@@ -60,5 +60,7 @@ export const ULW_LOOP_LEDGER_EVENT_KINDS = [
 	"criterion_failed",
 	"criterion_blocked",
 	"criteria_revised",
+	"batch_closed",
+	"batch_updated",
 ] as const satisfies readonly string[];
 export type UlwLoopLedgerEventKind = (typeof ULW_LOOP_LEDGER_EVENT_KINDS)[number];

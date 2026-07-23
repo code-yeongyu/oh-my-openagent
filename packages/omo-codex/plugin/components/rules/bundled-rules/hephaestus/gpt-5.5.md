@@ -74,7 +74,7 @@ Diagnostics catch type errors, not logic bugs; tests cover only what their autho
 
 # Global Review and Debugging Gate
 
-Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
+Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. Each passing review lane and debugging audit binds to the exact full commit SHA it reviewed. Immediately append a durable task-evidence/ledger record with its name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the record and require the exact lane/SHA pair; memory or an unstamped report is not coverage. Every missing pair at the current SHA still runs, and new commits require fresh applicable coverage. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
 
 # Failure Recovery
 

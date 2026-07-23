@@ -87,6 +87,7 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	}
 
 	const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
+		daemon: config.codegraph?.daemon === true,
 		env,
 		homeDir,
 		projectRoot,
@@ -110,6 +111,7 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 }
 
 async function isCodegraphProjectInitialized(options: {
+	readonly daemon: boolean;
 	readonly env: Record<string, string | undefined>;
 	readonly homeDir: string;
 	readonly projectRoot: string;
@@ -124,7 +126,7 @@ async function isCodegraphProjectInitialized(options: {
 
 	const invocation = resolveCodegraphCommandInvocation(resolved.command, [...resolved.argsPrefix, "status", "--json"]);
 	const codegraphEnv = {
-		...buildCodegraphEnv({ homeDir: options.homeDir }),
+		...buildCodegraphEnv({ daemon: options.daemon, homeDir: options.homeDir }),
 		...(options.trustedCodegraphInstallDir === undefined ? {} : { CODEGRAPH_INSTALL_DIR: options.trustedCodegraphInstallDir }),
 	};
 	const status = await runStatusProbe(

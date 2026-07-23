@@ -1,0 +1,28 @@
+Focused GREEN:
+- Initial planner + renderer proof: 27 pass, 0 fail, 94 assertions.
+- Reviewer blocker proof: 41 pass, 0 fail, 170 assertions.
+
+Package GREEN:
+- `bun test packages/senpi-task`
+- Result: 824 pass, 0 fail, 1 snapshot, 2776 assertions.
+- `bun run test:senpi`
+- Result after rebasing to current `dev`: 312 pass, 0 fail, 1 snapshot, 922 assertions.
+
+Type GREEN:
+- `tsgo --noEmit -p packages/senpi-task/tsconfig.json`
+- `tsgo --noEmit -p packages/omo-senpi/tsconfig.json`
+- `bun run typecheck`
+- Result: all commands exited 0.
+
+Build GREEN:
+- `mise exec bun@1.3.12 -- bun run build`
+- Result: all build steps completed with the CI-pinned Bun version.
+
+Post-rebase GREEN:
+- Branch base: `origin/dev@499b52358`.
+- `bun test packages/senpi-task`: 824 pass, 0 fail after one isolated pre-existing API-tripwire timeout was rerun successfully and the full suite then passed in one run.
+- Root typecheck, Senpi adapter gate, pinned build, direct surface driver, and xterm capture all passed.
+
+Behavior now observed:
+- Plain result: `task category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh) ...`
+- 72-column component: `task category:ultrabrain (openai GPT-5.6 Sol xhigh) background pending`

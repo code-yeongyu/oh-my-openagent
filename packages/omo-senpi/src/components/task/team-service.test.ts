@@ -136,6 +136,37 @@ function fakeManagedHandle(spec: ManagedStartSpec): ManagedChildHandle {
   }
 }
 
+describe("createTeamService curated agent gating", () => {
+  test("#given a team member spec naming a curated read-only agent #when team_create validates members #then the curated rejection message surfaces", async () => {
+    // given the real engine whose agent registry now carries the builtin curated agents
+    const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-curated-"))
+    tempRoots.push(cwd)
+    const pi = new FakeExtensionAPI()
+    const omoConfig = loadOmoConfig({ cwd }).config
+    const engine = composeTaskEngine({ pi, omoConfig, cwd, sharedParentTools: () => [] })
+    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "lead-session" } })
+    expect(Object.keys(engine.agents)).toContain("oracle")
+    const service = createTeamService({
+      manager: engine.manager,
+      runtime: engine.runtime,
+      settings: engine.settings,
+      omoConfig,
+      cwd,
+      agentNames: new Set(Object.keys(engine.agents)),
+    })
+
+    // when / then the member-validation path rejects the curated agent with the documented message
+    await expect(
+      service.createTeam({
+        inlineSpec: {
+          name: "curated-team",
+          members: [{ name: "oracle", kind: "subagent_type", subagent_type: "oracle", prompt: "review the plan" }],
+        },
+      }),
+    ).rejects.toThrow('curated read-only agent "oracle" cannot be a team member; delegate via the task tool instead')
+  })
+})
+
 describe("createTeamService lead messaging", () => {
   test("#given a mapped recipient task #when the lead sends #then the correlation event is persisted on the recipient task", async () => {
     // given

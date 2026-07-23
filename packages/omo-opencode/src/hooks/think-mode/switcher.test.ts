@@ -37,12 +37,14 @@ describe("think-mode switcher", () => {
         expect(variant).toBe("claude-opus-4-7-high")
       })
 
-      it("should handle claude-opus-4-7 high variant", () => {
-        // given a Claude Opus 4.7 model ID
-        const variant = getHighVariant("claude-opus-4-7")
+      it("should handle Claude Opus 4.7 and 4.8 high variants", () => {
+        // given Claude Opus model IDs
+        const opus47Variant = getHighVariant("claude-opus-4-7")
+        const opus48Variant = getHighVariant("claude-opus-4-8")
 
-        // then should return high variant
-        expect(variant).toBe("claude-opus-4-7-high")
+        // then each should return its high variant
+        expect(opus47Variant).toBe("claude-opus-4-7-high")
+        expect(opus48Variant).toBe("claude-opus-4-8-high")
       })
 
       it("should handle dots in GPT version numbers", () => {
@@ -74,6 +76,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high variants", () => {
         // given model IDs that are already high variants
         expect(getHighVariant("claude-opus-4-7-high")).toBeNull()
+        expect(getHighVariant("claude-opus-4-8-high")).toBeNull()
         expect(getHighVariant("gpt-5-4-high")).toBeNull()
         expect(getHighVariant("gemini-3-1-pro-high")).toBeNull()
       })
@@ -90,6 +93,7 @@ describe("think-mode switcher", () => {
     it("should detect -high suffix", () => {
       // given model IDs with -high suffix
       expect(isAlreadyHighVariant("claude-opus-4-7-high")).toBe(true)
+      expect(isAlreadyHighVariant("claude-opus-4-8-high")).toBe(true)
       expect(isAlreadyHighVariant("gpt-5-4-high")).toBe(true)
       expect(isAlreadyHighVariant("gemini-3.1-pro-high")).toBe(true)
     })
@@ -102,6 +106,7 @@ describe("think-mode switcher", () => {
     it("should return false for base models", () => {
       // given base model IDs without -high suffix
       expect(isAlreadyHighVariant("claude-opus-4-7")).toBe(false)
+      expect(isAlreadyHighVariant("claude-opus-4-8")).toBe(false)
       expect(isAlreadyHighVariant("claude-opus-4.7")).toBe(false)
       expect(isAlreadyHighVariant("gpt-5.4")).toBe(false)
       expect(isAlreadyHighVariant("gemini-3.1-pro")).toBe(false)

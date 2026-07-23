@@ -13,12 +13,17 @@ import {
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
-import { createWorktreeActiveBlock } from "./worktree-block"
+import { createPrDeliveryBlock, createWorktreeActiveBlock } from "./worktree-block"
 import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting an Atlas work session."
 const CONTEXT_INFO_MARKER = "<!-- omo-start-work-context -->"
+const COMMAND_INSTRUCTION_OPEN = "<command-instruction>"
+const COMMAND_INSTRUCTION_CLOSE = "</command-instruction>"
+const SESSION_CONTEXT_OPEN = "<session-context>"
+const SESSION_CONTEXT_CLOSE = "</session-context>"
+const RUNTIME_PLACEHOLDER_PATTERN = /\$SESSION_ID|\$TIMESTAMP/g
 
 interface StartWorkHookInput {
   sessionID: string
@@ -34,6 +39,101 @@ interface StartWorkCommandExecuteBeforeInput {
 interface StartWorkHookOutput {
   message?: Record<string, unknown>
   parts: Array<{ type: string; text?: string }>
+}
+
+type TextPart = StartWorkHookOutput["parts"][number]
+
+interface TextEntry {
+  readonly part: TextPart
+  readonly text: string
+  readonly start: number
+  readonly end: number
+}
+
+interface TextRange {
+  readonly start: number
+  readonly end: number
+}
+
+function findFrameworkSessionContextRanges(text: string): readonly TextRange[] {
+  const ranges: TextRange[] = []
+  let searchFrom = 0
+
+  while (searchFrom < text.length) {
+    const markerIndex = text.indexOf(START_WORK_TEMPLATE_MARKER, searchFrom)
+    if (markerIndex < 0) break
+
+    const instructionOpen = text.lastIndexOf(COMMAND_INSTRUCTION_OPEN, markerIndex)
+    const instructionBodyStart = instructionOpen + COMMAND_INSTRUCTION_OPEN.length
+    const instructionClose = text.indexOf(
+      COMMAND_INSTRUCTION_CLOSE,
+      markerIndex + START_WORK_TEMPLATE_MARKER.length,
+    )
+    if (
+      instructionOpen < searchFrom
+      || instructionClose < 0
+      || text.slice(instructionBodyStart, markerIndex).trim() !== ""
+    ) {
+      searchFrom = markerIndex + START_WORK_TEMPLATE_MARKER.length
+      continue
+    }
+
+    const instructionEnd = instructionClose + COMMAND_INSTRUCTION_CLOSE.length
+    const contextOpen = text.indexOf(SESSION_CONTEXT_OPEN, instructionEnd)
+    if (contextOpen < 0 || text.slice(instructionEnd, contextOpen).trim() !== "") {
+      searchFrom = instructionEnd
+      continue
+    }
+
+    const contextBodyStart = contextOpen + SESSION_CONTEXT_OPEN.length
+    const contextClose = text.indexOf(SESSION_CONTEXT_CLOSE, contextBodyStart)
+    if (contextClose < 0) {
+      searchFrom = contextBodyStart
+      continue
+    }
+
+    ranges.push({ start: contextBodyStart, end: contextClose })
+    searchFrom = contextClose + SESSION_CONTEXT_CLOSE.length
+  }
+
+  return ranges
+}
+
+function substituteSessionContextPlaceholders(
+  parts: TextPart[],
+  sessionId: string,
+  timestamp: string,
+): void {
+  let offset = 0
+  const entries: TextEntry[] = []
+  for (const part of parts) {
+    if (part.type !== "text" || !part.text) continue
+    entries.push({ part, text: part.text, start: offset, end: offset + part.text.length })
+    offset += part.text.length
+  }
+
+  const combinedText = entries.map((entry) => entry.text).join("")
+  const ranges = findFrameworkSessionContextRanges(combinedText)
+
+  for (const entry of entries) {
+    let cursor = 0
+    let substituted = ""
+    for (const range of ranges) {
+      const overlapStart = Math.max(entry.start, range.start)
+      const overlapEnd = Math.min(entry.end, range.end)
+      if (overlapStart >= overlapEnd) continue
+
+      const localStart = overlapStart - entry.start
+      const localEnd = overlapEnd - entry.start
+      substituted += entry.text.slice(cursor, localStart)
+      substituted += entry.text.slice(localStart, localEnd).replace(
+        RUNTIME_PLACEHOLDER_PATTERN,
+        (placeholder) => placeholder === "$SESSION_ID" ? sessionId : timestamp,
+      )
+      cursor = localEnd
+    }
+    entry.part.text = substituted + entry.text.slice(cursor)
+  }
 }
 
 function resolveWorktreeContext(
@@ -87,8 +187,9 @@ export function createStartWorkHook(ctx: PluginInput) {
     const sessionId = normalizeSessionId(input.sessionID, "opencode")
     const timestamp = new Date().toISOString()
 
-    const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
-    const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
+    const { planName: explicitPlanName, explicitWorktreePath, makePr, ship } = parseUserRequest(promptText)
+    const { worktreePath, block } = resolveWorktreeContext(explicitWorktreePath)
+    const worktreeBlock = block + createPrDeliveryBlock({ makePr, ship }, worktreePath)
     const preferredPlanPath = explicitPlanName
       ? null
       : await findRecentSessionPlanPath({
@@ -111,18 +212,15 @@ export function createStartWorkHook(ctx: PluginInput) {
       preferredPlanPath,
     })
 
-    // Substitute placeholders across every text part: on an error-retry path
-    // OpenCode may re-issue the original template alongside the already-
-    // processed text, leaving a second <session-context> block with un-
-    // substituted $SESSION_ID / $TIMESTAMP literals (#4480).
+    // Substitute placeholders in every raw session-context region: on an
+    // error-retry path OpenCode may re-issue the original template alongside
+    // the already-processed text (#4480).
     let firstTextIdx = -1
     let contextAlreadyInjected = false
+    substituteSessionContextPlaceholders(output.parts, sessionId, timestamp)
     for (let i = 0; i < output.parts.length; i++) {
       const part = output.parts[i]
       if (part.type !== "text" || !part.text) continue
-      part.text = part.text
-        .replace(/\$SESSION_ID/g, sessionId)
-        .replace(/\$TIMESTAMP/g, timestamp)
       if (part.text.includes(CONTEXT_INFO_MARKER)) {
         contextAlreadyInjected = true
       }

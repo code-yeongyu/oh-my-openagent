@@ -26,7 +26,12 @@ export function resolveLazyCodexPluginVersion(input: {
   readonly marketplaceName: string
   readonly pluginName: string
   readonly distributionManifest?: DistributionManifest
+  readonly versionOverride?: string
 }): string {
+  const override = input.versionOverride?.trim()
+  if (override !== undefined && override.length > 0) {
+    return override
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version
   }

@@ -1,5 +1,5 @@
 import type { CreatedHooks } from "../create-hooks"
-import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import { parseGoalCommand } from "../hooks/goal/command-arguments"
 import { log } from "../shared/logger"
 import { stopContinuation } from "./stop-continuation"
 
@@ -41,33 +41,30 @@ export function createCommandExecuteBeforeHandler(args: {
       stopContinuation({ directory, hooks, sessionID })
     }
 
-    if (hooks.ralphLoop && sessionID) {
-      if (normalizedCommand === "ralph-loop" || normalizedCommand === "ulw-loop") {
-        const parsedArguments = parseRalphLoopArguments(input.arguments || "")
-        const resumed = isRalphLoopResumeArgument(input.arguments || "")
-          && hooks.ralphLoop.resumeLoop?.(sessionID) === true
-        if (!resumed) {
-          hooks.ralphLoop.startLoop(sessionID, parsedArguments.prompt, {
-            ultrawork: normalizedCommand === "ulw-loop",
-            maxIterations: parsedArguments.maxIterations,
-            completionPromise: parsedArguments.completionPromise,
-            strategy: parsedArguments.strategy,
-          })
-        }
-        output.message ??= {}
-        output.message[NATIVE_LOOP_TRIGGERED_FLAG] = true
-        if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
-          hooks.stopContinuationGuard.clear(sessionID)
-          log("[stop-continuation] Stop state cleared by native command", {
-            sessionID,
-            command: normalizedCommand,
-          })
-        }
-      } else if (normalizedCommand === "cancel-ralph") {
-        hooks.ralphLoop.cancelLoop(sessionID)
-        output.message ??= {}
-        output.message[NATIVE_LOOP_TRIGGERED_FLAG] = true
+    if (hooks.goal && sessionID && normalizedCommand === "goal") {
+      const parsed = parseGoalCommand(input.arguments)
+      switch (parsed.kind) {
+        case "setObjective":
+          hooks.goal.setGoal(sessionID, parsed.objective)
+          break
+        case "setStatus":
+          if (parsed.status === "paused") {
+            hooks.goal.pauseGoal(sessionID)
+          } else {
+            hooks.goal.resumeGoal(sessionID)
+          }
+          break
+        case "clear":
+          hooks.goal.clearGoal(sessionID)
+          break
+        case "show":
+          // No side effect.
+          break
+        default:
+          break
       }
+      output.message ??= {}
+      output.message[NATIVE_LOOP_TRIGGERED_FLAG] = true
     }
 
     if (

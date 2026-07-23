@@ -22,9 +22,19 @@ export function createTaskTool(deps: TaskToolDeps): ToolDefinition<typeof TaskTo
     parameters: TaskToolParams,
     execute: (toolCallId, params, signal, onUpdate, ctx) => execute(toolCallId, params, signal, onUpdate, ctx),
     renderCall: (args, theme) => {
-      const lines = renderTaskCallLines(args, theme)
+      const resolvedModel = args.category === undefined ? undefined : deps.resolveCallModel?.(args)
+      const lines = renderTaskCallLines({
+        ...args,
+        ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+      }, theme)
       return linesComponent(lines.map((line) => theme.fg("toolTitle", line)))
     },
-    renderResult: (result, _options, theme) => renderTaskResultComponent(result.details, theme),
+    renderResult: (result, options, theme) => {
+      if (options.isPartial) {
+        const liveText = result.content.find((part) => part.type === "text")?.text
+        if (liveText !== undefined) return linesComponent(liveText.split("\n").map((line) => theme.fg("muted", line)))
+      }
+      return renderTaskResultComponent(result.details, theme)
+    },
   })
 }

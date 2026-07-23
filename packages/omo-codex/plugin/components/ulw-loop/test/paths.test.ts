@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact path tests predate this change.
 import { join, posix, win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";

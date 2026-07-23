@@ -28,6 +28,7 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
   - [Notification](#notification)
   - [MCPs](#mcps)
   - [LSP](#lsp)
+  - [CodeGraph](#codegraph)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
   - [Model Capabilities](#model-capabilities)
@@ -55,7 +56,7 @@ User config loads first. Project configs are discovered by walking from the work
 
 **Security note:** `mcp_env_allowlist` is user-only. Walked configs cannot extend it.
 
-**Rename compatibility:** The published package and CLI binary remain `oh-my-opencode`. OpenCode plugin registration prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. Config detection checks `oh-my-opencode` before `oh-my-openagent`, so if both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+**Rename compatibility:** OpenCode plugin registration and new config writes prefer `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. If both plugin config basenames exist in the same directory, the canonical `oh-my-openagent.*` file wins; update the canonical file only.
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
@@ -77,18 +78,18 @@ Here's a practical starting configuration:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.6 work best
+    // Main orchestrator: Claude Opus or Kimi K3 work best
     "sisyphus": {
-      "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
+      "model": "kimi-for-coding/kimi-k3",
+      "ultrawork": { "model": "anthropic/claude-opus-4-8", "variant": "max" },
     },
 
     // Research agents: cheap fast models are fine
     "librarian": { "model": "google/gemini-3-flash" },
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
-    // Architecture consultation: GPT-5.5 or Claude Opus
-    "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
+    // Architecture consultation: GPT-5.6 Sol or Claude Opus
+    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high" },
 
     // Prometheus inherits sisyphus model; just add prompt guidance
     "prometheus": {
@@ -104,10 +105,10 @@ Here's a practical starting configuration:
     "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
     // unspecified-high - complex work
-    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-8", "variant": "max" },
 
     // writing - docs/prose
-    "writing": { "model": "kimi-for-coding/k2p5" },
+    "writing": { "model": "kimi-for-coding/kimi-k3" },
 
     // visual-engineering - Gemini dominates visual tasks
     "visual-engineering": {
@@ -132,7 +133,7 @@ Here's a practical starting configuration:
       "zai-coding-plan": 10,
     },
     "modelConcurrency": {
-      "anthropic/claude-opus-4-7": 2,
+      "anthropic/claude-opus-4-8": 2,
       "opencode/gpt-5-nano": 20,
     },
   },
@@ -192,7 +193,7 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
 | `providerOptions` | object        | Provider-specific options                              |
 
-Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `shared/ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
+Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
 
 #### Anthropic Extended Thinking
 
@@ -239,10 +240,10 @@ Control what tools an agent can use:
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-7",
+      "model": "anthropic/claude-opus-4-8",
       "fallback_models": [
         // Simple string fallback
-        "openai/gpt-5.5",
+        "openai/gpt-5.6-sol",
         // Object with per-model settings
         {
           "model": "google/gemini-3.1-pro",
@@ -305,8 +306,8 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `openai/gpt-5.6-luna` (xhigh)   | General tasks, low effort                      |
-| `unspecified-high`   | `anthropic/claude-opus-4-7` (max) | General tasks, high effort                   |
-| `writing`            | `kimi-for-coding/k2p5`          | Documentation, prose, technical writing        |
+| `unspecified-high`   | `anthropic/claude-opus-4-8` (max) | General tasks, high effort                   |
+| `writing`            | `kimi-for-coding/kimi-k3`          | Documentation, prose, technical writing        |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -367,34 +368,34 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 #### Agent Provider Chains
 
-| Agent                 | Default Model       | Provider Priority                                                            |
-| --------------------- | ------------------- | ---------------------------------------------------------------------------- |
-| **Sisyphus**          | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `opencode-go\|vercel/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|bailian-coding-plan\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle` |
-| **Hephaestus**        | `gpt-5.6-sol`       | `openai\|vercel/gpt-5.6-sol (medium)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` |
-| **oracle**            | `gpt-5.5`           | `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `opencode-go\|vercel/glm-5.2` |
-| **librarian**         | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **explore**           | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **multimodal-looker** | `gpt-5.5`           | `openai\|opencode\|vercel/gpt-5.5 (medium)` → `opencode-go\|vercel/kimi-k2.6` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
-| **Prometheus**        | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (high)` → `opencode-go\|vercel/glm-5.2` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` |
-| **Metis**             | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (high)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/k2p5` |
-| **Momus**             | `gpt-5.6-sol`       | `openai\|vercel/gpt-5.6-sol (xhigh)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (xhigh)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
-| **Atlas**             | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k2.6` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
-| **Sisyphus-Junior**   | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k2.6` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
+| Agent | Default Model | Provider Priority |
+| --- | --- | --- |
+| **Sisyphus** | `claude-opus-4-8` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle` |
+| **Hephaestus** | `gpt-5.6-sol` | `openai\|github-copilot\|vercel\|opencode/gpt-5.6-sol (medium)` |
+| **Oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` |
+| **Librarian** | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **Explore** | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **Multimodal Looker** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (low)` → `opencode-go\|vercel/kimi-k3` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
+| **Prometheus** | `claude-opus-4-8` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` → `opencode-go\|vercel/glm-5.2` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` |
+| **Metis** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/kimi-k3` |
+| **Momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
+| **Atlas** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| **Sisyphus Junior** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
 
 #### Category Provider Chains
 
-This table documents the first entry of each hardcoded provider fallback chain, not the built-in category default shown above. For example, `writing` defaults to `kimi-for-coding/k2p5`, while its provider fallback chain starts with Gemini.
+This table documents the first entry of each hardcoded provider fallback chain, not the built-in category default shown above. For example, `writing` defaults to `kimi-for-coding/kimi-k3`, while its provider fallback chain starts with Gemini.
 
-| Category               | Provider Chain Primary | Provider Priority                                           |
-| ---------------------- | ------------------- | -------------------------------------------------------------- |
-| **visual-engineering** | `gemini-3.1-pro`    | `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/k2p5` |
-| **ultrabrain**         | `gpt-5.6-sol`       | `openai\|vercel/gpt-5.6-sol (xhigh)` → `openai\|opencode\|vercel/gpt-5.5 (xhigh)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `opencode-go\|vercel/glm-5.2` |
-| **deep**               | `gpt-5.6-terra`     | `openai\|vercel/gpt-5.6-terra (xhigh)` → `openai\|vercel/gpt-5.6-sol (high)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/kimi-k2.6` → `opencode-go\|vercel/glm-5.2` |
-| **artistry**           | `gemini-3.1-pro`    | `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` → `opencode-go\|vercel/kimi-k2.6` → `opencode-go\|vercel/glm-5.2` |
-| **quick**              | `gpt-5.4-mini`      | `openai\|github-copilot\|opencode\|vercel/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode\|vercel/gpt-5-nano` |
-| **unspecified-low**    | `gpt-5.6-luna`      | `openai\|vercel/gpt-5.6-luna (xhigh)` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.5 (medium)` → `opencode-go\|vercel/kimi-k2.6` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
-| **unspecified-high**   | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (high)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `kimi-for-coding/k2p5` → `opencode-go\|vercel/glm-5.2` → `opencode\|bailian-coding-plan\|vercel/kimi-k2.5` → `opencode\|bailian-coding-plan\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5` |
-| **writing**            | `gemini-3-flash`    | `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/kimi-k2.6` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| Category | Provider Chain Primary | Provider Priority |
+| --- | --- | --- |
+| **Visual Engineering** | `gemini-3.1-pro` | `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/kimi-k3` |
+| **Ultrabrain** | `gpt-5.6-sol` | `openai\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` |
+| **Deep** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (xhigh)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|github-copilot\|vercel/gpt-5.6-sol (high)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/glm-5.2` |
+| **Artistry** | `gemini-3.1-pro` | `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/glm-5.2` |
+| **Quick** | `gpt-5.4-mini` | `openai\|github-copilot\|opencode\|vercel/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode\|vercel/gpt-5-nano` |
+| **Unspecified Low** | `gpt-5.6-luna` | `openai\|vercel/gpt-5.6-luna (xhigh)` → `github-copilot/gpt-5.6-luna (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/kimi-k3` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| **Unspecified High** | `claude-opus-4-8` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `kimi-for-coding/kimi-k3` → `opencode-go\|vercel/glm-5.2` → `opencode\|bailian-coding-plan\|vercel\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` |
+| **Writing** | `gemini-3-flash` | `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/kimi-k3` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
 
 Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
 
@@ -412,7 +413,7 @@ Control parallel agent execution and concurrency limits.
     "defaultConcurrency": 5,
     "staleTimeoutMs": 180000,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
-    "modelConcurrency": { "anthropic/claude-opus-4-7": 2 }
+    "modelConcurrency": { "anthropic/claude-opus-4-8": 2 }
   }
 }
 ```
@@ -535,14 +536,14 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `codegraph-bootstrap`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `hephaestus-agents-md-injector`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
 
-Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, `tool-pair-validator`, and `thinking-block-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
+Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, and `tool-pair-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
 **Notes:**
 
 - `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
-- `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 and GPT-5.5 prompt paths.
+- `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing GPT-5.4 and the shared model-aware GPT-5.5/GPT-5.6 Sol prompt paths.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
 
 ### Commands
@@ -550,10 +551,10 @@ Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-
 Disable built-in commands via `disabled_commands`:
 
 ```json
-{ "disabled_commands": ["init-deep", "start-work"] }
+{ "disabled_commands": ["refactor", "start-work"] }
 ```
 
-Available commands: `init-deep`, `ralph-loop`, `ulw-loop`, `cancel-ralph`, `refactor`, `start-work`, `stop-continuation`, `handoff`
+Available commands: `goal`, `refactor`, `start-work`, `stop-continuation`, `remove-ai-slops`, `hyperplan`
 
 ### Browser Automation
 
@@ -649,6 +650,30 @@ To disable the LSP MCP entirely:
 { "disabled_mcps": ["lsp"] }
 ```
 
+### CodeGraph
+
+The `codegraph` MCP ships a pinned CodeGraph 1.4.1 binary; project stores built by older versions migrate automatically on first use, with no manual re-index. Two keys tune where it runs:
+
+```jsonc
+{
+  "codegraph": {
+    // Opt into the upstream shared daemon: one detached daemon per project
+    // serves every client, exits after about five minutes idle, and runs
+    // under an upstream PPID watchdog. Default false: each MCP process runs
+    // the index in-process (CODEGRAPH_NO_DAEMON=1 stays pinned).
+    "daemon": false,
+
+    // Extra exclude-only roots. Projects under these skip CodeGraph entirely.
+    // Entries may be absolute, ~-relative, or relative to the home directory.
+    "excluded_roots": ["~/scratch/codegraph"]
+  }
+}
+```
+
+An ambient `CODEGRAPH_NO_DAEMON=1` forces daemon-off even when `codegraph.daemon` is `true`. Inspect or stop running daemons with the upstream `codegraph daemon` command, an interactive picker that lists running daemons and stops the one you select.
+
+Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
+
 ---
 
 ## Advanced
@@ -714,9 +739,9 @@ Define `fallback_models` per agent or category:
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-7",
+      "model": "anthropic/claude-opus-4-8",
       "fallback_models": [
-        "openai/gpt-5.5",
+        "openai/gpt-5.6-sol",
         {
           "model": "google/gemini-3.1-pro",
           "variant": "high"
@@ -733,16 +758,16 @@ Define `fallback_models` per agent or category:
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-7",
+      "model": "anthropic/claude-opus-4-8",
       "fallback_models": [
-        "openai/gpt-5.5",
+        "openai/gpt-5.6-sol",
         {
           "model": "anthropic/claude-sonnet-4-6",
           "variant": "high",
           "thinking": { "type": "enabled", "budgetTokens": 12000 }
         },
         {
-          "model": "openai/gpt-5.5-codex",
+          "model": "openai/gpt-5.6-sol",
           "reasoningEffort": "high",
           "temperature": 0.2,
           "top_p": 0.95,
@@ -794,7 +819,7 @@ Use strings when you only need an ordered fallback chain:
       "model": "anthropic/claude-sonnet-4-6",
       "fallback_models": [
         "anthropic/claude-haiku-4-5",
-        "openai/gpt-5.5",
+        "openai/gpt-5.6-sol",
         "google/gemini-3.1-pro"
       ]
     }
@@ -810,11 +835,11 @@ If the primary model already establishes the provider, fallback entries can omit
 {
   "agents": {
     "atlas": {
-      "model": "openai/gpt-5.5",
+      "model": "openai/gpt-5.6-sol",
       "fallback_models": [
         "gpt-5.4-mini",
         {
-          "model": "gpt-5.5-codex",
+          "model": "gpt-5.6-sol",
           "reasoningEffort": "medium",
           "maxTokens": 4096
         }
@@ -824,7 +849,7 @@ If the primary model already establishes the provider, fallback entries can omit
 }
 ```
 
-In this example OmO treats `gpt-5.4-mini` and `gpt-5.5-codex` as OpenAI fallback entries because the current/default provider is already `openai`.
+In this example OmO treats `gpt-5.4-mini` and `gpt-5.6-sol` as OpenAI fallback entries because the current/default provider is already `openai`.
 
 **3. Mixed cross-provider chain**
 
@@ -834,9 +859,9 @@ Mix string entries and object entries when only some fallback models need specia
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-7",
+      "model": "anthropic/claude-opus-4-8",
       "fallback_models": [
-        "openai/gpt-5.5",
+        "openai/gpt-5.6-sol",
         {
           "model": "anthropic/claude-sonnet-4-6",
           "variant": "high",
@@ -860,15 +885,15 @@ Mix string entries and object entries when only some fallback models need specia
 {
   "categories": {
     "deep": {
-      "model": "openai/gpt-5.5-codex",
+      "model": "openai/gpt-5.6-sol",
       "fallback_models": [
         {
-          "model": "openai/gpt-5.5",
+          "model": "openai/gpt-5.6-sol",
           "reasoningEffort": "xhigh",
           "maxTokens": 12000
         },
         {
-          "model": "anthropic/claude-opus-4-7",
+          "model": "anthropic/claude-opus-4-8",
           "variant": "max",
           "temperature": 0.2
         },
@@ -887,10 +912,10 @@ This shows every supported object-style parameter in one place:
 {
   "agents": {
     "oracle": {
-      "model": "openai/gpt-5.5",
+      "model": "openai/gpt-5.6-sol",
       "fallback_models": [
         {
-          "model": "openai/gpt-5.5-codex(low)",
+          "model": "openai/gpt-5.6-sol(low)",
           "variant": "xhigh",
           "reasoningEffort": "high",
           "temperature": 0.3,
@@ -1084,11 +1109,11 @@ where early compaction would lose important context.
 
     // 1M lane: direct Anthropic, only for eligible long-context accounts/models.
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-6",
+      "model": "anthropic/claude-opus-4-8",
       "variant": "max"
     },
     "oracle": {
-      "model": "anthropic/claude-opus-4-6"
+      "model": "anthropic/claude-opus-4-8"
     }
   }
 }

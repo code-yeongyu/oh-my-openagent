@@ -1,0 +1,7 @@
+(fail) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.10ms]
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.11ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 19 roots exist with valid names [1.26ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.17ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [0.23ms]
+(fail) readOpencodeConfigAgents > handles malformed opencode.json gracefully [1.70ms]
+(fail) readOpencodeConfigAgents > returns empty record when no opencode.json exists [4.82ms]

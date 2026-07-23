@@ -27,6 +27,7 @@ import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderTaskCompletion } from "./renderers"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
 
@@ -45,6 +46,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   return {
     name: "task",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      // Unconditional omo process hygiene (T16): fires on session_start before any
+      // flag/capability gate can skip the rest of the component.
+      wireSessionStartProcessSweep(pi, ctx)
+
       registerTaskFlags(pi)
       if (pi.getFlag(TASK_ENABLED_FLAG) === false) {
         ctx.logger.info("omo-senpi task component disabled by flag")
@@ -111,7 +116,24 @@ function registerTaskFlags(pi: SenpiExtensionAPI): void {
 function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine, teamService: TeamToolsService): void {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
-  pi.registerTool({ ...createTaskTool({ manager, omoConfig: engine.omoConfig, agents: engine.agents }) })
+  pi.registerTool({
+    ...createTaskTool({
+      manager,
+      omoConfig: engine.omoConfig,
+      agents: engine.agents,
+      resolveCallModel: ({ category, model }) => {
+        if (category === undefined) return undefined
+        const resolution = engine.planner({
+          prompt: "",
+          parent_session_id: "",
+          depth: 0,
+          category,
+          ...(model === undefined ? {} : { model }),
+        })
+        return resolution.kind === "resolved" ? resolution.plan.resolved_model : undefined
+      },
+    }),
+  })
   pi.registerTool({
     ...createTaskSendTool({ manager, resolveCallerSessionId, teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL } }),
   })

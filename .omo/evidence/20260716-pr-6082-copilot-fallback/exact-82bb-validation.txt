@@ -1,0 +1,14 @@
+requested_base=82bb52a900a414d4fdd56e334ab6b31a2478f92d
+pr_source_head=2704556aa27ed870f239d53b2da5037099224b2c
+merge_tree=9653d2aff1867e84fb03b035463dd6d087b5bd37
+synthetic_merge_commit=b4c8a381a34d54463d69ba0cfbb30cd81809c49b
+
+focused_command=bun test packages/delegate-core/src/model-selection.test.ts packages/model-core/src/gpt-5.6-copilot-resolution.test.ts packages/model-core/src/model-settings-compatibility.test.ts packages/model-core/src/model-requirements-agents.test.ts packages/model-core/src/model-requirements-categories.test.ts packages/model-core/src/model-resolution-pipeline.test.ts packages/model-core/src/provider-model-id-transform.test.ts packages/model-core/src/model-capabilities/get-model-capabilities.test.ts packages/omo-opencode/src/agents/gpt-5.6-warm-cache-registration.test.ts packages/omo-opencode/src/cli/model-fallback.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts packages/omo-opencode/src/plugin-handlers/plan-model-inheritance.test.ts packages/omo-opencode/src/plugin-handlers/prometheus-agent-config-builder.test.ts packages/senpi-task/src/category/resolve-category.test.ts
+focused_result=211 passed, 0 failed, exit 0
+
+typecheck_command=bun run typecheck:packages
+typecheck_result=exit 0
+
+live_opencode_result=Copilot-only and Copilot-plus-Vercel isolated server scenarios passed against source head; custom-provider resolver probe passed
+host_session_count=5751 before, 5751 after
+cleanup=OpenCode processes stopped and temporary sandbox roots removed

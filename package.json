@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "4.17.1",
+  "version": "4.19.1",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -107,8 +107,10 @@
     "build": "bun run script/build.ts",
     "build:cli-node": "bun run script/build-cli-node.ts",
     "build:codex-install": "bun run script/build-codex-install.ts",
+    "install:codex-dev": "bun run script/build-codex-install.ts && bun run script/install-codex-dev.ts",
     "build:codex-plugin": "npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build",
-    "build:senpi-plugin": "node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
+    "build:senpi-plugin": "bun run build:lsp-daemon && bun run build:senpi-plugin:stage",
+    "build:senpi-plugin:stage": "bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs",
     "build:materialize-frontend": "node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict",
     "build:shared-skills-assets": "bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills",
     "build:lsp-tools-mcp": "npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build",
@@ -130,7 +132,7 @@
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
     "test": "bun test",
     "test:codex": "bun run build:codex-install && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && npm --prefix packages/omo-codex/plugin/components/ulw-loop test && bun run --cwd packages/omo-codex/plugin build && npm --prefix packages/omo-codex/plugin/components/codegraph run typecheck && npm --prefix packages/omo-codex/plugin/components/codegraph test && node scripts/check-third-party-notices.mjs --ship && bun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts packages/omo-codex/src/install/codex-cache.test.ts packages/omo-codex/src/install/codex-cleanup.test.ts packages/omo-codex/src/install/codex-config-agent-cleanup.test.ts packages/omo-codex/src/install/codex-config-autonomous-features.test.ts packages/omo-codex/src/install/codex-config-reasoning.test.ts packages/omo-codex/src/install/codex-config-toml.test.ts packages/omo-codex/src/install/codex-project-local-cleanup.test.ts packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts packages/omo-codex/src/install/install-codex.test.ts packages/omo-codex/src/install/install-codex-packaged.test.ts packages/omo-codex/src/install/link-cached-plugin-agents.test.ts packages/omo-codex/src/**/*.test.ts packages/utils/src/jsonc-parser.test.ts packages/utils/src/frontmatter.test.ts packages/hashline-core/src/hash-computation.test.ts packages/hashline-core/src/smoke-untested-modules.test.ts packages/rules-engine/src/index.test.ts packages/rules-engine/src/security-boundary.test.ts packages/agents-md-core/src/injector.test.ts packages/omo-codex/plugin/components/lsp/test/package-smoke.test.ts && node --test packages/omo-codex/plugin/test/*.test.mjs packages/omo-codex/scripts/install-cache-copy.test.mjs packages/omo-codex/scripts/install-cli-args.test.mjs packages/omo-codex/scripts/install-delegated-command.test.mjs packages/omo-codex/scripts/install-config-autonomous-features.test.mjs packages/omo-codex/scripts/install-config-autonomous.test.mjs packages/omo-codex/scripts/install-config-reasoning.test.mjs packages/omo-codex/scripts/install-config.test.mjs packages/omo-codex/scripts/install-hook-targets.test.mjs packages/omo-codex/scripts/install-project-local-cleanup.test.mjs packages/omo-codex/scripts/install-lazycodex-version-stamp.test.mjs packages/omo-codex/scripts/install-local-entrypoint.test.mjs packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs packages/omo-codex/scripts/install-local.test.mjs packages/omo-codex/scripts/install-marketplace-cache.test.mjs packages/omo-codex/scripts/install-mcp-context7-runtime.test.mjs packages/omo-codex/scripts/install-mcp-runtime.test.mjs packages/omo-codex/scripts/install-packaged-local.test.mjs packages/omo-codex/scripts/install-generated-bundle.test.mjs packages/omo-codex/scripts/install-agent-links.test.mjs packages/omo-codex/scripts/install-bin-links.test.mjs",
-    "test:senpi": "node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && bun test packages/omo-senpi",
+    "test:senpi": "bun run build:senpi-plugin && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && bun test packages/omo-senpi",
     "test:windows-codex": "bun run test:codex",
     "build:git-bash-mcp": "bun run --cwd packages/git-bash-mcp build"
   },
@@ -170,7 +172,6 @@
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.4",
     "posthog-node": "^5.34.3",
-    "vscode-jsonrpc": "^8.2.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -211,18 +212,18 @@
     "typescript": "^6.0.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.17.1",
-    "oh-my-opencode-darwin-x64": "4.17.1",
-    "oh-my-opencode-darwin-x64-baseline": "4.17.1",
-    "oh-my-opencode-linux-arm64": "4.17.1",
-    "oh-my-opencode-linux-arm64-musl": "4.17.1",
-    "oh-my-opencode-linux-x64": "4.17.1",
-    "oh-my-opencode-linux-x64-baseline": "4.17.1",
-    "oh-my-opencode-linux-x64-musl": "4.17.1",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.17.1",
-    "oh-my-opencode-windows-arm64": "4.17.1",
-    "oh-my-opencode-windows-x64": "4.17.1",
-    "oh-my-opencode-windows-x64-baseline": "4.17.1"
+    "oh-my-opencode-darwin-arm64": "4.19.1",
+    "oh-my-opencode-darwin-x64": "4.19.1",
+    "oh-my-opencode-darwin-x64-baseline": "4.19.1",
+    "oh-my-opencode-linux-arm64": "4.19.1",
+    "oh-my-opencode-linux-arm64-musl": "4.19.1",
+    "oh-my-opencode-linux-x64": "4.19.1",
+    "oh-my-opencode-linux-x64-baseline": "4.19.1",
+    "oh-my-opencode-linux-x64-musl": "4.19.1",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.19.1",
+    "oh-my-opencode-windows-arm64": "4.19.1",
+    "oh-my-opencode-windows-x64": "4.19.1",
+    "oh-my-opencode-windows-x64-baseline": "4.19.1"
   },
   "overrides": {
     "@earendil-works/pi-agent-core": "0.80.3",

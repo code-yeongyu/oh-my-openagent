@@ -15,7 +15,7 @@
  * (#3777, #4527).
  */
 export const MODEL_VERSION_MAP: Record<string, string> = {
-  "anthropic/claude-opus-4-4": "anthropic/claude-opus-4-7",
+  "anthropic/claude-opus-4-4": "anthropic/claude-opus-4-8",
 }
 
 const CURRENT_USER_SELECTABLE_MODELS = new Set([

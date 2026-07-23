@@ -16,6 +16,7 @@ export async function validateLazycodexPluginBundle(
   }
   await validatePluginMcpManifests(pluginRoot, issues)
   await validatePluginHookCommands(pluginRoot, issues)
+  await validatePluginManagedBins(pluginRoot, issues)
   if (issues.length > 0) {
     throw new Error(
       `lazycodex plugin bundle validation failed with ${issues.length} broken referenced target(s):\n${issues
@@ -80,6 +81,42 @@ async function validatePluginHookCommands(pluginRoot: string, issues: string[]):
       }
     }
   }
+}
+
+// Codex links every component package.json "bin" as a managed bin; a missing target leaves the
+// installer repairing a dangling bin on every session even when no hook references the CLI
+// (lazycodex#108: omo-start-work-continuation, omo-ulw-loop, ulw, ulw-loop).
+async function validatePluginManagedBins(pluginRoot: string, issues: string[]): Promise<void> {
+  const componentsRoot = join(pluginRoot, "components")
+  let entries
+  try {
+    entries = await readdir(componentsRoot, { withFileTypes: true })
+  } catch (error) {
+    if (error instanceof Error) return
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    for (const binTarget of await readBinTargets(join(componentsRoot, entry.name, "package.json"))) {
+      // Marketplace payload paths are POSIX; join() would emit backslashes on win32.
+      const relativePath = join("components", entry.name, binTarget).split(sep).join("/")
+      await collectBundleFileIssue(pluginRoot, pluginRoot, relativePath, "missing managed bin target", issues, {
+        allowEscape: false,
+      })
+    }
+  }
+}
+
+async function readBinTargets(manifestPath: string): Promise<string[]> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readFile(manifestPath, "utf8"))
+  } catch (error) {
+    if (error instanceof Error) return []
+    return []
+  }
+  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.bin)) return []
+  return Object.values(parsed.bin).filter((target): target is string => typeof target === "string")
 }
 
 async function findHookManifestPaths(root: string): Promise<string[]> {

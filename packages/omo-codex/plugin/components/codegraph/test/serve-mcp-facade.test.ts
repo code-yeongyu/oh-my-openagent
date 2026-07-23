@@ -47,7 +47,7 @@ describe("runCodegraphServe MCP unavailable facade", () => {
 			result: {
 				capabilities: { tools: { listChanged: false } },
 				protocolVersion: "2025-06-18",
-				serverInfo: { name: "codegraph", version: "1.0.1" },
+				serverInfo: { name: "codegraph", version: "1.4.1" },
 			},
 		});
 	});

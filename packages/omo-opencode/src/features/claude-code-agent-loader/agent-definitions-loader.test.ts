@@ -127,7 +127,7 @@ Prompt.`
 
       const result = parseMarkdownAgentFile(filePath, "definition-file", "kiro")
 
-      expect(result?.config.model).toBe("kiro/claude-opus-4-7")
+      expect(result?.config.model).toBe("kiro/claude-opus-4-8")
     })
   })
 

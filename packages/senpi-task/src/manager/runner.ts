@@ -13,6 +13,7 @@ export type InProcessSessionContext = {
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
   readonly model?: CreateAgentSessionOptions["model"]
+  readonly thinkingLevel?: CreateAgentSessionOptions["thinkingLevel"]
 }
 
 export type InProcessSessionContextProvider = (spec: ManagedStartSpec) => InProcessSessionContext
@@ -48,6 +49,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         // A detached rpc child cannot share the parent's in-memory model registry; thread the resolved
         // provider/modelId so the child resolves the requested model on its own command line.
         ...(spec.model !== undefined ? { model: spec.model } : {}),
+        ...(spec.variant !== undefined ? { variant: spec.variant } : {}),
         ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
       }
@@ -68,6 +70,7 @@ function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): 
     ...(context.authStorage !== undefined ? { authStorage: context.authStorage } : {}),
     ...(context.modelRegistry !== undefined ? { modelRegistry: context.modelRegistry } : {}),
     ...(context.model !== undefined ? { model: context.model } : {}),
+    ...(context.thinkingLevel !== undefined ? { thinkingLevel: context.thinkingLevel } : {}),
     ...(spec.agentType !== undefined ? { agentType: spec.agentType } : {}),
     ...(spec.instructions !== undefined ? { instructions: spec.instructions } : {}),
     ...(spec.toolAllowlist !== undefined ? { toolAllowlist: spec.toolAllowlist } : {}),

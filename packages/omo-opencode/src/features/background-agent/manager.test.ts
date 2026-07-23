@@ -162,7 +162,10 @@ class MockBackgroundManager {
     }
 
     if (existingTask.status === "running") {
-      return existingTask
+      throw new Error(
+        `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
+        "Wait for it to complete before resuming it with task_id.",
+      )
     }
 
     this.resumeCalls.push({ sessionId: input.sessionId, prompt: input.prompt })
@@ -281,6 +284,12 @@ function getDispatchedParentWakes(manager: BackgroundManager): Map<string, Pendi
   }>(manager)).parentWakeNotifier.getDispatchedParentWakes()
 }
 
+function getPendingParentWakeTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return (cast<{
+    parentWakeNotifier: { getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>> }
+  }>(manager)).parentWakeNotifier.getPendingParentWakeTimers()
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return (cast<{ completionTimers: Map<string, ReturnType<typeof setTimeout>> }>(manager)).completionTimers
 }
@@ -334,12 +343,39 @@ async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<v
   }
 }
 
-// Awaits the debounced parent-wake flush to settle by racing the real
-// onScheduledFlushSettled signal against a bounded state poll, so scheduled
-// flushes resolve on the signal (~100ms debounce) and direct-flush flows
-// resolve when their observable settles — replacing blind 400ms sleeps.
+// Awaits the debounced parent-wake flush to settle. Captures the settled-flush
+// count at entry (the flush is scheduled but still pending here), then awaits
+// count > captured — so a settle landing between this call and registration is
+// not missed.
+//
+// When a flush is armed (a pending wake or its debounce timer exists), the
+// scheduled flush's `finally` is GUARANTEED to fire onScheduledFlushSettled, so
+// await that real signal with no competing wall-clock deadline. Racing a fixed
+// state-poll timeout here is what made this flaky on slow (Windows CI) runners:
+// the ~100ms debounce plus the async dispatch could outlast the poll cap, so the
+// poll resolved by TIMEOUT — not by the predicate — tearing the test down before
+// promptAsync ran (observed as promptCalls.length 0). If the flush ever fails to
+// settle it now surfaces as a loud per-test timeout, never a silent false pass.
+//
+// Only when no flush is armed (settle can never fire) do we fall back to a
+// bounded state-drain so the helper never hangs.
 function waitForCoalescedFlush(manager: BackgroundManager, sessionID: string): Promise<void> {
-  return awaitFlushWithFallback(manager, sessionID)
+  const api = cast<{
+    getScheduledFlushSettledCount: (id: string) => number
+    awaitScheduledFlush: (id: string, sinceCount: number) => Promise<void>
+  }>(manager)
+  const sinceCount = api.getScheduledFlushSettledCount(sessionID)
+  const settled = api.awaitScheduledFlush(sessionID, sinceCount)
+  const flushArmed =
+    getPendingParentWakes(manager).has(sessionID) || getPendingParentWakeTimers(manager).has(sessionID)
+  if (flushArmed) {
+    return settled
+  }
+  const drained = waitUntil(
+    () => !getPendingParentWakes(manager).has(sessionID) || getDispatchedParentWakes(manager).has(sessionID),
+    600,
+  )
+  return Promise.race([settled, drained])
 }
 
 function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string): Promise<void> {
@@ -351,24 +387,6 @@ function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string)
 // the async late-error handling settles — instead of blindly sleeping 260ms.
 function waitForParentWakeErrorSettle(manager: BackgroundManager, sessionID: string): Promise<void> {
   return waitUntil(() => !getDispatchedParentWakes(manager).has(sessionID), 600)
-}
-
-// Capture the settled-flush count at entry (the debounced flush is scheduled but
-// still pending here), then await count > captured — so a settle that lands
-// between this call and registration is not missed. A bounded state-drain covers
-// flows that never schedule a flush (never hangs).
-function awaitFlushWithFallback(manager: BackgroundManager, sessionID: string): Promise<void> {
-  const api = cast<{
-    getScheduledFlushSettledCount: (id: string) => number
-    awaitScheduledFlush: (id: string, sinceCount: number) => Promise<void>
-  }>(manager)
-  const sinceCount = api.getScheduledFlushSettledCount(sessionID)
-  const settled = api.awaitScheduledFlush(sessionID, sinceCount)
-  const drained = waitUntil(
-    () => !getPendingParentWakes(manager).has(sessionID) || getDispatchedParentWakes(manager).has(sessionID),
-    600,
-  )
-  return Promise.race([settled, drained])
 }
 
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
@@ -1795,7 +1813,7 @@ describe("BackgroundManager.resume", () => {
     expect(result.progress?.toolCalls).toBe(42)
   })
 
-  test("should ignore resume when task is already running", () => {
+  test("should reject resume when task is already running", () => {
     // given
     const runningTask = createMockTask({
       id: "task-a",
@@ -1806,15 +1824,18 @@ describe("BackgroundManager.resume", () => {
     manager.addTask(runningTask)
 
     // when
-    const result = manager.resume({
+    expect(() => manager.resume({
       sessionId: "session-a",
-      prompt: "resume should be ignored",
+      prompt: "resume should be rejected",
       parentSessionId: "new-parent",
       parentMessageId: "new-msg",
-    })
+    })).toThrow(
+      "Task task-a is currently running and cannot accept a continuation prompt",
+    )
 
     // then
-    expect(result.parentSessionId).toBe("session-parent")
+    expect(runningTask.parentSessionId).toBe("session-parent")
+    expect(runningTask.parentMessageId).toBe("mock-message-id")
     expect(manager.resumeCalls).toHaveLength(0)
   })
 })
@@ -2973,6 +2994,70 @@ describe("BackgroundManager.resume concurrency key", () => {
     const concurrencyManager = getConcurrencyManager(manager)
     expect(concurrencyManager.getCount("anthropic")).toBe(1)
     expect(task.concurrencyKey).toBe("anthropic")
+  })
+})
+
+describe("BackgroundManager.resume running-task guard", () => {
+  test("rejects a running task without changing parent context or dispatching a prompt", async () => {
+    //#given
+    const promptCalls: string[] = []
+    const client = {
+      session: {
+        prompt: async () => {
+          promptCalls.push("prompt")
+          return {}
+        },
+        promptAsync: async () => {
+          promptCalls.push("promptAsync")
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const sessionId = "session-running-resume"
+    const task: BackgroundTask = {
+      id: "task-running-resume",
+      sessionId,
+      parentSessionId: "parent-session-original",
+      parentMessageId: "parent-message-original",
+      parentModel: { providerID: "openai", modelID: "gpt-5.4" },
+      parentAgent: "sisyphus",
+      parentTools: { task: false },
+      description: "running task",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    try {
+      //#when
+      await expectRejectsWithMessage(
+        manager.resume({
+          sessionId,
+          prompt: "continuation prompt",
+          parentSessionId: "parent-session-new",
+          parentMessageId: "parent-message-new",
+          parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+          parentAgent: "atlas",
+          parentTools: { task: true },
+        }),
+        "Task task-running-resume is currently running and cannot accept a continuation prompt",
+      )
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.parentSessionId).toBe("parent-session-original")
+      expect(task.parentMessageId).toBe("parent-message-original")
+      expect(task.parentModel).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(task.parentAgent).toBe("sisyphus")
+      expect(task.parentTools).toEqual({ task: false })
+      expect(promptCalls).toEqual([])
+    } finally {
+      manager.shutdown()
+    }
   })
 })
 

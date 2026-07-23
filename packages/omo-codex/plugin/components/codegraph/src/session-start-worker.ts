@@ -6,6 +6,7 @@ import { cwd as processCwd, env as processEnv, execPath as processExecPath, stde
 
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
 import {
@@ -25,7 +26,7 @@ import type {
 
 export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 
-const CODEGRAPH_VERSION = "1.0.1";
+const CODEGRAPH_VERSION = CODEGRAPH_PINNED_VERSION;
 const COMMAND_TIMEOUT_MS = 60_000;
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
@@ -127,7 +128,10 @@ async function resolveOrProvisionCommand(
 }
 
 function codegraphEnvForConfig(config: CodegraphBootstrapConfig, homeDir: string): Record<string, string> {
-	const env = buildCodegraphEnv({ homeDir });
+	// The detached indexing worker must NEVER engage the upstream daemon, even
+	// when the user opted into daemon mode for interactive MCP sessions: a
+	// daemon-backed init/sync would outlive and race the worker's lifecycle.
+	const env = buildCodegraphEnv({ daemon: false, homeDir });
 	return config.trustedCodegraphInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.trustedCodegraphInstallDir };
 }
 

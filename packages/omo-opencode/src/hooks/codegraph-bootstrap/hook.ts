@@ -3,14 +3,18 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 import {
+  CODEGRAPH_PINNED_VERSION,
   buildCodegraphEnv,
   ensureCodegraphGitignored,
   ensureCodegraphProvisioned,
   prepareCodegraphWorkspace,
   resolveCodegraphCommand,
   resolveCodegraphNodeSupport,
+  shouldExcludeCodegraphProject,
   type BuildCodegraphEnvOptions,
   type CodegraphCommandResolution,
+  type CodegraphProjectExclusionDecision,
+  type CodegraphProjectExclusionOptions,
   type CodegraphNodeSupport,
   type CodegraphProvisionResult,
   type CodegraphWorkspacePreparation,
@@ -39,10 +43,14 @@ export interface CodegraphBootstrapEventInput {
 export interface CodegraphBootstrapDeps {
   readonly buildEnv: (options?: BuildCodegraphEnvOptions) => Record<string, string>
   readonly ensureGitignored: (projectRoot: string) => boolean
+  readonly excludeProject: (
+    projectRoot: string,
+    options?: CodegraphProjectExclusionOptions,
+  ) => CodegraphProjectExclusionDecision
   readonly ensureProvisioned: (options: {
     readonly installDir?: string
     readonly lockDir: string
-    readonly version: "1.0.1"
+    readonly version: typeof CODEGRAPH_PINNED_VERSION
   }) => Promise<CodegraphProvisionResult>
   readonly log: (message: string, data?: Record<string, unknown>) => void
   readonly nodeSupport: () => CodegraphNodeSupport
@@ -60,7 +68,7 @@ export interface CodegraphBootstrapDeps {
   readonly schedule: (task: () => Promise<void>) => void
 }
 
-const CODEGRAPH_VERSION = "1.0.1"
+const CODEGRAPH_VERSION = CODEGRAPH_PINNED_VERSION
 const COMMAND_TIMEOUT_MS = 60_000
 const bootstrappedProjects = new Set<string>()
 
@@ -196,6 +204,7 @@ async function runBootstrap(
 const defaultDeps: CodegraphBootstrapDeps = {
   buildEnv: buildCodegraphEnv,
   ensureGitignored: ensureCodegraphGitignored,
+  excludeProject: shouldExcludeCodegraphProject,
   ensureProvisioned: ensureCodegraphProvisioned,
   log,
   nodeSupport: resolveCodegraphNodeSupport,
@@ -225,6 +234,19 @@ export function createCodegraphBootstrapHook(
 
         const projectRoot = resolveCodegraphProjectRoot(input.event.properties, ctx.directory)
         if (bootstrappedProjects.has(projectRoot)) return
+
+        const excludedRoots = codegraphConfig.excluded_roots
+        const exclusion = deps.excludeProject(projectRoot, {
+          ...(excludedRoots === undefined ? {} : { excludedRoots }),
+        })
+        if (exclusion.excluded) {
+          deps.log("[codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap", {
+            matchedRoot: exclusion.matchedRoot,
+            projectRoot,
+            reason: exclusion.reason,
+          })
+          return
+        }
 
         bootstrappedProjects.add(projectRoot)
         deps.schedule(() => runBootstrap(projectRoot, codegraphConfig, deps))

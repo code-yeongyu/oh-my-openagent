@@ -82,3 +82,5 @@ The wording changes, the test fails, and the next engineer edits the assertion t
 - "Skill X loads when requested and is absent when not" -> test inclusion + exclusion
 
 Test what would break the **behavior**. Never test what would only break a **diff**.
+
+**DELEGATION:** when you hand test-writing to a subagent, give it the behavior the test must distinguish ("fails if override precedence breaks"), NEVER a ready-made assertion string, prompt fragment, expected pass/assert count, or "marker already used by current tests". A prescribed mechanism that is wrong gets implemented faithfully — the defect ships behind a green suite, exactly what this rule exists to prevent. Nearby `toContain("<sentence>")` tests are existing violations, not a convention to follow.

@@ -1,6 +1,6 @@
 {
 	"name": "@sisyphuslabs/codex-teammode",
-	"version": "4.17.1",
+	"version": "4.19.1",
 	"description": "Codex team-mode hook component that keeps background thread titles descriptive after create_thread.",
 	"type": "module",
 	"private": true,

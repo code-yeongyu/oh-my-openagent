@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
+import { isGpt5_5Model, isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
 import {
   getSessionAgent,
   resolveRegisteredAgentName,
@@ -11,7 +11,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
 const TOAST_MESSAGE = [
   "Sisyphus works best with Claude Opus, and works fine with Kimi/GLM models.",
-  "Do NOT use Sisyphus with GPT (except GPT-5.4 and GPT-5.5 which have specialized support).",
+  "Do NOT use Sisyphus with GPT (except GPT-5.4, GPT-5.5, and GPT-5.6 Sol, which have GPT-native prompt support).",
   "For other GPT models, always use Hephaestus.",
 ].join("\n")
 function showToast(ctx: PluginInput, sessionID: string): void {
@@ -31,6 +31,8 @@ function showToast(ctx: PluginInput, sessionID: string): void {
 }
 
 function getNativeSisyphusGptVariant(model: { providerID: string; modelID: string }): string | undefined {
+  if (isGpt5_5Model(model.modelID)) return "medium"
+
   const chain = AGENT_MODEL_REQUIREMENTS["sisyphus"]?.fallbackChain ?? []
   const exactMatch = chain.find((entry) =>
     entry.providers.includes(model.providerID) && entry.model === model.modelID

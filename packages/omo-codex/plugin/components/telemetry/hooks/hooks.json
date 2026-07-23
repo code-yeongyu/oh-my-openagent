@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook session-start",
 						"timeout": 5,
-						"statusMessage": "(OmO 4.17.1) Recording Session Telemetry"
+						"statusMessage": "(OmO 4.19.1) Recording Session Telemetry"
 					}
 				]
 			}

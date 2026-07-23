@@ -7,6 +7,7 @@ import {
 	runJsonRpcStdioServer,
 	successResponse,
 	type JsonRpcResponse,
+	type ParentWatchdogConfig,
 } from "../../../../../mcp-stdio-core/src/index.ts";
 
 export interface UnavailableCodegraphMcpOptions {
@@ -14,6 +15,9 @@ export interface UnavailableCodegraphMcpOptions {
 	readonly output: Writable;
 	readonly reason: string;
 	readonly serverVersion: string;
+	// Test seam: production callers leave this unset so the watchdog uses its
+	// defaults (parentPid = process.ppid, 30s poll).
+	readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 interface UnavailableCodegraphMcpHandlerOptions {
@@ -32,6 +36,7 @@ export async function runUnavailableCodegraphMcpServer(
 		},
 		input: options.input,
 		output: options.output,
+		parentWatchdog: options.parentWatchdog ?? {},
 	});
 }
 

@@ -84,6 +84,8 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
       }
     case "timed_out":
       return { color: "warning", text: `task_output timed out ${details.task_id} after ${details.waited_ms}ms` }
+    case "waiting":
+      return { color: "toolTitle", text: details.progress.activity }
     case "not_found":
       return { color: "error", text: notFoundRow(details) }
     case "invalid_arguments":

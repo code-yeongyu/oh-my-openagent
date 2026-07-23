@@ -85,6 +85,112 @@ You are starting an Atlas work session.
   })
 })
 
+describe("start-work PR delivery flags", () => {
+  let testDir: string
+
+  function createStartWorkPromptWithArgs(args: string): string {
+    return `<command-instruction>
+You are starting an Atlas work session.
+</command-instruction>
+
+<session-context>
+Session ID: $SESSION_ID
+</session-context>
+
+<user-request>
+${args}
+</user-request>`
+  }
+
+  function createHookForDir(dir: string) {
+    return createStartWorkHook(unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
+      directory: dir,
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }))
+  }
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `start-work-hook-pr-delivery-${randomUUID()}`)
+    mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
+    writeFileSync(join(testDir, ".omo", "plans", "work.md"), "# Work\n- [ ] First task\n")
+    clearBoulderState(testDir)
+  })
+
+  afterEach(() => {
+    clearBoulderState(testDir)
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given --make-pr without worktree #when processing #then injected context instructs task-owned worktree and PR delivery", async () => {
+    // given
+    const hook = createHookForDir(testDir)
+    const output = {
+      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work --make-pr") }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "pr-sess" }, output)
+    const injected = output.parts[0].text
+
+    // then
+    expect(injected).toContain("PR Delivery Mode")
+    expect(injected).toContain("git worktree add")
+    expect(injected).not.toContain("until the PR is MERGED")
+  })
+
+  test("#given --ship #when processing #then injected context includes the merge lifecycle", async () => {
+    // given
+    const hook = createHookForDir(testDir)
+    const output = {
+      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work --ship") }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "ship-sess" }, output)
+    const injected = output.parts[0].text
+
+    // then
+    expect(injected).toContain("PR Delivery Mode")
+    expect(injected).toContain("until the PR is MERGED")
+  })
+
+  test("#given plain start-work #when processing #then no PR delivery block is injected", async () => {
+    // given
+    const hook = createHookForDir(testDir)
+    const output = {
+      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work") }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "plain-sess" }, output)
+    const injected = output.parts[0].text
+
+    // then
+    expect(injected).not.toContain("PR Delivery Mode")
+  })
+
+  test("#given --make-pr flag #when parsing plan name #then flag does not leak into boulder plan selection", async () => {
+    // given
+    const hook = createHookForDir(testDir)
+    const output = {
+      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work --make-pr") }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "leak-sess" }, output)
+    const state = readBoulderState(testDir)
+
+    // then
+    expect(state?.plan_name).toBe("work")
+  })
+})
+
 describe("start-work template label matches the activated agent (#5499)", () => {
   test("#given /start-work activates Atlas #when reading the shipped template header #then it announces an Atlas work session, not Sisyphus", () => {
     // /start-work activates the atlas agent (see createStartWorkHook), so the

@@ -10,7 +10,7 @@ import type {
   SendOutcome,
 } from "../steering"
 import type { TaskRecordStore } from "../store"
-import type { ManagedChildHandle } from "./child-handle"
+import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
 import type { ExecutionMode } from "./execution-mode"
 
 export type { ExecutionMode } from "./execution-mode"
@@ -26,6 +26,7 @@ export type ManagedStartSpec = {
   readonly parentSessionId: string
   readonly rootSessionId: string
   readonly model?: string
+  readonly variant?: string
   readonly agentType?: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
@@ -60,6 +61,7 @@ export type ManagerStartSpec = {
 export type ResolvedChildPlan = {
   readonly model: string
   readonly resolved_model?: ResolvedModelRecord
+  readonly variant?: string
   readonly agentExecutionMode?: ExecutionMode
   readonly agentType?: string
   readonly category?: string
@@ -73,6 +75,7 @@ export type ResolvedChildPlan = {
 export type PlanResolutionError = {
   readonly code: "unknown_target" | "model_unavailable" | "category_disabled" | "invalid_target"
   readonly message: string
+  readonly availableAgents?: readonly string[]
   readonly availableCategories?: readonly string[]
 }
 
@@ -166,6 +169,9 @@ export type TaskManagerOptions = {
   // Resolves launch inputs from the current runtime. Persisted task records never supply executable
   // extensions or environment during a respawn.
   readonly trustedRespawnLaunch?: TrustedRespawnLaunchResolver
+  // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
+  // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
+  readonly hostPid?: number
 }
 
 export type TaskManager = {
@@ -183,6 +189,8 @@ export type TaskManager = {
   // Live-handle read seam for the wiring's ResidencyRegistry (W1-V F7: registry and #live share one
   // forget path). Returns the ManagedChildHandle for a task this process still owns, if any.
   getResidentHandle(taskId: string): ManagedChildHandle | undefined
+  // Subscribe at the runner-agnostic handle seam now or when a queued task is promoted.
+  subscribeChild(taskId: string, listener: ManagedChildListener): () => void
   residentTaskIds(): readonly string[]
   // Whether a task was spawned run_in_background, so the store-terminal completion bridge only
   // notifies background terminals (sync spawns are awaited inline by the tool).

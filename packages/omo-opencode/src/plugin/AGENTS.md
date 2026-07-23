@@ -1,6 +1,6 @@
-# src/plugin/ — 12 OpenCode Hook Handlers + Hook Composition
+# src/plugin/ -- 12 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-07-03
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -11,16 +11,16 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | File | OpenCode Hook | Purpose |
 |------|---------------|---------|
 | `config.ts` | `config` | 6-phase config loading pipeline (delegates to `plugin-handlers/`) |
-| `tool-registry.ts` | `tool` | 12–35 tools assembled with config gates (team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1); split across `tool-registry-{core-tools,team-tools,gated-tools}.ts` |
+| `tool-registry.ts` | `tool` | 12-38 tools assembled with config gates (team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1, goal +3); split across `tool-registry-{core-tools,team-tools,gated-tools}.ts` |
 | `tool-definition.ts` | `tool.definition` | Per-tool definition transform (applies todo-description-override) |
-| `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection trigger |
+| `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection, goal command dispatch + default goal auto-start |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
 | `chat-headers.ts` | `chat.headers` | Copilot `x-initiator` header injection |
-| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (slash-command interception, etc.) |
+| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (stop-continuation, /goal dispatch, start-work, auto-slash-command) |
 | `event.ts` | `event` | Session lifecycle (created/deleted/idle/error/status), openclaw dispatch, runtime fallback, 4 team-session-event handlers (when team_mode.enabled) |
-| `tool-execute-before.ts` | `tool.execute.before` | Pre-tool guards |
+| `tool-execute-before.ts` | `tool.execute.before` | Pre-tool guards (mcp_ strip, bash sleep block, task subagent resolution, skill /goal + /stop-continuation dispatch) |
 | `tool-execute-after.ts` | `tool.execute.after` | Post-tool hooks (truncation, comment-checker, hashline read tagging, json-error-recovery) |
-| `messages-transform.ts` | `experimental.chat.messages.transform` | Context injection, thinking-block validation, tool-pair validation, keyword detection |
+| `messages-transform.ts` | `experimental.chat.messages.transform` | Context injection, thinking-block validation, tool-pair validation, keyword detection, category-skill reminder |
 | `system-transform.ts` | `experimental.chat.system.transform` | System-message-level transforms |
 | `session-compacting.ts` | `experimental.session.compacting` | Context + todo preservation across compaction (registered via `create-plugin-module.ts`) |
 | `skill-context.ts` | (helper) | Skill/browser/category context shared with tool creation |
@@ -63,6 +63,7 @@ const hashlineToolsRecord = config.hashline_edit ? { edit: createHashlineEditToo
 const teamModeToolsRecord = config.team_mode?.enabled ? { team_create, team_delete, team_shutdown_request, team_approve_shutdown, team_reject_shutdown, team_send_message, team_task_create, team_task_list, team_task_update, team_task_get, team_status, team_list } : {}
 const lookAt = isMultimodalLookerEnabled ? { look_at: createLookAt(ctx) } : {}
 const interactiveBashTool = interactiveBashEnabled ? { interactive_bash } : {}
+const goalToolsRecord = pluginConfig.goal?.enabled ? { create_goal, update_goal, get_goal } : {}
 
 const allTools = {
   ...createGrepTools(ctx),
@@ -76,6 +77,7 @@ const allTools = {
   ...teamModeToolsRecord,             // +12 conditional
   ...taskToolsRecord,                 // +4 conditional
   ...hashlineToolsRecord,             // +1 conditional
+  ...goalToolsRecord,                 // +3 conditional (config.goal.enabled)
 }
 
 // lsp_* tools are supplied by the built-in MCP server "lsp"

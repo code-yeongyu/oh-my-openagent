@@ -13,6 +13,7 @@ type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
 export async function installCachedPlugin(input: {
   readonly buildSource?: boolean
   readonly codexHome: string
+  readonly env?: NodeJS.ProcessEnv
   readonly marketplaceName: string
   readonly name: string
   readonly renameDirectory?: RenameDirectory
@@ -20,9 +21,11 @@ export async function installCachedPlugin(input: {
   readonly version: string
   readonly runCommand: RunCommand
 }): Promise<InstalledPlugin> {
+  const env = input.env ?? process.env
+  const npmInstallEnv = sanitizeNpmInstallEnv(env)
   if (input.buildSource !== false) {
-    await maybeRunNpmInstall(input.sourcePath, input.runCommand)
-    await maybeRunNpmBuild(input.sourcePath, input.runCommand)
+    await maybeRunNpmInstall(input.sourcePath, input.runCommand, npmInstallEnv)
+    await maybeRunNpmBuild(input.sourcePath, input.runCommand, env)
   }
 
   const targetPath = join(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version)
@@ -30,12 +33,19 @@ export async function installCachedPlugin(input: {
   await rm(tempPath, { recursive: true, force: true })
   try {
     await copyDirectory(input.sourcePath, tempPath)
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
+    const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
-    await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
+    // Rewriting local file: dependencies desyncs package.json from package-lock.json, and npm ci
+    // aborts with EUSAGE on that drift (lazycodex#137; approach credited to the community fix in
+    // oh-my-openagent#6202). The temp cache dir is throwaway, so let npm install reconcile the lock
+    // when the rewrite changed package.json; keep the deterministic npm ci fast path otherwise.
+    const installArgs = rewroteLocalFileDependencies
+      ? ["install", "--omit=dev", "--no-audit", "--no-fund"]
+      : ["ci", "--omit=dev"]
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs)
     await removeCachedManagedNpmBinShims(tempPath)
-    if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand)
+    if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand, env)
     await assertNoRemovedSparkshellPromptReferences(tempPath)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
@@ -48,27 +58,36 @@ export async function installCachedPlugin(input: {
   return { name: input.name, version: input.version, path: targetPath }
 }
 
-async function maybeRunNpmInstall(cwd: string, runCommand: RunCommand, args: readonly string[] = ["install"]): Promise<void> {
+async function maybeRunNpmInstall(
+  cwd: string,
+  runCommand: RunCommand,
+  env: NodeJS.ProcessEnv,
+  args: readonly string[] = ["install"],
+): Promise<void> {
   if (!(await fileExistsStrict(join(cwd, "package.json")))) return
-  await runCommand("npm", args, { cwd })
+  await runCommand("npm", args, { cwd, env })
 }
 
-async function maybeRunNpmBuild(cwd: string, runCommand: RunCommand): Promise<void> {
+async function maybeRunNpmBuild(cwd: string, runCommand: RunCommand, env: NodeJS.ProcessEnv): Promise<void> {
   if (!(await fileExistsStrict(join(cwd, "package.json")))) return
   const packageJson: unknown = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"))
   if (!isPlainRecord(packageJson)) return
   const scripts = packageJson.scripts
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string") return
-  await runCommand("npm", ["run", "build"], { cwd })
+  await runCommand("npm", ["run", "build"], { cwd, env })
 }
 
-async function maybeRunNpmSyncSkills(cwd: string, runCommand: RunCommand): Promise<void> {
+async function maybeRunNpmSyncSkills(cwd: string, runCommand: RunCommand, env: NodeJS.ProcessEnv): Promise<void> {
   if (!(await fileExistsStrict(join(cwd, "package.json")))) return
   const packageJson: unknown = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"))
   if (!isPlainRecord(packageJson)) return
   const scripts = packageJson.scripts
   if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string") return
-  await runCommand("npm", ["run", "sync:skills"], { cwd })
+  await runCommand("npm", ["run", "sync:skills"], { cwd, env })
+}
+
+function sanitizeNpmInstallEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== "npm_config_allow_scripts"))
 }
 
 function createTempSiblingPath(targetPath: string): string {

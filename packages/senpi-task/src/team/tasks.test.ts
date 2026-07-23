@@ -82,7 +82,7 @@ describe("team tasklist orchestration", () => {
     const claimed = await claimTeamTask(ctx, blocked.id, "alpha")
     expect(claimed.status).toBe("claimed")
     expect(claimed.owner).toBe("alpha")
-  })
+  }, 15_000)
 
   test("#given a claimed task #when a non-owner updates its status #then a typed cross-owner error is raised", async () => {
     // given

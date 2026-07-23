@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,6 +8,7 @@ import type { ReadonlyFileSystem, StopInput } from "../src/types.js";
 
 const DEFAULT_WORKSPACE = "/repo";
 const cleanupRoots: string[] = [];
+const SCAFFOLD_PLAN_MARKDOWN = readFileSync(new URL("./fixtures/plan-scaffold.md", import.meta.url), "utf8");
 
 afterEach(() => {
 	for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -49,7 +50,7 @@ describe("start-work Stop hook", () => {
 				status: "active",
 				worktreePath: "/tmp/worktree",
 			}),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First", "- [x] Done", "- [ ] Second"].join("\n"),
+			planMarkdown: SCAFFOLD_PLAN_MARKDOWN,
 		});
 		const fs = createMemoryFs();
 
@@ -62,11 +63,31 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toContain("- Plan: `launch-plan`");
 		expect(parsed.reason).toContain(`- Plan file: \`${join(workspace, ".omo", "plans", "plan.md")}\``);
 		expect(parsed.reason).toContain(`- Boulder state: \`${join(workspace, ".omo", "boulder.json")}\``);
-		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `2` of `3`");
-		expect(parsed.reason).toContain("- Next incomplete task: `First`");
+		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `2` of `4`");
+		expect(parsed.reason).toContain("- Next incomplete task: `1. Implement checklist parser parity`");
 		expect(parsed.reason).toContain("- Worktree: `/tmp/worktree`");
 		expect(parsed.reason).toContain(`- Ledger: \`${join(workspace, ".omo", "start-work", "ledger.jsonl")}\``);
 		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
+	});
+
+	it("#given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [x] 1. Done"].join("\n"),
+		});
+		const fs = createMemoryFs();
+
+		// when
+		const output = runStopHook(createStopInput(workspace), fs);
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.decision).toBe("block");
+		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `0` of `1`");
+		expect(parsed.reason).toContain("- Next incomplete task: `none (final gate pending)`");
+		expect(parsed.reason).toContain("When the remaining count is `0`, skip checkbox execution");
+		expect(parsed.reason).toContain("re-read the ledger record and verify the exact lane/SHA pair");
 	});
 
 	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {

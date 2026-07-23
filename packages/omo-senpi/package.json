@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "4.17.1",
+  "version": "4.19.1",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -28,11 +28,13 @@
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
     "@oh-my-opencode/prompts-core": "workspace:*",
+    "@oh-my-opencode/lsp-core": "workspace:*",
     "@oh-my-opencode/senpi-task": "workspace:*",
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
-    "vscode-jsonrpc": "^8.2.1"
+    "@oh-my-opencode/boulder-state": "workspace:*",
+    "@code-yeongyu/lsp-daemon": "file:../lsp-daemon"
   },
   "peerDependencies": {
     "@code-yeongyu/senpi": "2026.7.5-2"

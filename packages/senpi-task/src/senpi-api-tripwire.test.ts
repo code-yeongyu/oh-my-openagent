@@ -16,13 +16,32 @@ import {
   type ToolDefinition,
 } from "@code-yeongyu/senpi"
 
+import * as senpiTask from "./index"
 import { createMinimalSenpiResourceLoader } from "./index"
+import type { AgentResolutionResult, ResolveAgentOptions } from "./index"
 
 function acceptRpcTypes(command: RpcCommand, response: RpcResponse, event: AgentSessionEvent): readonly string[] {
   return [typeof command, typeof response, event.type]
 }
 
 describe("pinned Senpi API surface", () => {
+  test("#given the senpi-task root import #when curated agent exports are used #then values and result types resolve", () => {
+    // given
+    const options: ResolveAgentOptions = { modelOverride: "openai/explicit" }
+
+    // when
+    const result: AgentResolutionResult = senpiTask.resolveAgent(
+      "explore",
+      senpiTask.BUILTIN_AGENTS,
+      undefined,
+      options,
+    )
+
+    // then
+    expect(senpiTask.BUILTIN_AGENT_DEFAULTS).toHaveLength(5)
+    expect(result.kind).toBe("resolved")
+  })
+
   test("#given senpi root exports #when type checked #then task adapter can pass session construction seams", () => {
     // given
     const customTools: ToolDefinition[] = []

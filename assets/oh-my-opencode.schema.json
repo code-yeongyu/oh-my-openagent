@@ -59,9 +59,7 @@
       "items": {
         "type": "string",
         "enum": [
-          "ralph-loop",
-          "ulw-loop",
-          "cancel-ralph",
+          "goal",
           "refactor",
           "start-work",
           "stop-continuation",
@@ -6131,10 +6129,14 @@
         }
       ]
     },
-    "ralph_loop": {
+    "goal": {
       "type": "object",
       "properties": {
         "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "auto_start": {
           "default": false,
           "type": "boolean"
         },
@@ -6143,25 +6145,21 @@
           "type": "number",
           "minimum": 1,
           "maximum": 1000
-        },
-        "state_dir": {
-          "type": "string"
-        },
-        "default_strategy": {
-          "default": "continue",
-          "type": "string",
-          "enum": [
-            "reset",
-            "continue"
-          ]
         }
       },
       "required": [
         "enabled",
-        "default_max_iterations",
-        "default_strategy"
+        "auto_start",
+        "default_max_iterations"
       ],
       "additionalProperties": false
+    },
+    "ralph_loop": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
     },
     "runtime_fallback": {
       "anyOf": [
@@ -6558,9 +6556,19 @@
           "default": true,
           "type": "boolean"
         },
+        "daemon": {
+          "default": false,
+          "type": "boolean"
+        },
         "enabled": {
           "default": true,
           "type": "boolean"
+        },
+        "excluded_roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "install_dir": {
           "type": "string"
@@ -6576,6 +6584,7 @@
       "required": [
         "auto_init",
         "auto_provision",
+        "daemon",
         "enabled"
       ],
       "additionalProperties": false
@@ -6747,6 +6756,12 @@
             "dev-browser",
             "playwright-cli"
           ]
+        },
+        "playwright_mcp_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -6896,14 +6911,14 @@
           "default": false,
           "type": "boolean"
         },
-        "ralph_loop": {
+        "goal": {
           "default": false,
           "type": "boolean"
         }
       },
       "required": [
         "ultrawork",
-        "ralph_loop"
+        "goal"
       ],
       "additionalProperties": false
     },
