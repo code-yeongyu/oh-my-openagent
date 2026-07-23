@@ -8,6 +8,8 @@ import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sd
 
 const MAX_MESSAGE_LIMIT = 200
 const THINKING_MAX_CHARS = 2000
+const DEFAULT_FROM_END_TAIL = 20
+const TOOL_RESULT_MAX_CHARS = 2000
 
 function extractToolResultText(part: NonNullable<BackgroundOutputMessage["parts"]>[number]): string[] {
   if (typeof part.content === "string" && part.content.length > 0) {
@@ -112,7 +114,7 @@ export async function formatFullSession(
   const hasMore = limit !== undefined && normalizedMessages.length > limit
   let visibleMessages: typeof normalizedMessages
   if (limit === undefined) {
-    visibleMessages = normalizedMessages
+    visibleMessages = options.fromEnd ? normalizedMessages.slice(-DEFAULT_FROM_END_TAIL) : normalizedMessages
   } else if (options.fromEnd) {
     visibleMessages = normalizedMessages.slice(-limit)
   } else {
@@ -156,7 +158,7 @@ export async function formatFullSession(
       } else if (part.type === "tool_result") {
         const toolTexts = extractToolResultText(part)
         for (const toolText of toolTexts) {
-          lines.push(`[tool result] ${toolText}`)
+          lines.push(`[tool result] ${truncateText(toolText, TOOL_RESULT_MAX_CHARS)}`)
         }
       } else if ((part.type === "tool_use" || part.type === "tool") && part.tool) {
         const input = part.input === undefined ? "" : truncateText(JSON.stringify(part.input), thinkingMaxChars)

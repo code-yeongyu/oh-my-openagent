@@ -171,8 +171,8 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         const isActive = isTaskActiveStatus(resolvedTask.status)
         const fullSession = args.full_session ?? false
-        const includeThinking = isActive || (args.include_thinking ?? false)
-        const includeToolResults = isActive || (args.include_tool_results ?? false)
+        const includeThinking = args.include_thinking ?? isActive
+        const includeToolResults = args.include_tool_results ?? isActive
 
         if (fullSession) {
           const output = await formatFullSession(resolvedTask, client, {
@@ -189,7 +189,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         if (resolvedTask.status === "completed") {
           recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
-          return await formatTaskResult(resolvedTask, client)
+          return await formatTaskResult(resolvedTask, client, {
+            fromEnd: args.from_end,
+            messageLimit: args.message_limit,
+          })
         }
 
         if (resolvedTask.status === "error" || resolvedTask.status === "cancelled" || resolvedTask.status === "interrupt") {
