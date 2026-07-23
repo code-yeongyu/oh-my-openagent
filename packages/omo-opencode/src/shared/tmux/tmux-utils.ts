@@ -1,4 +1,4 @@
-export { isInsideTmux, getCurrentPaneId } from "./tmux-utils/environment"
+export { isInsideTmux, isTmuxPaneCompatible, getCurrentPaneId } from "./tmux-utils/environment"
 export type { SplitDirection } from "./tmux-utils/environment"
 
 export { isServerRunning, resetServerCheck, markServerRunningInProcess } from "./tmux-utils/server-health"

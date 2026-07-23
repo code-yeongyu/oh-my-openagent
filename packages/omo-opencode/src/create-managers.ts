@@ -12,7 +12,10 @@ import { lookupTeamSession } from "./features/team-mode/team-session-registry"
 import { TuiStateMirror } from "./features/tui-sidebar/mirror-manager"
 import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import { initTaskToastManager } from "./features/task-toast-manager"
-import { TmuxSessionManager } from "./features/tmux-subagent"
+import {
+  selectTmuxManagerEnvironmentPredicate,
+  TmuxSessionManager,
+} from "./features/tmux-subagent"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
@@ -79,7 +82,9 @@ export function createManagers(args: {
   if (tmuxConfig.enabled && ctx.serverUrl) {
     deps.markServerRunningInProcessFn()
   }
-  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, undefined, {
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, {
+    isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
+  }, {
     // Team-mode members get their tmux panes from team-layout-tmux, which
     // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent
     // manager to ignore those sessions prevents the polling loop from racing

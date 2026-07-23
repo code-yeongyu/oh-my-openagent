@@ -1,0 +1,31 @@
+Command:
+cd /Users/yeongyu/local-workspaces/omo-wt/review/pr-5811-cmux-eligibility &&
+bun test packages/tmux-core/src/tmux-utils.test.ts \
+  packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts \
+  packages/omo-opencode/src/shared/tmux/tmux-utils.test.ts
+
+Observed before production fix:
+
+packages/tmux-core/src/tmux-utils.test.ts
+- FAIL: returns true when CMUX_SOCKET_PATH is set without TMUX
+- Expected: true
+- Received: false
+
+packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts
+- FAIL: CMUX_SOCKET_PATH without TMUX reaches eager split-window attach
+- Expected: { success: true, paneId: "%42" }
+- Received: { success: false }
+
+packages/omo-opencode/src/shared/tmux/tmux-utils.test.ts
+- FAIL: returns true when CMUX_SOCKET_PATH is set without TMUX
+- Expected: true
+- Received: false
+
+Summary:
+41 pass
+3 fail
+60 expect() calls
+
+The failures are the intended regression: the existing `isInsideTmuxEnvironment`
+predicate only recognizes `TMUX`, so the manager and pane spawn guard reject the
+cmux-only environment before the eager `opencode attach` command is executed.

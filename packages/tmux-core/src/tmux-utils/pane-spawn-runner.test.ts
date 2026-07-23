@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { TmuxConfig } from "../types"
 import type { TmuxCommandResult } from "../runner"
+import { isTmuxPaneCompatibleEnvironment } from "./environment"
 
 const paneSpawnSpecifier = import.meta.resolve("./pane-spawn")
 
@@ -189,6 +190,32 @@ describe("spawnTmuxPane runner integration", () => {
 			expect(cmd).toContain("--dir")
 			expect(cmd).not.toContain("Focus this pane to attach.")
 			expect(cmd).not.toContain("while :; do sleep 86400; done")
+		})
+
+		it("#given CMUX_SOCKET_PATH without TMUX #when spawnTmuxPane called #then reaches eager split-window attach", async () => {
+			// given
+			isInsideTmuxMock.mockReturnValue(isTmuxPaneCompatibleEnvironment({
+				CMUX_SOCKET_PATH: "/tmp/cmux.sock",
+				TMUX_PANE: "%0",
+			}))
+			isCmuxCompatEnvironmentMock.mockReturnValue(true)
+			const spawnTmuxPane = await loadSpawnTmuxPane()
+
+			// when
+			const result = await spawnTmuxPane(
+				"session-cmux-only",
+				"worker",
+				enabledTmuxConfig,
+				"http://127.0.0.1:1234",
+				"/tmp/omo-project",
+				"%0",
+				"-h",
+				createDeps(),
+			)
+
+			// then
+			expect(result).toEqual({ success: true, paneId: "%42" })
+			expect(getSplitWindowCommand()).toContain("opencode attach")
 		})
 
 		it("#given isCmuxCompatEnvironment=false #when spawnTmuxPane called #then uses placeholder (regression guard)", async () => {

@@ -1,0 +1,36 @@
+Final review-fix GREEN:
+
+Targeted inline cmux and pane lifecycle:
+- 33 pass
+- 0 fail
+- 59 expect() calls
+
+Production manager wiring:
+- 14 pass
+- 0 fail
+- 33 expect() calls
+- Inline isolation selected the cmux-compatible pane predicate.
+- Window isolation retained literal tmux-only eligibility.
+
+Final affected scope:
+- 289 pass
+- 0 fail
+- 662 expect() calls
+- 37 test files
+
+Static gates:
+- `bun run typecheck`: PASS
+- `bun run build`: PASS (`build: all steps completed`)
+- strict TypeScript audit: no violations in 13 edited source/test files
+
+Final design:
+- `isInsideTmuxEnvironment` remains literal `TMUX` detection.
+- `isTmuxPaneCompatibleEnvironment` accepts literal tmux or the existing cmux
+  detector.
+- `selectTmuxManagerEnvironmentPredicate` selects pane compatibility only for
+  inline isolation and literal tmux for window/session isolation.
+- OpenCode pane spawn, replace, activate, and close adapters use pane
+  compatibility; window/session primitives remain literal tmux-only.
+- The manager-path test uses `TMUX` absent, `CMUX_SOCKET_PATH` present, and
+  `TMUX_PANE=%0`, then proves `onSessionCreated` reaches the source pane and
+  tracks spawned pane `%42`.
