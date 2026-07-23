@@ -102,6 +102,13 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
       join(sourceRoot, "packages", "omo-codex", "lazycodex-repository", ".github", "workflows", "pr-source-guidance.yml"),
       "name: PR source guidance\n\non:\n  pull_request_target:\n",
     )
+    await mkdir(join(sourceRoot, "packages", "omo-codex", "lazycodex-repository", "packages", "web", "lib"), {
+      recursive: true,
+    })
+    await writeFile(
+      join(sourceRoot, "packages", "omo-codex", "lazycodex-repository", "packages", "web", "lib", "site-config.ts"),
+      "export const siteConfig = { name: 'LazyCodex' }\n",
+    )
   }
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n")
@@ -191,6 +198,8 @@ describe("sync-lazycodex-marketplace", () => {
     expect(manifest).toMatchObject({ name: "omo", version: "1.2.3" })
     const workflow = await readFile(join(lazycodexRoot, ".github", "workflows", "pr-source-guidance.yml"), "utf8")
     expect(workflow).toContain("PR source guidance")
+    const siteConfig = await readFile(join(lazycodexRoot, "packages", "web", "lib", "site-config.ts"), "utf8")
+    expect(siteConfig).toContain("LazyCodex")
     const mcpManifest = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", ".mcp.json"), "utf8"))
     expect(Object.hasOwn(mcpManifest.mcpServers, astGrepMcpServerName)).toBe(false)
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe("./components/git-bash-mcp/dist/cli.js")

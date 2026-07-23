@@ -6,18 +6,10 @@ import { copyLazycodexRuntimeDists } from "./lazycodex-runtime-dists"
 
 const MARKETPLACE_SOURCE_PATH = join("packages", "omo-codex", "marketplace.json")
 const PLUGIN_SOURCE_PATH = join("packages", "omo-codex", "plugin")
-const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
-  "packages",
-  "omo-codex",
-  "lazycodex-repository",
-  ".github",
-  "workflows",
-  "pr-source-guidance.yml",
-)
+const LAZYCODEX_REPOSITORY_OVERLAY_SOURCE_PATH = join("packages", "omo-codex", "lazycodex-repository")
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
 const MARKETPLACE_ROOT_DESTINATION_PATH = "marketplace.json"
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
-const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
 const GIT_BASH_MCP_PLUGIN_ARG = "./components/git-bash-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_SOURCE_ARG = "../../lsp-tools-mcp/dist/cli.js"
@@ -81,7 +73,7 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     recursive: true,
     filter: (path) => shouldCopyPluginPath(path, pluginRoot),
   })
-  await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
+  await copyLazycodexRepositoryOverlay(sourceRoot, lazycodexRoot)
   await copyLazycodexRuntimeDists({
     sourceRoot,
     lazycodexRoot,
@@ -125,12 +117,22 @@ async function isFile(path: string): Promise<boolean> {
   }
 }
 
-async function copyLazycodexRepositoryWorkflow(sourceRoot: string, lazycodexRoot: string): Promise<void> {
-  const sourcePath = join(sourceRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH)
-  if (!(await isFile(sourcePath))) return
-  const destinationPath = join(lazycodexRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH)
-  await mkdir(dirname(destinationPath), { recursive: true })
-  await writeFile(destinationPath, await readFile(sourcePath, "utf8"))
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory()
+  } catch (error) {
+    if (error instanceof Error) return false
+    return false
+  }
+}
+
+async function copyLazycodexRepositoryOverlay(sourceRoot: string, lazycodexRoot: string): Promise<void> {
+  const sourcePath = join(sourceRoot, LAZYCODEX_REPOSITORY_OVERLAY_SOURCE_PATH)
+  if (!(await isDirectory(sourcePath))) return
+  await cp(sourcePath, lazycodexRoot, {
+    recursive: true,
+    filter: (path) => shouldCopyLazycodexRepositoryOverlayPath(path, sourcePath),
+  })
 }
 
 async function rewritePluginMcpManifest(pluginRoot: string): Promise<void> {
@@ -225,6 +227,13 @@ function rewriteMcpArg(arg: unknown): unknown {
 }
 
 const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude"])
+const LAZYCODEX_REPOSITORY_OVERLAY_COPY_DENYLIST = new Set([
+  ".git",
+  "node_modules",
+  ".next",
+  ".open-next",
+  ".wrangler",
+])
 
 function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
@@ -245,6 +254,12 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   // start-work-continuation/dist/cli.js and ulw-loop/dist/cli.js went missing while rules and
   // ultrawork (whose nested .gitignore has no `dist/` rule) survived (lazycodex#108).
   return name !== ".gitignore"
+}
+
+function shouldCopyLazycodexRepositoryOverlayPath(path: string, root: string): boolean {
+  const relative = path === root ? "" : path.slice(root.length + sep.length)
+  if (relative.length === 0) return true
+  return !relative.split(sep).some((part) => LAZYCODEX_REPOSITORY_OVERLAY_COPY_DENYLIST.has(part))
 }
 
 
