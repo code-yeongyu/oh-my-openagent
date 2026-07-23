@@ -56,8 +56,11 @@ export async function spawnTmuxPane(
 		log("[spawnTmuxPane] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!deps.isInsideTmux()) {
-		log("[spawnTmuxPane] SKIP: not inside tmux", { TMUX: process.env.TMUX })
+	if (!deps.isInsideTmux() && !deps.isCmuxCompatEnvironment()) {
+		log("[spawnTmuxPane] SKIP: not inside tmux or cmux-compat environment", {
+			TMUX: process.env.TMUX,
+			CMUX_SOCKET_PATH: process.env.CMUX_SOCKET_PATH,
+		})
 		return { success: false }
 	}
 

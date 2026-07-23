@@ -171,7 +171,7 @@ export class TmuxSessionManager {
     })
   }
   private isEnabled(): boolean {
-    return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+    return this.tmuxConfig.enabled && (this.deps.isInsideTmux() || isCmuxCompatEnvironment())
   }
 
   private isIsolated(): boolean {

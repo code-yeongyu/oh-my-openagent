@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { TmuxConfig } from "../types"
 import type { TmuxCommandResult } from "../runner"
@@ -247,6 +247,79 @@ describe("spawnTmuxPane runner integration", () => {
 			expect(cmd).toContain("opencode attach")
 			expect(cmd).toContain("/home/user/my")
 			expect(cmd).toContain("--dir '/home/user/my project/sub dir'")
+		})
+	})
+
+	describe("eligibility gate (headless cmux: CMUX_SOCKET_PATH without TMUX)", () => {
+		let savedTmux: string | undefined
+		let savedTmuxPane: string | undefined
+		let savedCmuxSocketPath: string | undefined
+
+		beforeEach(() => {
+			savedTmux = process.env.TMUX
+			savedTmuxPane = process.env.TMUX_PANE
+			savedCmuxSocketPath = process.env.CMUX_SOCKET_PATH
+			const tmuxCommandResults: TmuxCommandResult[] = [
+				{ success: true, output: "%42", stdout: "%42", stderr: "", exitCode: 0 },
+				{ success: true, output: "", stdout: "", stderr: "", exitCode: 0 },
+			]
+			runTmuxCommandMock.mockImplementation(async (): Promise<TmuxCommandResult> => {
+				const nextResult = tmuxCommandResults.shift()
+				if (!nextResult) {
+					throw new Error("No more tmux command results configured")
+				}
+				return nextResult
+			})
+		})
+
+		afterEach(() => {
+			if (savedTmux === undefined) delete process.env.TMUX
+			else process.env.TMUX = savedTmux
+			if (savedTmuxPane === undefined) delete process.env.TMUX_PANE
+			else process.env.TMUX_PANE = savedTmuxPane
+			if (savedCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
+			else process.env.CMUX_SOCKET_PATH = savedCmuxSocketPath
+		})
+
+		function createHeadlessDeps(): NonNullable<Parameters<typeof import("./pane-spawn").spawnTmuxPane>[7]> {
+			return {
+				log: logMock,
+				runTmuxCommand: runTmuxCommandMock,
+				isServerRunning: isServerRunningMock,
+				getTmuxPath: getTmuxPathMock,
+			}
+		}
+
+		it("#given CMUX_SOCKET_PATH set and TMUX unset #when spawnTmuxPane called #then split-window runs opencode attach eagerly", async () => {
+			// given
+			delete process.env.TMUX
+			delete process.env.TMUX_PANE
+			process.env.CMUX_SOCKET_PATH = "/tmp/cmux-headless-test.sock"
+			const spawnTmuxPane = await loadSpawnTmuxPane()
+
+			// when
+			const result = await spawnTmuxPane("session-headless", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/tmp/omo-project", "%0", "-h", createHeadlessDeps())
+
+			// then
+			expect(result).toEqual({ success: true, paneId: "%42" })
+			const cmd = getSplitWindowCommand()
+			expect(cmd).toContain("opencode attach")
+			expect(cmd).not.toContain("Focus this pane to attach.")
+		})
+
+		it("#given neither TMUX nor CMUX_SOCKET_PATH #when spawnTmuxPane called #then skips without issuing tmux commands (regression guard)", async () => {
+			// given
+			delete process.env.TMUX
+			delete process.env.TMUX_PANE
+			delete process.env.CMUX_SOCKET_PATH
+			const spawnTmuxPane = await loadSpawnTmuxPane()
+
+			// when
+			const result = await spawnTmuxPane("session-none", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/tmp/omo-project", "%0", "-h", createHeadlessDeps())
+
+			// then
+			expect(result).toEqual({ success: false })
+			expect(runTmuxCommandMock).not.toHaveBeenCalled()
 		})
 	})
 })
