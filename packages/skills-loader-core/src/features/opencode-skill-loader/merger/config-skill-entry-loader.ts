@@ -101,7 +101,7 @@ $ARGUMENTS
     argumentHint: entry["argument-hint"] || fileMetadata["argument-hint"],
   }
 
-  const allowedTools = entry["allowed-tools"] || parseAllowedTools(fileMetadata["allowed-tools"])
+  const allowedTools = parseAllowedTools(entry["allowed-tools"]) || parseAllowedTools(fileMetadata["allowed-tools"])
 
   return {
     name,
