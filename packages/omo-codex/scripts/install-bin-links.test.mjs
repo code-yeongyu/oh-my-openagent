@@ -9,6 +9,8 @@ import test from "node:test";
 import { linkCachedPluginBins, linkRootRuntimeBin } from "./install-dist/install-local.mjs";
 import { makeTempDir, writeJson } from "./install-test-fixtures.mjs";
 
+const BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM = 'if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"';
+
 async function writeRuntimeWrapperFixture({ withNodeCli = false } = {}) {
 	const root = await makeTempDir();
 	const repoRoot = join(root, "repo");
@@ -117,6 +119,7 @@ test("#given Windows platform #when writing the omo runtime wrapper #then embeds
 	const wrapper = await readFile(link.path, "utf8");
 	assert.match(wrapper, /OMO_RUNTIME/);
 	assert.match(wrapper, /dist[\\/]cli-node[\\/]index\.js/);
+	assert.ok(!wrapper.includes(BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM), "Windows runtime wrapper must not contain invalid quote comparison");
 	assert.ok(wrapper.indexOf("OMO_RUNTIME") < wrapper.indexOf("where bun"), "node override must precede bun discovery");
 });
 
@@ -158,6 +161,7 @@ test("#given Windows platform #when linking cached plugin bins #then writes comm
 	assert.match(shim, /@echo off/);
 	assert.match(shim, /NODE_REPL_NODE_PATH/);
 	assert.match(shim, /"%OMO_NODE_BINARY%"/);
+	assert.ok(!shim.includes(BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM), "Windows command shim must not contain invalid quote comparison");
 	assert.match(shim, new RegExp(`"${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
 	assert.doesNotMatch(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
 });

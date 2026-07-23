@@ -36,7 +36,8 @@ function bootstrapScriptFrom(text: string): string {
 
 async function runShell(script: string, env: NodeJS.ProcessEnv): Promise<ShellResult> {
 	return new Promise((resolvePromise, reject) => {
-		const child = spawn("/bin/sh", ["-c", script], { env });
+		const shell = process.platform === "win32" ? env["OMO_CODEX_GIT_BASH_PATH"] ?? "C:\\Program Files\\Git\\bin\\bash.exe" : "/bin/sh";
+		const child = spawn(shell, ["-c", script], { env });
 		const stdout: Buffer[] = [];
 		const stderr: Buffer[] = [];
 		child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
@@ -50,6 +51,10 @@ async function runShell(script: string, env: NodeJS.ProcessEnv): Promise<ShellRe
 			});
 		});
 	});
+}
+
+function shellPath(path: string): string {
+	return process.platform === "win32" ? path.replaceAll("\\", "/").replace(/^([A-Za-z]):/, (_match, drive: string) => `/${drive.toLowerCase()}`) : path;
 }
 
 describe("package.json", () => {
@@ -114,6 +119,8 @@ describe("src/cli.ts", () => {
 });
 
 describe("skills/ulw-loop/SKILL.md", () => {
+	const win32Only = process.platform === "win32" ? it : it.skip;
+
 	it("exists", async () => {
 		const info = await stat(join(repoRoot, "skills/ulw-loop/SKILL.md"));
 		expect(info.isFile()).toBe(true);
@@ -182,6 +189,47 @@ describe("skills/ulw-loop/SKILL.md", () => {
 			expect(result.code).toBe(0);
 			expect(result.stdout).toContain('"source":"cached-ulw-loop"');
 			expect(result.stderr).not.toContain("unknown command");
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
+	win32Only("#given Windows installer wrote only omo.cmd #when bootstrap runs in Git Bash #then falls back to the cmd shim", async () => {
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
+		const bootstrap = bootstrapScriptFrom(text);
+		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-windows-cmd-bootstrap-"));
+		try {
+			const home = join(root, "home");
+			const localBin = join(home, ".local", "bin");
+			const codexHome = join(home, ".codex");
+			await mkdir(localBin, { recursive: true });
+			await mkdir(codexHome, { recursive: true });
+			await writeFile(
+				join(localBin, "omo.cmd"),
+				[
+					"@echo off",
+					'if "%~1"=="ulw-loop" if "%~2"=="help" exit /b 0',
+					'if "%~1"=="ulw-loop" if "%~2"=="status" if "%~3"=="--json" (',
+					'  echo {"ok":true,"source":"windows-cmd-shim"}',
+					"  exit /b 0",
+					")",
+					"echo unexpected args: %* 1>&2",
+					"exit /b 1",
+					"",
+			].join("\r\n"),
+			);
+			await chmod(join(localBin, "omo.cmd"), 0o755);
+
+			const result = await runShell(`${bootstrap}\nomo ulw-loop status --json`, {
+				...process.env,
+				CODEX_HOME: shellPath(codexHome),
+				HOME: shellPath(home),
+				PATH: "/usr/bin:/bin",
+			});
+
+			expect(result.code).toBe(0);
+			expect(result.stdout).toContain('"source":"windows-cmd-shim"');
+			expect(result.stderr).not.toContain("No ulw-loop-capable omo executable found");
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}

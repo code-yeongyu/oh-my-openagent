@@ -10,6 +10,8 @@ import { tmpdir } from "node:os"
 import { basename, dirname, join, relative, sep } from "node:path"
 import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
 
+const BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM = 'if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"'
+
 describe("codex-cache", () => {
   test("rewrites cached mcp manifest relative args and cwd", async () => {
     // given
@@ -622,6 +624,7 @@ describe("codex-cache", () => {
     expect(commandShim).toContain("@echo off")
     expect(commandShim).toContain("NODE_REPL_NODE_PATH")
     expect(commandShim).toContain('"%OMO_NODE_BINARY%" "')
+    expect(commandShim).not.toContain(BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM)
     expect(commandShim).toContain(`"${join(pluginRoot, "dist", "cli.js")}" %*`)
     expect(commandShim).not.toContain(`node "${join(pluginRoot, "dist", "cli.js")}" %*`)
   })
