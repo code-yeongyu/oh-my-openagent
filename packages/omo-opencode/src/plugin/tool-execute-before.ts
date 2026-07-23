@@ -111,6 +111,13 @@ export function createToolExecuteBeforeHandler(args: {
       const subagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
       const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined
 
+      if (category && subagentType && subagentType !== "sisyphus-junior") {
+        throw new Error(
+          "task() received both category and subagent_type. " +
+          "Provide only ONE of them: category for task delegation (uses Sisyphus-Junior), " +
+          "or subagent_type for direct agent invocation."
+        )
+      }
       if (category) {
         replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
       } else if (!subagentType && taskId) {
