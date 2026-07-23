@@ -120,6 +120,106 @@ describe("createTaskTool", () => {
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
   })
 
+  test("#given a resolved category model #when the task call renders #then category, provider/model, and reasoning are shown before execution", () => {
+    // given
+    const tool = createTaskTool({
+      ...deps(fakeManager({})),
+      resolveCallModel: () => ({
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        reasoning_effort: "xhigh",
+        source: "category",
+      }),
+    })
+    const renderCall = tool.renderCall
+    if (renderCall === undefined) throw new Error("task renderCall is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderCall, undefined, [
+      { prompt: "Inspect task rendering", category: "quick", run_in_background: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 120)
+
+    // then
+    expect(row).toContain("quick (openai/gpt-5.6-sol:xhigh)")
+    expect(row).not.toContain("category:quick")
+    expect(row).toContain('"Inspect task rendering"')
+    expect(row).toContain(`${ANSI_ITALIC}foreground${ANSI_ITALIC_END}`)
+  })
+
+  test("#given a category resolver with variant-only effort #when the task call renders #then its executed effort renders", () => {
+    // given
+    const tool = createTaskTool({
+      ...deps(fakeManager({})),
+      resolveCallModel: () => ({
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        variant: "xhigh",
+        source: "category",
+      }),
+    })
+    const renderCall = tool.renderCall
+    if (renderCall === undefined) throw new Error("task renderCall is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderCall, undefined, [
+      { prompt: "Inspect task rendering", category: "ultrabrain", run_in_background: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 120)
+
+    // then
+    expect(row).toContain("ultrabrain (openai/gpt-5.6-sol:xhigh)")
+  })
+
+  test("#given no category model is available #when the task call renders #then the existing category target remains visible", () => {
+    // given
+    const tool = createTaskTool({ ...deps(fakeManager({})), resolveCallModel: () => undefined })
+    const renderCall = tool.renderCall
+    if (renderCall === undefined) throw new Error("task renderCall is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderCall, undefined, [
+      { prompt: "Inspect task rendering", category: "quick", run_in_background: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 120)
+
+    // then
+    expect(row).toContain("category:quick")
+    expect(row).toContain('"Inspect task rendering"')
+  })
+
+  test("#given an agent task call #when rendered #then category model resolution is not invoked", () => {
+    // given
+    const tool = createTaskTool({
+      ...deps(fakeManager({})),
+      resolveCallModel: () => {
+        throw new Error("agent task should not resolve a category model")
+      },
+    })
+    const renderCall = tool.renderCall
+    if (renderCall === undefined) throw new Error("task renderCall is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderCall, undefined, [
+      { prompt: "Inspect task rendering", subagent_type: "atlas", run_in_background: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 120)
+
+    // then
+    expect(row).toContain("agent:atlas")
+    expect(row).toContain('"Inspect task rendering"')
+  })
+
   test("#given a partial child progress result #when rendered #then the live status block is preserved", () => {
     const tool = createTaskTool(deps(fakeManager({})))
     const renderResult = tool.renderResult

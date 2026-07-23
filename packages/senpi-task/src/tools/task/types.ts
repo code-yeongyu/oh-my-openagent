@@ -32,6 +32,12 @@ export type SkillResolution = {
 
 export type SkillLoader = (names: readonly string[], cwd: string) => SkillResolution
 
+export type TaskCallModelResolver = (input: {
+  readonly category?: string
+  readonly subagent_type?: string
+  readonly model?: string
+}) => ResolvedModelRecord | undefined
+
 export type TaskCategoryInfo = {
   readonly name: string
   readonly description?: string
@@ -48,6 +54,7 @@ export type TaskToolDeps = {
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly resolveAncestry?: ResolveAncestry
   readonly loadSkills?: SkillLoader
+  readonly resolveCallModel?: TaskCallModelResolver
 }
 
 export type TaskToolMode = "spawn"

@@ -49,6 +49,17 @@ describe("taskCallLines", () => {
     expect(lines).toEqual(['task agent:atlas "ship it" foreground'])
   })
 
+  test("#given a category spawn call #when rendered #then its current target prompt and mode stay stable through extraction", () => {
+    // given
+    const args = { prompt: "inspect task rendering", category: "quick", run_in_background: false }
+
+    // when
+    const lines = taskCallLines(args)
+
+    // then
+    expect(lines).toEqual(['task category:quick "inspect task rendering" foreground'])
+  })
+
   test("#given a spawn call #when rendered #then target and mode are summarized", () => {
     // when
     const lines = taskCallLines({ prompt: "x", category: "quick", run_in_background: true })
