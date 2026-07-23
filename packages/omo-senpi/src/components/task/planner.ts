@@ -121,6 +121,7 @@ function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedMod
   return {
     model: resolution.model,
     ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
+    ...(resolution.resolved_model?.variant !== undefined ? { variant: resolution.resolved_model.variant } : {}),
     agentType: resolution.agentType,
     ...(resolution.instructions !== undefined ? { instructions: resolution.instructions } : {}),
     ...(resolution.toolAllowlist !== undefined ? { toolAllowlist: resolution.toolAllowlist } : {}),
@@ -143,6 +144,7 @@ function toPlanResolution(
   availableAgents: readonly string[],
 ): PlanResolution {
   if (resolution.kind === "resolved") {
+    const appliedVariant = resolution.spec.reasoningEffort ?? resolution.spec.variant
     return {
       kind: "resolved",
       plan: {
@@ -155,6 +157,7 @@ function toPlanResolution(
           ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
           ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
         },
+        ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
         category: resolution.category,
         ...(resolution.spec.prompt_append !== undefined && { promptAppend: resolution.spec.prompt_append }),
       },

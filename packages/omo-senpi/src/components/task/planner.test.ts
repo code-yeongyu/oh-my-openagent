@@ -330,3 +330,95 @@ describe("createTaskChildPlanner", () => {
     expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
   })
 })
+
+describe("createTaskChildPlanner plan variant", () => {
+  test("#given a category with an explicit reasoning effort and a variant #when planned #then the applied variant is the reasoning effort", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {
+        categories: {
+          ultrabrain: {
+            model: "google/gemini-3.1-pro",
+            variant: "high",
+            reasoningEffort: "xhigh",
+          },
+        },
+      },
+      {},
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Find the hard bug.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      category: "ultrabrain",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBe("xhigh")
+  })
+
+  test("#given a category resolving a variant-bearing fallback without reasoning effort #when planned #then the applied variant is the resolved variant", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      {},
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Think hard.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      category: "ultrabrain",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBe("high")
+  })
+
+  test("#given an explicit provider model #when planned #then no variant is applied", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      {},
+      () => registry([model("openai", "gpt-5.5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Use this model directly.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openai/gpt-5.5",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBeUndefined()
+  })
+
+  test("#given momus resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("openai", "gpt-5.6-sol")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Review the plan.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "momus",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("openai/gpt-5.6-sol")
+    expect(resolved.plan.variant).toBe("xhigh")
+  })
+})

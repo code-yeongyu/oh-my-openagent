@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { delimiter, dirname, isAbsolute, join, sep } from "node:path"
 
 import type { RpcRunnerSpec } from "../types"
+import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 
 const require = createRequire(import.meta.url)
 
@@ -96,6 +97,10 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   }
   if (spec.model !== undefined && spec.model.length > 0) {
     args.push("--model", spec.model)
+  }
+  const thinkingLevel = asSenpiThinkingLevel(spec.variant)
+  if (thinkingLevel !== undefined) {
+    args.push("--thinking", thinkingLevel)
   }
   return args
 }

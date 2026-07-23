@@ -115,3 +115,59 @@ describe("createRpcManagedRunner", () => {
     expect(captured?.model).toBe("anthropic/claude")
   })
 })
+
+describe("variant threading", () => {
+  test("#given a managed spec with a variant #when the rpc adapter starts #then the variant reaches the rpc spec", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start({ ...managedSpec(), variant: "max" })
+
+    // then
+    expect(captured?.variant).toBe("max")
+  })
+
+  test("#given a managed spec without a variant #when the rpc adapter starts #then no variant is threaded", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start(managedSpec())
+
+    // then
+    expect(captured?.variant).toBeUndefined()
+  })
+
+  test("#given a session context with a thinking level #when the in-process adapter starts #then the level reaches the child spec", async () => {
+    // given
+    let captured: ChildSpec | undefined
+    const runner: InProcessRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
+      },
+    }
+    const managed = createInProcessManagedRunner(runner, () => ({ thinkingLevel: "high" }))
+
+    // when
+    await managed.start(managedSpec())
+
+    // then
+    expect(captured?.thinkingLevel).toBe("high")
+  })
+})
