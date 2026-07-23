@@ -235,6 +235,28 @@ test("#given synced aggregate Codex skills #when they describe background orches
 	}
 });
 
+test("#given packaged start-work and ulw-plan skills #when inspected #then PR delivery options and the handoff explanation ship", async () => {
+	// given
+	const startWork = await readSkill("start-work");
+	const workflow = await readFile(join(root, "skills", "ulw-plan", "references", "full-workflow.md"), "utf8");
+
+	// when / then
+	assert.match(startWork, /--make-pr/);
+	assert.match(startWork, /--ship/);
+	assert.match(startWork, /implies `--make-pr`/i);
+	assert.match(startWork, /IMPLIES worktree mode/i);
+	assert.match(startWork, /Goal and todo discipline/i);
+	assert.match(startWork, /create_goal/);
+	assert.match(startWork, /one todo per column-zero checkbox/i);
+
+	assert.match(workflow, /Handoff explanation/i);
+	assert.match(workflow, /Added beyond the request/i);
+	assert.match(workflow, /\$start-work <plan-name>/);
+	assert.match(workflow, /--make-pr/);
+	assert.match(workflow, /--ship/);
+	assert.match(workflow, /COUNT the rows/i);
+});
+
 test("#given start-work skill #when synced for Codex #then the difficulty-tier delegation guidance survives the overlay", async () => {
 	const content = await readSkill("start-work");
 

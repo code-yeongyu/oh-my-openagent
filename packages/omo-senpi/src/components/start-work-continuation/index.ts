@@ -169,7 +169,8 @@ function renderDirective(state: DirectiveState): string {
     "1. Read the plan file AND the ledger first — they are the only sources of truth for what remains and what evidence exists; do not trust your memory of prior turns.",
     `2. When the remaining count is \`0\`, skip checkbox execution and perform the Final gate now. Otherwise, pick the FIRST unchecked top-level checkbox in \`## TODOs\` or \`## Final Verification Wave\`.${finalGateHint}`,
     "3. Apply the checkbox's tier and verify with real-surface evidence. Decompose and dispatch sub-tasks in parallel via Senpi's `task` tool when safe.",
-    "4. After verification, apply the checkbox, append a durable evidence record to the ledger, and continue.",
+    "4. Honor the delivery mode recorded in the goal/ledger at session start: `--make-pr` finishes through the task-owned worktree and an opened PR, then hands off with the PR URL; `--ship` keeps working until that PR is MERGED, then removes the worktree and syncs `.omo/` state back.",
+    "5. After verification, apply the checkbox, append a durable evidence record to the ledger, and continue.",
     "</omo-senpi-start-work-continuation>",
   ].join("\n")
 }
