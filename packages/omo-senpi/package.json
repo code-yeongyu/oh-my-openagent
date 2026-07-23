@@ -24,6 +24,7 @@
     "test": "bun test src/**/*.test.ts"
   },
   "dependencies": {
+    "@earendil-works/pi-tui": "0.80.3",
     "@oh-my-opencode/utils": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
@@ -34,7 +35,8 @@
     "@oh-my-opencode/delegate-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
-    "@code-yeongyu/lsp-daemon": "file:../lsp-daemon"
+    "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
+    "typebox": "1.1.38"
   },
   "peerDependencies": {
     "@code-yeongyu/senpi": "2026.7.5-2"
