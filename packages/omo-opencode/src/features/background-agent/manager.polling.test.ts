@@ -449,6 +449,66 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(task.completedAt).toBeDefined()
     })
 
+    test('#when session status is "interrupted" but no output exists #then marks task as error', async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-interrupted-no-output": { type: "interrupted" } } }),
+        messages: async () => ({ data: [] }),
+      })
+      const task = createRunningTask("ses-interrupted-no-output")
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      await manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("error")
+      expect(task.error).toBeDefined()
+      expect(task.error).toContain("terminated without producing any output")
+    })
+
+    test('#when session status is "interrupted" but no output exists #then marks task as error', async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-interrupted-no-output": { type: "interrupted" } } }),
+        messages: async () => ({ data: [] }),
+      })
+      const task = createRunningTask("ses-interrupted-no-output")
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      await manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("error")
+      expect(task.error).toBeDefined()
+      expect(task.error ?? "").toContain("terminated without producing any output")
+    })
+
+    test('#when session status is "interrupted" but no output exists #then marks task as error', async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-interrupted-no-output": { type: "interrupted" } } }),
+        messages: async () => ({ data: [] }),
+      })
+      const task = createRunningTask("ses-interrupted-no-output")
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      await manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("error")
+      expect(task.error).toBeDefined()
+      expect(typeof task.error === "string" && task.error.includes("terminated without producing any output")).toBe(true)
+    })
+
     test('#when session status is an unknown type #then completes the task', async () => {
       //#given
       const manager = createManagerWithClient({
