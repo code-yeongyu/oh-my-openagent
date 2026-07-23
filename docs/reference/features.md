@@ -428,10 +428,14 @@ The `/ulw-loop` slash command has been removed; continuous goal pursuit is now h
 **Usage**:
 
 ```
-/start-work [plan-name]
+/start-work [plan-name] [--worktree <path>] [--make-pr] [--ship]
 ```
 
 Uses atlas agent to execute planned tasks systematically.
+
+- `--worktree <path>`: work inside a task-owned git worktree.
+- `--make-pr`: deliver the work as a pull request; implies worktree mode (a task-owned worktree is created when `--worktree` is omitted) and hands off with the PR URL.
+- `--ship`: implies `--make-pr`, then keeps working until the PR passes CI/review gates and is merged, before cleaning up the worktree.
 
 ### /stop-continuation
 
