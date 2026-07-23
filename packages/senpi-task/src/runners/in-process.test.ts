@@ -357,3 +357,45 @@ describe("InProcessRunner", () => {
     expect(seen).toEqual(["agent_start", "agent_end"])
   })
 })
+
+describe("InProcessRunner thinking level", () => {
+  test("#given a spec carrying a thinking level #when the child session is created #then the level reaches the senpi session options", async () => {
+    // given
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    // when
+    const handle = await runner.start(baseSpec({ thinkingLevel: "xhigh" }))
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    // then
+    expect(captured?.thinkingLevel).toBe("xhigh")
+  })
+
+  test("#given a spec without a thinking level #when the child session is created #then no level is forced so senpi keeps its default", async () => {
+    // given
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    // when
+    const handle = await runner.start(baseSpec())
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    // then
+    expect(captured?.thinkingLevel).toBeUndefined()
+  })
+})

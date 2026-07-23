@@ -400,6 +400,7 @@ class TaskManagerImpl implements TaskManager {
         prompt: "",
         resumeSessionPath,
         model: record.model,
+        ...(record.resolved_model?.variant === undefined ? {} : { variant: record.resolved_model.variant }),
         ...(trustedLaunch?.extensions === undefined ? {} : { extensions: trustedLaunch.extensions }),
         ...(trustedLaunch?.memberEnv === undefined ? {} : { memberEnv: trustedLaunch.memberEnv }),
       })

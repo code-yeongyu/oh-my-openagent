@@ -39,6 +39,7 @@ export type ChildSpec = {
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
   readonly model?: CreateAgentSessionOptions["model"]
+  readonly thinkingLevel?: CreateAgentSessionOptions["thinkingLevel"]
   readonly toolAllowlist?: readonly string[]
   // executable ToolDefinitions merged AFTER the shared-tool family filter - the ONLY sanctioned
   // bypass of the task/team-family exclusion (team layer injects the pre-scoped member tool here).
@@ -100,6 +101,7 @@ export class InProcessRunner {
       ...(spec.authStorage !== undefined && { authStorage: spec.authStorage }),
       ...(spec.modelRegistry !== undefined && { modelRegistry: spec.modelRegistry }),
       ...(spec.model !== undefined && { model: spec.model }),
+      ...(spec.thinkingLevel !== undefined && { thinkingLevel: spec.thinkingLevel }),
       ...(spec.toolAllowlist !== undefined && { tools: [...spec.toolAllowlist] }),
     }
 

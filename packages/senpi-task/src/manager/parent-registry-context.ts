@@ -1,5 +1,6 @@
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
+import { asSenpiThinkingLevel } from "../senpi/thinking-level"
 import type { InProcessSessionContext, InProcessSessionContextProvider } from "./runner"
 import type { ManagedStartSpec } from "./types"
 
@@ -33,10 +34,12 @@ export function createParentRegistrySessionContext(
     const registry = resolveRegistry()
     if (registry === undefined) return {}
     const model = spec.model === undefined ? undefined : findModelReference(registry, spec.model)
+    const thinkingLevel = asSenpiThinkingLevel(spec.variant)
     return {
       modelRegistry: registry,
       authStorage: registry.authStorage,
       ...(model !== undefined && { model }),
+      ...(thinkingLevel !== undefined && { thinkingLevel }),
     }
   }
 }

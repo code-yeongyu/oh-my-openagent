@@ -26,6 +26,7 @@ export type ManagedStartSpec = {
   readonly parentSessionId: string
   readonly rootSessionId: string
   readonly model?: string
+  readonly variant?: string
   readonly agentType?: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
@@ -60,6 +61,7 @@ export type ManagerStartSpec = {
 export type ResolvedChildPlan = {
   readonly model: string
   readonly resolved_model?: ResolvedModelRecord
+  readonly variant?: string
   readonly agentExecutionMode?: ExecutionMode
   readonly agentType?: string
   readonly category?: string

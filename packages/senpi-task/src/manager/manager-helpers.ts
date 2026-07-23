@@ -53,6 +53,7 @@ export function buildManagedSpec(input: {
     parentSessionId: spec.parent_session_id,
     rootSessionId: spec.root_session_id ?? spec.parent_session_id,
     ...(plan.model !== undefined ? { model: plan.model } : {}),
+    ...(plan.variant !== undefined ? { variant: plan.variant } : {}),
     ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
     ...(instructions !== undefined ? { instructions } : {}),
     ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
