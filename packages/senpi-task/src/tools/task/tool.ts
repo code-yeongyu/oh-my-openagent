@@ -22,7 +22,11 @@ export function createTaskTool(deps: TaskToolDeps): ToolDefinition<typeof TaskTo
     parameters: TaskToolParams,
     execute: (toolCallId, params, signal, onUpdate, ctx) => execute(toolCallId, params, signal, onUpdate, ctx),
     renderCall: (args, theme) => {
-      const lines = renderTaskCallLines(args, theme)
+      const resolvedModel = args.category === undefined ? undefined : deps.resolveCallModel?.(args)
+      const lines = renderTaskCallLines({
+        ...args,
+        ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+      }, theme)
       return linesComponent(lines.map((line) => theme.fg("toolTitle", line)))
     },
     renderResult: (result, options, theme) => {

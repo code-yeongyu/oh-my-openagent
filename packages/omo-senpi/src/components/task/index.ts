@@ -116,7 +116,24 @@ function registerTaskFlags(pi: SenpiExtensionAPI): void {
 function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine, teamService: TeamToolsService): void {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
-  pi.registerTool({ ...createTaskTool({ manager, omoConfig: engine.omoConfig, agents: engine.agents }) })
+  pi.registerTool({
+    ...createTaskTool({
+      manager,
+      omoConfig: engine.omoConfig,
+      agents: engine.agents,
+      resolveCallModel: ({ category, model }) => {
+        if (category === undefined) return undefined
+        const resolution = engine.planner({
+          prompt: "",
+          parent_session_id: "",
+          depth: 0,
+          category,
+          ...(model === undefined ? {} : { model }),
+        })
+        return resolution.kind === "resolved" ? resolution.plan.resolved_model : undefined
+      },
+    }),
+  })
   pi.registerTool({
     ...createTaskSendTool({ manager, resolveCallerSessionId, teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL } }),
   })

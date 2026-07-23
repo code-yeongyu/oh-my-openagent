@@ -18,6 +18,7 @@ import {
   mapOmoConfigAgents,
   resolveMemberExtensionEntryPath,
   type AgentDefinition,
+  type ChildPlanner,
   type CompletionNotifier,
   type ManagedRunner,
   type PersistedTaskEvent,
@@ -41,6 +42,7 @@ export interface TaskEngine {
   readonly lifecycle: TaskLifecycle
   readonly notifier: CompletionNotifier
   readonly runtime: TaskRuntimeContext
+  readonly planner: ChildPlanner
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
@@ -138,10 +140,11 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
+  const planner = createTaskChildPlanner(deps.omoConfig, agents, () => runtime.modelRegistry())
   const manager = createTaskManager({
     store: notifyingStore,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
-    planner: createTaskChildPlanner(deps.omoConfig, agents, () => runtime.modelRegistry()),
+    planner,
     config: settings,
     cwd: deps.cwd,
     destruction: { destroyResidentTask: (taskId) => lifecycle.destroyResidentTask(taskId, "cancel") },
@@ -165,6 +168,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     lifecycle,
     notifier,
     runtime,
+    planner,
     agents,
     omoConfig: deps.omoConfig,
     settings,
