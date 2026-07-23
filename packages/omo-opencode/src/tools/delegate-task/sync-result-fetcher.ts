@@ -1,9 +1,22 @@
 import type { OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { normalizeSDKResponse } from "../../shared"
+import { truncateToTokenBudget } from "./token-limiter"
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+// Caps the text returned to the parent so an oversized subagent deliverable
+// cannot saturate the parent context. The post-tool truncator hook skips the
+// task tool, so the cap must be applied here on the fetch path. Sized to match
+// OpenCode's tool_output.max_bytes default (~51200 bytes ≈ 12800 tokens); the
+// full transcript stays available via background_output.
+const DEFAULT_MAX_SYNC_RESULT_TOKENS = 12_800
+
+function capSyncResult(content: string, maxTokens: number): string {
+  if (maxTokens <= 0) return content
+  return truncateToTokenBudget(content, maxTokens)
 }
 
 function messageText(msg: SessionMessage): string {
@@ -58,8 +71,13 @@ export async function fetchSyncResult(
   client: OpencodeClient,
   sessionID: string,
   anchorMessageCount?: number,
-  options?: { strictAbortRecovery?: boolean; deliverableTag?: string }
+  options?: {
+    strictAbortRecovery?: boolean
+    deliverableTag?: string
+    maxTokens?: number
+  }
 ): Promise<{ ok: true; textContent: string } | { ok: false; error: string }> {
+  const maxTokens = options?.maxTokens ?? DEFAULT_MAX_SYNC_RESULT_TOKENS
   const messagesResult = await client.session.messages({
     path: { id: sessionID },
   })
@@ -122,11 +140,11 @@ export async function fetchSyncResult(
     if (options.deliverableTag) {
       const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
       if (tagged) {
-        return { ok: true, textContent: tagged }
+        return { ok: true, textContent: capSyncResult(tagged, maxTokens) }
       }
     }
 
-    return { ok: true, textContent: lastContent }
+    return { ok: true, textContent: capSyncResult(lastContent, maxTokens) }
   }
 
   // Prefer an explicit deliverable envelope (e.g. `<plan>...</plan>`) when the
@@ -137,7 +155,7 @@ export async function fetchSyncResult(
   if (options?.deliverableTag) {
     const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
     if (tagged) {
-      return { ok: true, textContent: tagged }
+      return { ok: true, textContent: capSyncResult(tagged, maxTokens) }
     }
   }
 
@@ -160,5 +178,5 @@ export async function fetchSyncResult(
     }
   }
 
-  return { ok: true, textContent }
+  return { ok: true, textContent: capSyncResult(textContent, maxTokens) }
 }
