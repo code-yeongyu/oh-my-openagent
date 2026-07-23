@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "4.18.2",
+  "version": "4.19.1",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -110,7 +110,7 @@
     "install:codex-dev": "bun run script/build-codex-install.ts && bun run script/install-codex-dev.ts",
     "build:codex-plugin": "npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build",
     "build:senpi-plugin": "bun run build:lsp-daemon && bun run build:senpi-plugin:stage",
-    "build:senpi-plugin:stage": "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs",
+    "build:senpi-plugin:stage": "bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs",
     "build:materialize-frontend": "node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict",
     "build:shared-skills-assets": "bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills",
     "build:lsp-tools-mcp": "npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build",
@@ -212,18 +212,18 @@
     "typescript": "^6.0.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.18.2",
-    "oh-my-opencode-darwin-x64": "4.18.2",
-    "oh-my-opencode-darwin-x64-baseline": "4.18.2",
-    "oh-my-opencode-linux-arm64": "4.18.2",
-    "oh-my-opencode-linux-arm64-musl": "4.18.2",
-    "oh-my-opencode-linux-x64": "4.18.2",
-    "oh-my-opencode-linux-x64-baseline": "4.18.2",
-    "oh-my-opencode-linux-x64-musl": "4.18.2",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.18.2",
-    "oh-my-opencode-windows-arm64": "4.18.2",
-    "oh-my-opencode-windows-x64": "4.18.2",
-    "oh-my-opencode-windows-x64-baseline": "4.18.2"
+    "oh-my-opencode-darwin-arm64": "4.19.1",
+    "oh-my-opencode-darwin-x64": "4.19.1",
+    "oh-my-opencode-darwin-x64-baseline": "4.19.1",
+    "oh-my-opencode-linux-arm64": "4.19.1",
+    "oh-my-opencode-linux-arm64-musl": "4.19.1",
+    "oh-my-opencode-linux-x64": "4.19.1",
+    "oh-my-opencode-linux-x64-baseline": "4.19.1",
+    "oh-my-opencode-linux-x64-musl": "4.19.1",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.19.1",
+    "oh-my-opencode-windows-arm64": "4.19.1",
+    "oh-my-opencode-windows-x64": "4.19.1",
+    "oh-my-opencode-windows-x64-baseline": "4.19.1"
   },
   "overrides": {
     "@earendil-works/pi-agent-core": "0.80.3",

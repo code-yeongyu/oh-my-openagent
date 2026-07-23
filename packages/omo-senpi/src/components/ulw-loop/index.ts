@@ -1,8 +1,6 @@
-import { spawn } from "node:child_process"
-import { accessSync, constants, existsSync } from "node:fs"
-import { delimiter, join } from "node:path"
-
+import { findContinuableBoulderWork } from "../start-work-continuation/boulder-eligibility"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { resolveOmoBin, runOmoCommand } from "./omo-command"
 
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
 const CONTINUATION_LIMIT = 8
@@ -61,7 +59,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         state.consecutiveContinuations = 0
         state.previousStatusRaw = undefined
         const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
-        if (!status.active) return { action: "continue" }
+        if (status === null || !status.active) return { action: "continue" }
         return {
           action: "transform",
           text: `${payload.text}\n\n${STEERING_REMINDER}`,
@@ -78,7 +76,17 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
           return
         }
 
-        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        const cwd = cwdFromContext(eventCtx)
+        const sessionId = extractSessionId(eventCtx)
+        if (sessionId && findContinuableBoulderWork(cwd, sessionId) !== null) {
+          ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "boulder-continuation-active" })
+          return
+        }
+
+        const status = await readActiveStatus(omoBin, runCommand, cwd, ctx)
+        if (status === null) {
+          return
+        }
         if (!status.active) {
           state.previousStatusRaw = undefined
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "inactive" })
@@ -117,61 +125,22 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void
   pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })
 }
 
-function resolveOmoBin(): string | null {
-  const envBin = process.env.OMO_BIN?.trim()
-  if (envBin) return envBin
-  return findExecutableOnPath("omo")
-}
-
-const OMO_COMMAND_TIMEOUT_MS = 30_000
-
-async function runOmoCommand(
-  bin: string,
-  args: readonly string[],
-  options: { cwd: string },
-): Promise<{ code: number; stdout: string }> {
-  const { promise, resolve } = Promise.withResolvers<{ code: number; stdout: string }>()
-  // stderr is never consumed: piping it would wedge the child forever once the
-  // 64KiB pipe buffer fills (observed as thousands of live `omo ulw-loop status`
-  // processes). Inherit-discard it and hard-kill the child on timeout instead.
-  const child = spawn(bin, [...args], {
-    cwd: options.cwd,
-    stdio: ["ignore", "pipe", "ignore"],
-  })
-
-  const stdoutChunks: Buffer[] = []
-  let settled = false
-  const settle = (result: { code: number; stdout: string }): void => {
-    if (settled) return
-    settled = true
-    clearTimeout(timeout)
-    resolve(result)
-  }
-  const timeout = setTimeout(() => {
-    child.kill("SIGKILL")
-    settle({ code: 1, stdout: Buffer.concat(stdoutChunks).toString("utf8") })
-  }, OMO_COMMAND_TIMEOUT_MS)
-  timeout.unref?.()
-
-  child.stdout.on("data", (chunk) => {
-    stdoutChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
-  })
-  child.on("error", () => {
-    settle({ code: 1, stdout: Buffer.concat(stdoutChunks).toString("utf8") })
-  })
-  child.on("close", (code) => {
-    settle({ code: code ?? 1, stdout: Buffer.concat(stdoutChunks).toString("utf8") })
-  })
-  return promise
-}
-
 async function readActiveStatus(
   omoBin: string,
   runCommand: RunCommand,
   cwd: string,
   ctx: ComponentContext,
-): Promise<ActiveStatus> {
-  const result = await runCommand(omoBin, STATUS_ARGS, { cwd })
+): Promise<ActiveStatus | null> {
+  let result: { code: number; stdout: string }
+  try {
+    result = await runCommand(omoBin, STATUS_ARGS, { cwd })
+  } catch (error) {
+    ctx.logger.warn("omo-senpi ulw-loop status ignored", {
+      reason: "run-command-failed",
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
+  }
   if (result.code !== 0) {
     ctx.logger.warn("omo-senpi ulw-loop status ignored", { reason: "non-zero-exit", code: result.code })
     return { raw: result.stdout, active: false }
@@ -214,39 +183,18 @@ function isUserSourcedInput(value: InputEventLike): boolean {
   return value.source !== "extension"
 }
 
+function extractSessionId(eventCtx: unknown): string | undefined {
+  if (!isRecord(eventCtx)) return undefined
+  const value = eventCtx["sessionManager"]
+  if (!isRecord(value) || typeof value["getSessionId"] !== "function") return undefined
+  const manager = value as unknown as { getSessionId(): unknown }
+  const id = manager.getSessionId()
+  return typeof id === "string" ? id : undefined
+}
+
 function cwdFromContext(value: unknown): string {
   if (isRecord(value) && typeof value["cwd"] === "string") return value["cwd"]
   return process.cwd()
-}
-
-function findExecutableOnPath(command: string): string | null {
-  const pathValue = process.env.PATH
-  if (!pathValue) return null
-  for (const directory of pathValue.split(delimiter)) {
-    if (!directory) continue
-    for (const candidate of executableCandidates(directory, command)) {
-      if (isExecutableFile(candidate)) return candidate
-    }
-  }
-  return null
-}
-
-function executableCandidates(directory: string, command: string): string[] {
-  if (process.platform !== "win32") return [join(directory, command)]
-  const extensions = (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD")
-    .split(";")
-    .filter((extension) => extension.length > 0)
-  return [join(directory, command), ...extensions.map((extension) => join(directory, `${command}${extension.toLowerCase()}`))]
-}
-
-function isExecutableFile(file: string): boolean {
-  if (!existsSync(file)) return false
-  try {
-    accessSync(file, constants.X_OK)
-    return true
-  } catch {
-    return false
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

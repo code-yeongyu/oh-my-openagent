@@ -373,7 +373,92 @@ describe("createTaskStatusUi.syncNow", () => {
   })
 })
 
+describe("createTaskStatusUi.background progress", () => {
+  it("#given two background children #when their latest task events arrive within one debounce window #then footer and widget show truncated descriptions, activity, elapsed time, and spinner frames", () => {
+    // given a controllable 250ms debounce and two active background children created 65 seconds ago
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const first = record({
+      task_id: "st_first",
+      name: "Investigate the unexpectedly long background child description",
+      status: "running",
+      created_at: "2026-07-07T00:00:00.000Z",
+    })
+    const second = record({ task_id: "st_second", name: "Review tests", status: "running", created_at: "2026-07-07T00:00:00.000Z" })
+    const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([first, second]),
+      wasBackground: () => true,
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({
+      manager,
+      runtime: runtimeOf(ui, "session-a", "tui"),
+      timers,
+      now: () => Date.parse("2026-07-07T00:01:05.000Z"),
+    })
+
+    // when the manager-handle subscriptions receive child tool events in one debounce window
+    statusUi.syncNow()
+    listeners.get("st_first")?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/foo.ts" } })
+    listeners.get("st_second")?.({ type: "tool_execution_start", toolName: "bash", args: { command: "bun test" } })
+    expect(active.size).toBe(1)
+    for (const callback of active.values()) callback()
+
+    // then each active background child has a compact, single-line live row in the widget and active footer
+    const rows = ui.widgetCalls.at(-1)?.content ?? []
+    expect(rows).toEqual([
+      "⠋ st_first Investigate the... · read src/foo.ts · 1m 5s",
+      "⠋ st_second Review tests · bash bun test · 1m 5s",
+    ])
+    expect(ui.statusCalls.at(-1)).toContain("Investigate the...")
+    expect(ui.statusCalls.at(-1)).toContain("read src/foo.ts")
+  })
+})
+
 describe("createTaskStatusUi.scheduleSync", () => {
+  it("#given a just-started background child #when the store mutation schedules a render #then it subscribes before the debounce fires", () => {
+    // given a task that can emit its first tool event immediately after the start mutation
+    const active = new Map<number, () => void>()
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        active.set(1, callback)
+        return 1
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const listeners = new Map<string, (event: { readonly type: string }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([record({ task_id: "st_background", status: "running" })]),
+      wasBackground: (taskId) => taskId === "st_background",
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+
+    // when the store mutation schedules the debounced render
+    statusUi.scheduleSync()
+
+    // then the child subscription is already installed, before its first tool event can be emitted
+    expect(listeners.has("st_background")).toBe(true)
+    expect(active.size).toBe(1)
+  })
+
   it("#given several rapid schedule calls #when the debounce fires #then syncNow runs once (250ms debounce)", () => {
     // given a controllable timer
     const active = new Map<number, () => void>()
@@ -405,5 +490,35 @@ describe("createTaskStatusUi.scheduleSync", () => {
 
     // then exactly one sync ran
     expect(ui.statusCalls).toHaveLength(1)
+  })
+
+  it("#given a pending debounce #when dispose is called #then the timer is cleared and syncNow never runs", () => {
+    // given a controllable timer with a pending scheduled sync
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    let cleared = 0
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => {
+        if (typeof handle === "number" && active.delete(handle)) cleared += 1
+      },
+    }
+    const ui = fakeUi()
+    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+    statusUi.scheduleSync()
+    expect(active.size).toBe(1)
+
+    // when the component is disposed before the debounce elapses
+    statusUi.dispose()
+
+    // then the pending timer is cleared and no render happens
+    expect(cleared).toBe(1)
+    expect(active.size).toBe(0)
+    expect(ui.statusCalls).toHaveLength(0)
   })
 })

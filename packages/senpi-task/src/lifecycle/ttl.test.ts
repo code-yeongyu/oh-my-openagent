@@ -7,6 +7,7 @@ import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller } from "./port"
 import {
   cleanupProjects,
+  fakeHandle,
   FakeRegistry,
   seedRecord,
   settings,
@@ -74,6 +75,25 @@ describe("cleanupExpiredRecords (TTL)", () => {
     expect(result.retained).toContain("st_00000003")
   })
 
+  test("#given a freshly claimed pending record #when the cutoff is far in the future #then it is retained", () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000007", status: "pending", updated_at: iso(0) })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now: () => now() + TTL * 100,
+    })
+
+    // when
+    const result = lifecycle.cleanupExpiredRecords()
+
+    // then
+    expect(result.retained).toContain("st_00000007")
+    expect(existsSync(recordPath(store, "st_00000007"))).toBe(true)
+  })
+
   test("#given an old lost RPC record with a LIVE pid #when cleaning #then it is retained (no pid-dead proof)", () => {
     // given
     const store = tempStore()
@@ -99,5 +119,72 @@ describe("cleanupExpiredRecords (TTL)", () => {
 
     // then
     expect(result.deleted).toContain("st_00000005")
+  })
+
+  test("#given an expired terminal record owned by a live resident handle #when cleaning #then it is retained until the handle is forgotten", () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000006", status: "completed", updated_at: iso(TTL + 1) })
+    const registry = new FakeRegistry()
+    registry.add(fakeHandle("st_00000006", "in-process", []))
+    const lifecycle = createTaskLifecycle({ store, registry, config: settings({ ttl_ms: TTL }), now })
+
+    // when
+    const retained = lifecycle.cleanupExpiredRecords()
+
+    // then the live resident protects the record; deleting it would orphan an in-memory handle
+    expect(retained.retained).toContain("st_00000006")
+    expect(existsSync(recordPath(store, "st_00000006"))).toBe(true)
+
+    // when the resident is forgotten and cleanup runs again
+    registry.forget("st_00000006")
+    const afterForget = lifecycle.cleanupExpiredRecords()
+
+    // then the expired terminal record can be safely removed
+    expect(afterForget.deleted).toContain("st_00000006")
+    expect(existsSync(recordPath(store, "st_00000006"))).toBe(false)
+  })
+})
+
+describe("cleanupExpiredRecords (TTL) cross-process ownership", () => {
+  test("#given an expired resident record owned by a LIVE foreign process #when cleaning #then it is retained", () => {
+    // given a sibling senpi process still holds this child resident (revivable)
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000010", status: "completed", residency_state: "resident", updated_at: iso(TTL + 1000), host_pid: 4242 })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+      signaller: aliveSignaller(new Set([4242])),
+      hostPid: 1111,
+    })
+
+    // when
+    const result = lifecycle.cleanupExpiredRecords()
+
+    // then deleting it would orphan the sibling's live handle and let late appends recreate the log
+    expect(result.retained).toContain("st_00000010")
+    expect(existsSync(recordPath(store, "st_00000010"))).toBe(true)
+  })
+
+  test("#given an expired resident record whose foreign owner is DEAD #when cleaning #then it is deleted", () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000011", status: "completed", residency_state: "resident", updated_at: iso(TTL + 1000), host_pid: 4242 })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+      signaller: aliveSignaller(new Set()),
+      hostPid: 1111,
+    })
+
+    // when
+    const result = lifecycle.cleanupExpiredRecords()
+
+    // then
+    expect(result.deleted).toContain("st_00000011")
   })
 })

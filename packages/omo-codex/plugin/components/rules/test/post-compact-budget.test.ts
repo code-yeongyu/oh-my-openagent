@@ -76,6 +76,66 @@ describe("post-compact context budget", () => {
 		expect(budget.maxRuleChars).toBeLessThanOrEqual(budget.maxResultChars);
 	});
 
+	it("#given gpt-5.6-sol within its 372k window #when resolving post-compact budget #then keeps configured post-compact cap", () => {
+		// given
+		const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
+
+		// when
+		const budget = withPostCompactBudget(CONFIG, { model: "gpt-5.6-sol", transcriptPath });
+
+		// then
+		expect(budget.maxRuleChars).toBe(CONFIG.postCompactMaxRuleChars);
+		expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
+	});
+
+	it("#given gpt-5.6-terra within its 372k window #when resolving post-compact budget #then keeps configured post-compact cap", () => {
+		// given
+		const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
+
+		// when
+		const budget = withPostCompactBudget(CONFIG, { model: "gpt-5.6-terra", transcriptPath });
+
+		// then
+		expect(budget.maxRuleChars).toBe(CONFIG.postCompactMaxRuleChars);
+		expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
+	});
+
+	it("#given gpt-5.6-luna within its 372k window #when resolving post-compact budget #then keeps configured post-compact cap", () => {
+		// given
+		const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
+
+		// when
+		const budget = withPostCompactBudget(CONFIG, { model: "gpt-5.6-luna", transcriptPath });
+
+		// then
+		expect(budget.maxRuleChars).toBe(CONFIG.postCompactMaxRuleChars);
+		expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
+	});
+
+	it("#given provider-prefixed gpt-5.6 variant within its 372k window #when resolving post-compact budget #then keeps configured post-compact cap", () => {
+		// given
+		const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
+
+		// when
+		const budget = withPostCompactBudget(CONFIG, { model: "openai/gpt-5.6-sol", transcriptPath });
+
+		// then
+		expect(budget.maxRuleChars).toBe(CONFIG.postCompactMaxRuleChars);
+		expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
+	});
+
+	it("#given unknown model with the same transcript #when resolving post-compact budget #then keeps the 200k fallback floor", () => {
+		// given
+		const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
+
+		// when
+		const budget = withPostCompactBudget(CONFIG, { model: "unknown-model", transcriptPath });
+
+		// then
+		expect(budget.maxResultChars).toBe(500);
+		expect(budget.maxRuleChars).toBe(500);
+	});
+
 	it("#given context pressure marker after compaction #when resolving post-compact budget #then shrinks projected rule injection", () => {
 		// given
 		const transcriptPath = writeCompactedPressureTranscript("small compacted summary");

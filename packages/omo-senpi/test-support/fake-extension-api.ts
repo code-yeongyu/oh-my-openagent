@@ -39,6 +39,8 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly messages: FakeSendMessageCall[] = []
   readonly userMessages: FakeSendUserMessageCall[] = []
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
+  readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
+  events?: SenpiExtensionAPI["events"]
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 
@@ -79,6 +81,10 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void {
     this.userMessages.push({ content, options })
+  }
+
+  registerMcpServer(name: string, config: Record<string, unknown>): void {
+    this.mcpServers.push({ name, config })
   }
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {

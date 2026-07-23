@@ -122,6 +122,47 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 			rmSync(workspace, { recursive: true, force: true });
 		}
 	});
+
+	it("#given the unavailable facade with held-open stdio and a dead parent #when the watchdog polls #then the placeholder server settles without waiting for stdin EOF", async () => {
+		// given
+		// win32: the real-timer watchdog + PassThrough.destroy() teardown race leaves
+		// the read loop's async iterator pending on Windows, so this held-open-stdin
+		// case cannot settle under bun:test (which has no fake timers). The watchdog
+		// settle path IS covered deterministically by mcp-stdio-core's fake-timer test
+		// (passes on win32) and by real-process QA (task-13-*); production settles via
+		// stdin EOF, exercised by the other tests in this file that run on win32.
+		if (process.platform === "win32") return;
+		// Client stdio is held open and never sees EOF, so the parent-liveness
+		// watchdog is the only settle path for the placeholder server.
+		const stdin = new PassThrough();
+		const stdout = new PassThrough();
+		stdout.resume();
+		const stderr: string[] = [];
+
+		try {
+			// when
+			const exitCode = await runCodegraphServe({
+				config: { codegraph: { enabled: false }, sources: [], warnings: [] },
+				env: {},
+				stdin,
+				stdout,
+				stderr: { write: (chunk: string) => stderr.push(chunk) },
+				parentWatchdog: { pollIntervalMs: 10, probeAlive: () => false },
+			});
+
+			// then
+			expect(exitCode).toBe(0);
+			expect(stderr).toEqual([
+				"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n",
+			]);
+		} finally {
+			// The held-open streams are never ended by the test; destroy them so the
+			// bun test runner's event loop can drain and exit (an undestroyed
+			// PassThrough keeps the process alive on win32 and hangs the suite).
+			stdin.destroy();
+			stdout.destroy();
+		}
+	});
 });
 
 function closedMcpStdio(): { readonly stdin: PassThrough; readonly stdout: PassThrough } {

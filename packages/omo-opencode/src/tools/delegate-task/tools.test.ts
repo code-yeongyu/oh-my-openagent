@@ -30,11 +30,13 @@ const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai"]
 const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-opus-4-7",
+  "anthropic/claude-opus-4-8",
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
   "google/gemini-3.1-pro",
   "google/gemini-3-flash",
   "openai/gpt-5.4-mini",
+  "openai/gpt-5.6-sol",
   "openai/gpt-5.5",
   "openai/gpt-5.5",
 ])
@@ -138,9 +140,9 @@ describe("sisyphus-task", () => {
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
-        anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
+        anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
+        openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai"],
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -185,13 +187,13 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("xhigh")
     })
 
-    test("unspecified-high category uses claude-opus-4-7 max as primary", () => {
+    test("unspecified-high category uses claude-opus-4-8 max as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-opus-4-7")
+      expect(category.model).toBe("anthropic/claude-opus-4-8")
       expect(category.variant).toBe("max")
     })
   })
@@ -838,7 +840,7 @@ describe("sisyphus-task", () => {
     test("allows artistry to use its fallback chain when gemini is missing", () => {
       // given - artistry can fall back from gemini to another capable model
       const categoryName = "artistry"
-      const availableModels = new Set<string>(["anthropic/claude-opus-4-7"])
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-8"])
 
       // when
       const result = resolveCategoryConfig(categoryName, {
@@ -1137,7 +1139,7 @@ describe("sisyphus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-7" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -1161,7 +1163,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high uses claude-opus-4-7 max in DEFAULT_CATEGORIES
+      // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high default variant",
@@ -1173,10 +1175,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-7 should be passed with max variant
+      // then - claude-opus-4-8 should be passed with max variant
       expect(launchInput.model).toEqual({
         providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        modelID: "claude-opus-4-8",
         variant: "max",
       })
     }, { timeout: 20000 })
@@ -1196,7 +1198,7 @@ describe("sisyphus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-7" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
            create: async () => ({ data: { id: "ses_sync_default_variant" } }),
@@ -1222,7 +1224,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high uses claude-opus-4-7 max in DEFAULT_CATEGORIES
+      // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high sync variant",
@@ -1234,10 +1236,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-7 should be passed with max variant
+      // then - claude-opus-4-8 should be passed with max variant
       expect(promptBody.model).toEqual({
         providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        modelID: "claude-opus-4-8",
       })
       expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })
@@ -2770,7 +2772,7 @@ describe("sisyphus-task", () => {
           anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
           google: ["gemini-3.1-pro", "gemini-3-flash"],
         openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
-          "kimi-for-coding": ["k2p5"],
+          "kimi-for-coding": ["kimi-k3"],
         },
         connected: ["anthropic", "google", "openai", "kimi-for-coding"],
         updatedAt: "2026-01-01T00:00:00.000Z",
@@ -3641,7 +3643,7 @@ describe("sisyphus-task", () => {
         {
           name: "writing",
           description: "Documentation, prose, technical writing",
-          model: "kimi-for-coding/k2p5",
+          model: "kimi-for-coding/kimi-k3",
         },
       ]
       const availableSkills = [
@@ -4428,11 +4430,12 @@ describe("sisyphus-task", () => {
       )
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
-      // oracle fallback chain: gpt-5.5 (openai) > gemini-3.1-pro (google) > claude-opus-4-7 (anthropic)
-      // Since openai is in connectedProviders, should resolve to openai/gpt-5.5
+      // oracle fallback chain: gpt-5.6-sol (openai) > gemini-3.1-pro (google) > claude-opus-4-8 (anthropic)
+      // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at xhigh
       expect(promptBody.model).toBeDefined()
       expect(promptBody.model.providerID).toBe("openai")
-      expect(promptBody.model.modelID).toContain("gpt-5.5")
+      expect(promptBody.model.modelID).toBe("gpt-5.6-sol")
+      expect(promptBody.variant).toBe("xhigh")
     }, { timeout: 20000 })
   })
 

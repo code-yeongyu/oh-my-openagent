@@ -1,0 +1,10 @@
+{
+  "name": "oracle",
+  "mode": "subagent",
+  "model": {
+    "providerID": "openai",
+    "modelID": "gpt-5.6-sol"
+  },
+  "variant": "xhigh",
+  "temperature": 0.1
+}

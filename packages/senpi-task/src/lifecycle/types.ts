@@ -6,7 +6,7 @@ export type AdmissionResult =
   | { readonly kind: "evicted"; readonly evicted_task_id: string }
   | { readonly kind: "rejected"; readonly error: AgentLimitReached }
 
-export type ReconcileOutcomeKind = "resumed" | "lost" | "lost_and_terminated"
+export type ReconcileOutcomeKind = "resumed" | "lost" | "lost_and_terminated" | "foreign_live_owner"
 
 export type ReconcileOutcome = {
   readonly task_id: string

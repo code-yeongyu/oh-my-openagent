@@ -151,7 +151,7 @@ describe("createCompletionNotifier scheduled retries", () => {
     expect(parent.calls).toHaveLength(1)
   })
 
-  test("#given persistent enqueue failures w2notif #when eight timers exhaust #then no ninth timer is scheduled", () => {
+  test("#given persistent enqueue failures w2notif #when eight timers exhaust #then the cycle caps and the count is cleaned so a later reconcile restarts fresh", () => {
     // given
     const record = baseRecord()
     const { store, records } = fakeStore([record])
@@ -162,11 +162,18 @@ describe("createCompletionNotifier scheduled retries", () => {
 
     // when
     for (let index = 0; index < 8; index += 1) scheduler.run(index)
-    completion.reconcileFailedNotifications({ sessionId: "session-a", parentState: { kind: "idle" } })
 
-    // then
+    // then no ninth timer is scheduled within the same cycle
     expect(scheduler.calls).toHaveLength(8)
     expect(records.get(record.task_id)?.notification.notification_failed_epoch).toBe(0)
+
+    // when a later reconcile retries the same failed epoch
+    completion.reconcileFailedNotifications({ sessionId: "session-a", parentState: { kind: "idle" } })
+
+    // then the cleaned retry count restarts a fresh backoff cycle instead of leaking exhaustion
+    expect(scheduler.calls).toHaveLength(9)
+    expect(scheduler.calls[8]?.delayMs).toBeGreaterThanOrEqual(500)
+    expect(scheduler.calls[8]?.delayMs).toBeLessThan(700)
   })
 
   test("#given failed records from mixed sessions w2notif #when reconciled twice #then only eligible work delivers once", () => {

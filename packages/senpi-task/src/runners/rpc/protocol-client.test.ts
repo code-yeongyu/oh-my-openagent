@@ -54,6 +54,19 @@ function spawnSessionCommandChild(): ChildProcess {
   })
 }
 
+function spawnStderrFloodChild(): ChildProcess {
+  const source = String.raw`
+    const chunk = "x".repeat(1000);
+    for (let i = 0; i < 50; i++) process.stderr.write(chunk);
+    process.stdin.resume();
+  `
+  return spawn("node", ["--input-type=module", "-e", source], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: ["pipe", "pipe", "pipe"],
+  })
+}
+
 async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
@@ -213,5 +226,21 @@ describe("RpcProtocolClient", () => {
 
     // when / then
     expect(client.send({ type: "get_state" })).rejects.toThrow()
+  })
+
+  test("#given a verbose child stderr #when chunks accumulate #then the internal buffer is capped and tail reflects recent bytes", async () => {
+    // given
+    const child = track(spawnStderrFloodChild())
+    const client = new RpcProtocolClient({ child })
+    const STDERR_BUFFER_CAP = 16_384
+    const STDERR_TAIL_CAP = 4_096
+
+    // when
+    await waitFor(() => client.stderrTail.length >= STDERR_TAIL_CAP)
+
+    // then the raw buffer never exceeds the cap, preventing memory growth for chatty children
+    expect(client.stderrBufferLength).toBeLessThanOrEqual(STDERR_BUFFER_CAP)
+    expect(client.stderrTail.length).toBeLessThanOrEqual(STDERR_TAIL_CAP)
+    expect(client.stderrTail.startsWith("x")).toBe(true)
   })
 })

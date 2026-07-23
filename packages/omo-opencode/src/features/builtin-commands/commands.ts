@@ -1,7 +1,7 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 import { isAgentRegistered } from "../claude-code-session-state"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
-import { RALPH_LOOP_TEMPLATE, ULW_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
+import { GOAL_TEMPLATE } from "./templates/goal"
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
@@ -38,33 +38,16 @@ function createBuiltinCommandDefinitions(
   )
 
   return {
-     "ralph-loop": {
-       description: "(builtin) Start self-referential development loop until completion",
-       template: `<command-instruction>
-${RALPH_LOOP_TEMPLATE}
-</command-instruction>
-
-<user-task>
-$ARGUMENTS
-</user-task>`,
-       argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]',
-     },
-     "ulw-loop": {
-        description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
-        template: `<command-instruction>
-${ULW_LOOP_TEMPLATE}
-</command-instruction>
-
-<user-task>
-$ARGUMENTS
-</user-task>`,
-        argumentHint: '"task description" [--completion-promise=TEXT] [--strategy=reset|continue]',
-      },
-    "cancel-ralph": {
-      description: "(builtin) Cancel active Ralph Loop",
+    goal: {
+      description: "(builtin) Set, show, pause, resume, or clear the active thread goal",
       template: `<command-instruction>
-${CANCEL_RALPH_TEMPLATE}
-</command-instruction>`,
+${GOAL_TEMPLATE}
+</command-instruction>
+
+<user-task>
+$ARGUMENTS
+</user-task>`,
+      argumentHint: "<objective> | pause | resume | clear",
     },
     refactor: {
       description:

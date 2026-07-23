@@ -30,6 +30,7 @@ import { initI18n } from "../shared/i18n"
 import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
+import { sweepOmoFamiliesBestEffort } from "../shared/omo-process-sweep"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
 import { recordPluginTelemetry } from "../shared/posthog"
 import {
@@ -51,6 +52,7 @@ export type PluginModuleDeps = {
   log: typeof log
   logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
   migrateLegacyWorkspaceDirectory: typeof migrateLegacyWorkspaceDirectory
+  startOmoProcessSweep: () => Promise<void>
   detectDuplicateOmoPlugin: typeof detectDuplicateOmoPlugin
   getDuplicateOmoPluginWarning: typeof getDuplicateOmoPluginWarning
   detectExternalSkillPlugin: typeof detectExternalSkillPlugin
@@ -82,6 +84,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   log,
   logLegacyPluginStartupWarning,
   migrateLegacyWorkspaceDirectory,
+  startOmoProcessSweep: () => sweepOmoFamiliesBestEffort({ log }),
   detectDuplicateOmoPlugin,
   getDuplicateOmoPluginWarning,
   detectExternalSkillPlugin,
@@ -116,6 +119,23 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     })
     deps.logLegacyPluginStartupWarning()
     deps.migrateLegacyWorkspaceDirectory(input.directory)
+
+    // Unconditional omo process hygiene (T16): fire-and-forget family sweep,
+    // throttled per-family inside the sweep functions. Never awaited and
+    // never allowed to reject into startup.
+    try {
+      void deps
+        .startOmoProcessSweep()
+        .catch((error: unknown) => {
+          deps.log("[oh-my-openagent] omo process sweep failed", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
+    } catch (error) {
+      deps.log("[oh-my-openagent] omo process sweep failed to start", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
 
     const duplicateOmoPluginCheck = deps.detectDuplicateOmoPlugin(input.directory)
     if (duplicateOmoPluginCheck.detected) {

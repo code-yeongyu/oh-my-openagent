@@ -56,6 +56,39 @@ describe("provider model ID transforms", () => {
 		}
 	})
 
+	test("keeps antigravity-gemini-3-flash unchanged for google provider", () => {
+		// #given antigravity-prefixed gemini-3-flash model IDs
+		const provider = "google"
+		const models = [
+			"antigravity-gemini-3-flash",
+			"google/antigravity-gemini-3-flash",
+		] as const
+
+		for (const model of models) {
+			// #when transformed for the google provider
+			const result = transformModelForProvider(provider, model)
+
+			// #then it stays as the valid antigravity id (NOT -preview)
+			expect(result).toBe(model)
+		}
+	})
+
+	test("rewrites plain gemini-3-flash to gemini-3-flash-preview for google provider", () => {
+		// #given plain and google-prefixed gemini-3-flash model IDs
+		const scenarios = [
+			{ model: "gemini-3-flash", expected: "gemini-3-flash-preview" },
+			{ model: "google/gemini-3-flash", expected: "google/gemini-3-flash-preview" },
+		] as const
+
+		for (const scenario of scenarios) {
+			// #when transformed for the google provider
+			const result = transformModelForProvider("google", scenario.model)
+
+			// #then it becomes the -preview form (unchanged behavior)
+			expect(result).toBe(scenario.expected)
+		}
+	})
+
 	test("produces identical results for non-Anthropic providers", () => {
 		// #given non-Anthropic provider/model pairs
 		const scenarios = [

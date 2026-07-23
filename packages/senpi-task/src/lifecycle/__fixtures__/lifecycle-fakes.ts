@@ -34,6 +34,7 @@ export type SeedInput = {
   readonly updated_at?: string
   readonly pid?: number
   readonly child_session_id?: string
+  readonly host_pid?: number
 }
 
 // Write a persisted record at an exact status/residency/timestamp so lifecycle logic can be driven
@@ -55,6 +56,7 @@ export function seedRecord(store: TaskRecordStore, input: SeedInput): TaskRecord
     notification: { run_epoch: 0, notified_epoch: -1 },
     ...(input.pid !== undefined ? { pid: input.pid } : {}),
     ...(input.child_session_id !== undefined ? { child_session_id: input.child_session_id } : {}),
+    ...(input.host_pid !== undefined ? { host_pid: input.host_pid } : {}),
   }
   store.save(record)
   return record

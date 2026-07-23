@@ -2,6 +2,7 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 
 import { resolveExecutionMode, type ExecutionMode, type ManagerStartSpec, type StartResult } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { createChildProgress, type ToolProgressDetails } from "../../progress"
 import { executeBatch } from "./execute-batch"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
@@ -23,6 +24,7 @@ type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { read
 type RunSpawnInput = {
   readonly params: SingleSpawnParams
   readonly signal: AbortSignal | undefined
+  readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
   readonly ctx: TaskToolContext
 }
 
@@ -127,6 +129,15 @@ function startedDetails(
   }
 }
 
+function partialDetails(
+  started: Extract<StartResult, { kind: "started" }>,
+  params: SingleSpawnParams,
+  executionMode: ExecutionMode,
+  progress: ToolProgressDetails,
+): TaskToolDetails & ToolProgressDetails {
+  return { ...startedDetails(started, params, executionMode), ...progress }
+}
+
 function backgroundStartText(started: Extract<StartResult, { kind: "started" }>): string {
   const queue = started.queue_position !== undefined ? ` queued at position ${started.queue_position}` : ""
   return `Started task ${started.task_id} (${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
@@ -136,7 +147,7 @@ async function runSpawn(
   deps: TaskToolDeps,
   input: RunSpawnInput,
 ): Promise<AgentToolResult<TaskToolDetails>> {
-  const { params, signal, ctx } = input
+  const { params, signal, onUpdate, ctx } = input
   if (signal?.aborted) {
     const reason = "Parent aborted before spawn"
     return result(reason, { task_id: "", status: "cancelled", mode: "spawn", reason })
@@ -149,9 +160,11 @@ async function runSpawn(
   const spec = buildStartSpec(params, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
-    const available = started.error.availableCategories
-    const suffix = available && available.length > 0 ? ` Available categories: ${available.join(", ")}.` : ""
-    return result(started.error.message + suffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
+    const agents = started.error.availableAgents
+    const categories = started.error.availableCategories
+    const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
+    const categorySuffix = categories && categories.length > 0 ? ` Available categories: ${categories.join(", ")}.` : ""
+    return result(started.error.message + agentSuffix + categorySuffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
   }
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
@@ -178,8 +191,61 @@ async function runSpawn(
   if (params.run_in_background === true) {
     return result(backgroundStartText(started), startedDetails(started, params, spec.execution_mode))
   }
+
+  const startedAt = Date.now()
+  const progress = createChildProgress(started.task_id, params.category, startedAt)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let emittedAt = 0
+  let receivedChildEvent = false
+  let closed = false
+  const emit = (): void => {
+    if (closed || onUpdate === undefined) return
+    emittedAt = Date.now()
+    onUpdate({
+      content: [{ type: "text", text: progress.text(emittedAt) }],
+      details: partialDetails(started, params, spec.execution_mode, progress.details()),
+    })
+  }
+  const schedule = (): void => {
+    if (closed || onUpdate === undefined) return
+    if (!receivedChildEvent) {
+      receivedChildEvent = true
+      emit()
+      return
+    }
+    const remaining = 250 - (Date.now() - emittedAt)
+    if (remaining <= 0) {
+      emit()
+    } else if (timer === undefined) {
+      timer = setTimeout(() => {
+        timer = undefined
+        emit()
+      }, remaining)
+      timer.unref?.()
+    }
+  }
+  const unsubscribe = deps.manager.subscribeChild(started.task_id, (event) => {
+    if (progress.accept(event)) schedule()
+  })
+  if (started.status === "pending") {
+    onUpdate?.({
+      content: [{ type: "text", text: "queued · waiting for slot" }],
+      details: partialDetails(started, params, spec.execution_mode, {
+        progress: { activity: "queued · waiting for slot", startedAt },
+        childId: started.task_id,
+        turns: 0,
+      }),
+    })
+  } else {
+    emit()
+  }
   try {
     const final = await deps.manager.waitFor(started.task_id, { signal })
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+      emit()
+    }
     return syncResult(final, "spawn")
   } catch (error) {
     if (!signal?.aborted || error !== signal.reason) throw error
@@ -190,6 +256,10 @@ async function runSpawn(
       status: "cancelled",
       reason,
     })
+  } finally {
+    closed = true
+    if (timer !== undefined) clearTimeout(timer)
+    unsubscribe()
   }
 }
 
@@ -210,7 +280,7 @@ function invalidArguments(message: string): AgentToolResult<TaskToolDetails> {
 }
 
 export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
-  return async (_toolCallId, params, signal, _onUpdate, ctx) => {
+  return async (_toolCallId, params, signal, onUpdate, ctx) => {
     const shape = validateBatchShape(params)
     if (shape.kind === "error") return invalidArguments(shape.error.message)
 
@@ -226,7 +296,7 @@ export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
     const first = resolved.items[0]
     if (first === undefined) return invalidArguments("Provide at least one task item.")
     if (resolved.items.length === 1) {
-      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, ctx })
+      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, onUpdate, ctx })
     }
 
     const parentSessionId = ctx.sessionManager.getSessionId()

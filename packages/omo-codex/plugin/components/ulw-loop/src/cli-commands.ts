@@ -1,9 +1,9 @@
+import { checkpoint } from "./checkpoint-continuation.js";
 import { hasFlag, readValue } from "./cli-arg-parser.js";
 import { printJsonError, ULW_LOOP_HELP } from "./cli-output.js";
 import {
 	addGoal,
 	captureEvidence,
-	checkpoint,
 	completeGoals,
 	createGoals,
 	criteria,

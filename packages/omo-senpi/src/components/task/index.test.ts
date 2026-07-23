@@ -80,7 +80,7 @@ function fakeUi(): CapturedUi {
   }
 }
 
-const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {} }
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
 
 // Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
 // registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
@@ -135,8 +135,9 @@ describe("omo-senpi task component wiring", () => {
     expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
     // pull-delivered peer messages are plain user turns; only completion keeps a custom renderer
     expect(pi.messageRenderers.map((entry) => entry.customType)).toEqual(["senpi-task.completion"])
-    // exactly the task event handlers (session lifecycle + transition-buffer edges)
-    expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS].sort())
+    // exactly the task event handlers (session lifecycle + transition-buffer edges) plus the
+    // unconditional T16 hygiene sweep handler, which registers its own session_start listener
+    expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS, "session_start"].sort())
   })
 
   it("#given a fake ExtensionAPI boot #when the task component registers #then the 7 lead team tools are wired", () => {
@@ -151,7 +152,7 @@ describe("omo-senpi task component wiring", () => {
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
   })
 
-  it("#given the omo-task flag is false #when the component registers #then nothing is wired", () => {
+  it("#given the omo-task flag is false #when the component registers #then only the unconditional hygiene sweep handler is wired", () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
@@ -162,7 +163,7 @@ describe("omo-senpi task component wiring", () => {
 
     // then
     expect(pi.tools).toEqual([])
-    expect(pi.handlers).toEqual([])
+    expect(pi.handlers.map((handler) => handler.event)).toEqual(["session_start"])
     expect(pi.messageRenderers).toEqual([])
     expect(logger.entries).toContainEqual({ level: "info", message: "omo-senpi task component disabled by flag" })
   })
@@ -201,7 +202,7 @@ describe("omo-senpi task component wiring", () => {
     expect(leadCalls.ticks).toBe(2)
   })
 
-  it("#given a session start #when reconciliation runs #then reattach, mailbox reclaim, notification retry, and lead polling stay ordered", async () => {
+  it("#given a session start #when reconciliation runs #then reattach, cleanup, mailbox reclaim, notification retry, and lead polling stay ordered", async () => {
     // given
     const cwd = tempProject()
     const pi = new FakeExtensionAPI()
@@ -215,6 +216,10 @@ describe("omo-senpi task component wiring", () => {
         reconcileOnSessionStart: async () => {
           order.push("reattach")
           return { outcomes: [] }
+        },
+        cleanupExpiredRecords: () => {
+          order.push("cleanup")
+          return { deleted: [], retained: [] }
         },
       },
       notifier: {
@@ -246,7 +251,7 @@ describe("omo-senpi task component wiring", () => {
     })
 
     // then
-    expect(order).toEqual(["reattach", "reclaim", "notify", "poll"])
+    expect(order).toEqual(["reattach", "cleanup", "reclaim", "notify", "poll"])
   })
 
   it("#given a captured ui #when session_before_switch fires #then the ui bridge is cleared", async () => {
@@ -288,9 +293,9 @@ describe("omo-senpi task component wiring", () => {
     // when
     createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
-    // then no tools or events wired
+    // then no tools wired; only the unconditional hygiene sweep handler remains
     expect(pi.tools).toEqual([])
-    expect(pi.handlers).toEqual([])
+    expect(pi.handlers.map((handler) => handler.event)).toEqual(["session_start"])
     const skipWarnings = logger.entries.filter(
       (entry) => entry.level === "warn" && entry.message.includes("missing ExtensionAPI capabilities"),
     )

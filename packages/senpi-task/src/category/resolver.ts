@@ -32,6 +32,7 @@ type ParsedModel = {
 
 type ParsedRegistryModel<TModel extends SenpiModelPort> = ParsedModel & {
   readonly model: TModel
+  readonly displayName?: string
 }
 
 type ModelSelectionInput = {
@@ -66,11 +67,9 @@ function hasSecretLikeModelField(model: object): boolean {
   )
 }
 
-function ownStringDataProperty(model: object, key: "provider" | "id"): string | undefined {
+function ownStringDataProperty(model: object, key: "provider" | "id" | "name"): string | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(model, key)
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string"
-    ? descriptor.value
-    : undefined
+  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined
 }
 
 function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
@@ -87,10 +86,11 @@ function parseRegistryModel<TModel extends SenpiModelPort>(
   }
   const provider = ownStringDataProperty(model, "provider")
   const modelId = ownStringDataProperty(model, "id")
+  const displayName = ownStringDataProperty(model, "name")
   if (!provider || !modelId || (expected !== undefined && (provider !== expected.provider || modelId !== expected.modelId))) {
     return undefined
   }
-  return { model, provider, modelId }
+  return { model, provider, modelId, ...(displayName !== undefined && displayName.trim().length > 0 && displayName.length <= 120 && !/[\u0000-\u001f\u007f-\u009f]/u.test(displayName) ? { displayName } : {}) }
 }
 
 function parseModel(model: string): ParsedModel | undefined {
@@ -254,6 +254,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     model: foundModel.model,
     provider: foundModel.provider,
     modelId: foundModel.modelId,
+    ...(foundModel.displayName !== undefined ? { displayName: foundModel.displayName } : {}),
     ...(variant !== undefined ? { variant } : {}),
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),

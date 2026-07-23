@@ -15,6 +15,7 @@ const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
   "pr-source-guidance.yml",
 )
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
+const MARKETPLACE_ROOT_DESTINATION_PATH = "marketplace.json"
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
 const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
@@ -63,9 +64,15 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     throw new Error(`Sisyphus Labs plugin manifest must be named omo, got ${pluginManifest.name}`)
   }
 
+  const marketplaceContents = await readFile(marketplacePath, "utf8")
   const destinationMarketplacePath = join(lazycodexRoot, MARKETPLACE_DESTINATION_PATH)
   await mkdir(dirname(destinationMarketplacePath), { recursive: true })
-  await writeFile(destinationMarketplacePath, await readFile(marketplacePath, "utf8"))
+  await writeFile(destinationMarketplacePath, marketplaceContents)
+  // `codex plugin marketplace add <repo>` scans the repository ROOT for a
+  // supported manifest, so publish marketplace.json at the root as well (the
+  // .agents/plugins copy stays for back-compat). Its "source": "./plugins/omo"
+  // resolves correctly from the root, where the plugin payload is copied.
+  await writeFile(join(lazycodexRoot, MARKETPLACE_ROOT_DESTINATION_PATH), marketplaceContents)
 
   const destinationPluginRoot = join(lazycodexRoot, PLUGIN_DESTINATION_PATH)
   await rm(destinationPluginRoot, { recursive: true, force: true })
@@ -224,11 +231,20 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   if (relative.length === 0) return true
   const parts = relative.split(sep)
   if (parts.some((part) => PLUGIN_COPY_DENYLIST.has(part))) return false
+  if (parts.length <= 1) return true
+  const name = parts.at(-1)
   // Codex loads MCP servers only from the plugin-root .mcp.json (.codex-plugin/plugin.json declares
   // "mcpServers": "./.mcp.json"). A component's own nested .mcp.json is a standalone-plugin dev
   // manifest whose relative daemon path dangles once the plugin is flattened into the bundle, so it
   // must never ship in plugins/omo.
-  return !(parts.length > 1 && parts.at(-1) === ".mcp.json")
+  if (name === ".mcp.json") return false
+  // A component's nested .gitignore is a standalone-repository dev artifact. When it ships in the
+  // marketplace payload, a `dist/` rule in it overrides the lazycodex repository's root negation
+  // (`!plugins/omo/components/*/dist/**`), so `git add plugins/omo` silently drops the component's
+  // built CLI from the repo even though the file was copied and validated on disk. That is how
+  // start-work-continuation/dist/cli.js and ulw-loop/dist/cli.js went missing while rules and
+  // ultrawork (whose nested .gitignore has no `dist/` rule) survived (lazycodex#108).
+  return name !== ".gitignore"
 }
 
 

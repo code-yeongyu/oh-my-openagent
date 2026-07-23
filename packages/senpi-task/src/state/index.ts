@@ -13,7 +13,7 @@ export type {
   TaskTransitionResult,
 } from "./types"
 export { createTaskRecord } from "./record"
-export { createTaskId, parseTaskId } from "./id"
+export { bumpTaskId, createTaskId, parseTaskId, syncTaskIdFloor } from "./id"
 export type { TaskId } from "./id"
 export { messageability } from "./messageability"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"

@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 10,
-						"statusMessage": "(OmO 4.18.2) Loading Project Rules",
+						"statusMessage": "(OmO 4.19.1) Loading Project Rules",
 						"commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.ps1\" \"${PLUGIN_ROOT}\\components\\rules\\dist\\cli.js\" hook user-prompt-submit"
 					}
 				]

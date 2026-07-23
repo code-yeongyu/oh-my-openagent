@@ -7,6 +7,7 @@ import {
   linesComponent,
   normalizeRendererText,
   renderTaskCallLines,
+  renderTaskResultComponent,
   renderTaskResultLines,
   rendererVisibleWidth,
   statusThemeColor,
@@ -131,7 +132,7 @@ describe("taskResultLines", () => {
     expect(lines.join(" ")).toContain("completed")
   })
 
-  test("#given resolved category metadata #when rendered #then target, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {
+  test("#given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {
     // given
     const details = {
       task_id: "st_0000000c",
@@ -156,9 +157,7 @@ describe("taskResultLines", () => {
     const row = taskResultLines(details).join(" ")
 
     // then
-    expect(row).toContain("category:ultrabrain")
-    expect(row).toContain("GPT-5.6 Sol")
-    expect(row).toContain("reasoning:xhigh")
+    expect(row).toContain("category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh)")
     expect(row.match(/xhigh/gu)).toHaveLength(1)
     expect(row).toContain("background")
     expect(row).toContain("pending")
@@ -187,30 +186,56 @@ describe("taskResultLines", () => {
     expect(row).not.toContain("[object Object]")
   })
 
-  test("#given long result context #when rendered at width 72 #then every ANSI-aware row is bounded and truncated with an ellipsis", () => {
+  test("#given a persisted display already prefixed by the provider #when full and compact rows render #then the provider is not duplicated", () => {
     // given
-    const lines = taskResultLines({
+    const details = {
       task_id: "st_0000000e",
       status: "pending",
-      mode: "spawn",
+      mode: "spawn" as const,
       category: "ultrabrain",
       resolved_model: {
         provider: "openai",
         model_id: "gpt-5.6-sol",
-        display: "GPT-5.6 Sol Extended Display",
+        display: "OpenAI GPT-5.6 SOL",
         reasoning_effort: "xhigh",
-        source: "category",
+        source: "category" as const,
+      },
+      run_in_background: true,
+    }
+
+    // when
+    const plain = taskResultLines(details).join(" ")
+    const compact = renderTaskResultComponent(details, ANSI_THEME).render(96).join(" ")
+
+    // then
+    expect(plain).toContain("(OpenAI GPT-5.6 SOL reasoning:xhigh)")
+    expect(compact).toContain("(OpenAI GPT-5.6 SOL xhigh)")
+  })
+
+  test("#given resolved category context #when the real result component renders at width 72 #then provider, friendly model, and reasoning stay visible within bounds", () => {
+    // given
+    const details = {
+      task_id: "st_0000000e",
+      status: "pending",
+      mode: "spawn" as const,
+      category: "ultrabrain",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        reasoning_effort: "xhigh",
+        source: "category" as const,
       },
       run_in_background: true,
       queue_position: 12,
       reason: "긴 대기열 사유입니다. Provider capacity is constrained for this request.",
-    })
+    }
 
     // when
-    const rendered = linesComponent(lines).render(72)
+    const rendered = renderTaskResultComponent(details, ANSI_THEME).render(72)
 
     // then
-    expect(rendered.some((line) => line.includes("..."))).toBe(true)
+    expect(rendered.join(" ")).toContain("(openai GPT-5.6 Sol xhigh)")
     for (const line of rendered) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
   })
 })

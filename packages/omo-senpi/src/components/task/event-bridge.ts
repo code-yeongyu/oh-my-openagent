@@ -32,6 +32,10 @@ export function wireEventBridge(
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onSessionStart(engine.runtime.sessionId())
     await engine.lifecycle.reconcileOnSessionStart()
+    const cleanup = engine.lifecycle.cleanupExpiredRecords()
+    if (cleanup.deleted.length > 0) {
+      ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
+    }
     await reconcileTeamMailboxBestEffort(ctx, state)
     const sessionId = engine.runtime.sessionId()
     if (sessionId !== undefined) {
@@ -66,6 +70,7 @@ export function wireEventBridge(
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
+    statusUi.dispose()
     state.leadPollers.shutdown()
     await engine.lifecycle.teardownOnSessionShutdown()
   })

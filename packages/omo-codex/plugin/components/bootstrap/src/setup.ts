@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
@@ -10,6 +10,7 @@ import {
 	linkCachedPluginAgents,
 } from "../../../../src/install/link-cached-plugin-agents.ts";
 import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../src/install/codex-cache-bins.ts";
+import { hasForeignAgentRegistration } from "../../../../src/install/codex-config-agents.ts";
 import { updateCodexConfig } from "../../../../src/install/codex-config-toml.ts";
 import { stampGitBashMcpEnv } from "../../../../src/install/codex-git-bash-mcp-env.ts";
 import { trustedHookStatesForPlugin } from "../../../../src/install/codex-hook-trust.ts";
@@ -141,6 +142,16 @@ async function updateConfigStep(
 	const configPath = join(options.codexHome, "config.toml");
 	try {
 		await assertWritableConfigIfPresent(configPath);
+		// Orca mirrors the system [agents.*] entries into its runtime CODEX_HOME
+		// without copying the agents directory. Re-stamping our own registration
+		// for such a role would collide with the mirrored entry once Codex
+		// discovers <codexHome>/agents/<name>.toml (two different file paths for
+		// one role name -> upstream warning), so foreign pre-existing blocks are
+		// left untouched; directory discovery still loads the linked toml.
+		const existingConfig = await readConfigIfPresent(configPath);
+		const agentConfigs = inputs.agentConfigs.filter(
+			(agentConfig) => !hasForeignAgentRegistration(existingConfig, agentConfig),
+		);
 		// Re-stamping trusted hook hashes after an upgrade is what makes the
 		// next session's hooks trusted again once the user re-approved the
 		// bootstrap hook itself.
@@ -150,7 +161,7 @@ async function updateConfigStep(
 			pluginRoot: options.pluginRoot,
 		});
 		await updateCodexConfig({
-			agentConfigs: inputs.agentConfigs,
+			agentConfigs,
 			// Hard invariant: the bootstrap worker NEVER writes permission keys
 			// (approval/sandbox/network policies stay installer-flag-only).
 			autonomousPermissions: false,
@@ -187,6 +198,15 @@ async function assertWritableConfigIfPresent(configPath: string): Promise<void> 
 
 function errorCode(error: unknown): string | undefined {
 	return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
+}
+
+async function readConfigIfPresent(configPath: string): Promise<string> {
+	try {
+		return await readFile(configPath, "utf8");
+	} catch (error) {
+		if (errorCode(error) === "ENOENT") return "";
+		throw error;
+	}
 }
 
 async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: BootstrapDegradedEntry[]): Promise<void> {

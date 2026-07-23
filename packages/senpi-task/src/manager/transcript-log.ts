@@ -6,14 +6,16 @@ import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
 // names are the contract between writer and reader.
 export const TRANSCRIPT_ASSISTANT_EVENT = "assistant_message"
 export const TRANSCRIPT_TOOL_EVENT = "tool_execution"
+export const TRANSCRIPT_ERROR_EVENT = "child_error"
 
 export type TranscriptLogStore = {
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
 }
 
-// Persist the transcript-relevant slice of a child event: assistant prose from message_end and a
-// tool marker from tool_execution_end. Every other event (user/tool-result messages, lifecycle,
-// tool_execution_start) is ignored so the log stays a clean assistant/tool transcript.
+// Persist the transcript-relevant slice of a child event: assistant prose from message_end, a tool
+// marker from tool_execution_end, and a child_error breadcrumb when the assistant message carries a
+// stopReason "error" diagnostic (otherwise a failed turn leaves NO trace and task_output reads an
+// empty transcript). Every other event is ignored so the log stays a clean transcript.
 export function logTranscriptEvent(store: TranscriptLogStore, taskId: string, event: ManagedChildEvent): void {
   const persisted = toPersistedEvent(event)
   if (persisted !== undefined) store.appendEvent(taskId, persisted)
@@ -27,6 +29,8 @@ export function subscribeTranscriptLog(handle: ManagedChildHandle, store: Transc
 
 function toPersistedEvent(event: ManagedChildEvent): PersistedTaskEvent | undefined {
   if (event.type === "message_end") {
+    const failure = assistantFailure(event.message)
+    if (failure !== undefined) return { type: TRANSCRIPT_ERROR_EVENT, payload: failure }
     const text = assistantText(event.message)
     return text === undefined ? undefined : { type: TRANSCRIPT_ASSISTANT_EVENT, payload: { text } }
   }
@@ -34,6 +38,15 @@ function toPersistedEvent(event: ManagedChildEvent): PersistedTaskEvent | undefi
     return { type: TRANSCRIPT_TOOL_EVENT, payload: { tool: event.toolName, is_error: event.isError === true } }
   }
   return undefined
+}
+
+function assistantFailure(message: unknown): { readonly message: string; readonly stop_reason: string } | undefined {
+  if (!isRecord(message) || message.role !== "assistant") return undefined
+  if (message.stopReason !== "error") return undefined
+  const diagnostic = typeof message.errorMessage === "string" && message.errorMessage.length > 0
+    ? message.errorMessage
+    : "child turn failed without a diagnostic message"
+  return { message: diagnostic, stop_reason: "error" }
 }
 
 function assistantText(message: unknown): string | undefined {

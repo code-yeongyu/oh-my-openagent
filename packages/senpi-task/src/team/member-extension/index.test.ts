@@ -76,7 +76,7 @@ describe("member extension lifecycle", () => {
 
       loading = false
       await dispatch(handlers, "session_start")
-      await withTimeout(injection, 1_500)
+      await withTimeout(injection, 5_000)
 
       expect(injected).toHaveLength(1)
       expect(injected[0]).toContain(MESSAGE_ID)

@@ -1,3 +1,4 @@
+// biome-ignore-all format: long agent-facing instruction strings are intentionally stable.
 import {
 	codexGoalMode,
 	expectedCodexObjective,

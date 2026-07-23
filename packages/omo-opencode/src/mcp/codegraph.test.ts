@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from "bun:test"
 import { join } from "node:path"
-import { CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
+import { tmpdir } from "node:os"
+import { CODEGRAPH_NO_DAEMON_ENV, CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
 import { createCodegraphMcpConfig } from "./codegraph"
 import type { RuntimeExecutable } from "./runtime-executable"
 
@@ -182,6 +183,79 @@ describe("createCodegraphMcpConfig", () => {
       enabled: true,
     })
     expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
+  })
+
+  it("pins CODEGRAPH_NO_DAEMON=1 in the MCP environment when daemon is not opted in", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { enabled: true },
+      env: { OMO_CODEGRAPH_BIN: codegraphPath },
+      fileExists: (filePath) => filePath === codegraphPath,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({}),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBe("1")
+  })
+
+  it("omits CODEGRAPH_NO_DAEMON from the MCP environment when daemon=true", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { daemon: true, enabled: true },
+      env: { OMO_CODEGRAPH_BIN: codegraphPath },
+      fileExists: (filePath) => filePath === codegraphPath,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({}),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBeUndefined()
+  })
+
+  it("keeps the registration disabled when the project is under a configured excluded root", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/excluded/project",
+      config: { enabled: true, excluded_roots: ["/excluded"] },
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({ codegraph: codegraphPath }),
+    })
+
+    // then
+    expect(config.command).toEqual([codegraphPath, "serve", "--mcp"])
+    expect(config.enabled).toBe(false)
+  })
+
+  it("keeps the registration disabled when the project lives under the OS tmpdir by default", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: join(tmpdir(), "omo-codegraph-mcp-excluded-probe"),
+      config: { enabled: true },
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({ codegraph: codegraphPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(false)
   })
 })
 

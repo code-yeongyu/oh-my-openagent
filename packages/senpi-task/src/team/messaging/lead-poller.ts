@@ -9,6 +9,7 @@ import { MessageSchema, type Message } from "@oh-my-opencode/team-core/types"
 import type { PersistedTaskEvent } from "../../store"
 import { TEAM_LEAD_SENTINEL } from "../normalize"
 import { buildPeerMessageEnvelope } from "./message"
+import { createSessionMarkerIndex, type SessionMarkerIndex } from "./session-marker-index"
 import type { WaitClaim, WaitRegistry } from "./wait-registry"
 
 const DEAD_PID_LEASE_STALE_MS = 0
@@ -33,7 +34,11 @@ export type LeadPollerDeps = {
 type PendingPhase = "awaiting_flush" | "awaiting_persistence" | "recovery"
 
 type PendingDelivery = { readonly message: Message; readonly reservation: DeliveryReservation; phase: PendingPhase }
-type LeadPollState = { readonly pending: Map<string, PendingDelivery>; readonly isStopped: () => boolean }
+type LeadPollState = {
+  readonly pending: Map<string, PendingDelivery>
+  readonly isStopped: () => boolean
+  readonly markerIndex: SessionMarkerIndex
+}
 
 class InvalidReservedLeadMessageError extends Error {
   readonly path: string
@@ -47,7 +52,7 @@ class InvalidReservedLeadMessageError extends Error {
 export function createLeadPoller(deps: LeadPollerDeps): LeadPoller {
   const pending = new Map<string, PendingDelivery>()
   let stopped = false
-  const state: LeadPollState = { pending, isStopped: () => stopped }
+  const state: LeadPollState = { pending, isStopped: () => stopped, markerIndex: createSessionMarkerIndex() }
   const withLease = <T>(fn: () => Promise<T>): Promise<T> => withInboxConsumerLease(
     deps.teamRunId, TEAM_LEAD_SENTINEL, deps.config, fn, { staleAfterMs: DEAD_PID_LEASE_STALE_MS },
   )
@@ -85,7 +90,7 @@ async function settlePending(deps: LeadPollerDeps, state: LeadPollState): Promis
     }
     const sessionFile = deps.leadSessionFile?.()
     if (sessionFile === undefined) continue
-    const persisted = await sessionFileContainsMessage(sessionFile, delivery.message.messageId)
+    const persisted = await state.markerIndex.contains(sessionFile, delivery.message.messageId)
     if (!persisted && !releaseWhenMissing) continue
     if (!persisted) {
       await releaseDeliveryReservation(delivery.reservation)
@@ -114,7 +119,7 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
   }
 
   const sessionFile = deps.leadSessionFile?.()
-  if (sessionFile !== undefined && await sessionFileContainsMessage(sessionFile, message.messageId)) {
+  if (await state.markerIndex.contains(sessionFile, message.messageId)) {
     await commitDeliveryReservation(reservation)
     appendDeliveredEvent(deps, message)
     return
@@ -196,7 +201,7 @@ async function recoverReservations(deps: LeadPollerDeps, state: LeadPollState): 
     const sessionFile = deps.leadSessionFile?.()
     if (sessionFile === undefined) {
       state.pending.set(message.messageId, { message, reservation, phase: "recovery" })
-    } else if (await sessionFileContainsMessage(sessionFile, message.messageId)) {
+    } else if (await state.markerIndex.contains(sessionFile, message.messageId)) {
       await commitDeliveryReservation(reservation)
       appendDeliveredEvent(deps, message)
     } else {
@@ -216,36 +221,6 @@ async function readReservedMessage(path: string): Promise<Message> {
   const parsed = MessageSchema.safeParse(value)
   if (!parsed.success) throw new InvalidReservedLeadMessageError(path)
   return parsed.data
-}
-
-async function sessionFileContainsMessage(path: string, messageId: string): Promise<boolean> {
-  let text: string
-  try {
-    text = await readFile(path, "utf8")
-  } catch (error) {
-    if (isMissingPath(error)) return false
-    throw error
-  }
-  return text.split("\n").some((line) => containsEnvelopeMarker(parseJsonLine(line), messageId))
-}
-
-function parseJsonLine(line: string): unknown {
-  if (line.trim().length === 0) return undefined
-  try {
-    return JSON.parse(line)
-  } catch (error) {
-    if (error instanceof SyntaxError) return undefined
-    throw error
-  }
-}
-
-function containsEnvelopeMarker(value: unknown, messageId: string): boolean {
-  if (typeof value === "string") {
-    return value.includes("<peer_message ") && value.includes(`messageId="${messageId}"`)
-  }
-  if (Array.isArray(value)) return value.some((entry) => containsEnvelopeMarker(entry, messageId))
-  if (!isRecord(value)) return false
-  return Object.values(value).some((entry) => containsEnvelopeMarker(entry, messageId))
 }
 
 function appendDeliveredEvent(deps: LeadPollerDeps, message: Message): void {
@@ -268,10 +243,6 @@ function appendWaitedEvent(deps: LeadPollerDeps, message: Message): void {
 
 function inboxDir(deps: LeadPollerDeps): string {
   return getInboxDir(resolveBaseDir(deps.config), deps.teamRunId, TEAM_LEAD_SENTINEL)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function isMissingPath(error: unknown): boolean {

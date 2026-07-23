@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 
 import { normalizeUlwLoopSessionId, ulwLoopDir } from "./paths.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
@@ -73,15 +73,23 @@ function isResumableStatus(status: UlwLoopItem["status"]): boolean {
 // a separate file — a ledger append would change the count and self-reset.
 function consumeResumeBudget(stateDir: string, goalId: string): boolean {
 	const ledgerLineCount = countLedgerLines(join(stateDir, "ledger.jsonl"));
-	const counterPath = join(stateDir, `auto-resume-${goalId}.json`);
+	const counterPath = resolve(stateDir, `auto-resume-${goalId}.json`);
+	const stuckPath = resolve(stateDir, `auto-resume-${goalId}.stuck`);
+	// goals.json is untrusted input: a crafted goal id (e.g. `../../x`) must
+	// never drive a write outside the session state dir. Deny the resume.
+	if (!isInsideDir(stateDir, counterPath) || !isInsideDir(stateDir, stuckPath)) return false;
 	const previous = readCounter(counterPath);
 	const count = previous !== null && previous.ledgerLineCount === ledgerLineCount ? previous.count : 0;
 	if (count >= RESUME_CAP) {
-		writeFileSync(join(stateDir, `auto-resume-${goalId}.stuck`), `no ledger progress after ${count} resumes\n`);
+		writeFileSync(stuckPath, `no ledger progress after ${count} resumes\n`);
 		return false;
 	}
 	writeFileSync(counterPath, JSON.stringify({ count: count + 1, ledgerLineCount }));
 	return true;
+}
+
+function isInsideDir(dir: string, candidate: string): boolean {
+	return candidate.startsWith(resolve(dir) + sep);
 }
 
 function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: string): string {
@@ -93,7 +101,7 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: 
 		"The turn ended before the loop completed. Resume it now:",
 		`1. Run \`omo ulw-loop status${option} --json\` to reload the plan, the active goal, and currentAttemptDir.`,
 		"2. Continue the active goal's remaining success criteria, recording evidence with record-evidence.",
-		`3. Checkpoint through \`omo ulw-loop checkpoint${option}\` when the goal's criteria are proven.`,
+		`3. Checkpoint through \`omo ulw-loop checkpoint${option}\` when the goal's criteria are proven; a complete checkpoint prints the next goal instruction.`,
 		"If the loop is genuinely blocked on the user, checkpoint the goal as blocked with the reason instead.",
 	].join("\n");
 }

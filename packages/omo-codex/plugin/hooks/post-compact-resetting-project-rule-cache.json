@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-compact",
 						"timeout": 10,
-						"statusMessage": "(OmO 4.18.2) Resetting Project Rule Cache",
+						"statusMessage": "(OmO 4.19.1) Resetting Project Rule Cache",
 						"commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.ps1\" \"${PLUGIN_ROOT}\\components\\rules\\dist\\cli.js\" hook post-compact"
 					}
 				],

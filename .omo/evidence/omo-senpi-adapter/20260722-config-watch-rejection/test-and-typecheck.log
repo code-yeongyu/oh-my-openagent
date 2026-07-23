@@ -1,0 +1,22 @@
+== bun test packages/omo-senpi/src/components/config-watch (after unref fix) ==
+
+ 29 pass
+ 0 fail
+ 87 expect() calls
+Ran 29 tests across 3 files. [261.00ms]
+
+== tsgo --noEmit -p packages/omo-senpi/tsconfig.json ==
+tsgo: clean (exit 0)
+
+== repro driver (after unref fix) ==
+{
+  "result": "survived",
+  "registerCount": 4,
+  "sequence": [
+    "REGISTER#1",
+    "REGISTER#2",
+    "REGISTER#3",
+    "REGISTER#4"
+  ],
+  "totalEvents": 4
+}

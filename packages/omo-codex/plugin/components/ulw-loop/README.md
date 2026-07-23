@@ -11,17 +11,19 @@ Every subcommand below is implemented. Pass `--json` where supported for machine
 | Subcommand | Purpose |
 |------------|---------|
 | `omo ulw-loop help` | Print CLI usage. |
-| `omo ulw-loop create-goals` | Create repo-native goals and seed success criteria from a brief. |
+| `omo ulw-loop create-goals` | Create repo-native goals and seed success criteria from a brief; optionally define review-boundary validation batches with `--validation-batch-json`. |
 | `omo ulw-loop status` | Report active goal, criteria, and evidence state. |
-| `omo ulw-loop complete-goals` | Start or resume the next eligible goal, or report aggregate completion / blocked handoff. |
-| `omo ulw-loop checkpoint` | Gate a goal transition with evidence; final completion requires a complete Codex goal snapshot and a passing quality gate. |
-| `omo ulw-loop steer` | Apply a steering mutation proposal to the plan. |
+| `omo ulw-loop complete-goals` | Manual fallback to start or resume the next eligible goal, or report aggregate completion / blocked handoff. |
+| `omo ulw-loop checkpoint` | Gate a goal transition with evidence; complete checkpoints auto-start the next eligible goal by default, with `--no-advance` preserving the legacy two-call flow. |
+| `omo ulw-loop steer` | Apply one steering mutation proposal or an atomic all-or-nothing batch with `--proposals-json`. |
 | `omo ulw-loop add-goal` | Append a goal to the active plan. |
 | `omo ulw-loop criteria` | Inspect one goal's success criteria. |
 | `omo ulw-loop record-evidence` | Record observable evidence for one criterion. |
 | `omo ulw-loop record-review-blockers` | Mark a goal as review-blocked and add follow-up work from final-review findings. |
 
 The final quality gate parsed by `checkpoint` validates `codeReview`, `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`. `criteriaCoverage` records the original intent, desired outcome, user-facing outcome review, pass counts, and covered adversarial classes.
+
+Validation batches are optional review boundaries declared at plan creation with `--validation-batch-json '[{"batchId":"VB001","memberIds":[...],"finalGoalId":"..."}]'`. The batch-final goal cannot complete until every other member is complete or superseded-resolved, every member criterion is pass, and a quality gate's coverage counts match the recomputed member criteria. Steering split/supersede mutations keep batch membership consistent and record `batch_updated`.
 
 ## Codex Plugin
 
