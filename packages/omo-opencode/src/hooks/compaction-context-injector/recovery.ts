@@ -132,7 +132,7 @@ export function createRecoveryLogic(
 
       updateSessionAgent(sessionID, expectedPromptConfig.agent)
       if (model) {
-        setSessionModel(sessionID, model)
+        setSessionModel(sessionID, model, expectedPromptConfig.agent)
       }
       if (tools) {
         setSessionTools(sessionID, tools)

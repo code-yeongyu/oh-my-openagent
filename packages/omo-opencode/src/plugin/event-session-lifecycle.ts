@@ -143,7 +143,7 @@ export function handleMessageUpdatedSessionState(args: {
     const modelID = info?.modelID as string | undefined;
     if (providerID && modelID && !isCompactionMessage) {
       args.noteSessionModel(sessionID, { providerID, modelID });
-      setSessionModel(sessionID, { providerID, modelID });
+      setSessionModel(sessionID, { providerID, modelID }, agent);
     }
   }
 

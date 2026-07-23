@@ -112,11 +112,7 @@ export function createChatMessageHandler(args: {
       firstMessageVariantGate.markApplied(input.sessionID)
     }
 
-    const storedMainSessionModel = getStoredMainSessionModel(
-      input,
-      pluginConfig,
-      isFirstMessage,
-    )
+    const storedMainSessionModel = getStoredMainSessionModel(input, isFirstMessage)
     if (storedMainSessionModel) {
       output.message.model = storedMainSessionModel
     }

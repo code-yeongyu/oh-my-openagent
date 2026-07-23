@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { clearSessionModel, getSessionModel, setSessionModel } from "./session-model-state"
+import { clearSessionModel, getSessionModel, getStoredSessionModel, setSessionModel } from "./session-model-state"
 
 describe("session-model-state", () => {
   test("stores and retrieves a session model", () => {
@@ -13,6 +13,25 @@ describe("session-model-state", () => {
     expect(getSessionModel(sessionID)).toEqual({
       providerID: "github-copilot",
       modelID: "gpt-4.1",
+    })
+  })
+
+  test("keeps agent ownership metadata out of the public session model", () => {
+    //#given
+    const sessionID = "ses_owned"
+
+    //#when
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.4" }, "sisyphus")
+
+    //#then
+    expect(getSessionModel(sessionID)).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+    })
+    expect(getStoredSessionModel(sessionID)).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      agent: "sisyphus",
     })
   })
 
