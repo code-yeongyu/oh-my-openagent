@@ -155,6 +155,44 @@ describe("createTeam", () => {
     })
   })
 
+  test("#given member prompts #when members start #then every bootstrap carries the team pull protocol before the role", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const manager = new FakeTeamManager()
+    const spec = normalizeSenpiTeamSpec(
+      {
+        members: [
+          { name: "alpha", kind: "category", category: "quick", prompt: "task alpha" },
+          { name: "beta", kind: "subagent_type", subagent_type: "sisyphus" },
+        ],
+      },
+      "squad",
+    )
+
+    // when
+    await createTeam(spec, "project", {
+      manager,
+      stateDir,
+      taskSettings: taskSettings(),
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+    })
+
+    // then
+    const [alphaStart, betaStart] = manager.started
+    for (const start of [alphaStart, betaStart]) {
+      expect(start?.prompt).toContain("team messages")
+      expect(start?.prompt).toContain("team_wait")
+      expect(start?.prompt).toContain("task_send")
+    }
+    expect(alphaStart?.prompt).toContain("'alpha'")
+    expect(alphaStart?.prompt).toContain("'squad'")
+    expect(alphaStart?.prompt).toContain("task alpha")
+    expect(alphaStart?.prompt.indexOf("team_wait")).toBeLessThan(alphaStart?.prompt.indexOf("task alpha"))
+    expect(betaStart?.prompt).toContain("'beta'")
+    expect(betaStart?.prompt).toContain("'squad'")
+  })
+
   test("#given the created team #when the sidecar is read #then it maps every member to its st_ id", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())

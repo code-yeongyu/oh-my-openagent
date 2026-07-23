@@ -123,7 +123,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     ? undefined
     : [...new Set([...(launch.inheritedExtensions ?? []), launch.entryPath])]
   return {
-    prompt: member.prompt ?? `You are team member '${member.name}' in team '${input.spec.name}'.`,
+    prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
     root_session_id: input.leadSessionId,
     depth: input.spawnDepth,
@@ -140,6 +140,20 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
       },
     } : {}),
   }
+}
+
+// Every member bootstrap frames the pull protocol FIRST so members wait for work instead of
+// completing after the role prompt: role-only bootstraps historically completed in under two
+// minutes and left the lead's first task messages rotting in durable inboxes.
+function buildMemberPrompt(spec: TeamSpec, member: TeamMember): string {
+  const role = member.prompt ?? `You are team member '${member.name}' in team '${spec.name}'.`
+  return [
+    `You are '${member.name}', a member of team '${spec.name}' running under the senpi-task team runtime.`,
+    "Work arrives as team messages from the lead and the other members; coordinate with the task_send and team_wait tools.",
+    "After completing any immediate instructions below, call team_wait to receive work instead of ending your turn, and keep going until the lead releases you.",
+    "When you finish assigned work, task_send the lead a summary before returning to team_wait.",
+    role,
+  ].join("\n\n")
 }
 
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {
