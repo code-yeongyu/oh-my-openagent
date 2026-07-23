@@ -44,6 +44,10 @@ export function maybeCreateHephaestusConfig(input: {
   const hephaestusOverride = agentOverrides["hephaestus"]
   const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
   const hasHephaestusExplicitConfig = hephaestusOverride !== undefined
+  const allowNonGptModel = hephaestusOverride?.allow_non_gpt_model === true
+
+  const isUnsupportedHephaestusModel = (model: string | undefined) =>
+    !allowNonGptModel && !isHephaestusSupportedModel(model)
 
   const hasRequiredProvider =
     !hephaestusRequirement?.requiresProvider ||
@@ -79,7 +83,7 @@ export function maybeCreateHephaestusConfig(input: {
   }
   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
 
-  if (!isHephaestusSupportedModel(hephaestusModel)) {
+  if (isUnsupportedHephaestusModel(hephaestusModel)) {
     log("[agent-registration] Agent skipped: unsupported Hephaestus model", {
       agent: "hephaestus",
       configuredModel: hephaestusModel,
@@ -93,7 +97,8 @@ export function maybeCreateHephaestusConfig(input: {
     undefined,
     availableSkills,
     availableCategories,
-    useTaskSystem
+    useTaskSystem,
+    allowNonGptModel
   )
 
   hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
@@ -101,7 +106,7 @@ export function maybeCreateHephaestusConfig(input: {
   const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
   if (hepOverrideCategory) {
     hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
-    if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
+    if (isUnsupportedHephaestusModel(hephaestusConfig.model)) {
       log("[agent-registration] Agent skipped: unsupported Hephaestus category model", {
         agent: "hephaestus",
         configuredModel: hephaestusConfig.model,
@@ -114,7 +119,7 @@ export function maybeCreateHephaestusConfig(input: {
 
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
-    if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
+    if (isUnsupportedHephaestusModel(hephaestusConfig.model)) {
       log("[agent-registration] Agent skipped: unsupported Hephaestus override model", {
         agent: "hephaestus",
         configuredModel: hephaestusConfig.model,

@@ -407,6 +407,41 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
     });
   });
 
+  describe("#given non-GPT model with explicit Hephaestus opt-out", () => {
+    test("#when config is created #then Hephaestus is registered", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "anthropic/claude-opus-4-7",
+          allow_non_gpt_model: true,
+          permission: {
+            apply_patch: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["anthropic/claude-opus-4-7"]),
+        systemDefaultModel: "anthropic/claude-opus-4-7",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config).toBeDefined();
+      expect(config?.model).toBe("anthropic/claude-opus-4-7");
+      expect(config?.permission).toHaveProperty("apply_patch", "allow");
+    });
+  });
+
   describe("#given generic GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then Hephaestus is not registered", () => {
       // given

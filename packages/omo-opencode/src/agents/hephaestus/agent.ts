@@ -79,6 +79,7 @@ export interface HephaestusContext {
   availableSkills?: AvailableSkill[];
   availableCategories?: AvailableCategory[];
   useTaskSystem?: boolean;
+  allowUnsupportedModel?: boolean;
 }
 
 export function getHephaestusPrompt(
@@ -96,7 +97,9 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
   const useTaskSystem = ctx?.useTaskSystem ?? false;
   const model = ctx?.model;
 
-  const source = getHephaestusPromptSource(model);
+  const source = ctx?.allowUnsupportedModel && !isHephaestusSupportedModel(model)
+    ? "gpt"
+    : getHephaestusPromptSource(model);
 
   let basePrompt: string;
   switch (source) {
@@ -154,6 +157,7 @@ export function createHephaestusAgent(
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
   useTaskSystem = false,
+  allowUnsupportedModel = false,
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
 
@@ -164,6 +168,7 @@ export function createHephaestusAgent(
     availableSkills,
     availableCategories,
     useTaskSystem,
+    allowUnsupportedModel,
   });
 
   return {
