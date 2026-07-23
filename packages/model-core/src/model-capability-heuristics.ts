@@ -75,7 +75,13 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   {
     family: "glm",
     includes: ["glm"],
-    variants: ["low", "medium", "high"],
+    variants: ["low", "medium", "high", "max"],
+    reasoningEfforts: ["high", "max"],
+    reasoningEffortAliases: {
+      low: "high",
+      medium: "high",
+      xhigh: "max",
+    },
   },
   {
     family: "minimax",
