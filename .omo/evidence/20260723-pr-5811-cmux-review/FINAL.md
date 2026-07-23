@@ -20,12 +20,12 @@ bun test
 
 Result:
 
-- 12,111 pass
+- 12,143 pass
 - 3 pre-existing skips
 - 0 fail
 - 2 snapshots
-- 56,922 assertions
-- 1,551 test files
+- 83,310 assertions
+- 1,553 test files
 
 The skipped tests are existing live-platform smokes:
 
@@ -34,6 +34,10 @@ The skipped tests are existing live-platform smokes:
 - duplicate team-mode live tmux smoke registration
 
 No skip was added or changed by this work.
+
+After the PR was ready, current green `dev` (`ad951348f`) advanced. It was
+merged without conflicts, dependencies were refreshed with
+`bun install --frozen-lockfile`, and the full repository gate above was rerun.
 
 ## Final static gates
 
