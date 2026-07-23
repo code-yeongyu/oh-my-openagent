@@ -1,4 +1,5 @@
 import { getAgentToolRestrictions } from "../../../shared"
+import type { TeamSessionRole } from "../types"
 import type { TaskPromptBody } from "./task-prompt-body"
 
 export const FALLBACK_AGENT = "general"
@@ -27,7 +28,7 @@ function getErrorMessage(error: unknown): string {
 export function buildFallbackBody(
   originalBody: TaskPromptBody,
   fallbackAgent: string,
-  options: { includeTeamToolDenylist?: boolean } = {},
+  options: { includeTeamToolDenylist?: boolean; teamSessionRole?: TeamSessionRole } = {},
 ): TaskPromptBody {
   return {
     ...originalBody,

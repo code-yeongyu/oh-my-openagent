@@ -60,7 +60,7 @@ The markdown files keep live OpenCode sections as placeholders. `agent.ts` resol
 - Mode: `primary` (respects UI model selection)
 - Temperature: 0.1
 - Default model: `claude-sonnet-4-6`
-- Denied tools: `task`, `call_omo_agent` (Atlas delegates; it does not run subagents directly)
+- Spawn tools: `task`, `call_omo_agent`, and `look_at` allowed
 - Checkbox enforcement in prompts (per `prompt-checkbox-enforcement.test.ts`)
 - Auto-continue: never asks user for approval between plan steps
 - Parallel fan-out by default; sequential only for named blocking dependencies

@@ -151,7 +151,7 @@ describe("getHephaestusPrompt", () => {
 
     // then
     expect(prompt).toContain("You build context by examining");
-    expect(prompt).toContain("Forbidden stops");
+    expect(prompt).toContain("Forbidden stop");
     expect(prompt).toContain("Three-attempt failure protocol");
     expect(prompt).toContain("based on GPT-5.5");
     expect(prompt).toContain("Autonomy and Persistence");
@@ -239,8 +239,11 @@ describe("createHephaestusAgent", () => {
     expect(config).toHaveProperty("color", "#D97706");
     expect(config).toHaveProperty("permission");
     expect(config.permission).toHaveProperty("question", "allow");
+    expect(config.permission).toHaveProperty("task", "deny");
     expect(config.permission).toHaveProperty("call_omo_agent", "deny");
+    expect(config.permission).toHaveProperty("look_at", "deny");
     expect(config).toHaveProperty("reasoningEffort", "medium");
+    expect(config.description).not.toContain("uses explore/librarian agents");
   });
 
   test("GPT 5.4 model includes GPT-5.4 specific prompt content", () => {
@@ -268,7 +271,7 @@ describe("createHephaestusAgent", () => {
     // then
     expect(config.prompt).toContain("based on GPT-5.5");
     expect(config.prompt).toContain("Manual QA Gate");
-    expect(config.prompt).toContain("Forbidden stops");
+    expect(config.prompt).toContain("Forbidden stop");
     expect(config.prompt).toContain("Use `apply_patch`");
     expect(config.prompt).not.toContain("Do not use `apply_patch`");
   });

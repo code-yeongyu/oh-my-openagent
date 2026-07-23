@@ -9,7 +9,7 @@ const SISYPHUS_DESCRIPTION =
 function buildSisyphusPermission(model: string): AgentConfig["permission"] {
   return {
     question: "allow",
-    call_omo_agent: "deny",
+    call_omo_agent: "allow",
     ...getFrontierToolSchemaPermission(model),
   } as AgentConfig["permission"];
 }

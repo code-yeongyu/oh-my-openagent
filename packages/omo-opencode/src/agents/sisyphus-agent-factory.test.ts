@@ -25,7 +25,7 @@ describe("createSisyphusAgent", () => {
       expect(agent.color).toBe("#00CED1");
       expect(agent.permission).toMatchObject({
         question: "allow",
-        call_omo_agent: "deny",
+        call_omo_agent: "allow",
       });
     });
   });

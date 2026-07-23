@@ -34,12 +34,17 @@ Ask @explore for the policy on this feature
 
 | Agent             | Restrictions                                                                            |
 | ----------------- | --------------------------------------------------------------------------------------- |
-| oracle            | Read-only: cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent) |
-| librarian         | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent)            |
-| explore           | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent)            |
-| multimodal-looker | Allowlist: `read` only                                                                  |
-| atlas             | Cannot delegate (blocked: task, call_omo_agent)                                         |
-| momus             | Cannot write, edit, or delegate (blocked: write, edit, task)                            |
+| oracle            | Reviewer: blocked from write, edit, task, call_omo_agent, and look_at                  |
+| librarian         | Specialist: blocked from write, edit, task, call_omo_agent, and look_at                |
+| explore           | Specialist: blocked from write, edit, task, call_omo_agent, and look_at                |
+| multimodal-looker | Specialist allowlist: `read` only                                                     |
+| sisyphus          | Coordinator: task, call_omo_agent, and look_at allowed                               |
+| atlas             | Coordinator: task, call_omo_agent, and look_at allowed; team tools denied outside team |
+| hephaestus        | Worker: blocked from task, call_omo_agent, and look_at                                 |
+| momus             | Reviewer: blocked from write, edit, task, call_omo_agent, and look_at                  |
+| metis             | Specialist: blocked from write, edit, task, call_omo_agent, and look_at                |
+| sisyphus-junior   | Worker: blocked from task, call_omo_agent, and look_at                                 |
+| team member       | Blocked from task, call_omo_agent, and look_at regardless of underlying agent          |
 
 ### Instruction Files vs Enforcement
 

@@ -193,13 +193,14 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
-  describe("tool safety (task blocked, call_omo_agent allowed)", () => {
-    test("task remains blocked, call_omo_agent is allowed via tools format", () => {
+  describe("tool safety", () => {
+    test("spawn tools remain blocked via tools format", () => {
       // given
       const override = {
         tools: {
           task: true,
           call_omo_agent: true,
+          look_at: true,
           read: true,
         },
       }
@@ -212,23 +213,24 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
         expect(tools.task).toBe(false)
-        // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
-        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.call_omo_agent).toBe(false)
+        expect(tools.look_at).toBe(false)
         expect(tools.read).toBe(true)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
-        // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
-        expect(permission.call_omo_agent).toBe("allow")
+        expect(permission.call_omo_agent).toBe("deny")
+        expect(permission.look_at).toBe("deny")
       }
     })
 
-    test("task remains blocked when using permission format override", () => {
+    test("spawn tools remain blocked when using permission format override", () => {
       // given
       const override = {
         permission: {
           task: "allow",
           call_omo_agent: "allow",
+          look_at: "allow",
           read: "allow",
         },
       } as { permission: Record<string, string> }
@@ -236,16 +238,18 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
 
-      // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
+      // then
       const tools = result.tools as Record<string, boolean> | undefined
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
         expect(tools.task).toBe(false)
-        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.call_omo_agent).toBe(false)
+        expect(tools.look_at).toBe(false)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
-        expect(permission.call_omo_agent).toBe("allow")
+        expect(permission.call_omo_agent).toBe("deny")
+        expect(permission.look_at).toBe("deny")
       }
     })
 
@@ -279,6 +283,29 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(permission.grep).toBe("deny")
       // task must remain denied (hardcoded BLOCKED_TOOLS)
       expect(permission.task).toBe("deny")
+    })
+  })
+
+  describe("worker prompt contract", () => {
+    test("does not render delegation guidance for any denied-tool variant", () => {
+      // given
+      const models = [
+        "anthropic/claude-sonnet-4-6",
+        "google/gemini-3-pro",
+        "z-ai/glm-5-2",
+        "openai/gpt-4o",
+        "openai/gpt-5.4",
+        "openai/gpt-5.6",
+        "moonshot/kimi-k2.6",
+        "moonshot/kimi-k2.7",
+        "moonshot/kimi-k3",
+      ]
+
+      // when
+      const prompts = models.map((model) => buildSisyphusJuniorPrompt(model, false))
+
+      // then
+      for (const prompt of prompts) expect(prompt).not.toContain("<Anti_Duplication>")
     })
   })
 
@@ -577,6 +604,17 @@ describe("getSisyphusJuniorPromptSource", () => {
   test("returns 'gpt-5-5' for GitHub Copilot GPT 5.5", () => {
     // given
     const model = "github-copilot/gpt-5.5"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("gpt-5-5")
+  })
+
+  test("returns 'gpt-5-5' for GPT 5.6 models", () => {
+    // given
+    const model = "openai/gpt-5.6"
 
     // when
     const source = getSisyphusJuniorPromptSource(model)

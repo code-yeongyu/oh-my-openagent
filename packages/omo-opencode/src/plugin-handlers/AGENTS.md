@@ -81,8 +81,8 @@ PRs attempting any of the forbidden patterns will be rejected.
 | Agent | Granted | Denied |
 |-------|---------|--------|
 | Librarian | grep_app_* | - |
-| Atlas, Sisyphus, Prometheus | task, task_*, teammate | - |
-| Hephaestus | task | - |
+| Atlas, Sisyphus, Prometheus | task, call_omo_agent, task_*, teammate | - |
+| Hephaestus | - | task, call_omo_agent, look_at |
 | Default (all others) | - | grep_app_*, task_*, teammate, LSP |
 
 ## MULTI-LEVEL CONFIG MERGE

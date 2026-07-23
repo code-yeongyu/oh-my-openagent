@@ -450,6 +450,8 @@ export class BackgroundManager {
       id: task.id,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
+      teamRunId: task.teamRunId,
+      teamSessionRole: task.teamSessionRole,
       description: task.description,
       prompt: "[redacted]",
       agent: task.agent,
@@ -599,6 +601,7 @@ export class BackgroundManager {
         parentSessionId: input.parentSessionId,
         parentMessageId: input.parentMessageId,
         teamRunId: input.teamRunId,
+        teamSessionRole: input.teamSessionRole,
         parentModel: input.parentModel,
         parentAgent: input.parentAgent,
         parentTools: input.parentTools,
@@ -900,6 +903,7 @@ The fallback retry session is now created and can be inspected directly.
       ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
+        teamSessionRole: input.teamSessionRole,
       }),
     }
     setSessionTools(sessionID, launchTools)
@@ -951,6 +955,7 @@ The fallback retry session is now created and can be inspected directly.
         try {
           const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: input.teamRunId === undefined,
+            teamSessionRole: input.teamSessionRole,
           })
           const fallbackTools = fallbackBody.tools as Record<string, boolean>
           setSessionTools(sessionID, fallbackTools)
@@ -1403,6 +1408,7 @@ The fallback retry session is now created and can be inspected directly.
               question: false,
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
+                teamSessionRole: existingTask.teamSessionRole,
               }),
             }
             setSessionTools(existingTask.sessionId!, tools)

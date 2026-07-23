@@ -246,6 +246,22 @@ describe("tryFallbackRetry", () => {
       expect(args.processKey).toHaveBeenCalledWith(key)
     })
 
+    test("retains team member role in fallback retry input", async () => {
+      // given
+      const args = createDefaultArgs({
+        teamRunId: "team-run",
+        teamSessionRole: "member",
+        onSessionCreated: async () => {},
+      })
+
+      // when
+      await tryFallbackRetry(args)
+
+      // then
+      const key = `${args.task.model?.providerID}/${args.task.model?.modelID}`
+      expect(args.queuesByKey.get(key)?.[0]?.input).toMatchObject({ teamSessionRole: "member" })
+    })
+
     test("queues fallback retry on provider key when provider concurrency is configured", async () => {
       const args = createDefaultArgs({
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },

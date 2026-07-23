@@ -168,7 +168,7 @@ export function createHephaestusAgent(
 
   return {
     description:
-      "Autonomous Deep Worker - goal-oriented execution with GPT Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
+      "Autonomous Deep Worker - goal-oriented execution with GPT Codex. Explores thoroughly with direct tools, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
     mode: MODE,
     model,
     maxTokens: 32000,
@@ -176,7 +176,9 @@ export function createHephaestusAgent(
     color: "#D97706",
     permission: {
       question: "allow",
+      task: "deny",
       call_omo_agent: "deny",
+      look_at: "deny",
       ...getFrontierToolSchemaPermission(model),
     } as AgentConfig["permission"],
     reasoningEffort: "medium",

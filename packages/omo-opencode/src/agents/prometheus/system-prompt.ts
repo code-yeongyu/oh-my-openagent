@@ -5,6 +5,7 @@ export const PROMETHEUS_PERMISSION = {
   bash: "allow" as const,
   webfetch: "allow" as const,
   question: "allow" as const,
+  call_omo_agent: "allow" as const,
 }
 
 function loadDefaultPrometheusPrompt(): string {

@@ -55,6 +55,7 @@ function cloneRegisteredTask(task: BackgroundTask): BackgroundTask {
     parentSessionId: task.parentSessionId,
     parentMessageId: task.parentMessageId,
     teamRunId: task.teamRunId,
+    teamSessionRole: task.teamSessionRole,
     description: task.description,
     prompt: "[redacted]",
     agent: task.agent,

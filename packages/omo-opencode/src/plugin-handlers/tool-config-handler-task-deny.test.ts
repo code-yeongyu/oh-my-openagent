@@ -18,10 +18,10 @@ const TASK_DENIED_SUBAGENTS = [
   "momus",
 ] as const
 
-const TASK_ALLOWED_AGENT_NAMES = [
+const SPAWN_ALLOWED_AGENT_NAMES = [
   "sisyphus",
   "atlas",
-  "hephaestus",
+  "prometheus",
 ] as const
 
 function createParams(agentNames: readonly string[]): {
@@ -82,18 +82,35 @@ describe("applyToolConfig task permission hard denials", () => {
     })
   })
 
-  describe("#given primary and executor agents", () => {
+  describe("#given coordinator and planning agents", () => {
     describe("#when applying tool config", () => {
-      for (const agentName of TASK_ALLOWED_AGENT_NAMES) {
-        it(`#then should keep task allowed for ${agentName}`, () => {
+      for (const agentName of SPAWN_ALLOWED_AGENT_NAMES) {
+        it(`#then should allow spawn tools for ${agentName}`, () => {
           const params = createParams([agentName])
 
           applyToolConfig(params)
 
           const permission = requirePermission(params.agentResult, agentName)
           expect(permission.task).toBe("allow")
+          expect(permission.call_omo_agent).toBe("allow")
         })
       }
+    })
+  })
+
+  describe("#given Hephaestus worker", () => {
+    describe("#when applying tool config", () => {
+      it("#then should deny spawn tools without enabling teammate", () => {
+        const params = createParams(["hephaestus"])
+
+        applyToolConfig(params)
+
+        const permission = requirePermission(params.agentResult, "hephaestus")
+        expect(permission.task).toBe("deny")
+        expect(permission.call_omo_agent).toBe("deny")
+        expect(permission.look_at).toBe("deny")
+        expect(permission.teammate).toBeUndefined()
+      })
     })
   })
 

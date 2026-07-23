@@ -8450,6 +8450,63 @@ describe("BackgroundManager.launch - attempt state initialization", () => {
   })
 })
 
+describe("BackgroundManager team member launch policy", () => {
+  test("preserves member spawn denials in the real launch prompt", async () => {
+    // given
+    const promptCalls: Array<{ readonly body: { readonly tools: Record<string, boolean> } }> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/dev/shm" } }),
+        create: async () => ({ data: { id: "member-session" } }),
+        promptAsync: async (input: { readonly body: { readonly tools: Record<string, boolean> } }) => {
+          promptCalls.push(input)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client, "/dev/shm") })
+    ;(cast<{
+      reserveSubagentSpawn: () => Promise<{
+        spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
+        descendantCount: number
+        commit: () => number
+        rollback: () => void
+      }>
+    }>(manager)).reserveSubagentSpawn = async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit: () => 1,
+      rollback: () => {},
+    })
+
+    try {
+      // when
+      const launched = await manager.launch({
+        description: "team member launch",
+        prompt: "complete assigned work",
+        agent: "general",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+        parentAgent: "sisyphus",
+        teamRunId: "team-run",
+        teamSessionRole: "member",
+      })
+      await waitUntil(() => promptCalls.length === 1, 600)
+
+      // then
+      expect(getTaskMap(manager).get(launched.id)?.teamSessionRole).toBe("member")
+      expect(promptCalls[0]?.body.tools).toMatchObject({
+        task: false,
+        call_omo_agent: false,
+        look_at: false,
+      })
+    } finally {
+      manager.shutdown()
+    }
+  })
+})
+
 describe("BackgroundManager attempt lifecycle bindings", () => {
   test("startTask binds the created session to the queued attempt ID and mirrors task projection", async () => {
     //#given

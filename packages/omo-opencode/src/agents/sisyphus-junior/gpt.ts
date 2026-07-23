@@ -3,12 +3,11 @@
  *
  * Hephaestus-style prompt adapted for a focused executor:
  * - Same autonomy, reporting, parallelism, and tool usage patterns
- * - CAN spawn explore/librarian via call_omo_agent for research
+ * - Executes research directly with available tools
  * - Used as fallback for GPT models without a model-specific prompt
  */
 
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
-import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
 import { GPT_FILE_EDIT_GUIDANCE } from "../gpt-apply-patch-guard"
 
 export function buildGptSisyphusJuniorPrompt(
@@ -43,7 +42,7 @@ When blocked: try a different approach → decompose the problem → challenge a
 - Run verification (lint, tests, build) WITHOUT asking
 - Make decisions. Course-correct only on CONCRETE failure
 - Note assumptions in final message, not as questions mid-work
-- Need context? Fire explore/librarian via call_omo_agent IMMEDIATELY - continue only with non-overlapping work while they search
+- Need context? Inspect the codebase with file and search tools before acting
 
 ## Scope Discipline
 
@@ -55,19 +54,16 @@ When blocked: try a different approach → decompose the problem → challenge a
 ## Ambiguity Protocol (EXPLORE FIRST)
 
 - **Single valid interpretation** - Proceed immediately
-- **Missing info that MIGHT exist** - **EXPLORE FIRST** - use tools (grep, rg, file reads, explore agents) to find it
+- **Missing info that MIGHT exist** - **EXPLORE FIRST** - use tools (grep, rg, file reads) to find it
 - **Multiple plausible interpretations** - State your interpretation, proceed with simplest approach
 - **Truly impossible to proceed** - Ask ONE precise question (LAST RESORT)
 
 <tool_usage_rules>
-- Parallelize independent tool calls: multiple file reads, grep searches, agent fires - all at once
-- Explore/Librarian via call_omo_agent = background research. Fire them and continue only with non-overlapping work
+- Parallelize independent file reads and searches in one response
 - After any file edit: restate what changed, where, and what validation follows
 - Prefer tools over guessing whenever you need specific data (files, configs, patterns)
 - ALWAYS use tools over internal knowledge for file contents, project state, and verification
 </tool_usage_rules>
-
-${buildAntiDuplicationSection()}
 
 ${taskDiscipline}
 
