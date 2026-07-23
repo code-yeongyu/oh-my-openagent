@@ -8,6 +8,10 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import {
+  recordBackgroundOutputConsumption,
+  recordBackgroundTaskOutputConsumption,
+} from "../../shared/background-output-consumption"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
@@ -211,6 +215,14 @@ ${taskMetadataBlock}`
       }
     }
     const duration = formatDuration(startTime)
+
+    recordBackgroundOutputConsumption(parentContext.sessionID, parentContext.messageID, sessionID)
+    recordBackgroundTaskOutputConsumption({
+      parentSessionID: parentContext.sessionID,
+      parentMessageID: parentContext.messageID,
+      taskID: task.id,
+      taskSessionID: sessionID,
+    })
 
     return `SUPERVISED TASK COMPLETED SUCCESSFULLY
 

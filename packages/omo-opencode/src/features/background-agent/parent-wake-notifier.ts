@@ -1,6 +1,6 @@
 import { log } from "../../shared"
 import { settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
-import type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
+import type { ParentWakePromptContext, PendingParentWake, TaskIdentity } from "./parent-wake-dedupe"
 import { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import { ParentWakeFlushRunner } from "./parent-wake-flush-runner"
 import { ParentWakePendingQueue } from "./parent-wake-pending-queue"
@@ -13,7 +13,7 @@ import {
   rescheduleParentWakeWindowRecoveryAfterError,
 } from "./parent-wake-window-recovery"
 
-export type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
+export type { ParentWakePromptContext, PendingParentWake, TaskIdentity } from "./parent-wake-dedupe"
 
 export class ParentWakeNotifier {
   private readonly pendingQueue: ParentWakePendingQueue
@@ -111,13 +111,38 @@ export class ParentWakeNotifier {
     promptContext: ParentWakePromptContext,
     shouldReply: boolean,
     delayMs?: number,
+    taskIdentities?: readonly TaskIdentity[],
   ): void {
-    this.pendingQueue.queueWake(sessionID, notification, promptContext, shouldReply)
+    this.pendingQueue.queueWake(sessionID, notification, promptContext, shouldReply, taskIdentities)
     this.schedulePendingParentWakeFlush(sessionID, delayMs)
+  }
+
+  /**
+   * Queue a pending wake but schedule the flush with a caller-supplied
+   * operation. Used by the manager to route the timer-fired flush through its
+   * own `flushPendingParentWake` wrapper (which applies the consumed-success
+   * race guard) instead of the flush runner directly.
+   */
+  queuePendingParentWakeWithFlushOperation(
+    sessionID: string,
+    notification: string,
+    promptContext: ParentWakePromptContext,
+    shouldReply: boolean,
+    flushOperation: () => Promise<void>,
+    delayMs?: number,
+    taskIdentities?: readonly TaskIdentity[],
+  ): void {
+    this.pendingQueue.queueWake(sessionID, notification, promptContext, shouldReply, taskIdentities)
+    this.pendingQueue.scheduleFlush(sessionID, flushOperation, delayMs)
   }
 
   async flushPendingParentWake(sessionID: string): Promise<void> {
     await this.flushRunner.flushPendingParentWake(sessionID)
+  }
+
+  deletePendingParentWake(sessionID: string): void {
+    this.pendingQueue.deleteWake(sessionID)
+    this.flushRunner.clearPendingParentWakeTimer(sessionID)
   }
 
   clearDispatchedParentWake(sessionID: string): void {

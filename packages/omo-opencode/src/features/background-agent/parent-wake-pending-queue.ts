@@ -5,6 +5,7 @@ import {
   resolveParentWakePromptContext,
   type ParentWakePromptContext,
   type PendingParentWake,
+  type TaskIdentity,
 } from "./parent-wake-dedupe"
 import { unrefTimerHandle } from "./parent-wake-timer-handle"
 
@@ -14,6 +15,32 @@ type ParentWakePendingQueueOptions = {
     parentSessionID: string | undefined,
     operation: () => Promise<void>,
   ) => Promise<void>
+}
+
+function identityKey(id: TaskIdentity): string {
+  return `${id.taskID ?? ""}\u0000${id.taskSessionID ?? ""}`
+}
+
+function unionTaskIdentities(
+  existing: readonly TaskIdentity[] | undefined,
+  incoming: readonly TaskIdentity[] | undefined,
+): TaskIdentity[] | undefined {
+  if (!existing && !incoming) {
+    return undefined
+  }
+  const existingList = existing ?? []
+  const incomingList = incoming ?? []
+  if (existingList.length === 0 && incomingList.length === 0) {
+    return undefined
+  }
+  const seen = new Map<string, TaskIdentity>()
+  for (const id of existingList) {
+    seen.set(identityKey(id), id)
+  }
+  for (const id of incomingList) {
+    seen.set(identityKey(id), id)
+  }
+  return [...seen.values()]
 }
 
 export class ParentWakePendingQueue {
@@ -47,6 +74,7 @@ export class ParentWakePendingQueue {
     notification: string,
     promptContext: ParentWakePromptContext,
     shouldReply: boolean,
+    taskIdentities?: readonly TaskIdentity[],
   ): void {
     const now = Date.now()
     const resolvedPromptContext = resolveParentWakePromptContext(promptContext)
@@ -59,6 +87,7 @@ export class ParentWakePendingQueue {
       pendingWake.notifications = mergedNotifications
       pendingWake.promptContext = resolvedPromptContext
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
+      pendingWake.taskIdentities = unionTaskIdentities(pendingWake.taskIdentities, taskIdentities)
       if (notificationsChanged) {
         delete pendingWake.noReplyAdmittedAt
         delete pendingWake.noAssistantOutputRetryCount
@@ -71,6 +100,7 @@ export class ParentWakePendingQueue {
       notifications: [notification],
       shouldReply,
       queuedAt: now,
+      ...(taskIdentities && taskIdentities.length > 0 ? { taskIdentities: taskIdentities.map((id) => ({ ...id })) } : {}),
     })
   }
 
@@ -87,6 +117,7 @@ export class ParentWakePendingQueue {
       )
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
+      pendingWake.taskIdentities = unionTaskIdentities(pendingWake.taskIdentities, latestWake.taskIdentities)
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
