@@ -1,5 +1,7 @@
 export { buildPeerMessageEnvelope, buildTeamMessage } from "./message"
 export type { BuildTeamMessageOptions } from "./message"
+export { createLeadDeliveryJournal } from "./delivery-journal"
+export type { LeadDeliveryJournal, LeadDeliveryJournalOptions } from "./delivery-journal"
 export { createLeadPoller } from "./lead-poller"
 export type {
   LeadInjection,

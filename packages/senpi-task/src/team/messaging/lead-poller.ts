@@ -8,6 +8,7 @@ import { MessageSchema, type Message } from "@oh-my-opencode/team-core/types"
 
 import type { PersistedTaskEvent } from "../../store"
 import { TEAM_LEAD_SENTINEL } from "../normalize"
+import type { LeadDeliveryJournal } from "./delivery-journal"
 import { buildPeerMessageEnvelope } from "./message"
 import { createSessionMarkerIndex, type SessionMarkerIndex } from "./session-marker-index"
 import type { WaitClaim, WaitRegistry } from "./wait-registry"
@@ -18,15 +19,23 @@ const RESERVED_SUFFIX = ".json"
 
 export type LeadInjection = Readonly<{ key: string; source: "team-message"; content: string; onFlushed?: () => void }>
 
-export type LeadInjectionSink = { enqueue(injection: LeadInjection): void }
+export type LeadInjectionSink = {
+  enqueue(injection: LeadInjection): void
+  remove?(key: string): boolean
+}
 
 export type LeadPollFilter = Readonly<{ from?: string }>
 
-export type LeadPoller = { pollOnce(filter?: LeadPollFilter): Promise<void>; shutdown(): void }
+export type LeadPoller = {
+  pollOnce(filter?: LeadPollFilter): Promise<void>
+  suppressDelivered(messageId: string): Promise<boolean>
+  shutdown(): void
+}
 
 export type LeadPollerDeps = {
   readonly teamRunId: string; readonly config: TeamModeConfig
   readonly coordinator: LeadInjectionSink; readonly waitRegistry: WaitRegistry<Message>
+  readonly deliveryJournal?: LeadDeliveryJournal
   readonly appendEvent?: (taskId: string, event: PersistedTaskEvent) => void
   readonly eventTaskId: (message: Message) => string | undefined; readonly leadSessionFile?: () => string | undefined
 }
@@ -68,6 +77,20 @@ export function createLeadPoller(deps: LeadPollerDeps): LeadPoller {
           if (filter.from !== undefined && message.from !== filter.from) continue
           await processMessage(deps, message, state)
         }
+      })
+    },
+    async suppressDelivered(messageId: string): Promise<boolean> {
+      if (stopped) return false
+      return withLease(async () => {
+        const delivery = state.pending.get(messageId)
+        if (delivery === undefined || delivery.phase !== "awaiting_flush") return false
+        const removed = deps.coordinator.remove?.(`team-message:${messageId}`) ?? false
+        if (!removed) return false
+        await commitDeliveryReservation(delivery.reservation)
+        state.pending.delete(messageId)
+        deps.deliveryJournal?.markReported(deps.teamRunId, messageId)
+        appendDeliveredEvent(deps, delivery.message)
+        return true
       })
     },
     shutdown() {
@@ -117,6 +140,7 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
     await releaseDeliveryReservation(reservation)
     return
   }
+  deps.deliveryJournal?.record(deps.teamRunId, message)
 
   const sessionFile = deps.leadSessionFile?.()
   if (await state.markerIndex.contains(sessionFile, message.messageId)) {
@@ -127,6 +151,7 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
 
   const waitClaim = deps.waitRegistry.takeMatch(deps.teamRunId, message)
   if (waitClaim !== undefined) {
+    deps.deliveryJournal?.markReported(deps.teamRunId, message.messageId)
     await resolveWait(deps, { message, reservation, phase: "awaiting_persistence" }, waitClaim)
     return
   }

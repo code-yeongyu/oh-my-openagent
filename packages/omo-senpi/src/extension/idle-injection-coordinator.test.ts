@@ -47,6 +47,18 @@ describe("IdleInjectionCoordinator", () => {
     expect(calls[0]?.content).toBe("continue B")
   })
 
+  it("#given a queued injection #when removed by key #then the flush no-ops and removal reports true only once", () => {
+    // given
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({ key: "team-message:m1", source: "team-message", content: "x" })
+
+    // when / then
+    expect(coordinator.remove("team-message:m1")).toBe(true)
+    expect(coordinator.remove("team-message:m1")).toBe(false)
+    expect(coordinator.flushOnIdle()).toBe(0)
+    expect(calls).toHaveLength(0)
+  })
+
   it("#given an empty queue #when flushed #then nothing is delivered", () => {
     // given
     const { coordinator, calls } = createCoordinator()

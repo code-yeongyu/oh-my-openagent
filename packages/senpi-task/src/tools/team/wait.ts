@@ -57,6 +57,17 @@ export async function runTeamWait(
   const filter = input.from === undefined ? {} : { from: input.from }
   const registration = deps.registry.register(resolved.teamRunId, filter)
   try {
+    const delivered = deps.deliveryJournal?.takeOldestUnreported(resolved.teamRunId, filter)
+    if (delivered !== undefined) {
+      registration.cancel()
+      await poller.suppressDelivered?.(delivered.messageId)
+      return toolResult(formatMessageText(delivered), {
+        kind: "message",
+        message_id: delivered.messageId,
+        from: delivered.from,
+        body: delivered.body,
+      })
+    }
     await poller.pollOnce(filter)
     const outcome = await waitForMessage(registration, timeoutMs, signal)
     switch (outcome.kind) {
