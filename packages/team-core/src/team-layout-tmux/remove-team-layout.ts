@@ -43,6 +43,7 @@ export async function removeTeamLayoutWithDeps(
   const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget)
     ? tmuxMgrOrCleanupTarget
     : undefined
+  const attemptedPaneIds = Array.from(new Set(cleanupTarget?.paneIds ?? []))
   if (!cleanupTarget?.executionTarget) {
     resolvedDeps.log("tmux team layout cleanup skipped without persisted execution target", {
       kind: "warning",
@@ -51,7 +52,7 @@ export async function removeTeamLayoutWithDeps(
     return {
       attemptedPaneIds: [],
       removedPaneIds: [],
-      skippedPaneIds: cleanupTarget?.paneIds ?? [],
+      skippedPaneIds: attemptedPaneIds,
       reason: "missing-execution-target",
     }
   }
@@ -63,11 +64,11 @@ export async function removeTeamLayoutWithDeps(
     return {
       attemptedPaneIds: [],
       removedPaneIds: [],
-      skippedPaneIds: cleanupTarget.paneIds ?? [],
+      skippedPaneIds: attemptedPaneIds,
       reason: "invalid-execution-target",
     }
   }
-  if (!cleanupTarget.paneIds || cleanupTarget.paneIds.length === 0) {
+  if (attemptedPaneIds.length === 0) {
     resolvedDeps.log("tmux team layout cleanup skipped without owned pane identifiers", {
       kind: "warning",
       teamRunId,
@@ -80,7 +81,6 @@ export async function removeTeamLayoutWithDeps(
     }
   }
 
-  const attemptedPaneIds = [...cleanupTarget.paneIds]
   const removedPaneIds: string[] = []
   const skippedPaneIds: string[] = []
   let removalFailed = false
@@ -112,7 +112,7 @@ export async function removeTeamLayoutWithDeps(
       resolvedDeps.getEnvironment?.() ?? process.env,
     )
 
-    for (const paneId of cleanupTarget.paneIds) {
+    for (const paneId of attemptedPaneIds) {
       try {
         const ownership = await runTeamTmuxCleanupCommand(
           tmuxPath,

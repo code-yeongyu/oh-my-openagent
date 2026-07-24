@@ -1029,6 +1029,37 @@ describe("team-layout-tmux", () => {
     )).toBe(true)
   })
 
+  test("#given duplicate pane IDs #when removeTeamLayout runs #then each owned pane is checked and removed once", async () => {
+    // given
+    paneOwner = "run-deduplicated-cleanup"
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    const cleanupResult = await removeTeamLayout("run-deduplicated-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      paneIds: ["%7", "%7"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
+    }, tmuxMgr as never)
+
+    // then
+    expect(getCommands().filter((args) => args[0] === "show-options")).toEqual([
+      ["show-options", "-p", "-qv", "-t", "%7", "@omo_team_run_id"],
+    ])
+    expect(getCommands().filter((args) => args[0] === "kill-pane")).toEqual([
+      ["kill-pane", "-t", "%7"],
+    ])
+    expect(cleanupResult).toEqual({
+      attemptedPaneIds: ["%7"],
+      removedPaneIds: ["%7"],
+      skippedPaneIds: [],
+      reason: "removed",
+    })
+  })
+
   test("#given persisted native backend identity #when the current tmux socket changed #then cleanup stays on the original socket and verifies ownership", async () => {
     // given
     process.env.TMUX = "/tmp/current-tmux.sock,999,0"
@@ -1077,10 +1108,10 @@ describe("team-layout-tmux", () => {
     const { removeTeamLayout } = await loadLayoutModule()
 
     // when
-    await removeTeamLayout("run-legacy-cleanup", {
+    const cleanupResult = await removeTeamLayout("run-legacy-cleanup", {
       ownedSession: false,
       targetSessionId: "$caller",
-      paneIds: ["%7"],
+      paneIds: ["%7", "%7"],
     }, tmuxMgr as never)
 
     // then
@@ -1089,6 +1120,7 @@ describe("team-layout-tmux", () => {
       kind: "warning",
       teamRunId: "run-legacy-cleanup",
     })
+    expect(cleanupResult.skippedPaneIds).toEqual(["%7"])
   })
 
   test("#given a legacy owned session without pane ownership #when cleanup runs #then kill-session is rejected", async () => {
