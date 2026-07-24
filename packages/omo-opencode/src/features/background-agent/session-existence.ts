@@ -36,14 +36,19 @@ function isSessionNotFoundError(error: unknown): boolean {
   return message.includes("not found") || message.includes("missing")
 }
 
+export function sanitizeBareSessionId(sessionId: string): string {
+  return sessionId.replace(/^(opencode|codex|senpi):/, "")
+}
+
 export async function checkSessionExistence(
   client: OpencodeClient,
   sessionID: string,
   directory?: string
 ): Promise<SessionExistenceStatus> {
+  const rawId = sanitizeBareSessionId(sessionID)
   try {
     const response = await client.session.get({
-      path: { id: sessionID },
+      path: { id: rawId },
       ...(directory ? { query: { directory } } : {}),
     })
 
