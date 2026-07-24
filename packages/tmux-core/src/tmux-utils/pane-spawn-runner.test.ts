@@ -303,7 +303,7 @@ describe("spawnTmuxPane runner integration", () => {
 			const serverAccess = {
 				serverUrl: "http://127.0.0.1:1234",
 				checkServerHealth: async () => true,
-				getPaneEnvironment: () => ({ OPENCODE_SERVER_PASSWORD: "password-fixture" }),
+				getPaneEnvironment: () => ({ HARNESS_SECRET: "secret-fixture" }),
 			} satisfies TmuxServerAccess
 
 			// when

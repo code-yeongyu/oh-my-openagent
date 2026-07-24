@@ -199,6 +199,49 @@ describe("OMO tmux listener access", () => {
     }
   })
 
+  it("keeps raw OpenCode URLs fail-closed across every cmux lifecycle path when credentials are ambient", async () => {
+    const originalTmux = process.env.TMUX
+    const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
+    const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
+    const originalUsername = process.env.OPENCODE_SERVER_USERNAME
+    const recorder = createTmuxRecorder()
+    const rawServerUrl = "http://127.0.0.1:5318"
+    const spawnDeps = {
+      log: () => undefined,
+      runTmuxCommand: recorder.runTmuxCommand,
+      isInsideTmux: () => true,
+      isCmuxCompatEnvironment: () => true,
+      isServerRunning: async () => true,
+      getTmuxPath: async () => "cmux",
+    }
+    process.env.TMUX = "/tmp/cmuxterm-adapter.sock,1234,0"
+    process.env.CMUX_SOCKET_PATH = "/tmp/cmux-adapter.sock"
+    process.env.OPENCODE_SERVER_PASSWORD = "ambient-password"
+    process.env.OPENCODE_SERVER_USERNAME = "ambient-user"
+
+    try {
+      const pane = await spawnTmuxPane("pane-session", "pane", enabledTmuxConfig, rawServerUrl, "/tmp", undefined, "-h", spawnDeps)
+      const window = await spawnTmuxWindow("window-session", "window", enabledTmuxConfig, rawServerUrl, "/tmp", spawnDeps)
+      const session = await spawnTmuxSession("session-session", "session", enabledTmuxConfig, rawServerUrl, "/tmp", undefined, spawnDeps)
+      const replaced = await replaceTmuxPane("%replace", "replace-session", "replace", enabledTmuxConfig, rawServerUrl, "/tmp", spawnDeps)
+      const activated = await activateTmuxPane("%activate", "activate-session", rawServerUrl, "/tmp", spawnDeps)
+
+      expect([pane.success, window.success, session.success, replaced.success, activated]).toEqual([
+        false, false, false, false, false,
+      ])
+      expect(recorder.commands).toEqual([])
+    } finally {
+      if (originalTmux === undefined) delete process.env.TMUX
+      else process.env.TMUX = originalTmux
+      if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
+      else process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
+      if (originalPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+      else process.env.OPENCODE_SERVER_PASSWORD = originalPassword
+      if (originalUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
+      else process.env.OPENCODE_SERVER_USERNAME = originalUsername
+    }
+  })
+
   it("lets an explicit per-call health override win without calling bound health", async () => {
     const recorder = createTmuxRecorder()
     let boundHealthCalls = 0

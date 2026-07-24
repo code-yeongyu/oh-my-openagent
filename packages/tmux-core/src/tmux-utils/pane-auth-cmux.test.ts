@@ -10,8 +10,8 @@ import { spawnTmuxWindow } from "./window-spawn"
 
 const originalTmux = process.env.TMUX
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
-const originalUsername = process.env.OPENCODE_SERVER_USERNAME
-const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
+const originalHarnessIdentity = process.env.HARNESS_IDENTITY
+const originalHarnessSecret = process.env.HARNESS_SECRET
 
 const config = {
 	enabled: true,
@@ -34,8 +34,8 @@ const authenticatedServerAccess = {
 	serverUrl: "http://127.0.0.1:4096",
 	checkServerHealth: async () => true,
 	getPaneEnvironment: () => ({
-		OPENCODE_SERVER_USERNAME: "username-fixture",
-		OPENCODE_SERVER_PASSWORD: "password-fixture",
+		HARNESS_IDENTITY: "identity-fixture",
+		HARNESS_SECRET: "secret-fixture",
 	}),
 } satisfies TmuxServerAccess
 
@@ -43,22 +43,22 @@ const clearedServerAccess = {
 	serverUrl: "http://127.0.0.1:4096",
 	checkServerHealth: async () => true,
 	getPaneEnvironment: () => ({
-		OPENCODE_SERVER_USERNAME: "",
-		OPENCODE_SERVER_PASSWORD: "",
+		HARNESS_IDENTITY: "",
+		HARNESS_SECRET: "",
 	}),
 } satisfies TmuxServerAccess
 
 function switchToNativeTmux(): void {
 	process.env.TMUX = "/tmp/tmux-native.sock,1234,0"
 	delete process.env.CMUX_SOCKET_PATH
-	delete process.env.OPENCODE_SERVER_USERNAME
-	delete process.env.OPENCODE_SERVER_PASSWORD
+	delete process.env.HARNESS_IDENTITY
+	delete process.env.HARNESS_SECRET
 }
 
 function switchToAuthenticatedCmux(): void {
 	process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
 	process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
-	process.env.OPENCODE_SERVER_PASSWORD = "late-ambient-password-fixture"
+	process.env.HARNESS_SECRET = "late-ambient-secret-fixture"
 }
 
 function resultForCommand(command: string): TmuxCommandResult {
@@ -74,18 +74,18 @@ function restoreEnvironment(): void {
 	else process.env.TMUX = originalTmux
 	if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
 	else process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
-	if (originalUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
-	else process.env.OPENCODE_SERVER_USERNAME = originalUsername
-	if (originalPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
-	else process.env.OPENCODE_SERVER_PASSWORD = originalPassword
+	if (originalHarnessIdentity === undefined) delete process.env.HARNESS_IDENTITY
+	else process.env.HARNESS_IDENTITY = originalHarnessIdentity
+	if (originalHarnessSecret === undefined) delete process.env.HARNESS_SECRET
+	else process.env.HARNESS_SECRET = originalHarnessSecret
 }
 
 describe("cmux authenticated pane lifecycle", () => {
 	beforeEach(() => {
 		delete process.env.TMUX
 		process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
-		delete process.env.OPENCODE_SERVER_USERNAME
-		delete process.env.OPENCODE_SERVER_PASSWORD
+		delete process.env.HARNESS_IDENTITY
+		delete process.env.HARNESS_SECRET
 	})
 
 	afterEach(() => {
@@ -251,7 +251,7 @@ describe("cmux authenticated pane lifecycle", () => {
 
 	test("#given cleared credentials with an ambient value #when spawning under cmux #then failure prevents inheritance", async () => {
 		// given
-		process.env.OPENCODE_SERVER_PASSWORD = "ambient-password-fixture"
+		process.env.HARNESS_SECRET = "ambient-secret-fixture"
 		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
 
 		// when
@@ -277,37 +277,7 @@ describe("cmux authenticated pane lifecycle", () => {
 		expect(runTmuxCommand).not.toHaveBeenCalled()
 	})
 
-	test("#given a raw URL and ambient credentials #when spawning under cmux #then failure prevents child inheritance", async () => {
-		// given
-		process.env.OPENCODE_SERVER_USERNAME = "ambient-username-fixture"
-		process.env.OPENCODE_SERVER_PASSWORD = "ambient-password-fixture"
-		const runTmuxCommand = mock(async (_command: string, _args: string[]): Promise<TmuxCommandResult> => commandResult)
-
-		// when
-		const result = await spawnTmuxPane(
-			"session-cmux-raw",
-			"worker",
-			config,
-			"http://127.0.0.1:4096",
-			"/tmp/project",
-			"%0",
-			"-h",
-			{
-				runTmuxCommand,
-				isInsideTmux: () => false,
-				isCmuxCompatEnvironment: () => true,
-				isServerRunning: async () => true,
-				getTmuxPath: async () => "cmux",
-				log: mock(() => undefined),
-			},
-		)
-
-		// then
-		expect(result).toEqual({ success: false })
-		expect(runTmuxCommand).not.toHaveBeenCalled()
-	})
-
-	test("#given a raw URL without ambient credentials #when spawning under cmux #then explicit clears are safely omitted", async () => {
+	test("#given a raw URL #when spawning under cmux #then generic empty environment is safely omitted", async () => {
 		// given
 		const runTmuxCommand = mock(async (_command: string, _args: string[]): Promise<TmuxCommandResult> => commandResult)
 

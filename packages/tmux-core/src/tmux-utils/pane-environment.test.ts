@@ -99,14 +99,14 @@ describe("tmux pane environment capabilities", () => {
 
 	it("#given a pane environment and ambient values #when cmux omission is evaluated #then only redundant clears are safe", () => {
 		expect(canOmitTmuxPaneEnvironment({}, {})).toBe(true)
-		expect(canOmitTmuxPaneEnvironment({ OPENCODE_SERVER_PASSWORD: "", OPENCODE_SERVER_USERNAME: "" }, {})).toBe(true)
+		expect(canOmitTmuxPaneEnvironment({ HARNESS_SECRET: "", HARNESS_IDENTITY: "" }, {})).toBe(true)
 		expect(
 			canOmitTmuxPaneEnvironment(
-				{ OPENCODE_SERVER_PASSWORD: "", OPENCODE_SERVER_USERNAME: "" },
-				{ OPENCODE_SERVER_PASSWORD: "ambient-fixture" },
+				{ HARNESS_SECRET: "", HARNESS_IDENTITY: "" },
+				{ HARNESS_SECRET: "ambient-fixture" },
 			),
 		).toBe(false)
-		expect(canOmitTmuxPaneEnvironment({ OPENCODE_SERVER_PASSWORD: "desired-fixture" }, {})).toBe(false)
+		expect(canOmitTmuxPaneEnvironment({ HARNESS_SECRET: "desired-fixture" }, {})).toBe(false)
 	})
 
 	it("#given a server capability #when every pane lifecycle path runs #then its lazy environment reaches each mutation", async () => {
@@ -220,7 +220,7 @@ describe("tmux pane environment capabilities", () => {
 		expect(overriddenUrls).toEqual([access.serverUrl])
 	})
 
-	it("#given only raw server URLs and an ambient variable #when lifecycle paths mutate panes #then OpenCode auth is cleared without copying ambient values", async () => {
+	it("#given only raw server URLs #when lifecycle paths mutate panes #then core does not invent harness environment policy", async () => {
 		// given
 		const ambientName = "TMUX_CORE_AMBIENT_SECRET"
 		const originalAmbientValue = process.env[ambientName]
@@ -256,10 +256,7 @@ describe("tmux pane environment capabilities", () => {
 				activateRecorder.getCall(0)[1],
 			]
 			for (const args of mutationArgs) {
-				expect(extractEnvironment(args)).toEqual([
-					"OPENCODE_SERVER_PASSWORD=",
-					"OPENCODE_SERVER_USERNAME=",
-				])
+				expect(extractEnvironment(args)).toEqual([])
 				expect(args).not.toContain(`${ambientName}=ambient-value-fixture`)
 			}
 		} finally {

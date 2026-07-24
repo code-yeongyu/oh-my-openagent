@@ -16,12 +16,9 @@ describe("getHttpServerOriginForLog", () => {
 })
 
 describe("normalizeTmuxServerTarget", () => {
-	it("turns a legacy raw URL into explicitly anonymous OpenCode pane access", () => {
+	it("turns a legacy raw URL into generic pane access without harness policy", () => {
 		const access = normalizeTmuxServerTarget("http://127.0.0.1:4096")
 
-		expect(access.getPaneEnvironment()).toEqual({
-			OPENCODE_SERVER_PASSWORD: "",
-			OPENCODE_SERVER_USERNAME: "",
-		})
+		expect(access.getPaneEnvironment()).toEqual({})
 	})
 })

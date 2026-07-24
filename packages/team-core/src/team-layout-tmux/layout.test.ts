@@ -11,7 +11,7 @@ let displaySessionId = "$7"
 let displaySuccess = true
 const panesByWindow = new Map<string, string[]>()
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
-const originalOpenCodePassword = process.env.OPENCODE_SERVER_PASSWORD
+const originalHarnessSecret = process.env.HARNESS_SECRET
 
 function createTmuxCommandResult(output: string, success = true) {
   return {
@@ -130,14 +130,14 @@ describe("team-layout-tmux", () => {
     process.env.TMUX = "/tmp/tmux-1"
     process.env.TMUX_PANE = "%42"
     delete process.env.CMUX_SOCKET_PATH
-    delete process.env.OPENCODE_SERVER_PASSWORD
+    delete process.env.HARNESS_SECRET
   })
 
   afterEach(() => {
     if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
     else process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
-    if (originalOpenCodePassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
-    else process.env.OPENCODE_SERVER_PASSWORD = originalOpenCodePassword
+    if (originalHarnessSecret === undefined) delete process.env.HARNESS_SECRET
+    else process.env.HARNESS_SECRET = originalHarnessSecret
   })
 
   test("returns null and makes no tmux calls when visualization unavailable", async () => {
@@ -325,34 +325,22 @@ describe("team-layout-tmux", () => {
     expect(attachCommands.every((args) => args.join(" ").includes("http://127.0.0.1:43127/capability"))).toBe(true)
   })
 
-  test("#given a legacy manager and ambient credentials #when a native pane is created #then inherited credentials are explicitly cleared", async () => {
+  test("#given a legacy manager #when a native pane is created #then core does not invent harness environment policy", async () => {
     // given
-    const ambientVariableName = ["OPEN", "CODE", "_SERVER_", "PASSWORD"].join("")
-    const originalValue = process.env[ambientVariableName]
-    const ambientValue = "ambient-layout-fixture"
-    process.env[ambientVariableName] = ambientValue
+    const { createTeamLayout } = await loadLayoutModule()
 
-    try {
-      const { createTeamLayout } = await loadLayoutModule()
+    // when
+    const result = await createTeamLayout(
+      "run-legacy-generic",
+      [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+      tmuxMgr,
+    )
 
-      // when
-      const result = await createTeamLayout(
-        "run-legacy-anonymous",
-        [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
-        tmuxMgr,
-      )
-
-      // then
-      expect(result).not.toBeNull()
-      const split = getCommands().find((args) => args[0] === "split-window")
-      expect(split).toBeDefined()
-      expect(split).toContain("OPENCODE_SERVER_PASSWORD=")
-      expect(split).toContain("OPENCODE_SERVER_USERNAME=")
-      expect(split?.some((arg) => arg.includes(ambientValue))).toBe(false)
-    } finally {
-      if (originalValue === undefined) delete process.env[ambientVariableName]
-      else process.env[ambientVariableName] = originalValue
-    }
+    // then
+    expect(result).not.toBeNull()
+    const split = getCommands().find((args) => args[0] === "split-window")
+    expect(split).toBeDefined()
+    expect(split).not.toContain("-e")
   })
 
   test("#given the production logical tmux path and anonymous clears #when a cmux team layout is created #then the runner can redirect without environment flags", async () => {
@@ -363,8 +351,8 @@ describe("team-layout-tmux", () => {
         serverUrl: "http://127.0.0.1:43127",
         checkServerHealth: async () => true,
         getPaneEnvironment: () => ({
-          OPENCODE_SERVER_PASSWORD: "",
-          OPENCODE_SERVER_USERNAME: "",
+          HARNESS_SECRET: "",
+          HARNESS_IDENTITY: "",
         }),
       }),
     }
@@ -398,8 +386,8 @@ describe("team-layout-tmux", () => {
         getPaneEnvironment: () => {
           events.push("get-environment")
           return {
-            OPENCODE_SERVER_PASSWORD: "",
-            OPENCODE_SERVER_USERNAME: "",
+            HARNESS_SECRET: "",
+            HARNESS_IDENTITY: "",
           }
         },
       }),
@@ -437,8 +425,8 @@ describe("team-layout-tmux", () => {
         serverUrl: "http://127.0.0.1:43127",
         checkServerHealth: async () => true,
         getPaneEnvironment: () => ({
-          OPENCODE_SERVER_PASSWORD: "password-fixture",
-          OPENCODE_SERVER_USERNAME: "username-fixture",
+          HARNESS_SECRET: "secret-fixture",
+          HARNESS_IDENTITY: "identity-fixture",
         }),
       }),
     }
@@ -460,17 +448,17 @@ describe("team-layout-tmux", () => {
 
   test("#given anonymous clears and ambient credentials #when a cmux team layout is requested #then it fails before inheritance", async () => {
     // given
-    const ambientName = "OPENCODE_SERVER_PASSWORD"
+    const ambientName = "HARNESS_SECRET"
     const originalValue = process.env[ambientName]
-    process.env[ambientName] = "ambient-password-fixture"
+    process.env[ambientName] = "ambient-secret-fixture"
     const manager: TmuxMgrLike = {
       getServerUrl: () => { throw new Error("legacy URL must not be read") },
       getTmuxServerAccess: () => ({
         serverUrl: "http://127.0.0.1:43127",
         checkServerHealth: async () => true,
         getPaneEnvironment: () => ({
-          OPENCODE_SERVER_PASSWORD: "",
-          OPENCODE_SERVER_USERNAME: "",
+          HARNESS_SECRET: "",
+          HARNESS_IDENTITY: "",
         }),
       }),
     }
@@ -527,18 +515,23 @@ describe("team-layout-tmux", () => {
     expect(runTmuxCommandMock).not.toHaveBeenCalled()
   })
 
-  test("#given cmux and ambient credentials appear during tmux lookup #when a team layout is requested #then no tmux command inherits them", async () => {
+  test("#given cmux and a declared ambient value appear during tmux lookup #when a team layout is requested #then no tmux command inherits it", async () => {
     // given
     delete process.env.CMUX_SOCKET_PATH
-    delete process.env.OPENCODE_SERVER_PASSWORD
+    delete process.env.HARNESS_SECRET
     const manager: TmuxMgrLike = {
-      getServerUrl: () => "http://127.0.0.1:43127",
+      getServerUrl: () => { throw new Error("legacy URL must not be read") },
+      getTmuxServerAccess: () => ({
+        serverUrl: "http://127.0.0.1:43127",
+        checkServerHealth: async () => true,
+        getPaneEnvironment: () => ({ HARNESS_SECRET: "" }),
+      }),
     }
     const { createTeamLayout } = await loadLayoutModule({
       isCmuxCompatEnvironment: () => process.env.CMUX_SOCKET_PATH !== undefined,
       getTmuxPath: async () => {
         process.env.CMUX_SOCKET_PATH = "/tmp/cmux-late.sock"
-        process.env.OPENCODE_SERVER_PASSWORD = "late-ambient-password-fixture"
+        process.env.HARNESS_SECRET = "late-ambient-secret-fixture"
         return "cmux"
       },
     })
@@ -571,8 +564,8 @@ describe("team-layout-tmux", () => {
         serverUrl: "http://127.0.0.1:43127",
         checkServerHealth: async () => true,
         getPaneEnvironment: () => authenticated
-          ? { OPENCODE_SERVER_PASSWORD: "rotated-password-fixture" }
-          : { OPENCODE_SERVER_PASSWORD: "", OPENCODE_SERVER_USERNAME: "" },
+          ? { HARNESS_SECRET: "rotated-secret-fixture" }
+          : { HARNESS_SECRET: "", HARNESS_IDENTITY: "" },
       }),
     }
     const { createTeamLayout } = await loadLayoutModule({
@@ -594,8 +587,8 @@ describe("team-layout-tmux", () => {
     expect(calls.some(({ args }) => args[0] === "send-keys")).toBe(false)
     const cleanupEnvironment = calls.at(-1)?.options?.environment
     expect(cleanupEnvironment).toBeDefined()
-    expect(cleanupEnvironment?.OPENCODE_SERVER_PASSWORD).toBeUndefined()
-    expect(cleanupEnvironment?.OPENCODE_SERVER_USERNAME).toBeUndefined()
+    expect(cleanupEnvironment?.HARNESS_SECRET).toBeUndefined()
+    expect(cleanupEnvironment?.HARNESS_IDENTITY).toBeUndefined()
   })
 
   test("#given pane setup throws after a split #when the layout transaction aborts #then the created pane is rolled back", async () => {
@@ -897,7 +890,15 @@ describe("team-layout-tmux", () => {
 
   test("#given ownedSession=false and paneIds #when removeTeamLayout runs #then it kills panes instead of the caller window", async () => {
     // given
-    process.env.OPENCODE_SERVER_PASSWORD = "ambient-cleanup-password-fixture"
+    process.env.HARNESS_SECRET = "ambient-cleanup-secret-fixture"
+    const manager: TmuxMgrLike = {
+      getServerUrl: () => { throw new Error("legacy URL must not be read") },
+      getTmuxServerAccess: () => ({
+        serverUrl: "http://127.0.0.1:43127",
+        checkServerHealth: async () => true,
+        getPaneEnvironment: () => ({ HARNESS_SECRET: "" }),
+      }),
+    }
     const { removeTeamLayout } = await loadLayoutModule()
 
     // when
@@ -906,7 +907,7 @@ describe("team-layout-tmux", () => {
       targetSessionId: "$caller",
       focusWindowId: "test-session:0",
       paneIds: ["%10", "%11"],
-    }, tmuxMgr as never)
+    }, manager)
 
     // then
     const commands = getCommands()
@@ -916,7 +917,7 @@ describe("team-layout-tmux", () => {
     expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
     const cleanupCalls = runTmuxCommandMock.mock.calls.filter((call) => call[1][0] === "kill-pane")
     expect(cleanupCalls.every((call) =>
-      (call[2] as RunTmuxOptions | undefined)?.environment?.OPENCODE_SERVER_PASSWORD === undefined
+      (call[2] as RunTmuxOptions | undefined)?.environment?.HARNESS_SECRET === undefined
     )).toBe(true)
   })
 
@@ -1123,8 +1124,6 @@ describe("team-layout-tmux", () => {
       expect(splitCalls).toEqual([
         [
           "split-window",
-          "-e", "OPENCODE_SERVER_PASSWORD=",
-          "-e", "OPENCODE_SERVER_USERNAME=",
           "-t", process.env.TMUX_PANE ?? "",
           "-h",
           "-d",

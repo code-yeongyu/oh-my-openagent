@@ -172,8 +172,6 @@ function buildCleanupProcessEnvironment(
   for (const name of Object.keys(paneEnvironment)) {
     delete environment[name]
   }
-  delete environment.OPENCODE_SERVER_PASSWORD
-  delete environment.OPENCODE_SERVER_USERNAME
   return environment
 }
 

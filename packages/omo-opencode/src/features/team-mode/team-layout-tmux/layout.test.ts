@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import * as coreLayout from "@oh-my-opencode/team-core/team-layout-tmux/layout"
-import type { TmuxCommandResult } from "@oh-my-opencode/tmux-core"
+import type { RunTmuxOptions, TmuxCommandResult } from "@oh-my-opencode/tmux-core"
 
 import { createOpenCodeTmuxServerAccess } from "../../../shared/tmux"
 import * as layoutFacade from "./layout"
@@ -46,8 +46,10 @@ function paneEnvironment(args: ReadonlyArray<string>): Record<string, string> {
 
 function createLayoutHarness() {
   const calls: Array<Array<string>> = []
-  const runTmuxCommand = mock(async (_tmuxPath: string, args: Array<string>) => {
+  const executions: Array<{ args: Array<string>; options?: RunTmuxOptions }> = []
+  const runTmuxCommand = mock(async (_tmuxPath: string, args: Array<string>, options?: RunTmuxOptions) => {
     calls.push(args)
+    executions.push({ args, options })
     const [command] = args
     switch (command) {
       case "list-panes":
@@ -61,6 +63,7 @@ function createLayoutHarness() {
 
   return {
     calls,
+    executions,
     deps: {
       runTmuxCommand,
       isServerRunning: mock(async () => true),
@@ -147,5 +150,42 @@ describe("team layout adapter facade", () => {
 
     expect(result?.focusPanesByMember).toEqual({ member: "%member" })
     expect(paneEnvironment(findCommand(harness.calls, "split-window"))).toEqual(expectedEnvironment)
+  })
+
+  test("scrubs OpenCode capability keys from regular Team cleanup execution", async () => {
+    const passwordEnvironment = snapshotEnvironmentVariable("OPENCODE_SERVER_PASSWORD")
+    const usernameEnvironment = snapshotEnvironmentVariable("OPENCODE_SERVER_USERNAME")
+    process.env.OPENCODE_SERVER_PASSWORD = FIXTURE_PASSWORD
+    process.env.OPENCODE_SERVER_USERNAME = FIXTURE_USERNAME
+    const harness = createLayoutHarness()
+    const serverAccess = createOpenCodeTmuxServerAccess({
+      serverUrl: "http://localhost:4096",
+      source: "synthetic-fallback",
+      trusted: false,
+    })
+
+    try {
+      await layoutFacade.removeTeamLayout(
+        "run-adapter-cleanup",
+        {
+          ownedSession: false,
+          targetSessionId: "$caller",
+          paneIds: ["%member"],
+        },
+        {
+          getServerUrl: () => serverAccess.serverUrl,
+          getTmuxServerAccess: () => serverAccess,
+        },
+        harness.deps,
+      )
+
+      const cleanup = harness.executions.find(({ args }) => args[0] === "kill-pane")
+      expect(cleanup).toBeDefined()
+      expect(cleanup?.options?.environment?.OPENCODE_SERVER_PASSWORD).toBeUndefined()
+      expect(cleanup?.options?.environment?.OPENCODE_SERVER_USERNAME).toBeUndefined()
+    } finally {
+      restoreEnvironmentVariable("OPENCODE_SERVER_PASSWORD", passwordEnvironment)
+      restoreEnvironmentVariable("OPENCODE_SERVER_USERNAME", usernameEnvironment)
+    }
   })
 })
