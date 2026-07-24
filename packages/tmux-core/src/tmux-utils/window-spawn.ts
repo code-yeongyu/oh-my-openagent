@@ -1,12 +1,17 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
-import { isCmuxCompatEnvironment } from "../cmux-detect"
+import { isCmuxCompatEnvironment, isTmuxPathCompatibleWithBackend, resolveStableTmuxBackend } from "../cmux-detect"
 import type { TmuxServerTarget } from "../types"
 import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand, canOmitTmuxPaneEnvironment } from "./pane-command"
+import {
+	buildTmuxPlaceholderCommand,
+	planTmuxPaneEnvironment,
+	TMUX_BACKEND_MISMATCH_ERROR,
+	TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR,
+} from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -66,17 +71,15 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
-	const paneEnvironment = serverAccess.getPaneEnvironment()
-	const isCmux = isCmuxCompatEnvironment()
-	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
-		log("[spawnTmuxWindow] SKIP: authenticated cmux windows are unsupported")
+	const backend = await resolveStableTmuxBackend(deps.getTmuxPath)
+	if (!backend) {
+		log("[spawnTmuxWindow] SKIP: tmux backend changed or executable was unavailable")
 		return { success: false }
 	}
-	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
-	const tmux = await deps.getTmuxPath()
-	if (!tmux) {
-		log("[spawnTmuxWindow] SKIP: tmux not found")
+	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), backend.isCmux)
+	if (!environmentPlan) {
+		log("[spawnTmuxWindow] SKIP: pane environment cannot be safely omitted under cmux")
 		return { success: false }
 	}
 
@@ -90,11 +93,11 @@ export async function spawnTmuxWindow(
 		"-n", ISOLATED_WINDOW_NAME,
 		"-P",
 		"-F", "#{pane_id}",
-		...paneEnvironmentArgs,
+		...environmentPlan.args,
 		placeholderCmd,
 	]
 
-	const result = await runTmuxCommand(tmux, args)
+	const result = await runTmuxCommand(backend.path, args)
 	const paneId = result.output
 
 	if (result.exitCode !== 0 || !paneId) {
@@ -103,7 +106,16 @@ export async function spawnTmuxWindow(
 	}
 
 	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+	const titleIsCmux = isCmuxCompatEnvironment()
+	const titleBlockReason = titleIsCmux !== backend.isCmux ||
+		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
+		? TMUX_BACKEND_MISMATCH_ERROR
+		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
+			: undefined
+	const titleResult = titleBlockReason === undefined
+		? await runTmuxCommand(backend.path, ["select-pane", "-t", paneId, "-T", title])
+		: { exitCode: 1, stderr: titleBlockReason }
 	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxWindow] WARNING: failed to set pane title", {
 			paneId,

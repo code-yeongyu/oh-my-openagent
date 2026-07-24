@@ -121,6 +121,47 @@ describe("runTmuxCommand", () => {
 		})
 	})
 
+	test("#given an explicit process environment #when run #then the child receives that environment", async () => {
+		// given
+		const environment = {
+			...process.env,
+			TMUX_RUNNER_ENV_FIXTURE: "sanitized-fixture",
+		}
+
+		// when
+		const result = await runTmuxCommand(
+			"sh",
+			["-c", "printf '%s\\n' \"$TMUX_RUNNER_ENV_FIXTURE\""],
+			{ environment },
+		)
+
+		// then
+		expect(result.success).toBe(true)
+		expect(result.output).toBe("sanitized-fixture")
+	})
+
+	test("#given an ambient value removed from the explicit environment #when run #then the child cannot inherit it", async () => {
+		// given
+		process.env.TMUX_RUNNER_SCRUB_FIXTURE = "ambient-secret-fixture"
+		const environment = { ...process.env }
+		delete environment.TMUX_RUNNER_SCRUB_FIXTURE
+
+		try {
+			// when
+			const result = await runTmuxCommand(
+				"sh",
+				["-c", "printf '%s\\n' \"${TMUX_RUNNER_SCRUB_FIXTURE-unset}\""],
+				{ environment },
+			)
+
+			// then
+			expect(result.success).toBe(true)
+			expect(result.output).toBe("unset")
+		} finally {
+			delete process.env.TMUX_RUNNER_SCRUB_FIXTURE
+		}
+	})
+
 	test("#given command exits 1 with stderr #when run #then success false, stderr populated", async () => {
 		// given
 		const commandArguments = ["-c", "printf '%s\\n' 'some error' >&2; exit 1"]
@@ -222,5 +263,48 @@ describe("runTmuxCommand", () => {
 		})
 		const argsFileContent = await fs.readFile(argsFilePath, "utf8")
 		expect(normalizeLineEndings(argsFileContent)).toBe("__tmux-compat\ndisplay-message\n-p\n#{pane_id}\n")
+	})
+
+	test("#given cmux is no longer ambient #when the original cmux environment is supplied #then cleanup still uses cmux compatibility", async () => {
+		// given
+		const temporaryDirectory = await createTemporaryDirectory()
+		const argsFilePath = path.join(temporaryDirectory, "forced-cmux.args")
+		const cmuxPath = await createFakeCmux(temporaryDirectory, argsFilePath)
+
+		// when
+		const result = await runTmuxCommand(
+			cmuxPath,
+			["kill-pane", "-t", "%42"],
+			{
+				environment: {
+					...process.env,
+					CMUX_SOCKET_PATH: path.join(temporaryDirectory, "original-cmux.sock"),
+				},
+			},
+		)
+
+		// then
+		expect(result.success).toBe(true)
+		const argsFileContent = await fs.readFile(argsFilePath, "utf8")
+		expect(normalizeLineEndings(argsFileContent)).toBe("__tmux-compat\nkill-pane\n-t\n%42\n")
+	})
+
+	test("#given cmux becomes ambient #when the original native environment is supplied #then cleanup stays on native tmux", async () => {
+		// given
+		process.env.CMUX_SOCKET_PATH = "/tmp/cmux-transition-fixture.sock"
+		const environment = { ...process.env }
+		delete environment.CMUX_SOCKET_PATH
+		delete environment.TMUX
+
+		// when
+		const result = await runTmuxCommand(
+			"sh",
+			["-c", "printf '%s\\n' native-cleanup"],
+			{ environment },
+		)
+
+		// then
+		expect(result.success).toBe(true)
+		expect(result.output).toBe("native-cleanup")
 	})
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { getHttpServerOriginForLog } from "./tmux-server-target"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "./tmux-server-target"
 
 describe("getHttpServerOriginForLog", () => {
 	it("returns only the HTTP(S) origin and drops every secret-bearing URL component", () => {
@@ -12,5 +12,16 @@ describe("getHttpServerOriginForLog", () => {
 		expect(getHttpServerOriginForLog(undefined)).toBeUndefined()
 		expect(getHttpServerOriginForLog("malformed-url-secret")).toBeUndefined()
 		expect(getHttpServerOriginForLog("file:///tmp/private-token")).toBeUndefined()
+	})
+})
+
+describe("normalizeTmuxServerTarget", () => {
+	it("turns a legacy raw URL into explicitly anonymous OpenCode pane access", () => {
+		const access = normalizeTmuxServerTarget("http://127.0.0.1:4096")
+
+		expect(access.getPaneEnvironment()).toEqual({
+			OPENCODE_SERVER_PASSWORD: "",
+			OPENCODE_SERVER_USERNAME: "",
+		})
 	})
 })

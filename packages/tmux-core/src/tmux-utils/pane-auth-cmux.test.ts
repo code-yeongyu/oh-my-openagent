@@ -48,6 +48,27 @@ const clearedServerAccess = {
 	}),
 } satisfies TmuxServerAccess
 
+function switchToNativeTmux(): void {
+	process.env.TMUX = "/tmp/tmux-native.sock,1234,0"
+	delete process.env.CMUX_SOCKET_PATH
+	delete process.env.OPENCODE_SERVER_USERNAME
+	delete process.env.OPENCODE_SERVER_PASSWORD
+}
+
+function switchToAuthenticatedCmux(): void {
+	process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+	process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
+	process.env.OPENCODE_SERVER_PASSWORD = "late-ambient-password-fixture"
+}
+
+function resultForCommand(command: string): TmuxCommandResult {
+	if (command === "has-session") {
+		return { success: false, output: "", stdout: "", stderr: "", exitCode: 1 }
+	}
+	const output = ["split-window", "new-window", "new-session", "respawn-pane"].includes(command) ? "%42" : ""
+	return { success: true, output, stdout: output, stderr: "", exitCode: 0 }
+}
+
 function restoreEnvironment(): void {
 	if (originalTmux === undefined) delete process.env.TMUX
 	else process.env.TMUX = originalTmux
@@ -256,7 +277,7 @@ describe("cmux authenticated pane lifecycle", () => {
 		expect(runTmuxCommand).not.toHaveBeenCalled()
 	})
 
-	test("#given a raw URL and ambient credentials #when spawning under cmux #then ambient values are not absorbed", async () => {
+	test("#given a raw URL and ambient credentials #when spawning under cmux #then failure prevents child inheritance", async () => {
 		// given
 		process.env.OPENCODE_SERVER_USERNAME = "ambient-username-fixture"
 		process.env.OPENCODE_SERVER_PASSWORD = "ambient-password-fixture"
@@ -282,9 +303,258 @@ describe("cmux authenticated pane lifecycle", () => {
 		)
 
 		// then
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given a raw URL without ambient credentials #when spawning under cmux #then explicit clears are safely omitted", async () => {
+		// given
+		const runTmuxCommand = mock(async (_command: string, _args: string[]): Promise<TmuxCommandResult> => commandResult)
+
+		// when
+		const result = await spawnTmuxPane(
+			"session-cmux-raw-anonymous",
+			"worker",
+			config,
+			"http://127.0.0.1:4096",
+			"/tmp/project",
+			"%0",
+			"-h",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => false,
+				isCmuxCompatEnvironment: () => true,
+				isServerRunning: async () => true,
+				getTmuxPath: async () => "cmux",
+				log: mock(() => undefined),
+			},
+		)
+
+		// then
 		expect(result).toEqual({ success: true, paneId: "%42" })
-		const args = runTmuxCommand.mock.calls[0]?.[1] ?? []
-		expect(args).not.toContain("-e")
-		expect(args.some((arg) => arg.includes("ambient-username-fixture") || arg.includes("ambient-password-fixture"))).toBe(false)
+		expect(runTmuxCommand.mock.calls[0]?.[1]).not.toContain("-e")
+	})
+
+	test("#given cmux appears while resolving tmux #when spawning a pane #then the late environment is rejected before the runner", async () => {
+		switchToNativeTmux()
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		const result = await spawnTmuxPane(
+			"session-cmux-late-pane",
+			"worker",
+			config,
+			clearedServerAccess,
+			"/tmp/project",
+			"%0",
+			"-h",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				isCmuxCompatEnvironment: () => process.env.CMUX_SOCKET_PATH !== undefined,
+				getTmuxPath: async () => {
+					switchToAuthenticatedCmux()
+					return "cmux"
+				},
+				log: mock(() => undefined),
+			},
+		)
+
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given cmux appears while resolving tmux #when activating a pane #then the late environment is rejected before respawn", async () => {
+		switchToNativeTmux()
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		const result = await activateTmuxPane(
+			"%42",
+			"session-cmux-late-activate",
+			clearedServerAccess,
+			"/tmp/project",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				getTmuxPath: async () => {
+					switchToAuthenticatedCmux()
+					return "cmux"
+				},
+				log: mock(() => undefined),
+			},
+		)
+
+		expect(result).toBe(false)
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given cmux appears while resolving tmux #when replacing a pane #then the late environment is rejected before shutdown", async () => {
+		switchToNativeTmux()
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		const result = await replaceTmuxPane(
+			"%42",
+			"session-cmux-late-replace",
+			"worker",
+			config,
+			clearedServerAccess,
+			"/tmp/project",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				getTmuxPath: async () => {
+					switchToAuthenticatedCmux()
+					return "cmux"
+				},
+				log: mock(() => undefined),
+			},
+		)
+
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given cmux appears while resolving tmux #when spawning a window #then the late environment is rejected before creation", async () => {
+		switchToNativeTmux()
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		const result = await spawnTmuxWindow(
+			"session-cmux-late-window",
+			"worker",
+			config,
+			clearedServerAccess,
+			"/tmp/project",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				getTmuxPath: async () => {
+					switchToAuthenticatedCmux()
+					return "cmux"
+				},
+				log: mock(() => undefined),
+			},
+		)
+
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given cmux appears while resolving tmux #when spawning a session #then preparatory commands cannot inherit the late environment", async () => {
+		switchToNativeTmux()
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		const result = await spawnTmuxSession(
+			"session-cmux-late-session",
+			"worker",
+			config,
+			clearedServerAccess,
+			"/tmp/project",
+			"%0",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				getTmuxPath: async () => {
+					switchToAuthenticatedCmux()
+					return "cmux"
+				},
+				log: mock(() => undefined),
+			},
+		)
+
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given authenticated cmux appears after pane creation #when lifecycle paths set titles #then no title runner inherits it", async () => {
+		const exercise = async (
+			mutationCommand: string,
+			action: (
+				runTmuxCommand: (command: string, args: string[]) => Promise<TmuxCommandResult>,
+				log: (message: string, data?: unknown) => void,
+			) => Promise<unknown>,
+		) => {
+			switchToNativeTmux()
+			const calls: string[] = []
+			const log = mock((_message: string, _data?: unknown) => undefined)
+			const runTmuxCommand = mock(async (_command: string, args: string[]): Promise<TmuxCommandResult> => {
+				const command = args[0] ?? ""
+				calls.push(command)
+				if (command === mutationCommand) switchToAuthenticatedCmux()
+				return resultForCommand(command)
+			})
+
+			await action(runTmuxCommand, log)
+
+			expect(calls).toContain(mutationCommand)
+			expect(calls).not.toContain("select-pane")
+			expect(log.mock.calls.some((call) =>
+				(call[1] as { stderr?: string } | undefined)?.stderr ===
+					"tmux backend no longer matches the resolved executable"
+			)).toBe(true)
+		}
+
+		await exercise("split-window", (runTmuxCommand, log) =>
+			spawnTmuxPane(
+				"session-late-title-pane",
+				"worker",
+				config,
+				clearedServerAccess,
+				"/tmp/project",
+				"%0",
+				"-h",
+				{
+					runTmuxCommand,
+					isInsideTmux: () => true,
+					isCmuxCompatEnvironment: () => process.env.TMUX?.includes("cmuxterm") === true,
+					getTmuxPath: async () => "tmux",
+					log,
+				},
+			))
+
+		await exercise("new-window", (runTmuxCommand, log) =>
+			spawnTmuxWindow(
+				"session-late-title-window",
+				"worker",
+				config,
+				clearedServerAccess,
+				"/tmp/project",
+				{
+					runTmuxCommand,
+					isInsideTmux: () => true,
+					getTmuxPath: async () => "tmux",
+					log,
+				},
+			))
+
+		await exercise("new-session", (runTmuxCommand, log) =>
+			spawnTmuxSession(
+				"session-late-title-session",
+				"worker",
+				config,
+				clearedServerAccess,
+				"/tmp/project",
+				undefined,
+				{
+					runTmuxCommand,
+					isInsideTmux: () => true,
+					getTmuxPath: async () => "tmux",
+					log,
+				},
+			))
+
+		await exercise("respawn-pane", (runTmuxCommand, log) =>
+			replaceTmuxPane(
+				"%42",
+				"session-late-title-replace",
+				"worker",
+				config,
+				clearedServerAccess,
+				"/tmp/project",
+				{
+					runTmuxCommand,
+					isInsideTmux: () => true,
+					getTmuxPath: async () => "tmux",
+					log,
+				},
+			))
 	})
 })

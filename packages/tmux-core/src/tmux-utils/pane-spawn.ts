@@ -8,11 +8,16 @@ import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import {
 	buildTmuxAttachCommand,
-	buildTmuxEnvironmentArgs,
 	buildTmuxPlaceholderCommand,
-	canOmitTmuxPaneEnvironment,
+	planTmuxPaneEnvironment,
+	TMUX_BACKEND_MISMATCH_ERROR,
+	TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR,
 } from "./pane-command"
-import { isCmuxCompatEnvironment as _isCmuxCompatEnvironment } from "../cmux-detect"
+import {
+	isCmuxCompatEnvironment as _isCmuxCompatEnvironment,
+	isTmuxPathCompatibleWithBackend,
+	resolveStableTmuxBackend,
+} from "../cmux-detect"
 
 export type SpawnTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -65,7 +70,8 @@ export async function spawnTmuxPane(
 		log("[spawnTmuxPane] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!deps.isInsideTmux() && !deps.isCmuxCompatEnvironment()) {
+	const startedInCmux = deps.isCmuxCompatEnvironment()
+	if (!deps.isInsideTmux() && !startedInCmux) {
 		log("[spawnTmuxPane] SKIP: not inside tmux or cmux-compat environment", {
 			TMUX: process.env.TMUX,
 			CMUX_SOCKET_PATH: process.env.CMUX_SOCKET_PATH,
@@ -79,23 +85,28 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const paneEnvironment = serverAccess.getPaneEnvironment()
-	const isCmux = deps.isCmuxCompatEnvironment()
-	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
-		log("[spawnTmuxPane] SKIP: authenticated cmux panes are unsupported")
+	const backend = await resolveStableTmuxBackend(deps.getTmuxPath, deps.isCmuxCompatEnvironment)
+	if (!backend) {
+		log("[spawnTmuxPane] SKIP: tmux backend changed or executable was unavailable")
 		return { success: false }
 	}
-	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
-
-	const tmux = await deps.getTmuxPath()
-	if (!tmux) {
-		log("[spawnTmuxPane] SKIP: tmux not found")
+	if (backend.isCmux !== startedInCmux) {
+		log("[spawnTmuxPane] SKIP: tmux backend changed while validating server readiness")
+		return { success: false }
+	}
+	if (!deps.isInsideTmux() && !backend.isCmux) {
+		log("[spawnTmuxPane] SKIP: no compatible tmux backend after server readiness")
+		return { success: false }
+	}
+	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), backend.isCmux)
+	if (!environmentPlan) {
+		log("[spawnTmuxPane] SKIP: pane environment cannot be safely omitted under cmux")
 		return { success: false }
 	}
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const initialCmd = isCmux
+	const initialCmd = environmentPlan.isCmux
 		? buildTmuxAttachCommand(serverAccess.serverUrl, sessionId, _directory)
 		: buildTmuxPlaceholderCommand(description)
 
@@ -107,11 +118,11 @@ export async function spawnTmuxPane(
 		"-F",
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
-		...paneEnvironmentArgs,
+		...environmentPlan.args,
 		initialCmd,
 	]
 
-	const result = await runTmuxCommand(tmux, args)
+	const result = await runTmuxCommand(backend.path, args)
 	const paneId = result.output
 
 	if (result.exitCode !== 0 || !paneId) {
@@ -119,7 +130,16 @@ export async function spawnTmuxPane(
 	}
 
 	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+	const titleIsCmux = deps.isCmuxCompatEnvironment()
+	const titleBlockReason = titleIsCmux !== backend.isCmux ||
+		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
+		? TMUX_BACKEND_MISMATCH_ERROR
+		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
+			: undefined
+	const titleResult = titleBlockReason === undefined
+		? await runTmuxCommand(backend.path, ["select-pane", "-t", paneId, "-T", title])
+		: { exitCode: 1, stderr: titleBlockReason }
 	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxPane] WARNING: failed to set pane title", {
 			paneId,

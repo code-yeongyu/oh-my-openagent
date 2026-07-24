@@ -4,6 +4,9 @@ import type { TmuxPaneEnvironment } from "../types"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
+export const TMUX_BACKEND_MISMATCH_ERROR = "tmux backend no longer matches the resolved executable"
+export const TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR = "pane environment cannot be safely omitted under cmux"
+
 function shellQuoteForNestedCommand(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`
     .replace(/\\/g, "\\\\")
@@ -35,4 +38,20 @@ export function canOmitTmuxPaneEnvironment(
   ambientEnvironment: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return Object.entries(environment).every(([name, value]) => value === "" && !ambientEnvironment[name])
+}
+
+export type TmuxPaneEnvironmentPlan = {
+  readonly args: string[]
+  readonly isCmux: boolean
+}
+
+export function planTmuxPaneEnvironment(
+  environment: TmuxPaneEnvironment,
+  isCmux: boolean,
+): TmuxPaneEnvironmentPlan | null {
+  if (isCmux && !canOmitTmuxPaneEnvironment(environment)) return null
+  return {
+    args: isCmux ? [] : buildTmuxEnvironmentArgs(environment),
+    isCmux,
+  }
 }

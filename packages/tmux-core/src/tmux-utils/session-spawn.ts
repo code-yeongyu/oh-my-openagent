@@ -2,11 +2,16 @@ import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { isCmuxCompatEnvironment } from "../cmux-detect"
+import { isCmuxCompatEnvironment, isTmuxPathCompatibleWithBackend, resolveStableTmuxBackend } from "../cmux-detect"
 import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand, canOmitTmuxPaneEnvironment } from "./pane-command"
+import {
+	buildTmuxPlaceholderCommand,
+	planTmuxPaneEnvironment,
+	TMUX_BACKEND_MISMATCH_ERROR,
+	TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR,
+} from "./pane-command"
 
 const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
 
@@ -57,6 +62,16 @@ async function sessionExists(tmux: string, sessionName: string, runTmuxCommand: 
 	return result.exitCode === 0
 }
 
+function blockedTmuxCommandResult(stderr = TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR): Awaited<ReturnType<typeof RunTmuxCommand>> {
+	return {
+		success: false,
+		output: "",
+		stdout: "",
+		stderr,
+		exitCode: 1,
+	}
+}
+
 export async function spawnTmuxSession(
 	sessionId: string,
 	description: string,
@@ -94,34 +109,51 @@ export async function spawnTmuxSession(
 		return { success: false }
 	}
 
-	const paneEnvironment = serverAccess.getPaneEnvironment()
-	const isCmux = isCmuxCompatEnvironment()
-	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
-		log("[spawnTmuxSession] SKIP: authenticated cmux sessions are unsupported")
+	if (isCmuxCompatEnvironment() && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)) {
+		log("[spawnTmuxSession] SKIP: pane environment cannot be safely omitted under cmux")
 		return { success: false }
 	}
-	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
-	const tmux = await deps.getTmuxPath()
-	if (!tmux) {
-		log("[spawnTmuxSession] SKIP: tmux not found")
+	const backend = await resolveStableTmuxBackend(deps.getTmuxPath)
+	if (!backend) {
+		log("[spawnTmuxSession] SKIP: tmux backend changed or executable was unavailable")
 		return { success: false }
 	}
 
 	log("[spawnTmuxSession] all checks passed, creating isolated session...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const guardedRunTmuxCommand: typeof RunTmuxCommand = (tmuxPath, args, options) => {
+		const currentIsCmux = isCmuxCompatEnvironment()
+		if (currentIsCmux !== backend.isCmux || !isTmuxPathCompatibleWithBackend(tmuxPath, currentIsCmux)) {
+			return Promise.resolve(blockedTmuxCommandResult(TMUX_BACKEND_MISMATCH_ERROR))
+		}
+		if (!currentIsCmux) return runTmuxCommand(tmuxPath, args, options)
+		return planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+			? runTmuxCommand(tmuxPath, args, options)
+			: Promise.resolve(blockedTmuxCommandResult())
+	}
 
 	const sizeArgs: string[] = []
 	if (sourcePaneId) {
-		const dims = await getWindowDimensions(tmux, sourcePaneId, runTmuxCommand)
+		const dims = await getWindowDimensions(backend.path, sourcePaneId, guardedRunTmuxCommand)
 		if (dims) {
 			sizeArgs.push("-x", String(dims.width), "-y", String(dims.height))
 		}
 	}
 
 	const isolatedSessionName = getIsolatedSessionName(process.pid, managerId)
-	const sessionAlreadyExists = await sessionExists(tmux, isolatedSessionName, runTmuxCommand)
+	const sessionAlreadyExists = await sessionExists(backend.path, isolatedSessionName, guardedRunTmuxCommand)
+	const currentIsCmux = isCmuxCompatEnvironment()
+	if (currentIsCmux !== backend.isCmux || !isTmuxPathCompatibleWithBackend(backend.path, currentIsCmux)) {
+		log(`[spawnTmuxSession] SKIP: ${TMUX_BACKEND_MISMATCH_ERROR}`)
+		return { success: false }
+	}
+	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), currentIsCmux)
+	if (!environmentPlan) {
+		log(`[spawnTmuxSession] SKIP: ${TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR}`)
+		return { success: false }
+	}
 
 	const args = sessionAlreadyExists
 		? [
@@ -129,7 +161,7 @@ export async function spawnTmuxSession(
 			"-t", isolatedSessionName,
 			"-P",
 			"-F", "#{pane_id}",
-			...paneEnvironmentArgs,
+			...environmentPlan.args,
 			placeholderCmd,
 		]
 		: [
@@ -139,7 +171,7 @@ export async function spawnTmuxSession(
 			...sizeArgs,
 			"-P",
 			"-F", "#{pane_id}",
-			...paneEnvironmentArgs,
+			...environmentPlan.args,
 			placeholderCmd,
 		]
 
@@ -148,7 +180,7 @@ export async function spawnTmuxSession(
 		sessionName: isolatedSessionName,
 	})
 
-	const result = await runTmuxCommand(tmux, args)
+	const result = await runTmuxCommand(backend.path, args)
 	const paneId = result.output
 
 	if (result.exitCode !== 0 || !paneId) {
@@ -157,7 +189,16 @@ export async function spawnTmuxSession(
 	}
 
 	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+	const titleIsCmux = isCmuxCompatEnvironment()
+	const titleBlockReason = titleIsCmux !== backend.isCmux ||
+		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
+		? TMUX_BACKEND_MISMATCH_ERROR
+		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
+			: undefined
+	const titleResult = titleBlockReason === undefined
+		? await runTmuxCommand(backend.path, ["select-pane", "-t", paneId, "-T", title])
+		: { exitCode: 1, stderr: titleBlockReason }
 	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxSession] WARNING: failed to set pane title", {
 			paneId,

@@ -1,7 +1,11 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { isCmuxCompatEnvironment } from "./cmux-detect"
+import {
+  isCmuxCompatEnvironment,
+  isTmuxPathCompatibleWithBackend,
+  resolveStableTmuxBackend,
+} from "./cmux-detect"
 
 describe("isCmuxCompatEnvironment", () => {
   let savedTmux: string | undefined
@@ -59,5 +63,53 @@ describe("isCmuxCompatEnvironment", () => {
 
     // then
     expect(result).toBe(true)
+  })
+
+  it("#given known tmux and cmux executables #when backend compatibility is checked #then mismatches are rejected", () => {
+    expect(isTmuxPathCompatibleWithBackend("/usr/bin/tmux", false)).toBe(true)
+    expect(isTmuxPathCompatibleWithBackend("/usr/bin/tmux", true)).toBe(false)
+    expect(isTmuxPathCompatibleWithBackend("/opt/bin/cmux", true)).toBe(true)
+    expect(isTmuxPathCompatibleWithBackend("/opt/bin/cmux", false)).toBe(false)
+    expect(isTmuxPathCompatibleWithBackend("test-runner-shim", true)).toBe(true)
+  })
+
+  it("#given the default logical tmux alias under cmux #when resolving a stable backend #then it normalizes to cmux compat", async () => {
+    const result = await resolveStableTmuxBackend(
+      async () => "tmux",
+      () => true,
+    )
+
+    expect(result).toEqual({ isCmux: true, path: "cmux" })
+  })
+
+  it("#given an absolute native tmux path under cmux #when resolving a stable backend #then it rejects the stale executable", async () => {
+    const result = await resolveStableTmuxBackend(
+      async () => "/usr/bin/tmux",
+      () => true,
+    )
+
+    expect(result).toBeNull()
+  })
+
+  it("#given the backend changes during executable lookup #when resolution completes #then it fails closed", async () => {
+    let isCmux = false
+    const result = await resolveStableTmuxBackend(
+      async () => {
+        isCmux = true
+        return "cmux"
+      },
+      () => isCmux,
+    )
+
+    expect(result).toBeNull()
+  })
+
+  it("#given an ABA lookup returns a cmux path in native mode #when resolution completes #then path validation rejects it", async () => {
+    const result = await resolveStableTmuxBackend(
+      async () => "cmux",
+      () => false,
+    )
+
+    expect(result).toBeNull()
   })
 })

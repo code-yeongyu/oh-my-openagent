@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
-import type { TmuxConfig } from "../types"
+import type { TmuxConfig, TmuxServerAccess } from "../types"
 import type { TmuxCommandResult } from "../runner"
 import { isTmuxPaneCompatibleEnvironment } from "./environment"
 
@@ -262,6 +262,66 @@ describe("spawnTmuxPane runner integration", () => {
 			expect(cmd).toContain("opencode attach")
 			expect(cmd).toContain("/home/user/my")
 			expect(cmd).toContain("--dir '/home/user/my project/sub dir'")
+		})
+
+		it("#given the backend changes during readiness #when tmux is resolved #then spawn fails closed", async () => {
+			// given
+			isCmuxCompatEnvironmentMock
+				.mockImplementationOnce(() => true)
+				.mockImplementation(() => false)
+			const spawnTmuxPane = await loadSpawnTmuxPane()
+			const serverAccess = {
+				serverUrl: "http://127.0.0.1:1234",
+				checkServerHealth: async () => true,
+				getPaneEnvironment: () => ({}),
+			} satisfies TmuxServerAccess
+
+			// when
+			const result = await spawnTmuxPane(
+				"session-cmux-snapshot",
+				"worker",
+				enabledTmuxConfig,
+				serverAccess,
+				"/tmp/omo-project",
+				"%0",
+				"-h",
+				createDeps(),
+			)
+
+			// then
+			expect(result).toEqual({ success: false })
+			expect(isCmuxCompatEnvironmentMock).toHaveBeenCalledTimes(3)
+			expect(runTmuxCommandMock).not.toHaveBeenCalled()
+		})
+
+		it("#given cmux appears during health await #when pane environment cannot be omitted #then spawn fails closed", async () => {
+			// given
+			isCmuxCompatEnvironmentMock
+				.mockImplementationOnce(() => false)
+				.mockImplementation(() => true)
+			const spawnTmuxPane = await loadSpawnTmuxPane()
+			const serverAccess = {
+				serverUrl: "http://127.0.0.1:1234",
+				checkServerHealth: async () => true,
+				getPaneEnvironment: () => ({ OPENCODE_SERVER_PASSWORD: "password-fixture" }),
+			} satisfies TmuxServerAccess
+
+			// when
+			const result = await spawnTmuxPane(
+				"session-cmux-transition",
+				"worker",
+				enabledTmuxConfig,
+				serverAccess,
+				"/tmp/omo-project",
+				"%0",
+				"-h",
+				createDeps(),
+			)
+
+			// then
+			expect(result).toEqual({ success: false })
+			expect(isCmuxCompatEnvironmentMock).toHaveBeenCalledTimes(3)
+			expect(runTmuxCommandMock).not.toHaveBeenCalled()
 		})
 	})
 

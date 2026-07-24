@@ -220,7 +220,7 @@ describe("tmux pane environment capabilities", () => {
 		expect(overriddenUrls).toEqual([access.serverUrl])
 	})
 
-	it("#given only raw server URLs and an ambient variable #when lifecycle paths mutate panes #then no environment is propagated", async () => {
+	it("#given only raw server URLs and an ambient variable #when lifecycle paths mutate panes #then OpenCode auth is cleared without copying ambient values", async () => {
 		// given
 		const ambientName = "TMUX_CORE_AMBIENT_SECRET"
 		const originalAmbientValue = process.env[ambientName]
@@ -256,7 +256,10 @@ describe("tmux pane environment capabilities", () => {
 				activateRecorder.getCall(0)[1],
 			]
 			for (const args of mutationArgs) {
-				expect(extractEnvironment(args)).toEqual([])
+				expect(extractEnvironment(args)).toEqual([
+					"OPENCODE_SERVER_PASSWORD=",
+					"OPENCODE_SERVER_USERNAME=",
+				])
 				expect(args).not.toContain(`${ambientName}=ambient-value-fixture`)
 			}
 		} finally {

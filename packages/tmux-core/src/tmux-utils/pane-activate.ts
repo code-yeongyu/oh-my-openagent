@@ -1,9 +1,9 @@
 import { runTmuxCommand } from "../runner"
-import { isCmuxCompatEnvironment } from "../cmux-detect"
+import { isCmuxCompatEnvironment, resolveStableTmuxBackend } from "../cmux-detect"
 import { normalizeTmuxServerTarget } from "../tmux-server-target"
 import type { TmuxServerTarget } from "../types"
 import { isInsideTmux } from "./environment"
-import { buildTmuxAttachCommand, buildTmuxEnvironmentArgs, canOmitTmuxPaneEnvironment } from "./pane-command"
+import { buildTmuxAttachCommand, planTmuxPaneEnvironment } from "./pane-command"
 
 export type ActivateTmuxPaneDeps = {
   readonly isInsideTmux: () => boolean
@@ -31,25 +31,23 @@ export async function activateTmuxPane(
     return false
   }
 
-  const paneEnvironment = serverAccess.getPaneEnvironment()
-  const isCmux = isCmuxCompatEnvironment()
-  if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
-    deps.log("[activateTmuxPane] SKIP: authenticated cmux panes are unsupported", { paneId, sessionId })
+  const backend = await resolveStableTmuxBackend(deps.getTmuxPath)
+  if (!backend) {
+    deps.log("[activateTmuxPane] SKIP: tmux backend changed or executable was unavailable", { paneId, sessionId })
     return false
   }
-  const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
-  const tmux = await deps.getTmuxPath()
-  if (!tmux) {
-    deps.log("[activateTmuxPane] SKIP: tmux not found", { paneId, sessionId })
+  const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), backend.isCmux)
+  if (!environmentPlan) {
+    deps.log("[activateTmuxPane] SKIP: pane environment cannot be safely omitted under cmux", { paneId, sessionId })
     return false
   }
 
   const attachCommand = buildTmuxAttachCommand(serverAccess.serverUrl, sessionId, directory)
-  const result = await deps.runTmuxCommand(tmux, [
+  const result = await deps.runTmuxCommand(backend.path, [
     "respawn-pane",
     "-k",
-    ...paneEnvironmentArgs,
+    ...environmentPlan.args,
     "-t",
     paneId,
     attachCommand,

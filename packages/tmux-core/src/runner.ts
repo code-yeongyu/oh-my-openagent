@@ -1,9 +1,10 @@
 import { spawn } from "@oh-my-opencode/utils/runtime"
 import { isCmuxCompatEnvironment } from "./cmux-detect"
 
-type RunTmuxOptions = {
+export type RunTmuxOptions = {
 	retry?: number
 	timeoutMs?: number
+	environment?: Readonly<Record<string, string | undefined>>
 }
 
 export type TmuxCommandResult = {
@@ -30,8 +31,12 @@ function isTerminalTmuxError(stderr: string): boolean {
 	return TERMINAL_TMUX_ERROR_PATTERN.test(stderr)
 }
 
-function resolveTmuxExecutable(tmuxPath: string): string[] {
-	if (!isCmuxCompatEnvironment()) {
+function resolveTmuxExecutable(
+	tmuxPath: string,
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+	const useCmux = isCmuxCompatEnvironment({ ...environment })
+	if (!useCmux) {
 		return [tmuxPath]
 	}
 
@@ -40,9 +45,15 @@ function resolveTmuxExecutable(tmuxPath: string): string[] {
 	return [cmuxExecutable, "__tmux-compat"]
 }
 
-async function runTmuxCommandOnce(tmuxPath: string, args: Array<string>, timeoutMs?: number): Promise<TmuxCommandResult> {
+async function runTmuxCommandOnce(
+	tmuxPath: string,
+	args: Array<string>,
+	timeoutMs?: number,
+	environment?: Readonly<Record<string, string | undefined>>,
+): Promise<TmuxCommandResult> {
 	const abortController = new AbortController()
-	const subprocess = spawn([...resolveTmuxExecutable(tmuxPath), ...args], {
+	const subprocess = spawn([...resolveTmuxExecutable(tmuxPath, environment), ...args], {
+		env: environment,
 		stdout: "pipe",
 		stderr: "pipe",
 		signal: abortController.signal,
@@ -86,7 +97,12 @@ export async function runTmuxCommand(tmuxPath: string, args: string[], options: 
 	let lastResult = createTmuxCommandResult("", "", 1)
 
 	for (let attempt = 0; attempt <= retryCount; attempt += 1) {
-		const result = await runTmuxCommandOnce(tmuxPath, args, options.timeoutMs)
+		const result = await runTmuxCommandOnce(
+			tmuxPath,
+			args,
+			options.timeoutMs,
+			options.environment,
+		)
 		lastResult = result
 
 		if (result.exitCode === 0) {

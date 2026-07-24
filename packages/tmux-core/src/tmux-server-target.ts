@@ -1,9 +1,12 @@
-import type { TmuxServerAccess, TmuxServerTarget } from "./types"
+import type { TmuxPaneEnvironment, TmuxServerAccess, TmuxServerTarget } from "./types"
 import { isServerRunning } from "./tmux-utils/server-health"
 
 export type TmuxServerHealthCheck = (serverUrl: string) => Promise<boolean>
 
-const EMPTY_PANE_ENVIRONMENT = Object.freeze({})
+const CLEARED_LEGACY_OPENCODE_PANE_ENVIRONMENT: TmuxPaneEnvironment = Object.freeze({
+  OPENCODE_SERVER_PASSWORD: "",
+  OPENCODE_SERVER_USERNAME: "",
+})
 
 export function getHttpServerOriginForLog(serverUrl: string | undefined): string | undefined {
   if (!serverUrl) return undefined
@@ -35,6 +38,6 @@ export function normalizeTmuxServerTarget(
   return {
     serverUrl: target,
     checkServerHealth: () => healthCheck(target),
-    getPaneEnvironment: () => EMPTY_PANE_ENVIRONMENT,
+    getPaneEnvironment: () => CLEARED_LEGACY_OPENCODE_PANE_ENVIRONMENT,
   }
 }
