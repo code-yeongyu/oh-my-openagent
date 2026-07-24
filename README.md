@@ -372,17 +372,25 @@ Add your own under `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*
 
 ## Uninstallation
 
+If you only want to disable oh-my-openagent temporarily, remove the plugin entries from `opencode.json` and `tui.json`, then leave the plugin config files in place. Restart OpenCode after editing the files. On Desktop, fully quit and reopen the app so the plugin process is recreated.
+
 To remove oh-my-openagent:
 
 1. **Remove the plugin from your OpenCode config**
 
-   Edit `~/.config/opencode/opencode.json` (or `opencode.jsonc`) and remove either `"oh-my-openagent"` or the legacy `"oh-my-opencode"` entry from the `plugin` array:
+   Edit `~/.config/opencode/opencode.json` (or `opencode.jsonc`) and remove either `"oh-my-openagent"` or the legacy `"oh-my-opencode"` entry from the `plugin` array. If `~/.config/opencode/tui.json` exists, remove the same plugin entry there too so the TUI sidebar/plugin surface is disabled:
 
    ```bash
-   # Using jq
+   # Using jq for the server plugin entry
    jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
+
+   # If present, remove the TUI plugin entry as well
+   test ! -f ~/.config/opencode/tui.json || \
+     jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
+       ~/.config/opencode/tui.json > /tmp/tui.json && \
+       mv /tmp/tui.json ~/.config/opencode/tui.json
    ```
 
 2. **Remove configuration files (optional)**
@@ -400,9 +408,12 @@ To remove oh-my-openagent:
 3. **Verify removal**
 
    ```bash
-   opencode --version
-   # Plugin should no longer be loaded
+   bunx oh-my-openagent doctor --status
+   grep -R "oh-my-openagent\|oh-my-opencode" \
+     ~/.config/opencode/opencode.json ~/.config/opencode/opencode.jsonc ~/.config/opencode/tui.json 2>/dev/null
    ```
+
+   The doctor output should report that the plugin is not registered, and the `grep` command should print no active OpenCode or TUI plugin entry. If OpenCode still shows oh-my-openagent agents or sidebar UI, restart the terminal or Desktop app after saving both config files.
 
 4. **Remove omo-codex (Codex CLI Light edition)**
 
@@ -417,6 +428,8 @@ To remove oh-my-openagent:
    ```
 
    The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old project-local Codex plugin state, run the command from that project or pass `--project <path>`; it repairs known project-local `.codex/config.toml` conflicts and reports project-local `.codex` artifacts without deleting project-owned files.
+
+   To verify Codex Light removal, check that `~/.codex/config.toml` no longer contains `sisyphuslabs` or `omo@sisyphuslabs`, then start a new Codex session from the project that previously failed.
 
 ## Features
 
