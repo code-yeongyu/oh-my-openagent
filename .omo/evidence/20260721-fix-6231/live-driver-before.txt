@@ -1,0 +1,7 @@
+﻿# LIVE-SURFACE BEFORE FIX (#6231) - 2026-07-22T11:28:45.5249990+09:00
+launcher import line: import { spawnSync } from "node:child_process";
+node exit    : 1
+node stderr  : (node:29388) Warning: To load an ES module, set "type": "module" in the package.json or use the .mjs extension. | (Use `node --trace-warnings ...` to show where the warning was created) | C:\Users\pss\AppData\Local\Temp\omo-6231-live-yuSTwB\oh-my-opencode.js:2
+RESULT: FAIL - launcher crashed with a module SyntaxError before running
+
+EXIT=1

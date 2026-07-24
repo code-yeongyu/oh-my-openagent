@@ -1,0 +1,16 @@
+﻿# GREEN - after fix (#6231) - both build-binaries suites - 2026-07-22T11:26:47.1032823+09:00
+
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:2 char:8
++ $out = bun test script/build-binaries-launcher.test.ts script/build-b ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 16 pass
+ 0 fail
+ 87 expect() calls
+Ran 16 tests across 2 files. [2.66s]
+
+EXIT=0

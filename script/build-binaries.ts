@@ -35,9 +35,9 @@ const CLI_DIST_ENTRY = "dist/cli/index.js";
 
 export function createPlatformLauncherSource(): string {
   return `#!/usr/bin/env node
-import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+const { spawnSync } = require("node:child_process");
+const { existsSync } = require("node:fs");
+const { join } = require("node:path");
 
 const wrapperPackageRoot = process.env.OMO_WRAPPER_PACKAGE_ROOT;
 const lazyCodexInvocationNames = new Set(["lazycodex", "lazycodex-ai"]);

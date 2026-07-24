@@ -1,0 +1,42 @@
+﻿# NEGATIVE CONTROL - product stashed, #6231 test must fail again - 2026-07-22T11:27:11.2682377+09:00
+
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:3 char:8
++ $out = bun test script/build-binaries-launcher.test.ts 2>&1 | Out-Str ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+script\build-binaries-launcher.test.ts:
+172 |       encoding: "utf8",
+173 |       env: { PATH: process.env.PATH ?? "" },
+174 |     });
+175 | 
+176 |     // then: it must not fail to parse as a module, and must reach its own missing-root guard
+177 |     expect(result.stderr).not.toContain("Cannot use import statement outside a module");
+                                    ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "Cannot use import statement outside a module"
+Received: "(node:24216) Warning: To load an ES module, set \"type\": \"module\" in the package.json or use the .mjs 
+extension.\n(Use `node --trace-warnings ...` to show where the warning was 
+created)\nC:\\Users\\pss\\AppData\\Local\\Temp\\omo-launcher-modsys-CbqTkR\\oh-my-opencode.js:2\r\nimport { spawnSync 
+} from \"node:child_process\";\r\n^^^^^^\r\n\r\nSyntaxError: Cannot use import statement outside a module\r\n    at 
+wrapSafe (node:internal/modules/cjs/loader:1486:18)\r\n    at Module._compile 
+(node:internal/modules/cjs/loader:1528:20)\r\n    at Object..js (node:internal/modules/cjs/loader:1706:10)\r\n    at 
+Module.load (node:internal/modules/cjs/loader:1289:32)\r\n    at Function._load 
+(node:internal/modules/cjs/loader:1108:12)\r\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\r\n    
+at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)\r\n    at Function.executeUserEntryPoint [as runMain] 
+(node:internal/modules/run_main:170:5)\r\n    at node:internal/main/run_main_module:36:49\r\n\r\nNode.js v22.14.0\r\n"
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\dev-baseline\script\build-binaries-launcher.test.ts:177:31)
+(fail) platform launcher module system (#6231) > #given the launcher shipped as .js in a package without type:module 
+#when node loads it directly #then it parses as a module instead of throwing a SyntaxError [149.57ms]
+
+ 5 pass
+ 1 fail
+ 15 expect() calls
+Ran 6 tests across 1 file. [2.04s]
+
+EXIT=1
