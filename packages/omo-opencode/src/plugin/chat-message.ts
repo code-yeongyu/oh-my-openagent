@@ -9,6 +9,7 @@ import { handleGoalMessage } from "./chat-message/loop-commands"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runStartWorkHookIfApplicable } from "./chat-message/start-work-message"
+import { consumeNativeGoalCommandMarker } from "./command-execute-before"
 import { stopContinuation } from "./stop-continuation"
 import type {
   ChatMessageHandlerOutput,
@@ -87,6 +88,7 @@ export function createChatMessageHandler(args: {
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput,
   ): Promise<void> => {
+    const nativeGoalCommand = consumeNativeGoalCommandMarker(output.parts)
     if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
       log("[chat-message] Skipping synthetic/internal-only message", {
         sessionID: input.sessionID,
@@ -135,6 +137,7 @@ export function createChatMessageHandler(args: {
       output,
       isFirstMessage,
       pluginConfig,
+      nativeGoalCommand,
     })
     await applyUltraworkModelOverrideOnMessage(
       pluginConfig,

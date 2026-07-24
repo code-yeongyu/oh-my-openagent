@@ -1,7 +1,11 @@
 import { describe, expect, mock, test } from "bun:test"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
-import { createCommandExecuteBeforeHandler } from "./command-execute-before"
+import { handleGoalMessage } from "./chat-message/loop-commands"
+import {
+  consumeNativeGoalCommandMarker,
+  createCommandExecuteBeforeHandler,
+} from "./command-execute-before"
 
 function createMockGoal() {
   return {
@@ -176,5 +180,56 @@ describe("createCommandExecuteBeforeHandler", () => {
     // then
     expect(setGoal).not.toHaveBeenCalled()
     expect(resumeGoal).toHaveBeenCalledWith("ses-resume")
+  })
+
+  test("#given native /goal #when command and chat hooks run #then output stays valid and goal is set once", async () => {
+    // given
+    const setGoal = mock(() => createMockGoal())
+    const hooks = unsafeTestValue({
+      goal: {
+        setGoal,
+        getGoal: mock(() => null),
+        pauseGoal: mock(() => null),
+        resumeGoal: mock(() => null),
+        clearGoal: mock(() => true),
+        markComplete: mock(() => null),
+        event: mock(async () => {}),
+      },
+    })
+    const handler = createCommandExecuteBeforeHandler({
+      directory: process.cwd(),
+      hooks,
+    })
+    const output = {
+      message: {},
+      parts: [{ type: "text", text: "create" }],
+    }
+
+    // when
+    await handler(
+      {
+        command: "goal",
+        sessionID: "ses-goal",
+        arguments: "create",
+      },
+      output,
+    )
+    const nativeGoalCommand = consumeNativeGoalCommandMarker(output.parts)
+    handleGoalMessage(unsafeTestValue({
+      hooks,
+      input: { sessionID: "ses-goal" },
+      output,
+      isFirstMessage: false,
+      pluginConfig: {},
+      nativeGoalCommand,
+    }))
+
+    // then
+    expect(setGoal).toHaveBeenCalledTimes(1)
+    expect(nativeGoalCommand).toBeTrue()
+    expect(output).toEqual({
+      message: {},
+      parts: [{ type: "text", text: "create" }],
+    })
   })
 })
