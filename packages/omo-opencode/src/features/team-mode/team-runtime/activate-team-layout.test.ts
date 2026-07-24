@@ -79,6 +79,10 @@ describe("activateTeamLayout", () => {
       gridPanesByMember: { "member-a": "%21" },
       targetSessionId: "$caller",
       ownedSession: false,
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+      },
     })
 
     // when
@@ -127,6 +131,10 @@ describe("activateTeamLayout", () => {
       focusWindowId: "@10",
       gridWindowId: "@11",
       paneIds: ["%11", "%21"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+      },
     })
   })
 

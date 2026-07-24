@@ -2,11 +2,16 @@ import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import { isCmuxCompatEnvironment, isTmuxPathCompatibleWithBackend, resolveStableTmuxBackend } from "../cmux-detect"
 import type { TmuxServerTarget } from "../types"
-import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
+import {
+	getHttpServerOriginForLog,
+	getReadyTmuxPaneEnvironment,
+	normalizeTmuxServerTarget,
+} from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import {
+	applyTmuxPaneEnvironmentToCommand,
 	buildTmuxPlaceholderCommand,
 	planTmuxPaneEnvironment,
 	TMUX_BACKEND_MISMATCH_ERROR,
@@ -65,8 +70,8 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
-	const serverRunning = await serverAccess.checkServerHealth()
-	if (!serverRunning) {
+	const paneEnvironment = await getReadyTmuxPaneEnvironment(serverAccess)
+	if (!paneEnvironment) {
 		log("[spawnTmuxWindow] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
@@ -77,7 +82,7 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
-	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), backend.isCmux)
+	const environmentPlan = planTmuxPaneEnvironment(paneEnvironment, backend.isCmux)
 	if (!environmentPlan) {
 		log("[spawnTmuxWindow] SKIP: pane environment cannot be safely omitted under cmux")
 		return { success: false }
@@ -85,7 +90,10 @@ export async function spawnTmuxWindow(
 
 	log("[spawnTmuxWindow] all checks passed, creating isolated window...")
 
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const placeholderCmd = applyTmuxPaneEnvironmentToCommand(
+		buildTmuxPlaceholderCommand(description),
+		environmentPlan,
+	)
 
 	const args = [
 		"new-window",
@@ -110,7 +118,7 @@ export async function spawnTmuxWindow(
 	const titleBlockReason = titleIsCmux !== backend.isCmux ||
 		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
 		? TMUX_BACKEND_MISMATCH_ERROR
-		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+		: titleIsCmux && !planTmuxPaneEnvironment(paneEnvironment, true)
 			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
 			: undefined
 	const titleResult = titleBlockReason === undefined

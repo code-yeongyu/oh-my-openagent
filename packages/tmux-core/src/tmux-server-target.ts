@@ -25,16 +25,35 @@ export function normalizeTmuxServerTarget(
 ): TmuxServerAccess {
   if (typeof target !== "string") {
     if (!checkServerHealth) return target
+    const getReadyPaneEnvironment = async (): Promise<TmuxPaneEnvironment | null> => (
+      await checkServerHealth(target.serverUrl) ? target.getPaneEnvironment() : null
+    )
     return {
       ...target,
-      checkServerHealth: () => checkServerHealth(target.serverUrl),
+      checkServerHealth: async () => await getReadyPaneEnvironment() !== null,
+      getReadyPaneEnvironment,
     }
   }
 
   const healthCheck = checkServerHealth ?? isServerRunning
+  const getReadyPaneEnvironment = async (): Promise<TmuxPaneEnvironment | null> => (
+    await healthCheck(target) ? EMPTY_TMUX_PANE_ENVIRONMENT : null
+  )
   return {
     serverUrl: target,
-    checkServerHealth: () => healthCheck(target),
+    checkServerHealth: async () => await getReadyPaneEnvironment() !== null,
     getPaneEnvironment: () => EMPTY_TMUX_PANE_ENVIRONMENT,
+    getReadyPaneEnvironment,
   }
+}
+
+export async function getReadyTmuxPaneEnvironment(
+  access: TmuxServerAccess,
+): Promise<TmuxPaneEnvironment | null> {
+  if (access.getReadyPaneEnvironment) {
+    return access.getReadyPaneEnvironment()
+  }
+  return await access.checkServerHealth()
+    ? access.getPaneEnvironment()
+    : null
 }

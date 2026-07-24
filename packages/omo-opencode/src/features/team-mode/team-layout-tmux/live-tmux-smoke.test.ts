@@ -22,6 +22,10 @@ type TmuxManagerLike = {
 }
 
 type TeamLayoutResultLike = {
+	executionTarget: {
+		backend: "tmux"
+		tmuxEnvironment: string
+	}
 	focusWindowId: string
 	gridWindowId?: string
 	focusPanesByMember: Record<string, string>
@@ -79,6 +83,9 @@ function isTeamLayoutResultLike(value: unknown): value is TeamLayoutResultLike {
 	}
 
 	return typeof value.focusWindowId === "string"
+		&& isRecord(value.executionTarget)
+		&& value.executionTarget.backend === "tmux"
+		&& typeof value.executionTarget.tmuxEnvironment === "string"
 		&& (value.gridWindowId === undefined || typeof value.gridWindowId === "string")
 		&& isRecord(value.focusPanesByMember)
 		&& isRecord(value.gridPanesByMember)
@@ -206,6 +213,7 @@ async function invokeRemoveTeamLayout(
 	await Promise.resolve(Reflect.apply(removeTeamLayout, undefined, [
 		teamRunId,
 		{
+			executionTarget: layoutResult.executionTarget,
 			ownedSession: false,
 			targetSessionId,
 			focusWindowId: layoutResult.focusWindowId,

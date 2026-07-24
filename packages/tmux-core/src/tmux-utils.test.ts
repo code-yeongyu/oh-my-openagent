@@ -166,7 +166,7 @@ describe("isServerRunning", () => {
     expect(Object.getOwnPropertyDescriptor(globalThis, serverRunningKey)).toEqual(originalDescriptor)
   })
 
-  test("caches successful result", async () => {
+  test("revalidates a successful result for a later operation", async () => {
     // given
     const state = createServerHealthStateForTesting()
     const fetchMock = createFetchRecorder(async () => new Response(null, { status: 200 }))
@@ -175,8 +175,8 @@ describe("isServerRunning", () => {
     await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
     await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
 
-    // then - should only call fetch once due to caching
-    expect(fetchMock.calls.length).toBe(1)
+    // then
+    expect(fetchMock.calls.length).toBe(2)
   })
 
   test("does not cache failed result", async () => {

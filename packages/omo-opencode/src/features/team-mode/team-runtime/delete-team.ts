@@ -47,6 +47,21 @@ const FORCE_COMPLETABLE_MEMBER_STATUSES = new Set<RuntimeState["members"][number
 const FORCE_BYPASS_DELETING_STATUSES = new Set<RuntimeState["status"]>(["creating", "orphaned"])
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+
+function recordLayoutCleanupResult(
+  teamRunId: string,
+  cleanupResult: Awaited<ReturnType<typeof removeTeamLayout>>,
+  deps: DeleteTeamDeps,
+): boolean {
+  if (cleanupResult.reason === "removed") return true
+  deps.log("team layout cleanup incomplete", {
+    teamRunId,
+    reason: cleanupResult.reason,
+    skippedPaneIds: cleanupResult.skippedPaneIds,
+  })
+  return false
+}
+
 function ignoreStaleTeamSessionSweepFailure(error: unknown): void {
   if (error instanceof Error) return
 }
@@ -145,8 +160,11 @@ async function deleteTeamResources(
     }
   }
 
-  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && deps.canVisualize()
-  if (removedLayout) {
+  const hasPersistedExecutionTarget = runtimeState.tmuxLayout?.executionTarget !== undefined
+  const shouldAttemptLayoutCleanup = tmuxMgr !== undefined
+    && (hasPersistedExecutionTarget || (config.tmux_visualization && deps.canVisualize()))
+  let removedLayout = false
+  if (shouldAttemptLayoutCleanup) {
     const memberPaneIds = runtimeState.members
       .flatMap((member) => (
         member.agentType !== "leader" && member.tmuxPaneId
@@ -157,13 +175,17 @@ async function deleteTeamResources(
     const cleanupTarget = runtimeState.tmuxLayout
       ? {
           ...runtimeState.tmuxLayout,
-          paneIds: memberPaneIds.length > 0 ? memberPaneIds : undefined,
+          paneIds: Array.from(new Set([
+            ...(runtimeState.tmuxLayout.paneIds ?? []),
+            ...memberPaneIds,
+          ])),
         }
       : undefined
 
     if (options?.force === true) {
       try {
-        await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        const cleanupResult = await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        removedLayout = recordLayoutCleanupResult(teamRunId, cleanupResult, deps)
       } catch (error) {
         deps.log("team delete layout cleanup failed", {
           teamRunId,
@@ -171,7 +193,8 @@ async function deleteTeamResources(
         })
       }
     } else {
-      await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      const cleanupResult = await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      removedLayout = recordLayoutCleanupResult(teamRunId, cleanupResult, deps)
     }
   }
 

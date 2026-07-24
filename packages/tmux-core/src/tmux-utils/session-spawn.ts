@@ -3,10 +3,15 @@ import type { SpawnPaneResult } from "../types"
 import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isCmuxCompatEnvironment, isTmuxPathCompatibleWithBackend, resolveStableTmuxBackend } from "../cmux-detect"
-import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
+import {
+	getHttpServerOriginForLog,
+	getReadyTmuxPaneEnvironment,
+	normalizeTmuxServerTarget,
+} from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import {
+	applyTmuxPaneEnvironmentToCommand,
 	buildTmuxPlaceholderCommand,
 	planTmuxPaneEnvironment,
 	TMUX_BACKEND_MISMATCH_ERROR,
@@ -103,13 +108,13 @@ export async function spawnTmuxSession(
 		return { success: false }
 	}
 
-	const serverRunning = await serverAccess.checkServerHealth()
-	if (!serverRunning) {
+	const paneEnvironment = await getReadyTmuxPaneEnvironment(serverAccess)
+	if (!paneEnvironment) {
 		log("[spawnTmuxSession] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
 
-	if (isCmuxCompatEnvironment() && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)) {
+	if (isCmuxCompatEnvironment() && !planTmuxPaneEnvironment(paneEnvironment, true)) {
 		log("[spawnTmuxSession] SKIP: pane environment cannot be safely omitted under cmux")
 		return { success: false }
 	}
@@ -122,14 +127,13 @@ export async function spawnTmuxSession(
 
 	log("[spawnTmuxSession] all checks passed, creating isolated session...")
 
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 	const guardedRunTmuxCommand: typeof RunTmuxCommand = (tmuxPath, args, options) => {
 		const currentIsCmux = isCmuxCompatEnvironment()
 		if (currentIsCmux !== backend.isCmux || !isTmuxPathCompatibleWithBackend(tmuxPath, currentIsCmux)) {
 			return Promise.resolve(blockedTmuxCommandResult(TMUX_BACKEND_MISMATCH_ERROR))
 		}
 		if (!currentIsCmux) return runTmuxCommand(tmuxPath, args, options)
-		return planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+		return planTmuxPaneEnvironment(paneEnvironment, true)
 			? runTmuxCommand(tmuxPath, args, options)
 			: Promise.resolve(blockedTmuxCommandResult())
 	}
@@ -149,11 +153,15 @@ export async function spawnTmuxSession(
 		log(`[spawnTmuxSession] SKIP: ${TMUX_BACKEND_MISMATCH_ERROR}`)
 		return { success: false }
 	}
-	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), currentIsCmux)
+	const environmentPlan = planTmuxPaneEnvironment(paneEnvironment, currentIsCmux)
 	if (!environmentPlan) {
 		log(`[spawnTmuxSession] SKIP: ${TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR}`)
 		return { success: false }
 	}
+	const placeholderCmd = applyTmuxPaneEnvironmentToCommand(
+		buildTmuxPlaceholderCommand(description),
+		environmentPlan,
+	)
 
 	const args = sessionAlreadyExists
 		? [
@@ -193,7 +201,7 @@ export async function spawnTmuxSession(
 	const titleBlockReason = titleIsCmux !== backend.isCmux ||
 		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
 		? TMUX_BACKEND_MISMATCH_ERROR
-		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+		: titleIsCmux && !planTmuxPaneEnvironment(paneEnvironment, true)
 			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
 			: undefined
 	const titleResult = titleBlockReason === undefined

@@ -117,7 +117,7 @@ describe("isServerRunning request policy", () => {
 		expect(init?.redirect).toBe("error")
 	})
 
-	it("#given equivalent URLs and canonical headers #when health succeeds #then the normalized request policy is cached", async () => {
+	it("#given equivalent URLs and canonical headers #when checks are sequential #then readiness is revalidated", async () => {
 		// given
 		const state = createServerHealthStateForTesting()
 		const fetchImplementation = createFetchRecorder(async () => new Response(null, { status: 200 }))
@@ -135,11 +135,11 @@ describe("isServerRunning request policy", () => {
 		})
 
 		// then
-		expect(fetchImplementation.calls).toHaveLength(1)
+		expect(fetchImplementation.calls).toHaveLength(2)
 		expect(state.serverCheckUrl).toBe("http://127.0.0.1:4321/global/health")
 	})
 
-	it("#given a cached anonymous success #when request credentials rotate #then each request policy is probed", async () => {
+	it("#given an anonymous success #when request credentials rotate #then each operation is probed", async () => {
 		// given
 		const state = createServerHealthStateForTesting()
 		const observedTokens: Array<string | null> = []
@@ -169,6 +169,65 @@ describe("isServerRunning request policy", () => {
 			"Bearer first-credential-fixture",
 			"Bearer rotated-credential-fixture",
 		])
+	})
+
+	it("#given the same policy is checked concurrently #when readiness resolves #then callers share one probe", async () => {
+		// given
+		const state = createServerHealthStateForTesting()
+		const response = createDeferred<Response>()
+		const fetchImplementation = createFetchRecorder(async () => response.promise)
+		const options = {
+			fetchImplementation,
+			headers: { Authorization: "Bearer coalesced-policy-fixture" },
+			state,
+		}
+
+		// when
+		const firstCheck = isServerRunning("http://127.0.0.1:4321", options)
+		const secondCheck = isServerRunning("http://127.0.0.1:4321", options)
+		response.resolve(new Response(null, { status: 200 }))
+
+		// then
+		expect(await Promise.all([firstCheck, secondCheck])).toEqual([true, true])
+		expect(fetchImplementation.calls).toHaveLength(1)
+		expect(state.serverAvailable).toBe(true)
+	})
+
+	it("#given the same policy uses different transports #when checks overlap #then their results are not coalesced", async () => {
+		// given
+		const state = createServerHealthStateForTesting()
+		const firstResponse = createDeferred<Response>()
+		const firstFetch = createFetchRecorder(async () => firstResponse.promise)
+		const secondFetch = createFetchRecorder(async () => new Response(null, { status: 503 }))
+		const serverUrl = "http://127.0.0.1:4321"
+
+		// when
+		const firstCheck = isServerRunning(serverUrl, { fetchImplementation: firstFetch, state })
+		const secondCheck = isServerRunning(serverUrl, { fetchImplementation: secondFetch, state })
+		firstResponse.resolve(new Response(null, { status: 200 }))
+
+		// then
+		expect(await Promise.all([firstCheck, secondCheck])).toEqual([false, false])
+		expect(firstFetch.calls).toHaveLength(1)
+		expect(secondFetch.calls).toHaveLength(2)
+		expect(state.serverAvailable).toBe(false)
+	})
+
+	it("#given a previous success #when the listener stops #then a later operation cannot reuse stale readiness", async () => {
+		// given
+		const state = createServerHealthStateForTesting()
+		const fetchImplementation = createFetchRecorder(async (_call, index) => (
+			new Response(null, { status: index === 0 ? 200 : 503 })
+		))
+
+		// when
+		const first = await isServerRunning("http://127.0.0.1:4321", { fetchImplementation, state })
+		const second = await isServerRunning("http://127.0.0.1:4321", { fetchImplementation, state })
+
+		// then
+		expect([first, second]).toEqual([true, false])
+		expect(fetchImplementation.calls).toHaveLength(3)
+		expect(state.serverAvailable).toBe(false)
 	})
 
 	it("#given an injected state and a stale in-flight success #when a rotated policy fails #then the stale result cannot authorize a caller", async () => {
@@ -216,7 +275,7 @@ describe("isServerRunning request policy", () => {
 		])
 	})
 
-	it("#given an ABA policy sequence #when the first policy becomes current again #then authority follows semantic identity", async () => {
+	it("#given an ABA policy sequence #when the first policy becomes current again #then only the latest invocation owns authority", async () => {
 		// given
 		const state = createServerHealthStateForTesting()
 		const firstAResponse = createDeferred<Response>()
@@ -256,7 +315,7 @@ describe("isServerRunning request policy", () => {
 		const results = await Promise.all([firstA, policyB, secondA])
 
 		// then
-		expect(results).toEqual([true, false, true])
+		expect(results).toEqual([false, false, true])
 		expect(observedTokens).toEqual([
 			"Bearer policy-a-fixture",
 			"Bearer policy-b-fixture",
@@ -265,7 +324,7 @@ describe("isServerRunning request policy", () => {
 		expect(state.serverAvailable).toBe(true)
 	})
 
-	it("#given a successful manual-redirect policy #when redirect mode changes #then the cache is isolated", async () => {
+	it("#given a successful manual-redirect policy #when redirect mode changes #then every operation keeps its redirect policy", async () => {
 		// given
 		const state = createServerHealthStateForTesting()
 		const redirects: Array<RequestInit["redirect"]> = []
@@ -280,10 +339,10 @@ describe("isServerRunning request policy", () => {
 		await isServerRunning("http://127.0.0.1:4321/other", { fetchImplementation, state })
 
 		// then
-		expect(redirects).toEqual(["manual", "error"])
+		expect(redirects).toEqual(["manual", "error", "error"])
 	})
 
-	it("#given secret-bearing headers #when a successful policy is cached #then serialized state contains only an opaque identity", async () => {
+	it("#given secret-bearing headers #when readiness succeeds #then serialized state contains only an opaque identity", async () => {
 		// given
 		const state = createServerHealthStateForTesting()
 		const secret = "state-secret-fixture"

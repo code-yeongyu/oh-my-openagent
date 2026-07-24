@@ -3,9 +3,11 @@ import type { SpawnPaneResult } from "../types"
 import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isCmuxCompatEnvironment, isTmuxPathCompatibleWithBackend, resolveStableTmuxBackend } from "../cmux-detect"
-import { normalizeTmuxServerTarget } from "../tmux-server-target"
+import { getReadyTmuxPaneEnvironment, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
+import { isServerRunning } from "./server-health"
 import {
+	applyTmuxPaneEnvironmentToCommand,
 	buildTmuxPlaceholderCommand,
 	planTmuxPaneEnvironment,
 	TMUX_BACKEND_MISMATCH_ERROR,
@@ -16,6 +18,7 @@ export type ReplaceTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
 	readonly runTmuxCommand: typeof RunTmuxCommand
 	readonly isInsideTmux: typeof isInsideTmux
+	readonly isServerRunning: typeof isServerRunning
 	readonly getTmuxPath: () => Promise<string | null | undefined>
 }
 
@@ -26,6 +29,7 @@ async function resolveReplaceTmuxPaneDeps(deps?: Partial<ReplaceTmuxPaneDeps>): 
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
+		isServerRunning,
 		getTmuxPath: async () => null,
 		...deps,
 	}
@@ -42,7 +46,7 @@ export async function replaceTmuxPane(
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
 	const { log, runTmuxCommand } = deps
-	const serverAccess = normalizeTmuxServerTarget(serverTarget)
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
 
 	log("[replaceTmuxPane] called", { paneId, sessionId, description })
 
@@ -53,7 +57,13 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
-	if (isCmuxCompatEnvironment() && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)) {
+	const paneEnvironment = await getReadyTmuxPaneEnvironment(serverAccess)
+	if (!paneEnvironment) {
+		log("[replaceTmuxPane] SKIP: server listener not ready", { paneId, sessionId })
+		return { success: false }
+	}
+
+	if (isCmuxCompatEnvironment() && !planTmuxPaneEnvironment(paneEnvironment, true)) {
 		log("[replaceTmuxPane] SKIP: pane environment cannot be safely omitted under cmux", { paneId, sessionId })
 		return { success: false }
 	}
@@ -63,7 +73,7 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
-	if (backend.isCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)) {
+	if (backend.isCmux && !planTmuxPaneEnvironment(paneEnvironment, true)) {
 		log("[replaceTmuxPane] SKIP: pane environment cannot be safely omitted under cmux", { paneId, sessionId })
 		return { success: false }
 	}
@@ -76,13 +86,16 @@ export async function replaceTmuxPane(
 		log(`[replaceTmuxPane] SKIP: ${TMUX_BACKEND_MISMATCH_ERROR}`, { paneId, sessionId })
 		return { success: false }
 	}
-	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), currentIsCmux)
+	const environmentPlan = planTmuxPaneEnvironment(paneEnvironment, currentIsCmux)
 	if (!environmentPlan) {
 		log(`[replaceTmuxPane] SKIP: ${TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR}`, { paneId, sessionId })
 		return { success: false }
 	}
 
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const placeholderCmd = applyTmuxPaneEnvironmentToCommand(
+		buildTmuxPlaceholderCommand(description),
+		environmentPlan,
+	)
 
 	const result = await runTmuxCommand(backend.path, ["respawn-pane", "-k", ...environmentPlan.args, "-t", paneId, placeholderCmd])
 
@@ -96,7 +109,7 @@ export async function replaceTmuxPane(
 	const titleBlockReason = titleIsCmux !== backend.isCmux ||
 		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
 		? TMUX_BACKEND_MISMATCH_ERROR
-		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+		: titleIsCmux && !planTmuxPaneEnvironment(paneEnvironment, true)
 			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
 			: undefined
 	const titleResult = titleBlockReason === undefined

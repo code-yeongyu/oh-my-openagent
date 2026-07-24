@@ -76,8 +76,17 @@ export async function cleanupTeamRunResources(args: {
   if (args.createdLayout && args.tmuxMgr) {
     try {
       const runtimeState = await loadRuntimeState(args.teamRunId, args.config)
-      await removeTeamLayout(args.teamRunId, getLayoutCleanupTarget(runtimeState), args.tmuxMgr)
-      cleanupReport.removedLayout = true
+      const cleanupResult = await removeTeamLayout(
+        args.teamRunId,
+        getLayoutCleanupTarget(runtimeState),
+        args.tmuxMgr,
+      )
+      cleanupReport.removedLayout = cleanupResult.reason === "removed"
+      if (!cleanupReport.removedLayout) {
+        cleanupReport.errors.push(
+          `layout ${args.teamRunId}: cleanup ${cleanupResult.reason}; skipped ${cleanupResult.skippedPaneIds.length} pane(s)`,
+        )
+      }
     } catch (layoutError) {
       cleanupReport.errors.push(`layout ${args.teamRunId}: ${normalizeError(layoutError).message}`)
     }

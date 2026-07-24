@@ -152,9 +152,10 @@ describe("OMO tmux listener access", () => {
     expect([pane.success, window.success, session.success, replaced.success, activated]).toEqual([
       true, true, true, true, true,
     ])
-    expect(contacts).toEqual([
+    expect(contacts).toHaveLength(5)
+    expect(new Set(contacts)).toEqual(new Set([
       `Basic ${Buffer.from("opencode:trusted-password", "utf8").toString("base64")}`,
-    ])
+    ]))
     const created = creationCommands(recorder.commands)
     expect(created).toHaveLength(5)
     expect(created.every((args) => args.includes("OPENCODE_SERVER_PASSWORD=trusted-password"))).toBe(true)
@@ -188,8 +189,10 @@ describe("OMO tmux listener access", () => {
 
       const created = creationCommands(recorder.commands)
       expect(created).toHaveLength(5)
-      expect(created.every((args) => args.includes("OPENCODE_SERVER_PASSWORD="))).toBe(true)
-      expect(created.every((args) => args.includes("OPENCODE_SERVER_USERNAME="))).toBe(true)
+      expect(created.every((args) => args.at(-1)?.startsWith(
+        "env -u OPENCODE_SERVER_PASSWORD -u OPENCODE_SERVER_USERNAME -- ",
+      ))).toBe(true)
+      expect(created.every((args) => !args.includes("-e"))).toBe(true)
       expect(created.some((args) => args.some((arg) => arg.includes("ambient-password") || arg.includes("ambient-user")))).toBe(false)
     } finally {
       if (originalPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD

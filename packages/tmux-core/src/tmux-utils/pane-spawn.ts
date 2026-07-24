@@ -2,11 +2,16 @@ import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
+import {
+	getHttpServerOriginForLog,
+	getReadyTmuxPaneEnvironment,
+	normalizeTmuxServerTarget,
+} from "../tmux-server-target"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import {
+	applyTmuxPaneEnvironmentToCommand,
 	buildTmuxAttachCommand,
 	buildTmuxPlaceholderCommand,
 	planTmuxPaneEnvironment,
@@ -79,8 +84,8 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const serverRunning = await serverAccess.checkServerHealth()
-	if (!serverRunning) {
+	const paneEnvironment = await getReadyTmuxPaneEnvironment(serverAccess)
+	if (!paneEnvironment) {
 		log("[spawnTmuxPane] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
@@ -98,7 +103,7 @@ export async function spawnTmuxPane(
 		log("[spawnTmuxPane] SKIP: no compatible tmux backend after server readiness")
 		return { success: false }
 	}
-	const environmentPlan = planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), backend.isCmux)
+	const environmentPlan = planTmuxPaneEnvironment(paneEnvironment, backend.isCmux)
 	if (!environmentPlan) {
 		log("[spawnTmuxPane] SKIP: pane environment cannot be safely omitted under cmux")
 		return { success: false }
@@ -106,9 +111,9 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const initialCmd = environmentPlan.isCmux
+	const initialCmd = applyTmuxPaneEnvironmentToCommand(environmentPlan.isCmux
 		? buildTmuxAttachCommand(serverAccess.serverUrl, sessionId, _directory)
-		: buildTmuxPlaceholderCommand(description)
+		: buildTmuxPlaceholderCommand(description), environmentPlan)
 
 	const args = [
 		"split-window",
@@ -134,7 +139,7 @@ export async function spawnTmuxPane(
 	const titleBlockReason = titleIsCmux !== backend.isCmux ||
 		!isTmuxPathCompatibleWithBackend(backend.path, titleIsCmux)
 		? TMUX_BACKEND_MISMATCH_ERROR
-		: titleIsCmux && !planTmuxPaneEnvironment(serverAccess.getPaneEnvironment(), true)
+		: titleIsCmux && !planTmuxPaneEnvironment(paneEnvironment, true)
 			? TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR
 			: undefined
 	const titleResult = titleBlockReason === undefined

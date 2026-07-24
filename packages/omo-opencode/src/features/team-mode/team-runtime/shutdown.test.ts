@@ -357,7 +357,7 @@ describe("team-runtime shutdown", () => {
     )
 
     // then
-    expect(result.removedLayout).toBe(true)
+    expect(result.removedLayout).toBe(false)
     expect(transitionedStatuses).toContain("deleted")
     expect(logMock).toHaveBeenCalledWith("team delete layout cleanup failed", {
       teamRunId: fixture.teamRunId,
@@ -374,7 +374,12 @@ describe("team-runtime shutdown", () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
-    const removeLayoutMock = mock(async () => {})
+    const removeLayoutMock = mock(async () => ({
+      attemptedPaneIds: [],
+      removedPaneIds: [],
+      skippedPaneIds: [],
+      reason: "missing-pane-identifiers" as const,
+    }))
     const deps = {
       canVisualize: () => true,
       removeTeamLayout: removeLayoutMock,
@@ -398,6 +403,65 @@ describe("team-runtime shutdown", () => {
     // then
     expect(result.removedLayout).toBe(false)
     expect(removeLayoutMock).not.toHaveBeenCalled()
+  })
+
+  test("#given a persisted tmux target outside the original session #when deleteTeam runs #then cleanup still targets the recorded layout", async () => {
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    const removeLayoutMock = mock(async () => ({
+      attemptedPaneIds: ["%11", "%12"],
+      removedPaneIds: ["%11", "%12"],
+      skippedPaneIds: [],
+      reason: "removed" as const,
+    }))
+    const deps = {
+      canVisualize: () => false,
+      removeTeamLayout: removeLayoutMock,
+      log: () => {},
+    } satisfies DeleteTeamDeps
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "completed",
+    })
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => (
+        member.name === "member-a"
+          ? { ...member, tmuxPaneId: "%12" }
+          : member
+      )),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: ["%11"],
+        executionTarget: {
+          backend: "tmux",
+          tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+        },
+      },
+    }), fixture.config)
+
+    const result = await deleteTeam(
+      fixture.teamRunId,
+      { ...fixture.config, tmux_visualization: false },
+      { getServerUrl: () => "http://localhost" } as never,
+      undefined,
+      undefined,
+      deps,
+    )
+
+    expect(result.removedLayout).toBe(true)
+    expect(removeLayoutMock).toHaveBeenCalledWith(
+      fixture.teamRunId,
+      expect.objectContaining({
+        executionTarget: {
+          backend: "tmux",
+          tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+        },
+        paneIds: ["%11", "%12"],
+      }),
+      expect.anything(),
+    )
   })
 
   test("cancels team background tasks before deleting when force=true", async () => {

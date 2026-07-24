@@ -3,6 +3,7 @@ import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 import type { TmuxPaneEnvironment } from "../types"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
+const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 export const TMUX_BACKEND_MISMATCH_ERROR = "tmux backend no longer matches the resolved executable"
 export const TMUX_PANE_ENVIRONMENT_UNSAFE_ERROR = "pane environment cannot be safely omitted under cmux"
@@ -29,6 +30,7 @@ export function buildTmuxPlaceholderCommand(description: string): string {
 
 export function buildTmuxEnvironmentArgs(environment: TmuxPaneEnvironment): string[] {
   return Object.entries(environment)
+    .filter(([, value]) => value !== "")
     .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
     .flatMap(([name, value]) => ["-e", `${name}=${value}`])
 }
@@ -42,6 +44,7 @@ export function canOmitTmuxPaneEnvironment(
 
 export type TmuxPaneEnvironmentPlan = {
   readonly args: string[]
+  readonly clearedNames: string[]
   readonly isCmux: boolean
 }
 
@@ -49,9 +52,26 @@ export function planTmuxPaneEnvironment(
   environment: TmuxPaneEnvironment,
   isCmux: boolean,
 ): TmuxPaneEnvironmentPlan | null {
+  const entries = Object.entries(environment)
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+  if (entries.some(([name]) => !ENVIRONMENT_VARIABLE_NAME_PATTERN.test(name))) return null
   if (isCmux && !canOmitTmuxPaneEnvironment(environment)) return null
   return {
     args: isCmux ? [] : buildTmuxEnvironmentArgs(environment),
+    clearedNames: entries.flatMap(([name, value]) => value === "" ? [name] : []),
     isCmux,
   }
+}
+
+export function applyTmuxPaneEnvironmentToCommand(
+  command: string,
+  environmentPlan: TmuxPaneEnvironmentPlan,
+): string {
+  if (environmentPlan.clearedNames.length === 0) return command
+  const unsetArguments = environmentPlan.clearedNames.flatMap((name) => ["-u", name]).join(" ")
+  return `env ${unsetArguments} -- ${command}`
+}
+
+export function buildTmuxPaneShellCommand(environmentPlan: TmuxPaneEnvironmentPlan): string {
+  return applyTmuxPaneEnvironmentToCommand(TMUX_COMMAND_SHELL, environmentPlan)
 }

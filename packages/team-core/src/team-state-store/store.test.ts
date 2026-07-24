@@ -8,7 +8,7 @@ import path from "node:path"
 
 import { TeamModeConfigSchema } from "../config"
 import type { TeamModeConfig } from "../config"
-import type { ActiveTeamSummary, RuntimeState, TeamSpec } from "../types"
+import { RuntimeStateSchema, type ActiveTeamSummary, type RuntimeState, type TeamSpec } from "../types"
 import {
   InvalidTransitionError,
   RuntimeStateError,
@@ -118,6 +118,66 @@ describe("runtime state store", () => {
       expect.objectContaining({ name: "worker", agentType: "general-purpose", status: "pending", pendingInjectedMessageIds: [] }),
     ])
     expect(persistedState.status).toBe("creating")
+  })
+
+  test("#given persisted tmux cleanup identity #when runtime state is parsed #then only the non-secret backend target is accepted", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), undefined, "user", config)
+
+    const parsed = RuntimeStateSchema.parse({
+      ...runtimeState,
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$7",
+        paneIds: ["%11"],
+        executionTarget: {
+          backend: "cmux",
+          cmuxSocketPath: "/tmp/cmux.sock",
+        },
+      },
+    })
+
+    expect(parsed.tmuxLayout?.executionTarget).toEqual({
+      backend: "cmux",
+      cmuxSocketPath: "/tmp/cmux.sock",
+    })
+    expect(RuntimeStateSchema.safeParse({
+      ...runtimeState,
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$7",
+        paneIds: ["%11"],
+        executionTarget: {
+          backend: "tmux",
+          tmuxEnvironment: "/tmp/tmux.sock,123,0",
+          executablePath: "/private/bin/tmux",
+          paneEnvironment: { TEAM_ACCESS_TOKEN: "must-not-persist" },
+        },
+      },
+    }).success).toBe(false)
+    for (const executionTarget of [
+      {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/cmuxterm-invalid.sock,1,0",
+      },
+      {
+        backend: "cmux",
+        cmuxSocketPath: "/tmp/cmux.sock",
+        tmuxEnvironment: "/tmp/native-tmux.sock,1,0",
+      },
+    ]) {
+      expect(RuntimeStateSchema.safeParse({
+        ...runtimeState,
+        tmuxLayout: {
+          ownedSession: false,
+          targetSessionId: "$7",
+          paneIds: ["%11"],
+          executionTarget,
+        },
+      }).success).toBe(false)
+    }
   })
 
   test("loadRuntimeState throws RuntimeStateError for malformed state", async () => {

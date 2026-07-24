@@ -26,6 +26,7 @@ export type TmuxServerAccess = {
   readonly serverUrl: string
   readonly checkServerHealth: () => Promise<boolean>
   readonly getPaneEnvironment: () => TmuxPaneEnvironment
+  readonly getReadyPaneEnvironment?: () => Promise<TmuxPaneEnvironment | null>
 }
 
 export type TmuxServerTarget = string | TmuxServerAccess

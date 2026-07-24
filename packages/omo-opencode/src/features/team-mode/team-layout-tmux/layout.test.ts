@@ -56,6 +56,8 @@ function createLayoutHarness() {
         return commandResult("%caller")
       case "split-window":
         return commandResult("%member")
+      case "show-options":
+        return commandResult("run-adapter-cleanup")
       default:
         return commandResult()
     }
@@ -115,6 +117,7 @@ describe("team layout adapter facade", () => {
         OPENCODE_SERVER_PASSWORD: FIXTURE_PASSWORD,
         OPENCODE_SERVER_USERNAME: FIXTURE_USERNAME,
       },
+      expectedClears: false,
     },
     {
       label: "synthetic anonymous target",
@@ -123,12 +126,10 @@ describe("team layout adapter facade", () => {
         source: "synthetic-fallback" as const,
         trusted: false,
       },
-      expectedEnvironment: {
-        OPENCODE_SERVER_PASSWORD: "",
-        OPENCODE_SERVER_USERNAME: "",
-      },
+      expectedEnvironment: {},
+      expectedClears: true,
     },
-  ])("composes $label access through the facade", async ({ target, expectedEnvironment }) => {
+  ])("composes $label access through the facade", async ({ target, expectedEnvironment, expectedClears }) => {
     const harness = createLayoutHarness()
     const serverAccess = createOpenCodeTmuxServerAccess(target, {
       fetchImplementation: mock(async () => new Response(null, { status: 200 })),
@@ -149,7 +150,10 @@ describe("team layout adapter facade", () => {
     )
 
     expect(result?.focusPanesByMember).toEqual({ member: "%member" })
-    expect(paneEnvironment(findCommand(harness.calls, "split-window"))).toEqual(expectedEnvironment)
+    const split = findCommand(harness.calls, "split-window")
+    expect(paneEnvironment(split)).toEqual(expectedEnvironment)
+    expect(split.at(-1)?.startsWith("env -u OPENCODE_SERVER_PASSWORD -u OPENCODE_SERVER_USERNAME -- "))
+      .toBe(expectedClears)
   })
 
   test("scrubs OpenCode capability keys from regular Team cleanup execution", async () => {
@@ -171,6 +175,10 @@ describe("team layout adapter facade", () => {
           ownedSession: false,
           targetSessionId: "$caller",
           paneIds: ["%member"],
+          executionTarget: {
+            backend: "tmux",
+            tmuxEnvironment: "/tmp/omo-adapter-contract",
+          },
         },
         {
           getServerUrl: () => serverAccess.serverUrl,

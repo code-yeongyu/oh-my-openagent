@@ -60,23 +60,30 @@ export function createOpenCodeTmuxServerAccess(
 ): TmuxServerAccess {
   const state = createServerHealthState()
   const getEnvironment = options.getEnvironment ?? (() => process.env)
+  const getReadyPaneEnvironment = async (): Promise<TmuxPaneEnvironment | null> => {
+    const environment = getEnvironment()
+    const paneEnvironment = target.trusted
+      ? getTrustedPaneEnvironment(environment)
+      : CLEARED_OPENCODE_PANE_ENVIRONMENT
+    const authorization = target.trusted
+      ? getServerBasicAuthHeader(environment)
+      : undefined
+    const ready = await isServerRunning(target.serverUrl, {
+      headers: authorization ? { Authorization: authorization } : undefined,
+      redirect: "error",
+      fetchImplementation: options.fetchImplementation,
+      state,
+    })
+    return ready ? paneEnvironment : null
+  }
 
   return {
     serverUrl: target.serverUrl,
-    checkServerHealth: () => {
-      const authorization = target.trusted
-        ? getServerBasicAuthHeader(getEnvironment())
-        : undefined
-      return isServerRunning(target.serverUrl, {
-        headers: authorization ? { Authorization: authorization } : undefined,
-        redirect: "error",
-        fetchImplementation: options.fetchImplementation,
-        state,
-      })
-    },
+    checkServerHealth: async () => await getReadyPaneEnvironment() !== null,
     getPaneEnvironment: () => target.trusted
       ? getTrustedPaneEnvironment(getEnvironment())
       : CLEARED_OPENCODE_PANE_ENVIRONMENT,
+    getReadyPaneEnvironment,
   }
 }
 

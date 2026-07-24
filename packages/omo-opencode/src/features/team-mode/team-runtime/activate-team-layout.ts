@@ -43,6 +43,7 @@ export async function activateTeamLayout(
   await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
     ...currentState,
     tmuxLayout: {
+      executionTarget: normalizedLayout.executionTarget,
       ownedSession: normalizedLayout.ownedSession,
       targetSessionId: normalizedLayout.targetSessionId,
       focusWindowId: normalizedLayout.focusWindowId,

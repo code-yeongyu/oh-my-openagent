@@ -9,6 +9,7 @@ let nextWindowNumber = 1
 let nextPaneNumber = 1
 let displaySessionId = "$7"
 let displaySuccess = true
+let paneOwner = "run-cleanup"
 const panesByWindow = new Map<string, string[]>()
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
 const originalHarnessSecret = process.env.HARNESS_SECRET
@@ -46,6 +47,10 @@ function defaultRunTmuxCommand(_tmuxPath: string, args: Array<string>, _options?
     const windowTarget = args[2] ?? ""
     const allPanes = panesByWindow.get(windowTarget) ?? [process.env.TMUX_PANE ?? "%0"]
     return Promise.resolve(createTmuxCommandResult(allPanes.join("\n")))
+  }
+
+  if (command === "show-options") {
+    return Promise.resolve(createTmuxCommandResult(paneOwner))
   }
 
   if (command === "new-session") {
@@ -125,6 +130,7 @@ describe("team-layout-tmux", () => {
     nextPaneNumber = 1
     displaySessionId = "$7"
     displaySuccess = true
+    paneOwner = "run-cleanup"
     panesByWindow.clear()
     runTmuxCommandMock.mockImplementation(defaultRunTmuxCommand)
     process.env.TMUX = "/tmp/tmux-1"
@@ -161,6 +167,23 @@ describe("team-layout-tmux", () => {
 
     // when / then
     expect(canVisualize()).toBe(true)
+  })
+
+  test("#given native tmux inherited a stale cmux socket #when layout runs #then TMUX remains the authoritative backend", async () => {
+    process.env.CMUX_SOCKET_PATH = "/tmp/stale-cmux.sock"
+    const { createTeamLayout } = await loadLayoutModule()
+
+    const result = await createTeamLayout(
+      "run-native-with-stale-cmux",
+      [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+      tmuxMgr as never,
+    )
+
+    expect(result?.executionTarget).toEqual({
+      backend: "tmux",
+      tmuxEnvironment: "/tmp/tmux-1",
+    })
+    expect(getCommands().some((args) => args[0] === "split-window")).toBe(true)
   })
 
   test("returns null when server health check fails", async () => {
@@ -245,7 +268,7 @@ describe("team-layout-tmux", () => {
     ]
 
     // when
-    await createTeamLayout("run-attach", members, tmuxMgr as never)
+    const result = await createTeamLayout("run-attach", members, tmuxMgr as never)
 
     // then
     const commands = getCommands()
@@ -256,6 +279,15 @@ describe("team-layout-tmux", () => {
     const literals = sendKeysCalls.map((args) => args.join(" "))
     expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+    expect(commands.filter((args) =>
+      args[0] === "set-option"
+      && args.includes("@omo_team_run_id")
+      && args.includes("run-attach")
+    )).toHaveLength(2)
+    expect(result?.executionTarget).toEqual({
+      backend: "tmux",
+      tmuxEnvironment: "/tmp/tmux-1",
+    })
   })
 
   test("#given a server access capability #when health fails #then it uses the capability health check without consulting the legacy URL", async () => {
@@ -284,7 +316,7 @@ describe("team-layout-tmux", () => {
     expect(isServerRunningMock).toHaveBeenCalledTimes(0)
   })
 
-  test("#given a rotating pane environment #when both split paths create panes #then each pane receives the environment resolved at its own spawn", async () => {
+  test("#given a rotating pane environment #when both split paths create panes #then each pane uses its own readiness-bound snapshot", async () => {
     // given
     let environmentRevision = 0
     const getPaneEnvironment = mock(() => ({
@@ -325,6 +357,37 @@ describe("team-layout-tmux", () => {
     expect(attachCommands.every((args) => args.join(" ").includes("http://127.0.0.1:43127/capability"))).toBe(true)
   })
 
+  test("#given readiness disappears before a later split #when layout creation continues #then earlier panes are rolled back", async () => {
+    // given
+    let readyCalls = 0
+    const manager: TmuxMgrLike = {
+      getServerUrl: () => { throw new Error("legacy URL must not be read") },
+      getTmuxServerAccess: () => ({
+        serverUrl: "http://127.0.0.1:43127/capability",
+        checkServerHealth: async () => { throw new Error("atomic accessor must be used") },
+        getPaneEnvironment: () => { throw new Error("atomic accessor must be used") },
+        getReadyPaneEnvironment: async () => (++readyCalls === 1 ? {} : null),
+      }),
+    }
+    const { createTeamLayout } = await loadLayoutModule()
+
+    // when
+    const result = await createTeamLayout(
+      "run-readiness-lost",
+      [
+        { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+        { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      ],
+      manager,
+    )
+
+    // then
+    expect(result).toBeNull()
+    expect(readyCalls).toBe(2)
+    expect(getCommands().filter((args) => args[0] === "split-window")).toHaveLength(1)
+    expect(getCommands().filter((args) => args[0] === "kill-pane")).toHaveLength(1)
+  })
+
   test("#given a legacy manager #when a native pane is created #then core does not invent harness environment policy", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
@@ -359,6 +422,10 @@ describe("team-layout-tmux", () => {
     const { createTeamLayout } = await loadLayoutModule({
       isCmuxCompatEnvironment: () => true,
       getTmuxPath: async () => "tmux",
+      getEnvironment: () => ({
+        ...process.env,
+        TMUX: "/tmp/cmuxterm.sock,1,0",
+      }),
     })
 
     // when
@@ -398,6 +465,10 @@ describe("team-layout-tmux", () => {
     })
     const { createTeamLayout } = await loadLayoutModule({
       isCmuxCompatEnvironment: () => true,
+      getEnvironment: () => ({
+        ...process.env,
+        TMUX: "/tmp/cmuxterm.sock,1,0",
+      }),
       getTmuxPath: async () => {
         events.push("get-path")
         return "tmux"
@@ -548,7 +619,7 @@ describe("team-layout-tmux", () => {
     expect(runTmuxCommandMock).not.toHaveBeenCalled()
   })
 
-  test("#given authenticated cmux appears after a split #when pane setup continues #then layout aborts and sanitizes pane rollback", async () => {
+  test("#given credentials rotate after a cmux split #when pane setup continues #then the verified anonymous snapshot stays authoritative", async () => {
     // given
     let authenticated = false
     const calls: Array<{ args: Array<string>; options?: RunTmuxOptions }> = []
@@ -571,6 +642,10 @@ describe("team-layout-tmux", () => {
     const { createTeamLayout } = await loadLayoutModule({
       isCmuxCompatEnvironment: () => true,
       getTmuxPath: async () => "cmux",
+      getEnvironment: () => ({
+        ...process.env,
+        TMUX: "/tmp/cmuxterm.sock,1,0",
+      }),
       runTmuxCommand,
     })
 
@@ -582,13 +657,10 @@ describe("team-layout-tmux", () => {
     )
 
     // then
-    expect(result).toBeNull()
-    expect(calls.map(({ args }) => args[0])).toEqual(["list-panes", "split-window", "kill-pane"])
-    expect(calls.some(({ args }) => args[0] === "send-keys")).toBe(false)
-    const cleanupEnvironment = calls.at(-1)?.options?.environment
-    expect(cleanupEnvironment).toBeDefined()
-    expect(cleanupEnvironment?.HARNESS_SECRET).toBeUndefined()
-    expect(cleanupEnvironment?.HARNESS_IDENTITY).toBeUndefined()
+    expect(result).not.toBeNull()
+    expect(calls.some(({ args }) => args[0] === "kill-pane")).toBe(false)
+    expect(calls.some(({ args }) => args[0] === "send-keys")).toBe(true)
+    expect(calls.some(({ args }) => args.some((arg) => arg.includes("rotated-secret-fixture")))).toBe(false)
   })
 
   test("#given pane setup throws after a split #when the layout transaction aborts #then the created pane is rolled back", async () => {
@@ -734,35 +806,62 @@ describe("team-layout-tmux", () => {
     ])
   })
 
-  for (const failingCommand of ["select-layout", "resize-pane"]) {
-    test(`#given ${failingCommand} fails #when teammate panes were created #then all panes are rolled back`, async () => {
-      // given
-      const calls: Array<Array<string>> = []
-      const runTmuxCommand = mock(async (tmuxPath: string, args: Array<string>) => {
-        calls.push(args)
-        if (args[0] === failingCommand) return createTmuxCommandResult("", false)
-        return defaultRunTmuxCommand(tmuxPath, args)
-      })
-      const { createTeamLayout } = await loadLayoutModule({ runTmuxCommand })
-
-      // when
-      const result = await createTeamLayout(
-        `run-${failingCommand}-failure`,
-        [
-          { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
-          { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
-        ],
-        tmuxMgr,
-      )
-
-      // then
-      expect(result).toBeNull()
-      expect(calls.filter((args) => args[0] === "kill-pane")).toEqual([
-        ["kill-pane", "-t", "%2"],
-        ["kill-pane", "-t", "%1"],
-      ])
+  test("#given select-layout fails #when teammate panes were created #then all panes are rolled back", async () => {
+    // given
+    const calls: Array<Array<string>> = []
+    const runTmuxCommand = mock(async (tmuxPath: string, args: Array<string>) => {
+      calls.push(args)
+      if (args[0] === "select-layout") return createTmuxCommandResult("", false)
+      return defaultRunTmuxCommand(tmuxPath, args)
     })
-  }
+    const { createTeamLayout } = await loadLayoutModule({ runTmuxCommand })
+
+    // when
+    const result = await createTeamLayout(
+      "run-select-layout-failure",
+      [
+        { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+        { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      ],
+      tmuxMgr,
+    )
+
+    // then
+    expect(result).toBeNull()
+    expect(calls.filter((args) => args[0] === "kill-pane")).toEqual([
+      ["kill-pane", "-t", "%2"],
+      ["kill-pane", "-t", "%1"],
+    ])
+  })
+
+  test("#given resize-pane fails after layout commit #when teammate panes were created #then the committed layout remains active", async () => {
+    // given
+    const calls: Array<Array<string>> = []
+    const runTmuxCommand = mock(async (tmuxPath: string, args: Array<string>) => {
+      calls.push(args)
+      if (args[0] === "resize-pane") return createTmuxCommandResult("", false)
+      return defaultRunTmuxCommand(tmuxPath, args)
+    })
+    const { createTeamLayout } = await loadLayoutModule({ runTmuxCommand })
+
+    // when
+    const result = await createTeamLayout(
+      "run-resize-pane-failure",
+      [
+        { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+        { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      ],
+      tmuxMgr,
+    )
+
+    // then
+    expect(result).not.toBeNull()
+    expect(calls.some((args) => args[0] === "kill-pane")).toBe(false)
+    expect(logMock).toHaveBeenCalledWith("team caller pane resize failed; keeping committed layout", {
+      kind: "warning",
+      teamRunId: "run-resize-pane-failure",
+    })
+  })
 
   test("#given the cmux detector throws #when a team layout is requested #then dependency failure remains isolated", async () => {
     // given
@@ -869,7 +968,7 @@ describe("team-layout-tmux", () => {
     }
   })
 
-  test("#given ownedSession=false, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then tmux kill-window is called twice with -t @10 and -t @11 and kill-session is NEVER called", async () => {
+  test("#given only persisted window identifiers #when cleanup runs #then destructive cleanup fails closed", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
 
@@ -879,13 +978,18 @@ describe("team-layout-tmux", () => {
       targetSessionId: "$caller",
       focusWindowId: "@10",
       gridWindowId: "@11",
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, tmuxMgr as never)
 
     // then
-    const commands = getCommands()
-    expect(commands).toContainEqual(["kill-window", "-t", "@10"])
-    expect(commands).toContainEqual(["kill-window", "-t", "@11"])
-    expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
+    expect(getCommands()).toEqual([])
+    expect(logMock).toHaveBeenCalledWith("tmux team layout cleanup skipped without owned pane identifiers", {
+      kind: "warning",
+      teamRunId: "run-cleanup",
+    })
   })
 
   test("#given ownedSession=false and paneIds #when removeTeamLayout runs #then it kills panes instead of the caller window", async () => {
@@ -907,6 +1011,10 @@ describe("team-layout-tmux", () => {
       targetSessionId: "$caller",
       focusWindowId: "test-session:0",
       paneIds: ["%10", "%11"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, manager)
 
     // then
@@ -921,7 +1029,69 @@ describe("team-layout-tmux", () => {
     )).toBe(true)
   })
 
-  test("#given ownedSession=true, targetSessionId='omo-team-xyz' #when removeTeamLayout runs #then kill-session is called with -t omo-team-xyz (legacy behavior preserved)", async () => {
+  test("#given persisted native backend identity #when the current tmux socket changed #then cleanup stays on the original socket and verifies ownership", async () => {
+    // given
+    process.env.TMUX = "/tmp/current-tmux.sock,999,0"
+    const calls: Array<{ args: Array<string>; options?: RunTmuxOptions; tmuxPath: string }> = []
+    const runTmuxCommand = mock(async (tmuxPath: string, args: Array<string>, options?: RunTmuxOptions) => {
+      calls.push({ args, options, tmuxPath })
+      if (args[0] === "show-options") {
+        return createTmuxCommandResult("run-original-socket")
+      }
+      return createTmuxCommandResult("")
+    })
+    const { removeTeamLayout } = await loadLayoutModule({
+      getTmuxPath: async () => "cmux",
+      getTmuxPathForBackend: async (backend) => backend,
+      runTmuxCommand,
+    })
+
+    // when
+    const cleanupResult = await removeTeamLayout("run-original-socket", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      paneIds: ["%7"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+      },
+    } as TeamLayoutCleanupTarget, tmuxMgr as never)
+
+    // then
+    expect(calls.map(({ args }) => args[0])).toEqual(["show-options", "kill-pane"])
+    expect(calls.every(({ tmuxPath }) => tmuxPath === "tmux")).toBe(true)
+    expect(calls.every(({ options }) =>
+      options?.environment?.TMUX === "/tmp/original-tmux.sock,123,0"
+      && options.environment.CMUX_SOCKET_PATH === undefined
+    )).toBe(true)
+    expect(cleanupResult).toEqual({
+      attemptedPaneIds: ["%7"],
+      removedPaneIds: ["%7"],
+      skippedPaneIds: [],
+      reason: "removed",
+    })
+  })
+
+  test("#given legacy persisted layout without backend identity #when cleanup is requested #then destructive tmux commands fail closed", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    await removeTeamLayout("run-legacy-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      paneIds: ["%7"],
+    }, tmuxMgr as never)
+
+    // then
+    expect(getCommands().some((args) => ["kill-pane", "kill-window", "kill-session"].includes(args[0] ?? ""))).toBe(false)
+    expect(logMock).toHaveBeenCalledWith("tmux team layout cleanup skipped without persisted execution target", {
+      kind: "warning",
+      teamRunId: "run-legacy-cleanup",
+    })
+  })
+
+  test("#given a legacy owned session without pane ownership #when cleanup runs #then kill-session is rejected", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
 
@@ -931,37 +1101,27 @@ describe("team-layout-tmux", () => {
       targetSessionId: "omo-team-xyz",
       focusWindowId: "@10",
       gridWindowId: "@11",
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, tmuxMgr as never)
 
     // then
-    const commands = getCommands()
-    expect(commands).toContainEqual(["kill-session", "-t", "omo-team-xyz"])
+    expect(getCommands()).toEqual([])
+    expect(logMock).toHaveBeenCalledWith("tmux team layout cleanup skipped without owned pane identifiers", {
+      kind: "warning",
+      teamRunId: "run-cleanup",
+    })
   })
 
-  test("#given ownedSession=false and the first kill-window fails #when removeTeamLayout runs #then the second kill-window still fires", async () => {
+  test("#given the first pane ownership does not match #when cleanup runs #then it skips that pane and continues", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
-    let killWindowCallCount = 0
     runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, _options?: unknown) => {
-      if (args[0] === "kill-window") {
-        killWindowCallCount += 1
-        return Promise.resolve(createTmuxCommandResult("", killWindowCallCount > 1))
+      if (args[0] === "show-options") {
+        return Promise.resolve(createTmuxCommandResult(args.includes("%10") ? "another-run" : "run-cleanup"))
       }
-
-      const command = args[0]
-      if (command === "display") {
-        return Promise.resolve(createTmuxCommandResult(displaySessionId, displaySuccess))
-      }
-      if (command === "new-session") {
-        return Promise.resolve(createTmuxCommandResult(`@${nextWindowNumber++}`))
-      }
-      if (command === "new-window") {
-        return Promise.resolve(createTmuxCommandResult(`@${nextWindowNumber++} %${nextPaneNumber++}`))
-      }
-      if (command === "split-window") {
-        return Promise.resolve(createTmuxCommandResult(`%${nextPaneNumber++}`))
-      }
-
       return Promise.resolve(createTmuxCommandResult(""))
     })
 
@@ -969,23 +1129,66 @@ describe("team-layout-tmux", () => {
     await removeTeamLayout("run-cleanup", {
       ownedSession: false,
       targetSessionId: "$caller",
-      focusWindowId: "@10",
-      gridWindowId: "@11",
+      paneIds: ["%10", "%11"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, tmuxMgr as never)
 
     // then
-    const commands = getCommands().filter((args) => args[0] === "kill-window")
-    expect(commands).toEqual([
-      ["kill-window", "-t", "@10"],
-      ["kill-window", "-t", "@11"],
+    expect(getCommands().filter((args) => args[0] === "kill-pane")).toEqual([
+      ["kill-pane", "-t", "%11"],
     ])
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup skipped for unowned pane", {
+      kind: "warning",
+      paneId: "%10",
+      teamRunId: "run-cleanup",
+    })
   })
 
-  test("#given window cleanup throws secret-bearing text #when removeTeamLayout runs #then logs retain only the error type", async () => {
+  test("#given pane ownership cannot be checked #when cleanup runs #then it reports an operational failure", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
     runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, options?: unknown) => {
-      if (args[0] === "kill-window") {
+      if (args[0] === "show-options") {
+        return Promise.resolve(createTmuxCommandResult("", false))
+      }
+      return defaultRunTmuxCommand(_tmuxPath, args, options)
+    })
+
+    // when
+    const cleanupResult = await removeTeamLayout("run-ownership-check-failure", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      paneIds: ["%10"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
+    }, tmuxMgr as never)
+
+    // then
+    expect(getCommands().some((args) => args[0] === "kill-pane")).toBe(false)
+    expect(logMock).toHaveBeenCalledWith("tmux team pane ownership check failed", {
+      kind: "warning",
+      paneId: "%10",
+      teamRunId: "run-ownership-check-failure",
+    })
+    expect(cleanupResult).toEqual({
+      attemptedPaneIds: ["%10"],
+      removedPaneIds: [],
+      skippedPaneIds: ["%10"],
+      reason: "failed",
+    })
+  })
+
+  test("#given pane cleanup throws secret-bearing text #when removeTeamLayout runs #then logs retain only the error type", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+    runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, options?: unknown) => {
+      if (args[0] === "show-options") return Promise.resolve(createTmuxCommandResult("run-pane-error-redaction"))
+      if (args[0] === "kill-pane") {
         const error = new Error("secret-window-cleanup-message-fixture")
         error.name = "secret-window-cleanup-name-fixture"
         return Promise.reject(error)
@@ -994,20 +1197,26 @@ describe("team-layout-tmux", () => {
     })
 
     // when
-    await removeTeamLayout("run-window-error-redaction", {
+    const cleanupResult = await removeTeamLayout("run-pane-error-redaction", {
       ownedSession: false,
       targetSessionId: "$caller",
-      focusWindowId: "@10",
+      paneIds: ["%10"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, tmuxMgr as never)
 
     // then
-    expect(logMock).toHaveBeenCalledWith("tmux team layout window cleanup failed", {
-      teamRunId: "run-window-error-redaction",
-      windowId: "@10",
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", {
+      teamRunId: "run-pane-error-redaction",
+      paneId: "%10",
       errorType: "Error",
+      kind: "warning",
     })
     expect(JSON.stringify(logMock.mock.calls)).not.toContain("secret-window-cleanup-message-fixture")
     expect(JSON.stringify(logMock.mock.calls)).not.toContain("secret-window-cleanup-name-fixture")
+    expect(cleanupResult.reason).toBe("failed")
   })
 
   test("#given cleanup capability resolution throws secret-bearing text #when removeTeamLayout runs #then the outer log retains only the error type", async () => {
@@ -1026,6 +1235,10 @@ describe("team-layout-tmux", () => {
       ownedSession: false,
       targetSessionId: "$caller",
       paneIds: ["%11"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, manager as never)
 
     // then
@@ -1041,6 +1254,9 @@ describe("team-layout-tmux", () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
     runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, _options?: unknown) => {
+      if (args[0] === "show-options") {
+        return Promise.resolve(createTmuxCommandResult("run-pane-cleanup"))
+      }
       if (args[0] === "kill-pane") {
         return Promise.reject("pane already gone")
       }
@@ -1049,10 +1265,14 @@ describe("team-layout-tmux", () => {
     })
 
     // when
-    await removeTeamLayout("run-pane-cleanup", {
+    const cleanupResult = await removeTeamLayout("run-pane-cleanup", {
       ownedSession: false,
       targetSessionId: "$caller",
       paneIds: ["%11", "%12"],
+      executionTarget: {
+        backend: "tmux",
+        tmuxEnvironment: "/tmp/tmux-1",
+      },
     }, tmuxMgr as never)
 
     // then
@@ -1060,8 +1280,19 @@ describe("team-layout-tmux", () => {
       ["kill-pane", "-t", "%11"],
       ["kill-pane", "-t", "%12"],
     ])
-    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
-    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
+    expect(cleanupResult.reason).toBe("failed")
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", {
+      errorType: "string",
+      kind: "warning",
+      teamRunId: "run-pane-cleanup",
+      paneId: "%11",
+    })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", {
+      errorType: "string",
+      kind: "warning",
+      teamRunId: "run-pane-cleanup",
+      paneId: "%12",
+    })
   })
 
   test("skips all panes when lead member missing", async () => {
@@ -1126,11 +1357,12 @@ describe("team-layout-tmux", () => {
           "split-window",
           "-t", process.env.TMUX_PANE ?? "",
           "-h",
-          "-d",
           "-l", "70%",
+          "-d",
           "-P",
           "-F", "#{pane_id}",
           "-c", "/tmp/m1",
+          "/bin/sh",
         ],
       ])
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)

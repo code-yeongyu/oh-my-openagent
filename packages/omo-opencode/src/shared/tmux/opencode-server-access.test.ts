@@ -15,6 +15,19 @@ type FetchContact = {
   readonly url: string
 }
 
+type Deferred<T> = {
+  readonly promise: Promise<T>
+  resolve(value: T): void
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 function createFetchRecorder(contacts: FetchContact[]): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     contacts.push({
@@ -166,5 +179,53 @@ describe("OpenCode tmux server access", () => {
       OPENCODE_SERVER_PASSWORD: "rotated-password",
       OPENCODE_SERVER_USERNAME: "rotated-user",
     })
+  })
+
+  it("returns the exact credential snapshot whose readiness was verified", async () => {
+    const firstResponse = createDeferred<Response>()
+    const contacts: FetchContact[] = []
+    let environment = {
+      OPENCODE_SERVER_PASSWORD: "verified-password",
+      OPENCODE_SERVER_USERNAME: "verified-user",
+    }
+    const fetchImplementation = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      contacts.push({
+        authorization: new Headers(init?.headers).get("authorization"),
+        redirect: init?.redirect,
+        url: input.toString(),
+      })
+      return contacts.length === 1
+        ? firstResponse.promise
+        : new Response(null, { status: 200 })
+    }) as typeof fetch
+    const access = createOpenCodeTmuxServerAccess(trustedTarget(), {
+      fetchImplementation,
+      getEnvironment: () => environment,
+    })
+
+    const firstReadyEnvironment = access.getReadyPaneEnvironment?.()
+    environment = {
+      OPENCODE_SERVER_PASSWORD: "rotated-password",
+      OPENCODE_SERVER_USERNAME: "rotated-user",
+    }
+    firstResponse.resolve(new Response(null, { status: 200 }))
+
+    expect(await firstReadyEnvironment).toEqual({
+      OPENCODE_SERVER_PASSWORD: "verified-password",
+      OPENCODE_SERVER_USERNAME: "verified-user",
+    })
+    expect(contacts[0]?.authorization).toBe(
+      `Basic ${Buffer.from("verified-user:verified-password", "utf8").toString("base64")}`,
+    )
+    expect(await access.getReadyPaneEnvironment?.()).toEqual({
+      OPENCODE_SERVER_PASSWORD: "rotated-password",
+      OPENCODE_SERVER_USERNAME: "rotated-user",
+    })
+    expect(contacts[1]?.authorization).toBe(
+      `Basic ${Buffer.from("rotated-user:rotated-password", "utf8").toString("base64")}`,
+    )
   })
 })

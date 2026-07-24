@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { TmuxCommandResult } from "../runner"
 import type { TmuxConfig, TmuxServerAccess } from "../types"
 import { activateTmuxPane } from "./pane-activate"
-import { buildTmuxEnvironmentArgs, canOmitTmuxPaneEnvironment } from "./pane-command"
+import {
+	buildTmuxEnvironmentArgs,
+	canOmitTmuxPaneEnvironment,
+	planTmuxPaneEnvironment,
+} from "./pane-command"
 import { replaceTmuxPane } from "./pane-replace"
 import { spawnTmuxPane } from "./pane-spawn"
 import { spawnTmuxSession } from "./session-spawn"
@@ -109,6 +113,46 @@ describe("tmux pane environment capabilities", () => {
 		expect(canOmitTmuxPaneEnvironment({ HARNESS_SECRET: "desired-fixture" }, {})).toBe(false)
 	})
 
+	it("#given native tmux clears #when the pane environment is planned #then clears use child unsets instead of tmux -e", () => {
+		// given
+		const environment = {
+			HARNESS_IDENTITY: "",
+			HARNESS_SECRET: "",
+		}
+
+		// when
+		const plan = planTmuxPaneEnvironment(environment, false)
+
+		// then
+		expect(plan).toEqual({
+			args: [],
+			clearedNames: ["HARNESS_IDENTITY", "HARNESS_SECRET"],
+			isCmux: false,
+		})
+	})
+
+	it("#given mixed native tmux bindings #when the pane environment is planned #then secrets stay in -e and clears stay name-only", () => {
+		// given
+		const environment = {
+			HARNESS_IDENTITY: "",
+			HARNESS_SECRET: "desired-fixture",
+		}
+
+		// when
+		const plan = planTmuxPaneEnvironment(environment, false)
+
+		// then
+		expect(plan).toEqual({
+			args: ["-e", "HARNESS_SECRET=desired-fixture"],
+			clearedNames: ["HARNESS_IDENTITY"],
+			isCmux: false,
+		})
+	})
+
+	it("#given an invalid pane environment name #when the environment is planned #then execution fails closed", () => {
+		expect(planTmuxPaneEnvironment({ "HARNESS;INJECT": "" }, false)).toBeNull()
+	})
+
 	it("#given a server capability #when every pane lifecycle path runs #then its lazy environment reaches each mutation", async () => {
 		// given
 		let environmentReads = 0
@@ -158,10 +202,51 @@ describe("tmux pane environment capabilities", () => {
 			expect(extractEnvironment(args)).toEqual(["ALPHA=first value", "ZETA=last value"])
 		}
 		expect(environmentReads).toBe(6)
-		expect(healthChecks).toBe(4)
+		expect(healthChecks).toBe(6)
 		expect(activateRecorder.getCall(0)[1].at(-1)).toBe(
 			`/bin/sh -c "opencode attach 'http://127.0.0.1:4321/path with spaces' --session 'session with spaces' --dir '/tmp/project with spaces'"`,
 		)
+	})
+
+	it("#given native tmux clears #when every pane lifecycle path starts a process #then each child command unsets the names without -e", async () => {
+		// given
+		const access = createAccess({
+			getPaneEnvironment: () => ({
+				HARNESS_IDENTITY: "",
+				HARNESS_SECRET: "",
+			}),
+		})
+		const paneRecorder = createTmuxCommandRecorder([successResult("%pane"), successResult()])
+		const windowRecorder = createTmuxCommandRecorder([successResult("%window"), successResult()])
+		const sessionRecorder = createTmuxCommandRecorder([failedResult(), successResult("%session"), successResult()])
+		const replaceRecorder = createTmuxCommandRecorder([successResult(), successResult(), successResult()])
+		const activateRecorder = createTmuxCommandRecorder([successResult()])
+		const spawnDeps = (recorder: ReturnType<typeof createTmuxCommandRecorder>) => ({
+			log: () => undefined,
+			runTmuxCommand: recorder.runTmuxCommand,
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+		})
+
+		// when
+		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, access, "/tmp", undefined, "-h", spawnDeps(paneRecorder))
+		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, access, "/tmp", spawnDeps(windowRecorder))
+		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, access, "/tmp", undefined, spawnDeps(sessionRecorder))
+		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, access, "/tmp", spawnDeps(replaceRecorder))
+		await activateTmuxPane("%42", "session-1", access, "/tmp", spawnDeps(activateRecorder))
+
+		// then
+		const mutationArgs = [
+			paneRecorder.getCall(0)[1],
+			windowRecorder.getCall(0)[1],
+			sessionRecorder.getCall(1)[1],
+			replaceRecorder.getCall(1)[1],
+			activateRecorder.getCall(0)[1],
+		]
+		for (const args of mutationArgs) {
+			expect(args).not.toContain("-e")
+			expect(args.at(-1)).toStartWith("env -u HARNESS_IDENTITY -u HARNESS_SECRET -- ")
+		}
 	})
 
 	it("#given a rejected bound health check #when a pane spawn stops early #then its environment stays lazy", async () => {

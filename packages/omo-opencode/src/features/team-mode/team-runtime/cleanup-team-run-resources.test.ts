@@ -96,7 +96,12 @@ describe("cleanupTeamRunResources", () => {
         paneIds: ["%10", "%11"],
       },
     }, createConfig(baseDir))
-    const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue(undefined)
+    const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue({
+      attemptedPaneIds: ["%10", "%11"],
+      removedPaneIds: ["%10", "%11"],
+      skippedPaneIds: [],
+      reason: "removed",
+    })
 
     // when
     await cleanupTeamRunResources({
@@ -135,7 +140,12 @@ describe("cleanupTeamRunResources", () => {
         { name: "worker-1", agentType: "general-purpose", tmuxPaneId: "%10", tmuxGridPaneId: "%11", status: "running", pendingInjectedMessageIds: [] },
       ],
     }, createConfig(baseDir))
-    const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue(undefined)
+    const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue({
+      attemptedPaneIds: ["%10", "%11"],
+      removedPaneIds: ["%10", "%11"],
+      skippedPaneIds: [],
+      reason: "removed",
+    })
 
     // when
     await cleanupTeamRunResources({
@@ -154,5 +164,38 @@ describe("cleanupTeamRunResources", () => {
       focusWindowId: "test-session:0",
       paneIds: ["%10", "%11"],
     }, expect.anything())
+  })
+
+  test("reports a partial layout cleanup instead of claiming the layout was removed", async () => {
+    const baseDir = await mkdtemp(path.join(tmpdir(), "cleanup-team-run-layout-partial-"))
+    temporaryDirectories.push(baseDir)
+    const teamRunId = "66666666-6666-4666-8666-666666666666"
+    await mkdir(path.join(baseDir, "runtime", teamRunId), { recursive: true })
+    await saveRuntimeState({
+      ...createRuntimeState(teamRunId),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: ["%10", "%11"],
+      },
+    }, createConfig(baseDir))
+    spyOn(layoutModule, "removeTeamLayout").mockResolvedValue({
+      attemptedPaneIds: ["%10", "%11"],
+      removedPaneIds: ["%10"],
+      skippedPaneIds: ["%11"],
+      reason: "partial",
+    })
+
+    const report = await cleanupTeamRunResources({
+      teamRunId,
+      config: createConfig(baseDir),
+      resources: [{}],
+      bgMgr: createStubBgMgr(),
+      tmuxMgr: { getServerUrl: () => "http://127.0.0.1:12345" } as never,
+      createdLayout: true,
+    })
+
+    expect(report.removedLayout).toBe(false)
+    expect(report.errors).toContain(`layout ${teamRunId}: cleanup partial; skipped 1 pane(s)`)
   })
 })

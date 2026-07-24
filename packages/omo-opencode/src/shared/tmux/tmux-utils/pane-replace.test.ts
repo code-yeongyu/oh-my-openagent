@@ -68,6 +68,7 @@ function createDeps(): NonNullable<Parameters<typeof import("./pane-replace").re
 		log: logMock,
 		runTmuxCommand: runTmuxCommandMock,
 		isInsideTmux: isInsideTmuxMock,
+		isServerRunning: async () => true,
 		getTmuxPath: getTmuxPathMock,
 	}
 }

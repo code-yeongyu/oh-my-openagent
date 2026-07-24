@@ -1,5 +1,6 @@
 import * as z from "zod"
 import { createParseMember } from "./member-parser"
+import { isValidTeamLayoutExecutionTarget } from "./team-layout-tmux/execution-target"
 
 export const MESSAGE_KINDS = [
   "message",
@@ -164,12 +165,33 @@ const ShutdownRequestSchema = z.object({
   rejectedAt: z.number().int().positive().optional(),
 }).strict()
 
+const TmuxExecutionTargetValueSchema = z.string()
+  .min(1)
+  .max(4096)
+  .refine((value) => !value.includes("\0"), "tmux execution target must not contain NUL")
+
+const RuntimeStateTmuxExecutionTargetSchema = z.union([
+  z.object({
+    backend: z.literal("tmux"),
+    tmuxEnvironment: TmuxExecutionTargetValueSchema,
+  }).strict(),
+  z.object({
+    backend: z.literal("cmux"),
+    cmuxSocketPath: TmuxExecutionTargetValueSchema.optional(),
+    tmuxEnvironment: TmuxExecutionTargetValueSchema.optional(),
+  }).strict().refine(
+    (target) => target.cmuxSocketPath !== undefined || target.tmuxEnvironment !== undefined,
+    "cmux execution target requires a socket identity",
+  ),
+]).refine(isValidTeamLayoutExecutionTarget, "tmux execution target does not match its backend")
+
 const RuntimeStateTmuxLayoutSchema = z.object({
   ownedSession: z.boolean(),
   targetSessionId: z.string(),
   focusWindowId: z.string().optional(),
   gridWindowId: z.string().optional(),
   paneIds: z.array(z.string()).optional(),
+  executionTarget: RuntimeStateTmuxExecutionTargetSchema.optional(),
 }).strict()
 
 export const RuntimeStateSchema = z.object({

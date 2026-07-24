@@ -104,9 +104,9 @@ project context.
 
 #### Visual Multi-Agent with Tmux
 
-Start the host with `opencode --port <port>` to provide the OpenCode HTTP listener used by visualization panes. Child panes connect with `opencode attach`. The `/global/health` probe reuses `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME` only when OpenCode reports the current listener URL or `OPENCODE_PORT` identifies it explicitly; the username defaults to `opencode`. If OMO cannot verify that an address belongs to the current listener, such as a default address or one left by an older pane, it probes without credentials. Redirects and unsuccessful responses do not establish readiness. Successful readiness is cached for the listener address and current authentication settings, including credential changes, without storing the credentials; failed checks are not cached.
+Start the host with `opencode --port <port>` to provide the OpenCode HTTP listener used by visualization panes. Child panes connect with `opencode attach`. The `/global/health` probe reuses `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME` only when OpenCode reports the current listener URL or `OPENCODE_PORT` identifies it explicitly; the username defaults to `opencode`. If OMO cannot verify that an address belongs to the current listener, such as a default address or one left by an older pane, it probes without credentials. Redirects and unsuccessful responses do not establish readiness. Each pane operation revalidates readiness and uses the exact authentication snapshot that passed the probe; simultaneous checks for the same listener and authentication settings share one request without storing the credentials.
 
-Each newly spawned or respawned pane targeting that verified listener receives the current server authentication variables. Panes targeting any other address explicitly clear those variables. Existing panes and tmux's global environment are not changed retroactively. If the listener is not ready, background agents and teams continue while only pane visualization is skipped.
+Under native tmux, each newly spawned or respawned pane targeting that verified listener receives the current server authentication variables through tmux's per-pane environment flags. This requires a tmux release whose relevant pane command supports `-e`. Panes targeting another address clear those variables in the child process, without changing tmux's global environment; this anonymous path does not depend on tmux accepting an empty `NAME=` flag. Existing panes are not changed retroactively. If the listener is not ready or the required environment cannot be applied safely, background agents and teams continue while only pane visualization is skipped.
 
 Enable `tmux.enabled` to see background agents in separate tmux panes:
 
@@ -127,7 +127,7 @@ When running inside tmux:
 - Auto-cleanup when agents complete
 - **Stable agent ordering**: core-agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas, and can be customized with `agent_order`
 
-When running inside cmux (`cmux omo`), the same pane integration is routed through cmux's tmux compatibility command. OMO detects the cmux environment from `CMUX_SOCKET_PATH` or a cmux-provided `TMUX` value, so `tmux.enabled` can create cmux panes even when a real `tmux` binary is not installed.
+When running inside cmux, start OMO with `cmux omo`. OMO routes pane commands through cmux's tmux-compatible interface and does not require a native `tmux` binary on `PATH`. Because that interface cannot safely receive tmux `-e` bindings, OMO creates a cmux pane only when the required pane environment is safely omissible; authenticated listener variables therefore fail closed instead of being inherited or exposed.
 
 Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 

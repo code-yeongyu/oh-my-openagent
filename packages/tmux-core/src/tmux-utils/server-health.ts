@@ -22,6 +22,20 @@ export type IsServerRunningOptions = {
 	state?: ServerHealthState
 }
 
+type ServerHealthInternalState = {
+	generation: number
+	inFlight?: {
+		readonly fetchImplementation: typeof fetch
+		readonly generation: number
+		readonly healthUrl: string
+		readonly promise: Promise<boolean>
+		readonly requestPolicyId: string
+	}
+}
+
+const healthInternals = new WeakMap<ServerHealthState, ServerHealthInternalState>()
+const globalHealthInternal: ServerHealthInternalState = { generation: 0 }
+
 function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
@@ -43,14 +57,44 @@ function createRequestPolicyId(headers: RequestHeaders, redirect: RedirectMode):
 	return createHmac("sha256", REQUEST_POLICY_HMAC_KEY).update(canonicalPolicy, "utf8").digest("hex")
 }
 
-function isCurrentServerCheck(
+function getHealthInternal(state: ServerHealthState | undefined): ServerHealthInternalState {
+	if (!state) return globalHealthInternal
+	const existing = healthInternals.get(state)
+	if (existing) return existing
+	const created: ServerHealthInternalState = { generation: 0 }
+	healthInternals.set(state, created)
+	return created
+}
+
+function setServerCheckState(
 	state: ServerHealthState | undefined,
 	healthUrl: string,
 	requestPolicyId: string,
+	serverIsAvailable: boolean,
+): void {
+	if (state !== undefined) {
+		state.serverCheckUrl = healthUrl
+		state.serverCheckPolicyId = requestPolicyId
+		state.serverAvailable = serverIsAvailable
+		return
+	}
+	serverCheckUrl = healthUrl
+	serverCheckPolicyId = requestPolicyId
+	serverAvailable = serverIsAvailable
+}
+
+function isCurrentServerCheck(
+	state: ServerHealthState | undefined,
+	internal: ServerHealthInternalState,
+	healthUrl: string,
+	requestPolicyId: string,
+	generation: number,
 ): boolean {
 	const currentUrl = state !== undefined ? state.serverCheckUrl : serverCheckUrl
 	const currentPolicyId = state !== undefined ? state.serverCheckPolicyId : serverCheckPolicyId
-	return currentUrl === healthUrl && currentPolicyId === requestPolicyId
+	return internal.generation === generation
+		&& currentUrl === healthUrl
+		&& currentPolicyId === requestPolicyId
 }
 
 export function createServerHealthState(): ServerHealthState {
@@ -69,60 +113,86 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 	const redirect = options.redirect ?? "error"
 	const requestPolicyId = createRequestPolicyId(options.headers, redirect)
 	const state = options.state
-	const cachedUrl = state !== undefined ? state.serverCheckUrl : serverCheckUrl
-	const cachedAvailable = state !== undefined ? state.serverAvailable : serverAvailable
-	const cachedPolicyId = state !== undefined ? state.serverCheckPolicyId : serverCheckPolicyId
-	if (cachedUrl === healthUrl && cachedPolicyId === requestPolicyId && cachedAvailable === true) {
-		return true
+	const internal = getHealthInternal(state)
+	const inFlight = internal.inFlight
+	if (
+		inFlight
+		&& inFlight.fetchImplementation === fetchImplementation
+		&& inFlight.healthUrl === healthUrl
+		&& inFlight.requestPolicyId === requestPolicyId
+		&& isCurrentServerCheck(
+			state,
+			internal,
+			healthUrl,
+			requestPolicyId,
+			inFlight.generation,
+		)
+	) {
+		return inFlight.promise
 	}
 
-	if (state !== undefined) {
-		state.serverCheckUrl = healthUrl
-		state.serverCheckPolicyId = requestPolicyId
-		state.serverAvailable = false
-	} else {
-		serverCheckUrl = healthUrl
-		serverCheckPolicyId = requestPolicyId
-		serverAvailable = false
-	}
+	const generation = internal.generation + 1
+	internal.generation = generation
+	setServerCheckState(state, healthUrl, requestPolicyId, false)
 
-	const timeoutMs = 3000
-	const maxAttempts = 2
+	const checkPromise = (async (): Promise<boolean> => {
+		const timeoutMs = 3000
+		const maxAttempts = 2
 
-	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-		if (!isCurrentServerCheck(state, healthUrl, requestPolicyId)) return false
-
-		const controller = new AbortController()
-		const timeout = setTimeout(() => controller.abort(), timeoutMs)
-
-		try {
-			const response = await fetchImplementation(healthUrl, {
-				headers: options.headers,
-				redirect,
-				signal: controller.signal,
-			}).catch(() => null)
-
-			if (!isCurrentServerCheck(state, healthUrl, requestPolicyId)) return false
-
-			if (response?.ok) {
-				if (state !== undefined) state.serverAvailable = true
-				else serverAvailable = true
-				return true
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			if (!isCurrentServerCheck(state, internal, healthUrl, requestPolicyId, generation)) {
+				return false
 			}
-		} finally {
-			clearTimeout(timeout)
+
+			const controller = new AbortController()
+			const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+			try {
+				const response = await fetchImplementation(healthUrl, {
+					headers: options.headers,
+					redirect,
+					signal: controller.signal,
+				}).catch(() => null)
+
+				if (!isCurrentServerCheck(state, internal, healthUrl, requestPolicyId, generation)) {
+					return false
+				}
+
+				if (response?.ok) {
+					setServerCheckState(state, healthUrl, requestPolicyId, true)
+					return true
+				}
+			} finally {
+				clearTimeout(timeout)
+			}
+
+			if (attempt < maxAttempts) {
+				await delay(250)
+			}
 		}
 
-		if (attempt < maxAttempts) {
-			await delay(250)
+		return false
+	})()
+	internal.inFlight = {
+		fetchImplementation,
+		generation,
+		healthUrl,
+		promise: checkPromise,
+		requestPolicyId,
+	}
+	try {
+		return await checkPromise
+	} finally {
+		if (internal.inFlight?.generation === generation) {
+			internal.inFlight = undefined
 		}
 	}
-
-	return false
 }
 
 export function resetServerCheck(): void {
 	serverAvailable = null
 	serverCheckUrl = null
 	serverCheckPolicyId = null
+	globalHealthInternal.generation += 1
+	globalHealthInternal.inFlight = undefined
 }
