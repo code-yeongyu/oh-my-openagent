@@ -8,6 +8,7 @@ import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { TeamRunCreateError } from "./create"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
+import { getTeamLayoutCleanupTarget } from "./team-layout-cleanup-target"
 
 type SpawnedMemberResource = {
   taskId?: string
@@ -16,22 +17,6 @@ type SpawnedMemberResource = {
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
-}
-
-function getLayoutCleanupTarget(runtimeState: Awaited<ReturnType<typeof loadRuntimeState>>) {
-  if (!runtimeState.tmuxLayout) return undefined
-  if (runtimeState.tmuxLayout.paneIds && runtimeState.tmuxLayout.paneIds.length > 0) {
-    return runtimeState.tmuxLayout
-  }
-
-  const paneIds = runtimeState.members.flatMap((member) => {
-    const ids = [member.tmuxPaneId, member.tmuxGridPaneId].filter((paneId): paneId is string => Boolean(paneId))
-    return member.agentType === "leader" ? [] : ids
-  })
-
-  return paneIds.length > 0
-    ? { ...runtimeState.tmuxLayout, paneIds }
-    : runtimeState.tmuxLayout
 }
 
 export async function cleanupTeamRunResources(args: {
@@ -78,7 +63,7 @@ export async function cleanupTeamRunResources(args: {
       const runtimeState = await loadRuntimeState(args.teamRunId, args.config)
       const cleanupResult = await removeTeamLayout(
         args.teamRunId,
-        getLayoutCleanupTarget(runtimeState),
+        getTeamLayoutCleanupTarget(runtimeState),
         args.tmuxMgr,
       )
       cleanupReport.removedLayout = cleanupResult.reason === "removed"

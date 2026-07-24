@@ -93,8 +93,12 @@ describe("cleanupTeamRunResources", () => {
         ownedSession: false,
         targetSessionId: "$caller",
         focusWindowId: "test-session:0",
-        paneIds: ["%10", "%11"],
+        paneIds: ["%10"],
       },
+      members: [
+        { name: "lead", agentType: "leader", tmuxPaneId: "%0", status: "running", pendingInjectedMessageIds: [] },
+        { name: "worker-1", agentType: "general-purpose", tmuxPaneId: "%10", tmuxGridPaneId: "%11", status: "running", pendingInjectedMessageIds: [] },
+      ],
     }, createConfig(baseDir))
     const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue({
       attemptedPaneIds: ["%10", "%11"],
