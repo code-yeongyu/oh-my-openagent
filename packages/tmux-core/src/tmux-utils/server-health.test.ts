@@ -193,6 +193,105 @@ describe("isServerRunning request policy", () => {
 		expect(state.serverAvailable).toBe(true)
 	})
 
+	it("#given the same implicit listener and policy #when checks overlap #then callers share one probe", async () => {
+		// given
+		resetServerCheck()
+		const response = createDeferred<Response>()
+		const fetchImplementation = createFetchRecorder(async () => response.promise)
+		const options = {
+			fetchImplementation,
+			headers: { Authorization: "Bearer implicit-coalesced-policy-fixture" },
+		}
+
+		try {
+			// when
+			const firstCheck = isServerRunning("http://127.0.0.1:4321", options)
+			const secondCheck = isServerRunning("http://127.0.0.1:4321/path", options)
+			response.resolve(new Response(null, { status: 200 }))
+
+			// then
+			expect(await Promise.all([firstCheck, secondCheck])).toEqual([true, true])
+			expect(fetchImplementation.calls).toHaveLength(1)
+		} finally {
+			response.resolve(new Response(null, { status: 500 }))
+			resetServerCheck()
+		}
+	})
+
+	it("#given distinct implicit listeners #when their checks overlap #then each listener keeps independent authority", async () => {
+		// given
+		resetServerCheck()
+		const firstResponse = createDeferred<Response>()
+		const secondResponse = createDeferred<Response>()
+		const firstFetch = createFetchRecorder(async () => firstResponse.promise)
+		const secondFetch = createFetchRecorder(async () => secondResponse.promise)
+
+		try {
+			// when
+			const firstCheck = isServerRunning("http://127.0.0.1:4321", {
+				fetchImplementation: firstFetch,
+			})
+			const secondCheck = isServerRunning("http://127.0.0.1:4322", {
+				fetchImplementation: secondFetch,
+			})
+			firstResponse.resolve(new Response(null, { status: 200 }))
+			secondResponse.resolve(new Response(null, { status: 200 }))
+
+			// then
+			expect(await Promise.all([firstCheck, secondCheck])).toEqual([true, true])
+			expect(firstFetch.calls).toHaveLength(1)
+			expect(secondFetch.calls).toHaveLength(1)
+		} finally {
+			firstResponse.resolve(new Response(null, { status: 500 }))
+			secondResponse.resolve(new Response(null, { status: 500 }))
+			resetServerCheck()
+		}
+	})
+
+	it("#given implicit listener checks are in flight #when global readiness is reset #then every pending result loses authority", async () => {
+		// given
+		resetServerCheck()
+		const firstResponse = createDeferred<Response>()
+		const secondResponse = createDeferred<Response>()
+		const firstCheck = isServerRunning("http://127.0.0.1:4321", {
+			fetchImplementation: createFetchRecorder(async () => firstResponse.promise),
+		})
+		const secondCheck = isServerRunning("http://127.0.0.1:4322", {
+			fetchImplementation: createFetchRecorder(async () => secondResponse.promise),
+		})
+
+		// when
+		resetServerCheck()
+		firstResponse.resolve(new Response(null, { status: 200 }))
+		secondResponse.resolve(new Response(null, { status: 200 }))
+
+		// then
+		expect(await Promise.all([firstCheck, secondCheck])).toEqual([false, false])
+	})
+
+	it("#given one explicit state spans listeners #when their checks overlap #then the later listener supersedes the earlier one", async () => {
+		// given
+		const state = createServerHealthStateForTesting()
+		const firstResponse = createDeferred<Response>()
+		const firstFetch = createFetchRecorder(async () => firstResponse.promise)
+		const secondFetch = createFetchRecorder(async () => new Response(null, { status: 200 }))
+
+		// when
+		const firstCheck = isServerRunning("http://127.0.0.1:4321", {
+			fetchImplementation: firstFetch,
+			state,
+		})
+		const secondCheck = isServerRunning("http://127.0.0.1:4322", {
+			fetchImplementation: secondFetch,
+			state,
+		})
+		firstResponse.resolve(new Response(null, { status: 200 }))
+
+		// then
+		expect(await Promise.all([firstCheck, secondCheck])).toEqual([false, true])
+		expect(state.serverCheckUrl).toBe("http://127.0.0.1:4322/global/health")
+	})
+
 	it("#given the same policy uses different transports #when checks overlap #then their results are not coalesced", async () => {
 		// given
 		const state = createServerHealthStateForTesting()

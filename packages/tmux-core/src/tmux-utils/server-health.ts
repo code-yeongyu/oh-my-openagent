@@ -1,9 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto"
 
-let serverAvailable: boolean | null = null
-let serverCheckUrl: string | null = null
-let serverCheckPolicyId: string | null = null
-
 const REQUEST_POLICY_HMAC_KEY = randomBytes(32)
 
 type RequestHeaders = RequestInit["headers"]
@@ -34,7 +30,7 @@ type ServerHealthInternalState = {
 }
 
 const healthInternals = new WeakMap<ServerHealthState, ServerHealthInternalState>()
-const globalHealthInternal: ServerHealthInternalState = { generation: 0 }
+const implicitHealthInternals = new Map<string, ServerHealthInternalState>()
 
 function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -57,8 +53,17 @@ function createRequestPolicyId(headers: RequestHeaders, redirect: RedirectMode):
 	return createHmac("sha256", REQUEST_POLICY_HMAC_KEY).update(canonicalPolicy, "utf8").digest("hex")
 }
 
-function getHealthInternal(state: ServerHealthState | undefined): ServerHealthInternalState {
-	if (!state) return globalHealthInternal
+function getHealthInternal(
+	state: ServerHealthState | undefined,
+	healthUrl: string,
+): ServerHealthInternalState {
+	if (!state) {
+		const existing = implicitHealthInternals.get(healthUrl)
+		if (existing) return existing
+		const created: ServerHealthInternalState = { generation: 0 }
+		implicitHealthInternals.set(healthUrl, created)
+		return created
+	}
 	const existing = healthInternals.get(state)
 	if (existing) return existing
 	const created: ServerHealthInternalState = { generation: 0 }
@@ -72,15 +77,10 @@ function setServerCheckState(
 	requestPolicyId: string,
 	serverIsAvailable: boolean,
 ): void {
-	if (state !== undefined) {
-		state.serverCheckUrl = healthUrl
-		state.serverCheckPolicyId = requestPolicyId
-		state.serverAvailable = serverIsAvailable
-		return
-	}
-	serverCheckUrl = healthUrl
-	serverCheckPolicyId = requestPolicyId
-	serverAvailable = serverIsAvailable
+	if (state === undefined) return
+	state.serverCheckUrl = healthUrl
+	state.serverCheckPolicyId = requestPolicyId
+	state.serverAvailable = serverIsAvailable
 }
 
 function isCurrentServerCheck(
@@ -90,11 +90,12 @@ function isCurrentServerCheck(
 	requestPolicyId: string,
 	generation: number,
 ): boolean {
-	const currentUrl = state !== undefined ? state.serverCheckUrl : serverCheckUrl
-	const currentPolicyId = state !== undefined ? state.serverCheckPolicyId : serverCheckPolicyId
-	return internal.generation === generation
-		&& currentUrl === healthUrl
-		&& currentPolicyId === requestPolicyId
+	if (internal.generation !== generation) return false
+	return state === undefined
+		|| (
+			state.serverCheckUrl === healthUrl
+			&& state.serverCheckPolicyId === requestPolicyId
+		)
 }
 
 export function createServerHealthState(): ServerHealthState {
@@ -113,7 +114,7 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 	const redirect = options.redirect ?? "error"
 	const requestPolicyId = createRequestPolicyId(options.headers, redirect)
 	const state = options.state
-	const internal = getHealthInternal(state)
+	const internal = getHealthInternal(state, healthUrl)
 	const inFlight = internal.inFlight
 	if (
 		inFlight
@@ -186,13 +187,20 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 		if (internal.inFlight?.generation === generation) {
 			internal.inFlight = undefined
 		}
+		if (
+			state === undefined
+			&& internal.inFlight === undefined
+			&& implicitHealthInternals.get(healthUrl) === internal
+		) {
+			implicitHealthInternals.delete(healthUrl)
+		}
 	}
 }
 
 export function resetServerCheck(): void {
-	serverAvailable = null
-	serverCheckUrl = null
-	serverCheckPolicyId = null
-	globalHealthInternal.generation += 1
-	globalHealthInternal.inFlight = undefined
+	for (const internal of implicitHealthInternals.values()) {
+		internal.generation += 1
+		internal.inFlight = undefined
+	}
+	implicitHealthInternals.clear()
 }
