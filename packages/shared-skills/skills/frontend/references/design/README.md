@@ -18,13 +18,13 @@ The library lives flat in this directory (`references/design/`, max depth 1) and
 - **Layer A — taste skills (12 files):** how to execute. Discipline, motion physics, spacing rules, anti-slop guardrails, output completeness. Filenames end in `-skill.md` or start with `imagegen-`.
 - **Layer B — design systems (70 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`aside.md`, `claude.md`, `notion.md`, `stripe.md`, ...).
 
-A combined directory of all 83 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
+The combined reference catalog is at `_INDEX.md`. Read it before loading anything unless routing is obvious; it carries the mood mapping, structural mechanics, and stacking rules in one place.
 
-## Open Design Library
+Two project-original structural references sit outside those visual layers. `composition-skill.md` owns eligible multi-section page shape and proof inputs. `layout-skill.md` owns app-shell mechanics and scroll ownership. Neither chooses a visual style.
 
-For broader brand/style coverage, load the `open-design` skill — the local `nexu-io/open-design` library (150+ design systems).
+## Optional Open Design boundary
 
-Use the `open-design` skill when the request explicitly mentions Open Design, Claude Design alternatives, design-system libraries, or a brand/style that is not covered by this skill's curated reference set. Treat Open Design as the expanded reference library; keep this skill responsible for routing discipline, design-system gating, and frontend execution quality.
+OMO already ships a curated, pinned subset of Open Design material as Layer B references. It does not ship a separate Open Design skill or workflow. Query a configured local Open Design service through its `od` CLI or MCP only when built-in OMO curation has no suitable fit or the user explicitly requests Open Design. Do not install or invoke an unconfigured service implicitly. If the integration is unavailable, state that boundary and continue with the closest curated fallback in `_INDEX.md`.
 
 ## Phase 0 — Design System Gate (MANDATORY, runs before routing)
 
@@ -38,7 +38,7 @@ Before touching any UI code, before routing to any reference, before even thinki
 
 1. Read `design-system-architecture.md` — it defines the exact structure.
 2. Identify the branch: greenfield setup, existing UI with implicit patterns/components, or existing UI with no reusable component layer.
-3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then read exactly one Layer A style skill and one Layer B brand/design-system reference in full — every line, no partial reads; use `open-design` only when the curated set has no fit. Open `DESIGN.md` with a `## 0. Research Log` recording each research lane's deliverable (embedded-reference shortlist + pick, lazyweb screens viewed, imagen drafts — see the SKILL.md workflow); a lane with no line did not run. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
+3. **Greenfield setup:** route by surface. Marketing, editorial, portfolio, and discovery work uses `_INDEX.md` to shortlist 2-3 plausible Layer B references, then reads exactly one Layer A style skill and one Layer B reference in full. Operational product UI uses the `taste-skill.md` **Brief to Design System Map** only to choose an official design system, then follows that system and `layout-skill.md`. Query a configured local Open Design service only at the optional boundary above. Open `DESIGN.md` with a `## 0. Research Log` recording the applicable deliverables. For an eligible multi-section page, let approved content, proof inputs, and layout research produce the Section 4 Page Structure outcome below, then keep it aligned as the concept evolves. Extract palette, typography, material, component anatomy, interaction states, motion, and taste decisions into project-specific primitives. Never copy logos, trademarked assets, brand-specific copy, or unsupported proof claims.
    - **Commit a distinctive direction BEFORE extracting tokens.** In 1-2 sentences, name the atmosphere, the signature material, the color story, and the one moment a visitor will remember. For an expressive brief, sketch 2-3 genuinely different directions and pick the boldest one you can defend with the loaded reference; do not average them, because the average IS the generic default this skill exists to beat. A locked, never-revisited one-shot decision is how a page ends up flat.
    - **The reference's distinctive material MUST survive extraction (expressive briefs).** The common failure is loading a rich reference and then distilling it into a generic dark-SaaS token set. Your `DESIGN.md` must carry the *non-default* decisions forward and name which reference each came from: the actual elevation recipe (the specific layers that make a surface read as glass/glossy, not a single blur), a multi-stop perceptual color ramp (not one brand hex reused at varied opacity), the explicit display/body/mono type choices, and one signature interaction. Self-check before writing code: if your `DESIGN.md` could describe any generic dark SaaS, you flattened the reference — go back and put the specific material in.
 4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
@@ -57,6 +57,14 @@ Before touching any UI code, before routing to any reference, before even thinki
 ### Primitive Showcase Gate (MANDATORY)
 
 **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.** Skipping this gate ships ad-hoc-styled product screens and re-enters the redesign loop.
+
+### Page composition outcome
+
+Load `composition-skill.md` for a new or substantially restructured multi-section marketing, editorial, portfolio, or discovery page without a user-supplied exact visual reference. Its output is a concise Section 4 record of the content decision path, dominant composition, nav/footer voice, proof basis, and any intentional reuse rationale.
+
+Judge structural variety only against routes with similar purpose, audience, and content scale. If a route intentionally shares a publishing template or established information architecture, document that reason instead of forcing novelty. Otherwise, color, font, illustration, and copy changes alone should not disguise an unexplained structural clone. Keep the record aligned with the selected concept and implementation when evidence leads the design to evolve.
+
+Component-only work, app shells, and exact-reference reproduction do not need a Page Structure row. These exemptions never authorize invented proof.
 
 
 ## Phase 0.5 — React Dev Tooling Gate (MANDATORY for React projects)
@@ -104,7 +112,7 @@ Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel side
 
 **Then also load Layer A** — usually `taste-skill.md` for execution discipline (the design system says *what*, the taste-skill says *how* to write the React/CSS without slop).
 
-If the user names a brand not in the index, fall back to Step 2 + a mood-based shortcut from the index.
+If the user names a brand not in the index, use a mood-based shortcut from the index. Query a configured local Open Design service only when that built-in route has no suitable fit or the user explicitly requests Open Design.
 
 ### Step 2 — Read the brief's ambition, THEN map style/mood
 
@@ -121,7 +129,7 @@ Do NOT let an expressive brief fall through to `taste-skill`. Then map the phras
 | "brutalist", "raw", "Swiss", "experimental", "industrial", "anti-design", "unstyled" | `brutalist-skill.md` |
 | "premium", "luxury", "calm", "expensive", "elegant", "spa", "boutique", "glossy", "glassy", "liquid glass", "startup-grade", "make it beautiful/pretty" | `soft-skill.md` + a high-craft Layer B (`supabase` / `linear.app` / `vercel` / `stripe`) |
 | "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` |
-| Neutral or operational — internal tool, dashboard, admin, "just make it usable" with no surface ambition | `taste-skill.md` as Layer A, plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference |
+| Neutral or operational: internal tool, dashboard, admin, "just make it usable" with no surface ambition | Use the `taste-skill.md` **Brief to Design System Map** to choose an official design system, then add `layout-skill.md`; do not use the marketing Layer B shortlist. |
 
 You may also load a brand DESIGN.md from Layer B as a *concrete reference* if the user's mood maps cleanly (see the "Mood-based shortcuts" section in `_INDEX.md`).
 
@@ -173,7 +181,7 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 
 Triggers: dashboard, settings, mail/inbox, list-detail, command surface, split panes, fixed sidebar + scrolling body, admin console — or the user reports a layout that breaks when content gets long, empty, or unbroken (panel won't scroll, footer pushed off-screen, horizontal overflow on mobile).
 
-**Action:** Add `layout-skill.md` on top of whatever style skill you selected in Steps 1-2. It carries scroll-ownership doctrine, the two silently-failing CSS contracts (`min-block-size: 0` scroll shells, `minmax(min(…),100%)` grids), the named-primitive vocabulary, container-vs-viewport routing, and the content-stress matrix. It adds no visual direction — the style skill still owns taste. Skip it for pure scroll-the-document marketing pages, where `taste-skill` layout guidance already fits.
+**Action:** For operational product UI, pair `layout-skill.md` with the official design system selected through the `taste-skill.md` map. For a marketing app shell, add it to the selected style skill. It owns scroll behavior, spatial primitives, container routing, and content stress without choosing visual taste. Skip it for a document-scrolling marketing page.
 
 ## Stacking rules (read this once, internalize it)
 
@@ -183,7 +191,8 @@ Triggers: dashboard, settings, mail/inbox, list-detail, command surface, split p
 4. **`redesign-skill.md` replaces a style-skill** when the task is auditing, not building. Stack a Layer B brand if the user wants a specific direction.
 5. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
-7. **`layout-skill.md` stacks on top of any style skill** for app-shell / dashboard / split-pane work. It owns spatial structure and scroll ownership only — no visual direction — so it never conflicts with the style skill you picked.
+7. **`layout-skill.md` owns app-shell, dashboard, and split-pane structure.** Pair operational product UI with its selected official design system; pair a marketing app shell with the applicable style skill. It owns spatial mechanics and scroll behavior, not visual direction.
+8. **`composition-skill.md` stacks on top of any style skill** for eligible multi-section pages. It owns page sequence, dominant composition, nav/footer voice, route comparison, and proof inputs; the style skill still owns visual taste.
 
 ## Anti-patterns — do not do these
 
@@ -213,7 +222,7 @@ Once references are loaded, before writing any UI code:
 
 | User asks for... | Load these |
 |---|---|
-| "Build me a landing page" (no other info) | `_INDEX.md` shortlist → exactly one Layer B reference + `taste-skill.md` |
+| "Build me a landing page" (no other info) | `composition-skill.md` + `_INDEX.md` shortlist, then exactly one Layer B reference + `taste-skill.md` |
 | "Build me an Aside-style AI browser / agent page" | `aside.md` + `taste-skill.md` |
 | "Build me a Linear-style landing page" | `linear.app.md` + `taste-skill.md` |
 | "Make it Notion-like and minimal" | `notion.md` + `minimalist-skill.md` |
@@ -225,7 +234,7 @@ Once references are loaded, before writing any UI code:
 | "Generate a brand identity board for {company}" | `imagegen-brandkit.md` |
 | "Stop using placeholders" | Add `output-skill.md` to current stack |
 | "Also output a DESIGN.md doc" | Add `stitch-skill.md` to current stack |
-| "Build a dashboard / settings / inbox / app shell" | one style skill (usually `taste-skill.md`) + `layout-skill.md` |
+| "Build a dashboard / settings / inbox / app shell" | `taste-skill.md` **Brief to Design System Map**, then the selected official design system + `layout-skill.md` |
 | "Panel won't scroll / footer pushed off-screen / mobile overflow" | Add `layout-skill.md` to current stack |
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
@@ -236,6 +245,7 @@ This skill adds only the design-taste judgments `/visual-qa` cannot make for you
 
 1. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color a real perceptual ramp (multiple stops / OKLCH, not one tint at varied opacity), render the hero focal object as real dimensional material (a generated bitmap, or real light/shadow/gradient/depth — never flat geometric primitives), and add the one signature moment. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work.
 2. **Motion serves meaning; slop animation is forbidden.** Every interactive element must communicate its affordance and state changes — but a hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop. Do not add it, and treat any you find as a defect. The hero may carry one signature moment; the rest of the surface earns motion only where it signals interaction or state.
+3. **Structure and proof survive styling.** For an eligible page, the current Page Structure row, DOM order, dominant composition, nav/footer behavior, and responsive captures agree. Comparable routes do not become unexplained color-only variants, and every proof-shaped claim traces to an approved input.
 
 Report "done" only when `/visual-qa` has passed on fresh evidence AND neither a visual bug nor a floor-level or slop-laden surface remains.
 

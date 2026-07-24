@@ -14,6 +14,7 @@ This file is a router, not a rulebook. The rules live in four rulesets under `re
 | Request involves… | Read |
 |---|---|
 | ANY UI implementation, styling, redesign, mockup, or visual decision | `references/design/README.md` FIRST. It enforces two mandatory gates — the Design System Gate (a `DESIGN.md` must exist before any component is written) and the React Dev Tooling Gate (react-grab / react-scan / react-doctor installed by default) — then routes to the taste and brand references below. |
+| A new or substantially restructured multi-section marketing, editorial, portfolio, or discovery page without a user-supplied exact visual reference | ALSO `references/design/composition-skill.md`. Describe the approved content decision path, dominant composition, nav/footer voice, proof basis, and comparable-route rationale in the `DESIGN.md` Page Structure row. Keep the outcome aligned as concepts evolve. Component-only work, app shells, and exact-reference reproduction are exempt; an intentional template family may share one documented row. |
 | Writing or modifying frontend code, OR auditing performance / SEO / accessibility / quality | ALSO `references/perfection/README.md`. Lighthouse 100 in every category, measured on real Playwright Chromium (never the `lighthouse` CLI), achieved through architecture — never by dropping animations or hiding content. |
 | Looking up a concrete style, color palette, font pairing, chart type, landing-page structure, or UX guideline — or generating a project design system from keywords | `references/ui-ux-db/README.md`. A searchable CSV database with a CLI; a lookup tool, not a posture. Load on demand; `design` stays the source of truth for taste and the `DESIGN.md` contract. |
 | ANY implementation or redesign that creates or updates `DESIGN.md` — plus explicit operating-layer asks (personas, critique, debt, handoff, synthetic user testing) | `references/designpowers/README.md` + `references/designpowers/lane-c-review.md`. An internal frontend ruleset, not a separate skill: lane-c is the Phase Final flatness/critique reviewer, and its accessibility-constraints and accepted-debt language fills the required `DESIGN.md` sections. Load other lanes only when their phase applies. |
@@ -28,25 +29,33 @@ Every implementation must choose one of these branches before UI code changes:
    - **Static visual reference** (screenshot, generated mockup, Stitch/Imagen output, Figma export, overview, or annotated packet): load `references/design/image-to-code-skill.md` plus the relevant design/perfection files, extract the reference's exact tokens, layout geometry, copy, spacing, states, and responsive intent into `DESIGN.md`, then implement reusable primitives against that contract.
    - **Live site or URL reference** (the user names a site to clone or gives a URL): load `references/design/clone-from-url.md`. Drive a real browser and extract the runtime truth via `getComputedStyle` — tokens, layout geometry, default/hover/focus/active states, transitions and keyframes, and downloaded assets — into `DESIGN.md`, then clone-code reusable primitives against that contract.
    Final QA for both runs `/visual-qa` in reference-fidelity mode: compare the actual UI against the reference pixel-by-pixel and verify the code is an extensible design-system implementation, not a screenshot-matched one-off.
-2. **Greenfield or fresh setup:** if the user gave no concrete visual reference, design research is a build step with named deliverables — not exploration to be budgeted. Exploration-stop instincts ("enough exploration", two-wave caps) do not apply here. Fire every research lane IN PARALLEL before `DESIGN.md` is written, and open `DESIGN.md` with a `## 0. Research Log` section recording each lane's deliverable — a lane with no Research Log line did not run. Skip a lane only when its tool or network is genuinely unavailable, and name the skip in `DESIGN.md`:
-   - **Embedded references:** use `references/design/_INDEX.md` to shortlist 2-3 plausible Layer B references, then read exactly one Layer A style skill and one Layer B reference in full — every line, no partial reads (they are 200-500 lines; a sliced read produces the flattened token set this gate exists to prevent). Log the shortlist, the pick, and why. Use `open-design` only when the curated set has no fit; add `ui-ux-db` lookups for palette/type/domain questions.
-   - **Lazyweb real-product screens:** READ `references/design/lazyweb.md` FIRST and run its recipe verbatim — do not improvise curl calls against lazyweb.com; the recipe mints its own anonymous token. Log the queries run, how many screens you actually VIEWED, and the layout grammar harvested — never pixel copies.
-   - **Imagen concept drafts:** generate 2-3 imagen concept drafts, each seeded with the loaded Layer A + Layer B tokens (palette, type, material); pick the strongest and treat the chosen draft as the reference-fidelity contract. Log the draft paths and the pick.
-   Synthesize every lane into `DESIGN.md`. Treat sources as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions, then recombine them into project-specific primitives. Before laying out sections, inventory the content blocks and assign each a job — hook, explain, prove, compare, convert, navigate, retain — then order sections by the visitor's decision path, not by visual symmetry. Never freestyle past the selected references, never copy logos or brand-specific copy. Then run the Primitive Showcase Gate (`references/design/README.md` Phase 0) before any product screen.
-3. **Existing project with `DESIGN.md` or a component system:** read it, follow it, and update it before implementation only when the requested work needs a new token, primitive, state, motion rule, accessibility constraint, accepted debt, or reference-fidelity requirement.
+2. **Greenfield or fresh setup:** if the user gave no concrete visual reference, design research is a build step with named deliverables. Route by surface, run the applicable lanes in parallel before `DESIGN.md` is written, and open `DESIGN.md` with a `## 0. Research Log` section recording each deliverable. Skip a lane only when its tool or network is genuinely unavailable, and name the skip in `DESIGN.md`:
+   - **Embedded references:** for marketing, editorial, portfolio, and discovery surfaces, use `references/design/_INDEX.md` to shortlist 2-3 plausible Layer B references, then read exactly one Layer A style skill and one Layer B reference in full. For dashboards and other operational product UI, use the `taste-skill.md` **Brief to Design System Map** only to choose an official design system, then follow that system and `layout-skill.md`. After built-in OMO curation, query a configured local Open Design service through its `od` CLI or MCP only when no suitable built-in fit exists or the user explicitly requests Open Design. If the integration is unavailable, state that boundary and use the closest curated fallback. Add `ui-ux-db` lookups for palette, type, or domain questions.
+   - **Lazyweb real-product screens:** for applicable marketing, editorial, portfolio, and discovery work, read `references/design/lazyweb.md` first and follow its recipe. Log the queries, screens actually viewed, and layout grammar harvested without copying pixels.
+   - **Content and composition outcome:** inventory approved content and proof inputs, understand each block's role in the visitor's decision path, and use `references/design/composition-skill.md` for applicable multi-section pages. The Section 4 row makes sequence, dominant spatial relationship, nav/footer voice, proof basis, and comparable-route reasoning visible without prescribing a fixed catalog. Keep it current when a concept legitimately changes the composition.
+   - **Imagen concept drafts:** for an applicable expressive page, generate 2-3 drafts from the research outcomes and the selected Layer A and Layer B tokens. Pick the strongest and treat it as the reference-fidelity contract. Log the draft paths and the pick.
+   Synthesize each applicable lane into `DESIGN.md`. Treat sources as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions, then recombine them into project-specific primitives. Order approved content by the visitor's decision path, never invent proof to complete a layout, and never copy logos or brand-specific copy. Then run the Primitive Showcase Gate in `references/design/README.md` before any product screen.
+3. **Existing project with `DESIGN.md` or a component system:** read it, follow it, and update it before implementation only when the requested work needs a new token, primitive, state, motion rule, accessibility constraint, accepted debt, reference-fidelity requirement, or applicable Page Structure outcome.
 4. **Existing project with UI but no `DESIGN.md` and no reusable component layer:** STOP and ask the user one focused question: should you preserve the current look with copy-nearby styling, or extract a real `DESIGN.md` plus reusable components before continuing? Do not silently choose.
 
 For implementation, redesign, or design-system work that creates or updates `DESIGN.md`, `references/designpowers/README.md` + `lane-c-review.md` are part of the default load — feed their personas, accessibility, critique, debt, handoff, and role-reference guidance into the branch above. The resulting `DESIGN.md` is the implementation contract: tokens, typography, spacing, primitives, motion, responsive behavior, accessibility constraints, and accepted debt must be named there before code uses them. Verify component primitives, states, and final screens with real visual QA evidence; pass design-system decisions, implementation evidence, and unresolved debt into `/review-work` for significant implementation work.
 
 ## Ruleset 1 — design (`references/design/`)
 
-The reference library has one architecture file, 12 taste skills (Layer A — *how to execute*), and 70 brand design systems (Layer B — *what it should look like*). Most non-trivial tasks load **one Layer A + one Layer B**. `README.md` carries the full routing flow, stacking rules, anti-patterns, and the mandatory browser-based Design QA phase; `_INDEX.md` catalogs all 83 files with mood-to-brand mappings — read it whenever routing is not obvious from the tables below.
+The visual reference library has one architecture file, 12 taste skills (Layer A: *how to execute*), and 70 brand design systems (Layer B: *what it should look like*), plus project-original structural mechanics. Most non-trivial marketing, editorial, portfolio, and discovery tasks load **one Layer A + one Layer B**. Operational product UI uses the `taste-skill.md` **Brief to Design System Map** only, then follows the selected official design system with `layout-skill.md`. `README.md` carries the routing and QA contract; `_INDEX.md` catalogs the choices.
 
 ### Layer 0 — architecture
 
 | File | Read when |
 |---|---|
 | `design-system-architecture.md` | The project has no `DESIGN.md` (defines the structure you must create first — 8 sections plus a greenfield-only `## 0. Research Log`), or you are extracting a design system from existing UI code. |
+
+### Project-original structural mechanics
+
+| File | Read when |
+|---|---|
+| `composition-skill.md` | A new or substantially restructured multi-section marketing, editorial, portfolio, or discovery page has no user-supplied exact visual reference, or a comparable sibling risks becoming a color-only structural clone. It owns page shape and proof inputs, not visual taste. |
+| `layout-skill.md` | An app shell, dashboard, settings surface, inbox, split pane, or other operational UI needs spatial mechanics and scroll ownership. |
 
 ### Layer A — taste skills (pick AT MOST ONE style skill; they encode opposing philosophies)
 
@@ -65,7 +74,7 @@ The reference library has one architecture file, 12 taste skills (Layer A — *h
 
 ### Layer B — brand design systems (orthogonal to Layer A; stack freely)
 
-When the user names a brand or site — "Linear-style", "like Stripe's landing", "Aside-style browser agent" — load `references/design/<brand>.md` as the token source of truth (palette, type scale, components, do/don'ts). Coverage includes `aside` `apple` `stripe` `linear.app` `notion` `vercel` `claude` `figma` `airbnb` `nike` `tesla` `spotify` `raycast` `revolut` and ~56 more; the full list with mood shortcuts is in `_INDEX.md`. Extract the tokens and apply them to the project's own content — never copy logos or trademarked imagery. If the named brand is missing, fall back to a Layer A mood match or the `open-design` skill.
+When the user names a brand or site, load `references/design/<brand>.md` as the token source of truth. Extract its palette, type scale, components, and interaction language, then apply them to the project's own content without copying logos or trademarked imagery. If the named brand is missing, start with a curated Layer A and Layer B mood match. Query a configured local Open Design service through its `od` CLI or MCP only when built-in OMO curation has no suitable fit or the user explicitly requests Open Design.
 
 ### React dev tooling
 
@@ -108,7 +117,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 
 | Request | Load |
 |---|---|
-| "Build a landing page" (no direction given) | `design/README.md` + `design/_INDEX.md` shortlist → exactly one Layer B reference + `design/taste-skill.md` + `perfection/README.md` |
+| "Build a landing page" (no direction given) | `design/README.md` + `design/composition-skill.md` + `design/_INDEX.md` shortlist, then exactly one Layer B reference + `design/taste-skill.md` + `perfection/README.md` |
 | "Aside-style AI browser / browser agent page" | `design/README.md` + `design/aside.md` + `design/taste-skill.md` + `perfection/README.md` |
 | "Linear-style landing page" | `design/README.md` + `design/linear.app.md` + `design/taste-skill.md` + `perfection/README.md` |
 | "Premium SaaS hero like Stripe" | `design/README.md` + `design/stripe.md` + `design/soft-skill.md` + `perfection/README.md` |
@@ -125,6 +134,8 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 
 - **No design system = no UI work.** `DESIGN.md` exists before components do; every color, font size, and spacing value traces back to a token in it.
 - **Concrete reference = contract.** When a screenshot, generated mockup, overview, or annotated reference exists, the implementation must match its pixels, copy, component structure, and responsive intent unless the user explicitly accepts a deviation.
+- **Structure follows the brief.** For an eligible multi-section page, the current Page Structure outcome, DOM order, and responsive captures agree. Comparable routes do not become unexplained copy-and-color variants of one template.
+- **Proof must be real.** Metrics, testimonials, logos, rankings, certifications, and case outcomes trace to user-supplied or cited inputs. Otherwise omit the proof-shaped slot or keep an explicitly labeled non-production placeholder that production removes.
 - **Never weaken UX OR flatten the surface to buy points.** No dropping animations, hiding content, simplifying interactions, or replacing rendered/lit material with flat fills and flat geometric primitives for a Lighthouse score or a deadline. Hit 100 AND keep the surface dimensional — both, or neither.
 - **No emojis as icons.** SVG icon sets only (Lucide, Heroicons, Radix, Phosphor).
 - **GPU-composited animation only** — `transform`, `opacity`, `filter`; never animate layout properties.
@@ -135,7 +146,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 
 | Situation | Load |
 |---|---|
-| Brand/style not among the 70 in `references/design/`, or the user says "Open Design" | `open-design` skill — the local nexu-io/open-design library (137+ design skills, 150+ design systems) |
+| Built-in OMO references have no suitable fit, or the user explicitly requests Open Design | Query a configured local Open Design service through its `od` CLI or MCP inside this frontend route. OMO does not bundle a separate Open Design workflow. If the integration is unavailable, state the boundary and use the closest curated fallback. |
 | Driving a browser for the Design QA phase | `agent-browser` skill |
 | Pure TypeScript/logic work with zero visual surface | `programming` skill alone — this skill adds nothing there |
 

@@ -45,13 +45,14 @@ upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submod
 ```
 
 - The materialized files are GITIGNORED (`skills/frontend/.gitignore`) so they are never committed; a `skills/frontend/.npmignore` overrides that `.gitignore` for npm pack so the materialized refs DO ship. The lazycodex marketplace sync is a raw file copy and ships whatever is on disk after the plugin build materialized it.
-- The §5 project-original design docs (`README.md`, `_INDEX.md`, `aside.md`, `design-system-architecture.md`, `react-dev-tooling-skill.md`) and all of `references/perfection/*` stay committed (un-ignored in `.gitignore`).
+- The section 5 project-original design docs (`README.md`, `_INDEX.md`, `aside.md`, `clone-from-url.md`, `composition-skill.md`, `design-system-architecture.md`, `layout-skill.md`, `lazyweb.md`, `react-dev-tooling-skill.md`) and all of `references/perfection/*` stay committed and unignored.
 - ATTRIBUTION pins each upstream's SHA (`Pinned upstream commit:`); `script/update-frontend-upstreams.mjs` bumps the submodules + rewrites the pins (`--check` verifies pins == submodule HEAD, no network). `provenance-gate.test.ts` fails CI if any third-party path is committed, the materialize set is missing, or a pin drifts. `materialize-frontend-refs.test.ts` covers the allowed `SKILL.md` description quoting normalization.
 - Submodule init is non-fatal ONLY in `script/agent/setup.sh` (offline devs get a working tree minus brand refs); the plugin build chain runs it `--strict` so CI/publish ship a complete package.
 
 ## CONSUMERS
 
 - `skills-loader-core` (`workspace:*`) — default `skillsRootPath` for builtin/shared skill loading.
+- OMO frontend instruction content has one canonical owner here. OpenCode loads it through `skills-loader-core`; the loader core keeps only its byte-equal compatibility artifact.
 - `omo-opencode/src/cli/install-ast-grep-sg.ts` — finds the ast-grep skill dir for binary install.
 - `omo-codex/plugin` (`file:` dep) — `sync-skills.mjs` is the only transformer.
 
