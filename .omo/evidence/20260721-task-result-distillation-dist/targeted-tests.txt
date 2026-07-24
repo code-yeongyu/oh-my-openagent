@@ -1,0 +1,11 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/tools/background-task/task-result-format.test.ts:
+(pass) formatTaskResult > returns assistant session errors instead of masking them as success text [1.62ms]
+(pass) formatTaskResult > returns only the final assistant answer [0.97ms]
+(pass) formatTaskResult > falls back to the last tool text without exposing reasoning blocks [0.30ms]
+
+ 3 pass
+ 0 fail
+ 9 expect() calls
+Ran 3 tests across 1 file. [303.00ms]
