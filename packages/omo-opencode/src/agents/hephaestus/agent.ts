@@ -36,7 +36,17 @@ export class UnsupportedHephaestusModelError extends Error {
 }
 
 function extractModelName(model: string): string {
-  return model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  // 1. Strip provider prefix (e.g. "openai/gpt-5.4" -> "gpt-5.4")
+  let name = model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  // 2. Strip vendor prefix in hosted model IDs (e.g. Bedrock "openai.gpt-5.4" -> "gpt-5.4")
+  //    Only strip if there is a dot AND the part after the last dot looks like a known model name.
+  if (name.includes(".")) {
+    const afterDot = name.substring(name.lastIndexOf(".") + 1);
+    if (/^(gpt|claude|gemini)[.-]/i.test(afterDot)) {
+      name = afterDot;
+    }
+  }
+  return name;
 }
 
 export function isHephaestusSupportedModel(model: string | undefined): boolean {
