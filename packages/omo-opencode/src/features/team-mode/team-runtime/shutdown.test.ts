@@ -409,8 +409,8 @@ describe("team-runtime shutdown", () => {
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
     const removeLayoutMock = mock(async () => ({
-      attemptedPaneIds: ["%11", "%12"],
-      removedPaneIds: ["%11", "%12"],
+      attemptedPaneIds: ["%11", "%12", "%13"],
+      removedPaneIds: ["%11", "%12", "%13"],
       skippedPaneIds: [],
       reason: "removed" as const,
     }))
@@ -427,7 +427,7 @@ describe("team-runtime shutdown", () => {
       ...runtimeState,
       members: runtimeState.members.map((member) => (
         member.name === "member-a"
-          ? { ...member, tmuxPaneId: "%12" }
+          ? { ...member, tmuxPaneId: "%12", tmuxGridPaneId: "%13" }
           : member
       )),
       tmuxLayout: {
@@ -458,7 +458,7 @@ describe("team-runtime shutdown", () => {
           backend: "tmux",
           tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
         },
-        paneIds: ["%11", "%12"],
+        paneIds: ["%11", "%12", "%13"],
       }),
       expect.anything(),
     )

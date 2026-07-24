@@ -10,6 +10,7 @@ import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeS
 import type { RuntimeState } from "../types"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
+import { getTeamLayoutCleanupTarget } from "./team-layout-cleanup-target"
 
 export type DeleteTeamDeps = {
   canVisualize: typeof canVisualize
@@ -165,22 +166,7 @@ async function deleteTeamResources(
     && (hasPersistedExecutionTarget || (config.tmux_visualization && deps.canVisualize()))
   let removedLayout = false
   if (shouldAttemptLayoutCleanup) {
-    const memberPaneIds = runtimeState.members
-      .flatMap((member) => (
-        member.agentType !== "leader" && member.tmuxPaneId
-          ? [member.tmuxPaneId]
-          : []
-      ))
-
-    const cleanupTarget = runtimeState.tmuxLayout
-      ? {
-          ...runtimeState.tmuxLayout,
-          paneIds: Array.from(new Set([
-            ...(runtimeState.tmuxLayout.paneIds ?? []),
-            ...memberPaneIds,
-          ])),
-        }
-      : undefined
+    const cleanupTarget = getTeamLayoutCleanupTarget(runtimeState)
 
     if (options?.force === true) {
       try {
