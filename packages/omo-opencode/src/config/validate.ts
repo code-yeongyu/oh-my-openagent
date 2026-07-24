@@ -176,6 +176,7 @@ function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig 
     goal: {
       enabled: existingGoal?.enabled ?? enabled ?? false,
       auto_start: existingGoal?.auto_start ?? false,
+      ultrawork: existingGoal?.ultrawork ?? false,
       default_max_iterations: existingGoal?.default_max_iterations ?? defaultMaxIterations ?? 100,
     },
   }

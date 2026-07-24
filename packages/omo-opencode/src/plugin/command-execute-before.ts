@@ -1,6 +1,7 @@
 import type { CreatedHooks } from "../create-hooks"
 import { parseGoalCommand } from "../hooks/goal/command-arguments"
 import { log } from "../shared/logger"
+import { checkObjective } from "../hooks/goal/validation"
 import { stopContinuation } from "./stop-continuation"
 
 type CommandExecuteBeforeInput = {
@@ -44,9 +45,12 @@ export function createCommandExecuteBeforeHandler(args: {
     if (hooks.goal && sessionID && normalizedCommand === "goal") {
       const parsed = parseGoalCommand(input.arguments)
       switch (parsed.kind) {
-        case "setObjective":
-          hooks.goal.setGoal(sessionID, parsed.objective)
+        case "setObjective": {
+          const check = checkObjective(parsed.objective)
+          if (check.ok) hooks.goal.setGoal(sessionID, check.objective)
+          else log("[command] /goal not set: invalid objective", { sessionID, reason: check.error })
           break
+        }
         case "setStatus":
           if (parsed.status === "paused") {
             hooks.goal.pauseGoal(sessionID)

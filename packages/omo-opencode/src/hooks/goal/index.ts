@@ -6,9 +6,7 @@ import type { Goal } from "./types"
 
 export type GoalHookOptions = {
   readonly projectDir: string
-  readonly autoStart?: boolean
   readonly ultrawork?: boolean
-  readonly getSessionExists?: (sessionID: string) => Promise<boolean>
 }
 
 export type GoalHook = {
@@ -33,9 +31,23 @@ function getSessionIDFromEvent(properties: unknown): string | undefined {
   return undefined
 }
 
+async function resolveUltraworkPrompt(): Promise<string> {
+  const { getUltraworkMessage } = await import("../keyword-detector/ultrawork")
+  return getUltraworkMessage("sisyphus")
+}
+
+export function shouldActivateUltrawork(
+  ultraworkEnabled: boolean | undefined,
+  goalId: string,
+  activatedGoals: ReadonlySet<string>,
+): boolean {
+  return ultraworkEnabled === true && !activatedGoals.has(goalId)
+}
+
 export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): GoalHook {
   const controller: GoalController = createGoalController({ projectDir: options.projectDir })
   const inFlightContinuations = new Set<string>()
+  const ultraworkActivatedGoals = new Set<string>()
 
   async function handleSessionIdle(sessionID: string): Promise<void> {
     const goal = controller.getGoal(sessionID)
@@ -47,7 +59,11 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     }
     inFlightContinuations.add(sessionID)
     try {
-      const promptText = buildContinuationPrompt(goal)
+      // Activate ultrawork once per goal: its prompt carries an activation banner that must not
+      // repeat on every idle continuation. Later continuations stay in ultrawork via conversation history.
+      const activateUltrawork = shouldActivateUltrawork(options.ultrawork, goal.id, ultraworkActivatedGoals)
+      const ultraworkPrompt = activateUltrawork ? await resolveUltraworkPrompt() : undefined
+      const promptText = buildContinuationPrompt(goal, ultraworkPrompt)
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
         client: ctx.client,
@@ -62,7 +78,14 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
           },
         },
       })
-      if (promptResult.status === "failed" && !isInternalPromptDispatchAccepted(promptResult)) {
+      const dispatchAccepted = promptResult.status !== "failed" || isInternalPromptDispatchAccepted(promptResult)
+      if (activateUltrawork && dispatchAccepted) {
+        // Burn the once-per-goal activation only after the banner-carrying prompt was accepted, so a
+        // failed dispatch (or a resolveUltraworkPrompt import error above) retries ultrawork on the next
+        // idle instead of silently downgrading to a plain continuation.
+        ultraworkActivatedGoals.add(goal.id)
+      }
+      if (!dispatchAccepted) {
         // Log only; the dispatch may still have been accepted by another route.
         // eslint-disable-next-line no-console
         console.warn(`[${HOOK_NAME}] Idle continuation dispatch failed`, promptResult.error)
