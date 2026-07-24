@@ -97,6 +97,7 @@ describe("detectCurrentConfig - single package detection", () => {
 describe("addPluginToOpenCodeConfig - single package writes", () => {
   let testConfigDir = ""
   let testConfigPath = ""
+  let getPluginNameWithVersionSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     testConfigDir = join(tmpdir(), `omo-add-plugin-${Date.now()}-${Math.random().toString(36).slice(2)}`)
@@ -105,9 +106,14 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
     resetConfigContext()
+    // Mock npm dist-tags lookup so tests don't make real network calls that
+    // timeout under CI load. Individual tests override this with version-pinned
+    // expectations when they need to assert on the version-tagged entry.
+    getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent")
   })
 
   afterEach(() => {
+    getPluginNameWithVersionSpy.mockRestore()
     rmSync(testConfigDir, { recursive: true, force: true })
     resetConfigContext()
     delete process.env.OPENCODE_CONFIG_DIR
