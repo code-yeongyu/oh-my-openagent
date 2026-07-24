@@ -16,7 +16,8 @@
 1. WebFetch, 즉흥 curl, 수동 헤더 조합 **시도 금지**
 2. 즉시 다음을 실행:
    ```bash
-   python3 -m engine "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace]
+   python3 -m engine "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace] \
+                              [--no-retry] [--no-extract]
    ```
 3. 종료코드 0(ok) 또는 1(fail) 받은 뒤 판단. trace를 먼저 읽고 재시도 결정.
 4. 실패 시에만 `--trace --json`으로 재호출해서 원인 진단 후 `--device` 또는 `user_hint` 조정.
@@ -135,7 +136,13 @@ result = fetch(
 
 if result.ok:
     print(result.verdict)     # strong_ok | weak_ok
-    html = result.content
+    html = result.content     # raw body — 단, content-rescue가 발동한 경우 구조 텍스트
+    # v0.10.0 content-rescue: PDF 응답은 pypdf 추출 텍스트, visible text가 얇은
+    # SPA 셸은 JSON-LD articleBody / 렌더된 innerText로 대체될 수 있다.
+    # result.extraction_source로 판별: "raw"(원문 그대로) | pdf | json_ld | *+inner_text.
+    # 일반 HTML 성공은 항상 raw. 끄기: enable_extraction=False / --no-extract.
+    # 429/502/503/504는 probe에서 백오프 재시도(Retry-After 반영, 총 10초 캡);
+    # 끄기: enable_retry=False / --no-retry.
 else:
     # Phase 3 수동 개입 (Playwright MCP) 필요 — result.trace로 원인 진단
     pass
