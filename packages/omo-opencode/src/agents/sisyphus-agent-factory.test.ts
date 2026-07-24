@@ -63,6 +63,10 @@ describe("createSisyphusAgent", () => {
           promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-8"],
         },
         {
+          model: "anthropic/claude-opus-5",
+          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-5"],
+        },
+        {
           model: "anthropic/claude-fable-5",
           promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-fable-5"],
         },
@@ -143,12 +147,14 @@ describe("createSisyphusAgent", () => {
       // given
       const opus47Agent = createSisyphusAgent("anthropic/claude-opus-4-7");
       const opus48Agent = createSisyphusAgent("anthropic/claude-opus-4-8");
+      const opus5Agent = createSisyphusAgent("anthropic/claude-opus-5");
       const fable5Agent = createSisyphusAgent("anthropic/claude-fable-5");
       const sonnetAgent = createSisyphusAgent("anthropic/claude-sonnet-4-6");
 
       // then
       expect(opus47Agent.thinking).toBeUndefined();
       expect(opus48Agent.thinking).toBeUndefined();
+      expect(opus5Agent.thinking).toBeUndefined();
       expect(fable5Agent.thinking).toBeUndefined();
       expect(sonnetAgent.thinking).toEqual({
         type: "enabled",

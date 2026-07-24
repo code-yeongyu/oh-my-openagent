@@ -1,0 +1,31 @@
+real-db-session-count-before=21932
+sandbox=/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/opus5-qa.XXXXXX.9hjNk7RXbL
+fake-llm-port=59147
+--- opencode run agent=sisyphus model=openai/claude-opus-5 ---
+sh","timestamp":1784916893965,"sessionID":"ses_06aa9b879ffe7H1X6T1sBFG2qk","part":{"id":"prt_f95566107001dneePTu9ldw3as","reason":"stop","snapshot":"4b825dc642cb6eb9a060e54bf8d69288fbee4904","messageID":"msg_f955648b0001a4Iwce2yTHKy44","sessionID":"ses_06aa9b879ffe7H1X6T1sBFG2qk","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0}}
+
+--- opencode run agent=sisyphus model=openai/claude-opus-4-8 ---
+sh","timestamp":1784916902137,"sessionID":"ses_06aa99735ffeg3cm9W3LEomF53","part":{"id":"prt_f955680f5001v9h1AsWPybGbSf","reason":"stop","snapshot":"b9d4511a0f72d917924feb1ea476240ac10d3482","messageID":"msg_f955669a0001MHfxEiLj80jhA1","sessionID":"ses_06aa99735ffeg3cm9W3LEomF53","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0}}
+
+=== captured requests ===
+total 408
+drwxr-xr-x@  6 yeongyu  wheel    192 Jul 25 03:15 .
+drwxr-xr-x@ 10 yeongyu  wheel    320 Jul 25 03:14 ..
+-rw-r--r--@  1 yeongyu  wheel   2584 Jul 25 03:14 call-01-gpt-5.4-nano.json
+-rw-r--r--@  1 yeongyu  wheel  98960 Jul 25 03:14 call-02-claude-opus-5.json
+-rw-r--r--@  1 yeongyu  wheel   2585 Jul 25 03:14 call-03-gpt-5.4-nano.json
+-rw-r--r--@  1 yeongyu  wheel  97824 Jul 25 03:15 call-04-claude-opus-4-8.json
+opus5-capture=/tmp/opus5-qa/captures/call-02-claude-opus-5.json
+opus48-capture=/tmp/opus5-qa/captures/call-04-claude-opus-4-8.json
+PASS: opus-5 request carries Opus 5 identity
+PASS: opus-5 request carries delegation cap
+PASS: opus-5 request carries closing tone_preference
+PASS: opus-5 request carries over-verification counter
+PASS: opus-5 request does NOT carry 4.8 identity
+PASS: opus-4-8 request still carries 4.8 identity
+PASS: opus-4-8 request does NOT carry Opus 5 identity
+PASS: opus-4-8 request keeps its delegate-bias line
+real-db-session-count-after=21932
+PASS: real opencode DB untouched
+sandbox-removed=/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/opus5-qa.XXXXXX.9hjNk7RXbL
+QA_RESULT=PASS
