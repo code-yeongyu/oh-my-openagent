@@ -54,6 +54,7 @@ export type LocalMcpConfig = {
   type: "local"
   command: string[]
   enabled: boolean
+  cwd?: string
   environment?: Record<string, string>
 }
 
@@ -142,6 +143,7 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
     type: "local",
     command: resolvedCommand.command,
     enabled: resolvedCommand.exists,
+    cwd,
     environment: {
       LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.map((configPath) => resolve(cwd, configPath)).join(delimiter),
       LSP_TOOLS_MCP_USER_CONFIG: resolve(configDir, "lsp.json"),
