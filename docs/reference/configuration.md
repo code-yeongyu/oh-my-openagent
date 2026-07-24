@@ -623,6 +623,8 @@ Force-enable session notifications:
 
 `force_enable` (`false`) - force session-notification even if external notification plugins are detected.
 
+OpenCode also has native TUI Attention notifications in `tui.json`. Use either native Attention or OmO `session-notification` for the same events, not both, or you may receive duplicate desktop notifications. OmO auto-disables `session-notification` when it detects known external notification plugins such as `opencode-notifier`, but native Attention is OpenCode TUI config rather than a plugin entry, so OmO cannot detect it through the plugin list. Keep `session-notification` enabled when you want OmO's richer idle notification body with session title and recent message context; otherwise prefer native Attention for basic TUI notification and sound events.
+
 ### MCPs
 
 Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), and `lsp` (local language-server tools). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
