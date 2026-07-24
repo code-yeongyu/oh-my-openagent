@@ -74,6 +74,16 @@ export function truncateToolResult(partPath: string): {
 		const originalSize = part.state.output.length
 		const toolName = part.tool
 
+		// Non-destructive recovery: preserve the original output in a backup file
+		// before truncating, so it can be recovered via recoverTruncatedOutput().
+		// See issue #1734 — Improvement 1 (non-destructive recovery).
+		const backupPath = `${partPath}.original`
+		try {
+			writeFileSync(backupPath, part.state.output)
+		} catch {
+			// Best-effort backup — truncation proceeds even if backup fails
+		}
+
 		part.truncated = true
 		part.originalSize = originalSize
 		part.state.output = TRUNCATION_MESSAGE
@@ -92,6 +102,17 @@ export function truncateToolResult(partPath: string): {
 		}
 
 		return { success: false }
+	}
+}
+
+
+export function recoverTruncatedOutput(partPath: string): string | null {
+	try {
+		const backupPath = `${partPath}.original`
+		if (!existsSync(backupPath)) return null
+		return readFileSync(backupPath, "utf-8")
+	} catch {
+		return null
 	}
 }
 
