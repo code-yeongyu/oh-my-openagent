@@ -1,21 +1,34 @@
+/// <reference types="bun-types" />
+
 /**
  * Regression test for issue #4027: coordinator agents must not be selectable as
  * subagent targets via task(). Symmetric guard to PR #4065 (team_create caller
  * eligibility) — this covers the TARGET side of delegation.
  */
-const { describe, test, expect } = require("bun:test")
+import { describe, expect, test } from "bun:test"
 
 import { resolveSubagentExecution } from "./subagent-resolver"
 import { COORDINATOR_AGENT_NAMES } from "./constants"
+import type { AgentInfo } from "./subagent-discovery"
 import type { ExecutorContext } from "./executor-types"
+import type { OpencodeClient } from "./types"
 
-function makeCtx(): ExecutorContext {
+function makeCtx(agents: AgentInfo[] = []): ExecutorContext {
+  const client: OpencodeClient = {
+    app: { agents: async () => ({ data: agents }) },
+    config: { get: async () => ({ data: {} }) },
+    session: {
+      abort: async () => ({}),
+      create: async () => ({ data: { id: "unused" } }),
+      get: async () => ({ data: {} }),
+      messages: async () => ({ data: [] }),
+      status: async () => ({ data: {} }),
+    },
+  }
+
   return {
-    client: {
-      app: { agents: async () => ({ data: [] }) },
-      config: { get: async () => ({ data: {} }) },
-    } as unknown as ExecutorContext["client"],
-    manager: {} as unknown as ExecutorContext["manager"],
+    client,
+    manager: {} as ExecutorContext["manager"],
     directory: "/tmp/test",
   }
 }
@@ -138,6 +151,46 @@ describe("coordinator subagent guard (#4027)", () => {
     expect(result.error).toContain("prometheus")
     expect(result.error).toContain("coordinator agent")
     expect(result.agentToUse).toBe("")
+  })
+
+  test("#given subagent_type=plan resolves to a hidden demoted plan #when resolveSubagentExecution is called from a worker #then the coordinator lane is rejected", async () => {
+    //#given
+    const ctx = makeCtx([{ name: "plan", mode: "subagent", hidden: true }])
+    const args = {
+      subagent_type: "plan",
+      prompt: "plan something",
+      load_skills: [],
+      run_in_background: false,
+      description: "test delegation",
+    }
+
+    //#when
+    const result = await resolveSubagentExecution(args, ctx, "hephaestus", "")
+
+    //#then
+    expect(result.error).toContain("plan")
+    expect(result.error).toContain("coordinator agent")
+    expect(result.error).toContain("Prometheus")
+    expect(result.agentToUse).toBe("")
+  })
+
+  test("#given subagent_type=plan resolves to a visible custom subagent #when resolveSubagentExecution is called from a worker #then the coordinator guard does not reject it", async () => {
+    //#given
+    const ctx = makeCtx([{ name: "plan", mode: "subagent" }])
+    const args = {
+      subagent_type: "plan",
+      prompt: "plan something",
+      load_skills: [],
+      run_in_background: false,
+      description: "test delegation",
+    }
+
+    //#when
+    const result = await resolveSubagentExecution(args, ctx, "hephaestus", "")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("plan")
   })
 })
 
