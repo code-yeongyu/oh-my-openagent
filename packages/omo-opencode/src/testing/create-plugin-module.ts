@@ -8,7 +8,7 @@ import { createManagers } from "../create-managers"
 import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "../create-runtime-tmux-config"
 import { createTools } from "../create-tools"
 import { createRuntimeSkillSourceServer, selectRuntimeSecuritySkills } from "../features/opencode-runtime-skills"
-import { initializeOpenClaw } from "../openclaw"
+import { initializeOpenClaw, stopReplyListener } from "../openclaw"
 import { createPluginDispose } from "../plugin-dispose"
 import { createPluginInterface } from "../plugin-interface"
 import { loadPluginConfig } from "../plugin-config"
@@ -65,6 +65,7 @@ export type PluginModuleDeps = {
   recordPluginTelemetry: typeof recordPluginTelemetry
   initI18n: typeof initI18n
   initializeOpenClaw: typeof initializeOpenClaw
+  stopReplyListener: typeof stopReplyListener
   isTmuxIntegrationEnabled: typeof isTmuxIntegrationEnabled
   startTmuxCheck: typeof startTmuxCheck
   createFirstMessageVariantGate: typeof createFirstMessageVariantGate
@@ -97,6 +98,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   recordPluginTelemetry,
   initI18n,
   initializeOpenClaw,
+  stopReplyListener,
   isTmuxIntegrationEnabled,
   startTmuxCheck,
   createFirstMessageVariantGate,
@@ -183,101 +185,126 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)
     deps.setAgentSortOrder(pluginConfig.agent_order)
 
-    if (pluginConfig.openclaw) {
-      await deps.initializeOpenClaw(pluginConfig.openclaw)
-    }
-    if (pluginConfig.team_mode?.enabled) {
-      const teamModeConfig = pluginConfig.team_mode
-      try {
-        const { ensureBaseDirs, resolveBaseDir } = await import("../features/team-mode/team-registry/paths")
-        const { checkTeamModeDependencies } = await import("../features/team-mode/deps")
-        await checkTeamModeDependencies(teamModeConfig)
-        await ensureBaseDirs(resolveBaseDir(teamModeConfig))
-        if (pluginConfig.disabled_skills?.includes("team-mode")) {
-          console.warn(
-            "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
-          )
-        }
-      } catch (error) {
-        if (error instanceof Error) {
-          console.warn("[team-mode] init failed:", error)
-        } else {
-          console.warn("[team-mode] init failed:", String(error))
+    let openClawStarted = false
+    try {
+      if (pluginConfig.openclaw) {
+        openClawStarted = await deps.initializeOpenClaw(pluginConfig.openclaw)
+      }
+
+      if (pluginConfig.team_mode?.enabled) {
+        const teamModeConfig = pluginConfig.team_mode
+        try {
+          const { ensureBaseDirs, resolveBaseDir } = await import("../features/team-mode/team-registry/paths")
+          const { checkTeamModeDependencies } = await import("../features/team-mode/deps")
+          await checkTeamModeDependencies(teamModeConfig)
+          await ensureBaseDirs(resolveBaseDir(teamModeConfig))
+          if (pluginConfig.disabled_skills?.includes("team-mode")) {
+            console.warn(
+              "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
+            )
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            console.warn("[team-mode] init failed:", error)
+          } else {
+            console.warn("[team-mode] init failed:", String(error))
+          }
         }
       }
+
+      const tmuxIntegrationEnabled = deps.isTmuxIntegrationEnabled(pluginConfig)
+      if (tmuxIntegrationEnabled) {
+        deps.startTmuxCheck()
+      }
+      const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
+
+      const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
+      const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
+
+      const firstMessageVariantGate = deps.createFirstMessageVariantGate()
+
+      const tmuxConfig = deps.createRuntimeTmuxConfig(pluginConfig)
+
+      const modelCacheState = deps.createModelCacheState()
+
+      const managers = deps.createManagers({
+        ctx: input,
+        pluginConfig,
+        tmuxConfig,
+        modelCacheState,
+        backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
+        runtimeSkillSourceUrl: runtimeSkillSource?.url,
+      })
+
+      const toolsResult = await deps.createTools({
+        ctx: input,
+        pluginConfig,
+        managers,
+      })
+
+      const hooks = deps.createHooks({
+        ctx: input,
+        pluginConfig,
+        modelCacheState,
+        backgroundManager: managers.backgroundManager,
+        modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
+        monitorManager: managers.monitorManager,
+        isHookEnabled,
+        safeHookEnabled,
+        mergedSkills: toolsResult.mergedSkills,
+        availableSkills: toolsResult.availableSkills,
+      })
+
+      const pluginInterface = deps.createPluginInterface({
+        ctx: input,
+        pluginConfig,
+        firstMessageVariantGate,
+        managers,
+        hooks,
+        tools: toolsResult.filteredTools,
+      })
+
+      const dispose = createPluginDispose({
+        backgroundManager: managers.backgroundManager,
+        skillMcpManager: managers.skillMcpManager,
+        disposeHooks: hooks.disposeHooks,
+        disposeOpenClaw: openClawStarted
+          ? async () => {
+              const result = await deps.stopReplyListener()
+              if (!result.success) {
+                deps.log("[OhMyOpenCodePlugin] stopReplyListener() failed during dispose", result)
+              }
+            }
+          : undefined,
+      })
+
+      const pluginHooks: HooksWithRuntimeLifecycle = {
+        ...pluginInterface,
+
+        "experimental.session.compacting": createSessionCompactingHandler(hooks),
+
+        "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
+
+        dispose: async (): Promise<void> => {
+          runtimeSkillSource?.stop()
+          await dispose()
+        },
+      }
+
+      return pluginHooks
+    } catch (error) {
+      if (openClawStarted) {
+        try {
+          const result = await deps.stopReplyListener()
+          if (!result.success) {
+            deps.log("[OhMyOpenCodePlugin] stopReplyListener() failed after startup failure", result)
+          }
+        } catch (stopError) {
+          deps.log("[OhMyOpenCodePlugin] stopReplyListener() error after startup failure", stopError)
+        }
+      }
+      throw error
     }
-    const tmuxIntegrationEnabled = deps.isTmuxIntegrationEnabled(pluginConfig)
-    if (tmuxIntegrationEnabled) {
-      deps.startTmuxCheck()
-    }
-    const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
-
-    const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
-    const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
-
-    const firstMessageVariantGate = deps.createFirstMessageVariantGate()
-
-    const tmuxConfig = deps.createRuntimeTmuxConfig(pluginConfig)
-
-    const modelCacheState = deps.createModelCacheState()
-
-    const managers = deps.createManagers({
-      ctx: input,
-      pluginConfig,
-      tmuxConfig,
-      modelCacheState,
-      backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
-      runtimeSkillSourceUrl: runtimeSkillSource?.url,
-    })
-
-    const toolsResult = await deps.createTools({
-      ctx: input,
-      pluginConfig,
-      managers,
-    })
-
-    const hooks = deps.createHooks({
-      ctx: input,
-      pluginConfig,
-      modelCacheState,
-      backgroundManager: managers.backgroundManager,
-      modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
-      monitorManager: managers.monitorManager,
-      isHookEnabled,
-      safeHookEnabled,
-      mergedSkills: toolsResult.mergedSkills,
-      availableSkills: toolsResult.availableSkills,
-    })
-
-    const pluginInterface = deps.createPluginInterface({
-      ctx: input,
-      pluginConfig,
-      firstMessageVariantGate,
-      managers,
-      hooks,
-      tools: toolsResult.filteredTools,
-    })
-
-    const dispose = createPluginDispose({
-      backgroundManager: managers.backgroundManager,
-      skillMcpManager: managers.skillMcpManager,
-      disposeHooks: hooks.disposeHooks,
-    })
-
-    const pluginHooks: HooksWithRuntimeLifecycle = {
-      ...pluginInterface,
-
-      "experimental.session.compacting": createSessionCompactingHandler(hooks),
-
-      "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
-
-      dispose: async (): Promise<void> => {
-        runtimeSkillSource?.stop()
-        await dispose()
-      },
-    }
-
-    return pluginHooks
   }
 
   return {

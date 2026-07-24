@@ -10,8 +10,9 @@ export function createPluginDispose(args: {
     disconnectAll: () => Promise<void>
   }
   disposeHooks: () => void
+  disposeOpenClaw?: () => Promise<void>
 }): PluginDispose {
-  const { backgroundManager, skillMcpManager, disposeHooks } = args
+  const { backgroundManager, skillMcpManager, disposeHooks, disposeOpenClaw } = args
   let disposePromise: Promise<void> | null = null
 
   return async (): Promise<void> => {
@@ -30,6 +31,11 @@ export function createPluginDispose(args: {
         await skillMcpManager.disconnectAll()
       } catch (error) {
         log("[plugin-dispose] skillMcpManager.disconnectAll() error:", error)
+      }
+      try {
+        await disposeOpenClaw?.()
+      } catch (error) {
+        log("[plugin-dispose] disposeOpenClaw() error:", error)
       }
       try {
         disposeHooks()

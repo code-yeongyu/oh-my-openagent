@@ -129,17 +129,18 @@ export async function wakeOpenClaw(
   }
 }
 
-export async function initializeOpenClaw(config: OpenClawConfig): Promise<void> {
+export async function initializeOpenClaw(config: OpenClawConfig): Promise<boolean> {
   const hasReplyListenerCredentials = Boolean(
     config.replyListener?.discordBotToken || config.replyListener?.telegramBotToken,
   )
 
   if (config.enabled && hasReplyListenerCredentials) {
-    await startReplyListener(config)
-    return
+    const result = await startReplyListener(config)
+    return result.success && result.started
   }
 
   await stopReplyListener()
+  return false
 }
 
 export { startReplyListener, stopReplyListener }
