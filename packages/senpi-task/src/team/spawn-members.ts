@@ -130,6 +130,8 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     name: memberTaskName(input.teamRunId, member.name),
     execution_mode: "process",
     run_in_background: true,
+    caller_role: "coordinator",
+    lineage: "known",
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
     ...(extensions !== undefined ? { extensions } : {}),

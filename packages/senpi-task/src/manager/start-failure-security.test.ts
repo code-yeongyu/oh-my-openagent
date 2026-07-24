@@ -153,6 +153,8 @@ describe("TaskManager start failure security", () => {
         prompt: "private prompt payload",
         parent_session_id: "parent-1",
         depth: 1,
+        caller_role: "coordinator",
+        lineage: "known",
         category: "quick",
       })
 
@@ -181,6 +183,8 @@ describe("TaskManager start failure security", () => {
       prompt: "private prompt payload",
       parent_session_id: "parent-1",
       depth: 1,
+      caller_role: "coordinator",
+      lineage: "known",
       category: "quick",
     })
 
@@ -205,6 +209,8 @@ describe("TaskManager start failure security", () => {
       prompt: "private prompt payload",
       parent_session_id: "parent-1",
       depth: 1,
+      caller_role: "coordinator",
+      lineage: "known",
       category: "quick",
     })
 
@@ -236,6 +242,8 @@ describe("TaskManager start failure security", () => {
         prompt: "private prompt payload",
         parent_session_id: "parent-1",
         depth: 1,
+        caller_role: "coordinator",
+        lineage: "known",
         subagent_type: "oracle",
         name: "secure-agent",
         run_in_background: false,

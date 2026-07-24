@@ -1,5 +1,5 @@
 import { createInternalAgentTextPart, getAgentToolRestrictions } from "../../../shared"
-import type { LaunchInput } from "../types"
+import type { LaunchInput, TeamSessionRole } from "../types"
 
 type PromptModel = LaunchInput["model"]
 
@@ -11,6 +11,7 @@ type TaskPromptBodyOptions =
       readonly system: LaunchInput["skillContent"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly teamSessionRole?: TeamSessionRole
     }
   | {
       readonly kind: "resume"
@@ -18,6 +19,7 @@ type TaskPromptBodyOptions =
       readonly model: PromptModel
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly teamSessionRole?: TeamSessionRole
     }
 
 export type TaskPromptBody = {
@@ -56,6 +58,7 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
       question: false,
       ...getAgentToolRestrictions(options.agent, {
         includeTeamToolDenylist: options.includeTeamToolDenylist,
+        teamSessionRole: options.teamSessionRole,
       }),
     },
     parts: [createInternalAgentTextPart(options.prompt)],

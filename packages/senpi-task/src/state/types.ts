@@ -1,3 +1,5 @@
+import type { SpawnCallerRole, SpawnLineage } from "@oh-my-opencode/delegate-core"
+
 export const TASK_STATUSES = [
   "pending",
   "running",
@@ -20,6 +22,7 @@ export const RESIDENCY_STATES = [
 
 export type ResidencyState = (typeof RESIDENCY_STATES)[number]
 export type Messageability = "steer" | "revive" | "not-continuable"
+export type SpawnRole = "worker" | "team_member"
 
 export const RESOLVED_MODEL_SOURCES = ["category", "explicit", "agent"] as const
 
@@ -40,10 +43,11 @@ export type TaskNotification = {
   readonly notification_failed_epoch?: number
 }
 
-export type TaskSpawnSpec = {
-  readonly cwd: string
-  readonly extensions?: readonly string[]
-  readonly member_env?: Readonly<Record<string, string>>
+export type TaskSpawnPolicy = {
+  readonly caller_role: SpawnCallerRole
+  readonly lineage: SpawnLineage
+  readonly caller_max_depth?: number
+  readonly allowed_subagents?: readonly string[]
 }
 
 export type TaskRecordInput = {
@@ -58,6 +62,8 @@ export type TaskRecordInput = {
   readonly resolved_model?: ResolvedModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
+  readonly spawn_role?: SpawnRole
+  readonly spawn_policy?: TaskSpawnPolicy
 }
 
 export type TaskRecord = TaskRecordInput & {
@@ -72,7 +78,6 @@ export type TaskRecord = TaskRecordInput & {
   // reconciliation, so cross-process session starts never falsely mark live in-process children lost.
   readonly host_pid?: number
   readonly child_session_id?: string
-  readonly spawn_spec?: TaskSpawnSpec
   readonly final_response?: string
   readonly error_message?: string
   // Set true when the terminal error was an external kill / exit-by-signal (todo-8 kill contract); a

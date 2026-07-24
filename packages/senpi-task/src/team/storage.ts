@@ -1,5 +1,4 @@
-import { mkdir } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import {
   getInboxDir,
@@ -9,6 +8,7 @@ import {
 } from "@oh-my-opencode/team-core/team-registry"
 
 import { resolveStateDir } from "../store"
+import { ensurePrivateDirectory } from "../store/state-permissions"
 import type { StateDirConfig } from "../store"
 
 export type TeamRuntimeDirs = {
@@ -52,10 +52,14 @@ export async function ensureTeamRuntimeDirs(
   memberNames: readonly string[],
 ): Promise<TeamRuntimeDirs> {
   const dirs = resolveTeamRuntimeDirs(config, teamRunId)
-  await mkdir(dirs.runtimeDir, { recursive: true, mode: 0o700 })
-  await mkdir(dirs.tasksDir, { recursive: true, mode: 0o700 })
+  ensurePrivateDirectory(dirs.baseDir)
+  ensurePrivateDirectory(dirname(dirs.runtimeDir))
+  ensurePrivateDirectory(dirs.runtimeDir)
+  ensurePrivateDirectory(dirs.tasksDir)
   for (const memberName of memberNames) {
-    await mkdir(resolveTeamMemberInboxDir(config, teamRunId, memberName), { recursive: true, mode: 0o700 })
+    const inboxDir = resolveTeamMemberInboxDir(config, teamRunId, memberName)
+    ensurePrivateDirectory(dirname(inboxDir))
+    ensurePrivateDirectory(inboxDir)
   }
   return dirs
 }

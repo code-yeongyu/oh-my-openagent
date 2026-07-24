@@ -372,7 +372,12 @@ describe("deleteTeam", () => {
     const runtimeDir = resolveTeamRuntimeDirs(stateDir, created.runtimeState.teamRunId).runtimeDir
 
     // when
-    const result = await deleteTeam(created.runtimeState.teamRunId, { manager, stateDir, taskSettings: settings })
+    const result = await deleteTeam(created.runtimeState.teamRunId, {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      callerSessionId: "lead-session",
+    })
 
     // then
     expect([...result.cancelledTaskIds].sort()).toEqual(["st_000001", "st_000002"])
@@ -393,7 +398,12 @@ describe("deleteTeam", () => {
     const seeded = await createRuntimeState(spec, "lead-session", "project", config)
 
     // when
-    const attempt = deleteTeam(seeded.teamRunId, { manager, stateDir, taskSettings: settings })
+    const attempt = deleteTeam(seeded.teamRunId, {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      callerSessionId: "lead-session",
+    })
 
     // then
     await expect(attempt).rejects.toMatchObject({ code: "invalid_delete_state" })
@@ -415,10 +425,20 @@ describe("deleteTeam", () => {
       leadSessionId: "lead-session",
       spawnDepth: 1,
     })
-    await deleteTeam(created.runtimeState.teamRunId, { manager, stateDir, taskSettings: settings })
+    await deleteTeam(created.runtimeState.teamRunId, {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      callerSessionId: "lead-session",
+    })
 
     // when
-    const second = await deleteTeam(created.runtimeState.teamRunId, { manager, stateDir, taskSettings: settings })
+    const second = await deleteTeam(created.runtimeState.teamRunId, {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      callerSessionId: "lead-session",
+    })
 
     // then
     expect(second.cancelledTaskIds).toEqual([])

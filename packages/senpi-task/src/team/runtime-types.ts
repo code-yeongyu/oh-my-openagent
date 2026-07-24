@@ -13,6 +13,7 @@ export type SenpiTeamRuntimeErrorCode =
   | "member_start_rejected"
   | "create_deadline_exceeded"
   | "invalid_delete_state"
+  | "foreign_lead"
   | "sidecar_write_failed"
 
 /**
@@ -36,7 +37,7 @@ export class SenpiTeamRuntimeError extends Error {
 // this structurally; kept narrow so the runtime never reaches past start/cancel/read.
 export type TeamRuntimeManagerPort = {
   start(spec: ManagerStartSpec): Promise<StartResult>
-  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
+  cancelTask(idOrName: string, reason?: string, callerSessionId?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   getResidentHandle(taskId: string): { readonly sessionId: string | undefined } | undefined
 }
@@ -86,6 +87,7 @@ export type CreateTeamResult = {
 
 export type DeleteTeamDeps = {
   readonly manager: Pick<TeamRuntimeManagerPort, "cancelTask">
+  readonly callerSessionId: string
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
 }

@@ -29,13 +29,11 @@ export const LEAD_SCRIPT = {
     toolCall("task_update", { team_run_id: "__TEAM_RUN_ID__", task_id: "__TASK_ID__", status: "claimed" }),
     toolCall("task_update", { team_run_id: "__TEAM_RUN_ID__", task_id: "__TASK_ID__", status: "in_progress" }),
     toolCall("task_update", { team_run_id: "__TEAM_RUN_ID__", task_id: "__TASK_ID__", status: "completed" }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: { type: "shutdown_request", reason: "quick finished the e2e work" } }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: { type: "shutdown_response", request_id: "ignored-by-senpi", approve: true } }),
-    toolCall("task_output", { name: "team:__TEAM_RUN_ID__:quick", mode: "status", block: false }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_request", reason: "fixture shutdown probe" } }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_response", request_id: "ignored-by-senpi", approve: false, reason: "keep working on the e2e task" } }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_request", reason: "fixture cleanup after rejection proof" } }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_response", request_id: "ignored-by-senpi", approve: true } }),
+    toolCall("task_output", { name: "team:__TEAM_RUN_ID__:fixture", mode: "status", block: false }),
     text("lead e2e lifecycle drive complete"),
   ],
   quick: [
@@ -44,7 +42,7 @@ export const LEAD_SCRIPT = {
     text("quick member work complete"),
     { type: "hang" },
   ],
-  fixture: [text("fixture member acknowledged")],
+  fixture: [{ type: "hang" }],
 }
 
 export const DURA_REVIVE_SCRIPT = {

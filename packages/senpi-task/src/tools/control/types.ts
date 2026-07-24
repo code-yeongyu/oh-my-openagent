@@ -4,6 +4,7 @@ import type { TaskManager } from "../../manager"
 import type { TaskStatus } from "../../state"
 import type { SenpiShutdownErrorCode } from "../../team"
 import type { TeamSendDetails } from "../team/messaging"
+import type { ContinuationOwnershipDenial } from "../../steering"
 
 // The minimal read of the harness context the control tools need to name the calling session. The
 // W1-V scope guard is fail-open without a caller id, so the tool layer resolves and passes it on
@@ -24,10 +25,11 @@ export type SendResultDetails =
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
-  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly ownership_reason?: ContinuationOwnershipDenial; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string; readonly known_tasks: readonly string[] }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
   | { readonly kind: "interrupted"; readonly task_id: string; readonly previous_status: TaskStatus }
+  | { readonly kind: "unmanaged_live_process"; readonly task_id: string; readonly pid: number; readonly reason: string }
   | { readonly kind: "noop"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string }
   | { readonly kind: "team_message"; readonly team: TeamSendDetails }
   | { readonly kind: "shutdown_requested"; readonly team_run_id: string; readonly member: string }
@@ -43,8 +45,10 @@ export type SendResultDetails =
 
 export type CancelResultDetails =
   | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus }
+  | { readonly kind: "unmanaged_live_process"; readonly task_id: string; readonly pid: number; readonly reason: string }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly ownership_reason?: ContinuationOwnershipDenial; readonly reason: string }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
 
 export type SendToolResult = AgentToolResult<SendResultDetails>

@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
+import { assertContinuationOwnership } from "../../shared/continuation-ownership"
 
 export async function createOrGetSession(
   args: CallOmoAgentArgs,
@@ -25,6 +26,11 @@ export async function createOrGetSession(
       log(`[call_omo_agent] Session get error:`, sessionResult.error)
       throw new Error(`Failed to get existing session: ${sessionResult.error}`)
     }
+    assertContinuationOwnership({
+      callerSessionID: toolContext.sessionID,
+      targetSessionID: args.session_id,
+      ownerSessionID: sessionResult.data?.parentID,
+    })
     return { sessionID: args.session_id, isNew: false }
   } else {
     log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)

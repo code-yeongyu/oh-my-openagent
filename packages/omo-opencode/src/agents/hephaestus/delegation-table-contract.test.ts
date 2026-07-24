@@ -7,6 +7,8 @@ import type {
 	AvailableSkill,
 } from "../dynamic-agent-prompt-builder";
 import { buildGpt55SisyphusPrompt } from "../sisyphus/gpt-5-5";
+import { buildHephaestusPrompt as buildGptHephaestusPrompt } from "./gpt";
+import { buildHephaestusPrompt as buildGpt54HephaestusPrompt } from "./gpt-5-4";
 import { buildGpt55HephaestusPrompt } from "./gpt-5-5";
 import { buildGpt56HephaestusPrompt } from "./gpt-5-6";
 
@@ -119,7 +121,15 @@ const AVAILABLE_CATEGORIES: AvailableCategory[] = [
 ];
 
 const PROMPT_BUILDERS = [
-	{
+  {
+    name: "GPT",
+    build: buildGptHephaestusPrompt,
+  },
+  {
+    name: "GPT-5.4",
+    build: buildGpt54HephaestusPrompt,
+  },
+  {
 		name: "GPT-5.5",
 		build: buildGpt55HephaestusPrompt,
 	},
@@ -141,10 +151,10 @@ function extractDelegationAgentNames(prompt: string): Set<string> {
 }
 
 for (const { name, build } of PROMPT_BUILDERS) {
-	describe(`${name} Hephaestus generated prompt`, () => {
-		test("renders exactly the direct-agent allowlist", () => {
-			// given: direct agents, planning agents, and an arbitrary future agent are available
-			const prompt = build(
+  describe(`${name} Hephaestus generated prompt`, () => {
+    test("does not advertise direct-agent delegation", () => {
+      // given: direct agents are available to the prompt builder
+      const prompt = build(
 				AVAILABLE_AGENTS,
 				[],
 				AVAILABLE_SKILLS,
@@ -152,15 +162,13 @@ for (const { name, build } of PROMPT_BUILDERS) {
 				false,
 			);
 
-			// then: the rendered table contains the complete direct-agent set and nothing else
-			expect(extractDelegationAgentNames(prompt)).toEqual(
-				new Set(["explore", "librarian", "oracle"]),
-			);
-		});
+      // then: worker admission remains authoritative
+      expect(extractDelegationAgentNames(prompt)).toEqual(new Set());
+    });
 
-		test("preserves category and Oracle guidance outside the table", () => {
-			// given: the generated prompt includes category and Oracle inputs
-			const todoPrompt = build(
+    test("does not advertise category or Oracle delegation", () => {
+      // given: category and Oracle inputs are available to the prompt builder
+      const todoPrompt = build(
 				AVAILABLE_AGENTS,
 				[],
 				AVAILABLE_SKILLS,
@@ -168,11 +176,10 @@ for (const { name, build } of PROMPT_BUILDERS) {
 				false,
 			);
 
-			// then: filtering the table does not remove separate delegation surfaces
-			expect(todoPrompt).toContain("### Category + Skills Delegation System");
-			expect(todoPrompt).toContain("`deep`");
-			expect(todoPrompt).toContain("<Oracle_Usage>");
-		});
+      // then: no delegation surface is rendered for a worker
+      expect(todoPrompt).not.toContain("### Category + Skills Delegation System");
+      expect(todoPrompt).not.toContain("<Oracle_Usage>");
+    });
 
 		test("preserves the selected tracking tool", () => {
 			// given: the same generated prompt with each supported tracking mode

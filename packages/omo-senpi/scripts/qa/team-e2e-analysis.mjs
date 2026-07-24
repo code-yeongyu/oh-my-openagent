@@ -24,9 +24,9 @@ export async function analyzeMain(run, sandbox, obsDir) {
   const teamEnqueues = teamMessageEnqueues(send)
   const shutdownRequests = shutdownDetails(send, "shutdown_requested")
   const shutdownResponses = shutdownDetails(send, "shutdown_responded")
-  const approvedQuick = shutdownResponses.some((details) => details.member === "quick" && details.approved === true)
+  const approvedFixture = shutdownResponses.some((details) => details.member === "fixture" && details.approved === true)
   const rejectedFixture = shutdownResponses.some((details) => details.member === "fixture" && details.approved === false)
-  const quickCancelled = outputSnapshots.some((snapshot) => snapshot.name === `team:${runId}:quick` && snapshot.status === "cancelled")
+  const fixtureCancelled = outputSnapshots.some((snapshot) => snapshot.name === `team:${runId}:fixture` && snapshot.status === "cancelled")
   const waitMessageId = waited?.details?.message_id
   const quickTask = runId === undefined ? undefined : memberTaskId(sandbox.cwd, runId, "quick")
   const leadToQuick = teamEnqueues.find((entry) => entry.recipients.includes("quick"))
@@ -49,8 +49,8 @@ export async function analyzeMain(run, sandbox, obsDir) {
     teamWaitProcessedLedger: evidence.processed,
     teamWaitEventLoggedOnce: evidence.events === 1,
     taskCreateClaimUpdate: taskCreate?.details?.kind === "created" && claimed && completed,
-    shutdownApproved: approvedQuick,
-    shutdown_via_task_send: shutdownRequests.some((details) => details.member === "quick") && approvedQuick && quickCancelled,
+    shutdownApproved: approvedFixture,
+    shutdown_via_task_send: shutdownRequests.some((details) => details.member === "fixture") && approvedFixture && fixtureCancelled,
     rejectRestoredMember: rejectedFixture,
     leadExitClean: run.status === 0,
   }

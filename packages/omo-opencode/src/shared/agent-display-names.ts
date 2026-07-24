@@ -26,6 +26,8 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
+export type AgentDisplayOverrides = Readonly<Record<string, { readonly displayName?: string } | undefined>>
+
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
 const VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX = /^\d+\|/
 const AGENT_WRAPPER_CHARS_REGEX = /^[\\/"']+|[\\/"']+$/g
@@ -119,8 +121,13 @@ function resolveKnownAgentConfigKey(agentName: string): string | undefined {
  * Resolve an agent name (display name or config key) to its lowercase config key.
  * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
  */
-export function getAgentConfigKey(agentName: string): string {
+export function getAgentConfigKey(agentName: string, overrides?: AgentDisplayOverrides): string {
   const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
+  const configuredKey = Object.entries(overrides ?? {}).find(([, override]) => {
+    return override?.displayName !== undefined
+      && stripAgentListSortPrefix(override.displayName).trim().toLowerCase() === lower
+  })?.[0]
+  if (configuredKey !== undefined) return resolveKnownAgentConfigKey(configuredKey) ?? configuredKey.toLowerCase()
   return resolveKnownAgentConfigKey(agentName) ?? lower
 }
 

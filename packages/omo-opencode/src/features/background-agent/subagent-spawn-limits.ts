@@ -1,81 +1,148 @@
-import type { BackgroundTaskConfig } from "../../config/schema"
+import {
+  decideSpawnAdmission,
+  type SpawnPolicyDecision,
+  type SpawnPolicyInput,
+} from "@oh-my-opencode/delegate-core"
+import type { AgentOverrides, BackgroundTaskConfig } from "../../config/schema"
+import type { TeamModeConfig } from "../../config/schema/team-mode"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { getAgentSpawnPolicy } from "../../shared/agent-tool-restrictions"
+import { findResolvedMemberSession } from "../team-mode/member-session-resolution"
+import { lookupTeamSession } from "../team-mode/team-session-registry"
 import type { OpencodeClient } from "./constants"
 
-export const DEFAULT_MAX_SUBAGENT_DEPTH = 3
-
-export interface SubagentSpawnContext {
-  rootSessionID: string
-  parentDepth: number
-  childDepth: number
+export type SpawnAdmissionRequest = {
+  readonly parentSessionID: string
+  readonly parentAgent: string
+  readonly targetAgent: string
 }
 
-export function getMaxSubagentDepth(config?: BackgroundTaskConfig): number {
-  return config?.maxDepth ?? DEFAULT_MAX_SUBAGENT_DEPTH
+export type SubagentSpawnContext = {
+  readonly rootSessionID: string
+  readonly parentDepth: number
+  readonly childDepth: number
+  readonly decision: Extract<SpawnPolicyDecision, { readonly allowed: true }>
 }
 
-export async function resolveSubagentSpawnContext(
+type LineageDiscovery = {
+  readonly lineage: "known" | "unknown" | "cyclic"
+  readonly currentDepth: number
+  readonly rootSessionID: string
+}
+
+export class OpenCodeSpawnAdmissionError extends Error {
+  readonly name = "OpenCodeSpawnAdmissionError"
+
+  constructor(
+    readonly decision: Extract<SpawnPolicyDecision, { readonly allowed: false }>,
+    readonly request: SpawnAdmissionRequest,
+  ) {
+    super(`Subagent spawn denied: ${decision.reason}`)
+  }
+}
+
+export class MissingSpawnCallerIdentityError extends Error {
+  readonly name = "MissingSpawnCallerIdentityError"
+
+  constructor() {
+    super("Subagent spawn denied: trusted caller identity is required")
+  }
+}
+
+export function requireSpawnCallerIdentity(parentAgent: string | undefined): string {
+  const trustedParentAgent = parentAgent?.trim()
+  if (!trustedParentAgent) throw new MissingSpawnCallerIdentityError()
+  return trustedParentAgent
+}
+
+function resolveAgentOverride(agentOverrides: AgentOverrides | undefined, agentName: string) {
+  if (!agentOverrides) return undefined
+  const agentKey = getAgentConfigKey(agentName, agentOverrides)
+  return agentOverrides[agentKey]
+    ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentKey)?.[1]
+}
+
+function intersectAllowedTargets(
+  roleTargets: readonly string[] | undefined,
+  overrideTargets: readonly string[] | undefined,
+  agentOverrides: AgentOverrides | undefined,
+): readonly string[] | undefined {
+  const normalizedRoleTargets = roleTargets?.map((target) => getAgentConfigKey(target, agentOverrides))
+  const normalizedOverrideTargets = overrideTargets?.map((target) => getAgentConfigKey(target, agentOverrides))
+  if (!normalizedRoleTargets) return normalizedOverrideTargets
+  if (!normalizedOverrideTargets) return normalizedRoleTargets
+  const overrideSet = new Set(normalizedOverrideTargets)
+  return normalizedRoleTargets.filter((target) => overrideSet.has(target))
+}
+
+export async function discoverSubagentLineage(
   client: OpencodeClient,
   parentSessionID: string,
-  directory?: string
-): Promise<SubagentSpawnContext> {
+  directory?: string,
+): Promise<LineageDiscovery> {
   const visitedSessionIDs = new Set<string>()
-  let rootSessionID = parentSessionID
   let currentSessionID = parentSessionID
-  let parentDepth = 0
+  let currentDepth = 0
 
   while (true) {
-    if (visitedSessionIDs.has(currentSessionID)) {
-      throw new Error(`Detected a session parent cycle while resolving ${parentSessionID}`)
-    }
-
+    if (visitedSessionIDs.has(currentSessionID)) return { lineage: "cyclic", currentDepth, rootSessionID: parentSessionID }
     visitedSessionIDs.add(currentSessionID)
 
-    let nextParentSessionID: string | undefined
     try {
       const response = await client.session.get({
         path: { id: currentSessionID },
         ...(directory ? { query: { directory } } : {}),
       })
-      if (response.error) {
-        throw new Error(String(response.error))
-      }
-
-      if (!response.data) {
-        throw new Error("No session data returned")
-      }
-
-      nextParentSessionID = response.data.parentID
+      if (response.error || !response.data) return { lineage: "unknown", currentDepth, rootSessionID: parentSessionID }
+      if (!response.data.parentID) return { lineage: "known", currentDepth, rootSessionID: currentSessionID }
+      currentSessionID = response.data.parentID
+      currentDepth += 1
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      throw new Error(
-        `Subagent spawn blocked: failed to resolve session lineage for ${parentSessionID}, so background_task.maxDepth cannot be enforced safely. ${reason}`
-      )
+      if (!(error instanceof Error)) throw error
+      return { lineage: "unknown", currentDepth, rootSessionID: parentSessionID }
     }
-
-    if (!nextParentSessionID) {
-      rootSessionID = currentSessionID
-      break
-    }
-
-    currentSessionID = nextParentSessionID
-    parentDepth += 1
-  }
-
-  return {
-    rootSessionID,
-    parentDepth,
-    childDepth: parentDepth + 1,
   }
 }
 
-export function createSubagentDepthLimitError(input: {
-  childDepth: number
-  maxDepth: number
-  parentSessionID: string
-  rootSessionID: string
-}): Error {
-  const { childDepth, maxDepth, parentSessionID, rootSessionID } = input
-  return new Error(
-    `Subagent spawn blocked: child depth ${childDepth} exceeds background_task.maxDepth=${maxDepth}. Parent session: ${parentSessionID}. Root session: ${rootSessionID}. Continue in an existing subagent session instead of spawning another.`
-  )
+export async function decideOpenCodeSpawnAdmission(input: {
+  readonly client: OpencodeClient
+  readonly directory?: string
+  readonly config?: BackgroundTaskConfig
+  readonly agentOverrides?: AgentOverrides
+  readonly teamModeConfig?: TeamModeConfig
+  readonly request: SpawnAdmissionRequest
+}): Promise<{ readonly decision: SpawnPolicyDecision; readonly lineage: LineageDiscovery }> {
+  const lineage = await discoverSubagentLineage(input.client, input.request.parentSessionID, input.directory)
+  const registeredRole = lookupTeamSession(input.request.parentSessionID)?.role
+  const persistedMember = registeredRole === undefined && input.teamModeConfig?.enabled
+    ? await findResolvedMemberSession(input.request.parentSessionID, input.teamModeConfig, "spawn admission")
+    : null
+  const teamSessionRole = registeredRole ?? (persistedMember === null ? undefined : "member")
+  const rolePolicy = getAgentSpawnPolicy({
+    agentName: input.request.parentAgent,
+    agentOverrides: input.agentOverrides,
+    ...(teamSessionRole ? { teamSessionRole } : {}),
+  })
+  const agentOverride = resolveAgentOverride(input.agentOverrides, input.request.parentAgent)
+  const policyInput = {
+    currentDepth: lineage.currentDepth,
+    lineage: lineage.lineage,
+    callerRole: rolePolicy.callerRole,
+    targetAgent: getAgentConfigKey(input.request.targetAgent, input.agentOverrides),
+    configuredMaxDepth: input.config?.maxDepth,
+    callerMaxDepth: agentOverride?.maxDepth,
+    allowedSubagents: intersectAllowedTargets(rolePolicy.allowedSubagents, agentOverride?.allowedSubagents, input.agentOverrides),
+  } satisfies SpawnPolicyInput
+  return { decision: decideSpawnAdmission(policyInput), lineage }
+}
+
+export async function assertOpenCodeSpawnAdmission(input: Parameters<typeof decideOpenCodeSpawnAdmission>[0]): Promise<SubagentSpawnContext> {
+  const result = await decideOpenCodeSpawnAdmission(input)
+  if (!result.decision.allowed) throw new OpenCodeSpawnAdmissionError(result.decision, input.request)
+  return {
+    rootSessionID: result.lineage.rootSessionID,
+    parentDepth: result.lineage.currentDepth,
+    childDepth: result.decision.childDepth,
+    decision: result.decision,
+  }
 }

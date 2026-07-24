@@ -2,6 +2,7 @@ import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { Message } from "@oh-my-opencode/team-core/types"
 import {
   TEAM_LEAD_SENTINEL,
+  SENPI_TASK_LINEAGE_TASK_ID_ENV,
   WaitRegistry,
   buildLeadTeamTools,
   createLeadDeliveryJournal,
@@ -21,7 +22,7 @@ import {
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { shouldWarnDualConfig } from "./coexistence"
 import { registerTaskCommands } from "./commands"
-import { composeTaskEngine, type TaskEngine } from "./engine"
+import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { detectOpencodeConfig } from "./opencode-config"
@@ -41,10 +42,17 @@ export interface TaskComponentOptions {
   // Project root the task engine anchors its state dir + omo.json load to. Defaults to the senpi
   // launch cwd; injectable so tests never write task state into the repo working tree.
   readonly resolveCwd?: () => string
+  readonly resolveRestrictedChildRuntime?: () => boolean
+  readonly runnerFactories?: TaskRunnerFactories
 }
 
 export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenpiComponent {
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
+  const resolveRestrictedChildRuntime = options.resolveRestrictedChildRuntime ?? (() => (
+    process.env.SENPI_TASK_MEMBER !== undefined
+    || process.env[SENPI_TASK_LINEAGE_TASK_ID_ENV] !== undefined
+    || isRpcChildSessionDirectory(process.env.SENPI_CODING_AGENT_SESSION_DIR)
+  ))
   return {
     name: "task",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
@@ -55,6 +63,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       registerTaskFlags(pi)
       if (pi.getFlag(TASK_ENABLED_FLAG) === false) {
         ctx.logger.info("omo-senpi task component disabled by flag")
+        return
+      }
+      if (resolveRestrictedChildRuntime()) {
+        ctx.logger.info("omo-senpi task component skipped in child runtime")
         return
       }
 
@@ -78,6 +90,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         cwd,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
+        ...(options.runnerFactories !== undefined && { runnerFactories: options.runnerFactories }),
       })
 
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
@@ -97,6 +110,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
     },
   }
+}
+
+function isRpcChildSessionDirectory(sessionDir: string | undefined): boolean {
+  return sessionDir?.split(/[\\/]/).includes("children") ?? false
 }
 
 function registerTaskFlags(pi: SenpiExtensionAPI): void {
@@ -123,6 +140,7 @@ function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine, teamServic
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
+      resolveAncestry: engine.resolveAncestry,
       resolveCallModel: ({ category, model }) => {
         if (category === undefined) return undefined
         const resolution = engine.planner({
@@ -139,7 +157,7 @@ function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine, teamServic
   pi.registerTool({
     ...createTaskSendTool({ manager, resolveCallerSessionId, teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL } }),
   })
-  pi.registerTool({ ...createTaskCancelTool({ manager }) })
+  pi.registerTool({ ...createTaskCancelTool({ manager, resolveCallerSessionId }) })
   pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, waitConfig: engine.settings.wait, resolveCallerSessionId }) })
 }
 

@@ -26,6 +26,7 @@ type RunSpawnInput = {
   readonly signal: AbortSignal | undefined
   readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
   readonly ctx: TaskToolContext
+  readonly parentSessionId: string
 }
 
 function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToolDetails> {
@@ -67,16 +68,22 @@ function buildStartSpec(
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
   const skills = loadSkills(params.load_skills ?? [], cwd)
   const executionMode = resolvedTaskExecutionMode(target, deps)
+  const lineage = ancestry?.lineage ?? "unknown"
+  const callerRole = ancestry?.callerRole ?? "leaf"
   return {
     prompt: skills.prepend + params.prompt,
     parent_session_id: parentSessionId,
     root_session_id: ancestry?.rootSessionId ?? parentSessionId,
     depth: (ancestry?.depth ?? 0) + 1,
+    lineage,
+    caller_role: callerRole,
     ...("category" in target ? { category: target.category } : { subagent_type: target.subagentType }),
     execution_mode: executionMode,
     ...(params.model !== undefined && { model: params.model }),
     ...(params.name !== undefined && { name: params.name }),
     ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),
+    ...(ancestry?.callerMaxDepth !== undefined ? { caller_max_depth: ancestry.callerMaxDepth } : {}),
+    ...(ancestry?.allowedSubagents !== undefined ? { allowed_subagents: ancestry.allowedSubagents } : {}),
   }
 }
 
@@ -147,7 +154,7 @@ async function runSpawn(
   deps: TaskToolDeps,
   input: RunSpawnInput,
 ): Promise<AgentToolResult<TaskToolDetails>> {
-  const { params, signal, onUpdate, ctx } = input
+  const { params, signal, onUpdate, ctx, parentSessionId } = input
   if (signal?.aborted) {
     const reason = "Parent aborted before spawn"
     return result(reason, { task_id: "", status: "cancelled", mode: "spawn", reason })
@@ -250,7 +257,7 @@ async function runSpawn(
   } catch (error) {
     if (!signal?.aborted || error !== signal.reason) throw error
     const reason = "parent turn aborted"
-    await deps.manager.cancelTask(started.task_id, reason)
+    await deps.manager.cancelTask(started.task_id, reason, parentSessionId)
     return result(`Task ${started.task_id} cancelled: ${reason}.${continuationFooter(started.task_id)}`, {
       ...startedDetails(started, params, spec.execution_mode),
       status: "cancelled",
@@ -294,16 +301,17 @@ export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
     }
 
     const first = resolved.items[0]
-    if (first === undefined) return invalidArguments("Provide at least one task item.")
+  if (first === undefined) return invalidArguments("Provide at least one task item.")
+    const parentSessionId = ctx.sessionManager.getSessionId()
     if (resolved.items.length === 1) {
-      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, onUpdate, ctx })
+      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, onUpdate, ctx, parentSessionId })
     }
 
-    const parentSessionId = ctx.sessionManager.getSessionId()
     return executeBatch({
       manager: deps.manager,
       items: resolved.items,
       signal,
+      callerSessionId: parentSessionId,
       runInBackground: params.run_in_background === true,
       startItem: async (item) => {
         const itemParams = singleSpawnParams(item, params.run_in_background)

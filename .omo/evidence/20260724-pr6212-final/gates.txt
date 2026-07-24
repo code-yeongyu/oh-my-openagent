@@ -1,0 +1,35 @@
+PASS: focused OpenCode and Senpi regression suite
+Command:
+`PATH=/home/peacemaker/.bun/bin:$PATH TMPDIR=/dev/shm bun test packages/omo-opencode/src/features/background-agent/manager.test.ts packages/omo-opencode/src/features/background-agent/spawn-admission.test.ts packages/omo-opencode/src/features/background-agent/fallback-admission.test.ts packages/omo-opencode/src/features/team-mode/resolve-caller-team-lead.test.ts packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts packages/omo-opencode/src/features/team-mode/tools/lifecycle.test.ts packages/senpi-task/src/manager/manager-respawn-race.test.ts packages/senpi-task/src/manager/manager-respawn-resolution.test.ts packages/senpi-task/src/team/member-extension/member-identity.test.ts packages/senpi-task/src/team/member-map.test.ts packages/senpi-task/src/team/runtime.test.ts`
+Observed: 290 pass, 0 fail, 862 expectations across 11 files.
+
+PASS: Senpi package gate
+Command: `PATH=/home/peacemaker/.bun/bin:$PATH TMPDIR=/dev/shm bun run test:senpi`
+Observed: 335 pass, 0 fail, 1 snapshot, 1001 expectations across 60 files.
+
+PASS: root typecheck
+Command: `PATH=/home/peacemaker/.bun/bin:$PATH TMPDIR=/dev/shm bun run typecheck`
+Observed: root, script, and all workspace `tsgo --noEmit` checks exited 0.
+
+PASS: root build
+Command: `PATH=/home/peacemaker/.bun/bin:$PATH TMPDIR=/dev/shm bun run build`
+Observed: OpenCode bundle, schemas, Senpi plugin, LSP runtimes, Codex plugin,
+and declarations completed. Generated Codex drift was restored before final
+diff checks.
+
+PASS: clean archive schema and extension freshness
+Command sequence: archive product `887ad66216f801d6e8061b4cf35526deb186f099`,
+run `bun install --frozen-lockfile --ignore-scripts`, save both assets, run
+`bun run build:schema`, `bun run build:omo-schema`, byte-compare saved assets,
+then run `node packages/omo-senpi/plugin/scripts/build-extension.mjs --check`.
+Observed: both schema assets byte-matched; `omo.js` and `omo-member.js` current.
+
+PASS: final diff checks
+Commands: `GIT_MASTER=1 git diff --check`; product path review; status/history
+inspection.
+Observed: no whitespace errors, no forbidden drift, eight commits after base,
+clean worktree after evidence autosquash.
+
+LSP NOTE
+`lsp_diagnostics` rejects sibling-worktree paths. Root and package `tsgo`
+checks cover changed TypeScript surfaces.

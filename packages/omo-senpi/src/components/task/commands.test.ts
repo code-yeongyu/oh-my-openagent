@@ -24,18 +24,20 @@ function listed(records: readonly TaskRecord[]): readonly ListedTask[] {
   return records.map((rec) => ({ record: rec }))
 }
 
-function fakeManager(records: readonly TaskRecord[]): CommandManager & { cancelled: string[] } {
-  const cancelled: string[] = []
+function fakeManager(
+  records: readonly TaskRecord[],
+  cancelOutcome?: CancelOutcome,
+): CommandManager & { cancelled: Array<{ taskId: string; callerSessionId: string | undefined }> } {
+  const cancelled: Array<{ taskId: string; callerSessionId: string | undefined }> = []
   return {
     cancelled,
     list: (scope) => {
       if (scope.scope === "all") return listed(records)
       return listed(records.filter((rec) => rec.parent_session_id === scope.session_id || rec.root_session_id === scope.session_id))
     },
-    cancelTask: (idOrName) => {
-      cancelled.push(idOrName)
-      const outcome: CancelOutcome = { kind: "cancelled", task_id: idOrName, previous_status: "running" }
-      return Promise.resolve(outcome)
+    cancelTask: (idOrName, _reason, callerSessionId) => {
+      cancelled.push({ taskId: idOrName, callerSessionId })
+      return Promise.resolve(cancelOutcome ?? { kind: "cancelled", task_id: idOrName, previous_status: "running" })
     },
   }
 }
@@ -72,7 +74,7 @@ function commandCtx(
     mode,
     hasUI: mode === "tui",
     ui: uiImpl,
-    sessionManager: { getSessionId: () => sessionId ?? "unknown" },
+    ...(sessionId === undefined ? {} : { sessionManager: { getSessionId: () => sessionId } }),
   }
   return { ctx, ui: uiImpl }
 }
@@ -147,7 +149,8 @@ describe("registerTaskCommands", () => {
 
     // then the selector was shown and the chosen task cancelled
     expect(ui.selectCalls).toHaveLength(1)
-    expect(manager.cancelled).toEqual(["st_kill"])
+    expect(manager.cancelled).toEqual([{ taskId: "st_kill", callerSessionId: "session-a" }])
+    expect(ui.notifications).toEqual(["Cancelled st_kill."])
   })
 
   it("#given the selector is dismissed #when /task-kill runs #then nothing is cancelled", async () => {
@@ -180,5 +183,66 @@ describe("registerTaskCommands", () => {
     expect(ui.selectCalls).toHaveLength(0)
     expect(manager.cancelled).toEqual([])
     expect(ui.notifications.join("\n")).toContain("No cancellable")
+  })
+
+  it.each([
+    {
+      label: "ownership denial",
+      outcome: {
+        kind: "scope_denied",
+        task_id: "st_kill",
+        owning_session_id: "session-b",
+        ownership_reason: "foreign_caller",
+        reason: "owned by another session",
+      } satisfies CancelOutcome,
+    },
+    {
+      label: "terminal no-op",
+      outcome: {
+        kind: "noop",
+        task_id: "st_kill",
+        status: "completed",
+        reason: "task already completed",
+      } satisfies CancelOutcome,
+    },
+    {
+      label: "unmanaged process",
+      outcome: {
+        kind: "unmanaged_live_process",
+        task_id: "st_kill",
+        pid: 4321,
+        reason: "task belongs to another process",
+      } satisfies CancelOutcome,
+    },
+  ])("#given $label #when /task-kill confirms #then it reports failure instead of success", async ({ outcome }) => {
+    // given
+    const manager = fakeManager([record({ task_id: "st_kill", status: "running" })], outcome)
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, manager)
+    const { ctx, ui } = commandCtx("session-a", "tui", {
+      select: (_title, options) => Promise.resolve(options[0]),
+    })
+
+    // when
+    await invoke(pi, "task-kill", "", ctx)
+
+    // then
+    expect(ui.notifications).toEqual([outcome.reason])
+    expect(ui.notifications.join("\n")).not.toContain("Cancelled st_kill")
+  })
+
+  it("#given no current session #when /task-kill runs #then it reports missing caller and never cancels", async () => {
+    // given
+    const manager = fakeManager([record({ task_id: "st_kill", status: "running" })])
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, manager)
+    const { ctx, ui } = commandCtx(undefined, "tui")
+
+    // when
+    await invoke(pi, "task-kill", "", ctx)
+
+    // then
+    expect(manager.cancelled).toEqual([])
+    expect(ui.notifications).toEqual(["Cannot cancel task without a current session."])
   })
 })

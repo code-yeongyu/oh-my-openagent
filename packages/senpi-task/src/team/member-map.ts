@@ -20,7 +20,7 @@ export function memberTaskMapPath(runtimeDir: string): string {
 export async function writeMemberTaskMap(runtimeDir: string, map: MemberTaskMap): Promise<void> {
   const target = memberTaskMapPath(runtimeDir)
   const tempPath = `${target}.${process.pid}.${randomUUID()}.tmp`
-  await writeFile(tempPath, `${JSON.stringify(map, null, 2)}\n`, "utf8")
+  await writeFile(tempPath, `${JSON.stringify(map, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
   await rename(tempPath, target)
 }
 

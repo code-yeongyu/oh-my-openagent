@@ -24,7 +24,7 @@ function resolveSenpi() {
 
 async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
   const checks = []
-  const a = driveSenpi(senpiBin, sandbox, sessionDir, SCENARIO_A_STEPS)
+  const a = driveSenpi({ senpiBin, sandbox, sessionDir, parentSteps: SCENARIO_A_STEPS })
   const aEvents = parseEvents(a.stdout)
   const routing = analyzeRpcRouting(readRecords(stateDir))
   checks.push({ check: "process_mode_routes_to_rpc_runner", verdict: routing.routed ? "PASS" : "FAIL", ...(routing.reason && { reason: routing.reason }), facts: routing.facts })

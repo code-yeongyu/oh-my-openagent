@@ -52,7 +52,7 @@ export async function cleanupTeamRunResources(args: {
   for (const resource of [...args.resources].reverse()) {
     if (resource.taskId) {
       try {
-        await args.bgMgr.cancelTask(resource.taskId, {
+        await args.bgMgr.cancelTaskForCleanup(resource.taskId, {
           source: "team-create-rollback",
           reason: "creating_rollback",
           skipNotification: true,

@@ -1,4 +1,6 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
+import type { AgentOverrides, BackgroundTaskConfig } from "../../config/schema"
+import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { LOOK_AT_DESCRIPTION } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log } from "../../shared"
@@ -10,7 +12,16 @@ import { getMissingLookAtFilePath } from "./missing-file-error"
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
-export function createLookAt(ctx: PluginInput): ToolDefinition {
+export type LookAtSpawnAdmissionConfig = {
+  readonly backgroundTaskConfig?: BackgroundTaskConfig
+  readonly agentOverrides?: AgentOverrides
+  readonly teamModeConfig?: TeamModeConfig
+}
+
+export function createLookAt(
+  ctx: PluginInput,
+  spawnAdmissionConfig: LookAtSpawnAdmissionConfig = {},
+): ToolDefinition {
   return tool({
     description: LOOK_AT_DESCRIPTION,
     args: {
@@ -43,6 +54,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           toolContext,
           goal: args.goal,
           inputParts: preparedInput.inputParts,
+          spawnAdmissionConfig,
         })
       } catch (error) {
         const missingFilePath = getMissingLookAtFilePath(error, args)

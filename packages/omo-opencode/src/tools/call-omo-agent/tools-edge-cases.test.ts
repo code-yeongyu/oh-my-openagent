@@ -2,7 +2,7 @@
  * Requirement-based integration tests for createCallOmoAgent edge cases
  * around restricted agent validation and execution cleanup.
  *
- * R1: Spawn reservation is rolled back when execution fails after reservation
+ * R1: Sync execution checks current spawn admission before creating a child
  * R2: Dynamic runtime agents do not expand the call_omo_agent allowlist
  * R3: An agent present in both ALLOWED_AGENTS and runtime results is callable
  * R4: session_id continuation rejects in background mode when session already exists
@@ -30,15 +30,6 @@ const DEFAULT_AGENTS = [
   { name: "librarian", mode: "subagent" },
 ]
 
-const reserveCommitMock = mock(() => 1)
-const reserveRollbackMock = mock(() => {})
-const reserveSubagentSpawnMock = mock(() => Promise.resolve({
-  spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
-  descendantCount: 1,
-  commit: reserveCommitMock,
-  rollback: reserveRollbackMock,
-}))
-
 const toolCtx = {
   sessionID: "test",
   messageID: "msg",
@@ -48,24 +39,14 @@ const toolCtx = {
 
 beforeEach(() => {
   clearCallableAgentsCache()
-  reserveSubagentSpawnMock.mockClear()
-  reserveCommitMock.mockClear()
-  reserveRollbackMock.mockClear()
 })
 
 describe("createCallOmoAgent edge cases", () => {
-  describe("#given spawn reservation succeeds but sync execution fails", () => {
-    test("#then rollback is called to release the reservation", async () => {
+  describe("#given current spawn admission rejects sync execution", () => {
+    test("#then the denial is returned before child execution", async () => {
       const mockCtx = createMockCtx(DEFAULT_AGENTS)
-      reserveSubagentSpawnMock.mockResolvedValueOnce({
-        spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
-        descendantCount: 1,
-        commit: reserveCommitMock,
-        rollback: reserveRollbackMock,
-      })
       const mockManager = {
-        assertCanSpawn: mock(() => Promise.resolve(undefined)),
-        reserveSubagentSpawn: reserveSubagentSpawnMock,
+        assertCanSpawn: mock(() => Promise.reject(new Error("spawn denied"))),
         launch: mock(() => Promise.resolve()),
         getTask: mock(() => undefined),
       }
@@ -82,8 +63,7 @@ describe("createCallOmoAgent edge cases", () => {
         toolCtx,
       )
 
-      expect(reserveRollbackMock).toHaveBeenCalled()
-      expect(result).toContain("Error:")
+      expect(result).toContain("spawn denied")
     })
   })
 
@@ -96,7 +76,6 @@ describe("createCallOmoAgent edge cases", () => {
       const mockCtx = createMockCtx(agents)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),
-        reserveSubagentSpawn: reserveSubagentSpawnMock,
         launch: mock(() => Promise.resolve({
           id: "task-id",
           sessionId: "ses-1",
@@ -133,7 +112,6 @@ describe("createCallOmoAgent edge cases", () => {
       const mockCtx = createMockCtx(agents)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),
-        reserveSubagentSpawn: reserveSubagentSpawnMock,
         launch: mock(() => Promise.resolve({
           id: "task-id",
           sessionId: "ses-1",
@@ -169,7 +147,6 @@ describe("createCallOmoAgent edge cases", () => {
       const mockCtx = createMockCtx(agents)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),
-        reserveSubagentSpawn: reserveSubagentSpawnMock,
         launch: mock(() => Promise.resolve()),
         getTask: mock(() => undefined),
       }
@@ -196,7 +173,6 @@ describe("createCallOmoAgent edge cases", () => {
       const mockCtx = createMockCtx(DEFAULT_AGENTS)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),
-        reserveSubagentSpawn: reserveSubagentSpawnMock,
         launch: mock(() => Promise.resolve()),
         getTask: mock(() => undefined),
       }

@@ -5,6 +5,9 @@ import type { ParentContext } from "./executor-types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
+const admissionManager = unsafeTestValue({
+  assertCanSpawn: async () => ({ rootSessionID: "ses_parent", parentDepth: 0, childDepth: 1 }),
+})
 
 type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
 
@@ -46,6 +49,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
 
       await executeSyncTask(args, ctx, {
         client: { session: { create: async () => ({ data: { id: "ses_sync" } }) } },
+        manager: admissionManager,
         directory: "/tmp",
         onSyncSessionCreated: null,
       }, parentContext, "explore", MODEL, undefined, undefined, undefined, deps)
@@ -222,6 +226,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       await executeSyncContinuation(args, ctx, unsafeTestValue({
         client: {
           session: {
+            get: async () => ({ data: { parentID: "ses_parent" } }),
             messages: async () => ({
               data: [{ info: { agent: "explore", model: MODEL } }],
             }),
@@ -252,6 +257,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       await executeSyncContinuation(args, ctx, unsafeTestValue({
         client: {
           session: {
+            get: async () => ({ data: { parentID: "ses_parent" } }),
             messages: async () => ({
               data: [{ info: { agent: "explore", model: MODEL } }],
             }),
@@ -281,6 +287,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       await executeSyncContinuation(args, ctx, unsafeTestValue({
         client: {
           session: {
+            get: async () => ({ data: { parentID: "ses_parent" } }),
             messages: async () => ({
               data: [{ info: { agent: "explore", model: MODEL } }],
             }),
@@ -315,6 +322,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       await executeSyncContinuation(args, ctx, unsafeTestValue({
         client: {
           session: {
+            get: async () => ({ data: { parentID: "ses_parent" } }),
             messages: async () => ({
               data: [{ info: { agent: "explore", model: MODEL } }],
             }),
@@ -350,6 +358,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
 
       await executeSyncTask(args, ctx, {
         client: { session: { create: async () => ({ data: { id: "ses_sync" } }) } },
+        manager: admissionManager,
         directory: "/tmp",
         onSyncSessionCreated: null,
       }, parentContext, "Sisyphus-Junior", MODEL, undefined, undefined, undefined, deps)
@@ -466,6 +475,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       await executeSyncContinuation(args, ctx, unsafeTestValue({
         client: {
           session: {
+            get: async () => ({ data: { parentID: "ses_parent" } }),
             messages: async () => ({
               data: [{ info: { agent: "explore", model: MODEL } }],
             }),

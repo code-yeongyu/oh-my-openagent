@@ -5,7 +5,7 @@ import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
 import { renderTaskSendCall, renderTaskSendResult } from "./renderers"
-import { invalidArguments, mapSendOutcome, notFound, scopeDenied } from "./send-results"
+import { invalidArguments, mapSendOutcome, notFound } from "./send-results"
 import { isStructuredMessage, TaskSendParams } from "./send-schema"
 import type { TaskSendInput } from "./send-schema"
 import { missingTeamRunId, resolveTeamRunId, routeStructuredMessage } from "./send-shutdown"
@@ -22,7 +22,7 @@ const DESCRIPTION = [
   "Use deliver_as='interrupt' without a message to park a running child as interrupted while keeping its resident session.",
   "A plain-text message to a finished resident child revives that same session as a follow-up; disposed, evicted, or cancelled children are not revived.",
   "Structured shutdown messages are lead-only and route to the team shutdown protocol.",
-  "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
+  "Only the direct parent session may continue a child.",
 ].join(" ")
 
 export type TaskSendDeps = {
@@ -41,9 +41,7 @@ export async function runTaskSend(
   if (validation !== undefined) return validation
 
   if (params.deliver_as === "interrupt") {
-    const denied = scopeDenied(manager, params.to, callerSessionId, params.all_scope)
-    if (denied !== undefined) return denied
-    const outcome = await manager.interruptTask(params.to)
+    const outcome = await manager.interruptTask({ idOrName: params.to, ...(callerSessionId !== undefined ? { callerSessionId } : {}) })
     switch (outcome.kind) {
       case "interrupted":
         return toolResult(`Interrupted ${outcome.task_id}.`, {
@@ -60,6 +58,16 @@ export async function runTaskSend(
         })
       case "not_found":
         return notFound(manager, outcome.reason, callerSessionId)
+      case "scope_denied":
+        return toolResult(outcome.reason, {
+          kind: "scope_denied",
+          task_id: outcome.task_id,
+          owning_session_id: outcome.owning_session_id,
+          ownership_reason: outcome.ownership_reason,
+          reason: outcome.reason,
+        })
+      case "unmanaged_live_process":
+        return toolResult(outcome.reason, outcome)
     }
   }
 
@@ -69,7 +77,6 @@ export async function runTaskSend(
       message: params.message,
       deliverAs: params.deliver_as ?? DEFAULT_SEND_DELIVERY,
       ...(callerSessionId !== undefined ? { callerSessionId } : {}),
-      ...(params.all_scope === true ? { allScope: true } : {}),
     })
 
     if (outcome.kind !== "not_found") return mapSendOutcome(outcome)

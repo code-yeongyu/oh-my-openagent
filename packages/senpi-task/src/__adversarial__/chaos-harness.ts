@@ -140,7 +140,7 @@ function makeClock(): () => number {
 }
 
 function alwaysAlive(): ProcessSignaller {
-  return { isAlive: () => true, signal: () => {} }
+  return { isAlive: () => true }
 }
 
 function singleModelPlanner(): ChildPlanner {

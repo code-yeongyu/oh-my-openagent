@@ -1,6 +1,7 @@
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import type { AgentOverrides, BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import type { TeamModeConfig } from "../../config/schema/team-mode"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import {
   dispatchInternalPrompt,
@@ -32,8 +33,10 @@ import {
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { assertContinuationOwnership, ContinuationOwnershipError } from "../../shared/continuation-ownership"
 import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
+import { lookupTeamSession } from "../team-mode/team-session-registry"
 import { getTaskToastManager } from "../task-toast-manager"
 import { abortWithTimeout } from "./abort-with-timeout"
 import {
@@ -100,9 +103,9 @@ import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
 import { invokeTmuxSessionCreatedCallback } from "./spawner/tmux-callback-invoker"
 import {
-  createSubagentDepthLimitError,
-  getMaxSubagentDepth,
-  resolveSubagentSpawnContext,
+  assertOpenCodeSpawnAdmission,
+  requireSpawnCallerIdentity,
+  type SpawnAdmissionRequest,
   type SubagentSpawnContext,
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
@@ -137,6 +140,13 @@ type ResumeTaskSnapshot = {
   parentTools?: Record<string, boolean>
   concurrencyKey?: string
   concurrencyGroup?: string
+}
+
+type CancelTaskOptions = {
+  readonly source?: string
+  readonly reason?: string
+  readonly abortSession?: boolean
+  readonly skipNotification?: boolean
 }
 
 const TERMINAL_BACKGROUND_TASK_STATUSES = new Set<BackgroundTask["status"]>([
@@ -233,6 +243,8 @@ const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
   config?: BackgroundTaskConfig
+  agentOverrides?: AgentOverrides
+  teamModeConfig?: TeamModeConfig
   tmuxConfig?: TmuxConfig
   onSubagentSessionCreated?: OnSubagentSessionCreated
   onSubagentSessionDeleted?: OnSubagentSessionDeleted
@@ -257,6 +269,8 @@ export class BackgroundManager {
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
+  private agentOverrides?: AgentOverrides
+  private teamModeConfig?: TeamModeConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onSubagentSessionDeleted?: OnSubagentSessionDeleted
@@ -295,6 +309,8 @@ export class BackgroundManager {
     this.directory = pluginContext.directory
     this.concurrencyManager = new ConcurrencyManager(options.config)
     this.config = options.config
+    this.agentOverrides = options.agentOverrides
+    this.teamModeConfig = options.teamModeConfig
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onSubagentSessionDeleted = options?.onSubagentSessionDeleted
@@ -342,28 +358,24 @@ export class BackgroundManager {
     }
   }
 
-  async assertCanSpawn(parentSessionID: string): Promise<SubagentSpawnContext> {
-    const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionID, this.directory)
-    const maxDepth = getMaxSubagentDepth(this.config)
-    if (spawnContext.childDepth > maxDepth) {
-      throw createSubagentDepthLimitError({
-        childDepth: spawnContext.childDepth,
-        maxDepth,
-        parentSessionID,
-        rootSessionID: spawnContext.rootSessionID,
-      })
-    }
-
-    return spawnContext
+  async assertCanSpawn(request: SpawnAdmissionRequest): Promise<SubagentSpawnContext> {
+    return assertOpenCodeSpawnAdmission({
+      client: this.client,
+      directory: this.directory,
+      config: this.config,
+      agentOverrides: this.agentOverrides,
+      teamModeConfig: this.teamModeConfig,
+      request,
+    })
   }
 
-  async reserveSubagentSpawn(parentSessionID: string): Promise<{
+  async reserveSubagentSpawn(request: SpawnAdmissionRequest): Promise<{
     spawnContext: SubagentSpawnContext
     descendantCount: number
     commit: () => number
     rollback: () => void
   }> {
-    const spawnContext = await this.assertCanSpawn(parentSessionID)
+    const spawnContext = await this.assertCanSpawn(request)
     const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
     let settled = false
 
@@ -450,6 +462,8 @@ export class BackgroundManager {
       id: task.id,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
+      teamRunId: task.teamRunId,
+      teamSessionRole: task.teamSessionRole,
       description: task.description,
       prompt: "[redacted]",
       agent: task.agent,
@@ -574,7 +588,12 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required after sanitization")
     }
 
-    const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionId)
+    const parentAgent = requireSpawnCallerIdentity(input.parentAgent)
+    const spawnReservation = await this.reserveSubagentSpawn({
+      parentSessionID: input.parentSessionId,
+      parentAgent,
+      targetAgent: input.agent,
+    })
 
     try {
       log("[background-agent] spawn guard passed", {
@@ -599,6 +618,7 @@ export class BackgroundManager {
         parentSessionId: input.parentSessionId,
         parentMessageId: input.parentMessageId,
         teamRunId: input.teamRunId,
+        teamSessionRole: input.teamSessionRole,
         parentModel: input.parentModel,
         parentAgent: input.parentAgent,
         parentTools: input.parentTools,
@@ -899,7 +919,9 @@ The fallback retry session is now created and can be inspected directly.
       question: false,
       ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
+        agentOverrides: this.agentOverrides,
         includeTeamToolDenylist: input.teamRunId === undefined,
+        teamSessionRole: input.teamSessionRole,
       }),
     }
     setSessionTools(sessionID, launchTools)
@@ -949,8 +971,14 @@ The fallback retry session is now created and can be inspected directly.
           taskId: task.id,
         })
         try {
+          await this.assertCanSpawn({
+            parentSessionID: input.parentSessionId,
+            parentAgent: requireSpawnCallerIdentity(input.parentAgent),
+            targetAgent: FALLBACK_AGENT,
+          })
           const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: input.teamRunId === undefined,
+            teamSessionRole: input.teamSessionRole,
           })
           const fallbackTools = fallbackBody.tools as Record<string, boolean>
           setSessionTools(sessionID, fallbackTools)
@@ -1285,15 +1313,38 @@ The fallback retry session is now created and can be inspected directly.
     return task
   }
 
+  private assertCanResume(existingTask: BackgroundTask, input: ResumeInput): void {
+    if (!existingTask.sessionId) throw new ContinuationOwnershipError("unknown_lineage")
+    const targetTeam = existingTask.teamRunId === undefined
+      ? undefined
+      : lookupTeamSession(existingTask.sessionId)
+    const callerTeam = existingTask.teamRunId === undefined
+      ? undefined
+      : lookupTeamSession(input.parentSessionId)
+    if (existingTask.teamRunId !== undefined && (!targetTeam || !callerTeam)) {
+      throw new ContinuationOwnershipError("stale_registry")
+    }
+
+    assertContinuationOwnership({
+      callerSessionID: input.parentSessionId,
+      targetSessionID: existingTask.sessionId,
+      ownerSessionID: existingTask.parentSessionId,
+      ...(callerTeam ? { callerTeam } : {}),
+      ...(targetTeam ? { targetTeam } : {}),
+    })
+  }
+
   async resume(input: ResumeInput): Promise<BackgroundTask> {
     const existingTask = this.findBySession(input.sessionId)
     if (!existingTask) {
-      throw new Error(`Task not found for session: ${input.sessionId}`)
+      throw new ContinuationOwnershipError("unknown_lineage")
     }
 
     if (!existingTask.sessionId) {
-      throw new Error(`Task has no sessionID: ${existingTask.id}`)
+      throw new ContinuationOwnershipError("unknown_lineage")
     }
+
+    this.assertCanResume(existingTask, input)
 
     if (existingTask.status === "running") {
       throw new Error(
@@ -1321,7 +1372,6 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.status = "running"
     existingTask.completedAt = undefined
     existingTask.error = undefined
-    this.updateTaskParent(existingTask, input.parentSessionId)
     existingTask.parentMessageId = input.parentMessageId
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
@@ -1402,7 +1452,9 @@ The fallback retry session is now created and can be inspected directly.
               call_omo_agent: true,
               question: false,
               ...getAgentToolRestrictions(existingTask.agent, {
+                agentOverrides: this.agentOverrides,
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
+                teamSessionRole: existingTask.teamSessionRole,
               }),
             }
             setSessionTools(existingTask.sessionId!, tools)
@@ -1750,7 +1802,7 @@ The fallback retry session is now created and can be inspected directly.
                 toolName: loopDetection.toolName,
                 repeatedCount: loopDetection.repeatedCount,
               })
-              void this.cancelTask(task.id, {
+              void this.cancelTaskForCleanup(task.id, {
                 source: "circuit-breaker",
                 reason: `Subagent called ${loopDetection.toolName} ${loopDetection.repeatedCount} consecutive times (threshold: ${circuitBreaker.consecutiveThreshold}). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
               })
@@ -1768,7 +1820,7 @@ The fallback retry session is now created and can be inspected directly.
             agent: task.agent,
             sessionID,
           })
-          void this.cancelTask(task.id, {
+          void this.cancelTaskForCleanup(task.id, {
             source: "circuit-breaker",
             reason: `Subagent exceeded maximum tool call limit (${maxToolCalls}). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
           })
@@ -1886,7 +1938,7 @@ The fallback retry session is now created and can be inspected directly.
         parentSessionsToClear.add(task.parentSessionId)
 
         if (task.status === "running" || task.status === "pending") {
-          void this.cancelTask(task.id, {
+          void this.cancelTaskForCleanup(task.id, {
             source: "session.deleted",
             reason: "Session deleted",
           }).then(() => {
@@ -2154,6 +2206,7 @@ The fallback retry session is now created and can be inspected directly.
       idleDeferralTimers: this.idleDeferralTimers,
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
+      admitRetrySpawn: (request) => this.assertCanSpawn(request),
       onRetrying: ({ task, source }) => {
         const currentAttempt = getCurrentAttempt(task)
         const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)
@@ -2362,7 +2415,24 @@ The task was re-queued on a fallback model after a retryable failure.
 
   async cancelTask(
     taskId: string,
-    options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
+    callerSessionID: string | undefined,
+    options?: CancelTaskOptions,
+  ): Promise<boolean> {
+    if (!callerSessionID?.trim()) {
+      return false
+    }
+
+    const task = this.tasks.get(taskId)
+    if (!task || task.parentSessionId !== callerSessionID) {
+      return false
+    }
+
+    return this.cancelTaskForCleanup(taskId, options)
+  }
+
+  async cancelTaskForCleanup(
+    taskId: string,
+    options?: CancelTaskOptions,
   ): Promise<boolean> {
     const task = this.tasks.get(taskId)
     if (!task || (task.status !== "running" && task.status !== "pending")) {
@@ -2466,7 +2536,7 @@ The task was re-queued on a fallback model after a retryable failure.
       return false
     }
 
-    void this.cancelTask(taskId, { source: "cancelPendingTask", abortSession: false })
+    void this.cancelTaskForCleanup(taskId, { source: "cancelPendingTask", abortSession: false })
     return true
   }
 

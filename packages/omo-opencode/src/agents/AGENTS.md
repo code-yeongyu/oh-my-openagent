@@ -37,13 +37,18 @@ Defined in [`src/shared/agent-tool-restrictions.ts`](../shared/agent-tool-restri
 
 | Agent | Denied Tools |
 |-------|-------------|
-| Oracle | write, edit, task, call_omo_agent |
-| Librarian | write, edit, task, call_omo_agent |
-| Explore | write, edit, task, call_omo_agent |
+| Oracle | write, edit, task, call_omo_agent, look_at |
+| Librarian | write, edit, task, call_omo_agent, look_at |
+| Explore | write, edit, task, call_omo_agent, look_at |
 | Multimodal-Looker | ALL except read |
-| Atlas | task, call_omo_agent |
-| Momus | write, edit, task |
+| Atlas | team tools only; spawn tools allowed |
+| Hephaestus | task, call_omo_agent, look_at |
+| Sisyphus-Junior | task, call_omo_agent, look_at |
+| Momus | write, edit, task, call_omo_agent, look_at |
+| Metis | write, edit, task, call_omo_agent, look_at |
 | Prometheus | enforces `.md`-only writes via `prometheus-md-only` hook (path-based, not tool-based) |
+
+Team-member sessions deny `task`, `call_omo_agent`, and `look_at` regardless of underlying agent.
 
 ## TEAM-MODE ELIGIBILITY
 

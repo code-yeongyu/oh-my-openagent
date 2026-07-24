@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Two harness-neutral primitives for the `task`/delegate tool: (1) resolve which model a category/agent delegation should run on, with a multi-step fallback chain; (2) detect common `task()` invocation errors and build corrective retry guidance. Purely functional — zero state, zero IO, all deps injected. Package: `@oh-my-opencode/delegate-core`.
+Three harness-neutral primitives for the `task`/delegate tool: model resolution, corrective retry guidance, and spawn admission. All are pure functions with zero state or IO and injected inputs. Package: `@oh-my-opencode/delegate-core`.
 
 ## PUBLIC API (`src/index.ts` barrel)
 
@@ -13,6 +13,7 @@ Two harness-neutral primitives for the `task`/delegate tool: (1) resolve which m
 | `model-selection.ts` | `resolveModelForDelegateTask(input, deps)`; types `DelegateFallbackEntry`, `DelegateModelResolutionInput/Result/Deps` |
 | `retry-patterns.ts` | `detectDelegateTaskError(output)`, `DELEGATE_TASK_ERROR_PATTERNS` (9 entries) |
 | `retry-guidance.ts` | `buildRetryGuidance(errorInfo)` — fix hint + available options + example call |
+| `spawn-policy.ts` | `decideSpawnAdmission(input)` — role, lineage, target allowlist, and depth enforcement with immutable depth ceiling `2` |
 
 ### Resolution order (`resolveModelForDelegateTask`)
 
@@ -21,6 +22,10 @@ Two harness-neutral primitives for the `task`/delegate tool: (1) resolve which m
 ### Recognized error patterns (9)
 
 `missing_run_in_background`, `missing_load_skills`, `mutual_exclusion`, `missing_category_or_agent`, `unknown_category`, `empty_agent`, `unknown_agent`, `primary_agent`, `unknown_skills`.
+
+### Spawn admission
+
+Spawn admission defaults to depth `1`, fails closed for unknown or cyclic lineage, and limits effective depth to the minimum of configured depth, caller depth, and immutable ceiling `2`. Target allowlists only narrow access. They never expand role or depth permission.
 
 ## DEPENDENCIES & CONSUMERS
 

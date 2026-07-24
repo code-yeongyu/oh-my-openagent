@@ -47,6 +47,7 @@ describe("BackgroundManager session created callback", () => {
       agent: "general",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
+      parentAgent: "sisyphus",
       onSessionCreated: (sessionId) => {
         events.push(`onSessionCreated:${sessionId}`)
       },

@@ -6,7 +6,7 @@ import { describe, test, expect } from "bun:test"
 import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
+import type { BackgroundOutputManager, BackgroundOutputClient } from "./tools"
 import { consumeToolMetadata, clearPendingStore } from "../../features/tool-metadata-store"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -15,7 +15,7 @@ const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 const mockContext: ToolContext = {
   sessionID: "test-session",
   messageID: "test-message",
-  agent: "test-agent",
+  agent: "sisyphus",
   directory: projectDir,
   worktree: projectDir,
   abort: new AbortController().signal,
@@ -392,15 +392,14 @@ describe("background_cancel", () => {
     const cancelled: string[] = []
     const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
-      getAllDescendantTasks: () => [task],
+      getTasksByParentSession: () => [task],
       cancelTask: async (taskId: string) => {
         cancelled.push(taskId)
         task.status = "cancelled"
         return true
       },
     })
-    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
-    const tool = createBackgroundCancel(manager, client)
+    const tool = createBackgroundCancel(manager)
 
     // #when
     const output = await tool.execute({ taskId: task.id }, mockContext)
@@ -415,11 +414,10 @@ describe("background_cancel", () => {
     const task = createTask({ status: "running" })
     const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
-      getAllDescendantTasks: () => [task],
+      getTasksByParentSession: () => [task],
       cancelTask: async () => false,
     })
-    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
-    const tool = createBackgroundCancel(manager, client)
+    const tool = createBackgroundCancel(manager)
 
     // #when
     const output = await tool.execute({ taskId: task.id }, mockContext)
@@ -435,7 +433,7 @@ describe("background_cancel", () => {
     const cancelled: string[] = []
     const manager = unsafeTestValue<BackgroundManager>({
       getTask: () => undefined,
-      getAllDescendantTasks: () => [taskA, taskB],
+      getTasksByParentSession: () => [taskA, taskB],
       cancelTask: async (taskId: string) => {
         cancelled.push(taskId)
         const task = taskId === taskA.id ? taskA : taskB
@@ -443,8 +441,7 @@ describe("background_cancel", () => {
         return true
       },
     })
-    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
-    const tool = createBackgroundCancel(manager, client)
+    const tool = createBackgroundCancel(manager)
 
     // #when
     const output = await tool.execute({ all: true }, mockContext)
@@ -460,15 +457,14 @@ describe("background_cancel", () => {
     const taskB = createTask({ id: "task-b", status: "pending", sessionId: undefined, description: "pending task" })
     const manager = unsafeTestValue<BackgroundManager>({
       getTask: () => undefined,
-      getAllDescendantTasks: () => [taskA, taskB],
+      getTasksByParentSession: () => [taskA, taskB],
       cancelTask: async (taskId: string) => {
         const task = taskId === taskA.id ? taskA : taskB
         task.status = "cancelled"
         return true
       },
     })
-    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
-    const tool = createBackgroundCancel(manager, client)
+    const tool = createBackgroundCancel(manager)
 
     // #when
     const output = await tool.execute({ all: true }, mockContext)
@@ -481,18 +477,17 @@ describe("background_cancel", () => {
   test("passes skipNotification: true to cancelTask to prevent deadlock", async () => {
     // #given
     const task = createTask({ id: "task-1", status: "running" })
-    const cancelOptions: Array<{ taskId: string; options: unknown }> = []
+    const cancelOptions: Array<{ taskId: string; callerSessionID: string | undefined; options: unknown }> = []
     const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
-      getAllDescendantTasks: () => [task],
-      cancelTask: async (taskId: string, options?: unknown) => {
-        cancelOptions.push({ taskId, options })
+      getTasksByParentSession: () => [task],
+      cancelTask: async (taskId: string, callerSessionID: string | undefined, options?: unknown) => {
+        cancelOptions.push({ taskId, callerSessionID, options })
         task.status = "cancelled"
         return true
       },
     })
-    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
-    const tool = createBackgroundCancel(manager, client)
+    const tool = createBackgroundCancel(manager)
 
     // #when - cancel all tasks
     await tool.execute({ all: true }, mockContext)
@@ -502,23 +497,23 @@ describe("background_cancel", () => {
     expect(cancelOptions[0].options).toEqual(
       expect.objectContaining({ skipNotification: true })
     )
+    expect(cancelOptions[0]?.callerSessionID).toBe(mockContext.sessionID)
   })
 
   test("passes skipNotification: true when cancelling single task", async () => {
     // #given
     const task = createTask({ id: "task-1", status: "running" })
-    const cancelOptions: Array<{ taskId: string; options: unknown }> = []
+    const cancelOptions: Array<{ taskId: string; callerSessionID: string | undefined; options: unknown }> = []
     const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
-      getAllDescendantTasks: () => [task],
-      cancelTask: async (taskId: string, options?: unknown) => {
-        cancelOptions.push({ taskId, options })
+      getTasksByParentSession: () => [task],
+      cancelTask: async (taskId: string, callerSessionID: string | undefined, options?: unknown) => {
+        cancelOptions.push({ taskId, callerSessionID, options })
         task.status = "cancelled"
         return true
       },
     })
-    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
-    const tool = createBackgroundCancel(manager, client)
+    const tool = createBackgroundCancel(manager)
 
     // #when - cancel single task
     await tool.execute({ taskId: task.id }, mockContext)
@@ -528,6 +523,7 @@ describe("background_cancel", () => {
     expect(cancelOptions[0].options).toEqual(
       expect.objectContaining({ skipNotification: true })
     )
+    expect(cancelOptions[0]?.callerSessionID).toBe(mockContext.sessionID)
   })
 })
 type BackgroundOutputMessage = {

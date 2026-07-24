@@ -29,6 +29,8 @@ export const AgentOverrideConfigSchema = z.object({
   permission: AgentPermissionSchema.optional(),
   /** Maximum tokens for response. Passed directly to OpenCode SDK. */
   maxTokens: z.number().optional(),
+  maxDepth: z.number().int().nonnegative().max(2).optional(),
+  allowedSubagents: z.array(z.string()).optional(),
   /** Extended thinking configuration (Anthropic). Overrides category and default settings. */
   thinking: z
     .object({

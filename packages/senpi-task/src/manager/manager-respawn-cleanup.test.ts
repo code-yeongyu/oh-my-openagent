@@ -15,6 +15,7 @@ function respawnRecord(): TaskRecord {
     parent_session_id: "parent-1",
     root_session_id: "parent-1",
     depth: 1,
+    category: "quick",
     execution_mode: "process",
     model: "openai/gpt-5.6",
     status: "lost",
@@ -22,7 +23,6 @@ function respawnRecord(): TaskRecord {
     created_at: "2026-07-12T00:00:00.000Z",
     updated_at: "2026-07-12T00:01:00.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
-    spawn_spec: { cwd: "/tmp/project" },
   }
 }
 
@@ -66,11 +66,12 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
       planner: categoryPlanner(),
       config: settings(),
       cwd: project,
+      trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 } as const),
       rpcRespawnRunner: { start: () => handle },
     })
 
     // when
-    const result = await manager.respawn(record, "/tmp/session.jsonl")
+    const result = await manager.respawn(record, "parent-1", "/tmp/session.jsonl")
 
     // then
     expect(result).toEqual({ ok: false, reason: "rpc respawn cleanup failed" })
@@ -82,13 +83,29 @@ describe("TaskManager respawn launch trust boundary", () => {
   test("#given persisted extension and member env inputs #when respawned #then neither reaches the current runner", async () => {
     // given
     const record = respawnRecord()
-    const maliciousRecord: TaskRecord = {
+    const maliciousRecord = {
       ...record,
+      model: "malicious/override",
+      root_session_id: "malicious-root",
+      depth: 99,
+      resolved_model: {
+        source: "explicit",
+        provider: "malicious",
+        model_id: "override",
+        display: "malicious/override",
+        variant: "maximum",
+      },
       spawn_spec: {
-        cwd: record.spawn_spec?.cwd ?? "/tmp/project",
+        cwd: "/tmp/malicious-cwd",
         extensions: ["/tmp/malicious-extension.ts"],
         member_env: { MALICIOUS_MEMBER_ENV: "execute-me" },
       },
+    } satisfies TaskRecord & {
+      readonly spawn_spec: {
+        readonly cwd: string
+        readonly extensions: readonly string[]
+        readonly member_env: Readonly<Record<string, string>>
+      }
     }
     const handle = {
       task_id: record.task_id,
@@ -112,31 +129,47 @@ describe("TaskManager respawn launch trust boundary", () => {
     } satisfies RpcChildHandle
     let extensions: readonly string[] | undefined
     let memberEnv: Readonly<Record<string, string>> | undefined
+    let cwd: string | undefined
+    let model: string | undefined
+    let variant: string | undefined
+    let plannerInput: Parameters<ReturnType<typeof categoryPlanner>>[0] | undefined
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
       runners: { "in-process": runner, process: runner },
-      planner: categoryPlanner(),
+      planner: (spec) => {
+        plannerInput = spec
+        return categoryPlanner()(spec)
+      },
       config: settings(),
       cwd: project,
+      trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 } as const),
       rpcRespawnRunner: {
         start: (spec) => {
           extensions = spec.extensions
           memberEnv = spec.memberEnv
+          cwd = spec.cwd
+          model = spec.model
+          variant = spec.variant
           return handle
         },
       },
     })
 
     // when
-    const result = await manager.respawn(maliciousRecord, "/tmp/session.jsonl")
+    const result = await manager.respawn(maliciousRecord, "parent-1", "/tmp/session.jsonl")
 
     // then
     expect(result.ok).toBe(true)
     expect(extensions).toBeUndefined()
-    expect(memberEnv).toBeUndefined()
+    expect(memberEnv).toEqual({ SENPI_TASK_LINEAGE_TASK_ID: record.task_id })
+    expect(cwd).toBe(project)
+    expect(model).toBe("anthropic/claude")
+    expect(variant).toBeUndefined()
+    expect(plannerInput?.root_session_id).toBe("parent-1")
+    expect(plannerInput?.depth).toBe(1)
   })
 })
 
@@ -146,11 +179,7 @@ describe("TaskManager team-member respawn", () => {
     const record: TaskRecord = {
       ...respawnRecord(),
       name: "team:11111111-1111-4111-8111-111111111111:alpha",
-      spawn_spec: {
-        cwd: "/tmp/project",
-        extensions: ["/tmp/malicious-extension.ts"],
-        member_env: { SENPI_TASK_MEMBER: "untrusted::member" },
-      },
+      pid: 1234,
     }
     const trustedLaunch = {
       extensions: ["/trusted/member-extension.js", "/trusted/provider-extension.js"],
@@ -178,11 +207,16 @@ describe("TaskManager team-member respawn", () => {
         facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
       }),
       lastSeen: () => undefined,
-      switchSession: () => Promise.resolve({ cancelled: false }),
+      switchSession: () => {
+        pidDuringSwitch = store.load(record.task_id)?.pid
+        return Promise.resolve({ cancelled: false })
+      },
     } satisfies RpcChildHandle
     let startedSpec: RpcRunnerSpec | undefined
+    let pidDuringSwitch: number | undefined
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
+    store.save(record)
     const runner = new FakeRunner()
     const options = {
       store,
@@ -190,6 +224,7 @@ describe("TaskManager team-member respawn", () => {
       planner: categoryPlanner(),
       config: settings(),
       cwd: project,
+      trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 } as const),
       rpcRespawnRunner: {
         start: (spec: RpcRunnerSpec) => {
           startedSpec = spec
@@ -201,12 +236,16 @@ describe("TaskManager team-member respawn", () => {
     const manager = createTaskManager(options)
 
     // when
-    const result = await manager.respawn(record, "/tmp/session.jsonl")
+    const result = await manager.respawn(record, "parent-1", "/tmp/session.jsonl")
 
     // then
     expect(result.ok).toBe(true)
     expect(startedSpec?.extensions).toEqual(trustedLaunch.extensions)
-    expect(startedSpec?.memberEnv).toEqual(trustedLaunch.memberEnv)
+    expect(startedSpec?.memberEnv).toEqual({
+      ...trustedLaunch.memberEnv,
+      SENPI_TASK_LINEAGE_TASK_ID: record.task_id,
+    })
+    expect(pidDuringSwitch).toBe(4321)
   })
 })
 
@@ -253,6 +292,7 @@ describe("TaskManager respawn variant", () => {
       planner: categoryPlanner(),
       config: settings(),
       cwd: project,
+      trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 } as const),
       rpcRespawnRunner: {
         start: (spec: RpcRunnerSpec) => {
           startedSpec = spec
@@ -262,10 +302,10 @@ describe("TaskManager respawn variant", () => {
     })
 
     // when
-    const result = await manager.respawn(record, "/tmp/session.jsonl")
+    const result = await manager.respawn(record, "parent-1", "/tmp/session.jsonl")
 
     // then
     expect(result.ok).toBe(true)
-    expect(startedSpec?.variant).toBe("xhigh")
+    expect(startedSpec?.variant).toBeUndefined()
   })
 })

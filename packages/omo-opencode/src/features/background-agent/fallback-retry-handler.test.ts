@@ -51,6 +51,7 @@ function createMockTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask
     status: "error",
     parentSessionId: "parent-session-1",
     parentMessageId: "parent-message-1",
+    parentAgent: "sisyphus",
     fallbackChain: [
       { model: "fallback-model-1", providers: ["provider-a"], variant: undefined },
       { model: "fallback-model-2", providers: ["provider-b"], variant: undefined },
@@ -105,6 +106,7 @@ function createDefaultArgs(taskOverrides: Partial<BackgroundTask> = {}) {
     idleDeferralTimers,
     queuesByKey,
     processKey: processKeyFn,
+    admitRetrySpawn: mock(async () => {}),
     deps: retryHandlerDeps,
   }
 }
@@ -131,6 +133,22 @@ describe("tryFallbackRetry", () => {
       const result = await tryFallbackRetry(args)
 
       expect(result).toBe(true)
+      expect(args.admitRetrySpawn).toHaveBeenCalledWith({
+        parentSessionID: "parent-session-1",
+        parentAgent: "sisyphus",
+        targetAgent: "sisyphus-junior",
+      })
+    })
+
+    test("rejects before mutating task state when current admission denies retry", async () => {
+      const args = createDefaultArgs()
+      args.admitRetrySpawn.mockRejectedValueOnce(new Error("spawn denied"))
+
+      await expect(tryFallbackRetry(args)).rejects.toThrow("spawn denied")
+
+      expect(args.task.attemptCount).toBe(0)
+      expect(args.concurrencyManager.release).not.toHaveBeenCalled()
+      expect(args.queuesByKey.size).toBe(0)
     })
 
     test("resets task status to pending", async () => {
@@ -244,6 +262,22 @@ describe("tryFallbackRetry", () => {
       expect(queue!.length).toBe(1)
       expect(queue![0].task).toBe(args.task)
       expect(args.processKey).toHaveBeenCalledWith(key)
+    })
+
+    test("retains team member role in fallback retry input", async () => {
+      // given
+      const args = createDefaultArgs({
+        teamRunId: "team-run",
+        teamSessionRole: "member",
+        onSessionCreated: async () => {},
+      })
+
+      // when
+      await tryFallbackRetry(args)
+
+      // then
+      const key = `${args.task.model?.providerID}/${args.task.model?.modelID}`
+      expect(args.queuesByKey.get(key)?.[0]?.input).toMatchObject({ teamSessionRole: "member" })
     })
 
     test("queues fallback retry on provider key when provider concurrency is configured", async () => {

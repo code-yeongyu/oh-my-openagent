@@ -35,4 +35,8 @@ describe("AgentOverridesSchema", () => {
 
     expect(result.success).toBe(false)
   })
+
+  test("rejects agent depth above supported depth", () => {
+    expect(AgentOverridesSchema.safeParse({ sisyphus: { maxDepth: 3 } }).success).toBe(false)
+  })
 })

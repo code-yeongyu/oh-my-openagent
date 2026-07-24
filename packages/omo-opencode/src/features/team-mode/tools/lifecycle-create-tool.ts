@@ -70,21 +70,21 @@ export function createTeamCreateTool(
     args: {
       teamName: tool.schema.string().optional().describe("Named team spec to load. Provide exactly one of teamName or inline_spec."),
       inline_spec: TeamCreateInlineSpecToolSchema.optional().describe("Inline team spec object or JSON string. Provide exactly one of teamName or inline_spec; members must be a flat array, e.g. { name: \"project-analysis-team\", members: [{ name: \"structure-analyst\", category: \"quick\", prompt: \"Analyze project structure.\" }] }."),
-      leadSessionId: tool.schema.string().optional().describe("Optional non-empty session ID override. Usually omit this and let team_create use the current session."),
     },
     async execute(rawArgs, toolContext) {
       const args = parseTeamCreateArgs(rawArgs)
       const runtimeContext = toolContext as TeamLifecycleToolContext
-      const leadSessionId = args.leadSessionId ?? runtimeContext.sessionID
-      if (!leadSessionId) throw new Error("team_create requires leadSessionId or tool context sessionID")
+      const leadSessionId = runtimeContext.sessionID
+      if (!leadSessionId) throw new Error("team_create requires tool context sessionID")
       const projectRoot = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
-      const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent)
-      if (callerTeamLead.displayName !== undefined) {
-        const callerAgentKey = getAgentConfigKey(callerTeamLead.displayName)
+      const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent, executorConfig?.agentOverrides)
+      if (callerTeamLead.displayName !== undefined && !callerTeamLead.isEligibleForTeamLead) {
+        const callerAgentKey = getAgentConfigKey(callerTeamLead.displayName, executorConfig?.agentOverrides)
         const callerRegistryEntry = AGENT_ELIGIBILITY_REGISTRY[callerAgentKey]
         if (callerRegistryEntry?.verdict === "hard-reject") {
           throw new Error(`team_create denied: caller '${callerAgentKey}' is a hard-reject agent and cannot create teams regardless of an explicit 'lead' in the spec. ${callerRegistryEntry.rejectionMessage ?? `Agent '${callerAgentKey}' is not eligible to lead a team.`}`)
         }
+        throw new Error(`team_create denied: caller '${callerAgentKey}' is not an eligible team lead`)
       }
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
       const spec = args.teamName

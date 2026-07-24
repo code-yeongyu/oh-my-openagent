@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -56,5 +56,16 @@ describe("member task map sidecar", () => {
 
     // then
     expect(entries).toEqual(["senpi-task-members.json"])
+  })
+
+  test.skipIf(process.platform === "win32")("#given a completed write #when target is inspected #then rename preserves private mode", async () => {
+    // given
+    await writeMemberTaskMap(runtimeDir, { alpha: "st_000001" })
+
+    // when
+    const mode = statSync(memberTaskMapPath(runtimeDir)).mode & 0o777
+
+    // then
+    expect(mode).toBe(0o600)
   })
 })

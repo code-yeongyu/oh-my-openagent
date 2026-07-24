@@ -10,6 +10,8 @@ export type BackgroundTaskStatus =
   | "cancelled"
   | "interrupt"
 
+export type TeamSessionRole = "lead" | "member"
+
 export interface ToolCallWindow {
   lastSignature: string
   consecutiveCount: number
@@ -48,6 +50,7 @@ export interface BackgroundTask {
   parentSessionId: string
   parentMessageId: string
   teamRunId?: string
+  teamSessionRole?: TeamSessionRole
   description: string
   prompt: string
   agent: string
@@ -116,6 +119,7 @@ export interface LaunchInput {
   parentSessionId: string
   parentMessageId: string
   teamRunId?: string
+  teamSessionRole?: TeamSessionRole
   suppressTmuxSpawn?: boolean
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string

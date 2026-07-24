@@ -4,11 +4,9 @@ import { BackgroundTaskConfigSchema } from "./background-task"
 
 describe("BackgroundTaskConfigSchema", () => {
   describe("maxDepth", () => {
-    describe("#given valid maxDepth (3)", () => {
-      test("#when parsed #then returns correct value", () => {
-        const result = BackgroundTaskConfigSchema.parse({ maxDepth: 3 })
-
-        expect(result.maxDepth).toBe(3)
+    describe("#given maxDepth above supported depth (3)", () => {
+      test("#when parsed #then rejects it", () => {
+        expect(BackgroundTaskConfigSchema.safeParse({ maxDepth: 3 }).success).toBe(false)
       })
     })
 

@@ -17,7 +17,7 @@ export const OmoTaskSettingsSchema = z.object({
   default_concurrency: z.number().int().positive().default(5),
   provider_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
-  max_depth: z.number().int().nonnegative().default(1),
+  max_depth: z.number().int().nonnegative().max(2).default(1),
   residency_max_children: z.number().int().positive().default(8),
   ttl_ms: z.number().int().positive().default(86400000),
   state_dir: z.string().optional(),

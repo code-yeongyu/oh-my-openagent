@@ -17,11 +17,13 @@ import {
   createTaskRecordStore,
   mapOmoConfigAgents,
   resolveMemberExtensionEntryPath,
+  SENPI_MAX_CHILD_DEPTH,
   type AgentDefinition,
   type ChildPlanner,
   type CompletionNotifier,
   type ManagedRunner,
   type PersistedTaskEvent,
+  type ResolveAncestry,
   type SpawnAdmission,
   type TaskLifecycle,
   type TaskManager,
@@ -35,6 +37,7 @@ import { createParentNotifier } from "./parent-notifier"
 import { createTaskChildPlanner } from "./planner"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
+import { createStoredSpawnLineageResolver } from "./spawn-lineage"
 import { createMutationNotifyingStore } from "./store-mutation-observer"
 
 export interface TaskEngine {
@@ -48,6 +51,7 @@ export interface TaskEngine {
   readonly settings: OmoTaskSettings
   readonly stateDir: string
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
+  readonly resolveAncestry: ResolveAncestry
   // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
   // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
   onStoreMutation(listener: () => void): () => void
@@ -89,7 +93,11 @@ const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
  * Construction order breaks the store<->manager and lifecycle<->manager cycles via late binding.
  */
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
-  const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
+  const configuredSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
+  const settings: OmoTaskSettings = {
+    ...configuredSettings,
+    max_depth: Math.min(configuredSettings.max_depth, SENPI_MAX_CHILD_DEPTH),
+  }
   const runtime = new TaskRuntimeContext(deps.cwd)
   const agents = resolveAgents(deps.omoConfig)
 
@@ -135,6 +143,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     for (const listener of mutationListeners) listener()
   })
 
+  const resolveAncestry = createStoredSpawnLineageResolver({ store: notifyingStore, omoConfig: deps.omoConfig, env: process.env })
   const registry = createManagerResidencyRegistry(getManager)
   const lifecycle = createTaskLifecycle({ store: notifyingStore, registry, config: settings })
 
@@ -149,6 +158,18 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     cwd: deps.cwd,
     destruction: { destroyResidentTask: (taskId) => lifecycle.destroyResidentTask(taskId, "cancel") },
     admit: (parentSessionId) => admitAdapter(lifecycle, parentSessionId),
+    trustedRespawnAdmission: async (_record, currentSessionId) => {
+      const ancestry = resolveAncestry(currentSessionId)
+      if (ancestry === undefined) return undefined
+      return {
+        callerRole: ancestry.callerRole ?? "leaf",
+        lineage: ancestry.lineage ?? "unknown",
+        rootSessionId: ancestry.rootSessionId,
+        childDepth: ancestry.depth + 1,
+        ...(ancestry.callerMaxDepth !== undefined ? { callerMaxDepth: ancestry.callerMaxDepth } : {}),
+        ...(ancestry.allowedSubagents !== undefined ? { allowedSubagents: ancestry.allowedSubagents } : {}),
+      }
+    },
     trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({
       stateDir: {
         project_dir: deps.cwd,
@@ -174,6 +195,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     settings,
     stateDir: baseStore.stateDir,
     appendTaskEvent,
+    resolveAncestry,
     onStoreMutation: (listener) => {
       mutationListeners.add(listener)
       return () => mutationListeners.delete(listener)
@@ -194,7 +216,7 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
     get sharedParentTools(): readonly ToolDefinition[] {
       return build.sharedParentTools()
     },
-    depthPolicy: { maxDepth: Math.max(build.settings.max_depth + 1, 1) },
+    depthPolicy: { maxDepth: build.settings.max_depth },
   })
   // Thread the PARENT session's captured model registry (and its bound auth storage) into every child,
   // resolving the plan's provider/modelId against that same registry. Without this a child spawns

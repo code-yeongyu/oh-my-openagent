@@ -156,6 +156,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "error", text: `task_send invalid: ${details.reason}` }
     case "interrupted":
       return { color: "warning", text: `task_send interrupted ${details.task_id} (was ${details.previous_status})` }
+    case "unmanaged_live_process":
+      return { color: "warning", text: `task_send unmanaged process ${details.task_id} pid:${details.pid}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.previous_status), text: `task_send no change ${details.task_id} (${details.previous_status}): ${details.reason}` }
     case "team_message":
@@ -209,12 +211,16 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
         color: statusThemeColor(details.status),
         text: `task_cancel cancelled ${details.task_id} (${details.previous_status} -> ${details.status})`,
       }
+    case "unmanaged_live_process":
+      return { color: "warning", text: `task_cancel unmanaged process ${details.task_id} pid:${details.pid}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
     case "not_found":
       return { color: "error", text: `task_cancel not found: ${details.reason}` }
     case "invalid_arguments":
       return { color: "error", text: `task_cancel invalid: ${details.reason}` }
+    case "scope_denied":
+      return { color: "error", text: `task_cancel denied ${details.task_id} owner:${details.owning_session_id}` }
     default:
       return assertNever(details)
   }

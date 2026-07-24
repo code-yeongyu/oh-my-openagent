@@ -67,6 +67,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   test("removes toast when fetchSyncResult throws", async () => {
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -130,6 +131,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   test("removes toast when pollSyncSession throws", async () => {
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -193,6 +195,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   test("recovers from MessageAbortedError poll error when result already exists", async () => {
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -252,6 +255,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   test("recovers from canonical aborted-operation message", async () => {
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -309,6 +313,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   test("returns MessageAbortedError poll error when recovery fetch has no result", async () => {
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -367,6 +372,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   test("does not recover abort poll error when anchor cannot be established", async () => {
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => {
           throw new Error("messages unavailable")
         },
@@ -423,6 +429,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#given - mock successful completion with messages growing after anchor
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -487,6 +494,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const abortCalls: Array<{ path: { id: string } }> = []
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -556,6 +564,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const abortCalls: Array<{ path: { id: string } }> = []
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -620,6 +629,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -684,6 +694,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -745,6 +756,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#given - mock session messages with agent info on the last assistant message
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "oracle" } },
@@ -800,6 +812,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#given - mock session messages without any agent info
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -856,6 +869,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -922,6 +936,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       question: false,
       write: false,
       edit: false,
+      look_at: false,
       ...TEAM_TOOL_DENIALS,
     })
   })
@@ -931,6 +946,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -997,6 +1013,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       question: false,
       write: false,
       edit: false,
+      look_at: false,
       ...TEAM_TOOL_DENIALS,
     })
   })
@@ -1006,6 +1023,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         messages: async () => ({
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -1070,6 +1088,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: true,
       call_omo_agent: true,
       question: false,
+      look_at: false,
       ...TEAM_TOOL_DENIALS,
     })
   })

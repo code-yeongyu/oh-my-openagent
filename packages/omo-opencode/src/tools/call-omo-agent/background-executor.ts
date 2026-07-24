@@ -4,19 +4,17 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { resolveMessageContext } from "../../features/hook-message-injector"
-import { getSessionAgent } from "../../features/claude-code-session-state"
-import { getMessageDir } from "./message-dir"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { sanitizeSubagentType } from "../delegate-task/subagent-discovery"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { requireSpawnCallerIdentity } from "../../features/background-agent/subagent-spawn-limits"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
   toolContext: {
     sessionID: string
     messageID: string
-    agent: string
+    agent?: string
     abort: AbortSignal
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
@@ -26,24 +24,11 @@ export async function executeBackground(
   model?: DelegatedModelConfig,
 ): Promise<string> {
   try {
-    const messageDir = getMessageDir(toolContext.sessionID)
-    const { prevMessage, firstMessageAgent } = await resolveMessageContext(
-      toolContext.sessionID,
-      client,
-      messageDir
-    )
-
-    const sessionAgent = getSessionAgent(toolContext.sessionID)
-    const parentAgent = toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
-    
-    log("[call_omo_agent] parentAgent resolution", {
+    const parentAgent = requireSpawnCallerIdentity(toolContext.agent)
+    log("[call_omo_agent] trusted parent agent", {
       sessionID: toolContext.sessionID,
-      messageDir,
       ctxAgent: toolContext.agent,
-      sessionAgent,
-      firstMessageAgent,
-      prevMessageAgent: prevMessage?.agent,
-      resolvedParentAgent: parentAgent,
+      parentAgent,
     })
 
     const task = await manager.launch({

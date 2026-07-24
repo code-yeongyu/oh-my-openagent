@@ -21,7 +21,7 @@ describe("runTaskCancel", () => {
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
 
-    const result = await runTaskCancel(manager, { task_id: started.task_id, reason: "no longer needed" })
+    const result = await runTaskCancel(manager, { task_id: started.task_id, reason: "no longer needed" }, "p1")
 
     expect(result.details.kind).toBe("cancelled")
     if (result.details.kind !== "cancelled") throw new Error("expected cancelled")
@@ -34,7 +34,7 @@ describe("runTaskCancel", () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
-    const cancelled = await runTaskCancel(manager, { task_id: started.task_id })
+    const cancelled = await runTaskCancel(manager, { task_id: started.task_id }, "p1")
     expect(cancelled.details.kind).toBe("cancelled")
 
     const result = await runTaskSend(manager, { to: started.task_id, message: "continue anyway" }, "p1")
@@ -48,9 +48,9 @@ describe("runTaskCancel", () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
-    await runTaskCancel(manager, { task_id: started.task_id })
+    await runTaskCancel(manager, { task_id: started.task_id }, "p1")
 
-    const result = await runTaskCancel(manager, { task_id: started.task_id })
+    const result = await runTaskCancel(manager, { task_id: started.task_id }, "p1")
 
     expect(result.details.kind).toBe("noop")
     if (result.details.kind !== "noop") throw new Error("expected noop")
@@ -64,6 +64,25 @@ describe("runTaskCancel", () => {
 
     expect(result.details.kind).toBe("not_found")
   })
+
+  test.each([undefined, "root-only", "foreign"])(
+    "#given caller %s #when cancelling another session child #then denial occurs before mutation",
+    async (callerSessionId) => {
+      // given
+      const { manager, inProcess } = makeManager({})
+      const started = await manager.start(baseSpec({ parent_session_id: "p1", root_session_id: "root-only" }))
+      if (started.kind !== "started") throw new Error("expected started")
+      const handle = inProcess.handles.get(started.task_id)
+
+      // when
+      const result = await runTaskCancel(manager, { task_id: started.task_id }, callerSessionId)
+
+      // then
+      expect(result.details.kind).toBe("scope_denied")
+      expect(manager.get(started.task_id)?.status).toBe("running")
+      expect(handle).toBeDefined()
+    },
+  )
 
   test("#given no identifier #when cancelled #then invalid_arguments is returned", async () => {
     const { manager } = makeManager({})

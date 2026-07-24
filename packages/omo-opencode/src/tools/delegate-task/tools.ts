@@ -1,7 +1,9 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { requireSpawnCallerIdentity } from "../../features/background-agent/subagent-spawn-limits"
 import type { DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
+import type { ParentContext } from "./executor-types"
 import {
   resolveSkillContent,
   resolveParentContext,
@@ -88,6 +90,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const ctx = toolContext as ToolContextWithMetadata
       const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
 
+      try {
+        requireSpawnCallerIdentity(ctx.agent)
+      } catch (error) {
+        return `Error: ${error instanceof Error ? error.message : String(error)}`
+      }
+
       const runInBackground = delegateTaskArgs.run_in_background === true
 
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
@@ -118,7 +126,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         nativeSkillInfos,
       })
 
-      const parentContext = await resolveParentContext(ctx, options.client)
+      let parentContext: ParentContext
+      try {
+        parentContext = await resolveParentContext(ctx, options.client)
+      } catch (error) {
+        return `Error: ${error instanceof Error ? error.message : String(error)}`
+      }
 
       if (delegateTaskArgs.task_id) {
         if (runInBackground) {

@@ -25,3 +25,9 @@ describe("OmoTaskSettingsSchema reattach", () => {
     expect(parsed.reattach_on_reconcile).toBe(false)
   })
 })
+
+describe("OmoTaskSettingsSchema depth", () => {
+  test("#given depth beyond shared cap #when task settings parse #then rejects it", () => {
+    expect(OmoTaskSettingsSchema.safeParse({ max_depth: 3 }).success).toBe(false)
+  })
+})

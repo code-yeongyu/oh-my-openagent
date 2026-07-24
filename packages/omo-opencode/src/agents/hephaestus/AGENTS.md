@@ -1,6 +1,6 @@
 ---
 name: hephaestus-agent
-description: Developer reference for the Hephaestus autonomous deep worker agent — model variants, key behaviors, and delegation patterns.
+description: Developer reference for the Hephaestus autonomous deep worker agent - model variants and key behaviors.
 ---
 
 # src/agents/hephaestus/ -- Autonomous Deep Worker
@@ -16,7 +16,7 @@ description: Developer reference for the Hephaestus autonomous deep worker agent
 | File | Purpose |
 |------|---------|
 | `agent.ts` | `createHephaestusAgent()` factory, model-variant routing |
-| `gpt.ts` | Base GPT prompt: discipline rules, delegation, verification |
+| `gpt.ts` | Base GPT prompt: discipline rules and verification |
 | `gpt-5-6.ts` | GPT-5.6-native outcome-first prompt |
 | `gpt-5-5.ts` | GPT-5.5-native prompt with task discipline sections |
 | `gpt-5-4.ts` | GPT-5.4-native prompt with XML-tagged blocks, entropy-reduced |
@@ -26,10 +26,8 @@ description: Developer reference for the Hephaestus autonomous deep worker agent
 
 - Mode: `primary` (respects UI model selection)
 - Requires OpenAI-compatible provider (no fallback chain)
-- NEVER trusts subagent self-reports -- always verifies
-- NEVER uses `background_cancel(all=true)`
-- Delegates exploration to background agents, never sequential
-- Uses `run_in_background=true` for explore/librarian
+- Spawn tools `task`, `call_omo_agent`, and `look_at` are denied
+- Executes assigned goals directly without delegation
 
 ## MODEL VARIANTS
 

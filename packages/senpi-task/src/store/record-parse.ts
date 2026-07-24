@@ -3,7 +3,9 @@ import {
   RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
   type ResolvedModelRecord,
+  type SpawnRole,
   type TaskRecord,
+  type TaskSpawnPolicy,
 } from "../state"
 import { parseTaskId } from "../state/id"
 
@@ -22,7 +24,8 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
   const resolvedModel = readOptionalResolvedModel(value)
-  const spawnSpec = readOptionalSpawnSpec(value)
+  const spawnRole = readOptionalSpawnRole(value)
+  const spawnPolicy = readOptionalSpawnPolicy(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -42,7 +45,8 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
-    ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
+    ...(spawnRole === undefined ? {} : { spawn_role: spawnRole }),
+    ...(spawnPolicy === undefined ? {} : { spawn_policy: spawnPolicy }),
     ...(pid === undefined ? {} : { pid }),
     ...(hostPid === undefined ? {} : { host_pid: hostPid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
@@ -52,11 +56,36 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   }
 }
 
-function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spawn_spec"] {
-  const value = record["spawn_spec"]
+function readOptionalSpawnPolicy(record: Record<string, unknown>): TaskSpawnPolicy | undefined {
+  const value = record["spawn_policy"]
   if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("spawn_spec is not an object")
-  return { cwd: readString(value, "cwd") }
+  if (!isRecord(value)) throw new Error("spawn_policy is not an object")
+  const callerRole = readString(value, "caller_role")
+  const lineage = readString(value, "lineage")
+  if (!isSpawnCallerRole(callerRole)) throw new Error("spawn_policy.caller_role is invalid")
+  if (lineage !== "known" && lineage !== "unknown" && lineage !== "cyclic") {
+    throw new Error("spawn_policy.lineage is invalid")
+  }
+  const callerMaxDepth = readOptionalNumber(value, "caller_max_depth")
+  const allowedSubagents = readOptionalStringArray(value, "allowed_subagents")
+  return {
+    caller_role: callerRole,
+    lineage,
+    ...(callerMaxDepth === undefined ? {} : { caller_max_depth: callerMaxDepth }),
+    ...(allowedSubagents === undefined ? {} : { allowed_subagents: allowedSubagents }),
+  }
+}
+
+function isSpawnCallerRole(value: string): value is TaskSpawnPolicy["caller_role"] {
+  return value === "coordinator" || value === "planning_coordinator" || value === "worker"
+    || value === "reviewer" || value === "specialist" || value === "team_member" || value === "leaf"
+}
+
+function readOptionalSpawnRole(record: Record<string, unknown>): SpawnRole | undefined {
+  const value = record["spawn_role"]
+  if (value === undefined) return undefined
+  if (value === "worker" || value === "team_member") return value
+  throw new Error("spawn_role is invalid")
 }
 
 function readOptionalResolvedModel(record: Record<string, unknown>): ResolvedModelRecord | undefined {

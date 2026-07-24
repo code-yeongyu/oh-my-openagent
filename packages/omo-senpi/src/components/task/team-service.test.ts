@@ -32,12 +32,13 @@ afterEach(() => {
   for (const root of tempRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-async function activeTeamHarness() {
+async function activeTeamHarness(teamLeadSessionId = "lead-session") {
   const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-service-"))
   tempRoots.push(cwd)
   const pi = new FakeExtensionAPI()
   const omoConfig = loadOmoConfig({ cwd }).config
   const engine = composeTaskEngine({ pi, omoConfig, cwd, sharedParentTools: () => [] })
+  engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "lead-session" } })
   const stateDir = {
     project_dir: cwd,
     ...(engine.settings.state_dir !== undefined ? { task: { state_dir: engine.settings.state_dir } } : {}),
@@ -47,7 +48,7 @@ async function activeTeamHarness() {
     { members: [{ name: "beta", kind: "category", category: "quick", prompt: "work" }] },
     "squad",
   )
-  const creating = await createRuntimeState(spec, "lead-session", "project", config)
+  const creating = await createRuntimeState(spec, teamLeadSessionId, "project", config)
   const runtimeState = await transitionRuntimeState(
     creating.teamRunId,
     (state) => ({

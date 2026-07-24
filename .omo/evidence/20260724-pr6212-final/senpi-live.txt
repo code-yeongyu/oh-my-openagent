@@ -1,0 +1,26 @@
+RUNTIME
+Temporary Node v24.4.1 runtime and local Senpi 2026.7.5-2 install. Local mock
+providers and isolated agent directories. Runtime deleted after drivers exited.
+
+PRODUCT
+Validated product `887ad66216f801d6e8061b4cf35526deb186f099` (tree
+`fe6ed7c6bbd03ad6d72800b8b849fce9b628462c`).
+
+COMMANDS
+With Node v24.4.1 first on `PATH`, `SENPI_BIN` set to isolated local install,
+and `TMPDIR=/dev/shm`:
+`node packages/omo-senpi/scripts/qa/task-e2e.mjs`
+`node packages/omo-senpi/scripts/qa/team-e2e.mjs`
+`node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs`
+
+OBSERVED
+- Task: PASS. 12/12 checks including spawn, wake, revive, output, batch,
+  extension suppression, real-state isolation, and no leaked PIDs.
+- Team: PASS. 24/24 checks including delivery, wait ledger, shutdown, reclaim,
+  crash restart, and exactly-once processed/session/event ledgers.
+- RPC: PASS. 8/8 checks including process routing, PID plus child JSONL, steer,
+  completion, SIGKILL, untrusted-process preservation, and no leaked PIDs.
+
+ISOLATION
+All drivers reported untouched real credentials and agent state. Raw provider
+payloads, sandbox paths, process IDs, and verbose transcripts were omitted.

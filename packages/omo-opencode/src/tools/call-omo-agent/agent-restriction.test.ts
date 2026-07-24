@@ -31,12 +31,6 @@ function createBackgroundManager() {
     manager: {
       launch,
       getTask: mock(() => undefined),
-      reserveSubagentSpawn: mock(() => Promise.resolve({
-        spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
-        descendantCount: 1,
-        commit: mock(() => undefined),
-        rollback: mock(() => undefined),
-      })),
     },
     launch,
   }

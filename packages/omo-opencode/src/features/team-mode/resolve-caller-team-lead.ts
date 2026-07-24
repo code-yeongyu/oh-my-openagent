@@ -1,4 +1,5 @@
 import { getAgentConfigKey, getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import type { AgentOverrides } from "../../config/schema"
 
 import { AGENT_ELIGIBILITY_REGISTRY, type TeamSpec } from "./types"
 
@@ -8,7 +9,7 @@ export type CallerTeamLead = {
   isEligibleForTeamLead: boolean
 }
 
-export function resolveCallerTeamLead(rawAgentName: string | undefined): CallerTeamLead {
+export function resolveCallerTeamLead(rawAgentName: string | undefined, agentOverrides?: AgentOverrides): CallerTeamLead {
   if (typeof rawAgentName !== "string") {
     return { isEligibleForTeamLead: false }
   }
@@ -18,8 +19,8 @@ export function resolveCallerTeamLead(rawAgentName: string | undefined): CallerT
     return { isEligibleForTeamLead: false }
   }
 
-  const agentTypeId = getAgentConfigKey(strippedDisplayName)
-  const canonicalDisplayName = getAgentDisplayName(agentTypeId)
+  const agentTypeId = getAgentConfigKey(strippedDisplayName, agentOverrides)
+  const canonicalDisplayName = getAgentDisplayName(agentTypeId, agentOverrides)
   const isStructuredDisplayName = strippedDisplayName.includes(" - ")
   const displayName = isStructuredDisplayName && strippedDisplayName.toLowerCase() === canonicalDisplayName.toLowerCase()
     ? canonicalDisplayName

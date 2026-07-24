@@ -49,6 +49,7 @@ export async function runCrashRestartScenario(input) {
       sandbox,
       prompt: "restart the same sandbox and reconcile the crashed member",
       script: NOOP_SCRIPT,
+      sessionId: target.parentSessionId,
     }).completion
     restartStatus = restartResult.status
     writeFileSync(join(input.outDir, "crash-restart-stdout.json.log"), restartResult.stdout)
@@ -101,6 +102,7 @@ function readCrashTarget(cwd, markerPath) {
     runId,
     taskId,
     pid,
+    parentSessionId: record?.parent_session_id,
   }
 }
 

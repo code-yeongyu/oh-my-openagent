@@ -34,7 +34,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "keep going", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "keep going", deliverAs: "steer", callerSessionId: "parent-1" })
 
     // then
     expect(outcome.kind).toBe("steered")
@@ -52,7 +52,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "second pass" })
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "second pass", callerSessionId: "parent-1" })
 
     // then
     if (outcome.kind !== "revived") throw new Error("expected revived")
@@ -75,7 +75,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const interrupted = await harness.engine.interruptTask(record.task_id)
+    const interrupted = await harness.engine.interruptTask({ idOrName: record.task_id, callerSessionId: "parent-1" })
 
     // then
     if (interrupted.kind !== "interrupted") throw new Error("expected interrupted")
@@ -86,7 +86,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     expect(afterInterrupt?.final_response).toBe("partial answer so far")
 
     // when (send after interrupt works -> revive)
-    const sent = await harness.engine.sendToTask({ idOrName: record.task_id, message: "resume please" })
+    const sent = await harness.engine.sendToTask({ idOrName: record.task_id, message: "resume please", callerSessionId: "parent-1" })
 
     // then
     expect(sent.kind).toBe("revived")
@@ -102,7 +102,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const cancelled = await harness.engine.cancelTask(record.task_id, "user aborted")
+    const cancelled = await harness.engine.cancelTask({ idOrName: record.task_id, reason: "user aborted", callerSessionId: "parent-1" })
 
     // then
     if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
@@ -112,7 +112,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     expect(harness.store.load(record.task_id)?.status).toBe("cancelled")
 
     // when (send after cancel)
-    const sent = await harness.engine.sendToTask({ idOrName: record.task_id, message: "one more" })
+    const sent = await harness.engine.sendToTask({ idOrName: record.task_id, message: "one more", callerSessionId: "parent-1" })
 
     // then
     expect(sent.kind).toBe("not_continuable")
@@ -127,7 +127,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const cancelled = await harness.engine.cancelTask(record.task_id, "user aborted")
+    const cancelled = await harness.engine.cancelTask({ idOrName: record.task_id, reason: "user aborted", callerSessionId: "parent-1" })
 
     // then (abort rejection does NOT skip appendEvent + destruction; record is not a resident zombie)
     if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
@@ -144,10 +144,10 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     toRunning(harness, record)
     const fake = makeFakeHandle(record.task_id, flavor)
     harness.setLive(record.task_id, fake.handle)
-    await harness.engine.cancelTask(record.task_id)
+    await harness.engine.cancelTask({ idOrName: record.task_id, callerSessionId: "parent-1" })
 
     // when
-    const second = await harness.engine.cancelTask(record.task_id)
+    const second = await harness.engine.cancelTask({ idOrName: record.task_id, callerSessionId: "parent-1" })
 
     // then
     expect(second.kind).toBe("noop")
@@ -158,8 +158,8 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     // given
     const harness = makeHarness()
     const record = harness.seedRecord()
-    const first = await harness.engine.sendToTask({ idOrName: record.task_id, message: "first" })
-    const second = await harness.engine.sendToTask({ idOrName: record.task_id, message: "second" })
+    const first = await harness.engine.sendToTask({ idOrName: record.task_id, message: "first", callerSessionId: "parent-1" })
+    const second = await harness.engine.sendToTask({ idOrName: record.task_id, message: "second", callerSessionId: "parent-1" })
 
     // then (queued while pending)
     if (first.kind !== "queued" || second.kind !== "queued") throw new Error("expected queued")
@@ -177,7 +177,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
 })
 
 describe("steering engine scope + resolution guards", () => {
-  test("#given a task owned by another session #when sent without all_scope #then it is scope-denied naming the owning session", async () => {
+  test("#given a task owned by another session #when sent #then it is scope-denied naming the owning session", async () => {
     // given
     const harness = makeHarness()
     const record = harness.seedRecord({ parent_session_id: "parent-1", root_session_id: "parent-1" })
@@ -190,21 +190,6 @@ describe("steering engine scope + resolution guards", () => {
     // then
     if (outcome.kind !== "scope_denied") throw new Error("expected scope_denied")
     expect(outcome.owning_session_id).toBe("parent-1")
-  })
-
-  test("#given a cross-session task #when sent with all_scope #then delivery is allowed", async () => {
-    // given
-    const harness = makeHarness()
-    const record = harness.seedRecord({ parent_session_id: "parent-1", root_session_id: "parent-1" })
-    toRunning(harness, record)
-    const fake = makeFakeHandle(record.task_id, "in-process")
-    harness.setLive(record.task_id, fake.handle)
-
-    // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2", allScope: true })
-
-    // then
-    expect(outcome.kind).toBe("steered")
   })
 
   test("#given an unknown selector #when sent #then it reports not_found", async () => {
@@ -231,7 +216,7 @@ describe("steering engine scope + resolution guards", () => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: "researcher", message: "go", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({ idOrName: "researcher", message: "go", deliverAs: "steer", callerSessionId: "parent-1" })
 
     // then
     expect(outcome.kind).toBe("steered")
@@ -262,11 +247,11 @@ describe("steering pending cancellation", () => {
       },
       now: Date.now,
     })
-    await engine.sendToTask({ idOrName: record.task_id, message: "first" })
-    await engine.sendToTask({ idOrName: record.task_id, message: "second" })
+    await engine.sendToTask({ idOrName: record.task_id, message: "first", callerSessionId: "parent-1" })
+    await engine.sendToTask({ idOrName: record.task_id, message: "second", callerSessionId: "parent-1" })
 
     // when
-    const cancelled = await engine.cancelTask(record.task_id, "not needed")
+    const cancelled = await engine.cancelTask({ idOrName: record.task_id, reason: "not needed", callerSessionId: "parent-1" })
     const fake = makeFakeHandle(record.task_id, "in-process")
     live.set(record.task_id, fake.handle)
     await engine.notifyStarted(record.task_id)
@@ -287,7 +272,7 @@ describe("steering pending cancellation", () => {
     const record = harness.seedRecord()
 
     // when
-    const interrupted = await harness.engine.interruptTask(record.task_id)
+    const interrupted = await harness.engine.interruptTask({ idOrName: record.task_id, callerSessionId: "parent-1" })
 
     // then
     expect(interrupted.kind).toBe("noop")
@@ -298,8 +283,8 @@ describe("steering pending cancellation", () => {
     // given a queued task with two buffered messages
     const harness = makeHarness()
     const record = harness.seedRecord()
-    await harness.engine.sendToTask({ idOrName: record.task_id, message: "first" })
-    await harness.engine.sendToTask({ idOrName: record.task_id, message: "second" })
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "first", callerSessionId: "parent-1" })
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "second", callerSessionId: "parent-1" })
 
     // when the manager forgets the task before it ever launches, then a stale start fires
     harness.engine.dropPending(record.task_id)

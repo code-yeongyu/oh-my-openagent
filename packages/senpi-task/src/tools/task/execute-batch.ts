@@ -22,6 +22,7 @@ export type ExecuteBatchInput = {
   readonly manager: TaskManager
   readonly items: readonly ResolvedSpawnItem[]
   readonly signal: AbortSignal | undefined
+  readonly callerSessionId: string
   readonly runInBackground: boolean
   readonly startItem: (item: ResolvedSpawnItem) => Promise<StartResult>
 }
@@ -168,7 +169,9 @@ async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[
     : []
   await Promise.allSettled(unsettledIndexes.map((index) => {
     const start = live[index]
-    return start === undefined ? Promise.resolve() : input.manager.cancelTask(start.result.task_id, "parent turn aborted")
+    return start === undefined
+      ? Promise.resolve()
+      : input.manager.cancelTask(start.result.task_id, "parent turn aborted", input.callerSessionId)
   }))
 
   let liveIndex = 0

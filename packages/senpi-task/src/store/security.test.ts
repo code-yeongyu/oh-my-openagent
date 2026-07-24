@@ -186,7 +186,7 @@ describe("parseTaskRecord persisted boundary", () => {
       expect(result.diagnostics).toEqual([{ type: "parse_error", path, message: testCase.message }])
     }
   })
-  test("#given persisted spawn extensions and member env #when listed #then untrusted launch inputs are discarded", () => {
+  test("#given persisted launch inputs #when listed #then they are discarded", () => {
     // given
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
@@ -203,7 +203,7 @@ describe("parseTaskRecord persisted boundary", () => {
 
     // then
     expect(result.diagnostics).toEqual([])
-    expect(result.records[0]?.spawn_spec).toEqual({ cwd: "/safe/project" })
+    expect(result.records[0]).not.toHaveProperty("spawn_spec")
   })
 
   test("#given a persisted killed:true error record #when listed #then the killed FACT survives the parse round-trip", () => {

@@ -22,7 +22,7 @@ describe("TaskManager revive concurrency slot", () => {
     await flush()
     expect(store.load(a.task_id)?.status).toBe("completed")
 
-    const revived = await manager.continueTask(a.task_id, "again")
+    const revived = await manager.continueTask(a.task_id, "again", "parent-1")
     if (revived.kind !== "continued") throw new Error("expected continued")
     expect(revived.delivered).toBe("revive")
     expect(store.load(a.task_id)?.notification.run_epoch).toBe(1)
@@ -52,7 +52,7 @@ describe("TaskManager revive concurrency slot", () => {
     if (a.kind !== "started") throw new Error("expected started")
 
     // when A is interrupted (a terminal, slot-freeing transition)
-    const interrupted = await manager.interruptTask(a.task_id)
+    const interrupted = await manager.interruptTask({ idOrName: a.task_id, callerSessionId: "parent-1" })
     expect(interrupted.kind).toBe("interrupted")
 
     // then a new task B acquires the freed slot immediately (running, not queued)

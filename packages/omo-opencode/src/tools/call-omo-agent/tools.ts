@@ -20,6 +20,7 @@ import { createOrGetSession } from "./session-creator"
 import { processMessages } from "./message-processor"
 import { waitForCompletion } from "./completion-poller"
 import { getFirstFallbackModel } from "../../agents/builtin-agents/model-resolution"
+import { requireSpawnCallerIdentity } from "../../features/background-agent/subagent-spawn-limits"
 
 function createSyncExecutorDeps(modelFallbackControllerAccessor?: ModelFallbackControllerAccessor) {
   return {
@@ -158,6 +159,12 @@ export function createCallOmoAgent(
         return "Error: subagent_type is required."
       }
 
+      try {
+        requireSpawnCallerIdentity(toolCtx.agent)
+      } catch (error) {
+        return `Error: ${error instanceof Error ? error.message : String(error)}`
+      }
+
       const callableAgents = await resolveCallableAgents(ctx.client);
 
       // Strip ZWSP and case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
@@ -192,20 +199,21 @@ export function createCallOmoAgent(
       }
 
       if (!args.session_id) {
-        let spawnReservation: Awaited<ReturnType<BackgroundManager["reserveSubagentSpawn"]>> | undefined
         try {
-          spawnReservation = await backgroundManager.reserveSubagentSpawn(toolCtx.sessionID)
+          await backgroundManager.assertCanSpawn({
+            parentSessionID: toolCtx.sessionID,
+            parentAgent: toolCtx.agent,
+            targetAgent: args.subagent_type,
+          })
           return await executeSync(
             args,
             toolCtx,
             ctx,
             createSyncExecutorDeps(modelFallbackControllerAccessor),
             fallbackChain,
-            spawnReservation,
             resolvedModel,
           )
         } catch (error) {
-          spawnReservation?.rollback()
           return `Error: ${error instanceof Error ? error.message : String(error)}`
         }
       }
@@ -216,10 +224,8 @@ export function createCallOmoAgent(
         ctx,
         createSyncExecutorDeps(modelFallbackControllerAccessor),
         fallbackChain,
-        undefined,
         resolvedModel,
       )
     },
   });
 }
-

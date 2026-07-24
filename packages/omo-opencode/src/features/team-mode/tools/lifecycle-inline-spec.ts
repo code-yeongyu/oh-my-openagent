@@ -19,7 +19,6 @@ function omitEmptyStringArgs(rawArgs: unknown): unknown {
 export const TeamCreateArgsSchema = z.preprocess(omitEmptyStringArgs, z.object({
   teamName: z.string().min(1).nullish(),
   inline_spec: z.unknown().nullish(),
-  leadSessionId: z.string().nullish(),
 }).superRefine((value, ctx) => {
   const optionCount = Number(value.teamName != null) + Number(value.inline_spec != null)
   if (optionCount !== 1) {

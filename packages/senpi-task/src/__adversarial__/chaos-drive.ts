@@ -48,7 +48,7 @@ export async function runIteration(seed: number): Promise<IterationReport> {
   const concurrency = rng.int(1, 4)
   const residencyMax = rng.int(1, 4)
   const maxTasks = rng.int(3, 8)
-  const harness = buildHarness({ concurrency, residencyMax, maxDepth: 3 })
+  const harness = buildHarness({ concurrency, residencyMax, maxDepth: 2 })
   const state: ChaosState = {
     harness,
     rng,

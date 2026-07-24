@@ -68,6 +68,7 @@ describe("delegate-task Oracle gap closure", () => {
     await executeSyncContinuation(args, ctx, {
       client: {
         session: {
+          get: async () => ({ data: { parentID: "ses_parent" } }),
           messages: async () => ({ data: [{ info: { agent: "explore", model: MODEL, variant: "max" } }] }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
@@ -99,6 +100,7 @@ describe("delegate-task Oracle gap closure", () => {
     const result = await executeSyncContinuation(args, makeMockCtx(), {
       client: {
         session: {
+          get: async () => ({ data: { parentID: "ses_parent" } }),
           messages: async () => ({ data: [{ info: { agent: "explore", model: MODEL } }] }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
@@ -191,6 +193,7 @@ describe("delegate-task Oracle gap closure", () => {
     }, makeMockCtx(), {
       client: {
         session: {
+          get: async () => ({ data: { parentID: "ses_parent" } }),
           messages: async () => ({ data: [{ info: { agent: "explore", model: MODEL } }] }),
           prompt: async (input: { body?: { system?: string } }) => {
             promptCalls.push(input)

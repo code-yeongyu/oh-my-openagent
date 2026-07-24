@@ -291,7 +291,7 @@ describe("applyToolConfig", () => {
       expect(agent.permission.teammate).toBe("allow")
     })
 
-    it("#then should allow teammate for hephaestus", () => {
+    it("#then should preserve worker restrictions for hephaestus", () => {
       // given
       const params = createParams({ agents: ["hephaestus"] })
 
@@ -302,7 +302,10 @@ describe("applyToolConfig", () => {
       const agent = params.agentResult.hephaestus as {
         permission: Record<string, unknown>
       }
-      expect(agent.permission.teammate).toBe("allow")
+      expect(agent.permission.task).toBe("deny")
+      expect(agent.permission.call_omo_agent).toBe("deny")
+      expect(agent.permission.look_at).toBe("deny")
+      expect(agent.permission.teammate).toBeUndefined()
     })
   })
 

@@ -15,7 +15,13 @@ const CTX: TaskToolContext = {
 }
 
 function deps(manager: TaskManager): TaskToolDeps {
-  return { manager, omoConfig: OMO_CONFIG, agents: {}, loadSkills: () => ({ prepend: "", resolved: [], missing: [] }) }
+  return {
+    manager,
+    omoConfig: OMO_CONFIG,
+    agents: {},
+    resolveAncestry: (sessionId) => ({ depth: 0, rootSessionId: sessionId, lineage: "known", callerRole: "coordinator" }),
+    loadSkills: () => ({ prepend: "", resolved: [], missing: [] }),
+  }
 }
 
 afterEach(() => {

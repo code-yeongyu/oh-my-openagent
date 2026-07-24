@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { SENPI_TASK_LINEAGE_TASK_ID_ENV } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
@@ -168,6 +169,78 @@ describe("omo-senpi task component wiring", () => {
     expect(logger.entries).toContainEqual({ level: "info", message: "omo-senpi task component disabled by flag" })
   })
 
+  it("#given a task child runtime #when the component registers #then only the unconditional hygiene sweep is wired", () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    // when
+    createTaskComponent({ resolveCwd: () => tempProject(), resolveRestrictedChildRuntime: () => true }).register(pi, ctxFor(pi, logger))
+
+    // then
+    expect(pi.tools).toEqual([])
+    expect(pi.commands).toEqual([])
+    expect(pi.handlers.map((handler) => handler.event)).toEqual(["session_start"])
+    expect(logger.entries).toContainEqual({ level: "info", message: "omo-senpi task component skipped in child runtime" })
+  })
+
+  it("#given a lineage child marker #when the component registers #then task and team tools stay unavailable", () => {
+    // given
+    const previous = process.env[SENPI_TASK_LINEAGE_TASK_ID_ENV]
+    process.env[SENPI_TASK_LINEAGE_TASK_ID_ENV] = "st_00000001"
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    try {
+      // when
+      createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+
+      // then
+      expect(pi.tools).toEqual([])
+      expect(pi.commands).toEqual([])
+    } finally {
+      if (previous === undefined) delete process.env[SENPI_TASK_LINEAGE_TASK_ID_ENV]
+      else process.env[SENPI_TASK_LINEAGE_TASK_ID_ENV] = previous
+    }
+  })
+
+  it("#given an RPC child session directory #when the component registers #then task and team tools stay unavailable", () => {
+    // given
+    const previous = process.env.SENPI_CODING_AGENT_SESSION_DIR
+    const project = tempProject()
+    process.env.SENPI_CODING_AGENT_SESSION_DIR = join(project, ".omo", "senpi-task", "children", "st_00000001", "sessions")
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    try {
+      // when
+      createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+
+      // then
+      expect(pi.tools).toEqual([])
+      expect(pi.commands).toEqual([])
+    } finally {
+      if (previous === undefined) delete process.env.SENPI_CODING_AGENT_SESSION_DIR
+      else process.env.SENPI_CODING_AGENT_SESSION_DIR = previous
+    }
+  })
+
+  it("#given a root session directory #when the component registers #then task and team tools remain available", () => {
+    const previous = process.env.SENPI_CODING_AGENT_SESSION_DIR
+    const project = tempProject()
+    process.env.SENPI_CODING_AGENT_SESSION_DIR = join(project, "sessions")
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    try {
+      createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+      expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
+    } finally {
+      if (previous === undefined) delete process.env.SENPI_CODING_AGENT_SESSION_DIR
+      else process.env.SENPI_CODING_AGENT_SESSION_DIR = previous
+    }
+  })
+
   it("#given a malformed omo.json #when the component registers #then it boots with defaults, warns once, and still wires the tools", () => {
     // given a project whose .omo/omo.json is invalid JSON
     const project = tempProject()
@@ -213,8 +286,8 @@ describe("omo-senpi task component wiring", () => {
       ...base,
       lifecycle: {
         ...base.lifecycle,
-        reconcileOnSessionStart: async () => {
-          order.push("reattach")
+        reconcileOnSessionStart: async (currentSessionId) => {
+          order.push(`reattach:${currentSessionId}`)
           return { outcomes: [] }
         },
         cleanupExpiredRecords: () => {
@@ -251,7 +324,7 @@ describe("omo-senpi task component wiring", () => {
     })
 
     // then
-    expect(order).toEqual(["reattach", "cleanup", "reclaim", "notify", "poll"])
+    expect(order).toEqual(["reattach:session-a", "cleanup", "reclaim", "notify", "poll"])
   })
 
   it("#given a captured ui #when session_before_switch fires #then the ui bridge is cleared", async () => {

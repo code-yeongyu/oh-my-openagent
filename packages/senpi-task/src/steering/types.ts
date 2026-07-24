@@ -1,6 +1,7 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
+import type { ContinuationOwnershipDenial } from "./ownership"
 
 export type DestructionCause = "cancel"
 
@@ -30,7 +31,17 @@ export type SendInput = {
   readonly message: string
   readonly deliverAs?: SendDelivery
   readonly callerSessionId?: string
-  readonly allScope?: boolean
+}
+
+export type InterruptInput = {
+  readonly idOrName: string
+  readonly callerSessionId?: string
+}
+
+export type CancelInput = {
+  readonly idOrName: string
+  readonly reason?: string
+  readonly callerSessionId?: string
 }
 
 // The SEND DEFAULT is "followUp": codex's followup_task routes a send to a running child as a
@@ -42,23 +53,34 @@ export type SendOutcome =
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
-  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly ownership_reason: ContinuationOwnershipDenial; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string; readonly suggestion: string }
+
+export type UnmanagedLiveProcessOutcome = {
+  readonly kind: "unmanaged_live_process"
+  readonly task_id: string
+  readonly pid: number
+  readonly reason: string
+}
 
 export type InterruptOutcome =
   | { readonly kind: "interrupted"; readonly task_id: string; readonly previous_status: TaskStatus }
+  | UnmanagedLiveProcessOutcome
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly ownership_reason: ContinuationOwnershipDenial; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type CancelOutcome =
   | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }
+  | UnmanagedLiveProcessOutcome
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly ownership_reason: ContinuationOwnershipDenial; readonly reason: string }
 
 export type SteeringEngine = {
   sendToTask(input: SendInput): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
-  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
+  interruptTask(input: InterruptInput): Promise<InterruptOutcome>
+  cancelTask(input: CancelInput): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.
   notifyStarted(taskId: string): Promise<void>
   // Called by the manager when a task is forgotten (destroyed/evicted/failed to launch) so buffered

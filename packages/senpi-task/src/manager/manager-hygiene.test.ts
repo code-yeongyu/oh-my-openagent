@@ -22,7 +22,7 @@ describe("TaskManager release guard growth", () => {
       inProcess.handles.get(taskId)?.settle({ status: "completed", finalResponse: `pass-${cycle}` })
       await flush()
       if (cycle < 2) {
-        const revived = await manager.continueTask(taskId, "again")
+        const revived = await manager.continueTask(taskId, "again", "parent-1")
         if (revived.kind !== "continued") throw new Error("expected continued")
       }
     }

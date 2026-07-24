@@ -13,7 +13,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 | State machine | `src/state/` | `TaskStatus` (7: `pending`/`running`/`completed`/`error`/`cancelled`/`interrupted`/`lost`) and `ResidencyState` (5) enums, `TaskRecord`, and `transitionTaskRecord` with late/invalid-transition audits (`state/types.ts`, `state/transitions.ts`). |
 | Store | `src/store/` | `createTaskRecordStore` JSONL record store with an in-memory read cache (mtime+size validated; `list()` prunes entries whose files vanished on disk) and a capped (16) LRU append-fd pool reusing open JSONL log handles; `resolveStateDir` (`<project_dir>/.omo/senpi-task` default, `store/state-dir.ts:6`), redaction, and the security test. |
 | Runners | `src/runners/` | `InProcessRunner` (shares parent tool closures) and `RpcProcessRunner` (spawns a child Senpi process with JSON-RPC steer/abort/prompt). RPC internals under `src/runners/rpc/`. |
-| Manager | `src/manager/` | `createTaskManager` wiring runners, concurrency, name registry, depth policy, execution-mode resolution, and transcript logging. |
+| Manager | `src/manager/` | `createTaskManager` wiring runners, concurrency, name registry, spawn admission, execution-mode resolution, current-config respawn revalidation, and transcript logging. |
 | Lifecycle | `src/lifecycle/` | `createTaskLifecycle` - residency admission (`residency.ts`), TTL sweep (`ttl.ts`, skips records with a live resident handle so deletion cannot orphan an in-memory handle), crash reconcile (`reconcile.ts`), and shutdown teardown (`shutdown.ts`). |
 | Completion | `src/completion/` | `createCompletionNotifier` + `routeCompletion` - the exactly-once wake/deliver/buffer/queue routing table (`completion/routing.ts`). |
 | Steering | `src/steering/` | `createSteeringEngine` - send / interrupt / cancel against a live or resident child. |
@@ -70,6 +70,8 @@ Every `session_start` runs recovery in order: reattach durable process members, 
 - **process**: `RpcProcessRunner` spawns a child Senpi process; steering (`steer`/`abort`/`prompt`) crosses a JSON-RPC boundary (`src/runners/rpc/protocol-client.ts`), child transcripts land under `<stateDir>/children/<taskId>/sessions/<taskId>/`, and session-start reconciliation can respawn and `switch_session` to the newest persisted JSONL. Team members always use this mode so the member extension and durable inbox poller live inside the child.
 
 Mode is chosen by `resolveExecutionMode` from the omo.json `task.default_execution_mode` and per-agent `execution_mode` (`src/manager/execution-mode.ts`).
+
+Senpi currently caps effective child depth at `1`, even though the shared schema accepts cross-harness ceiling `2`. Senpi child and team-member runtimes do not receive general spawn tools, so a second spawn level is intentionally unavailable in this adapter.
 
 ## QA
 

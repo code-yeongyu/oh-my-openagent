@@ -13,6 +13,8 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     parent_session_id,
     resolved_model,
     root_session_id,
+    spawn_policy,
+    spawn_role,
     tool_allow,
     tool_deny,
   } = input
@@ -37,5 +39,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     ...(resolved_model === undefined ? {} : { resolved_model }),
     ...(tool_allow === undefined ? {} : { tool_allow }),
     ...(tool_deny === undefined ? {} : { tool_deny }),
+    ...(spawn_role === undefined ? {} : { spawn_role }),
+    ...(spawn_policy === undefined ? {} : { spawn_policy }),
   }
 }

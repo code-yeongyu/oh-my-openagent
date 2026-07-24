@@ -4,6 +4,7 @@ import { CURATED_READONLY_AGENT_NAMES } from "../agents/builtin"
 import { createChildResourceLoader } from "./in-process/child-loader"
 import { createChildHandle, type ChildHandle, type ChildSession } from "./in-process/child-handle"
 import { createCuratedReadonlyBashTool } from "./in-process/curated-readonly-bash"
+import { createChildSessionFromHostSdk, resolveHostSenpiSdkEntry } from "./in-process/host-sdk"
 import { RunnerError } from "./in-process/runner-error"
 import { mergeChildCustomTools } from "./in-process/shared-tool-filter"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -63,7 +64,12 @@ export type InProcessRunnerOptions = {
   readonly createSession?: CreateChildSession
 }
 
-const defaultCreateChildSession: CreateChildSession = async (options) => (await createAgentSession(options)).session
+const defaultCreateChildSession: CreateChildSession = async (options) => {
+  const hostSdkEntry = resolveHostSenpiSdkEntry(process.argv[1])
+  return hostSdkEntry === undefined
+    ? (await createAgentSession(options)).session
+    : createChildSessionFromHostSdk(hostSdkEntry, options)
+}
 
 export class InProcessRunner {
   readonly #sharedParentTools: readonly ToolDefinition[]

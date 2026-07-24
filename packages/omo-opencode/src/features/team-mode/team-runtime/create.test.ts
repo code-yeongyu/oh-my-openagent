@@ -76,6 +76,7 @@ function createManager(
   manager.launch = launchMock
   manager.getTask = getTaskMock
   manager.cancelTask = cancelTaskMock
+  manager.cancelTaskForCleanup = cancelTaskMock
   return { manager, launchMock, cancelTaskMock }
 }
 
@@ -128,6 +129,53 @@ describe("createTeamRun", () => {
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members.map((member) => member.sessionId)).toEqual(["session-1", "session-2", "session-3"])
     expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(true)
+  })
+
+  test("creates a team through the real BackgroundManager launch path", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-real-manager-"))
+    temporaryDirectories.push(baseDir)
+    const createSessionMock = mock(async () => ({ data: { id: "real-child-session" } }))
+    const client = {
+      session: {
+        get: async ({ path: sessionPath }: { path: { id: string } }) => ({
+          data: { id: sessionPath.id, directory: baseDir },
+        }),
+        create: createSessionMock,
+        promptAsync: async () => ({ data: {} }),
+        messages: async () => ({ data: [] }),
+        todo: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+        abort: async () => ({}),
+      },
+    }
+    const config = createConfig(baseDir)
+    const pluginContext = { client, directory: baseDir } as PluginInput
+    const manager = new BackgroundManager({ pluginContext, teamModeConfig: config, enableParentSessionNotifications: false })
+
+    try {
+      // when
+      const runtimeState = await createTeamRun(
+        createSpec(2),
+        "lead-session",
+        { client: pluginContext.client, manager, directory: baseDir },
+        config,
+        manager,
+        undefined,
+        { callerAgentTypeId: "sisyphus", parentMessageID: "lead-message" },
+      )
+
+      // then
+      expect(runtimeState.status).toBe("active")
+      expect(runtimeState.members.map((member) => member.sessionId)).toEqual(["lead-session", "real-child-session"])
+      expect(createSessionMock).toHaveBeenCalledTimes(1)
+      expect(createSessionMock.mock.calls[0]?.[0]).toMatchObject({
+        body: { parentID: "lead-session" },
+        query: { directory: baseDir },
+      })
+    } finally {
+      manager.shutdown()
+    }
   })
 
   test("#given a new team runtime #when createTeamRun succeeds #then it registers the run for session cleanup", async () => {
@@ -493,6 +541,37 @@ describe("createTeamRun", () => {
     expect(runtimeState.members.map((member) => ({ name: member.name, sessionId: member.sessionId }))).toEqual([
       { name: "captain", sessionId: "lead-session" },
       { name: "member-1", sessionId: "member-1-agent-session-1" },
+    ])
+  })
+
+  test("passes trusted caller identity and team roles to every launched member", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-launch-context-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: `task-${++launchCount}`,
+      sessionId: `session-${launchCount}`,
+      status: "running",
+    } as BackgroundTask))
+
+    // when
+    await createTeamRun(
+      createSpec(2),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+      undefined,
+      { callerAgentTypeId: "sisyphus" },
+    )
+
+    // then
+    expect(launchMock.mock.calls.map(([input]) => ({
+      parentAgent: input.parentAgent,
+      teamSessionRole: input.teamSessionRole,
+    }))).toEqual([
+      { parentAgent: "sisyphus", teamSessionRole: "member" },
     ])
   })
 })

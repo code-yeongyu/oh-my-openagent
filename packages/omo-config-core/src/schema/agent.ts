@@ -8,7 +8,7 @@ export const OmoAgentDefSchema = z.object({
   tools: z.record(z.string(), z.boolean()).optional(),
   execution_mode: z.enum(["in-process", "process"]).optional(),
   background: z.boolean().optional(),
-  max_depth: z.number().int().nonnegative().optional(),
+  max_depth: z.number().int().nonnegative().max(2).optional(),
   allowed_subagents: z.array(z.string()).optional(),
   temperature: z.number().min(0).max(2).optional(),
   disable: z.boolean().optional(),

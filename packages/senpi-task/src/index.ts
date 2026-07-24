@@ -138,6 +138,8 @@ export {
   decideDepthPolicy,
   findModelReference,
   resolveExecutionMode,
+  SENPI_MAX_CHILD_DEPTH,
+  SENPI_TASK_LINEAGE_TASK_ID_ENV,
 } from "./manager"
 export type {
   AdmitResident,
@@ -171,6 +173,8 @@ export type {
   TaskConcurrencyConfig,
   TaskManager,
   TaskManagerOptions,
+  TrustedRespawnAdmission,
+  TrustedRespawnAdmissionResolver,
   TrustedRespawnLaunch,
   TrustedRespawnLaunchResolver,
 } from "./manager"

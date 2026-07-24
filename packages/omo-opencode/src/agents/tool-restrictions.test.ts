@@ -30,6 +30,32 @@ const TEAM_TOOL_NAMES = [
 describe("read-only agent tool restrictions", () => {
   const FILE_WRITE_TOOLS = ["write", "edit", "apply_patch"]
 
+  test("resolves configured ASCII and CJK display aliases before building spawn tool maps", () => {
+    const agentOverrides = {
+      sisyphus: { displayName: "Release Coordinator" },
+      atlas: { displayName: "执行总监" },
+      prometheus: { displayName: "计划总监" },
+    }
+
+    const sisyphus = getAgentToolRestrictions("Release Coordinator", { agentOverrides })
+    const atlas = getAgentToolRestrictions("执行总监", { agentOverrides })
+    const prometheus = getAgentToolRestrictions("计划总监", { agentOverrides })
+    const unknown = getAgentToolRestrictions("Unmapped Alias", { agentOverrides })
+
+    for (const coordinator of [sisyphus, atlas]) {
+      expect(coordinator.task).toBeUndefined()
+      expect(coordinator.call_omo_agent).toBeUndefined()
+      expect(coordinator.look_at).toBeUndefined()
+    }
+    expect(prometheus.task).toBeUndefined()
+    expect(prometheus.call_omo_agent).toBeUndefined()
+    expect(prometheus.look_at).toBe(false)
+    expect(prometheus.team_create).toBe(false)
+    expect(unknown.task).toBe(false)
+    expect(unknown.call_omo_agent).toBe(false)
+    expect(unknown.look_at).toBe(false)
+  })
+
   test("denies team tools for every delegated subagent prompt", () => {
     // given
     const restrictedAgentNames = [
@@ -66,6 +92,8 @@ describe("read-only agent tool restrictions", () => {
       expect(restrictions[toolName]).toBeUndefined()
     }
     expect(restrictions.task).toBe(false)
+    expect(restrictions.call_omo_agent).toBe(false)
+    expect(restrictions.look_at).toBe(false)
   })
 
   describe("Oracle", () => {
@@ -82,7 +110,7 @@ describe("read-only agent tool restrictions", () => {
       }
     })
 
-    test("denies task but allows call_omo_agent for research", () => {
+    test("denies spawn tools at the session boundary", () => {
       // given
       const agent = createOracleAgent(TEST_MODEL)
 
@@ -90,8 +118,12 @@ describe("read-only agent tool restrictions", () => {
       const permission = agent.permission as Record<string, string>
 
       // then
+      const sessionRestrictions = getAgentToolRestrictions("oracle")
+
       expect(permission["task"]).toBe("deny")
-      expect(permission["call_omo_agent"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBe(false)
+      expect(sessionRestrictions["call_omo_agent"]).toBe(false)
+      expect(sessionRestrictions["look_at"]).toBe(false)
     })
   })
 
@@ -139,7 +171,7 @@ describe("read-only agent tool restrictions", () => {
       }
     })
 
-    test("allows task delegation while remaining ineligible for team membership", () => {
+    test("denies spawn tools consistently with reviewer admission", () => {
       // given
       const agent = createMomusAgent(TEST_MODEL)
 
@@ -149,7 +181,9 @@ describe("read-only agent tool restrictions", () => {
 
       // then
       expect(permission["task"]).toBeUndefined()
-      expect(sessionRestrictions["task"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBe(false)
+      expect(sessionRestrictions["call_omo_agent"]).toBe(false)
+      expect(sessionRestrictions["look_at"]).toBe(false)
     })
   })
 
@@ -167,7 +201,7 @@ describe("read-only agent tool restrictions", () => {
       }
     })
 
-    test("allows task delegation while remaining ineligible for team membership", () => {
+    test("denies spawn tools consistently with specialist admission", () => {
       // given
       const agent = createMetisAgent(TEST_MODEL)
 
@@ -177,7 +211,9 @@ describe("read-only agent tool restrictions", () => {
 
       // then
       expect(permission["task"]).toBeUndefined()
-      expect(sessionRestrictions["task"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBe(false)
+      expect(sessionRestrictions["call_omo_agent"]).toBe(false)
+      expect(sessionRestrictions["look_at"]).toBe(false)
     })
   })
 
@@ -188,10 +224,26 @@ describe("read-only agent tool restrictions", () => {
 
       // when
       const permission = (agent.permission ?? {}) as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("atlas")
 
       // then
       expect(permission["task"]).toBeUndefined()
       expect(permission["call_omo_agent"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBeUndefined()
+      expect(sessionRestrictions["call_omo_agent"]).toBeUndefined()
+      expect(sessionRestrictions["look_at"]).toBeUndefined()
+    })
+  })
+
+  describe("Hephaestus", () => {
+    test("denies spawn tools consistently with worker admission", () => {
+      // given / when
+      const restrictions = getAgentToolRestrictions("hephaestus")
+
+      // then
+      expect(restrictions.task).toBe(false)
+      expect(restrictions.call_omo_agent).toBe(false)
+      expect(restrictions.look_at).toBe(false)
     })
   })
 

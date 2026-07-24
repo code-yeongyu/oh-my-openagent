@@ -13,7 +13,7 @@ describe("TaskManager.continueTask", () => {
     if (started.kind !== "started") throw new Error("expected started")
 
     // when
-    const result = await manager.continueTask(started.task_id, "keep going", "steer")
+    const result = await manager.continueTask(started.task_id, "keep going", "parent-1", "steer")
 
     // then
     expect(result.kind).toBe("continued")
@@ -30,7 +30,7 @@ describe("TaskManager.continueTask", () => {
     if (started.kind !== "started") throw new Error("expected started")
 
     // when
-    const result = await manager.continueTask(started.task_id, "more context")
+    const result = await manager.continueTask(started.task_id, "more context", "parent-1")
 
     // then
     if (result.kind !== "continued") throw new Error("expected continued")
@@ -49,7 +49,7 @@ describe("TaskManager.continueTask", () => {
     expect(store.load(started.task_id)?.status).toBe("completed")
 
     // when
-    const result = await manager.continueTask(started.task_id, "second pass")
+    const result = await manager.continueTask(started.task_id, "second pass", "parent-1")
 
     // then
     if (result.kind !== "continued") throw new Error("expected continued")
@@ -68,7 +68,7 @@ describe("TaskManager.continueTask", () => {
     store.transition(started.task_id, { type: "cancel", timestamp: new Date().toISOString() })
 
     // when
-    const result = await manager.continueTask(started.task_id, "hello")
+    const result = await manager.continueTask(started.task_id, "hello", "parent-1")
 
     // then
     expect(result.kind).toBe("not_continuable")
@@ -81,7 +81,7 @@ describe("TaskManager.continueTask", () => {
     const { manager } = makeManager({})
 
     // when
-    const result = await manager.continueTask("st_0000dead", "hello")
+    const result = await manager.continueTask("st_0000dead", "hello", "parent-1")
 
     // then
     expect(result.kind).toBe("not_continuable")

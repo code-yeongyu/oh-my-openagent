@@ -26,14 +26,8 @@ afterEach(cleanupProjects)
 
 type SignalCall = { readonly pid: number; readonly signal: string }
 
-function fakeSignaller(alive: Set<number>, calls: SignalCall[]): ProcessSignaller {
-  return {
-    isAlive: (pid) => alive.has(pid),
-    signal: (pid, signal) => {
-      calls.push({ pid, signal })
-      alive.delete(pid)
-    },
-  }
+function fakeSignaller(alive: Set<number>, _calls: SignalCall[]): ProcessSignaller {
+  return { isAlive: (pid) => alive.has(pid) }
 }
 
 const now = () => 5_000_000
@@ -42,7 +36,7 @@ function seedProcessRecord(store: TaskRecordStore, taskId: string, status: TaskS
   const record = seedRecord(store, { task_id: taskId, status, residency_state: "resident", execution_mode: "process", pid: 900, updated_at: new Date(now() - 1_000).toISOString() })
   const persisted: TaskRecord = {
     ...record,
-    spawn_spec: { cwd: "/tmp/project", extensions: ["/tmp/member-extension.ts"], member_env: { SENPI_TASK_MEMBER: "run-1::alpha" } },
+    category: "quick",
   }
   store.replace(persisted)
   return persisted
@@ -115,10 +109,11 @@ function createManager(store: TaskRecordStore, respawnRunner: FakeRespawnRunner,
   const manager = createTaskManager({
     store,
     runners: { "in-process": inProcess, process: processRunner },
-    planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
+    planner: (spec) => ({ kind: "resolved", plan: { model: "anthropic/claude", ...(spec.category === undefined ? {} : { category: spec.category }) } }),
     config: settings({ default_concurrency: defaultConcurrency }),
     cwd: "/tmp/project",
     rpcRespawnRunner: respawnRunner,
+    trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 }),
   })
   return { manager, inProcess }
 }
@@ -137,7 +132,7 @@ function createHarness(options: HarnessOptions) {
   const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner)
   const signals: SignalCall[] = []
   const alive = options.alive === true ? new Set([900]) : new Set<number>()
-  const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals), orphanKillDelayMs: 0 })
+  const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals) })
   return { store, sessionPath, respawnRunner, signals, lifecycle, ...managed }
 }
 
@@ -147,7 +142,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, sessionPath, respawnRunner, manager, lifecycle } = createHarness({ taskId: "st_00000001" })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("resumed")
@@ -180,7 +175,7 @@ describe("reconcileOnSessionStart reattach", () => {
       config: settings(),
       now,
       signaller: fakeSignaller(new Set(), []),
-      respawn: async (record, path) => {
+      respawn: async (record, _currentSessionId, path) => {
         calls.push(`respawn:${record.task_id}:${path}`)
         return { ok: true, handle: injectedHandle }
       },
@@ -191,7 +186,7 @@ describe("reconcileOnSessionStart reattach", () => {
     })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     if (sessionPath === undefined) throw new Error("expected a persisted session path")
@@ -208,7 +203,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000002", sessions: false })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -217,17 +212,17 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(respawnRunner.startedSpecs).toHaveLength(0)
   })
 
-  test(" w2reattach #given a live foreign process and persisted session #when reconciled #then it is terminated before respawn reattach", async () => {
+  test(" w2reattach #given a live process and persisted session #when reconciled #then it is retained without respawn", async () => {
     // given
     const { store, respawnRunner, signals, lifecycle } = createHarness({ taskId: "st_00000003", alive: true })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
-    expect(signals).toEqual([{ pid: 900, signal: "SIGTERM" }])
-    expect(respawnRunner.startedSpecs).toHaveLength(1)
-    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(signals).toEqual([])
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
+    expect(result.outcomes[0]?.kind).toBe("untrusted_live_process")
     expect(store.load("st_00000003")?.status).toBe("running")
     expect(store.load("st_00000003")?.residency_state).toBe("resident")
   })
@@ -241,7 +236,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []) })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -269,7 +264,7 @@ describe("reconcileOnSessionStart reattach", () => {
     })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]).toEqual({ task_id: "st_00000013", kind: "resumed", reason: "owned by this process" })
@@ -282,10 +277,10 @@ describe("reconcileOnSessionStart reattach", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000011", status: "running", residency_state: "resident", execution_mode: "in-process" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []) })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -297,14 +292,48 @@ describe("reconcileOnSessionStart reattach", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000012", status: "lost", residency_state: "resident", execution_mode: "in-process" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []) })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
     expect(store.load("st_00000012")?.residency_state).toBe("disposed")
+  })
+
+  test(" w2reattach #given a handleless lost process with a live pid #when reconciled #then it keeps the residency slot without signalling", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, {
+      task_id: "st_00000014",
+      status: "lost",
+      residency_state: "resident",
+      execution_mode: "process",
+      pid: 900,
+    })
+    const signals: SignalCall[] = []
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ residency_max_children: 1 }),
+      now,
+      signaller: fakeSignaller(new Set([900]), signals),
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
+    const admission = await lifecycle.admitResident("parent-1")
+
+    // then
+    expect(result.outcomes[0]).toEqual({
+      task_id: "st_00000014",
+      kind: "untrusted_live_process",
+      reason: "live pid 900 has no local handle",
+    })
+    expect(store.load("st_00000014")?.residency_state).toBe("resident")
+    expect(admission.kind).toBe("rejected")
+    expect(signals).toEqual([])
   })
 
   test(" w2reattach #given reconcile reattach is disabled #when a durable session exists #then v1 lost behavior runs without respawn", async () => {
@@ -312,7 +341,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000005", config: { reattach_on_reconcile: false } })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -327,7 +356,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, signals, lifecycle } = createHarness({ taskId: "st_00000006", alive: true, registry })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("resumed")
@@ -340,7 +369,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, manager, lifecycle } = createHarness({ taskId: "st_00000007", status: "completed" })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("resumed")
@@ -349,19 +378,19 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(manager.getResidentHandle("st_00000007")?.pid).toBe(1001)
   })
 
-  test(" w2reattach #given a completed resident daemon with a live foreign pid #when reconciled #then it is terminated before reattach", async () => {
+  test(" w2reattach #given a completed resident with a live pid #when reconciled #then it is retained without respawn", async () => {
     // given
-    const { store, manager, signals, lifecycle } = createHarness({ taskId: "st_0000000a", status: "completed", alive: true })
+    const { store, signals, lifecycle } = createHarness({ taskId: "st_0000000a", status: "completed", alive: true })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
-    expect(signals).toEqual([{ pid: 900, signal: "SIGTERM" }])
-    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(signals).toEqual([])
+    expect(result.outcomes[0]?.kind).toBe("untrusted_live_process")
     expect(store.load("st_0000000a")?.status).toBe("completed")
     expect(store.load("st_0000000a")?.residency_state).toBe("resident")
-    expect(manager.getResidentHandle("st_0000000a")?.pid).toBe(1001)
+    expect(store.load("st_0000000a")?.pid).toBe(900)
   })
 
   test(" w2reattach #given overlapping reconcile sweeps #when both respawn #then the duplicate child is discarded without replacing the owner", async () => {
@@ -369,7 +398,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, respawnRunner, manager, lifecycle } = createHarness({ taskId: "st_0000000b" })
 
     // when
-    const results = await Promise.all([lifecycle.reconcileOnSessionStart(), lifecycle.reconcileOnSessionStart()])
+    const results = await Promise.all([lifecycle.reconcileOnSessionStart("parent-1"), lifecycle.reconcileOnSessionStart("parent-1")])
 
     // then
     expect(respawnRunner.startedSpecs).toHaveLength(2)
@@ -380,17 +409,24 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1001)
   })
 
-  test(" w2reattach #given a process runner reports effective launch inputs #when persisted record is reloaded #then only safe spawn facts survive", async () => {
+  test(" w2reattach #given a process runner reports launch inputs #when persisted record is reloaded #then launch inputs do not persist", async () => {
     // given
     const processRunner = new EffectiveSpawnRunner()
     const { store, manager } = createHarness({ taskId: "st_0000000c", processRunner })
 
     // when
-    const result = await manager.start({ prompt: "bootstrap", parent_session_id: "parent-1", depth: 1, execution_mode: "process" })
+    const result = await manager.start({
+      prompt: "bootstrap",
+      parent_session_id: "parent-1",
+      depth: 1,
+      execution_mode: "process",
+      caller_role: "coordinator",
+      lineage: "known",
+    })
 
     // then
     if (result.kind !== "started") throw new Error("expected started task")
-    expect(store.load(result.task_id)?.spawn_spec).toEqual({ cwd: "/tmp/project" })
+    expect(store.load(result.task_id)).not.toHaveProperty("spawn_spec")
   })
 
   test(" w2reattach #given switch_session is cancelled #when reconciled #then the fresh child is torn down and the record stays lost", async () => {
@@ -399,7 +435,7 @@ describe("reconcileOnSessionStart reattach", () => {
     respawnRunner.cancelSwitch = true
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -421,7 +457,7 @@ describe("reconcileOnSessionStart reattach", () => {
     createTaskManager({
       store,
       runners: { "in-process": inProcess, process: inProcess },
-      planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
+       planner: (spec) => ({ kind: "resolved", plan: { model: "anthropic/claude", ...(spec.category === undefined ? {} : { category: spec.category }) } }),
       config: settings(),
       cwd: "/tmp/project",
       rpcRespawnRunner: respawnRunner,
@@ -429,6 +465,7 @@ describe("reconcileOnSessionStart reattach", () => {
         if (record.task_id === rejectedRecord.task_id) throw new Error("current team runtime unavailable")
         return undefined
       },
+       trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 }),
     })
     const lifecycle = createTaskLifecycle({
       store,
@@ -436,11 +473,10 @@ describe("reconcileOnSessionStart reattach", () => {
       config: settings(),
       now,
       signaller: fakeSignaller(new Set(), []),
-      orphanKillDelayMs: 0,
     })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes.find((outcome) => outcome.task_id === rejectedRecord.task_id)?.kind).toBe("lost")
@@ -454,6 +490,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const teamRecord = {
       ...seedProcessRecord(store, "st_0000000f"),
       name: "team:11111111-1111-4111-8111-111111111111:alpha",
+      spawn_role: "team_member" as const,
     }
     store.replace(teamRecord)
     const healthyRecord = seedProcessRecord(store, "st_00000010")
@@ -464,7 +501,7 @@ describe("reconcileOnSessionStart reattach", () => {
     createTaskManager({
       store,
       runners: { "in-process": inProcess, process: inProcess },
-      planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
+       planner: (spec) => ({ kind: "resolved", plan: { model: "anthropic/claude", ...(spec.category === undefined ? {} : { category: spec.category }) } }),
       config: settings(),
       cwd: "/tmp/project",
       rpcRespawnRunner: respawnRunner,
@@ -476,6 +513,7 @@ describe("reconcileOnSessionStart reattach", () => {
           inheritedExtensions: ["/trusted/provider-extension.js"],
         },
       }),
+       trustedRespawnAdmission: async () => ({ callerRole: "coordinator", lineage: "known", rootSessionId: "parent-1", childDepth: 1 }),
     })
     const lifecycle = createTaskLifecycle({
       store,
@@ -483,28 +521,43 @@ describe("reconcileOnSessionStart reattach", () => {
       config: settings(),
       now,
       signaller: fakeSignaller(new Set(), []),
-      orphanKillDelayMs: 0,
     })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes.find((outcome) => outcome.task_id === teamRecord.task_id)?.kind).toBe("lost")
     expect(result.outcomes.find((outcome) => outcome.task_id === healthyRecord.task_id)?.kind).toBe("resumed")
     expect(respawnRunner.startedSpecs.map((spec) => spec.task_id)).toEqual([healthyRecord.task_id])
     expect(respawnRunner.startedSpecs[0]?.extensions).toEqual(["/trusted/provider-extension.js"])
-    expect(respawnRunner.startedSpecs[0]?.memberEnv).toBeUndefined()
+    expect(respawnRunner.startedSpecs[0]?.memberEnv).toEqual({
+      SENPI_TASK_LINEAGE_TASK_ID: healthyRecord.task_id,
+    })
   })
 
   test(" w2reattach #given one concurrency slot and two queued tasks #when a reattached task completes #then only the first queued task starts", async () => {
     // given
     const { store, respawnRunner, manager, inProcess, lifecycle } = createHarness({ taskId: "st_00000009", concurrency: 1, config: { default_concurrency: 1 } })
-    await lifecycle.reconcileOnSessionStart()
+    await lifecycle.reconcileOnSessionStart("parent-1")
 
     // when
-    const firstQueued = await manager.start({ prompt: "next", parent_session_id: "parent-1", depth: 1, execution_mode: "in-process" })
-    const secondQueued = await manager.start({ prompt: "later", parent_session_id: "parent-1", depth: 1, execution_mode: "in-process" })
+    const firstQueued = await manager.start({
+      prompt: "next",
+      parent_session_id: "parent-1",
+      depth: 1,
+      execution_mode: "in-process",
+      caller_role: "coordinator",
+      lineage: "known",
+    })
+    const secondQueued = await manager.start({
+      prompt: "later",
+      parent_session_id: "parent-1",
+      depth: 1,
+      execution_mode: "in-process",
+      caller_role: "coordinator",
+      lineage: "known",
+    })
     if (firstQueued.kind !== "started" || secondQueued.kind !== "started") throw new Error("expected queued tasks")
     expect(firstQueued.status).toBe("pending")
     expect(secondQueued.status).toBe("pending")
@@ -553,7 +606,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     const { store, lifecycle } = crossProcessHarness({ host_pid: foreignPid, ownerAlive: true })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then the sibling's live child is never falsely declared lost
     expect(result.outcomes[0]?.kind).toBe("foreign_live_owner")
@@ -568,7 +621,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     const { store, lifecycle } = crossProcessHarness({ host_pid: foreignPid, ownerAlive: false })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -580,7 +633,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     const { store, lifecycle } = crossProcessHarness({ ownerAlive: false })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
@@ -607,7 +660,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     })
 
     // when
-    const result = await lifecycle.reconcileOnSessionStart()
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then a same-process record without a handle is genuinely unreachable
     expect(result.outcomes[0]?.kind).toBe("lost")

@@ -17,7 +17,7 @@ export type DeleteTeamDeps = {
   log: typeof log
 }
 
-export type DeleteTeamBackgroundManager = Pick<BackgroundManager, "getTasksByParentSession" | "cancelTask">
+export type DeleteTeamBackgroundManager = Pick<BackgroundManager, "getTasksByParentSession" | "cancelTaskForCleanup">
 
 const defaultDeleteTeamDeps: DeleteTeamDeps = {
   canVisualize,
@@ -94,7 +94,7 @@ export async function deleteTeam(
       return await deleteTeamResources(teamRunId, config, runtimeState, tmuxMgr, options, deps)
     }
 
-    await Promise.all(teamTasks.map((task) => bgMgr.cancelTask(task.id, {
+    await Promise.all(teamTasks.map((task) => bgMgr.cancelTaskForCleanup(task.id, {
       source: "team-mode-delete",
       reason: `delete team ${teamRunId}`,
     })))

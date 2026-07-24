@@ -151,6 +151,8 @@ export function baseSpec(overrides: Partial<ManagerStartSpec> = {}): ManagerStar
     parent_session_id: "parent-1",
     depth: 1,
     category: "quick",
+    caller_role: "coordinator",
+    lineage: "known",
     ...overrides,
   }
 }

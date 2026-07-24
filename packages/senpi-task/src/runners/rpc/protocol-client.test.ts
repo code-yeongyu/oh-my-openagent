@@ -113,6 +113,8 @@ describe("RpcProtocolClient", () => {
     })
     handle.subscribe((event) => events.push(event))
     if (handle.switchSession === undefined) throw new Error("switchSession was not exposed")
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(events).toEqual([])
     const result = await handle.switchSession("/tmp/session.jsonl")
     await waitFor(() => events.some((event) => event.type === "session_info_changed"))
 

@@ -4,12 +4,13 @@ import { log } from "@oh-my-opencode/utils"
 import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
+import { isProcessPid } from "../state/pid"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
-import type { CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
+import type { CancelOutcome, DestructionPort, InterruptInput, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { decideDepthPolicy } from "./depth-policy"
@@ -26,6 +27,7 @@ import {
 import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { NameRegistry } from "./names"
 import { subscribeTranscriptLog } from "./transcript-log"
+import { buildTaskLineageEnv } from "./lineage-env"
 import type {
   ContinueResult,
   ListScope,
@@ -66,7 +68,7 @@ type TaskManagerImplOptions = TaskManagerOptions & {
 }
 
 type ReattachingTaskManager = TaskManager & {
-  respawn(record: TaskRecord, resumeSessionPath: string): Promise<RespawnResult>
+  respawn(record: TaskRecord, currentSessionId: string, resumeSessionPath: string): Promise<RespawnResult>
   reattach(record: TaskRecord, handle: ManagedChildHandle): Promise<ReattachResult>
   waiterKeyCount(): number
   releasedKeyCount(): number
@@ -75,6 +77,11 @@ type ReattachingTaskManager = TaskManager & {
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
+
+function spawnDenialMessage(decision: Extract<ReturnType<typeof decideDepthPolicy>, { readonly allowed: false }>): string {
+  if (decision.reason === "invalid_policy") return `Invalid spawn policy field: ${decision.invalidField}.`
+  return `Spawn denied: ${decision.reason}.`
+}
 
 function publicStartFailureMessage(error: unknown): string {
   try {
@@ -155,7 +162,7 @@ class TaskManagerImpl implements TaskManager {
     }
     this.#steering = createSteeringEngine(port)
     registerLifecycleReattachPorts(options.store, {
-      respawn: (record, resumeSessionPath) => this.respawn(record, resumeSessionPath),
+      respawn: (record, currentSessionId, resumeSessionPath) => this.respawn(record, currentSessionId, resumeSessionPath),
       reattach: (record, handle) => this.reattach(record, handle),
     })
   }
@@ -170,22 +177,30 @@ class TaskManagerImpl implements TaskManager {
     if (resolution.kind === "error") return { kind: "plan_unresolved", error: resolution.error }
     const plan = resolution.plan
 
-    if (this.#options.admit !== undefined) {
-      const admission = await this.#options.admit(spec.parent_session_id)
-      if (admission.kind === "rejected") return { kind: "residency_denied", reason: admission.message }
-    }
-
-    const maxDepth = plan.maxDepth ?? this.#options.config.max_depth
-    const allowedSubagents = [...(spec.allowed_subagents ?? []), ...(plan.allowedSubagents ?? [])]
-    const targetAgentType = spec.subagent_type ?? plan.agentType
+    const maxDepth = this.#options.config.max_depth
+    const targetAgentType = plan.agentType ?? plan.category ?? spec.subagent_type ?? spec.category ?? plan.model
     const decision = decideDepthPolicy({
       childDepth: spec.depth,
       maxDepth,
-      ...(targetAgentType !== undefined ? { targetAgentType } : {}),
-      allowedSubagents,
+      targetAgentType,
+      callerRole: spec.caller_role ?? "leaf",
+      lineage: spec.lineage ?? "unknown",
+      ...(spec.caller_max_depth !== undefined ? { callerMaxDepth: spec.caller_max_depth } : {}),
+      ...(spec.allowed_subagents !== undefined ? { allowedSubagents: spec.allowed_subagents } : {}),
     })
     if (!decision.allowed) {
-      return { kind: "depth_denied", reason: decision.reason, child_depth: spec.depth, max_depth: maxDepth }
+      return {
+        kind: "depth_denied",
+        reason: spawnDenialMessage(decision),
+        child_depth: spec.depth,
+        max_depth: "effectiveMaxDepth" in decision ? decision.effectiveMaxDepth : maxDepth,
+        denial: decision,
+      }
+    }
+
+    if (this.#options.admit !== undefined) {
+      const admission = await this.#options.admit(spec.parent_session_id)
+      if (admission.kind === "rejected") return { kind: "residency_denied", reason: admission.message }
     }
 
     const executionMode: ExecutionMode = resolveExecutionMode({
@@ -216,8 +231,8 @@ class TaskManagerImpl implements TaskManager {
         kind: "start_failed",
         task_id: "",
         name: requestedName ?? "",
-        ...(spec.category ?? plan.category !== undefined ? { category: spec.category ?? plan.category } : {}),
-        ...(spec.subagent_type ?? plan.agentType !== undefined ? { subagent_type: spec.subagent_type ?? plan.agentType } : {}),
+        ...(plan.category ?? spec.category !== undefined ? { category: plan.category ?? spec.category } : {}),
+        ...(plan.agentType ?? spec.subagent_type !== undefined ? { subagent_type: plan.agentType ?? spec.subagent_type } : {}),
         execution_mode: executionMode,
         model: plan.model,
         ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
@@ -238,16 +253,7 @@ class TaskManagerImpl implements TaskManager {
         cwd: this.#options.cwd,
         stateDir: this.#options.store.stateDir,
       })
-      finalRecord = executionMode === "process"
-        ? {
-            ...renamedRecord,
-            spawn_spec: {
-              cwd: managedSpec.cwd,
-              ...(managedSpec.extensions === undefined ? {} : { extensions: managedSpec.extensions }),
-              ...(managedSpec.memberEnv === undefined ? {} : { member_env: managedSpec.memberEnv }),
-            },
-          }
-        : renamedRecord
+      finalRecord = renamedRecord
       if (finalRecord !== claimed) this.#options.store.replace(finalRecord)
       if (spec.run_in_background === true) this.#background.add(finalRecord.task_id)
     } catch (error) {
@@ -317,9 +323,10 @@ class TaskManagerImpl implements TaskManager {
   async continueTask(
     taskIdOrName: string,
     prompt: string,
+    callerSessionId: string | undefined,
     deliverAs: "steer" | "followUp" = "followUp",
   ): Promise<ContinueResult> {
-    const outcome = await this.#steering.sendToTask({ idOrName: taskIdOrName, message: prompt, deliverAs })
+    const outcome = await this.#steering.sendToTask({ idOrName: taskIdOrName, message: prompt, deliverAs, callerSessionId })
     return toContinueResult(outcome)
   }
 
@@ -327,14 +334,14 @@ class TaskManagerImpl implements TaskManager {
     return this.#steering.sendToTask(input)
   }
 
-  async interruptTask(idOrName: string): Promise<InterruptOutcome> {
-    const outcome = await this.#steering.interruptTask(idOrName)
+  async interruptTask(input: InterruptInput): Promise<InterruptOutcome> {
+    const outcome = await this.#steering.interruptTask(input)
     if (outcome.kind === "interrupted") this.#releaseSlotForTask(outcome.task_id)
     return outcome
   }
 
-  async cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome> {
-    const outcome = await this.#steering.cancelTask(idOrName, reason)
+  async cancelTask(idOrName: string, reason?: string, callerSessionId?: string): Promise<CancelOutcome> {
+    const outcome = await this.#steering.cancelTask({ idOrName, reason, callerSessionId })
     if (outcome.kind === "cancelled") this.#releaseSlotForTask(outcome.task_id)
     return outcome
   }
@@ -384,39 +391,87 @@ class TaskManagerImpl implements TaskManager {
 
   wasBackground(taskId: string): boolean { return this.#background.has(taskId) }
 
-  async respawn(record: TaskRecord, resumeSessionPath: string): Promise<RespawnResult> {
-    const spawnSpec = record.spawn_spec
-    if (spawnSpec === undefined) return { ok: false, reason: "persisted spawn spec unavailable" }
+  async respawn(record: TaskRecord, currentSessionId: string, resumeSessionPath: string): Promise<RespawnResult> {
+    if (record.parent_session_id !== currentSessionId) return { ok: false, reason: "persisted record belongs to another session" }
+    if (record.agent_type === undefined && record.category === undefined) {
+      return { ok: false, reason: "current spawn target unavailable" }
+    }
+    const respawnAdmission = this.#options.trustedRespawnAdmission === undefined
+      ? undefined
+      : await this.#options.trustedRespawnAdmission(record, currentSessionId)
+    if (respawnAdmission === undefined) return { ok: false, reason: "current spawn policy unavailable" }
+    const currentTarget = this.#options.planner({
+      prompt: "",
+      parent_session_id: currentSessionId,
+      root_session_id: respawnAdmission.rootSessionId,
+      depth: respawnAdmission.childDepth,
+      ...(record.agent_type !== undefined
+        ? { subagent_type: record.agent_type }
+        : record.category !== undefined
+          ? { category: record.category }
+          : {}),
+    })
+    if (
+      currentTarget.kind === "error"
+      || (record.agent_type !== undefined && currentTarget.plan.agentType !== record.agent_type)
+      || (record.category !== undefined && currentTarget.plan.category !== record.category)
+    ) return { ok: false, reason: "current spawn target unavailable" }
+    const decision = decideDepthPolicy({
+      childDepth: respawnAdmission.childDepth,
+      maxDepth: this.#options.config.max_depth,
+      targetAgentType: currentTarget.plan.agentType ?? currentTarget.plan.category ?? currentTarget.plan.model,
+      callerRole: respawnAdmission.callerRole,
+      lineage: respawnAdmission.lineage,
+      ...(respawnAdmission.callerMaxDepth !== undefined ? { callerMaxDepth: respawnAdmission.callerMaxDepth } : {}),
+      ...(respawnAdmission.allowedSubagents !== undefined ? { allowedSubagents: respawnAdmission.allowedSubagents } : {}),
+    })
+    if (!decision.allowed) return { ok: false, reason: spawnDenialMessage(decision) }
 
     let handle: RpcChildHandle | undefined
+    let stagedPid: number | undefined
     try {
       const trustedLaunch = this.#options.trustedRespawnLaunch === undefined
         ? undefined
         : await this.#options.trustedRespawnLaunch(record)
       handle = this.#rpcRespawnRunner.start({
         task_id: record.task_id,
-        cwd: spawnSpec.cwd,
+        cwd: trustedLaunch?.cwd ?? this.#options.cwd,
         state_dir: join(this.#options.store.stateDir, "children", record.task_id),
         prompt: "",
         resumeSessionPath,
-        model: record.model,
-        ...(record.resolved_model?.variant === undefined ? {} : { variant: record.resolved_model.variant }),
+        model: currentTarget.plan.model,
+        ...(currentTarget.plan.variant === undefined ? {} : { variant: currentTarget.plan.variant }),
         ...(trustedLaunch?.extensions === undefined ? {} : { extensions: trustedLaunch.extensions }),
-        ...(trustedLaunch?.memberEnv === undefined ? {} : { memberEnv: trustedLaunch.memberEnv }),
+        memberEnv: buildTaskLineageEnv(record, trustedLaunch?.memberEnv),
       })
+      const pidFacts = processFacts(handle.pid)
+      if (pidFacts.pid !== undefined && pidFacts.pid !== record.pid) {
+        this.#options.store.replace({ ...(this.#tryLoad(record.task_id) ?? record), ...pidFacts })
+        stagedPid = pidFacts.pid
+      }
       const switchSession = handle.switchSession
       if (switchSession === undefined) {
         if (!(await this.#disposeFailedRespawn(handle))) return { ok: false, reason: RESPAWN_CLEANUP_FAILURE_REASON }
+        this.#restoreRespawnPid(record, stagedPid)
         return { ok: false, reason: "respawned RPC handle cannot switch sessions" }
       }
       const switched = await switchSession(resumeSessionPath)
       if (switched.cancelled) {
         if (!(await this.#disposeFailedRespawn(handle))) return { ok: false, reason: RESPAWN_CLEANUP_FAILURE_REASON }
+        this.#restoreRespawnPid(record, stagedPid)
         return { ok: false, reason: "switch_session was cancelled" }
       }
+      const { resolved_model: _staleResolvedModel, ...currentRecord } = this.#tryLoad(record.task_id) ?? record
+      this.#options.store.replace({
+        ...currentRecord,
+        model: currentTarget.plan.model,
+        ...(currentTarget.plan.resolved_model === undefined ? {} : { resolved_model: currentTarget.plan.resolved_model }),
+        updated_at: nowIso(this.#now),
+      })
       return { ok: true, handle: adaptRpcHandle(handle) }
     } catch (error) { // no-excuse-ok: catch - RPC respawn boundary converts failures into a typed result.
       const cleanedUp = handle === undefined || await this.#disposeFailedRespawn(handle)
+      if (cleanedUp) this.#restoreRespawnPid(record, stagedPid)
       log("senpi-task rpc respawn failed", { taskId: record.task_id, error: String(error) })
       return { ok: false, reason: cleanedUp ? "rpc respawn failed" : RESPAWN_CLEANUP_FAILURE_REASON }
     }
@@ -429,40 +484,44 @@ class TaskManagerImpl implements TaskManager {
     }
     let unsubscribe: (() => void) | undefined
     let acquiredEpoch: number | undefined
+    let acquiredModel: string | undefined
     try {
+      const currentRecord = this.#tryLoad(record.task_id) ?? record
+      const pidFacts = processFacts(handle.pid)
       unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
-      this.#live.set(record.task_id, { handle, model: record.model, unsubscribe })
+      this.#live.set(record.task_id, { handle, model: currentRecord.model, unsubscribe })
       this.#attachChildSubscribers(record.task_id, handle)
-      if (isTerminalRecord(record) && record.status !== "lost") {
+      if (isTerminalRecord(currentRecord) && currentRecord.status !== "lost") {
         this.#options.store.replace({
-          ...record,
+          ...currentRecord,
           residency_state: "resident",
           host_pid: this.#hostPid,
           updated_at: nowIso(this.#now),
-          ...(handle.pid === undefined ? {} : { pid: handle.pid }),
+          ...pidFacts,
         })
         return { ok: true }
       }
 
-      const { error_message: _error, final_response: _final, killed: _killed, ...rest } = record
+      const { error_message: _error, final_response: _final, killed: _killed, ...rest } = currentRecord
       const reattached: TaskRecord = {
         ...rest,
         status: "running",
         residency_state: "resident",
         host_pid: this.#hostPid,
         updated_at: nowIso(this.#now),
-        notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
-        ...(handle.pid === undefined ? {} : { pid: handle.pid }),
+        notification: { ...currentRecord.notification, run_epoch: currentRecord.notification.run_epoch + 1 },
+        ...pidFacts,
       }
       this.#options.store.replace(reattached)
       acquiredEpoch = reattached.notification.run_epoch
-      this.#concurrency.acquire(record.model, record.task_id)
-      this.#trackOutcome(record.task_id, handle, record.model, acquiredEpoch)
+      acquiredModel = currentRecord.model
+      this.#concurrency.acquire(currentRecord.model, record.task_id)
+      this.#trackOutcome(record.task_id, handle, currentRecord.model, acquiredEpoch)
       return { ok: true }
     } catch (error) { // no-excuse-ok: catch - ownership-transfer boundary converts setup failure into a typed result.
       unsubscribe?.()
       if (this.#live.get(record.task_id)?.handle === handle) this.#live.delete(record.task_id)
-      if (acquiredEpoch !== undefined) this.#releaseSlot(record.task_id, record.model, acquiredEpoch)
+      if (acquiredEpoch !== undefined && acquiredModel !== undefined) this.#releaseSlot(record.task_id, acquiredModel, acquiredEpoch)
       await discardManagedHandle(handle)
       log("senpi-task rpc reattach failed", { taskId: record.task_id, error: String(error) })
       return { ok: false, kind: "failed", reason: "manager reattach failed" }
@@ -519,6 +578,23 @@ class TaskManagerImpl implements TaskManager {
     }
   }
 
+  #restoreRespawnPid(record: TaskRecord, stagedPid: number | undefined): void {
+    if (stagedPid === undefined) return
+    const current = this.#tryLoad(record.task_id)
+    if (current?.pid !== stagedPid) return
+    const livePid = processFacts(this.#live.get(record.task_id)?.handle.pid).pid
+    if (livePid !== undefined) {
+      this.#options.store.replace({ ...current, pid: livePid })
+      return
+    }
+    if (record.pid === undefined) {
+      const { pid: _pid, ...restored } = current
+      this.#options.store.replace(restored)
+      return
+    }
+    this.#options.store.replace({ ...current, pid: record.pid })
+  }
+
   async #launch(context: LaunchContext): Promise<{ ok: true } | { ok: false; error: string }> {
     const { record, managedSpec, runner, model } = context
     const startResult = this.#options.store.transition(record.task_id, { type: "start", timestamp: nowIso(this.#now) })
@@ -560,9 +636,8 @@ class TaskManagerImpl implements TaskManager {
     return { ok: true }
   }
 
-  // Persist the spawned child's OS pid onto the running record so task_output(status) and session_start
-  // reconciliation can see (and, for an orphan, signal) the live process. The pure decision lives in
-  // recordSpawnedPid; in-process children (no pid) and already-terminal records are left untouched.
+  // Persist only the spawned child's OS pid so reconciliation can identify a live process. Launch
+  // inputs remain runtime-only and are rebuilt from current configuration during respawn.
   #attachChildSubscribers(taskId: string, handle: ManagedChildHandle): void {
     const subscribers = this.#childSubscribers.get(taskId)
     if (subscribers === undefined) return
@@ -575,18 +650,7 @@ class TaskManagerImpl implements TaskManager {
     const current = this.#tryLoad(taskId)
     if (current === null || isTerminalRecord(current)) return
     const withPid = recordSpawnedPid(current, handle.pid) ?? current
-    const spawnSpec = handle.spawnSpec
-    const updated: TaskRecord = spawnSpec === undefined
-      ? withPid
-      : {
-          ...withPid,
-          spawn_spec: {
-            cwd: spawnSpec.cwd,
-            ...(spawnSpec.extensions === undefined ? {} : { extensions: spawnSpec.extensions }),
-            ...(spawnSpec.memberEnv === undefined ? {} : { member_env: spawnSpec.memberEnv }),
-          },
-        }
-    if (updated !== current) this.#options.store.replace(updated)
+    if (withPid !== current) this.#options.store.replace(withPid)
   }
 
   #trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
@@ -659,6 +723,11 @@ class TaskManagerImpl implements TaskManager {
       return null
     }
   }
+}
+
+function processFacts(pid: number | undefined): Partial<Pick<TaskRecord, "pid">> {
+  if (pid === undefined || !isProcessPid(pid)) return {}
+  return { pid }
 }
 
 export function createTaskManager(options: TaskManagerImplOptions): ReattachingTaskManager {

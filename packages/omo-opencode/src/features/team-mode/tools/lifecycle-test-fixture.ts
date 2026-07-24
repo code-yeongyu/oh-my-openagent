@@ -26,7 +26,7 @@ export function createToolContext(sessionID: string): ToolContext {
   return {
     sessionID,
     messageID: randomUUID(),
-    agent: "test-agent",
+    agent: "sisyphus",
     directory: "/project",
     worktree: "/project",
     abort: new AbortController().signal,

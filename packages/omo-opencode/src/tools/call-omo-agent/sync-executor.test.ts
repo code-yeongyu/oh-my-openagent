@@ -1,6 +1,5 @@
 /// <reference types="bun-types" />
 
-import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { describe, test, expect, mock } from "bun:test"
 
 type ExecuteSync = typeof import("./sync-executor").executeSync
@@ -268,7 +267,6 @@ describe("executeSync", () => {
       toolContext,
       createContext(recorder.promptAsync) as never,
       deps,
-      undefined,
       undefined,
       model,
     )
@@ -576,54 +574,6 @@ describe("executeSync", () => {
     expect(recorder.promptAsync).toHaveBeenCalledTimes(1)
     expect(deps.waitForCompletion).toHaveBeenCalledTimes(1)
     expect(deps.processMessages).toHaveBeenCalledTimes(1)
-  })
-
-  test("commits reserved descendant quota after creating a new sync session", async () => {
-    //#given
-    const { executeSync } = require("./sync-executor")
-
-    const deps = {
-      createOrGetSession: mock(async () => ({ sessionID: "ses-test-789", isNew: true })),
-      waitForCompletion: mock(async () => {}),
-      processMessages: mock(async () => "agent response"),
-      setSessionFallbackChain: mock(() => {}),
-      clearSessionFallbackChain: mock(() => {}),
-    }
-
-    const spawnReservation = {
-      commit: mock(() => 1),
-      rollback: mock(() => {}),
-    }
-
-    const args = {
-      subagent_type: "explore",
-      description: "test task",
-      prompt: "find something",
-    }
-
-    const toolContext = {
-      sessionID: "parent-session",
-      messageID: "msg-4",
-      agent: "sisyphus",
-      abort: new AbortController().signal,
-      metadata: mock(async () => {}),
-    }
-
-    const ctx = {
-      client: {
-        session: {
-          prompt: mock(async () => ({ data: {} })),
-          promptAsync: mock(async () => ({ data: {} })),
-        },
-      },
-    }
-
-    //#when
-    await executeSync(args, toolContext, unsafeTestValue(ctx), deps, undefined, spawnReservation)
-
-    //#then
-    expect(spawnReservation.commit).toHaveBeenCalledTimes(1)
-    expect(spawnReservation.rollback).toHaveBeenCalledTimes(0)
   })
 
   test("strips legacy ZWSP-prefixed agent names from persisted sync prompt body (GH-3259)", async () => {

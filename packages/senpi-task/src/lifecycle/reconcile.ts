@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
+import { isProcessPid } from "../state/pid"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
@@ -8,104 +9,68 @@ import { destroyResidentTask } from "./destroy"
 import { getLifecycleReattachPorts } from "./port"
 import type { ReconcileOutcome, ReconcileResult } from "./types"
 
-const HEARTBEAT_FRESH_MS = 30_000
-
-/** Reconcile persisted task records with handles and processes visible to this session. */
-export async function reconcileOnSessionStart(context: LifecycleContext): Promise<ReconcileResult> {
+export async function reconcileOnSessionStart(context: LifecycleContext, currentSessionId: string | undefined): Promise<ReconcileResult> {
   const outcomes: ReconcileOutcome[] = []
   for (const record of context.store.list().records) {
-    outcomes.push(await reconcileRecord(context, record))
+    outcomes.push(await reconcileRecord(context, record, currentSessionId))
   }
   return { outcomes }
 }
 
-async function reconcileRecord(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
+async function reconcileRecord(
+  context: LifecycleContext,
+  record: TaskRecord,
+  currentSessionId: string | undefined,
+): Promise<ReconcileOutcome> {
+  if (currentSessionId === undefined || currentSessionId.length === 0) {
+    return { task_id: record.task_id, kind: "untrusted_session", reason: "current session unavailable" }
+  }
+  if (record.parent_session_id !== currentSessionId) {
+    return { task_id: record.task_id, kind: "foreign_session", reason: "record belongs to another session" }
+  }
   if (hasLiveResidentHandle(context, record.task_id)) {
     return { task_id: record.task_id, kind: "resumed", reason: "owned by this process" }
   }
 
+  const foreignHostPid = record.host_pid
+  if (foreignHostPid !== undefined && isProcessPid(foreignHostPid) && foreignHostPid !== context.hostPid) {
+    if (context.signaller.isAlive(foreignHostPid)) {
+      return { task_id: record.task_id, kind: "foreign_live_owner", reason: `task owned by live process pid=${foreignHostPid}` }
+    }
+  }
+
   if (TERMINAL_STATUSES.has(record.status)) {
-    return reconcileTerminalRecord(context, record)
+    return reconcileTerminalRecord(context, record, currentSessionId)
   }
 
   if (record.execution_mode !== "process") {
-    // The project store is shared by every senpi process in this project. A record owned by a LIVE
-    // sibling process is not orphaned: marking it lost here would clobber that process's running
-    // child (its completion would then be dropped as a late transition). Only a dead owner - or a
-    // legacy record with no owner pid - is genuinely unreachable from any process.
-    const ownerPid = record.host_pid
-    if (ownerPid !== undefined && ownerPid !== context.hostPid && context.signaller.isAlive(ownerPid)) {
-      return {
-        task_id: record.task_id,
-        kind: "foreign_live_owner",
-        reason: `in-process child owned by live process pid=${ownerPid}`,
-      }
-    }
     await markLost(context, record, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }
 
   const pid = record.pid
-  if (pid === undefined) {
+  if (pid === undefined || !isProcessPid(pid)) {
     await markLost(context, record, "rpc task had no recorded pid")
     return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
   }
 
   const alive = context.signaller.isAlive(pid)
-  if (context.config.reattach_on_reconcile === false) {
-    return reconcileWithoutReattach(context, record, pid, alive)
+  if (alive) {
+    return { task_id: record.task_id, kind: "untrusted_live_process", reason: `live pid ${pid} has no local handle` }
   }
 
   const sessionPath = newestSessionPath(context, record.task_id)
-  if (!alive) {
-    if (sessionPath !== undefined) return reattachRecord(context, record, sessionPath)
+  if (context.config.reattach_on_reconcile === false || sessionPath === undefined) {
     await markLost(context, record, `rpc pid=${pid} is dead; mapping exit facts only`)
     return { task_id: record.task_id, kind: "lost", reason: `dead pid ${pid}` }
   }
-
-  const heartbeat = heartbeatState(context, record)
-  await markLost(
-    context,
-    record,
-    `rpc orphan pid=${pid} session=${record.child_session_id ?? "unknown"} heartbeat=${heartbeat}; terminating before reattach`,
-  )
-  if (sessionPath === undefined) {
-    return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
-  }
-  const current = context.store.load(record.task_id) ?? record
-  return reattachRecord(context, current, sessionPath)
-}
-
-async function reconcileWithoutReattach(
-  context: LifecycleContext,
-  record: TaskRecord,
-  pid: number,
-  alive: boolean,
-): Promise<ReconcileOutcome> {
-  if (!alive) {
-    await markLost(context, record, `rpc pid=${pid} is dead; mapping exit facts only`)
-    return { task_id: record.task_id, kind: "lost", reason: `dead pid ${pid}` }
-  }
-  return loseAndTerminate(context, record, pid)
-}
-
-async function loseAndTerminate(
-  context: LifecycleContext,
-  record: TaskRecord,
-  pid: number,
-): Promise<ReconcileOutcome> {
-  const heartbeat = heartbeatState(context, record)
-  await markLost(
-    context,
-    record,
-    `rpc orphan pid=${pid} session=${record.child_session_id ?? "unknown"} heartbeat=${heartbeat}; reattach disabled, terminating orphan`,
-  )
-  return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
+  return reattachRecord(context, record, currentSessionId, sessionPath)
 }
 
 async function reattachRecord(
   context: LifecycleContext,
   record: TaskRecord,
+  currentSessionId: string,
   sessionPath: string,
 ): Promise<ReconcileOutcome> {
   const ports = context.reattachPorts ?? getLifecycleReattachPorts(context.store)
@@ -114,7 +79,7 @@ async function reattachRecord(
     return { task_id: record.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
-  const respawned = await ports.respawn(record, sessionPath)
+  const respawned = await ports.respawn(record, currentSessionId, sessionPath)
   if (!respawned.ok) {
     await markLost(context, record, `reattach failed: ${respawned.reason}`)
     return { task_id: record.task_id, kind: "lost", reason: respawned.reason }
@@ -127,45 +92,40 @@ async function reattachRecord(
     await markLost(context, context.store.load(record.task_id) ?? record, reattached.reason)
     return { task_id: record.task_id, kind: "lost", reason: reattached.reason }
   }
-  context.store.appendEvent(record.task_id, {
-    type: "reconcile_reattached",
-    payload: { session_path: sessionPath },
-  })
+  context.store.appendEvent(record.task_id, { type: "reconcile_reattached", payload: { session_path: sessionPath } })
   return { task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" }
 }
 
-async function reconcileTerminalRecord(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (record.status === "lost") {
-    // Self-heal leaked {lost, resident} records persisted before lost tasks released their claim: a
-    // lost child is unreachable, so it must never keep holding a residency slot across sessions.
-    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return { task_id: record.task_id, kind: "lost", reason: "already lost" }
-  }
+async function reconcileTerminalRecord(
+  context: LifecycleContext,
+  record: TaskRecord,
+  currentSessionId: string,
+): Promise<ReconcileOutcome> {
   const pid = record.pid
-  if (record.execution_mode !== "process" || record.residency_state !== "resident" || pid === undefined) {
+  if (record.execution_mode !== "process" || record.residency_state !== "resident" || pid === undefined || !isProcessPid(pid)) {
+    if (record.status === "lost") {
+      if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
+      return { task_id: record.task_id, kind: "lost", reason: "already lost" }
+    }
     return { task_id: record.task_id, kind: "resumed" }
   }
 
   const alive = context.signaller.isAlive(pid)
   const sessionPath = newestSessionPath(context, record.task_id)
   if (alive) {
+    return { task_id: record.task_id, kind: "untrusted_live_process", reason: `live pid ${pid} has no local handle` }
+  }
+  if (record.status === "lost") {
     await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    if (sessionPath === undefined || context.config.reattach_on_reconcile === false) {
-      return { task_id: record.task_id, kind: "lost_and_terminated", reason: `terminal resident orphan pid ${pid}` }
-    }
-    return reattachRecord(context, context.store.load(record.task_id) ?? record, sessionPath)
+    return { task_id: record.task_id, kind: "lost", reason: "already lost" }
   }
   if (sessionPath !== undefined && context.config.reattach_on_reconcile !== false) {
-    return reattachRecord(context, record, sessionPath)
+    return reattachRecord(context, record, currentSessionId, sessionPath)
   }
   return { task_id: record.task_id, kind: "resumed" }
 }
 
 function hasLiveResidentHandle(context: LifecycleContext, taskId: string): boolean {
-  // The adapter registry is a view over the manager and can briefly expose an incomplete keyed
-  // lookup while a session transition is publishing its new epoch. The entries snapshot is the
-  // authoritative same-process ownership witness; never classify that resident as a prior-process
-  // task merely because the point lookup missed it.
   return context.registry.get(taskId) !== undefined || context.registry.entries().some((handle) => handle.task_id === taskId)
 }
 
@@ -177,11 +137,7 @@ function newestSessionPath(context: LifecycleContext, taskId: string): string | 
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue
       const path = join(sessionDir, entry.name)
       const mtimeMs = statSync(path).mtimeMs
-      if (
-        newest === undefined ||
-        mtimeMs > newest.mtimeMs ||
-        (mtimeMs === newest.mtimeMs && path > newest.path)
-      ) {
+      if (newest === undefined || mtimeMs > newest.mtimeMs || (mtimeMs === newest.mtimeMs && path > newest.path)) {
         newest = { path, mtimeMs }
       }
     }
@@ -196,13 +152,6 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error
 }
 
-function heartbeatState(context: LifecycleContext, record: TaskRecord): "fresh" | "stale" {
-  return context.now() - Date.parse(record.updated_at) < HEARTBEAT_FRESH_MS ? "fresh" : "stale"
-}
-
-// Mark a record lost AND release its residency claim through the destruction port: a lost child is
-// unreachable, so it must never keep occupying a residency slot the LRU gate cannot reclaim
-// (the reconcile_lost cause also kills a still-alive orphan pid before the claim is dropped).
 async function markLost(context: LifecycleContext, record: TaskRecord, message: string): Promise<void> {
   const result = markRecordLostForReconciliation(record, { timestamp: nowIso(context), error_message: message })
   if (!result.applied) return

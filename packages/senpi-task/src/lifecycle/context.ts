@@ -1,11 +1,9 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import { log } from "@oh-my-opencode/utils"
 
+import { isProcessPid } from "../state/pid"
 import type { TaskRecordStore } from "../store"
 import { injectedLifecycleReattachPorts } from "./port"
 import type { LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
-
-const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
 
 export type LifecycleContext = {
   readonly store: TaskRecordStore
@@ -13,28 +11,19 @@ export type LifecycleContext = {
   readonly config: OmoTaskSettings
   readonly now: () => number
   readonly signaller: ProcessSignaller
-  readonly orphanKillDelayMs: number
   readonly hostPid: number
   readonly reattachPorts: LifecycleReattachPorts | undefined
 }
 
-// The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
-// no other module needs to reach for it. Signal 0 probes existence; EPERM means the pid exists but
-// belongs to another user, which still counts as alive.
 export const defaultSignaller: ProcessSignaller = {
   isAlive(pid) {
+    if (!isProcessPid(pid)) return false
     try {
       process.kill(pid, 0)
       return true
     } catch (error) {
-      return (error as NodeJS.ErrnoException).code === "EPERM"
-    }
-  },
-  signal(pid, signal) {
-    try {
-      process.kill(pid, signal)
-    } catch (error) {
-      log("senpi-task orphan signal skipped", { pid, signal, error: String(error) })
+      if (!(error instanceof Error)) throw error
+      return "code" in error && error.code === "EPERM"
     }
   },
 }
@@ -46,7 +35,6 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     config: deps.config,
     now: deps.now ?? Date.now,
     signaller: deps.signaller ?? defaultSignaller,
-    orphanKillDelayMs: deps.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS,
     hostPid: deps.hostPid ?? process.pid,
     reattachPorts: injectedLifecycleReattachPorts(deps),
   }
@@ -57,7 +45,3 @@ export function nowIso(context: LifecycleContext): string {
 }
 
 export const TERMINAL_STATUSES = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
-
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}

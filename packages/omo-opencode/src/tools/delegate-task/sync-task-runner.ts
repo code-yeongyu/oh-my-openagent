@@ -10,6 +10,7 @@ import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
 import type { SyncTaskDeps } from "./sync-task-deps"
 import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import { requireSpawnCallerIdentity } from "../../features/background-agent/subagent-spawn-limits"
 
 type SyncTaskRunnerInput = {
   readonly args: DelegateTaskArgs
@@ -177,6 +178,11 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
         return pollError
       }
 
+      await executorCtx.manager.assertCanSpawn({
+        parentSessionID: parentContext.sessionID,
+        parentAgent: requireSpawnCallerIdentity(parentContext.agent ?? ctx.agent),
+        targetAgent: agentToUse,
+      })
       cleanupRetrySession(activeSessionID)
 
       const retrySessionResult = await deps.createSyncSession(client, {
