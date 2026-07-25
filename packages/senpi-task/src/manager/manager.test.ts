@@ -417,7 +417,8 @@ describe("TaskManager child subscriptions", () => {
     await flush()
 
     const promoted = runner.handles.get(queued.task_id)
-    expect(promoted?.subscribeCount()).toBe(2)
+    // Owned transcript + run-stats subscriptions plus the deferred external child listener.
+    expect(promoted?.subscribeCount()).toBe(3)
     unsubscribe()
     expect(promoted?.unsubscribeCount()).toBe(1)
   })

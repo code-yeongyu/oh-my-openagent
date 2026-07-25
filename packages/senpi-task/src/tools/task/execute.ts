@@ -47,6 +47,7 @@ function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails 
     execution_mode: record.execution_mode,
     model: record.model,
     ...(record.resolved_model !== undefined && { resolved_model: record.resolved_model }),
+    ...(record.run_stats !== undefined && { run_stats: record.run_stats }),
     run_in_background: false,
   }
 }
@@ -193,7 +194,15 @@ async function runSpawn(
   }
 
   const startedAt = Date.now()
-  const progress = createChildProgress(started.task_id, params.category, startedAt)
+  const progress = createChildProgress(
+    started.task_id,
+    {
+      ...(params.category !== undefined && { category: params.category }),
+      ...(params.subagent_type !== undefined && { agentType: params.subagent_type }),
+      ...(started.resolved_model !== undefined && { resolvedModel: started.resolved_model }),
+    },
+    startedAt,
+  )
   let timer: ReturnType<typeof setTimeout> | undefined
   let emittedAt = 0
   let receivedChildEvent = false
@@ -202,7 +211,7 @@ async function runSpawn(
     if (closed || onUpdate === undefined) return
     emittedAt = Date.now()
     onUpdate({
-      content: [{ type: "text", text: progress.text(emittedAt) }],
+      content: [{ type: "text", text: progress.contentText() }],
       details: partialDetails(started, params, spec.execution_mode, progress.details()),
     })
   }
@@ -229,7 +238,7 @@ async function runSpawn(
   })
   if (started.status === "pending") {
     onUpdate?.({
-      content: [{ type: "text", text: "queued · waiting for slot" }],
+      content: [{ type: "text", text: "" }],
       details: partialDetails(started, params, spec.execution_mode, {
         progress: { activity: "queued · waiting for slot", startedAt },
         childId: started.task_id,

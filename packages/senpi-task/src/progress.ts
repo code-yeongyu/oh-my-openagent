@@ -1,4 +1,6 @@
 import type { ManagedChildEvent } from "./manager/child-handle"
+import { createRunStatsTracker } from "./run-stats"
+import type { ResolvedModelRecord } from "./state"
 
 export type ToolProgressDetails = {
   readonly progress: {
@@ -9,56 +11,86 @@ export type ToolProgressDetails = {
   readonly currentTool?: string
   readonly lastAssistantLine?: string
   readonly turns: number
+  readonly toolCalls?: number
   readonly tokens?: number
+  readonly outputTokens?: number
+  readonly tokensPerSecond?: number
+}
+
+export type ChildProgressTarget = {
+  readonly category?: string
+  readonly agentType?: string
+  readonly resolvedModel?: ResolvedModelRecord
 }
 
 type ChildProgress = {
   accept(event: ManagedChildEvent): boolean
   details(): ToolProgressDetails
-  text(now: number): string
+  // The partial-result content row. The composed status line intentionally lives ONLY in
+  // details.progress.activity: senpi's ToolExecutionRenderer already draws that line below the
+  // result, so echoing it in content would render the same status twice.
+  contentText(): string
 }
 
-export function createChildProgress(taskId: string, category: string | undefined, startedAt: number): ChildProgress {
+export function createChildProgress(
+  taskId: string,
+  target: ChildProgressTarget,
+  startedAt: number,
+  now: () => number = Date.now,
+): ChildProgress {
+  const tracker = createRunStatsTracker(startedAt, now)
+  const targetToken = formatProgressTarget(target)
   let currentTool: string | undefined
   let lastAssistantLine: string | undefined
-  let turns = 0
-  let tokens: number | undefined
+  let lastTotalTokens: number | undefined
 
-  const activity = (): string => currentTool === undefined ? "running" : `running ${currentTool}`
-  const details = (): ToolProgressDetails => ({
-    progress: { activity: activity(), startedAt },
-    childId: taskId,
-    ...(currentTool === undefined ? {} : { currentTool }),
-    ...(lastAssistantLine === undefined ? {} : { lastAssistantLine }),
-    turns,
-    ...(tokens === undefined ? {} : { tokens }),
-  })
+  const activity = (stats: ReturnType<typeof tracker.snapshot>): string => {
+    const running = currentTool === undefined ? "running" : `running ${currentTool}`
+    const tokens = [
+      taskId,
+      targetToken,
+      `turn ${stats.turns}${toolCountSuffix(stats.tool_calls)}`,
+      running,
+      stats.tokens_per_second === undefined ? undefined : `${stats.tokens_per_second} tok/s`,
+    ]
+    return tokens.filter((token): token is string => typeof token === "string" && token.length > 0).join(" · ")
+  }
 
   return {
     accept(event): boolean {
+      const statsChanged = tracker.accept(event)
       if (event.type === "tool_execution_start" && typeof event.toolName === "string") {
         currentTool = toolLabel(event.toolName, event.args ?? event.input)
         return true
       }
       if (event.type === "tool_execution_end") {
-        if (currentTool === undefined) return false
+        if (currentTool === undefined) return statsChanged
         currentTool = undefined
         return true
       }
-      if (event.type !== "message_end") return false
+      if (event.type !== "message_end") return statsChanged
       const text = assistantText(event.message)
-      if (text === undefined) return false
-      turns += 1
+      if (text === undefined) return statsChanged
       lastAssistantLine = truncate(lastNonEmptyLine(text), 120)
-      tokens = readTokens(event.message) ?? tokens
+      lastTotalTokens = readTokens(event.message) ?? lastTotalTokens
       return true
     },
-    details,
-    text(now): string {
-      const elapsed = Math.max(0, Math.floor((now - startedAt) / 1_000))
-      const target = category === undefined ? taskId : `${taskId} · ${category}`
-      const line = `⏵ ${target} · turn ${turns} · ${activity()} · ${elapsed}s`
-      return lastAssistantLine === undefined ? line : `${line}\n↳ last: ${lastAssistantLine}`
+    details(): ToolProgressDetails {
+      const stats = tracker.snapshot(now())
+      return {
+        progress: { activity: activity(stats), startedAt },
+        childId: taskId,
+        ...(currentTool === undefined ? {} : { currentTool }),
+        ...(lastAssistantLine === undefined ? {} : { lastAssistantLine }),
+        turns: stats.turns,
+        toolCalls: stats.tool_calls,
+        ...(lastTotalTokens === undefined ? {} : { tokens: lastTotalTokens }),
+        ...(stats.output_tokens === undefined ? {} : { outputTokens: stats.output_tokens }),
+        ...(stats.tokens_per_second === undefined ? {} : { tokensPerSecond: stats.tokens_per_second }),
+      }
+    },
+    contentText(): string {
+      return lastAssistantLine === undefined ? "" : `↳ last: ${lastAssistantLine}`
     },
   }
 }
@@ -69,8 +101,27 @@ export function readToolProgressDetails(value: unknown): ToolProgressDetails | u
   if (typeof value.childId !== "string" || typeof value.turns !== "number") return undefined
   if (value.currentTool !== undefined && typeof value.currentTool !== "string") return undefined
   if (value.lastAssistantLine !== undefined && typeof value.lastAssistantLine !== "string") return undefined
-  if (value.tokens !== undefined && typeof value.tokens !== "number") return undefined
+  const optionalNumbers = [value.toolCalls, value.tokens, value.outputTokens, value.tokensPerSecond]
+  if (optionalNumbers.some((entry) => entry !== undefined && typeof entry !== "number")) return undefined
   return value as ToolProgressDetails
+}
+
+function formatProgressTarget(target: ChildProgressTarget): string | undefined {
+  const label = target.category ?? target.agentType
+  const model = formatProgressModel(target.resolvedModel)
+  if (label === undefined) return model
+  return model === undefined ? label : `${label} (${model})`
+}
+
+function formatProgressModel(resolved: ResolvedModelRecord | undefined): string | undefined {
+  if (resolved === undefined) return undefined
+  const effort = resolved.reasoning_effort ?? resolved.variant
+  return `${resolved.provider}/${resolved.model_id}${effort === undefined ? "" : `:${effort}`}`
+}
+
+function toolCountSuffix(toolCalls: number): string {
+  if (toolCalls <= 0) return ""
+  return ` (${toolCalls} ${toolCalls === 1 ? "tool" : "tools"})`
 }
 
 function toolLabel(toolName: string, args: unknown): string {

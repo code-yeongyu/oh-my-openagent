@@ -2,7 +2,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
 import type { TaskManager } from "../../manager"
-import type { ResolvedModelRecord } from "../../state"
+import type { ResolvedModelRecord, TaskRunStats } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
 // The narrow slice of senpi's ExtensionContext the task tool reads. ExtensionContext satisfies it
@@ -32,11 +32,6 @@ export type SkillResolution = {
 
 export type SkillLoader = (names: readonly string[], cwd: string) => SkillResolution
 
-export type TaskCallModelResolver = (input: {
-  readonly category?: string
-  readonly subagent_type?: string
-  readonly model?: string
-}) => ResolvedModelRecord | undefined
 
 export type TaskCategoryInfo = {
   readonly name: string
@@ -54,7 +49,6 @@ export type TaskToolDeps = {
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly resolveAncestry?: ResolveAncestry
   readonly loadSkills?: SkillLoader
-  readonly resolveCallModel?: TaskCallModelResolver
 }
 
 export type TaskToolMode = "spawn"
@@ -93,6 +87,7 @@ export type TaskToolDetails = {
   readonly queue_position?: number
   readonly items?: readonly TaskToolItemDetail[]
   readonly reason?: string
+  readonly run_stats?: TaskRunStats
 }
 
 export type { TaskToolParamsStatic }

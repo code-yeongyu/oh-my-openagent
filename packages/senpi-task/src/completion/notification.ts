@@ -16,15 +16,18 @@ export type BuildDetailsOptions = {
 
 export function buildCompletionDetails(record: TaskRecord, options: BuildDetailsOptions = {}): CompletionDetails {
   const head = responseHead(record)
+  const runStats = record.run_stats
+  const tokens = options.tokens ?? runStats?.total_tokens
   const base: CompletionDetails = {
     task_id: record.task_id,
     name: record.name ?? record.task_id,
     status: record.status,
     duration_ms: durationMs(record),
+    ...(runStats === undefined ? {} : { run_stats: runStats }),
     final_response_head: head,
     continuation_hint: continuationHint(record),
   }
-  return options.tokens === undefined ? base : { ...base, tokens: options.tokens }
+  return tokens === undefined ? base : { ...base, tokens }
 }
 
 export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
@@ -67,6 +70,8 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
     `status:${normalizeRendererText(detail.status)}`,
     `duration:${formatDuration(detail.duration_ms)}`,
     detail.tokens === undefined ? undefined : `tokens:${detail.tokens}`,
+    detail.run_stats?.tool_calls === undefined ? undefined : `tools:${detail.run_stats.tool_calls}`,
+    detail.run_stats?.tokens_per_second === undefined ? undefined : `tps:${detail.run_stats.tokens_per_second}`,
   ])
   const head = normalizeRendererText(detail.final_response_head)
   const continuation = normalizeRendererText(detail.continuation_hint)

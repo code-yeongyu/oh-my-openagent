@@ -2,33 +2,114 @@ import { describe, expect, test } from "bun:test"
 
 import { createChildProgress, readToolProgressDetails } from "./progress"
 
-describe("child task progress", () => {
-  test("#given child events #when progress is composed #then it exposes stable live status details", () => {
-    const progress = createChildProgress("st_00000001", "quick", 1_000)
+const RESOLVED_MODEL = {
+  provider: "apitopia",
+  model_id: "kimi-k3-unlocked",
+  display: "Kimi K3 Unlocked",
+  reasoning_effort: "max",
+  source: "category",
+} as const
 
+describe("child task progress", () => {
+  test("#given child events #when progress is composed #then activity carries target, model, turn and tool counts", () => {
+    // given
+    let nowMs = 1_000
+    const progress = createChildProgress(
+      "st_00000001",
+      { category: "quick", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => nowMs,
+    )
+
+    // when
     progress.accept({ type: "tool_execution_start", toolName: "read", args: { path: "src/foo.ts" } })
+    nowMs = 3_000
+    progress.accept({ type: "tool_execution_end", toolName: "read" })
+    nowMs = 5_000
     progress.accept({
       type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "First line\nFinal assistant update" }] },
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "First line\nFinal assistant update" }],
+        usage: { output: 100, totalTokens: 500 },
+      },
     })
 
+    // then
     const details = progress.details()
     expect(details).toEqual({
-      progress: { activity: "running read src/foo.ts", startedAt: 1_000 },
+      progress: {
+        activity: "st_00000001 · quick (apitopia/kimi-k3-unlocked:max) · turn 1 (1 tool) · running · 50 tok/s",
+        startedAt: 1_000,
+      },
       childId: "st_00000001",
-      currentTool: "read src/foo.ts",
       lastAssistantLine: "Final assistant update",
       turns: 1,
+      toolCalls: 1,
+      tokens: 500,
+      outputTokens: 100,
+      tokensPerSecond: 50,
     })
-    expect(progress.text(43_000)).toBe("⏵ st_00000001 · quick · turn 1 · running read src/foo.ts · 42s\n↳ last: Final assistant update")
+    expect(progress.contentText()).toBe("↳ last: Final assistant update")
+  })
+
+  test("#given a running tool #when composed #then the activity names the tool and pluralizes tool counts", () => {
+    // given
+    const progress = createChildProgress("st_00000002", { agentType: "oracle" }, 1_000, () => 2_000)
+
+    // when
+    progress.accept({ type: "tool_execution_start", toolName: "read", args: { path: "a.ts" } })
+    progress.accept({ type: "tool_execution_end", toolName: "read" })
+    progress.accept({ type: "tool_execution_start", toolName: "grep", args: { pattern: "TODO" } })
+    progress.accept({
+      type: "message_end",
+      message: { role: "assistant", content: [{ type: "text", text: "looking" }] },
+    })
+
+    // then
+    const details = progress.details()
+    expect(details.progress.activity).toBe("st_00000002 · oracle · turn 1 (2 tools) · running grep TODO")
+    expect(details.currentTool).toBe("grep TODO")
+    expect(details.toolCalls).toBe(2)
+  })
+
+  test("#given no events yet #when composed #then activity has no turn-zero noise beyond the base status", () => {
+    // given
+    const progress = createChildProgress("st_00000003", { category: "deep" }, 1_000, () => 1_000)
+
+    // then
+    expect(progress.details().progress.activity).toBe("st_00000003 · deep · turn 0 · running")
+    expect(progress.contentText()).toBe("")
   })
 
   test("#given unknown details #when read #then only the local progress shape is accepted", () => {
-    expect(readToolProgressDetails({ progress: { activity: "queued", startedAt: 1 }, childId: "st_1", turns: 0 })).toEqual({
+    expect(
+      readToolProgressDetails({ progress: { activity: "queued", startedAt: 1 }, childId: "st_1", turns: 0 }),
+    ).toEqual({
       progress: { activity: "queued", startedAt: 1 },
       childId: "st_1",
       turns: 0,
     })
+    expect(
+      readToolProgressDetails({
+        progress: { activity: "running", startedAt: 1 },
+        childId: "st_1",
+        turns: 1,
+        toolCalls: 2,
+        outputTokens: 10,
+        tokensPerSecond: 5,
+      }),
+    ).toEqual({
+      progress: { activity: "running", startedAt: 1 },
+      childId: "st_1",
+      turns: 1,
+      toolCalls: 2,
+      outputTokens: 10,
+      tokensPerSecond: 5,
+    })
     expect(readToolProgressDetails({ progress: { startedAt: "1" }, childId: "st_1", turns: 0 })).toBeUndefined()
+    expect(
+      readToolProgressDetails({ progress: { activity: "x", startedAt: 1 }, childId: "st_1", turns: 0, toolCalls: "2" }),
+    ).toBeUndefined()
   })
 })

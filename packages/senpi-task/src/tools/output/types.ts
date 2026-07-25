@@ -2,7 +2,7 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { ToolProgressDetails } from "../../progress"
 import type { TaskManager } from "../../manager"
-import type { ResolvedModelRecord, TaskStatus } from "../../state"
+import type { ResolvedModelRecord, TaskRunStats, TaskStatus } from "../../state"
 import type { CallerSessionResolver, WaitBounds } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "waitFor">
@@ -43,6 +43,7 @@ export type TaskSnapshot = {
   readonly child_session_id?: string
   readonly final_response?: string
   readonly error_message?: string
+  readonly run_stats?: TaskRunStats
   readonly lost?: LostBreadcrumbs
 }
 

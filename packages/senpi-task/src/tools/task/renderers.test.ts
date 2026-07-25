@@ -46,7 +46,7 @@ describe("taskCallLines", () => {
     const lines = taskCallLines(args)
 
     // then
-    expect(lines).toEqual(['task agent:atlas "ship it" foreground'])
+    expect(lines).toEqual(['task "ship it" foreground'])
   })
 
   test("#given a category spawn call #when rendered #then its current target prompt and mode stay stable through extraction", () => {
@@ -57,7 +57,7 @@ describe("taskCallLines", () => {
     const lines = taskCallLines(args)
 
     // then
-    expect(lines).toEqual(['task category:quick "inspect task rendering" foreground'])
+    expect(lines).toEqual(['task "inspect task rendering" foreground'])
   })
 
   test("#given a spawn call #when rendered #then target and mode are summarized", () => {
@@ -65,7 +65,7 @@ describe("taskCallLines", () => {
     const lines = taskCallLines({ prompt: "x", category: "quick", run_in_background: true })
 
     // then
-    expect(lines.join(" ")).toContain("quick")
+    expect(lines.join(" ")).not.toContain("quick")
     expect(lines.join(" ")).toContain("background")
   })
 
@@ -89,21 +89,25 @@ describe("taskCallLines", () => {
 
     // then
     expect(line).toContain("실제 프롬프트")
+    expect(line).toContain("Second line")
     expect(line).not.toContain("\n")
     expect(line).toContain("...")
-    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
+    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(100)
   })
 
   test("#given a long Korean prompt #when excerpted #then truncation backs up to a word boundary", () => {
     // given
-    const prompt = "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트를 확인하세요."
+    const sentence = "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트를 확인하세요."
+    const prompt = `${sentence} ${sentence}`
 
     // when
     const [line = ""] = taskCallLines({ prompt, category: "missing-cat", run_in_background: false })
 
     // then
-    expect(line).toContain('"한국어로 긴 작업 지시를..."')
-    expect(line).not.toContain("작...")
+    expect(line).toContain('"한국어로 긴 작업 지시를')
+    expect(line).toContain("...")
+    expect(line).not.toContain("한국...")
+    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(100)
   })
 })
 
@@ -348,5 +352,45 @@ describe("linesComponent", () => {
     expect(rendered).toHaveLength(1)
     expect(rendered[0]).toContain("...")
     expect(rendererVisibleWidth(rendered[0])).toBeLessThanOrEqual(72)
+  })
+})
+
+describe("taskResultLines run stats", () => {
+  test("#given terminal details with run stats #when rendered #then runtime and tps tokens are appended", () => {
+    // given
+    const details = {
+      task_id: "st_00000009",
+      status: "completed",
+      mode: "spawn" as const,
+      category: "deep",
+      execution_mode: "in-process",
+      model: "apitopia/kimi-k3-unlocked",
+      run_in_background: false,
+      run_stats: {
+        runtime_ms: 134_000,
+        turns: 3,
+        tool_calls: 5,
+        output_tokens: 900,
+        total_tokens: 4_200,
+        generation_ms: 7_600,
+        tokens_per_second: 118,
+      },
+    }
+
+    // when
+    const [line = ""] = taskResultLines(details)
+
+    // then
+    expect(line).toContain("ran:2m14s")
+    expect(line).toContain("tps:118")
+  })
+
+  test("#given details without run stats #when rendered #then no runtime tokens appear", () => {
+    // when
+    const [line = ""] = taskResultLines({ task_id: "st_00000009", status: "completed", mode: "spawn" as const })
+
+    // then
+    expect(line).not.toContain("ran:")
+    expect(line).not.toContain("tps:")
   })
 })

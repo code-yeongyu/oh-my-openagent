@@ -24,7 +24,7 @@ describe("buildPrometheusAgentConfig", () => {
       (category) => ({ model: `${category}/default-model` } as CategoryConfig)
     );
     resolveModelPipelineSpy = spyOn(shared, "resolveModelPipeline").mockReturnValue({
-      model: "anthropic/claude-opus-4-8",
+      model: "anthropic/claude-fable-5",
       provenance: "provider-fallback",
     });
     ;({ buildPrometheusAgentConfig } = await importFreshPrometheusAgentConfigBuilderModule())
@@ -42,7 +42,7 @@ describe("buildPrometheusAgentConfig", () => {
     describe("#when currentModel is NOT in Prometheus fallback chain", () => {
       test("falls through to fallback chain instead of using currentModel as override", async () => {
         // given - currentModel is a model NOT in Prometheus fallback chain
-        // Prometheus chain: claude-opus-4-8, gpt-5.4, glm-5, gemini-3.1-pro
+        // Prometheus chain: claude-fable-5, kimi-k3
         const currentModel = "some-provider/not-prometheus-compatible";
 
         // when
@@ -65,14 +65,14 @@ describe("buildPrometheusAgentConfig", () => {
             systemDefaultModel: undefined,
           }),
         });
-        expect(result.model).toBe("anthropic/claude-opus-4-8");
+        expect(result.model).toBe("anthropic/claude-fable-5");
       });
     });
 
     describe("#when currentModel IS in Prometheus fallback chain", () => {
-      test("preserves currentModel as uiSelectedModel for claude-opus-4-8", async () => {
+      test("preserves currentModel as uiSelectedModel for claude-fable-5", async () => {
         // given - currentModel matches a Prometheus fallback chain entry
-        const currentModel = "anthropic/claude-opus-4-8";
+        const currentModel = "anthropic/claude-fable-5";
 
         // when - should not throw and should produce a valid config
         const result = await buildPrometheusAgentConfig({
@@ -84,6 +84,7 @@ describe("buildPrometheusAgentConfig", () => {
 
         // then - config should be produced (currentModel accepted as valid)
         expect(result).toBeDefined();
+        expect(result.variant).toBe("xhigh");
         expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             intent: expect.objectContaining({
@@ -310,7 +311,7 @@ describe("buildPrometheusAgentConfig", () => {
             },
           })
         );
-        expect(result.model).toBe("anthropic/claude-opus-4-8");
+        expect(result.model).toBe("anthropic/claude-fable-5");
       });
   });
 

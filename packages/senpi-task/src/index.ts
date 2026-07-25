@@ -16,6 +16,7 @@ export type {
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
+  TaskRunStats,
   TaskStatus,
   TaskTransition,
   TaskTransitionAudit,

@@ -142,3 +142,43 @@ describe("buildCompletionMessage", () => {
     expect(message.content).not.toContain("<task-notification>")
   })
 })
+
+describe("completion run stats", () => {
+  test("#given a record with run stats #when details are built #then run stats and token fallback are attached", () => {
+    // given
+    const record = completedRecord({
+      run_stats: {
+        runtime_ms: 3_000,
+        turns: 2,
+        tool_calls: 4,
+        output_tokens: 500,
+        total_tokens: 1_800,
+        generation_ms: 2_000,
+        tokens_per_second: 250,
+      },
+    })
+
+    // when
+    const details = buildCompletionDetails(record)
+    const message = buildCompletionMessage([details])
+
+    // then
+    expect(details.run_stats?.tokens_per_second).toBe(250)
+    expect(details.tokens).toBe(1_800)
+    expect(message.content).toContain("tps:250")
+    expect(message.content).toContain("tools:4")
+  })
+
+  test("#given explicit tokens #when details are built #then the explicit value wins over run stats", () => {
+    // given
+    const record = completedRecord({
+      run_stats: { runtime_ms: 3_000, turns: 1, tool_calls: 0, total_tokens: 1_800 },
+    })
+
+    // when
+    const details = buildCompletionDetails(record, { tokens: 42 })
+
+    // then
+    expect(details.tokens).toBe(42)
+  })
+})

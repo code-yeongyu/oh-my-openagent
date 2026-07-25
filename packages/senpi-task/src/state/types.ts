@@ -34,6 +34,20 @@ export type ResolvedModelRecord = {
   readonly source: ResolvedModelSource
 }
 
+// Usage/runtime facts accumulated over ONE run of the child (spawn to terminal transition).
+// total_tokens sums usage.totalTokens across assistant turns (billed volume: context re-sent
+// per turn counts every time); output_tokens sums completion tokens only. generation_ms sums
+// assistant streaming windows, so tokens_per_second reflects generation speed, not tool time.
+export type TaskRunStats = {
+  readonly runtime_ms: number
+  readonly turns: number
+  readonly tool_calls: number
+  readonly output_tokens?: number
+  readonly total_tokens?: number
+  readonly generation_ms?: number
+  readonly tokens_per_second?: number
+}
+
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
@@ -78,6 +92,7 @@ export type TaskRecord = TaskRecordInput & {
   // Set true when the terminal error was an external kill / exit-by-signal (todo-8 kill contract); a
   // record FACT, not a status - the state vocabulary stays completed/error/cancelled/interrupted/lost.
   readonly killed?: boolean
+  readonly run_stats?: TaskRunStats
   readonly notification: TaskNotification
 }
 
@@ -92,22 +107,26 @@ export type TaskTransition =
       readonly type: "complete"
       readonly timestamp: string
       readonly final_response: string
+      readonly run_stats?: TaskRunStats
     }
   | {
       readonly type: "fail"
       readonly timestamp: string
       readonly error_message: string
       readonly killed?: boolean
+      readonly run_stats?: TaskRunStats
     }
   | {
       readonly type: "cancel"
       readonly timestamp: string
       readonly error_message?: string
+      readonly run_stats?: TaskRunStats
     }
   | {
       readonly type: "interrupt"
       readonly timestamp: string
       readonly error_message?: string
+      readonly run_stats?: TaskRunStats
     }
   | {
       readonly type: "lose"

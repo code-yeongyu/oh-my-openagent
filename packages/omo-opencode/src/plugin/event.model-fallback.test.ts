@@ -561,10 +561,10 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k3",
+      providerID: "anthropic",
+      modelID: "claude-opus-5",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(output.message["variant"]).toBe("max")
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -704,7 +704,34 @@ describe("createEventHandler - model fallback", () => {
         properties: { sessionID },
       },
     })
-    await handler({ event: retryStatus })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_idle_reset_opus5",
+            sessionID,
+            role: "user",
+            modelID: "claude-opus-5",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        ...retryStatus,
+        properties: {
+          ...retryStatus.properties,
+          status: {
+            ...retryStatus.properties.status,
+            message:
+              "All credentials for model claude-opus-5 are cooling down [retrying in ~5 days attempt #1]",
+          },
+        },
+      },
+    })
 
     //#then
     expect(abortCalls).toEqual([sessionID, sessionID])
@@ -1070,9 +1097,9 @@ describe("createEventHandler - model fallback", () => {
     //#when - first retry cycle
     const first = await triggerRetryCycle("anthropic", "claude-opus-4-8-thinking")
 
-    //#then - first fallback entry applied (no-op skip: claude-opus-4-8 matches current model after normalization)
-    expect(first.message["model"]).toMatchObject({ providerID: "opencode-go", modelID: "kimi-k3" })
-    expect(first.message["variant"]).toBeUndefined()
+    //#then - first Opus 5 fallback entry is applied to the legacy Opus 4.8 input
+    expect(first.message["model"]).toMatchObject({ providerID: "anthropic", modelID: "claude-opus-5" })
+    expect(first.message["variant"]).toBe("max")
 
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k3")

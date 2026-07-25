@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
-import type { ManagedChildEvent, ManagedChildListener, StartResult } from "../../manager"
+import type { ManagedChildListener, StartResult } from "../../manager"
+import type { ToolProgressDetails } from "../../progress"
 import type { TaskRecord } from "../../state"
 import type { TaskToolDetails } from "./types"
 import { CTX, createFakeManager, makeDeps, makeRecord } from "./__fixtures__/task-tool-fakes"
@@ -15,6 +16,10 @@ function deferred<T>(): { readonly promise: Promise<T>; resolve(value: T): void 
 function text(result: AgentToolResult<TaskToolDetails>): string {
   const content = result.content[0]
   return content?.type === "text" ? content.text : ""
+}
+
+function activity(result: AgentToolResult<TaskToolDetails>): string {
+  return (result.details as TaskToolDetails & ToolProgressDetails).progress.activity
 }
 
 describe("foreground task progress", () => {
@@ -50,7 +55,9 @@ describe("foreground task progress", () => {
       message: { role: "assistant", content: [{ type: "text", text: "I found the relevant implementation." }] },
     })
     expect(updates.length).toBeGreaterThanOrEqual(2)
-    expect(text(updates.at(-1)!)).toContain("running read src/foo.ts")
+    expect(activity(updates.at(-1)!)).toContain("running read src/foo.ts")
+    expect(activity(updates.at(-1)!)).toContain("st_00000001")
+    expect(text(updates.at(-1)!)).not.toContain("⏵")
 
     completion.resolve(makeRecord({ task_id: "st_00000001", status: "completed", final_response: "final" }))
     const final = await execution
@@ -58,7 +65,8 @@ describe("foreground task progress", () => {
     listener?.({ type: "tool_execution_start", toolName: "bash", args: { command: "should not stream" } })
 
     expect(text(final)).toContain("final")
-    expect(text(updates.at(-1)!)).toContain("last: I found the relevant implementation.")
+    expect(text(updates.at(-1)!)).toBe("↳ last: I found the relevant implementation.")
+    expect(activity(updates.at(-1)!)).toContain("(1 tool)")
     expect(unsubscribed).toBe(true)
     expect(updates).toHaveLength(updatesAtCompletion)
   })
@@ -89,9 +97,10 @@ describe("foreground task progress", () => {
     )
 
     await subscribed.promise
-    expect(text(updates[0]!)).toBe("queued · waiting for slot")
+    expect(text(updates[0]!)).toBe("")
+    expect(activity(updates[0]!)).toBe("queued · waiting for slot")
     pendingListener?.({ type: "tool_execution_start", toolName: "grep", args: { pattern: "TODO" } })
-    expect(text(updates.at(-1)!)).toContain("running grep TODO")
+    expect(activity(updates.at(-1)!)).toContain("running grep TODO")
 
     completion.resolve(makeRecord({ task_id: "st_00000002", status: "completed", final_response: "done" }))
     await execution

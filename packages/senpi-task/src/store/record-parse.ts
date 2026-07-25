@@ -4,6 +4,7 @@ import {
   TASK_STATUSES,
   type ResolvedModelRecord,
   type TaskRecord,
+  type TaskRunStats,
 } from "../state"
 import { parseTaskId } from "../state/id"
 
@@ -23,6 +24,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const killed = readOptionalBoolean(value, "killed")
   const resolvedModel = readOptionalResolvedModel(value)
   const spawnSpec = readOptionalSpawnSpec(value)
+  const runStats = readOptionalRunStats(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -49,6 +51,26 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
     ...(killed === undefined ? {} : { killed }),
+    ...(runStats === undefined ? {} : { run_stats: runStats }),
+  }
+}
+
+function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | undefined {
+  const value = record["run_stats"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("run_stats is not an object")
+  const outputTokens = readOptionalNumber(value, "output_tokens")
+  const totalTokens = readOptionalNumber(value, "total_tokens")
+  const generationMs = readOptionalNumber(value, "generation_ms")
+  const tokensPerSecond = readOptionalNumber(value, "tokens_per_second")
+  return {
+    runtime_ms: readNumber(value, "runtime_ms"),
+    turns: readNumber(value, "turns"),
+    tool_calls: readNumber(value, "tool_calls"),
+    ...(outputTokens === undefined ? {} : { output_tokens: outputTokens }),
+    ...(totalTokens === undefined ? {} : { total_tokens: totalTokens }),
+    ...(generationMs === undefined ? {} : { generation_ms: generationMs }),
+    ...(tokensPerSecond === undefined ? {} : { tokens_per_second: tokensPerSecond }),
   }
 }
 

@@ -8,6 +8,7 @@ import {
   rendererVisibleWidth,
   statusThemeColor,
 } from "../task/renderers"
+import { runStatsSuffix } from "../run-stats-format"
 import type { TaskOutputInput } from "./output"
 import type { TaskOutputDetails, TaskSnapshot } from "./types"
 
@@ -70,7 +71,7 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
     case "status":
       return {
         color: statusThemeColor(details.snapshot.status),
-        text: `task_output status ${details.snapshot.task_id} (${details.snapshot.status}) ${taskOutputModelText(details.snapshot)}`,
+        text: `task_output status ${details.snapshot.task_id} (${details.snapshot.status}) ${taskOutputModelText(details.snapshot)}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     case "transcript":
       return {

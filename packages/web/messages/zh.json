@@ -97,7 +97,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "活跃工作被记录在 boulder.json 中。停电？系统崩溃？没关系。从你停下的地方精确恢复。",
-      "model": "Claude Opus 4.7 Max"
+      "model": "Claude Opus 5 High"
     },
     "prometheusAtlas": {
       "badge": "编排工作流",
@@ -106,7 +106,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.7 Max",
+        "model": "Claude Fable 5 XHigh",
         "description": "架构师。与你访谈，探索代码库，并创建详细的执行计划。从不写代码。使用 Metis 和 Momus 作为质量关卡。",
         "features": [
           "智能访谈模式",

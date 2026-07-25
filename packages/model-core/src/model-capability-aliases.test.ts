@@ -56,14 +56,13 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes Kimi for Coding k2pb aliases to the snapshot ID", () => {
+  test("leaves discontinued Kimi k2pb IDs unaliased", () => {
     const result = resolveModelIDAlias("kimi-for-coding/k2pb")
 
     expect(result).toEqual({
       requestedModelID: "kimi-for-coding/k2pb",
-      canonicalModelID: "k2p5",
-      source: "exact-alias",
-      ruleID: "kimi-k2pb-alias",
+      canonicalModelID: "k2pb",
+      source: "canonical",
     })
   })
 

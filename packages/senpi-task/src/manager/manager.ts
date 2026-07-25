@@ -25,6 +25,7 @@ import {
 } from "./manager-helpers"
 import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { NameRegistry } from "./names"
+import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeTranscriptLog } from "./transcript-log"
 import type {
   ContinueResult,
@@ -98,6 +99,7 @@ function publicStartFailureMessage(error: unknown): string {
 class TaskManagerImpl implements TaskManager {
   readonly #options: TaskManagerImplOptions
   readonly #now: () => number
+  readonly #runStats = new Map<string, RunStatsTracker>()
   readonly #hostPid: number
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
@@ -151,6 +153,7 @@ class TaskManagerImpl implements TaskManager {
       },
       reacquireForRevive: (taskId) => this.#reacquireForRevive(taskId),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
+      runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       now: this.#now,
     }
     this.#steering = createSteeringEngine(port)
@@ -362,6 +365,7 @@ class TaskManagerImpl implements TaskManager {
     }
     this.#background.delete(taskId)
     this.#released.delete(taskId)
+    this.#runStats.delete(taskId)
     this.#steering.dropPending(taskId)
   }
 
@@ -430,7 +434,7 @@ class TaskManagerImpl implements TaskManager {
     let unsubscribe: (() => void) | undefined
     let acquiredEpoch: number | undefined
     try {
-      unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
+      unsubscribe = this.#subscribeChildFacts(handle, record.task_id)
       this.#live.set(record.task_id, { handle, model: record.model, unsubscribe })
       this.#attachChildSubscribers(record.task_id, handle)
       if (isTerminalRecord(record) && record.status !== "lost") {
@@ -551,7 +555,7 @@ class TaskManagerImpl implements TaskManager {
       return { ok: false, error: "task was cancelled during launch" }
     }
 
-    const unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
+    const unsubscribe = this.#subscribeChildFacts(handle, record.task_id)
     this.#live.set(record.task_id, { handle, model, unsubscribe })
     this.#attachChildSubscribers(record.task_id, handle)
     this.#recordSpawnFacts(record.task_id, handle)
@@ -589,22 +593,40 @@ class TaskManagerImpl implements TaskManager {
     if (updated !== current) this.#options.store.replace(updated)
   }
 
+  // One child subscription feeds BOTH durable facts: the JSONL transcript log and the run-stats
+  // tracker whose snapshot lands on the terminal record. Looked up per event so a revive can
+  // swap in a fresh tracker without resubscribing.
+  #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
+    const transcript = subscribeTranscriptLog(handle, this.#options.store, taskId)
+    this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
+    const stats = handle.subscribe((event) => {
+      this.#runStats.get(taskId)?.accept(event)
+    })
+    return () => {
+      transcript()
+      stats()
+    }
+  }
+
   #trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
     handle
       .waitForOutcome()
       .then((outcome) => {
         this.#releaseSlot(taskId, model, epoch)
         const timestamp = nowIso(this.#now)
+        const runStats = this.#runStats.get(taskId)?.snapshot(this.#now())
+        const runStatsField = runStats === undefined ? {} : { run_stats: runStats }
         if (outcome.status === "completed") {
-          this.#options.store.transition(taskId, { type: "complete", timestamp, final_response: outcome.finalResponse })
+          this.#options.store.transition(taskId, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })
         } else if (outcome.status === "cancelled") {
-          this.#options.store.transition(taskId, { type: "cancel", timestamp })
+          this.#options.store.transition(taskId, { type: "cancel", timestamp, ...runStatsField })
         } else {
           this.#options.store.transition(taskId, {
             type: "fail",
             timestamp,
             error_message: outcome.failure.message,
             ...(outcome.killed === true ? { killed: true } : {}),
+            ...runStatsField,
           })
         }
         this.#settleWaiters(taskId)
@@ -620,6 +642,8 @@ class TaskManagerImpl implements TaskManager {
     const record = this.#tryLoad(taskId)
     const epoch = record?.notification.run_epoch ?? 0
     this.#concurrency.acquire(live.model, taskId)
+    // A revived run gets a fresh tracker so its eventual terminal stats describe THIS run.
+    this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
     this.#trackOutcome(taskId, live.handle, live.model, epoch)
   }
 

@@ -56,7 +56,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.6-sol",
       variant: "medium",
     })
-    expect(opusFallback?.model).toBe("claude-opus-4-8")
+    expect(opusFallback?.model).toBe("claude-opus-5")
     expect(opusFallback?.variant).toBe("max")
   })
 
@@ -74,7 +74,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary?.variant).toBe("high")
     expect(second?.providers[0]).toBe("zai-coding-plan")
     expect(second?.model).toBe("glm-5")
-    expect(third?.model).toBe("claude-opus-4-8")
+    expect(third?.model).toBe("claude-opus-5")
     expect(third?.variant).toBe("max")
     expect(fourth?.providers[0]).toBe("opencode-go")
     expect(fourth?.model).toBe("glm-5.2")
@@ -134,7 +134,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       variant: "max",
     })
     expect(secondary).toEqual({

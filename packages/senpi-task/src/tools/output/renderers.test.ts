@@ -216,3 +216,43 @@ describe("task_output renderers", () => {
     expectNoTerminalControls(plain)
   })
 })
+
+describe("task_output run stats rendering", () => {
+  test("#given a terminal snapshot with run stats #when the status row renders #then runtime and tps are shown", () => {
+    // given
+    const detail: TaskOutputDetails = {
+      kind: "status",
+      snapshot: snapshot({
+        run_stats: {
+          runtime_ms: 134_000,
+          turns: 3,
+          tool_calls: 5,
+          output_tokens: 900,
+          total_tokens: 4_200,
+          generation_ms: 7_600,
+          tokens_per_second: 118,
+        },
+      }),
+    }
+
+    // when
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    // then
+    expect(line).toContain("task_output status st_done (completed)")
+    expect(line).toContain("· ran 2m 14s")
+    expect(line).toContain("· 118 tok/s")
+  })
+
+  test("#given a snapshot without run stats #when the status row renders #then no runtime tokens appear", () => {
+    // when
+    const line = firstLine(
+      renderTaskOutputResult(toolResult("ignored", { kind: "status", snapshot: snapshot() }), RESULT_OPTIONS, TEST_THEME),
+      200,
+    )
+
+    // then
+    expect(line).not.toContain("ran ")
+    expect(line).not.toContain("tok/s")
+  })
+})

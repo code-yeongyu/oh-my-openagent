@@ -61,7 +61,7 @@ describe("generateModelConfig", () => {
             variant: "high",
           },
           {
-            model: "github-copilot/claude-opus-4.8",
+            model: "github-copilot/claude-opus-5",
             variant: "max",
           },
           {
@@ -203,7 +203,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -220,7 +220,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5")
     })
 
     test("Sisyphus resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
@@ -261,8 +261,8 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.metis?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.metis?.variant).toBe("medium")
+      expect(result.agents?.metis?.model).toBe("opencode/gpt-5-nano")
+      expect(result.agents?.metis?.variant).toBeUndefined()
     })
 
     test("Sisyphus-Junior resolves to gpt-5.6-sol medium when only OpenAI is available", () => {

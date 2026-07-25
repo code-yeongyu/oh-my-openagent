@@ -1,4 +1,4 @@
-import type { TaskRecord, TaskStatus } from "../state"
+import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
@@ -22,6 +22,7 @@ export type CompletionDetails = {
   readonly status: TaskStatus
   readonly duration_ms: number
   readonly tokens?: number
+  readonly run_stats?: TaskRunStats
   readonly final_response_head: string
   readonly continuation_hint: string
 }

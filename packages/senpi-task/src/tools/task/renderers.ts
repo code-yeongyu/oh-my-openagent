@@ -16,6 +16,7 @@ import {
   optionalRendererText,
   rendererVisibleWidth,
 } from "./renderer-text"
+import { runStatsResultTokens } from "../run-stats-format"
 import { qualifyResolvedModelDisplay } from "./resolved-model-display"
 
 const TASK_REASON_EXCERPT_WIDTH = 40
@@ -133,6 +134,7 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
     mode,
     formatTaskStatus(details.status),
     taskId === undefined ? undefined : `id:${taskId}`,
+    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ])

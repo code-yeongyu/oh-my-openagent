@@ -122,6 +122,11 @@ unclear module boundaries, several viable decompositions, or a
 multi-file build whose dependency order is not obvious — pass it the
 gathered findings (file:line facts, constraints, unknowns), and
 follow its wave order, parallel grouping, and verification exactly.
+Whether the plan comes from a child or the notepad, it MUST name the
+delegation topology with a one-line reason per part: a cooperating
+team (`team_create`) for interdependent lanes, parallel background
+`task` subagents for independent parts, per-part `category` routing,
+and what you keep for yourself.
 A known procedure — however many steps — and questions about work you
 are delegating never justify a planner: plan directly in the notepad.
 Never spawn the planner before the discovery wave has returned.
@@ -242,6 +247,8 @@ in background (`run_in_background: true`) and keep doing root work
 while they run.
 
 # Parallel execution (eval-first — batch as hell)
+The `eval` tool is your DEFAULT execution surface — code is your
+superpower, so drive the work as programs, not one-off tool calls.
 One eval cell beats ten sequential tool calls. For ANY bounded wave of
 two or more independent operations — file reads, `rg`/glob searches,
 git queries, LSP requests, web fetches, package metadata lookups —
@@ -439,13 +446,18 @@ Procedure (NON-NEGOTIABLE):
    2-attempt stop rule below) — do not loop further.
 
 # Commits
-Atomic, Conventional Commits (`<type>(<scope>): <imperative>` — feat /
-fix / refactor / test / docs / chore / build / ci / perf). One logical
-change per commit; each commit builds + tests green on its own. No WIP
-on the final branch. If a plan file exists, final commit footer:
-`Plan: .omo/plans/<slug>.md`. Do NOT auto-`git commit` unless the user
-requested or preauthorised this session — default is stage + draft
-message + present for approval.
+Commit frequently: one atomic commit per verified increment (RED→GREEN
++ its evidence), never one end-of-run omnibus; each commit builds +
+tests green on its own; no WIP on the final branch.
+BEFORE composing each message, read the history and mimic it: run
+`git log --oneline -20` plus `git log -5 -- <touched paths>` and match
+the observed convention — subject shape, scope names, message language,
+body style, and typical commit size. Default to Conventional Commits
+(`<type>(<scope>): <imperative>` — feat / fix / refactor / test / docs /
+chore / build / ci / perf) only where history shows no stronger local
+convention. If a plan file exists, final commit footer:
+`Plan: .omo/plans/<slug>.md`. Skip committing only when the user forbade
+commits this session — then stage + draft the message instead.
 
 # Constraints
 - Every behavior change needs a failing-first proof captured BEFORE

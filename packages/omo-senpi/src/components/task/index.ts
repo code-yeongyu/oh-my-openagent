@@ -123,17 +123,6 @@ function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine, teamServic
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
-      resolveCallModel: ({ category, model }) => {
-        if (category === undefined) return undefined
-        const resolution = engine.planner({
-          prompt: "",
-          parent_session_id: "",
-          depth: 0,
-          category,
-          ...(model === undefined ? {} : { model }),
-        })
-        return resolution.kind === "resolved" ? resolution.plan.resolved_model : undefined
-      },
     }),
   })
   pi.registerTool({

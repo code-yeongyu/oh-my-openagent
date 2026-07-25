@@ -255,7 +255,7 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then the native provider stays primary
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5")
     })
   })
 

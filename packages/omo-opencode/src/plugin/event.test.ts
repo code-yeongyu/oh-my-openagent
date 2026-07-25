@@ -1500,10 +1500,28 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		}))
 		await eventHandler(asEventHandlerInput({
 			event: {
+				type: "message.updated",
+				properties: {
+					info: {
+						id: "msg_user_retry_rearm_opus5",
+						sessionID,
+						role: "user",
+						modelID: "claude-opus-5",
+						providerID: "anthropic",
+						agent: "Sisyphus - Ultraworker",
+					},
+				},
+			},
+		}))
+		await eventHandler(asEventHandlerInput({
+			event: {
 				type: "session.status",
 				properties: {
 					sessionID,
-					status: retryStatus,
+					status: {
+						...retryStatus,
+						message: "All credentials for model claude-opus-5 are cooling down [retrying in 7m 56s attempt #1]",
+					},
 				},
 			},
 		}))
