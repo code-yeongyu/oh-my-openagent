@@ -583,7 +583,7 @@ Agent Request → User Override (if configured) → Fallback Chain → System De
 
 ### File-Based Prompts
 
-You can load agent system prompts from external files using `file://` URLs in the `prompt` field, or append additional content with `prompt_append`. The `prompt_append` field also works on categories.
+You can load agent system prompts from external files using `file://` URLs in the `prompt` field, or append one or more ordered sources with `prompt_append`. Use `prompt_append_exclude_model_keywords` to skip those sources for matching resolved model IDs and `prompt_append_always` for sources that must remain. Category-level `prompt_append` remains a single unconditional source.
 
 ```jsonc
 {
@@ -592,7 +592,12 @@ You can load agent system prompts from external files using `file://` URLs in th
       "prompt": "file:///path/to/custom-prompt.md",
     },
     "oracle": {
-      "prompt_append": "file:///path/to/additional-context.md",
+      "prompt_append": [
+        "file:///path/to/additional-context.md",
+        "file://./project-context.md",
+      ],
+      "prompt_append_exclude_model_keywords": ["claude", "gpt"],
+      "prompt_append_always": "file://./shared-context.md",
     },
   },
   "categories": {
@@ -603,7 +608,7 @@ You can load agent system prompts from external files using `file://` URLs in th
 }
 ```
 
-The file content is loaded at runtime and injected into the agent's system prompt. Supports `~` expansion for home directory and relative `file://` paths.
+The file content is loaded at runtime and injected into the agent's system prompt. Conditional files skipped by a model keyword match are not read. Supports `~` expansion for home directory and relative `file://` paths.
 
 ---
 
