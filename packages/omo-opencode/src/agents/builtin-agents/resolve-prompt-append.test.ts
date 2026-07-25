@@ -74,7 +74,12 @@ describe("resolveAgentPromptAppend", () => {
     })).toBe("always")
   })
 
-  test("treats empty include keywords as no restriction", () => {
+  test("treats empty or blank include keywords as no restriction", () => {
+    expect(resolveAgentPromptAppend({
+      model: "openai/gpt-5.6-sol",
+      promptAppend: "conditional",
+      includeModelKeywords: [],
+    })).toBe("conditional")
     expect(resolveAgentPromptAppend({
       model: "openai/gpt-5.6-sol",
       promptAppend: "conditional",
