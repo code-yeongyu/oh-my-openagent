@@ -70,6 +70,15 @@ const FAILURE_WAKE = [
   "</system-reminder>",
 ].join("\n")
 
+const READY_WAKE = [
+  "<system-reminder>",
+  "[BACKGROUND TASK RESULT READY]",
+  "**ID:** `task-a`",
+  "**Description:** task A",
+  "**1 task still in progress.** You WILL be notified when ALL complete.",
+  "</system-reminder>",
+].join("\n")
+
 const BLOCKED_MESSAGES: SessionMessageStub[] = [
   {
     info: { role: "user", time: { created: 80_000 } },
@@ -143,7 +152,7 @@ afterEach(() => {
 })
 
 describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
-  test("#given an all-complete wake during history deferral #then it dispatches once only after replies are safe", async () => {
+  test("#given a reply-required task result during history deferral #then it is delivered promptly exactly once", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -152,37 +161,39 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
       sessionStatuses: { "parent-1": { type: "idle" } },
       messagesProvider: () => (blocked ? BLOCKED_MESSAGES : SAFE_MESSAGES),
     })
-    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    notifier.queuePendingParentWake("parent-1", READY_WAKE, { agent: "sisyphus" }, true)
 
     try {
       // when: flush while the latest assistant turn still blocks internal prompts
       await notifier.flushPendingParentWake("parent-1")
 
-      // then: the reply-required wake stays pending without an early noReply copy
-      expect(promptAsyncCalls).toHaveLength(0)
-      const retainedWake = notifier.getPendingParentWakes().get("parent-1")
-      expect(retainedWake?.shouldReply).toBe(true)
-      expect(retainedWake?.noReplyAdmittedAt).toBeUndefined()
-      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      // then: the task result is deposited immediately without forking a reply
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("[BACKGROUND TASK RESULT READY]")
+      expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("task-a")
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().get("parent-1")?.shouldReply).toBe(false)
+      expect(notifier.getDispatchedParentWakeTimers().has("parent-1")).toBe(false)
 
-      // when: another flush runs while the parent is still unsafe
+      // when: the same reply-required content is queued while the parent is still unsafe
+      notifier.queuePendingParentWake("parent-1", READY_WAKE, { agent: "sisyphus" }, true)
       notifier.clearPendingParentWakeTimer("parent-1")
       await notifier.flushPendingParentWake("parent-1")
 
-      // then: no notification is dispatched and the wake stays retained
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
-      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      // then: content identity suppresses the duplicate despite reply mode
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
 
-      // when: the parent becomes safe and the gate hold expires
+      // when: the same content is queued again after the parent becomes safe
       blocked = false
       releaseParentWakeHold("parent-1")
+      notifier.queuePendingParentWake("parent-1", READY_WAKE, { agent: "sisyphus" }, true)
+      notifier.clearPendingParentWakeTimer("parent-1")
       await notifier.flushPendingParentWake("parent-1")
 
-      // then: exactly one reply-producing resume is dispatched
+      // then: reply mode does not make identical content a second notification
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
-      expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
@@ -191,7 +202,7 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
     }
   })
 
-  test("#given a blocked reply-required wake #then the dispatched tracker stays empty", async () => {
+  test("#given a blocked reply-required wake #then the dispatched tracker records its no-reply delivery", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -206,8 +217,9 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getDispatchedParentWakes().get("parent-1")?.shouldReply).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -250,7 +262,7 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
     }
   })
 
-  test("#given user message in progress when all-complete wake flushes #then the wake waits until the user turn settles", async () => {
+  test("#given user message in progress when all-complete wake flushes #then it deposits once without racing a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -272,8 +284,9 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
 
       // when: the user turn settles and the gate hold expires
       userMessageFresh = false
@@ -282,7 +295,6 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
@@ -365,7 +377,7 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
     return { manager, promptAsyncCalls }
   }
 
-  test("#given completion during fresh parent activity #then the parent wakes once activity goes stale", async () => {
+  test("#given completion during fresh parent activity #then it is deposited once without a later duplicate", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -407,11 +419,15 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
       await notifyParentSession.call(manager, task)
       await flushPendingParentWake.call(manager, "parent-1")
 
-      // then: retained without dispatch for a later wake
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(parentWakeNotifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
-      // regression: the reply-required wake must be scheduled for re-flush
-      expect(parentWakeNotifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      // then: admitted promptly without starting a competing reply
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(parentWakeNotifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(parentWakeNotifier.getPendingParentWakeTimers().has("parent-1")).toBe(false)
+      expect(parentWakeNotifier.hasInFlightParentWakeDispatch("parent-1")).toBe(false)
+      expect(parentWakeNotifier.hasNotificationPreparation("parent-1")).toBe(false)
+      expect(parentWakeNotifier.hasDispatchedReplyWake("parent-1")).toBe(false)
+      expect(manager.hasPendingParentWake("parent-1")).toBe(false)
 
       // when: activity goes stale and the gate hold expires
       now = 110_000
@@ -419,9 +435,8 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
       releaseParentWakeHold("parent-1")
       await flushPendingParentWake.call(manager, "parent-1")
 
-      // then: the parent resumes exactly once with a reply-producing wake
+      // then: reply timing does not duplicate the delivered content
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
       expect(parentWakeNotifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {

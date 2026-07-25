@@ -89,6 +89,10 @@ export class ParentWakeNotifier {
     return this.dispatchedTracker.hasInFlight(sessionID)
   }
 
+  hasDispatchedReplyWake(sessionID: string): boolean {
+    return this.dispatchedTracker.getWake(sessionID)?.shouldReply === true
+  }
+
   reserveNotificationPreparation(sessionID: string): void {
     this.dispatchedTracker.reserveNotificationPreparation(sessionID)
   }
@@ -129,6 +133,9 @@ export class ParentWakeNotifier {
     if (!wake) {
       return false
     }
+    if (!wake.shouldReply) {
+      return false
+    }
 
     await settleAfterSessionIdle()
 
@@ -154,6 +161,9 @@ export class ParentWakeNotifier {
   requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID: string): boolean {
     const wake = this.dispatchedTracker.getWake(sessionID)
     if (!wake) {
+      return false
+    }
+    if (!wake.shouldReply) {
       return false
     }
 

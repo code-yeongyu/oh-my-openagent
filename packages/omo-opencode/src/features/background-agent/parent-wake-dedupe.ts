@@ -52,11 +52,19 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
 
 export function isRedundantParentWake(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
   return parentWakePromptContextMatches(latestWake, dispatchedWake)
-    && parentWakeReplyModeIsCovered(latestWake, dispatchedWake)
-    && parentWakeNotificationsAreCovered(latestWake, dispatchedWake)
+    && getUndeliveredParentWakeNotifications(latestWake, dispatchedWake).length === 0
 }
 
 export function mergeParentWakeNotifications(existingNotifications: readonly string[], nextNotification: string): string[] {
+  const duplicateIndex = existingNotifications.findIndex((notification) =>
+    getParentWakeNotificationIdentity(notification) === getParentWakeNotificationIdentity(nextNotification)
+  )
+  if (duplicateIndex !== -1) {
+    return existingNotifications.map((notification, index) =>
+      index === duplicateIndex ? nextNotification : notification
+    )
+  }
+
   if (isFinalBackgroundTaskNotification(nextNotification)) {
     return [
       nextNotification,
@@ -65,10 +73,6 @@ export function mergeParentWakeNotifications(existingNotifications: readonly str
         && !isBackgroundTaskProgressNotification(notification)
       ),
     ]
-  }
-
-  if (existingNotifications.includes(nextNotification)) {
-    return [...existingNotifications]
   }
 
   if (
@@ -81,17 +85,30 @@ export function mergeParentWakeNotifications(existingNotifications: readonly str
   return [...existingNotifications, nextNotification]
 }
 
+export function getUndeliveredParentWakeNotifications(
+  latestWake: PendingParentWake,
+  dispatchedWake: PendingParentWake,
+): string[] {
+  if (!parentWakePromptContextMatches(latestWake, dispatchedWake)) {
+    return [...latestWake.notifications]
+  }
+
+  const dispatchedIdentities = new Set(dispatchedWake.notifications.map(getParentWakeNotificationIdentity))
+  return latestWake.notifications.filter((notification) =>
+    !dispatchedIdentities.has(getParentWakeNotificationIdentity(notification))
+  )
+}
+
 function parentWakePromptContextMatches(left: PendingParentWake, right: PendingParentWake): boolean {
   return JSON.stringify(left.promptContext) === JSON.stringify(right.promptContext)
 }
 
-function parentWakeReplyModeIsCovered(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
-  return !latestWake.shouldReply || dispatchedWake.shouldReply
-}
-
-function parentWakeNotificationsAreCovered(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
-  const dispatchedNotifications = new Set(dispatchedWake.notifications)
-  return latestWake.notifications.every((notification) => dispatchedNotifications.has(notification))
+function getParentWakeNotificationIdentity(notification: string): string {
+  const taskID = notification.split("\n")
+    .map((line) => /^\*\*ID:\*\* `([^`]+)`$/.exec(line.trim())?.[1])
+    .find((id) => id !== undefined)
+  const headers = getSystemReminderHeaderLines(notification)
+  return taskID && headers.length > 0 ? `${headers.join("\n")}\n${taskID}` : notification
 }
 
 export function isFailureParentWake(wake: PendingParentWake): boolean {

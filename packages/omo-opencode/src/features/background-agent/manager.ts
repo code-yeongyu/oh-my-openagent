@@ -1124,7 +1124,7 @@ The fallback retry session is now created and can be inspected directly.
    * would report false between the status flip and the wake landing in the pending map.
    */
   hasPendingParentWake(sessionID: string): boolean {
-    return this.hasUndeliveredParentWake(sessionID) || this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+    return this.hasUndeliveredParentWake(sessionID) || this.parentWakeNotifier.hasDispatchedReplyWake(sessionID)
   }
 
   private hasUndeliveredParentWake(sessionID: string): boolean {
@@ -1649,8 +1649,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
       if (isEmptyNoProgressAssistantTurnInfo(info)) {
         const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
-        if (dispatchedWake) {
-          this.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID)
+        if (dispatchedWake && this.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID)) {
           return
         }
       }

@@ -142,7 +142,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given reply-required wake ages while parent is busy #then it does not force a reply", async () => {
+  test("#given reply-required wake ages while parent is busy #then its no-reply delivery is not duplicated", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -159,8 +159,9 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeUndefined()
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
 
       // when
       now = 220_000
@@ -170,16 +171,15 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
-      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
     }
   })
 
-  test("#given retained reply wake and fresh activity exceed active ceiling #then it dispatches once safe", async () => {
+  test("#given delivered reply wake and fresh activity exceed active ceiling #then it is not dispatched twice", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -205,7 +205,7 @@ describe("parent wake active defer ceiling", () => {
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).not.toBe(true)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
@@ -213,7 +213,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given fresh user message and aged wake while parent is busy #then it stays pending", async () => {
+  test("#given fresh user message and aged wake while parent is busy #then it deposits without a reply", async () => {
     // given
     const originalDateNow = Date.now
     const now = 220_000
@@ -235,16 +235,16 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
-      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
     }
   })
 
-  test("#given blocked tool history and aged wake while parent is busy #then it stays pending", async () => {
+  test("#given blocked tool history and aged wake while parent is busy #then it deposits without a reply", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier({
       sessionStatuses: { "parent-1": { type: "busy" } },
@@ -257,9 +257,9 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
-      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       notifier.shutdown()
     }

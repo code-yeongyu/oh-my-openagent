@@ -189,7 +189,7 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
     }
   })
 
-  test("#given a silent parent wake is in post-dispatch hold #when the duplicate requests a reply #then the reply upgrade is preserved", async () => {
+  test("#given a silent parent wake is in post-dispatch hold #when the duplicate requests a reply #then delivered content is not dispatched twice", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
     const sessionID = "parent-hold-reply-upgrade"
@@ -206,14 +206,12 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(notifier.getPendingParentWakes().get(sessionID)?.shouldReply).toBe(true)
-      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
 
       releaseParentWakeHold(sessionID)
       await notifier.flushPendingParentWake(sessionID)
 
-      expect(promptAsyncCalls).toHaveLength(2)
-      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(promptAsyncCalls).toHaveLength(1)
       expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
     } finally {
       notifier.shutdown()

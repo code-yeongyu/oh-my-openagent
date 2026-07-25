@@ -85,8 +85,9 @@ describe("ParentWakeNotifier — assistant text dispatch race", () => {
       await notifier.flushPendingParentWake("parent-stale-then-fresh-text")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-stale-then-fresh-text")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-stale-then-fresh-text")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

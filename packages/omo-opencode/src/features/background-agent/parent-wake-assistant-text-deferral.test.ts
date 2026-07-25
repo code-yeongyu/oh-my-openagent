@@ -200,8 +200,8 @@ describe("ParentWakeNotifier — assistant text history deferral", () => {
       await notifier.flushPendingParentWake("parent-fresh-text-flush")
 
       // then
-      expect(promptAsyncCallCount).toBe(0)
-      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(true)
+      expect(promptAsyncCallCount).toBe(1)
+      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

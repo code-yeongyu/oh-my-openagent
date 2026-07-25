@@ -90,7 +90,9 @@ export class ParentWakeDispatchedTracker {
     const dispatchedWake = cloneParentWake(wake)
     dispatchedWake.dispatchedAt = dispatchedAt
     this.dispatchedParentWakes.set(sessionID, dispatchedWake)
-    this.scheduleFailureWindowTimer(sessionID)
+    if (dispatchedWake.shouldReply) {
+      this.scheduleFailureWindowTimer(sessionID)
+    }
   }
 
   refreshWakeTimer(sessionID: string): void {

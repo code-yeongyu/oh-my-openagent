@@ -1,7 +1,12 @@
 import { log } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 import { refreshBackgroundTaskNotificationCount } from "./background-task-notification-template"
-import { isFailureParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
+import {
+  getUndeliveredParentWakeNotifications,
+  isFailureParentWake,
+  isRedundantParentWake,
+  type PendingParentWake,
+} from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakePendingQueue } from "./parent-wake-pending-queue"
 import { sendParentWakePrompt } from "./parent-wake-prompt-dispatch"
@@ -50,6 +55,15 @@ export class ParentWakeFlushRunner {
       latestWake.notifications = latestWake.notifications.map((notification) =>
         refreshBackgroundTaskNotificationCount(notification, remainingCount))
     }
+    const deliveredWake = this.deps.dispatchedTracker.getWake(sessionID)
+    if (deliveredWake) {
+      latestWake.notifications = getUndeliveredParentWakeNotifications(latestWake, deliveredWake)
+      if (latestWake.notifications.length === 0) {
+        this.deps.pendingQueue.deleteWake(sessionID)
+        log("[background-agent] Suppressed parent wake content already delivered:", { sessionID })
+        return
+      }
+    }
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
       return
     }
@@ -76,7 +90,7 @@ export class ParentWakeFlushRunner {
       log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
       })
-      if (latestWake.shouldReply) {
+      if (latestWake.shouldReply && this.deps.pendingQueue.hasWake(sessionID)) {
         this.schedulePendingParentWakeFlush(sessionID)
       }
       return
@@ -169,21 +183,20 @@ export class ParentWakeFlushRunner {
     }, delayMs)
   }
 
-  // Sending a reply-required wake as noReply and again as a reply duplicates
-  // the notification, so retain it until one reply dispatch is safe.
   private deferReplyWakeWhileUnsafe(sessionID: string, latestWake: PendingParentWake): boolean {
-    if (!latestWake.shouldReply) {
-      return false
+    if (isFailureParentWake(latestWake)) {
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred failure parent wake until parent session is safe:", { sessionID })
+      return true
     }
-
-    this.schedulePendingParentWakeFlush(sessionID)
-    log(
-      isFailureParentWake(latestWake)
-        ? "[background-agent] Deferred failure parent wake until parent session is safe:"
-        : "[background-agent] Deferred reply-required parent wake until parent session is safe:",
-      { sessionID },
-    )
-    return true
+    if (latestWake.shouldReply && latestWake.noReplyAdmittedAt !== undefined) {
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred retained reply-required parent wake until parent session is safe:", {
+        sessionID,
+      })
+      return true
+    }
+    return false
   }
 
   clearPendingParentWakeTimer(sessionID: string): void {
@@ -249,6 +262,10 @@ export class ParentWakeFlushRunner {
         requeueWake: (wake) => this.requeueWake(sessionID, wake),
         scheduleFlush: (delayMs) => this.schedulePendingParentWakeFlush(sessionID, delayMs),
       })
+      if (options.retainPendingWake === true && latestWake.noReplyAdmittedAt !== undefined) {
+        this.deps.pendingQueue.deleteWake(sessionID)
+        this.clearPendingParentWakeTimer(sessionID)
+      }
     } finally {
       this.deps.dispatchedTracker.clearInFlight(sessionID)
     }
