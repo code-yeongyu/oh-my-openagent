@@ -436,6 +436,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -1016,6 +1022,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -1598,6 +1610,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -2178,6 +2196,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -2763,6 +2787,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -3343,6 +3373,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -3925,6 +3961,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -4505,6 +4547,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -5087,6 +5135,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -5667,6 +5721,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -6249,6 +6309,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -6829,6 +6895,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -7411,6 +7483,12 @@
                 }
               ]
             },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
               "items": {
@@ -7991,6 +8069,12 @@
                   }
                 }
               ]
+            },
+            "prompt_append_include_model_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "prompt_append_exclude_model_keywords": {
               "type": "array",
@@ -8573,6 +8657,12 @@
                 }
               }
             ]
+          },
+          "prompt_append_include_model_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "prompt_append_exclude_model_keywords": {
             "type": "array",

@@ -7,6 +7,7 @@ describe("resolveAgentPromptAppend", () => {
       model: "google/gemini-3.1-pro",
       promptAppend: ["conditional-one", "conditional-two"],
       promptAppendAlways: ["always-one", "always-two"],
+      includeModelKeywords: ["gemini"],
       excludeModelKeywords: ["claude", "gpt"],
     })
 
@@ -19,6 +20,29 @@ describe("resolveAgentPromptAppend", () => {
       promptAppend: "conditional",
       promptAppendAlways: "always",
       excludeModelKeywords: [" claude ", " gpt "],
+    })
+
+    expect(result).toBe("always")
+  })
+
+  test("skips conditional sources when the model ID does not match an include keyword", () => {
+    const result = resolveAgentPromptAppend({
+      model: "openai/gpt-5.6-sol",
+      promptAppend: "conditional",
+      promptAppendAlways: "always",
+      includeModelKeywords: [" claude ", " gemini "],
+    })
+
+    expect(result).toBe("always")
+  })
+
+  test("gives exclusions precedence when include and exclude keywords both match", () => {
+    const result = resolveAgentPromptAppend({
+      model: "openai/gpt-5.6-sol",
+      promptAppend: "conditional",
+      promptAppendAlways: "always",
+      includeModelKeywords: ["gpt"],
+      excludeModelKeywords: ["5.6"],
     })
 
     expect(result).toBe("always")
@@ -40,6 +64,22 @@ describe("resolveAgentPromptAppend", () => {
       promptAppendAlways: "always",
       excludeModelKeywords: ["gpt"],
     })).toBe("conditional\n\nalways")
+  })
+
+  test("skips conditional sources for an unknown model when include keywords are configured", () => {
+    expect(resolveAgentPromptAppend({
+      promptAppend: "conditional",
+      promptAppendAlways: "always",
+      includeModelKeywords: ["gemini"],
+    })).toBe("always")
+  })
+
+  test("treats empty include keywords as no restriction", () => {
+    expect(resolveAgentPromptAppend({
+      model: "openai/gpt-5.6-sol",
+      promptAppend: "conditional",
+      includeModelKeywords: ["", "  "],
+    })).toBe("conditional")
   })
 
   test("treats empty literal sources as no-ops", () => {

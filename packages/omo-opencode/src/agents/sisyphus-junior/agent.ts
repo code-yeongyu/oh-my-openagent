@@ -125,6 +125,7 @@ export function createSisyphusJuniorAgentWithOverrides(
     model,
     promptAppend: override?.prompt_append,
     promptAppendAlways: override?.prompt_append_always,
+    includeModelKeywords: override?.prompt_append_include_model_keywords,
     excludeModelKeywords: override?.prompt_append_exclude_model_keywords,
     configDir: directory,
   })

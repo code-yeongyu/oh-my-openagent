@@ -21,6 +21,8 @@ export const AgentOverrideConfigSchema = z.object({
   prompt: z.string().optional(),
   /** Text sources to append to the agent prompt. Supports file:// URIs. */
   prompt_append: z.union([z.string(), z.array(z.string())]).optional(),
+  /** Only apply prompt_append when the resolved model ID contains a keyword. */
+  prompt_append_include_model_keywords: z.array(z.string()).optional(),
   /** Skip prompt_append when the resolved model ID contains any keyword. */
   prompt_append_exclude_model_keywords: z.array(z.string()).optional(),
   /** Text sources appended after prompt_append regardless of the resolved model. */

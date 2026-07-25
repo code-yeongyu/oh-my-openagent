@@ -216,6 +216,7 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `top_p`           | number         | Top-p sampling                                                  |
 | `prompt`          | string         | Replace system prompt. Supports `file://` URIs                  |
 | `prompt_append`   | string\|array  | Append ordered text or `file://` sources to the system prompt   |
+| `prompt_append_include_model_keywords` | array | Only apply `prompt_append` when the resolved model ID contains a keyword |
 | `prompt_append_exclude_model_keywords` | array | Skip `prompt_append` when the resolved model ID contains a keyword |
 | `prompt_append_always` | string\|array | Append ordered sources regardless of model keyword matches   |
 | `tools`           | array         | Allowed tools list                                     |
@@ -304,7 +305,7 @@ Object entries support: `model`, `variant`, `reasoningEffort`, `temperature`, `t
 
 `prompt`, `prompt_append`, and `prompt_append_always` support loading content from files via `file://` URIs. Agent-level append fields accept one source or an ordered source array. Category-level `prompt_append` remains a single source and supports the same URI forms.
 
-When `prompt_append_exclude_model_keywords` is configured, OmO compares each non-empty keyword against the resolved model ID after the provider prefix. Matching is case-insensitive substring matching. A match skips the entire `prompt_append` group without reading its files, then appends `prompt_append_always`. When no keyword matches, conditional sources are appended first and always sources follow. Sources within each group retain their configured order and are separated by a blank line.
+OmO compares each non-empty model keyword against the resolved model ID after the provider prefix using case-insensitive substring matching. A non-empty `prompt_append_include_model_keywords` list requires at least one match before applying `prompt_append`; an empty or omitted list adds no restriction. Any `prompt_append_exclude_model_keywords` match skips the entire conditional group and takes precedence when both lists match. Skipped files are not read. `prompt_append_always` remains active, conditional sources precede always sources, and sources within each group retain their configured order separated by a blank line.
 
 For Prometheus, file-backed `prompt` content is appended after the mandatory base prompt; it does not replace the base prompt.
 
@@ -316,6 +317,7 @@ For Prometheus, file-backed `prompt` content is appended after the mandatory bas
         "file:///absolute/path/to/prompt.txt",
         "file://./project-context.md"
       ],
+      "prompt_append_include_model_keywords": ["gemini", "kimi"],
       "prompt_append_exclude_model_keywords": ["claude", "gpt"],
       "prompt_append_always": "file://./shared-context.md"
     },

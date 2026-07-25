@@ -6,6 +6,7 @@ export type ResolveAgentPromptAppendInput = {
   model?: string
   promptAppend?: PromptAppendSource
   promptAppendAlways?: PromptAppendSource
+  includeModelKeywords?: string[]
   excludeModelKeywords?: string[]
   configDir?: string
 }
@@ -27,9 +28,10 @@ function modelMatchesKeyword(model: string | undefined, keywords: string[] | und
 }
 
 export function resolveAgentPromptAppend(input: ResolveAgentPromptAppendInput): string | undefined {
-  const conditionalSources = modelMatchesKeyword(input.model, input.excludeModelKeywords)
-    ? []
-    : normalizeSources(input.promptAppend)
+  const hasIncludeKeywords = input.includeModelKeywords?.some((keyword) => keyword.trim().length > 0) ?? false
+  const includeMatches = !hasIncludeKeywords || modelMatchesKeyword(input.model, input.includeModelKeywords)
+  const excludeMatches = modelMatchesKeyword(input.model, input.excludeModelKeywords)
+  const conditionalSources = includeMatches && !excludeMatches ? normalizeSources(input.promptAppend) : []
   const sources = [...conditionalSources, ...normalizeSources(input.promptAppendAlways)]
   if (sources.length === 0) return undefined
 

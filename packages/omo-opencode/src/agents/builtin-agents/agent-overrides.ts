@@ -45,6 +45,7 @@ export function mergeAgentConfig(
   const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
   const {
     prompt_append,
+    prompt_append_include_model_keywords,
     prompt_append_exclude_model_keywords,
     prompt_append_always,
     reasoning,
@@ -68,6 +69,7 @@ export function mergeAgentConfig(
     model: typeof merged.model === "string" ? merged.model : undefined,
     promptAppend: prompt_append,
     promptAppendAlways: prompt_append_always,
+    includeModelKeywords: prompt_append_include_model_keywords,
     excludeModelKeywords: prompt_append_exclude_model_keywords,
     configDir: directory,
   })

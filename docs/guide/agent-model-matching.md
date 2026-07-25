@@ -583,7 +583,7 @@ Agent Request → User Override (if configured) → Fallback Chain → System De
 
 ### File-Based Prompts
 
-You can load agent system prompts from external files using `file://` URLs in the `prompt` field, or append one or more ordered sources with `prompt_append`. Use `prompt_append_exclude_model_keywords` to skip those sources for matching resolved model IDs and `prompt_append_always` for sources that must remain. Category-level `prompt_append` remains a single unconditional source.
+You can load agent system prompts from external files using `file://` URLs in the `prompt` field, or append one or more ordered sources with `prompt_append`. Use `prompt_append_include_model_keywords` to require a resolved model ID match and `prompt_append_exclude_model_keywords` to skip matching models; exclusions take precedence. `prompt_append_always` supplies sources that must remain. Category-level `prompt_append` remains a single unconditional source.
 
 ```jsonc
 {
@@ -596,6 +596,7 @@ You can load agent system prompts from external files using `file://` URLs in th
         "file:///path/to/additional-context.md",
         "file://./project-context.md",
       ],
+      "prompt_append_include_model_keywords": ["gemini", "kimi"],
       "prompt_append_exclude_model_keywords": ["claude", "gpt"],
       "prompt_append_always": "file://./shared-context.md",
     },

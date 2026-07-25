@@ -79,6 +79,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const override = {
         model: "openai/gpt-5.6-sol",
         prompt_append: ["conditional-one", "conditional-two"],
+        prompt_append_include_model_keywords: ["gpt"],
         prompt_append_exclude_model_keywords: ["gpt"],
         prompt_append_always: ["always-one", "always-two"],
       }

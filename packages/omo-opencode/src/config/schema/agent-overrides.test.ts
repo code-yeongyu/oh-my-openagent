@@ -62,6 +62,7 @@ describe("AgentOverridesSchema", () => {
     const input = {
       oracle: {
         prompt_append: ["first", "second"],
+        prompt_append_include_model_keywords: ["gemini"],
         prompt_append_exclude_model_keywords: ["claude", "gpt"],
         prompt_append_always: ["third", "fourth"],
       },
@@ -72,6 +73,7 @@ describe("AgentOverridesSchema", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.oracle?.prompt_append).toEqual(["first", "second"])
+      expect(result.data.oracle?.prompt_append_include_model_keywords).toEqual(["gemini"])
       expect(result.data.oracle?.prompt_append_exclude_model_keywords).toEqual(["claude", "gpt"])
       expect(result.data.oracle?.prompt_append_always).toEqual(["third", "fourth"])
     }

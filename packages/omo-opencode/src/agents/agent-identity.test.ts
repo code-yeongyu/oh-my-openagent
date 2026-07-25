@@ -145,6 +145,7 @@ describe("Agent identity preservation through overrides", () => {
       const merged = mergeAgentConfig(baseConfig, {
         model: "openai/gpt-5.6-sol",
         prompt_append: ["conditional-one", "conditional-two"],
+        prompt_append_include_model_keywords: ["gpt"],
         prompt_append_exclude_model_keywords: ["gpt"],
         prompt_append_always: ["always-one", "always-two"],
       })
@@ -153,6 +154,7 @@ describe("Agent identity preservation through overrides", () => {
       expect(merged.prompt).not.toContain("conditional-two")
       expect(merged.prompt).toContain("always-one\n\nalways-two")
       expect(merged).not.toHaveProperty("prompt_append")
+      expect(merged).not.toHaveProperty("prompt_append_include_model_keywords")
       expect(merged).not.toHaveProperty("prompt_append_exclude_model_keywords")
       expect(merged).not.toHaveProperty("prompt_append_always")
     })

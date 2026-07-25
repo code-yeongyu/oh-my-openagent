@@ -278,7 +278,7 @@ The plugin uses two independent fallback systems:
 
 ### File-Based Prompts
 
-Load agent system prompts from external files using `file://` URLs in the `prompt` field, or append ordered sources with `prompt_append`. Agent overrides can skip that conditional group when the resolved model ID matches `prompt_append_exclude_model_keywords`, while `prompt_append_always` remains active. Category-level `prompt_append` remains a single unconditional source.
+Load agent system prompts from external files using `file://` URLs in the `prompt` field, or append ordered sources with `prompt_append`. Agent overrides can require a resolved model ID match with `prompt_append_include_model_keywords` and skip matches with `prompt_append_exclude_model_keywords`; exclusions take precedence. `prompt_append_always` remains active. Category-level `prompt_append` remains a single unconditional source.
 
 ```jsonc
 {
@@ -291,6 +291,7 @@ Load agent system prompts from external files using `file://` URLs in the `promp
         "file:///path/to/additional-context.md",
         "file://./project-context.md"
       ],
+      "prompt_append_include_model_keywords": ["gemini", "kimi"],
       "prompt_append_exclude_model_keywords": ["claude", "gpt"],
       "prompt_append_always": "file://./shared-context.md"
     }
