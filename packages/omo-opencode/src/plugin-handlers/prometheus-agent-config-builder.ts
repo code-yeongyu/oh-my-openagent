@@ -1,7 +1,8 @@
-import type { CategoryConfig } from "../config/schema";
+import type { AgentOverrideConfig, CategoryConfig } from "../config/schema";
 import type { FallbackModels } from "../config/schema/fallback-models";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
+import { resolveAgentPromptAppend } from "../agents/builtin-agents/resolve-prompt-append";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import type { FallbackEntry } from "../shared/model-requirements";
 import {
@@ -11,20 +12,8 @@ import {
 } from "../shared";
 import { resolveCategoryConfig } from "./category-config-resolver";
 
-type PrometheusOverride = Record<string, unknown> & {
-  category?: string;
-  model?: string;
-  reasoning?: string;
-  variant?: string;
-  reasoningEffort?: string;
-  textVerbosity?: string;
-  thinking?: { type: string; budgetTokens?: number };
-  temperature?: number;
-  top_p?: number;
-  maxTokens?: number;
+type PrometheusOverride = Record<string, unknown> & AgentOverrideConfig & {
   fallback_models?: FallbackModels;
-  prompt?: string;
-  prompt_append?: string;
 };
 
 function isModelInFallbackChain(
@@ -47,6 +36,7 @@ export async function buildPrometheusAgentConfig(params: {
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
   disabledTools?: readonly string[];
+  directory?: string;
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginPrometheusOverride?.category
     ? resolveCategoryConfig(params.pluginPrometheusOverride.category, params.userCategories)
@@ -134,13 +124,27 @@ export async function buildPrometheusAgentConfig(params: {
   const override = params.pluginPrometheusOverride;
   if (!override) return base;
 
-  const { prompt, prompt_append, ...restOverride } = override;
+  const {
+    prompt,
+    prompt_append,
+    prompt_append_exclude_model_keywords,
+    prompt_append_always,
+    ...restOverride
+  } = override;
   const merged = { ...base, ...restOverride };
   if (typeof merged.prompt === "string") {
-    for (const promptAddition of [prompt, prompt_append]) {
-      if (promptAddition) {
-        merged.prompt = merged.prompt + "\n" + resolvePromptAppend(promptAddition);
-      }
+    if (prompt) {
+      merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt, params.directory);
+    }
+    const promptAppend = resolveAgentPromptAppend({
+      model: resolvedModel,
+      promptAppend: prompt_append,
+      promptAppendAlways: prompt_append_always,
+      excludeModelKeywords: prompt_append_exclude_model_keywords,
+      configDir: params.directory,
+    });
+    if (promptAppend !== undefined) {
+      merged.prompt = merged.prompt + "\n" + promptAppend;
     }
   }
   return merged;

@@ -49,6 +49,7 @@ export async function applyAgentConfig(
     currentModel,
     useTaskSystem,
     disabledAgentNames,
+    directory: params.ctx.directory,
   });
 
   return finalizeAgentConfig({
