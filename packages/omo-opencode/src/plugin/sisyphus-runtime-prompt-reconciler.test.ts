@@ -44,7 +44,9 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
     expect(system[0]).not.toContain("based on GPT-5.5")
     expect(system[0]).not.toContain(GPT_APPLY_PATCH_GUIDANCE)
     // ...and the entry is exactly what registration would have baked for qwen.
-    expect(system[0]).toBe(createSisyphusAgent(NON_GPT_MODEL, [], [], [], []).prompt)
+    const expectedPrompt = createSisyphusAgent(NON_GPT_MODEL, [], [], [], []).prompt
+    if (typeof expectedPrompt !== "string") throw new Error("Expected Sisyphus prompt to be a string")
+    expect(system[0]).toBe(expectedPrompt)
   })
 
   test("#given the baked body concatenated with other system text #when run on a non-GPT model #then only the body portion is rebuilt", () => {
