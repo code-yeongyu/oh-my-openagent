@@ -138,4 +138,23 @@ describe("Agent identity preservation through overrides", () => {
       })
     })
   })
+
+  describe("#given ordered prompt append sources with a model exclusion", () => {
+    it("#then skips conditional sources and keeps always sources", () => {
+      const baseConfig = createSisyphusAgent("anthropic/claude-opus-4-7")
+      const merged = mergeAgentConfig(baseConfig, {
+        model: "openai/gpt-5.6-sol",
+        prompt_append: ["conditional-one", "conditional-two"],
+        prompt_append_exclude_model_keywords: ["gpt"],
+        prompt_append_always: ["always-one", "always-two"],
+      })
+
+      expect(merged.prompt).not.toContain("conditional-one")
+      expect(merged.prompt).not.toContain("conditional-two")
+      expect(merged.prompt).toContain("always-one\n\nalways-two")
+      expect(merged).not.toHaveProperty("prompt_append")
+      expect(merged).not.toHaveProperty("prompt_append_exclude_model_keywords")
+      expect(merged).not.toHaveProperty("prompt_append_always")
+    })
+  })
 })
