@@ -1,5 +1,3 @@
-import { resolveSisyphusPromptFamily } from "./sisyphus-agent-factory";
-
 /**
  * Context captured at Sisyphus registration so the per-request system-transform
  * hook can rebuild the prompt for the model actually selected at runtime.
@@ -45,13 +43,7 @@ export function reconcileSisyphusRuntimePrompt(
 ): boolean {
   if (!runtimeModel || !context) return false
 
-  // Same family => the baked body already matches the runtime model; leave it.
-  if (
-    resolveSisyphusPromptFamily(runtimeModel) ===
-    resolveSisyphusPromptFamily(context.configuredModel)
-  ) {
-    return false
-  }
+  if (runtimeModel === context.configuredModel) return false
 
   const rebuilt = context.rebuildPromptForModel(runtimeModel)
   if (rebuilt === context.bakedPrompt) return false
