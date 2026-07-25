@@ -50,6 +50,7 @@ function isBackgroundTaskId(value: string): boolean {
 async function getTaskWithMissingRetry(
   manager: BackgroundOutputManager,
   taskId: string,
+  parentSessionId: string,
 ): Promise<BackgroundTask | undefined> {
   const task = manager.getTask(taskId)
   if (task || !isBackgroundTaskId(taskId)) {
@@ -75,7 +76,7 @@ async function getTaskWithMissingRetry(
     }
   )
 
-  return retriedTask
+  return retriedTask ?? await manager.recoverTask?.(taskId, parentSessionId)
 }
 
 function formatTaskNotFoundMessage(taskId: string): string {
@@ -115,7 +116,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
         const ctx = toolContext as ToolContextWithMetadata
-        const task = await getTaskWithMissingRetry(manager, args.task_id)
+        const task = await getTaskWithMissingRetry(manager, args.task_id, ctx.sessionID)
         if (!task) {
           return formatTaskNotFoundMessage(args.task_id)
         }
@@ -145,7 +146,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             const remainingMs = timeoutMs - (Date.now() - startTime)
             await delay(Math.min(BACKGROUND_OUTPUT_POLL_INTERVAL_MS, Math.max(1, remainingMs)))
 
-            const currentTask = await getTaskWithMissingRetry(manager, args.task_id)
+            const currentTask = await getTaskWithMissingRetry(manager, args.task_id, ctx.sessionID)
             if (!currentTask) {
               return `Task was deleted: ${args.task_id}`
             }
@@ -158,7 +159,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           }
 
           if (isTaskActiveStatus(resolvedTask.status)) {
-            const finalCheck = await getTaskWithMissingRetry(manager, args.task_id)
+            const finalCheck = await getTaskWithMissingRetry(manager, args.task_id, ctx.sessionID)
             if (finalCheck) {
               resolvedTask = finalCheck
             }

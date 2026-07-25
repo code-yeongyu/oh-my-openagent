@@ -49,6 +49,7 @@ import {
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
 import { writeBackgroundTaskMarker } from "./background-task-marker"
+import { recoverBackgroundTask } from "./background-task-recovery"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -1044,6 +1045,26 @@ The fallback retry session is now created and can be inspected directly.
     return this.tasks.get(id) ?? this.completedTaskArchive.get(id) ?? getRegisteredBackgroundTask(id)
   }
 
+  async recoverTask(id: string, parentSessionID: string): Promise<BackgroundTask | undefined> {
+    const existingTask = this.getTask(id) ?? this.findBySession(id)
+    if (existingTask) {
+      return existingTask
+    }
+
+    const response = await messagesInDirectory(
+      this.client,
+      { path: { id: parentSessionID } },
+      this.directory,
+    )
+    const task = recoverBackgroundTask(normalizeSDKResponse<unknown[]>(response, []), id, parentSessionID)
+    if (!task) {
+      return undefined
+    }
+
+    this.addTask(task)
+    return task
+  }
+
   getTasksSnapshot(): BackgroundTaskSnapshot[] { return toBackgroundTaskSnapshots(this.tasks.values()) }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
@@ -1287,6 +1308,7 @@ The fallback retry session is now created and can be inspected directly.
 
   async resume(input: ResumeInput): Promise<BackgroundTask> {
     const existingTask = this.findBySession(input.sessionId)
+      ?? await this.recoverTask(input.sessionId, input.parentSessionId)
     if (!existingTask) {
       throw new Error(`Task not found for session: ${input.sessionId}`)
     }
