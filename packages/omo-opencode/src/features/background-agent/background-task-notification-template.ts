@@ -124,3 +124,13 @@ ${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
 </system-reminder>`
 }
+
+export function refreshBackgroundTaskNotificationCount(
+  notification: string,
+  remainingCount: number,
+): string {
+  return notification.replace(
+    /\*\*\d+ tasks? still in progress\.\*\*/g,
+    `**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.**`,
+  )
+}

@@ -312,6 +312,10 @@ export class BackgroundManager {
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
         onPendingWakeRequeued: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
         onScheduledFlushSettled: (sessionID) => this.recordScheduledFlushSettled(sessionID),
+        getRemainingTaskCount: (sessionID) => this.pendingByParent.get(sessionID)?.size
+          ?? this.getTasksByParentSession(sessionID)
+            .filter((task) => task.status === "running" || task.status === "pending")
+            .length,
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,

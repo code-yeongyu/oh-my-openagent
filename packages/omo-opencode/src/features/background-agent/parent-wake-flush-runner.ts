@@ -1,5 +1,6 @@
 import { log } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
+import { refreshBackgroundTaskNotificationCount } from "./background-task-notification-template"
 import { isFailureParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakePendingQueue } from "./parent-wake-pending-queue"
@@ -43,6 +44,11 @@ export class ParentWakeFlushRunner {
     const latestWake = this.deps.pendingQueue.getWake(sessionID)
     if (!latestWake) {
       return
+    }
+    const remainingCount = this.deps.notifierDeps.getRemainingTaskCount?.(sessionID)
+    if (remainingCount !== undefined) {
+      latestWake.notifications = latestWake.notifications.map((notification) =>
+        refreshBackgroundTaskNotificationCount(notification, remainingCount))
     }
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
       return

@@ -31,6 +31,7 @@ export type ParentWakeNotifierDeps = {
   ) => Promise<void>
   readonly onPendingWakeRequeued?: (sessionID: string) => void
   readonly onScheduledFlushSettled?: (sessionID: string) => void
+  readonly getRemainingTaskCount?: (sessionID: string) => number
 }
 
 export type ParentWakeNotifierOptions = {

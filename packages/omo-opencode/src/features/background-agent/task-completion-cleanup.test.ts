@@ -463,6 +463,53 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(notificationPayload).not.toContain("ALL BACKGROUND TASKS COMPLETE")
     })
 
+    test("#when sibling completions change a queued failure count #then delivery uses the current remaining count", async () => {
+      // given
+      const sessionStatuses: Record<string, { type: string }> = {
+        "parent-1": { type: "busy" },
+      }
+      const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
+      managerUnderTest = manager
+      const taskA = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "error",
+        error: "failed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
+      const taskB = createTask({
+        id: "task-b",
+        parentSessionId: "parent-1",
+        description: "task B",
+        status: "running",
+      })
+      const taskC = createTask({
+        id: "task-c",
+        parentSessionId: "parent-1",
+        description: "task C",
+        status: "running",
+      })
+      getTasks(manager).set(taskA.id, taskA)
+      getTasks(manager).set(taskB.id, taskB)
+      getTasks(manager).set(taskC.id, taskC)
+      getPendingByParent(manager).set(taskA.parentSessionId, new Set([taskA.id, taskB.id, taskC.id]))
+      await notifyParentSessionForTest(manager, taskA)
+      taskB.status = "completed"
+      taskB.completedAt = new Date("2026-03-11T00:02:00.000Z")
+      await notifyParentSessionForTest(manager, taskB)
+
+      // when
+      sessionStatuses["parent-1"] = { type: "idle" }
+      manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
+      await waitForDeferredWake(manager, promptAsyncCalls)
+
+      // then
+      const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
+      expect(notificationPayload).toContain("1 task still in progress")
+      expect(notificationPayload).not.toContain("2 tasks still in progress")
+    })
+
     test("#when partial and all-complete notifications queue while parent session is busy #then idle flushes one reply wake", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
