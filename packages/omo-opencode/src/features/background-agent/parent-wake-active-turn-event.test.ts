@@ -203,7 +203,7 @@ describe("BackgroundManager parent wake active turn events", () => {
     expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
   })
 
-  test("#when parent reasoning delta is newer than stale idle state #then background completion records an admit-only wake", async () => {
+  test("#when parent reasoning delta is newer than stale idle state #then background completion stays pending", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "idle" },
@@ -233,12 +233,11 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
-  test("#when parent idle event follows fresh reasoning delta #then background completion still records an admit-only wake", async () => {
+  test("#when parent idle event follows fresh reasoning delta #then background completion still stays pending", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "idle" },
@@ -269,8 +268,7 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 })

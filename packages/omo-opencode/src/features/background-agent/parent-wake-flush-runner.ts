@@ -163,22 +163,21 @@ export class ParentWakeFlushRunner {
     }, delayMs)
   }
 
-  // Reply-required wakes must never be consumed by an admit-only noReply
-  // dispatch (issues #4874/#5086): failure wakes stay queued until the parent
-  // is safe, and an already-admitted final wake is not re-admitted while the
-  // parent remains unsafe.
+  // Sending a reply-required wake as noReply and again as a reply duplicates
+  // the notification, so retain it until one reply dispatch is safe.
   private deferReplyWakeWhileUnsafe(sessionID: string, latestWake: PendingParentWake): boolean {
-    if (isFailureParentWake(latestWake)) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred failure parent wake until parent session is safe:", { sessionID })
-      return true
+    if (!latestWake.shouldReply) {
+      return false
     }
-    if (latestWake.shouldReply && latestWake.noReplyAdmittedAt !== undefined) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred retained reply-required parent wake until parent session is safe:", { sessionID })
-      return true
-    }
-    return false
+
+    this.schedulePendingParentWakeFlush(sessionID)
+    log(
+      isFailureParentWake(latestWake)
+        ? "[background-agent] Deferred failure parent wake until parent session is safe:"
+        : "[background-agent] Deferred reply-required parent wake until parent session is safe:",
+      { sessionID },
+    )
+    return true
   }
 
   clearPendingParentWakeTimer(sessionID: string): void {

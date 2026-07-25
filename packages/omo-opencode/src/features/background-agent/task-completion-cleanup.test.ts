@@ -547,7 +547,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
     })
 
-    test("#when parent status is idle but latest assistant turn is still waiting on tool results #then background completion records a no-reply wake", async () => {
+    test("#when parent status is idle but latest assistant turn is still waiting on tool results #then background completion stays pending", async () => {
       // given
       const originalDateNow = Date.now
       Date.now = () => 1778820000000
@@ -582,15 +582,14 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         await waitForCoalescedFlush(manager, promptAsyncCalls)
 
         // then
-        expect(promptAsyncCalls).toHaveLength(1)
-        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(0)
         expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("#when parent status is idle but latest assistant turn has running tool state without finish #then background completion records a no-reply wake", async () => {
+    test("#when parent status is idle but latest assistant turn has running tool state without finish #then background completion stays pending", async () => {
       // given
       const originalDateNow = Date.now
       Date.now = () => 1778820000000
@@ -628,15 +627,14 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         await waitForCoalescedFlush(manager, promptAsyncCalls)
 
         // then
-        expect(promptAsyncCalls).toHaveLength(1)
-        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(0)
         expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("#when stale tool-call history keeps blocking an all-complete wake #then the wake is admitted as noReply with reply liveness retained", async () => {
+    test("#when stale tool-call history keeps blocking an all-complete wake #then the wake stays pending", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
@@ -680,14 +678,11 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
-      expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     })
 
-    test("#when stale sdk tool-call part keeps blocking an all-complete wake #then the wake is admitted as noReply with reply liveness retained", async () => {
+    test("#when stale sdk tool-call part keeps blocking an all-complete wake #then the wake stays pending", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
@@ -731,14 +726,11 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
-      expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     })
 
-    test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake records a no-reply wake", async () => {
+    test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake stays pending", async () => {
       // given
       const originalDateNow = Date.now
       Date.now = () => 100_000
@@ -773,8 +765,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         await waitForCoalescedFlush(manager, promptAsyncCalls)
 
         // then
-        expect(promptAsyncCalls).toHaveLength(1)
-        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(0)
         expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow

@@ -142,7 +142,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given retained noReply wake ages while parent is busy #then it does not force a reply", async () => {
+  test("#given reply-required wake ages while parent is busy #then it does not force a reply", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -159,9 +159,8 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeUndefined()
 
       // when
       now = 220_000
@@ -171,7 +170,7 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
       expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
     } finally {
@@ -180,7 +179,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given retained noReply wake and fresh activity exceed active ceiling #then it dispatches once safe", async () => {
+  test("#given retained reply wake and fresh activity exceed active ceiling #then it dispatches once safe", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -205,9 +204,8 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(2)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(promptAsyncCalls[1]?.body.noReply).not.toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).not.toBe(true)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
@@ -215,7 +213,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given fresh user message and aged wake while parent is busy #then it admits noReply", async () => {
+  test("#given fresh user message and aged wake while parent is busy #then it stays pending", async () => {
     // given
     const originalDateNow = Date.now
     const now = 220_000
@@ -237,8 +235,7 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
       expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
     } finally {
@@ -247,7 +244,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given blocked tool history and aged wake while parent is busy #then it admits noReply", async () => {
+  test("#given blocked tool history and aged wake while parent is busy #then it stays pending", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier({
       sessionStatuses: { "parent-1": { type: "busy" } },
@@ -260,8 +257,7 @@ describe("parent wake active defer ceiling", () => {
       await notifier.flushPendingParentWake("parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
       expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
     } finally {
