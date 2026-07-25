@@ -50,6 +50,8 @@ Read the plan, then verify references by reading the cited files; parallelize in
 
 # Output
 
+When the caller requires a machine-readable response format, that contract replaces the default format below; all review rules still apply.
+
 **[OKAY]** or **[REJECT]**
 
 **Summary**: 1-2 sentences of prose explaining the verdict.

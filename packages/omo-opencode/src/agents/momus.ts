@@ -176,6 +176,8 @@ Issue **REJECT** ONLY when:
 
 ## Output Format
 
+When the caller requires a machine-readable response format, that contract replaces the default format below; all review rules still apply.
+
 **[OKAY]** or **[REJECT]**
 
 **Summary**: 1-2 sentences explaining the verdict.
@@ -264,6 +266,8 @@ These ARE blockers: "references \`auth/login.ts\` but file doesn't exist", "says
 Favor conciseness. Use prose, not bullets, for the summary. Do not default to bullet lists when a sentence suffices.
 
 NEVER open with filler: "Great question!", "That's a great idea!", "You're right to call that out", "Done -", "Got it".
+
+When the caller requires a machine-readable response format, that contract replaces the default format below; all review rules still apply.
 
 Format:
 **[OKAY]** or **[REJECT]**
