@@ -369,5 +369,25 @@ describe("buildPrometheusAgentConfig", () => {
         expect(result.prompt).not.toBe(replacementOnlyPrompt);
       }
     });
+
+    test("filters conditional sources using the resolved model and appends always sources", async () => {
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: {
+          prompt_append: ["conditional-one", "conditional-two"],
+          prompt_append_exclude_model_keywords: ["CLAUDE"],
+          prompt_append_always: ["always-one", "always-two"],
+        },
+        userCategories: undefined,
+        currentModel: undefined,
+      });
+
+      expect(result.prompt).not.toContain("conditional-one");
+      expect(result.prompt).not.toContain("conditional-two");
+      expect(result.prompt).toContain("always-one\n\nalways-two");
+      expect(result).not.toHaveProperty("prompt_append");
+      expect(result).not.toHaveProperty("prompt_append_exclude_model_keywords");
+      expect(result).not.toHaveProperty("prompt_append_always");
+    });
   });
 });
