@@ -3,7 +3,8 @@
 ## What was tested
 
 - Loaded this branch's `packages/omo-opencode/src/index.ts` in a real OpenCode server under isolated XDG data, config, cache, and state directories.
-- Queried `/global/health` and `/config` to verify that the real harness became healthy with this worktree plugin source configured.
+- Drove `anthropic/claude-opus-5` through a local isolated provider and the real OpenCode message and bash-tool path at 200,000 and 790,000 input tokens.
+- Captured SSE proving no auto-compaction after the below-threshold turn, then an `auto: true` compaction part and `session.compacted` after the above-threshold turn.
 - Added a production-hook regression test for the preemptive-compaction path. The same `claude-opus-5` session remains below the 78% threshold at 200,000 input and cache-read tokens, then triggers exactly one summarize call at 790,000 tokens.
 - Ran the focused resolver and preemptive-compaction suites.
 - Ran package TypeScript checks with `bun run typecheck:packages`.
@@ -11,6 +12,7 @@
 ## What was observed
 
 - Real OpenCode v1.18.5 reported `healthy: true` with the worktree plugin URI present in `/config`.
+- Session `ses_06373d6f5ffehNws4s2eB0K01l` completed the 200K and 790K tool turns; SSE then emitted an automatic compaction part and `session.compacted`.
 - The real OpenCode database session count stayed at 4,329 before and after the isolated server run.
 - Focused tests: 32 pass, 0 fail. This includes `claude-opus-5`, the 5-series `-high` variants, genuine 200K-model guards, and the production compaction decision path.
 - Package typecheck exited successfully.
@@ -18,13 +20,18 @@
 Exact captured output:
 
 - `opencode-source-load.txt`
+- `real-opencode-compaction.txt`
 - `focused-tests.txt`
 - `typecheck-packages.txt`
 
 ## Why it is enough
 
-The resolver tests pin the model-ID classification, while the hook-level test pins the user-visible consequence: 200K usage must not cause premature compaction for a GA 1M Opus 5 session, and usage above 78% of 1M must still compact. The isolated OpenCode run verifies that the changed source tree loads in the real harness without touching the user's OpenCode state.
+The resolver tests pin the model-ID classification, while the hook-level test pins the user-visible consequence: 200K usage must not cause premature compaction for a GA 1M Opus 5 session, and usage above 78% of 1M must still compact. The isolated OpenCode interaction now proves the same decision through real message, tool, SSE, and `session.summarize` paths without touching the user's OpenCode state.
 
 ## What was omitted
 
-No provider request was needed because this behavior is a deterministic local compaction decision over OpenCode message usage metadata. No credentials, environment dumps, auth headers, or private configuration were captured. The isolated server used localhost only and its sandbox was removed after capture.
+No external provider request or credential was needed. The deterministic local provider supplied usage metadata and compaction output over localhost. No credentials, environment dumps, auth headers, or private configuration were captured, and the isolated XDG sandbox was removed after capture.
+
+## Residual risk observed in the real harness
+
+The real summarize request was queued behind the in-flight tool turn. The plugin timeout fired at 60 seconds shortly before OpenCode completed the queued summary and emitted `session.compacted`. This pre-existing queue/timeout interaction is recorded rather than hidden; it does not change the threshold proof requested for this model-classification PR.
