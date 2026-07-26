@@ -74,6 +74,10 @@ import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { messageUpdatedInfoHasParentWakeOutput } from "./message-updated-parent-wake-output"
 import {
+  ManagedBashCheckpointObserver,
+  type ManagedBashCheckpointScope,
+} from "./managed-bash-checkpoint"
+import {
   type CircuitBreakerSettings,
   detectRepetitiveToolUse,
   recordToolCall,
@@ -283,6 +287,7 @@ export class BackgroundManager {
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
   private readonly scheduledFlushSettledCounts = new Map<string, number>()
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
+  private readonly managedBashCheckpointObserver = new ManagedBashCheckpointObserver()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -1602,6 +1607,8 @@ The fallback retry session is now created and can be inspected directly.
   handleEvent(event: Event): void {
     const props = event.properties
 
+    this.handleManagedBashCheckpointEvent(event)
+
     if (event.type.startsWith(SESSION_NEXT_EVENT_PREFIX)) {
       const sessionID = resolveSessionEventID(props)
       const partInfo = resolveSessionNextPartInfo(event.type, props)
@@ -2144,6 +2151,7 @@ The fallback retry session is now created and can be inspected directly.
     source: string,
   ): Promise<boolean> {
     const previousSessionID = task.sessionId
+    const previousCheckpointAttemptID = getCurrentAttempt(task)?.attemptId ?? previousSessionID
     let retryingNotification: string | undefined
     const result = tryFallbackRetry({
       task,
@@ -2173,6 +2181,9 @@ The task was re-queued on a fallback model after a retryable failure.
       },
     })
     const retried = await result
+    if (retried && previousCheckpointAttemptID) {
+      await this.purgeManagedBashCheckpointAttempt(task, previousCheckpointAttemptID)
+    }
     if (retried && retryingNotification) {
       const parentPromptContext = await this.resolveParentWakePromptContext(task)
       this.queuePendingParentWake(
@@ -2438,6 +2449,10 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     if (options?.skipNotification) {
+      const checkpointAttemptID = task.currentAttemptID ?? task.sessionId
+      if (checkpointAttemptID) {
+        await this.purgeManagedBashCheckpointAttempt(task, checkpointAttemptID)
+      }
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
@@ -2668,55 +2683,60 @@ The task was re-queued on a fallback model after a retryable failure.
       completedTasks,
     })
 
-      if (this.enableParentSessionNotifications) {
-        const parentPromptContext = await this.resolveParentWakePromptContext(task)
+    const checkpointAttemptID = task.currentAttemptID ?? task.sessionId
+    if (checkpointAttemptID) {
+      this.purgeManagedBashCheckpointAttemptAlreadySerialized(task, checkpointAttemptID)
+    }
 
-        log("[background-agent] notifyParentSession context:", {
+    if (this.enableParentSessionNotifications) {
+      const parentPromptContext = await this.resolveParentWakePromptContext(task)
+
+      log("[background-agent] notifyParentSession context:", {
+        taskId: task.id,
+        resolvedAgent: parentPromptContext.agent,
+        resolvedModel: parentPromptContext.model,
+      })
+
+      const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
+      const shouldReply = allComplete || isTaskFailure
+
+      const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
+
+      if (shouldDeferNotification) {
+        this.queuePendingParentWake(
+          task.parentSessionId,
+          notification,
+          parentPromptContext,
+          shouldReply,
+          PENDING_PARENT_WAKE_DEBOUNCE_MS,
+        )
+        log("[background-agent] Queued notification while parent session is active:", {
           taskId: task.id,
-          resolvedAgent: parentPromptContext.agent,
-          resolvedModel: parentPromptContext.model,
+          allComplete,
+          isTaskFailure,
+          shouldReply,
         })
-
-        const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
-
-        const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
-
-        if (shouldDeferNotification) {
-          this.queuePendingParentWake(
-            task.parentSessionId,
-            notification,
-            parentPromptContext,
-            shouldReply,
-            PENDING_PARENT_WAKE_DEBOUNCE_MS,
-          )
-          log("[background-agent] Queued notification while parent session is active:", {
-            taskId: task.id,
-            allComplete,
-            isTaskFailure,
-            shouldReply,
-          })
-        } else {
-          this.queuePendingParentWake(
-            task.parentSessionId,
-            notification,
-            parentPromptContext,
-            shouldReply,
-            PENDING_PARENT_WAKE_DEBOUNCE_MS,
-          )
-          log("[background-agent] Queued notification for short-debounce flush to idle parent:", {
-            taskId: task.id,
-            allComplete,
-            isTaskFailure,
-            shouldReply,
-          })
-        }
       } else {
-        log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
+        this.queuePendingParentWake(
+          task.parentSessionId,
+          notification,
+          parentPromptContext,
+          shouldReply,
+          PENDING_PARENT_WAKE_DEBOUNCE_MS,
+        )
+        log("[background-agent] Queued notification for short-debounce flush to idle parent:", {
           taskId: task.id,
-          parentSessionID: task.parentSessionId,
+          allComplete,
+          isTaskFailure,
+          shouldReply,
         })
       }
+    } else {
+      log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
+        taskId: task.id,
+        parentSessionID: task.parentSessionId,
+      })
+    }
 
     if (task.status !== "running" && task.status !== "pending") {
       this.scheduleTaskRemoval(task.id)
@@ -2842,6 +2862,71 @@ The task was re-queued on a fallback model after a retryable failure.
   ): void {
     this.parentWakeNotifier.queuePendingParentWake(sessionID, notification, promptContext, shouldReply, delayMs)
     this.updateBackgroundTaskMarker(sessionID)
+  }
+
+  private queueLatestParentWake(input: {
+    readonly sessionID: string
+    readonly notification: string
+    readonly promptContext: ParentWakePromptContext
+    readonly latestOnlyKey: string
+  }): void {
+    this.parentWakeNotifier.queueLatestParentWake({
+      ...input,
+      delayMs: PENDING_PARENT_WAKE_DEBOUNCE_MS,
+    })
+    this.updateBackgroundTaskMarker(input.sessionID)
+  }
+
+  private handleManagedBashCheckpointEvent(event: Event): void {
+    if (!this.enableParentSessionNotifications) return
+    if (
+      event.type !== "session.next.tool.called"
+      && event.type !== "session.next.tool.success"
+      && event.type !== "message.part.updated"
+    ) return
+
+    const sessionID = event.type === "message.part.updated"
+      ? resolveMessageEventSessionID(event.properties)
+      : resolveSessionEventID(event.properties)
+    if (!sessionID) return
+    const resolved = this.resolveTaskAttemptBySession(sessionID)
+    if (!resolved?.isCurrent || resolved.task.status !== "running") return
+
+    const scope: ManagedBashCheckpointScope = {
+      taskID: resolved.task.id,
+      attemptID: resolved.attemptID ?? resolved.task.currentAttemptID ?? sessionID,
+    }
+    if (event.type === "session.next.tool.called") {
+      this.managedBashCheckpointObserver.observeCalled(event.properties, scope)
+      return
+    }
+
+    const observation = event.type === "session.next.tool.success"
+      ? this.managedBashCheckpointObserver.observeSuccess(event.properties, scope)
+      : this.managedBashCheckpointObserver.observeCompletedPart(event.properties, scope)
+    if (!observation) return
+
+    this.queueLatestParentWake({
+      sessionID: resolved.task.parentSessionId,
+      notification: observation.notification,
+      promptContext: {
+        ...(resolved.task.parentAgent ? { agent: resolved.task.parentAgent } : {}),
+        ...(resolved.task.parentModel ? { model: resolved.task.parentModel } : {}),
+        ...(resolved.task.parentTools ? { tools: resolved.task.parentTools } : {}),
+      },
+      latestOnlyKey: observation.latestOnlyKey,
+    })
+  }
+
+  private purgeManagedBashCheckpointAttempt(task: BackgroundTask, attemptID: string): Promise<void> {
+    return this.enqueueNotificationForParent(task.parentSessionId, async () => {
+      this.purgeManagedBashCheckpointAttemptAlreadySerialized(task, attemptID)
+    })
+  }
+
+  private purgeManagedBashCheckpointAttemptAlreadySerialized(task: BackgroundTask, attemptID: string): void {
+    const keys = this.managedBashCheckpointObserver.purgeAttempt({ taskID: task.id, attemptID })
+    if (keys.length > 0) this.parentWakeNotifier.removeLatestParentWakes(task.parentSessionId, keys)
   }
 
   private async flushPendingParentWake(sessionID: string): Promise<void> {
@@ -3178,6 +3263,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.idleDeferralTimers.clear()
 
     this.parentWakeNotifier.shutdown()
+    this.managedBashCheckpointObserver.clear()
 
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
