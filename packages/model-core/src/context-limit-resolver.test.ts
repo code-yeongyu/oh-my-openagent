@@ -234,6 +234,15 @@ describe("resolveActualContextLimit", () => {
     }
   })
 
+  it("returns GA 1M for the OpenCode Amazon Bedrock provider ID", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("amazon-bedrock", "us.anthropic.claude-opus-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
   it("uses a cached context limit for a regional AWS Bedrock Opus 5 model ID", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]

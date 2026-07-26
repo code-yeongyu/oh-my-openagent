@@ -12,6 +12,7 @@ function isAnthropicProvider(providerID: string, modelID: string): boolean {
   const normalized = providerID.toLowerCase()
   return normalized === "anthropic"
     || normalized === "google-vertex-anthropic"
+    || normalized === "amazon-bedrock"
     || normalized === "aws-bedrock-anthropic"
     || (normalized === "google" && modelID.toLowerCase().startsWith("claude-"))
 }

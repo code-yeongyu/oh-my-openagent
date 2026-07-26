@@ -23,8 +23,8 @@ function createMockContext(): HookContext {
   }
 }
 
-describe("preemptive-compaction aws-bedrock-anthropic", () => {
-  it("uses the GA 1M threshold for a regional AWS Bedrock Opus 5 model ID", async () => {
+describe("preemptive-compaction Bedrock providers", () => {
+  it("uses the GA 1M threshold for OpenCode's Amazon Bedrock provider ID", async () => {
     // given
     const ctx = createMockContext()
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
@@ -38,7 +38,7 @@ describe("preemptive-compaction aws-bedrock-anthropic", () => {
             info: {
               role: "assistant",
               sessionID,
-              providerID: "aws-bedrock-anthropic",
+              providerID: "amazon-bedrock",
               modelID: "us.anthropic.claude-opus-5",
               finish: true,
               tokens: {
