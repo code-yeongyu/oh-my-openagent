@@ -13,7 +13,7 @@
 - Re-loaded the final restricted-classification code through an isolated real OpenCode server with both Claude and non-Claude Amazon Bedrock catalog identities.
 - Ran package TypeScript checks with `bun run typecheck:packages`.
 - Scoped native Anthropic 1M overrides away from `amazon-bedrock`, then verified the exact cached 200K Haiku identity under all three Anthropic override signals in both the resolver and production preemptive-compaction hook.
-- Re-loaded the final revision in an isolated real OpenCode server with both Anthropic environment flags enabled and both the 1M Opus and 200K Haiku Amazon Bedrock catalog identities present.
+- Re-loaded the final revision in an isolated real OpenCode server with the native Anthropic 1M beta state and both Anthropic 1M environment flags enabled, then drove the cached-200K Amazon Bedrock Haiku identity through a real 160K message, bash-tool, automatic-compaction, and SSE path.
 
 ## What was observed
 
@@ -26,20 +26,21 @@
 - The non-Claude regression returned its cached 272K limit despite `anthropicContext1MEnabled`, `ANTHROPIC_1M_CONTEXT`, and `VERTEX_ANTHROPIC_1M_CONTEXT` all being enabled, while the documented Claude identity remained on the GA 1M path.
 - Package typecheck exited successfully.
 - The cached `amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0` limit remained 200K despite the model-cache flag and both Anthropic 1M environment flags; at 160K usage, the production hook summarized exactly once.
-- The final isolated source-load smoke exposed both the 1M Opus and 200K Haiku Amazon Bedrock identities while both environment flags were enabled, and the host DB remained at 4,329 sessions before and after.
+- The final isolated real-harness session `ses_06328f097ffecOs41DtHkfxsiN` used `amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0` with `anthropicContext1MEnabled`, `ANTHROPIC_1M_CONTEXT`, and `VERTEX_ANTHROPIC_1M_CONTEXT` all enabled. At 160K input tokens the real bash tool completed, SSE emitted an `auto: true` compaction part and `session.compacted`, and the host DB remained at 4,329 sessions before and after.
 
 Exact captured output:
 
 - `opencode-source-load.txt`
 - `real-opencode-compaction.txt`
 - `real-opencode-fast-alias.txt` (fresh final-code alias run)
-- `real-opencode-amazon-bedrock.txt` (documented provider identity through real message/tool/SSE path)
+- `real-opencode-amazon-bedrock.txt` (documented 1M Opus provider identity through real message/tool/SSE path)
+- `real-opencode-amazon-bedrock-haiku-200k.txt` (final cached-200K Haiku path at 160K with all three 1M signals enabled)
 - `focused-tests.txt`
 - `typecheck-packages.txt`
 
 ## Why it is enough
 
-The resolver tests pin the model-ID classification, including Bedrock namespace and regional-prefix normalization, multi-model-provider discrimination, and Amazon Bedrock cache precedence over native Anthropic override flags, while the hook-level tests pin the user-visible consequence: 200K usage must not cause premature compaction for a GA 1M Opus 5 session, and usage above 78% of 1M must still compact. The isolated OpenCode interactions prove the same decision through real message, tool, SSE, and `session.summarize` paths without touching the user OpenCode state. The real message-path runs specifically prove both the catalogued `claude-opus-5-fast` alias and documented `amazon-bedrock/us.anthropic.claude-opus-5` identity take the 1M threshold path. The final-code isolated source-load smoke proves the Bedrock normalization revision loads through the real plugin entry, while focused resolver and production-hook tests directly cover the exact `aws-bedrock-anthropic/us.anthropic.claude-opus-5` identity and cached-limit path.
+The resolver tests pin the model-ID classification, including Bedrock namespace and regional-prefix normalization, multi-model-provider discrimination, and Amazon Bedrock cache precedence over native Anthropic override flags, while the hook-level tests pin the user-visible consequence: 200K usage must not cause premature compaction for a GA 1M Opus 5 session, and usage above 78% of 1M must still compact. The isolated OpenCode interactions prove the same decision through real message, tool, SSE, and `session.summarize` paths without touching the user OpenCode state. The real message-path runs specifically prove both the catalogued `claude-opus-5-fast` alias and documented `amazon-bedrock/us.anthropic.claude-opus-5` identity take the 1M threshold path. The final real OpenCode Haiku run closes the cache-precedence path end to end: despite all three 1M signals, the exact cached-200K Amazon Bedrock identity compacted at 160K through the real message, bash-tool, `session.summarize`, and SSE path. Focused resolver and production-hook tests also directly cover the exact `aws-bedrock-anthropic/us.anthropic.claude-opus-5` identity and cached-limit path.
 
 ## What was omitted
 
