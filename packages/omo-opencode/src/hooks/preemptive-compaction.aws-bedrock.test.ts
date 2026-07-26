@@ -24,6 +24,52 @@ function createMockContext(): HookContext {
 }
 
 describe("preemptive-compaction aws-bedrock-anthropic", () => {
+  it("uses the GA 1M threshold for a regional AWS Bedrock Opus 5 model ID", async () => {
+    // given
+    const ctx = createMockContext()
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+    const hook = createPreemptiveCompactionHook(ctx, pluginConfig)
+    const sessionID = "ses_aws_bedrock_opus_5"
+    const sendUsage = async (input: number, callID: string): Promise<void> => {
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              role: "assistant",
+              sessionID,
+              providerID: "aws-bedrock-anthropic",
+              modelID: "us.anthropic.claude-opus-5",
+              finish: true,
+              tokens: {
+                input,
+                output: 1_000,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        },
+      })
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID },
+        { title: "", output: "test", metadata: null },
+      )
+    }
+
+    // when
+    await sendUsage(200_000, "call_aws_bedrock_below")
+
+    // then
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+
+    // when
+    await sendUsage(790_000, "call_aws_bedrock_above")
+
+    // then
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
   it("triggers compaction for aws-bedrock-anthropic provider when usage exceeds threshold", async () => {
     // given
     const ctx = createMockContext()

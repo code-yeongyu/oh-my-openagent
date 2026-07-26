@@ -223,6 +223,31 @@ describe("resolveActualContextLimit", () => {
     })).toBe(920_000)
   })
 
+  it("returns GA 1M for AWS Bedrock Opus 5 model IDs", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of ["anthropic.claude-opus-5", "us.anthropic.claude-opus-5"]) {
+      expect(resolveActualContextLimit("aws-bedrock-anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
+  it("uses a cached context limit for a regional AWS Bedrock Opus 5 model ID", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelID = "us.anthropic.claude-opus-5"
+    const modelContextLimitsCache = new Map<string, number>([
+      [`aws-bedrock-anthropic/${modelID}`, 930_000],
+    ])
+
+    expect(resolveActualContextLimit("aws-bedrock-anthropic", modelID, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(930_000)
+  })
+
   it("applies the -high variant suffix to 5-series models", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
