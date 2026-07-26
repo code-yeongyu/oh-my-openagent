@@ -17,7 +17,7 @@ import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import {
   clearBackgroundOutputConsumptionState,
-  recordBackgroundOutputConsumption,
+  recordBackgroundTaskOutputConsumption,
 } from "../../shared/background-output-consumption"
 
 type PromptAsyncCall = {
@@ -85,7 +85,12 @@ function createTask(overrides: Partial<BackgroundTask> & { id: string; parentSes
   }
 }
 
-function createManager(enableParentSessionNotifications: boolean): {
+function createManager(
+  enableParentSessionNotifications: boolean,
+  sessionStatuses?: Record<string, { type: string }>,
+  promptAsyncImpl?: (call: PromptAsyncCall) => Promise<unknown>,
+  sessionMessages?: SessionMessageForTest[],
+): {
   manager: BackgroundManager
   promptAsyncCalls: PromptAsyncCall[]
 }
@@ -305,7 +310,12 @@ describe("consumed background task output should not trigger a redundant complet
     // when - completion queues/debounces the wake FIRST
     await notifyParentSessionForTest(manager, task)
     // then the parent consumes the output in the same turn (records consumption)
-    recordBackgroundOutputConsumption(task.parentSessionId, task.parentMessageId, task.sessionId)
+    recordBackgroundTaskOutputConsumption({
+      parentSessionID: task.parentSessionId,
+      parentMessageID: task.parentMessageId,
+      taskID: task.id,
+      taskSessionID: task.sessionId,
+    })
     // flush the deferred wake
     await waitForCoalescedFlush(manager, promptAsyncCalls)
 
@@ -361,7 +371,12 @@ describe("consumed background task output should not trigger a redundant complet
         getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
         // when - parent inspects the failed output (records consumption), completion queues wake, flush
-        recordBackgroundOutputConsumption(task.parentSessionId, task.parentMessageId, task.sessionId)
+        recordBackgroundTaskOutputConsumption({
+          parentSessionID: task.parentSessionId,
+          parentMessageID: task.parentMessageId,
+          taskID: task.id,
+          taskSessionID: task.sessionId,
+        })
         await notifyParentSessionForTest(manager, task)
         await waitForCoalescedFlush(manager, promptAsyncCalls)
 
@@ -399,7 +414,12 @@ describe("consumed background task output should not trigger a redundant complet
     getPendingByParent(manager).set(successTask.parentSessionId, new Set([successTask.id, failedTask.id]))
 
     // when - the success is consumed BEFORE the grouped notification is generated
-    recordBackgroundOutputConsumption(successTask.parentSessionId, successTask.parentMessageId, successTask.sessionId)
+    recordBackgroundTaskOutputConsumption({
+      parentSessionID: successTask.parentSessionId,
+      parentMessageID: successTask.parentMessageId,
+      taskID: successTask.id,
+      taskSessionID: successTask.sessionId,
+    })
     await notifyParentSessionForTest(manager, successTask)
     await notifyParentSessionForTest(manager, failedTask)
     await waitForCoalescedFlush(manager, promptAsyncCalls)
@@ -458,7 +478,12 @@ describe("consumed background task output should not trigger a redundant complet
     // then the timer flushes
     await notifyParentSessionForTest(manager, taskA)
     await notifyParentSessionForTest(manager, taskB)
-    recordBackgroundOutputConsumption(taskB.parentSessionId, taskB.parentMessageId, taskB.sessionId)
+    recordBackgroundTaskOutputConsumption({
+      parentSessionID: taskB.parentSessionId,
+      parentMessageID: taskB.parentMessageId,
+      taskID: taskB.id,
+      taskSessionID: taskB.sessionId,
+    })
     await waitForCoalescedFlush(manager, promptAsyncCalls)
 
     // then - the wake MUST fire because A's output was NEVER consumed. The
@@ -467,5 +492,89 @@ describe("consumed background task output should not trigger a redundant complet
     expect(promptAsyncCalls).toHaveLength(1)
     const payload = getPromptText(promptAsyncCalls[0])
     expect(payload).toContain(taskA.id)
+  })
+
+  test("#given an active parent defers a queued success wake #when the task is consumed before the retry #then the deferred retry is suppressed", async () => {
+    // given
+    const parentSessionID = "parent-deferred-consumption"
+    const sessionStatuses = { [parentSessionID]: { type: "busy" } }
+    const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
+    managerUnderTest = manager
+    const task = createTask({
+      id: "bg_deferred_consumed",
+      parentSessionId: parentSessionID,
+      sessionId: "ses_deferred_consumed",
+      description: "deferred consumed success",
+      status: "completed",
+      completedAt: new Date("2026-03-11T00:01:00.000Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(parentSessionID, new Set([task.id]))
+    await notifyParentSessionForTest(manager, task)
+
+    const initialTimer = getPendingParentWakeTimers(manager).get(parentSessionID)
+    if (!initialTimer || !fakeTimers) {
+      throw new Error("Expected initial parent wake timer")
+    }
+    await fakeTimers.run(initialTimer)
+    expect(promptAsyncCalls).toHaveLength(0)
+
+    // when
+    sessionStatuses[parentSessionID] = { type: "idle" }
+    recordBackgroundTaskOutputConsumption({
+      parentSessionID,
+      parentMessageID: task.parentMessageId,
+      taskID: task.id,
+      taskSessionID: task.sessionId,
+    })
+    await waitForDeferredWake(manager, promptAsyncCalls)
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(getPendingParentWakes(manager).has(parentSessionID)).toBe(false)
+  })
+
+  test("#given a consumed progress wake followed by an unconsumed final success #when notifications coalesce #then the final wake replaces the stale progress notice", async () => {
+    // given
+    const parentSessionID = "parent-final-replacement"
+    const { manager, promptAsyncCalls } = createManager(true)
+    managerUnderTest = manager
+    const consumedTask = createTask({
+      id: "bg_consumed_progress",
+      parentSessionId: parentSessionID,
+      sessionId: "ses_consumed_progress",
+      description: "consumed progress task",
+      status: "completed",
+      completedAt: new Date("2026-03-11T00:01:00.000Z"),
+    })
+    const finalTask = createTask({
+      id: "bg_unconsumed_final",
+      parentSessionId: parentSessionID,
+      sessionId: "ses_unconsumed_final",
+      description: "unconsumed final task",
+      status: "completed",
+      completedAt: new Date("2026-03-11T00:02:00.000Z"),
+    })
+    getTasks(manager).set(consumedTask.id, consumedTask)
+    getTasks(manager).set(finalTask.id, finalTask)
+    getPendingByParent(manager).set(parentSessionID, new Set([consumedTask.id, finalTask.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, consumedTask)
+    recordBackgroundTaskOutputConsumption({
+      parentSessionID,
+      parentMessageID: consumedTask.parentMessageId,
+      taskID: consumedTask.id,
+      taskSessionID: consumedTask.sessionId,
+    })
+    await notifyParentSessionForTest(manager, finalTask)
+    await waitForCoalescedFlush(manager, promptAsyncCalls)
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(1)
+    const payload = getPromptText(promptAsyncCalls[0])
+    expect(payload).toContain(finalTask.id)
+    expect(payload).not.toContain(consumedTask.id)
+    expect(payload).not.toContain(consumedTask.description)
   })
 })

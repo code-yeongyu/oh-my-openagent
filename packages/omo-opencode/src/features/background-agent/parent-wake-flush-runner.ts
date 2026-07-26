@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { isBackgroundTaskOutputConsumption } from "../../shared/background-output-consumption"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 import { isFailureParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
@@ -42,6 +43,20 @@ export class ParentWakeFlushRunner {
 
     const latestWake = this.deps.pendingQueue.getWake(sessionID)
     if (!latestWake) {
+      return
+    }
+    const taskIdentities = latestWake.taskIdentities
+    if (
+      taskIdentities
+      && taskIdentities.length > 0
+      && !isFailureParentWake(latestWake)
+      && taskIdentities.every((identity) => isBackgroundTaskOutputConsumption({
+        parentSessionID: sessionID,
+        ...identity,
+      }))
+    ) {
+      this.deps.pendingQueue.deleteWake(sessionID)
+      log("[background-agent] Suppressed consumed-success parent wake at flush time:", { sessionID })
       return
     }
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {

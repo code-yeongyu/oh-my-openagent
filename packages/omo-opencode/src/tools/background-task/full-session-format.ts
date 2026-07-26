@@ -9,6 +9,25 @@ import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sd
 const MAX_MESSAGE_LIMIT = 200
 const THINKING_MAX_CHARS = 2000
 
+export type FormattedFullSession = {
+  readonly output: string
+  readonly includesCompletedOutput: boolean
+}
+
+type FullSessionFormatOptions = {
+  readonly includeThinking: boolean
+  readonly messageLimit?: number
+  readonly sinceMessageId?: string
+  readonly includeToolResults: boolean
+  readonly thinkingMaxChars?: number
+  readonly fromEnd?: boolean
+}
+
+type NormalizedMessage = {
+  readonly message: BackgroundOutputMessage
+  readonly includesCompletedOutput: boolean
+}
+
 function extractToolResultText(part: NonNullable<BackgroundOutputMessage["parts"]>[number]): string[] {
   if (typeof part.content === "string" && part.content.length > 0) {
     return [part.content]
@@ -31,20 +50,34 @@ function extractToolResultText(part: NonNullable<BackgroundOutputMessage["parts"
   return []
 }
 
-export async function formatFullSession(
+function formattedFullSession(output: string, includesCompletedOutput = false): FormattedFullSession {
+  return { output, includesCompletedOutput }
+}
+
+function messageHasCompletedOutput(
+  message: BackgroundOutputMessage,
+  includeThinking: boolean,
+  includeToolResults: boolean,
+): boolean {
+  if (message.info?.role !== "assistant" && message.info?.role !== "tool") {
+    return false
+  }
+  return (message.parts ?? []).some((part) => {
+    if (part.type === "text") return Boolean(part.text)
+    if (part.type === "reasoning") return includeThinking && Boolean(part.text)
+    if (part.type === "thinking") return includeThinking && Boolean(part.thinking)
+    if (part.type === "tool_result") return includeToolResults && extractToolResultText(part).length > 0
+    return false
+  })
+}
+
+export async function formatFullSessionWithMetadata(
   task: BackgroundTask,
   client: BackgroundOutputClient,
-  options: {
-    includeThinking: boolean
-    messageLimit?: number
-    sinceMessageId?: string
-    includeToolResults: boolean
-    thinkingMaxChars?: number
-    fromEnd?: boolean
-  }
-): Promise<string> {
+  options: FullSessionFormatOptions,
+): Promise<FormattedFullSession> {
   if (!task.sessionId) {
-    return formatTaskStatus(task)
+    return formattedFullSession(formatTaskStatus(task))
   }
 
   let messagesResult: BackgroundOutputMessagesResult
@@ -54,17 +87,17 @@ export async function formatFullSession(
       getBackgroundOutputFetchTimeoutMs(),
     )
   } catch (error) {
-    return `Error fetching messages: ${error instanceof Error ? error.message : String(error)}`
+    return formattedFullSession(`Error fetching messages: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   const errorMessage = getErrorMessage(messagesResult)
   if (errorMessage) {
-    return `Error fetching messages: ${errorMessage}`
+    return formattedFullSession(`Error fetching messages: ${errorMessage}`)
   }
 
   const rawMessages = extractMessages(messagesResult)
   if (!Array.isArray(rawMessages)) {
-    return "Error fetching messages: invalid response"
+    return formattedFullSession("Error fetching messages: invalid response")
   }
 
   const sortedMessages = [...rawMessages].sort((a, b) => {
@@ -77,7 +110,7 @@ export async function formatFullSession(
   if (options.sinceMessageId) {
     const index = filteredMessages.findIndex((message) => message.id === options.sinceMessageId)
     if (index === -1) {
-      return `Error: since_message_id not found: ${options.sinceMessageId}`
+      return formattedFullSession(`Error: since_message_id not found: ${options.sinceMessageId}`)
     }
     filteredMessages = filteredMessages.slice(index + 1)
   }
@@ -86,7 +119,16 @@ export async function formatFullSession(
   const includeToolResults = options.includeToolResults
   const thinkingMaxChars = options.thinkingMaxChars ?? THINKING_MAX_CHARS
 
-  const normalizedMessages: BackgroundOutputMessage[] = []
+  let completedOutputMessage: BackgroundOutputMessage | undefined
+  for (let index = sortedMessages.length - 1; index >= 0; index -= 1) {
+    const message = sortedMessages[index]
+    if (message && messageHasCompletedOutput(message, includeThinking, includeToolResults)) {
+      completedOutputMessage = message
+      break
+    }
+  }
+
+  const normalizedMessages: NormalizedMessage[] = []
   for (const message of filteredMessages) {
     const parts = (message.parts ?? []).filter((part) => {
       if (part.type === "thinking" || part.type === "reasoning") {
@@ -105,12 +147,15 @@ export async function formatFullSession(
       continue
     }
 
-    normalizedMessages.push({ ...message, parts })
+    normalizedMessages.push({
+      message: { ...message, parts },
+      includesCompletedOutput: message === completedOutputMessage,
+    })
   }
 
   const limit = typeof options.messageLimit === "number" ? Math.min(options.messageLimit, MAX_MESSAGE_LIMIT) : undefined
   const hasMore = limit !== undefined && normalizedMessages.length > limit
-  let visibleMessages: typeof normalizedMessages
+  let visibleMessages: readonly NormalizedMessage[]
   if (limit === undefined) {
     visibleMessages = normalizedMessages
   } else if (options.fromEnd) {
@@ -135,10 +180,10 @@ export async function formatFullSession(
   if (visibleMessages.length === 0) {
     lines.push("")
     lines.push("(No messages found)")
-    return lines.join("\n")
+    return formattedFullSession(lines.join("\n"))
   }
 
-  for (const message of visibleMessages) {
+  for (const { message } of visibleMessages) {
     const role = message.info?.role ?? "unknown"
     const agent = message.info?.agent ? ` (${message.info.agent})` : ""
     const time = formatMessageTime(message.info?.time)
@@ -165,5 +210,16 @@ export async function formatFullSession(
     }
   }
 
-  return lines.join("\n")
+  return formattedFullSession(
+    lines.join("\n"),
+    visibleMessages.some((entry) => entry.includesCompletedOutput),
+  )
+}
+
+export async function formatFullSession(
+  task: BackgroundTask,
+  client: BackgroundOutputClient,
+  options: FullSessionFormatOptions,
+): Promise<string> {
+  return (await formatFullSessionWithMetadata(task, client, options)).output
 }

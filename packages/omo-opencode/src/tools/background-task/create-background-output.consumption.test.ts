@@ -19,7 +19,10 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { BackgroundTask } from "../../features/background-agent"
 import { createEventHandler } from "../../plugin/event"
-import { clearBackgroundOutputConsumptionState } from "../../shared/background-output-consumption"
+import {
+  clearBackgroundOutputConsumptionState,
+  isBackgroundTaskOutputConsumption,
+} from "../../shared/background-output-consumption"
 import { resetMessageCursor } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { createBackgroundOutput } from "./create-background-output"
@@ -149,5 +152,56 @@ describe("createBackgroundOutput full_session consumption recording", () => {
     // the cursor, and the result is consumable again.
     expect(redriveOutput).toContain("final result")
     expect(redriveOutput).not.toContain("No new output since last check")
+  })
+
+  test("#given a completed task whose result fetch fails #when background_output returns the fetch error #then the task is not marked consumed", async () => {
+    // given
+    const task = createTask()
+    const manager: BackgroundOutputManager = {
+      getTask: id => (id === task.id ? task : undefined),
+    }
+    const client: BackgroundOutputClient = {
+      session: {
+        messages: async () => {
+          throw new Error("fetch failed")
+        },
+      },
+    }
+    const tool = createBackgroundOutput(manager, client)
+
+    // when
+    await tool.execute(
+      { task_id: task.id },
+      { ...baseContext, messageID: "msg-fetch-error" } as ToolContextWithCallID
+    )
+
+    // then
+    expect(isBackgroundTaskOutputConsumption({
+      parentSessionID,
+      taskID: task.id,
+      taskSessionID,
+    })).toBe(false)
+  })
+
+  test("#given full_session filters omit the completed output #when background_output returns the filtered transcript #then the task is not marked consumed", async () => {
+    // given
+    const task = createTask()
+    const manager: BackgroundOutputManager = {
+      getTask: id => (id === task.id ? task : undefined),
+    }
+    const tool = createBackgroundOutput(manager, createMockClient())
+
+    // when
+    await tool.execute(
+      { task_id: task.id, full_session: true, since_message_id: "m1" },
+      { ...baseContext, messageID: "msg-filtered-full-session" } as ToolContextWithCallID
+    )
+
+    // then
+    expect(isBackgroundTaskOutputConsumption({
+      parentSessionID,
+      taskID: task.id,
+      taskSessionID,
+    })).toBe(false)
   })
 })

@@ -10,9 +10,21 @@ function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
+export type FormattedTaskResult = {
+  readonly output: string
+  readonly includesCompletedOutput: boolean
+}
+
+function formattedTaskResult(output: string, includesCompletedOutput = false): FormattedTaskResult {
+  return { output, includesCompletedOutput }
+}
+
+export async function formatTaskResultWithMetadata(
+  task: BackgroundTask,
+  client: BackgroundOutputClient,
+): Promise<FormattedTaskResult> {
   if (!task.sessionId) {
-    return `Error: Task has no sessionID`
+    return formattedTaskResult("Error: Task has no sessionID")
   }
 
   let messagesResult: BackgroundOutputMessagesResult
@@ -22,17 +34,17 @@ export async function formatTaskResult(task: BackgroundTask, client: BackgroundO
       getBackgroundOutputFetchTimeoutMs(),
     )
   } catch (error) {
-    return `Error fetching messages: ${error instanceof Error ? error.message : String(error)}`
+    return formattedTaskResult(`Error fetching messages: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   const errorMessage = getErrorMessage(messagesResult)
   if (errorMessage) {
-    return `Error fetching messages: ${errorMessage}`
+    return formattedTaskResult(`Error fetching messages: ${errorMessage}`)
   }
 
   const messages = extractMessages(messagesResult)
   if (!Array.isArray(messages) || messages.length === 0) {
-    return `Task Result
+    return formattedTaskResult(`Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -41,12 +53,12 @@ Session ID: ${task.sessionId}
 
 ---
 
-(No messages found)`
+(No messages found)`)
   }
 
   const relevantMessages = messages.filter((m) => m.info?.role === "assistant" || m.info?.role === "tool")
   if (relevantMessages.length === 0) {
-    return `Task Result
+    return formattedTaskResult(`Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -55,7 +67,7 @@ Session ID: ${task.sessionId}
 
 ---
 
-(No assistant or tool response found)`
+(No assistant or tool response found)`)
   }
 
   const sortedMessages = [...relevantMessages].sort((a, b) => {
@@ -69,7 +81,7 @@ Session ID: ${task.sessionId}
     .map((message) => extractErrorMessage(message.info?.error))
     .find((message): message is string => typeof message === "string" && message.length > 0)
   if (sessionError) {
-    return `Task Result
+    return formattedTaskResult(`Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -78,13 +90,13 @@ Session ID: ${task.sessionId}
 
 ---
 
-Session error: ${sessionError}`
+Session error: ${sessionError}`)
   }
 
   const newMessages = consumeNewMessages(task.sessionId, sortedMessages)
   if (newMessages.length === 0) {
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
-    return `Task Result
+    return formattedTaskResult(`Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -93,7 +105,7 @@ Session ID: ${task.sessionId}
 
 ---
 
-(No new output since last check)`
+(No new output since last check)`)
   }
 
   const extractedContent: string[] = []
@@ -125,7 +137,7 @@ Session ID: ${task.sessionId}
   const textContent = extractedContent.filter((text) => text.length > 0).join("\n\n")
   const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
-  return `Task Result
+  return formattedTaskResult(`Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -134,5 +146,9 @@ Session ID: ${task.sessionId}
 
 ---
 
-${textContent || "(No text output)"}`
+${textContent || "(No text output)"}`, textContent.length > 0)
+}
+
+export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
+  return (await formatTaskResultWithMetadata(task, client)).output
 }

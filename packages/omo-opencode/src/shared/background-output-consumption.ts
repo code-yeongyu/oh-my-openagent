@@ -42,18 +42,6 @@ export function recordBackgroundOutputConsumption(
 
   if (existing.has(taskSessionID)) return
   existing.set(taskSessionID, getMessageCursor(taskSessionID))
-
-  // Also record the consumed-success identity so wake-suppression queries
-  // (isBackgroundTaskOutputConsumption) can see this consumption. The legacy
-  // positional helper only snapshots the cursor; without this, any callsite
-  // using it (and the Task 1 tests that drive it directly) would populate the
-  // cursor map but leave the identity map empty, so suppression never triggers.
-  recordBackgroundTaskOutputConsumption({
-    parentSessionID,
-    parentMessageID,
-    taskID: undefined,
-    taskSessionID,
-  })
 }
 
 export function recordBackgroundTaskOutputConsumption(args: {

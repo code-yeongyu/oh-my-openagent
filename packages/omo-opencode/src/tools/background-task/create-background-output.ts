@@ -6,8 +6,8 @@ import type { BackgroundOutputArgs } from "./types"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
-import { formatFullSession } from "./full-session-format"
-import { formatTaskResult } from "./task-result-format"
+import { formatFullSessionWithMetadata } from "./full-session-format"
+import { formatTaskResultWithMetadata } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
@@ -181,15 +181,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           // Cursor snapshot must be captured before formatFullSession reads the transcript.
           if (resolvedTask.status === "completed") {
             recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
-            recordBackgroundTaskOutputConsumption({
-              parentSessionID: ctx.sessionID,
-              parentMessageID: ctx.messageID,
-              taskID: resolvedTask.id,
-              taskSessionID: resolvedTask.sessionId,
-            })
           }
 
-          const output = await formatFullSession(resolvedTask, client, {
+          const result = await formatFullSessionWithMetadata(resolvedTask, client, {
             includeThinking,
             messageLimit: args.message_limit,
             sinceMessageId: args.since_message_id,
@@ -198,18 +192,30 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             fromEnd: args.from_end,
           })
 
-          return didTimeoutWhileActive ? appendTimeoutNote(output, timeoutMs) : output
+          if (resolvedTask.status === "completed" && result.includesCompletedOutput) {
+            recordBackgroundTaskOutputConsumption({
+              parentSessionID: ctx.sessionID,
+              parentMessageID: ctx.messageID,
+              taskID: resolvedTask.id,
+              taskSessionID: resolvedTask.sessionId,
+            })
+          }
+
+          return didTimeoutWhileActive ? appendTimeoutNote(result.output, timeoutMs) : result.output
         }
 
         if (resolvedTask.status === "completed") {
           recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
-          recordBackgroundTaskOutputConsumption({
-            parentSessionID: ctx.sessionID,
-            parentMessageID: ctx.messageID,
-            taskID: resolvedTask.id,
-            taskSessionID: resolvedTask.sessionId,
-          })
-          return await formatTaskResult(resolvedTask, client)
+          const result = await formatTaskResultWithMetadata(resolvedTask, client)
+          if (result.includesCompletedOutput) {
+            recordBackgroundTaskOutputConsumption({
+              parentSessionID: ctx.sessionID,
+              parentMessageID: ctx.messageID,
+              taskID: resolvedTask.id,
+              taskSessionID: resolvedTask.sessionId,
+            })
+          }
+          return result.output
         }
 
         if (resolvedTask.status === "error" || resolvedTask.status === "cancelled" || resolvedTask.status === "interrupt") {
