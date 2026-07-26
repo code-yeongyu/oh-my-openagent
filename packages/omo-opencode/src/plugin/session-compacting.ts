@@ -27,6 +27,11 @@ export type CompactionAutocontinueHook = (
 
 type CompactionAutocontinueHandlerOptions = {
   readonly duplicateGuardMs?: number
+  readonly clearCompactionRequest?: (sessionID: string) => void
+}
+
+type SessionCompactingHandlerOptions = {
+  readonly markCompactionRequest?: (sessionID: string) => void
 }
 
 type TimerHandleWithOptionalUnref = ReturnType<typeof setTimeout> & {
@@ -96,6 +101,7 @@ function unrefTimer(timer: TimerHandleWithOptionalUnref, sessionID: string): voi
 
 export function createSessionCompactingHandler(
   hooks: CompactionHookDependencies,
+  options: SessionCompactingHandlerOptions = {},
 ): SessionCompactingHook {
   return async (
     input: SessionCompactingInput,
@@ -123,6 +129,7 @@ export function createSessionCompactingHandler(
         output.context.push(context)
       }
     })
+    options.markCompactionRequest?.(input.sessionID)
   }
 }
 
@@ -150,6 +157,7 @@ export function createCompactionAutocontinueHandler(
     input: CompactionAutocontinueInput,
     output: CompactionAutocontinueOutput,
   ): Promise<void> => {
+    options.clearCompactionRequest?.(input.sessionID)
     if (isCompactionAgent(input.agent)) {
       output.enabled = false
       return

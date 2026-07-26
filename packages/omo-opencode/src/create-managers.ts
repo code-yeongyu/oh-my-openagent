@@ -66,6 +66,7 @@ export function createManagers(args: {
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
   runtimeSkillSourceUrl?: string
+  configureRuntimePromptAppends?: (agentConfigs: Record<string, unknown>) => void
   deps?: Partial<CreateManagersDeps>
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
@@ -214,6 +215,7 @@ export function createManagers(args: {
     pluginConfig,
     modelCacheState,
     runtimeSkillSourceUrl,
+    configureRuntimePromptAppends: args.configureRuntimePromptAppends,
   })
   return {
     tmuxSessionManager,

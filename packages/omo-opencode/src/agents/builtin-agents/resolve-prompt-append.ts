@@ -27,11 +27,18 @@ function modelMatchesKeyword(model: string | undefined, keywords: string[] | und
   })
 }
 
-export function resolveAgentPromptAppend(input: ResolveAgentPromptAppendInput): string | undefined {
+export function shouldIncludeAgentPromptAppend(input: Pick<
+  ResolveAgentPromptAppendInput,
+  "model" | "includeModelKeywords" | "excludeModelKeywords"
+>): boolean {
   const hasIncludeKeywords = input.includeModelKeywords?.some((keyword) => keyword.trim().length > 0) ?? false
   const includeMatches = !hasIncludeKeywords || modelMatchesKeyword(input.model, input.includeModelKeywords)
   const excludeMatches = modelMatchesKeyword(input.model, input.excludeModelKeywords)
-  const conditionalSources = includeMatches && !excludeMatches ? normalizeSources(input.promptAppend) : []
+  return includeMatches && !excludeMatches
+}
+
+export function resolveAgentPromptAppend(input: ResolveAgentPromptAppendInput): string | undefined {
+  const conditionalSources = shouldIncludeAgentPromptAppend(input) ? normalizeSources(input.promptAppend) : []
   const sources = [...conditionalSources, ...normalizeSources(input.promptAppendAlways)]
   if (sources.length === 0) return undefined
 

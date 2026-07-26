@@ -16,6 +16,7 @@ import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
+import type { RuntimePromptAppendRegistry } from "./agents/runtime-prompt-append-reconciler"
 
 export function createPluginInterface(args: {
   ctx: PluginContext
@@ -29,6 +30,9 @@ export function createPluginInterface(args: {
   managers: Managers
   hooks: CreatedHooks
   tools: ToolsRecord
+  reconcileRuntimePromptAppend?: RuntimePromptAppendRegistry["reconcile"]
+  isCompactionRequest?: (sessionID: string) => boolean
+  clearCompactionRequest?: (sessionID: string) => void
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
@@ -70,6 +74,7 @@ export function createPluginInterface(args: {
       pluginConfig,
       firstMessageVariantGate,
       hooks,
+      clearCompactionRequest: args.clearCompactionRequest,
     }),
 
     "experimental.chat.messages.transform": createMessagesTransformHandler({
@@ -79,6 +84,10 @@ export function createPluginInterface(args: {
     "experimental.chat.system.transform": createSystemTransformHandler(
       pluginConfig.default_mode,
       getUltraworkMessage,
+      {
+        reconcileRuntimePromptAppend: args.reconcileRuntimePromptAppend,
+        isCompactionRequest: args.isCompactionRequest,
+      },
     ),
 
     config: managers.configHandler,
