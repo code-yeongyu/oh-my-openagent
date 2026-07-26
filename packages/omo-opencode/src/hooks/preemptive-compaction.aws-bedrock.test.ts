@@ -1,10 +1,21 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it, mock } from "bun:test"
+import { afterEach, describe, expect, it, mock } from "bun:test"
 
 import { OhMyOpenCodeConfigSchema } from "../config"
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
+
+const originalAnthropicContextEnv = process.env.ANTHROPIC_1M_CONTEXT
+const originalVertexContextEnv = process.env.VERTEX_ANTHROPIC_1M_CONTEXT
+
+afterEach(() => {
+  if (originalAnthropicContextEnv === undefined) delete process.env.ANTHROPIC_1M_CONTEXT
+  else process.env.ANTHROPIC_1M_CONTEXT = originalAnthropicContextEnv
+
+  if (originalVertexContextEnv === undefined) delete process.env.VERTEX_ANTHROPIC_1M_CONTEXT
+  else process.env.VERTEX_ANTHROPIC_1M_CONTEXT = originalVertexContextEnv
+})
 
 type HookContext = Parameters<typeof createPreemptiveCompactionHook>[0]
 
@@ -65,6 +76,50 @@ describe("preemptive-compaction Bedrock providers", () => {
 
     // when
     await sendUsage(790_000, "call_aws_bedrock_above")
+
+    // then
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
+  it("uses the cached 200K limit for Amazon Bedrock Claude models despite Anthropic 1M flags", async () => {
+    // given
+    process.env.ANTHROPIC_1M_CONTEXT = "true"
+    process.env.VERTEX_ANTHROPIC_1M_CONTEXT = "true"
+    const ctx = createMockContext()
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+    const modelID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    const hook = createPreemptiveCompactionHook(ctx, pluginConfig, {
+      anthropicContext1MEnabled: true,
+      modelContextLimitsCache: new Map([[`amazon-bedrock/${modelID}`, 200_000]]),
+    })
+    const sessionID = "ses_amazon_bedrock_haiku_200k"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "amazon-bedrock",
+            modelID,
+            finish: true,
+            tokens: {
+              input: 160_000,
+              output: 1_000,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    // when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_amazon_bedrock_haiku" },
+      { title: "", output: "test", metadata: null },
+    )
 
     // then
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)

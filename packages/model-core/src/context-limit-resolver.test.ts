@@ -257,6 +257,20 @@ describe("resolveActualContextLimit", () => {
     })).toBe(272_000)
   })
 
+  it("keeps Amazon Bedrock Claude models on their cached limit when Anthropic 1M flags are enabled", () => {
+    process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
+    process.env[VERTEX_CONTEXT_ENV_KEY] = "true"
+    const modelID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    const modelContextLimitsCache = new Map<string, number>([
+      [`amazon-bedrock/${modelID}`, 200_000],
+    ])
+
+    expect(resolveActualContextLimit("amazon-bedrock", modelID, {
+      anthropicContext1MEnabled: true,
+      modelContextLimitsCache,
+    })).toBe(200_000)
+  })
+
   it("uses a cached context limit for a regional AWS Bedrock Opus 5 model ID", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]

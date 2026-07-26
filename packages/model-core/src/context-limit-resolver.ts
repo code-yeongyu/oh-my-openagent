@@ -38,10 +38,16 @@ export function resolveActualContextLimit(
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
   if (isAnthropicProvider(providerID, modelID)) {
+    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
+    if (providerID.toLowerCase() === "amazon-bedrock") {
+      if (cachedLimit) return cachedLimit
+      if (hasGA1MContext(modelID)) return ANTHROPIC_GA_1M_LIMIT
+      return DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+    }
+
     const explicit1M = getAnthropicActualLimit(modelCacheState)
     if (explicit1M === ANTHROPIC_GA_1M_LIMIT) return explicit1M
 
-    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
     if (cachedLimit && hasGA1MContext(modelID)) return cachedLimit
 
     if (hasGA1MContext(modelID)) return ANTHROPIC_GA_1M_LIMIT
