@@ -174,6 +174,40 @@ describe("createChatMessageHandler - synthetic/internal messages", () => {
 })
 
 describe("createChatMessageHandler - first message hook ordering", () => {
+  test("clears a stale compaction marker before a normal user request", async () => {
+    // given
+    const clearedSessions: string[] = []
+    const args = createMockHandlerArgs()
+    args.clearCompactionRequest = (sessionID) => {
+      clearedSessions.push(sessionID)
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("meidocho"), {
+      message: {},
+      parts: [{ type: "text", text: "continue" }],
+    })
+
+    // then
+    expect(clearedSessions).toEqual(["test-session"])
+  })
+
+  test("uses the resolved output agent when the first request omits input.agent", async () => {
+    // given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput(), {
+      message: { agent: "meidocho" },
+      parts: [{ type: "text", text: "hello" }],
+    })
+
+    // then
+    expect(getSessionAgent("test-session")).toBe("meidocho")
+  })
+
   test("updates session agent and marks the first-message gate before chat hooks run", async () => {
     // given
     const hookObservations: Array<{
