@@ -702,6 +702,7 @@ Auto-switches to backup models on API errors.
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
+    "first_prompt_watchdog_seconds": 90,
     "notify_on_fallback": true
   }
 }
@@ -714,6 +715,7 @@ Auto-switches to backup models on API errors.
 | `max_fallback_attempts` | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
 | `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
 | `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and `message.updated` provider retry signal detection.** Structured `session.status` retry events can still trigger fallback. |
+| `first_prompt_watchdog_seconds` | `90`           | Seconds a subagent may remain silent before its first fallback is dispatched. **Set to `0` to disable this watchdog.** |
 | `notify_on_fallback`    | `true`              | Toast notification on model switch                                                                                             |
 
 #### Speeding Up Fallback (Proxy APIs)

@@ -12,6 +12,7 @@ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { invalidateFallbackDispatchLease } from "./fallback-dispatch-lease"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -55,6 +56,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const cancelledSessions = new Set<string>()
 
   const resetRetryState = (sessionID: string) => {
+    invalidateFallbackDispatchLease(deps, sessionID)
     const state = sessionStates.get(sessionID)
     if (state) {
       sessionStates.set(sessionID, createFallbackState(state.originalModel))
@@ -101,6 +103,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     if (sessionID) {
       log(`[${HOOK_NAME}] Cleaning up session state`, { sessionID })
+      invalidateFallbackDispatchLease(deps, sessionID)
       cancelledSessions.delete(sessionID)
       sessionStates.delete(sessionID)
       sessionLastAccess.delete(sessionID)
@@ -117,6 +120,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
+    invalidateFallbackDispatchLease(deps, sessionID)
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
     }

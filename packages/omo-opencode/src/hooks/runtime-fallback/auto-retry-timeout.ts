@@ -5,6 +5,12 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import {
+  isFallbackDispatchLeaseOwner,
+  releaseFallbackDispatchLease,
+  supersedeFallbackDispatchLease,
+  type FallbackDispatchLease,
+} from "./fallback-dispatch-lease"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -17,6 +23,7 @@ export function createFallbackTimeoutHelpers(
     newModel: string,
     resolvedAgent: string | undefined,
     source: string,
+    suppliedLease?: FallbackDispatchLease,
   ) => Promise<AutoRetryDispatchOutcome>,
 ) {
   const {
@@ -54,42 +61,61 @@ export function createFallbackTimeoutHelpers(
       const state = sessionStates.get(sessionID)
       if (!state) return
 
-      if (sessionRetryInFlight.has(sessionID)) {
-        log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
-      }
+      // Timeout escalation must move to the next model even when a prior
+      // fallback is still waiting on OpenCode. Replacing its lease invalidates
+      // the older async branch before it can submit or roll back stale work.
+      const lease = supersedeFallbackDispatchLease(deps, sessionID)
 
-      await abortSessionRequest(sessionID, "session.timeout")
-      sessionRetryInFlight.delete(sessionID)
-
-      if (state.pendingFallbackModel) {
-        state.pendingFallbackModel = undefined
-      }
-      state.pendingFallbackPromptMayHaveBeenAccepted = false
-      const stateSnapshot = snapshotFallbackState(state)
-
-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
-      if (fallbackModels.length === 0) return
-
-      log(`[${HOOK_NAME}] Session fallback timeout reached`, {
-        sessionID,
-        timeoutSeconds: config.timeout_seconds,
-        currentModel: state.currentModel,
-      })
-
-      const result = prepareFallback(sessionID, state, fallbackModels, config)
-      if (result.success && result.newModel) {
-        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
-        if (!dispatchOutcome.accepted) {
-          restoreFallbackState(state, stateSnapshot)
-          if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
-            scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
-          }
-          log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
-            sessionID,
-            status: dispatchOutcome.status,
-            reason: dispatchOutcome.reason,
-          })
+      try {
+        if (sessionRetryInFlight.has(sessionID)) {
+          log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
         }
+
+        await abortSessionRequest(sessionID, "session.timeout")
+        if (!isFallbackDispatchLeaseOwner(deps, sessionID, lease)) return
+
+        if (state.pendingFallbackModel) {
+          state.pendingFallbackModel = undefined
+        }
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
+        const stateSnapshot = snapshotFallbackState(state)
+
+        const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+        if (fallbackModels.length === 0) return
+
+        log(`[${HOOK_NAME}] Session fallback timeout reached`, {
+          sessionID,
+          timeoutSeconds: config.timeout_seconds,
+          currentModel: state.currentModel,
+        })
+
+        const result = prepareFallback(sessionID, state, fallbackModels, config)
+        if (result.success && result.newModel) {
+          const dispatchOutcome = await autoRetryWithFallback(
+            sessionID,
+            result.newModel,
+            resolvedAgent,
+            "session.timeout",
+            lease,
+          )
+          if (!isFallbackDispatchLeaseOwner(deps, sessionID, lease)) return
+          if (!dispatchOutcome.accepted) {
+            restoreFallbackState(state, stateSnapshot)
+            if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
+              scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
+            }
+            log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
+              sessionID,
+              status: dispatchOutcome.status,
+              reason: dispatchOutcome.reason,
+            })
+          }
+        }
+      } finally {
+        if (isFallbackDispatchLeaseOwner(deps, sessionID, lease)) {
+          sessionRetryInFlight.delete(sessionID)
+        }
+        releaseFallbackDispatchLease(deps, sessionID, lease)
       }
     }, timeoutMs)
 

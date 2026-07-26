@@ -12,6 +12,12 @@ import {
 } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
+import {
+  isFallbackDispatchLeaseOwner,
+  releaseFallbackDispatchLease,
+  tryAcquireFallbackDispatchLease,
+  type FallbackDispatchLease,
+} from "./fallback-dispatch-lease"
 
 export function createAutoRetryDispatcher(
   deps: HookDeps,
@@ -32,8 +38,9 @@ export function createAutoRetryDispatcher(
     newModel: string,
     resolvedAgent: string | undefined,
     source: string,
+    suppliedLease?: FallbackDispatchLease,
   ): Promise<AutoRetryDispatchOutcome> => {
-    if (sessionRetryInFlight.has(sessionID)) {
+    if (!suppliedLease && sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
       return { accepted: false, status: "blocked", reason: "retry already in flight" }
     }
@@ -57,6 +64,16 @@ export function createAutoRetryDispatcher(
       return { accepted: false, status: "invalid-model", reason: "missing provider prefix" }
     }
 
+    const dispatchLease = suppliedLease
+      ? (isFallbackDispatchLeaseOwner(deps, sessionID, suppliedLease) ? suppliedLease : undefined)
+      : tryAcquireFallbackDispatchLease(deps, sessionID)
+    if (!dispatchLease) {
+      log(`[${HOOK_NAME}] Fallback dispatch already owns session, skipping (${source})`, { sessionID })
+      return { accepted: false, status: "blocked", reason: "fallback dispatch already owns session" }
+    }
+    const acquiredLeaseHere = !suppliedLease
+    const isCurrentDispatch = (): boolean => isFallbackDispatchLeaseOwner(deps, sessionID, dispatchLease)
+
     const hadAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
     const previousPendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
     const previousPendingFallbackPromptMayHaveBeenAccepted = sessionStates.get(sessionID)?.pendingFallbackPromptMayHaveBeenAccepted
@@ -69,6 +86,10 @@ export function createAutoRetryDispatcher(
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
+      if (!isCurrentDispatch()) {
+        log(`[${HOOK_NAME}] Fallback dispatch became stale while reading messages (${source})`, { sessionID })
+        return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+      }
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)
       const fetchedParts = originalRetryMetadata.parts.length > 0
@@ -98,6 +119,10 @@ export function createAutoRetryDispatcher(
 
       const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
       const launchAgent = resolveRegisteredAgentName(retryAgent)
+      if (!isCurrentDispatch()) {
+        log(`[${HOOK_NAME}] Fallback dispatch became stale before prompt setup (${source})`, { sessionID })
+        return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+      }
       if (!hadAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
@@ -129,12 +154,28 @@ export function createAutoRetryDispatcher(
         input: retryPromptInput,
       })
 
+      if (!isCurrentDispatch()) {
+        log(`[${HOOK_NAME}] Fallback dispatch became stale before prompt submission (${source})`, { sessionID })
+        return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+      }
       let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
+      if (!isCurrentDispatch()) {
+        log(`[${HOOK_NAME}] Fallback dispatch became stale after prompt submission (${source})`, { sessionID })
+        return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+      }
       if (promptResult.status === "active") {
         log(`[${HOOK_NAME}] Session active, queueing fallback dispatch (${source})`, {
           sessionID,
         })
+        if (!isCurrentDispatch()) {
+          log(`[${HOOK_NAME}] Fallback dispatch became stale before queued prompt submission (${source})`, { sessionID })
+          return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+        }
         promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}:active-queue`)
+        if (!isCurrentDispatch()) {
+          log(`[${HOOK_NAME}] Fallback dispatch became stale after queued prompt submission (${source})`, { sessionID })
+          return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+        }
         acceptedStatus = "queued"
       }
       if (promptResult.status === "failed") {
@@ -162,10 +203,18 @@ export function createAutoRetryDispatcher(
             maxAttempts: MAX_RESERVED_RETRIES,
           })
           await new Promise((r) => setTimeout(r, delay))
+          if (!isCurrentDispatch()) {
+            log(`[${HOOK_NAME}] Fallback dispatch became stale during reserved retry (${source})`, { sessionID })
+            return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+          }
           reservedResult = await dispatchRetryPrompt(
             `runtime-fallback:${source}:reserved-retry-${attempt + 1}`,
             "defer",
           )
+          if (!isCurrentDispatch()) {
+            log(`[${HOOK_NAME}] Fallback dispatch became stale after reserved prompt submission (${source})`, { sessionID })
+            return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+          }
           if (reservedResult.status !== "reserved") break
         }
         if (reservedResult.status === "failed") {
@@ -194,6 +243,10 @@ export function createAutoRetryDispatcher(
         })
         return { accepted: false, status: "blocked", reason: `prompt gate returned ${promptResult.status}` }
       }
+      if (!isCurrentDispatch()) {
+        log(`[${HOOK_NAME}] Fallback dispatch became stale before accepting prompt result (${source})`, { sessionID })
+        return { accepted: false, status: "blocked", reason: "fallback dispatch superseded" }
+      }
       sessionAwaitingFallbackResult.add(sessionID)
       if (hadAwaitingFallbackResult) {
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
@@ -212,30 +265,35 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
       return { accepted: false, status: "failed", reason: retryError.message }
     } finally {
-      sessionRetryInFlight.delete(sessionID)
-      if (retryMayHaveBeenAccepted) {
-        const state = sessionStates.get(sessionID)
-        if (state) {
-          state.pendingFallbackPromptMayHaveBeenAccepted = true
-        }
-      }
-      if (!retryDispatched && !retryMayHaveBeenAccepted) {
-        if (hadAwaitingFallbackResult) {
-          sessionAwaitingFallbackResult.add(sessionID)
-        } else {
-          sessionAwaitingFallbackResult.delete(sessionID)
-          clearSessionFallbackTimeout(sessionID)
-        }
-        const state = sessionStates.get(sessionID)
-        if (state) {
-          if (hadAwaitingFallbackResult) {
-            state.pendingFallbackModel = previousPendingFallbackModel
-            state.pendingFallbackPromptMayHaveBeenAccepted = previousPendingFallbackPromptMayHaveBeenAccepted
-          } else if (state.pendingFallbackModel) {
-            state.pendingFallbackModel = undefined
-            state.pendingFallbackPromptMayHaveBeenAccepted = false
+      if (isCurrentDispatch()) {
+        sessionRetryInFlight.delete(sessionID)
+        if (retryMayHaveBeenAccepted) {
+          const state = sessionStates.get(sessionID)
+          if (state) {
+            state.pendingFallbackPromptMayHaveBeenAccepted = true
           }
         }
+        if (!retryDispatched && !retryMayHaveBeenAccepted) {
+          if (hadAwaitingFallbackResult) {
+            sessionAwaitingFallbackResult.add(sessionID)
+          } else {
+            sessionAwaitingFallbackResult.delete(sessionID)
+            clearSessionFallbackTimeout(sessionID)
+          }
+          const state = sessionStates.get(sessionID)
+          if (state) {
+            if (hadAwaitingFallbackResult) {
+              state.pendingFallbackModel = previousPendingFallbackModel
+              state.pendingFallbackPromptMayHaveBeenAccepted = previousPendingFallbackPromptMayHaveBeenAccepted
+            } else if (state.pendingFallbackModel) {
+              state.pendingFallbackModel = undefined
+              state.pendingFallbackPromptMayHaveBeenAccepted = false
+            }
+          }
+        }
+      }
+      if (acquiredLeaseHere) {
+        releaseFallbackDispatchLease(deps, sessionID, dispatchLease)
       }
     }
   }

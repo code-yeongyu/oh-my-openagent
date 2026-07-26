@@ -3,6 +3,7 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { createFirstPromptWatchdog, observeEventForWatchdog, type FirstPromptWatchdog } from "./first-prompt-watchdog"
+import { releaseFallbackDispatchLease, tryAcquireFallbackDispatchLease } from "./fallback-dispatch-lease"
 
 const WATCHDOG_MS = 100
 const SAFE_WAIT_BEFORE_FIRE_MS = 40
@@ -290,6 +291,229 @@ describe("first-prompt-watchdog", () => {
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)
     const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given a fallback is already awaiting its result #when its internal user prompt is observed #then the watchdog does not arm or abort the fallback", async () => {
+    // given
+    const sessionID = "session-awaiting-fallback"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given a watchdog was armed before fallback dispatch begins #when its timer fires while awaiting fallback #then it does not abort or dispatch a second fallback", async () => {
+    // given
+    const sessionID = "session-watchdog-race"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given another fallback takes ownership while the watchdog abort is pending #when the abort resolves #then the watchdog does not dispatch a second retry", async () => {
+    // given
+    const sessionID = "session-watchdog-interleaved-ownership"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    let releaseAbort: (() => void) | undefined
+    let markAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const helpers = createHelpers(calls, AGENT)
+    helpers.abortSessionRequest = async (id, source) => {
+      calls.abort.push({ sessionID: id, source })
+      markAbortStarted?.()
+      await new Promise<void>((resolve) => { releaseAbort = resolve })
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    const fire = getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+    await abortStarted
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    releaseAbort?.()
+    await fire
+
+    // then
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given the watchdog fires #when the session terminates while agent context resolution is pending #then the stale watchdog generation does not abort or dispatch", async () => {
+    // given
+    const sessionID = "session-watchdog-terminal-during-resolution"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    let releaseResolution: (() => void) | undefined
+    let markResolutionStarted: (() => void) | undefined
+    const resolutionStarted = new Promise<void>((resolve) => { markResolutionStarted = resolve })
+    const helpers = createHelpers(calls, AGENT)
+    helpers.resolveAgentForSessionFromContext = async () => {
+      markResolutionStarted?.()
+      await new Promise<void>((resolve) => { releaseResolution = resolve })
+      return AGENT
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    const fire = getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+    await resolutionStarted
+    watchdog.onSessionTerminal(sessionID)
+    releaseResolution?.()
+    await fire
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given the watchdog fires #when it is disposed while agent context resolution is pending #then the stale watchdog generation does not abort or dispatch", async () => {
+    // given
+    const sessionID = "session-watchdog-dispose-during-resolution"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    let releaseResolution: (() => void) | undefined
+    let markResolutionStarted: (() => void) | undefined
+    const resolutionStarted = new Promise<void>((resolve) => { markResolutionStarted = resolve })
+    const helpers = createHelpers(calls, AGENT)
+    helpers.resolveAgentForSessionFromContext = async () => {
+      markResolutionStarted?.()
+      await new Promise<void>((resolve) => { releaseResolution = resolve })
+      return AGENT
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    const fire = getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+    await resolutionStarted
+    watchdog.dispose()
+    releaseResolution?.()
+    await fire
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+  })
+
+  it("#given the watchdog abort produces session.error followed by session.idle #when the internal-abort marker is consumed before idle #then the watchdog keeps its generation and dispatches the fallback", async () => {
+    // given
+    const sessionID = "session-watchdog-internal-abort-terminal"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+    helpers.abortSessionRequest = async (id, source) => {
+      calls.abort.push({ sessionID: id, source })
+      deps.internallyAbortedSessions.add(id)
+      watchdog.onSessionTerminal(id, "session.error")
+      deps.internallyAbortedSessions.delete(id)
+      watchdog.onSessionTerminal(id, "session.idle")
+    }
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+
+    watchdog.dispose()
+  })
+
+  it("#given the watchdog fallback is dispatching #when the accepted fallback emits a real error #then the watchdog releases its lease for the normal error handler to advance the chain", async () => {
+    // given
+    const sessionID = "session-watchdog-fallback-real-error"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    let releaseFallbackDispatch: (() => void) | undefined
+    let markFallbackDispatchStarted: (() => void) | undefined
+    const fallbackDispatchStarted = new Promise<void>((resolve) => { markFallbackDispatchStarted = resolve })
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+    helpers.abortSessionRequest = async (id, source) => {
+      calls.abort.push({ sessionID: id, source })
+      deps.internallyAbortedSessions.add(id)
+      watchdog.onSessionTerminal(id, "session.error")
+      deps.internallyAbortedSessions.delete(id)
+      watchdog.onSessionTerminal(id, "session.idle")
+    }
+    helpers.autoRetryWithFallback = async (id, newModel, resolvedAgent, source) => {
+      calls.autoRetry.push({ sessionID: id, newModel, resolvedAgent, source })
+      markFallbackDispatchStarted?.()
+      await new Promise<void>((resolve) => { releaseFallbackDispatch = resolve })
+    }
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    const fire = getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+    await fallbackDispatchStarted
+    watchdog.onSessionTerminal(sessionID, "session.error")
+    const nextLease = tryAcquireFallbackDispatchLease(deps, sessionID)
+    releaseFallbackDispatch?.()
+    await fire
+
+    // then
+    expect(calls.autoRetry).toHaveLength(1)
+    expect(nextLease).toBeDefined()
+    if (nextLease) {
+      releaseFallbackDispatchLease(deps, sessionID, nextLease)
+    }
+
+    watchdog.dispose()
+  })
+
+  it("#given the watchdog timeout is disabled #when a silent subagent user prompt arrives #then no watchdog timer is armed", async () => {
+    // given
+    const sessionID = "session-watchdog-disabled"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), 0)
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)

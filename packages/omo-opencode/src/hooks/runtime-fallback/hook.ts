@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { invalidateAllFallbackDispatchLeases } from "./fallback-dispatch-lease"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -44,6 +45,10 @@ export function createRuntimeFallbackHook(
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
     restore_primary_after_cooldown: options?.config?.restore_primary_after_cooldown ?? DEFAULT_CONFIG.restore_primary_after_cooldown,
   }
+  const firstPromptWatchdogMs = (
+    options?.config?.first_prompt_watchdog_seconds
+    ?? DEFAULT_CONFIG.first_prompt_watchdog_seconds
+  ) * 1000
 
   const deps: HookDeps = {
     ctx,
@@ -63,7 +68,7 @@ export function createRuntimeFallbackHook(
   const baseEventHandler = factories.createEventHandler(deps, helpers)
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers, firstPromptWatchdogMs)
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -105,6 +110,7 @@ export function createRuntimeFallbackHook(
     }
 
     firstPromptWatchdog.dispose()
+    invalidateAllFallbackDispatchLeases(deps)
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()

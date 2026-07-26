@@ -142,4 +142,33 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
     helpers.clearSessionFallbackTimeout(sessionID)
   })
+
+  test("#given timeout escalation supersedes an in-flight retry but no fallback remains #when the takeover exits early #then it clears the stale retry-in-flight marker", async () => {
+    // given
+    const sessionID = "session-timeout-no-fallback-cleanup"
+    const deps = createDeps()
+    deps.pluginConfig = undefined
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionStates.set(sessionID, createFallbackState("openai/gpt-5.4"))
+    let resolveAbort: (() => void) | undefined
+    const abortCalled = new Promise<void>((resolve) => { resolveAbort = resolve })
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => { resolveAbort?.() },
+      async () => ({ accepted: true, status: "dispatched" }),
+    )
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await Promise.race([
+      abortCalled,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timer did not fire")), 1000)
+      }),
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // then
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+  })
 })

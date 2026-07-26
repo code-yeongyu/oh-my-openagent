@@ -11,6 +11,12 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import {
+  isFallbackDispatchLeaseOwner,
+  releaseFallbackDispatchLease,
+  supersedeFallbackDispatchLease,
+  type FallbackDispatchLease,
+} from "./fallback-dispatch-lease"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -72,134 +78,147 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       let state = sessionStates.get(sessionID)
       const pendingFallbackModel = state?.pendingFallbackModel
       const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
-      if (
-        wasAwaitingFallbackResult &&
-        pendingFallbackModel &&
-        !retrySignal &&
-        model !== pendingFallbackModel
-      ) {
-        log(`[${HOOK_NAME}] message.updated fallback skipped - awaiting fallback result`, {
+      let takeoverLease: FallbackDispatchLease | undefined
+      try {
+        if (
+          wasAwaitingFallbackResult &&
+          pendingFallbackModel &&
+          !retrySignal &&
+          model !== pendingFallbackModel
+        ) {
+          log(`[${HOOK_NAME}] message.updated fallback skipped - awaiting fallback result`, {
+            sessionID,
+            pendingFallbackModel,
+            model,
+          })
+          return
+        }
+        if (wasAwaitingFallbackResult) {
+          sessionAwaitingFallbackResult.delete(sessionID)
+        }
+        if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
+          log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
+          return
+        }
+
+        if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+          log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
+            sessionID,
+            model,
+          })
+          takeoverLease = supersedeFallbackDispatchLease(deps, sessionID)
+          await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
+          if (!isFallbackDispatchLeaseOwner(deps, sessionID, takeoverLease)) return
+        }
+
+        if (retrySignal && timeoutEnabled) {
+          log(`[${HOOK_NAME}] Detected provider auto-retry signal`, { sessionID, model })
+        }
+
+        if (!retrySignal) {
+          helpers.clearSessionFallbackTimeout(sessionID)
+        }
+
+        log(`[${HOOK_NAME}] message.updated with assistant error`, {
           sessionID,
-          pendingFallbackModel,
           model,
-        })
-        return
-      }
-      if (wasAwaitingFallbackResult) {
-        sessionAwaitingFallbackResult.delete(sessionID)
-      }
-      if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
-        log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
-        return
-      }
-
-      if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
-        log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
-          sessionID,
-          model,
-        })
-        await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
-        sessionRetryInFlight.delete(sessionID)
-      }
-
-      if (retrySignal && timeoutEnabled) {
-        log(`[${HOOK_NAME}] Detected provider auto-retry signal`, { sessionID, model })
-      }
-
-      if (!retrySignal) {
-        helpers.clearSessionFallbackTimeout(sessionID)
-      }
-
-      log(`[${HOOK_NAME}] message.updated with assistant error`, {
-        sessionID,
-        model,
-        statusCode: extractStatusCode(error, config.retry_on_errors),
-        errorName: extractErrorName(error),
-        errorType: classifyErrorType(error),
-      })
-
-      if (!isRetryableError(error, config.retry_on_errors)) {
-        log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
-          sessionID,
           statusCode: extractStatusCode(error, config.retry_on_errors),
           errorName: extractErrorName(error),
           errorType: classifyErrorType(error),
         })
-        return
-      }
 
-      const agent = info?.agent as string | undefined
-      const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
-
-      if (fallbackModels.length === 0) {
-        if (
-          subagentSessions.has(sessionID) &&
-          classifyErrorType(error) === "quota_exceeded"
-        ) {
-          log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
+        if (!isRetryableError(error, config.retry_on_errors)) {
+          log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
             sessionID,
-            model,
-          })
-          await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
-        }
-        return
-      }
-
-      if (!state) {
-        const initialModel = resolveFallbackBootstrapModel({
-          sessionID,
-          source: "message.updated",
-          eventModel: model,
-          resolvedAgent,
-          pluginConfig,
-        })
-
-        if (!initialModel) {
-          log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
-            sessionID,
+            statusCode: extractStatusCode(error, config.retry_on_errors),
             errorName: extractErrorName(error),
             errorType: classifyErrorType(error),
           })
           return
         }
 
-        state = createFallbackState(initialModel)
-        sessionStates.set(sessionID, state)
-        sessionLastAccess.set(sessionID, Date.now())
-      } else {
-        sessionLastAccess.set(sessionID, Date.now())
+        const agent = info?.agent as string | undefined
+        const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+        if (takeoverLease && !isFallbackDispatchLeaseOwner(deps, sessionID, takeoverLease)) return
+        const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
-        if (state.pendingFallbackModel) {
-          if (retrySignal && timeoutEnabled) {
-            log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
+        if (fallbackModels.length === 0) {
+          if (
+            subagentSessions.has(sessionID) &&
+            classifyErrorType(error) === "quota_exceeded"
+          ) {
+            log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
               sessionID,
-              pendingFallbackModel: state.pendingFallbackModel,
+              model,
             })
-            state.pendingFallbackModel = undefined
-            state.pendingFallbackPromptMayHaveBeenAccepted = false
-          } else {
-            log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
+            await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+          }
+          return
+        }
+
+        if (!state) {
+          const initialModel = resolveFallbackBootstrapModel({
+            sessionID,
+            source: "message.updated",
+            eventModel: model,
+            resolvedAgent,
+            pluginConfig,
+          })
+
+          if (!initialModel) {
+            log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
               sessionID,
-              pendingFallbackModel: state.pendingFallbackModel,
+              errorName: extractErrorName(error),
+              errorType: classifyErrorType(error),
             })
             return
           }
+
+          state = createFallbackState(initialModel)
+          sessionStates.set(sessionID, state)
+          sessionLastAccess.set(sessionID, Date.now())
+        } else {
+          sessionLastAccess.set(sessionID, Date.now())
+
+          if (state.pendingFallbackModel) {
+            if (retrySignal && timeoutEnabled) {
+              log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
+                sessionID,
+                pendingFallbackModel: state.pendingFallbackModel,
+              })
+              state.pendingFallbackModel = undefined
+              state.pendingFallbackPromptMayHaveBeenAccepted = false
+            } else {
+              log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
+                sessionID,
+                pendingFallbackModel: state.pendingFallbackModel,
+              })
+              return
+            }
+          }
+        }
+
+        if (classifyErrorType(error) === "quota_exceeded") {
+          await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
+          sessionRetryInFlight.delete(sessionID)
+        }
+
+        await dispatchFallbackRetry(deps, helpers, {
+          sessionID,
+          state,
+          fallbackModels,
+          resolvedAgent,
+          source: "message.updated",
+          lease: takeoverLease,
+        })
+      } finally {
+        if (takeoverLease) {
+          if (isFallbackDispatchLeaseOwner(deps, sessionID, takeoverLease)) {
+            sessionRetryInFlight.delete(sessionID)
+          }
+          releaseFallbackDispatchLease(deps, sessionID, takeoverLease)
         }
       }
-
-      if (classifyErrorType(error) === "quota_exceeded") {
-        await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
-        sessionRetryInFlight.delete(sessionID)
-      }
-
-      await dispatchFallbackRetry(deps, helpers, {
-        sessionID,
-        state,
-        fallbackModels,
-        resolvedAgent,
-        source: "message.updated",
-      })
     }
   }
 }
