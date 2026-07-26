@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -67,6 +67,33 @@ describe("CodeGraph command runner", () => {
     }
   })
 
+  test("#given the command spawns a hanging descendant #when the timeout expires #then the process tree is reaped", async () => {
+    // given
+    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-timeout-"))
+    let descendantPid: number | undefined
+
+    try {
+      // when
+      const result = await runCodegraphCommand(
+        workspace,
+        "node",
+        [
+          "-e",
+          "const{spawn}=require('node:child_process');const{writeFileSync}=require('node:fs');const{join}=require('node:path');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});writeFileSync(join(process.env.HOME,'survivor.pid'),String(child.pid));setInterval(()=>{},1000)",
+        ],
+        { env: { HOME: workspace }, timeoutMs: 100 },
+      )
+      descendantPid = Number.parseInt(readFileSync(join(workspace, "survivor.pid"), "utf8").trim(), 10)
+
+      // then
+      expect(result.timedOut).toBeTrue()
+      expect(isProcessAlive(descendantPid)).toBeFalse()
+    } finally {
+      if (descendantPid !== undefined && isProcessAlive(descendantPid)) process.kill(descendantPid, "SIGKILL")
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+
   test("#given non-Windows codegraph command #when command runner builds invocation #then it executes directly", () => {
     // given
     const command = "/home/test/.omo/codegraph/bin/codegraph"
@@ -78,3 +105,12 @@ describe("CodeGraph command runner", () => {
     expect(invocation).toEqual({ args: ["sync"], command })
   })
 })
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}

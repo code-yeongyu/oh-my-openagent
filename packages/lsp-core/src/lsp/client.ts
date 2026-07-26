@@ -237,7 +237,20 @@ export class LspClient extends LspClientConnection {
 			if (!pushFallbackOnly) continue;
 
 			const remainingMs = deadlineAt - Date.now();
-			if (remainingMs <= 0) return this.freshnessTimeout(absPath);
+			if (remainingMs <= 0) {
+				// A server that never advertised pull diagnostics (or rejected the pull
+				// method) and has never published for this document stays silent for a
+				// clean file (e.g. Marksman, #6131). Resolve with the version-current
+				// pull cache or explicit empty instead of a freshness timeout; a stale
+				// pull cache from an older document version is never returned. Servers
+				// that have published before keep timing out via publishGeneration > 0,
+				// and a hung advertised pull keeps timing out because pull stays supported.
+				if (!this.isDiagnosticPullSupported() && snapshot.publishGeneration === 0) {
+					const cached = this.documents.getPullCache(snapshot);
+					return { items: cached === null ? [] : [...cached.diagnostics] };
+				}
+				return this.freshnessTimeout(absPath);
+			}
 			const waitMs = push.status === "wait" ? Math.min(push.waitMs, remainingMs) : remainingMs;
 			await waitForDiagnosticsActivity(this.documents.waitForDiagnosticsActivity(snapshot, waitMs), signal);
 		}

@@ -159,7 +159,7 @@ describe("parseTaskRecord persisted boundary", () => {
 
     // then
     expect(result.records).toEqual([])
-    expect(result.diagnostics).toEqual([{ type: "parse_error", path, message: "resolved_model.source must be category or explicit" }])
+    expect(result.diagnostics).toEqual([{ type: "parse_error", path, message: "resolved_model.source must be category or explicit or agent" }])
   })
 
   test("#given malformed known resolved model fields #when listed #then diagnostic is typed and record is skipped", () => {

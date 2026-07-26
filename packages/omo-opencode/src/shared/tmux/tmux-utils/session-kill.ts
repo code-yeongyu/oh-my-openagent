@@ -1,7 +1,7 @@
 import { killTmuxSessionIfExists as killTmuxSessionIfExistsCore } from "@oh-my-opencode/tmux-core"
 
 export async function killTmuxSessionIfExists(sessionName: string): Promise<boolean> {
-  const [{ log }, { isInsideTmux }, { getTmuxPath }, { runTmuxCommand }] = await Promise.all([
+  const [{ log }, { isNativeTmux }, { getTmuxPath }, { runTmuxCommand }] = await Promise.all([
     import("../../logger"),
     import("./environment"),
     import("../../../tools/interactive-bash/tmux-path-resolver"),
@@ -9,7 +9,7 @@ export async function killTmuxSessionIfExists(sessionName: string): Promise<bool
   ])
   return killTmuxSessionIfExistsCore(sessionName, {
     log,
-    isInsideTmux,
+    isInsideTmux: isNativeTmux,
     getTmuxPath,
     runTmuxCommand,
   })

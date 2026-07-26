@@ -125,7 +125,7 @@ export function createModelFallbackEventHandler(args: {
 
     const providerHint = params.info.providerID as string | undefined;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
-    const rawModel = (params.info.modelID as string | undefined) ?? "claude-opus-4-7";
+    const rawModel = (params.info.modelID as string | undefined) ?? "claude-opus-4-8";
     const currentModel = normalizeFallbackModelID(rawModel);
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
@@ -170,7 +170,7 @@ export function createModelFallbackEventHandler(args: {
     const parsed = extractProviderModelFromErrorMessage(retryMessage);
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
-    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-7");
+    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-8");
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: parsed.providerID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
@@ -206,7 +206,7 @@ export function createModelFallbackEventHandler(args: {
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined) || parsed.modelID || "claude-opus-4-7",
+      (params.props?.modelID as string | undefined) || parsed.modelID || "claude-opus-4-8",
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);

@@ -1,4 +1,4 @@
-import type { TaskRecord, TaskStatus } from "../state"
+import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
@@ -22,7 +22,9 @@ export type CompletionDetails = {
   readonly status: TaskStatus
   readonly duration_ms: number
   readonly tokens?: number
-  readonly final_response_head: string
+  readonly run_stats?: TaskRunStats
+  readonly final_response: string
+  readonly final_response_file?: string
   readonly continuation_hint: string
 }
 
@@ -56,6 +58,7 @@ export type CompletionRetrySchedule = (fn: () => void, delayMs: number) => () =>
 export type CompletionNotifierDeps = {
   readonly notifier: ParentNotifier
   readonly store: CompletionNotifierStore
+  readonly stateDir?: string
   readonly schedule?: CompletionRetrySchedule
   readonly getParentState?: () => ParentState
   readonly getCurrentSessionId?: () => string | undefined

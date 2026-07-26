@@ -426,7 +426,16 @@ export function createOracleAgent(model: string): AgentConfig {
     prompt: ORACLE_DEFAULT_PROMPT,
   } as AgentConfig;
 
-  if (isGpt5_5Model(model) || isGpt5_6Model(model)) {
+  if (isGpt5_6Model(model)) {
+    return {
+      ...base,
+      prompt: ORACLE_GPT_5_5_PROMPT,
+      reasoningEffort: "xhigh",
+      textVerbosity: "high",
+    } as AgentConfig;
+  }
+
+  if (isGpt5_5Model(model)) {
     return {
       ...base,
       prompt: ORACLE_GPT_5_5_PROMPT,

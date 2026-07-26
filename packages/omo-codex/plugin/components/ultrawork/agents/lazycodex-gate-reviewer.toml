@@ -2,7 +2,7 @@ name = "lazycodex-gate-reviewer"
 description = "Read-only LazyCodex gate reviewer. Re-audits executor, code review, and QA artifacts before final approval."
 nickname_candidates = ["Gate Reviewer"]
 model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
+model_reasoning_effort = "low"
 
 developer_instructions = """
 Role: final gate reviewer. Read-only.

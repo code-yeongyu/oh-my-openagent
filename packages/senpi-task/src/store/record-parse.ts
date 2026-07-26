@@ -4,6 +4,7 @@ import {
   TASK_STATUSES,
   type ResolvedModelRecord,
   type TaskRecord,
+  type TaskRunStats,
 } from "../state"
 import { parseTaskId } from "../state/id"
 
@@ -11,17 +12,20 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
   const name = readOptionalString(value, "name")
+  const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
   const category = readOptionalString(value, "category")
   const toolAllow = readOptionalStringArray(value, "tool_allow")
   const toolDeny = readOptionalStringArray(value, "tool_deny")
   const pid = readOptionalNumber(value, "pid")
+  const hostPid = readOptionalNumber(value, "host_pid")
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
   const resolvedModel = readOptionalResolvedModel(value)
   const spawnSpec = readOptionalSpawnSpec(value)
+  const runStats = readOptionalRunStats(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -36,6 +40,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     updated_at: readString(value, "updated_at"),
     notification: readNotification(value),
     ...(name === undefined ? {} : { name }),
+    ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
@@ -43,10 +48,31 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(pid === undefined ? {} : { pid }),
+    ...(hostPid === undefined ? {} : { host_pid: hostPid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
     ...(killed === undefined ? {} : { killed }),
+    ...(runStats === undefined ? {} : { run_stats: runStats }),
+  }
+}
+
+function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | undefined {
+  const value = record["run_stats"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("run_stats is not an object")
+  const outputTokens = readOptionalNumber(value, "output_tokens")
+  const totalTokens = readOptionalNumber(value, "total_tokens")
+  const generationMs = readOptionalNumber(value, "generation_ms")
+  const tokensPerSecond = readOptionalNumber(value, "tokens_per_second")
+  return {
+    runtime_ms: readNumber(value, "runtime_ms"),
+    turns: readNumber(value, "turns"),
+    tool_calls: readNumber(value, "tool_calls"),
+    ...(outputTokens === undefined ? {} : { output_tokens: outputTokens }),
+    ...(totalTokens === undefined ? {} : { total_tokens: totalTokens }),
+    ...(generationMs === undefined ? {} : { generation_ms: generationMs }),
+    ...(tokensPerSecond === undefined ? {} : { tokens_per_second: tokensPerSecond }),
   }
 }
 
@@ -105,6 +131,7 @@ function readResolvedModelSource(record: Record<string, unknown>): ResolvedModel
   switch (source) {
     case "category":
     case "explicit":
+    case "agent":
       return source
     default:
       throw new Error(`resolved_model.source must be ${RESOLVED_MODEL_SOURCES.join(" or ")}`)

@@ -1,9 +1,11 @@
 import {
   addBoulderWork,
   createBoulderState,
+  getPlanName,
   writeBoulderState,
 } from "../../features/boulder-state"
 import { buildAutoSelectedPlanContextInfoOnly } from "./context-info-formatters"
+import { ensureNotepadScaffold } from "./notepad-scaffold"
 
 export function createNewWorkOrInitialize(params: {
   readonly directory: string
@@ -24,6 +26,8 @@ export function createNewWorkOrInitialize(params: {
     const initializedState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
     writeBoulderState(directory, initializedState)
   }
+
+  ensureNotepadScaffold({ directory, planName: getPlanName(planPath) })
 }
 
 export function buildAutoSelectedPlanContextWithStateInit(params: {
@@ -41,6 +45,8 @@ export function buildAutoSelectedPlanContextWithStateInit(params: {
 
   const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
   writeBoulderState(directory, newState)
+
+  ensureNotepadScaffold({ directory, planName: getPlanName(planPath), timestamp })
 
   return buildAutoSelectedPlanContextInfoOnly({
     planPath,

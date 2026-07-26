@@ -7,13 +7,31 @@ import { readOpencodeConfigAgents } from "./opencode-config-agents-reader"
 
 describe("readOpencodeConfigAgents", () => {
   let mockGlobalConfigDir = ""
+  let mockXdgHomeDir = ""
+  let originalOpencodeConfigDir: string | undefined
+  let originalXdgConfigHome: string | undefined
 
   beforeEach(() => {
     mockGlobalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-mock-global-"))
+    mockXdgHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-mock-xdg-"))
+    originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME
     process.env.OPENCODE_CONFIG_DIR = mockGlobalConfigDir
+    process.env.XDG_CONFIG_HOME = mockXdgHomeDir
   })
 
   afterEach(() => {
+    if (originalOpencodeConfigDir !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (originalXdgConfigHome !== undefined) {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome
+    } else {
+      delete process.env.XDG_CONFIG_HOME
+    }
+    fs.rmSync(mockXdgHomeDir, { recursive: true, force: true })
     fs.rmSync(mockGlobalConfigDir, { recursive: true, force: true })
   })
 

@@ -7,24 +7,25 @@ import { fileURLToPath } from "node:url"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "../..")
 const repoRoot = resolve(packageRoot, "../..")
-const sourcePath = resolve(repoRoot, "packages/omo-codex/plugin/components/ultrawork/directive.md")
+const sourcePath = resolve(repoRoot, "packages/omo-senpi/skills/ultrawork/SKILL.md")
 const targetPath = resolve(packageRoot, "src/components/ultrawork/generated-directive.ts")
 
+// The directive is authored senpi-native (skills/ultrawork/SKILL.md) and senpi HAS
+// goal/todo/task/team tools, so the source speaks them directly. These tokens name
+// harness surfaces senpi does not have; any match means other-edition text leaked in,
+// and the build MUST fail loudly — silently stripping blocks is how the old
+// codex-derived pipeline shipped mangled sentences.
 const forbiddenDirectiveTokens = [
-  "create_goal",
-  "complete_goal",
-  "add_subgoal",
-  "update_plan",
   "multi_agent",
   "spawn_agent",
+  "update_plan",
+  "wait_agent",
+  "fork_context",
+  "fork_turns",
+  "codex",
 ]
 
-const forbiddenPatterns = [
-  ...forbiddenDirectiveTokens.map((token) => new RegExp(token, "i")),
-  /browser:control-in-app-browser/i,
-  /Codex Browser plugin/i,
-  /Browser plugin/i,
-]
+const forbiddenPatterns = forbiddenDirectiveTokens.map((token) => new RegExp(token, "i"))
 
 function normalizeNewlines(value) {
   return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
@@ -34,16 +35,27 @@ function splitBlocks(value) {
   return normalizeNewlines(value).split(/\n{2,}/)
 }
 
-export function transformDirective(rawDirective) {
-  const keptBlocks = []
-  for (const block of splitBlocks(rawDirective)) {
-    if (forbiddenPatterns.some((pattern) => pattern.test(block))) {
-      continue
+function extractSkillBody(rawSkill) {
+  const normalized = normalizeNewlines(rawSkill)
+  const frontmatter = normalized.match(/^---\n[\s\S]*?\n---\n+/)
+  return frontmatter === null ? normalized : normalized.slice(frontmatter[0].length)
+}
+
+export function transformDirective(rawSkill) {
+  const body = extractSkillBody(rawSkill)
+  const violations = []
+  for (const block of splitBlocks(body)) {
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(block)) {
+        violations.push(`/${pattern.source}/i: ${block.trim().slice(0, 120)}`)
+      }
     }
-    keptBlocks.push(block.trim())
+  }
+  if (violations.length > 0) {
+    throw new Error(`senpi ultrawork directive source contains forbidden non-senpi tokens:\n  - ${violations.join("\n  - ")}`)
   }
 
-  return `${keptBlocks.filter((block) => block.length > 0).join("\n\n").trim()}\n`
+  return `${body.trim()}\n`
 }
 
 function renderGeneratedModule(directive) {
@@ -62,7 +74,14 @@ function readExpectedModule() {
 }
 
 function main(argv) {
-  const expected = readExpectedModule()
+  let expected
+  try {
+    expected = readExpectedModule()
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
+
   if (argv.includes("--check")) {
     const actual = readFileSync(targetPath, "utf8")
     if (actual !== expected) {

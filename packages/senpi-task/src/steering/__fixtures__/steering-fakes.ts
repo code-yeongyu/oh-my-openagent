@@ -119,6 +119,7 @@ export function makeHarness(): SteeringHarness {
       return false
     },
     destruction,
+    runStatsSnapshot: () => undefined,
     now: () => clock,
   }
   return {

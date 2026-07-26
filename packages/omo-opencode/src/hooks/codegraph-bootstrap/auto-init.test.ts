@@ -23,6 +23,7 @@ function createDeps(
       events.push(`gitignore:${projectRoot}`)
       return true
     },
+    excludeProject: () => ({ excluded: false }),
     ensureProvisioned: async () => {
       events.push("provision")
       return { binPath: "/bin/codegraph", provisioned: true }

@@ -60,13 +60,14 @@ describe("TaskManager transcript subscription ownership", () => {
     if (started.kind !== "started") throw new Error("expected started")
     const fake = inProcess.handles.get(started.task_id)
     if (fake === undefined) throw new Error("expected live handle")
-    expect(fake.subscribeCount()).toBe(1)
+    // Two owned subscriptions per child: the transcript log and the run-stats tracker.
+    expect(fake.subscribeCount()).toBe(2)
     expect(fake.unsubscribeCount()).toBe(0)
 
     // when
     manager.forget(started.task_id)
 
     // then
-    expect(fake.unsubscribeCount()).toBe(1)
+    expect(fake.unsubscribeCount()).toBe(fake.subscribeCount())
   })
 })

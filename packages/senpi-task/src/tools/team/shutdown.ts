@@ -1,30 +1,28 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
-import { Type } from "typebox"
-import type { Static } from "typebox"
 
 import { SenpiShutdownError } from "../../team"
 import { toolResult } from "../control"
 import type { TeamToolsService } from "./types"
 
-export const TeamShutdownRequestParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  member: Type.String({ description: "Member to request shutdown for." }),
-})
+// Shutdown has no standalone tool registration: the model-facing surface is the structured-message
+// union on task_send. These input types describe the runner calls only; the dead TypeBox param
+// schemas that implied standalone team_shutdown_* tools were removed so no future registrar wires
+// a second, inconsistent shutdown UI.
+export type TeamShutdownRequestInput = {
+  readonly team_run_id: string
+  readonly member: string
+}
 
-export const TeamApproveShutdownParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  member: Type.String({ description: "Member whose pending shutdown to approve." }),
-})
+export type TeamApproveShutdownInput = {
+  readonly team_run_id: string
+  readonly member: string
+}
 
-export const TeamRejectShutdownParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  member: Type.String({ description: "Member whose pending shutdown to reject." }),
-  reason: Type.String({ description: "Why the member should keep working." }),
-})
-
-export type TeamShutdownRequestInput = Static<typeof TeamShutdownRequestParams>
-export type TeamApproveShutdownInput = Static<typeof TeamApproveShutdownParams>
-export type TeamRejectShutdownInput = Static<typeof TeamRejectShutdownParams>
+export type TeamRejectShutdownInput = {
+  readonly team_run_id: string
+  readonly member: string
+  readonly reason: string
+}
 
 export type ShutdownErrorView =
   | { readonly kind: "unknown_member"; readonly member: string; readonly reason: string }
@@ -45,7 +43,7 @@ function shutdownErrorView(error: unknown): ShutdownErrorView {
 export async function runTeamShutdownRequest(service: TeamToolsService, params: TeamShutdownRequestInput): Promise<AgentToolResult<TeamShutdownRequestDetails>> {
   try {
     await service.requestShutdown(params.team_run_id, params.member)
-    return toolResult(`Requested shutdown for '${params.member}'.`, { kind: "requested", team_run_id: params.team_run_id, member: params.member })
+    return toolResult(`Requested shutdown for '${params.member}' (team ${params.team_run_id}).`, { kind: "requested", team_run_id: params.team_run_id, member: params.member })
   } catch (error) {
     const view = shutdownErrorView(error)
     return toolResult(view.reason, view)
@@ -55,7 +53,7 @@ export async function runTeamShutdownRequest(service: TeamToolsService, params: 
 export async function runTeamApproveShutdown(service: TeamToolsService, params: TeamApproveShutdownInput): Promise<AgentToolResult<TeamApproveShutdownDetails>> {
   try {
     await service.approveShutdown(params.team_run_id, params.member)
-    return toolResult(`Approved shutdown for '${params.member}'.`, { kind: "approved", team_run_id: params.team_run_id, member: params.member })
+    return toolResult(`Approved shutdown for '${params.member}' (team ${params.team_run_id}).`, { kind: "approved", team_run_id: params.team_run_id, member: params.member })
   } catch (error) {
     const view = shutdownErrorView(error)
     return toolResult(view.reason, view)
@@ -65,7 +63,7 @@ export async function runTeamApproveShutdown(service: TeamToolsService, params: 
 export async function runTeamRejectShutdown(service: TeamToolsService, params: TeamRejectShutdownInput): Promise<AgentToolResult<TeamRejectShutdownDetails>> {
   try {
     await service.rejectShutdown(params.team_run_id, params.member, params.reason)
-    return toolResult(`Rejected shutdown for '${params.member}'.`, { kind: "rejected", team_run_id: params.team_run_id, member: params.member, reason: params.reason })
+    return toolResult(`Rejected shutdown for '${params.member}' (team ${params.team_run_id}): ${params.reason.replace(/\s+/g, " ").trim().slice(0, 160)}`, { kind: "rejected", team_run_id: params.team_run_id, member: params.member, reason: params.reason })
   } catch (error) {
     const view = shutdownErrorView(error)
     return toolResult(view.reason, view)

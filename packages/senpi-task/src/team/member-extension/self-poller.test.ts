@@ -13,7 +13,6 @@ import type { Message } from "@oh-my-opencode/team-core/types"
 
 import type { PersistedTaskEvent } from "../../store"
 import { buildPeerMessageEnvelope } from "../messaging/message"
-import { WaitRegistry } from "../messaging/wait-registry"
 import { createMemberSelfPoller } from "./self-poller"
 
 const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
@@ -25,7 +24,6 @@ type Harness = {
   readonly sessionDir: string
   readonly injected: string[]
   readonly events: PersistedTaskEvent[]
-  readonly registry: WaitRegistry<Message>
 }
 
 function createHarness(): Harness {
@@ -40,7 +38,6 @@ function createHarness(): Harness {
     sessionDir,
     injected: [],
     events: [],
-    registry: new WaitRegistry<Message>(),
   }
 }
 
@@ -66,7 +63,6 @@ function poller(harness: Harness) {
     memberName: "alice",
     config: harness.config,
     sessionDir: harness.sessionDir,
-    waitRegistry: harness.registry,
     sendUserMessage: (content) => harness.injected.push(content),
     appendEvent: (event) => harness.events.push(event),
   })
@@ -102,7 +98,6 @@ describe("member self-poller", () => {
       memberName: "alice",
       config: harness.config,
       sessionDir: harness.sessionDir,
-      waitRegistry: harness.registry,
       sendUserMessage: (content) => harness.injected.push(content),
       appendEvent: (event) => harness.events.push(event),
       afterInject: async () => {

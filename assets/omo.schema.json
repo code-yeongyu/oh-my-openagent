@@ -313,6 +313,19 @@
         "additionalProperties": false
       }
     },
+    "codegraph": {
+      "type": "object",
+      "properties": {
+        "daemon": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "daemon"
+      ],
+      "additionalProperties": false
+    },
     "task": {
       "type": "object",
       "properties": {

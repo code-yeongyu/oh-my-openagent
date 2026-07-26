@@ -1,10 +1,11 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import ts from "typescript"
+import * as ts from "typescript/unstable/ast"
+import { TypeScriptSourceParser } from "./typescript-native-source-parser"
 
 function __repoRootFrom(start: string): string {
   let dir = start
@@ -18,6 +19,10 @@ function __repoRootFrom(start: string): string {
 
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
 const WORKSPACE_ROOT = __repoRootFrom(import.meta.dir)
+const parser = new TypeScriptSourceParser(WORKSPACE_ROOT)
+afterAll(async () => {
+  await parser.close()
+})
 const MOCK_MODULE_TOKEN = "mock.module"
 const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
   // TODO(MOCK-MODULE-AUDIT): add cleanup for auto-update checker hook module mocks.
@@ -122,13 +127,17 @@ function isMockModuleCall(node: ts.CallExpression): boolean {
     && expression.name.text === "module"
 }
 
+function isStringLiteralLike(node: ts.Node): node is ts.StringLiteral | ts.NoSubstitutionTemplateLiteral {
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
+}
+
 function getMockModulePath(node: ts.CallExpression): string | null {
   if (!isMockModuleCall(node)) {
     return null
   }
 
   const modulePath = node.arguments[0]
-  if (!modulePath || !ts.isStringLiteralLike(modulePath)) {
+  if (!modulePath || !isStringLiteralLike(modulePath)) {
     return null
   }
 
@@ -146,7 +155,7 @@ function collectMockModulePaths(sourceFile: ts.SourceFile): string[] {
       }
     }
 
-    ts.forEachChild(node, visit)
+    node.forEachChild(visit)
   }
 
   visit(sourceFile)
@@ -198,7 +207,7 @@ function hasCleanupPattern(sourceFile: ts.SourceFile): boolean {
       return
     }
 
-    ts.forEachChild(node, visit)
+    node.forEachChild(visit)
   }
 
   visit(sourceFile)
@@ -209,6 +218,7 @@ describe("mock.module lifecycle hygiene", () => {
   test("#given test files using mock.module #when audited #then each must pair with cleanup", async () => {
     // given
     const files = [...await listTestFiles(SOURCE_ROOT), ...await listPackageTestFiles()]
+    const parsedSourceFiles = await parser.parse(files)
     const offenders: string[] = []
 
     // when
@@ -221,7 +231,10 @@ describe("mock.module lifecycle hygiene", () => {
       if (!contents.includes(MOCK_MODULE_TOKEN)) {
         continue
       }
-      const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true)
+      const sourceFile = parsedSourceFiles.get(filePath)
+      if (!sourceFile) {
+        throw new Error(`TypeScript did not parse ${filePath}`)
+      }
       if (hasMockModuleCall(sourceFile) && !hasCleanupPattern(sourceFile)) {
         offenders.push(relativeSourcePath(filePath))
       }

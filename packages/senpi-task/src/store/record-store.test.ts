@@ -33,6 +33,27 @@ function baseRecord(taskId: string) {
 }
 
 describe("createTaskRecordStore caching", () => {
+  test("#given an agent-resolved record #when a fresh store reads it #then source agent round-trips without diagnostics", () => {
+    // given
+    const project = tempProject()
+    const writer = createTaskRecordStore({ project_dir: project })
+    const resolvedModel = {
+      source: "agent" as const,
+      provider: "openai",
+      model_id: "gpt-5.4-mini-fast",
+      display: "openai/gpt-5.4-mini-fast",
+    }
+    writer.save({ ...baseRecord("st_00000007"), resolved_model: resolvedModel })
+    const reader = createTaskRecordStore({ project_dir: project })
+
+    // when
+    const result = reader.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.resolved_model).toEqual(resolvedModel)
+  })
+
   test("#given unchanged records #when list() is called repeatedly #then results stay consistent", () => {
     // given
     const project = tempProject()

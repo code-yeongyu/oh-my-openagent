@@ -225,6 +225,32 @@ test("#given aggregate SessionStart hooks #when inspected #then LazyCodex auto-u
 	assert(sessionStartCommands.some((command) => command.includes("scripts/auto-update.mjs")));
 });
 
+test("#given aggregate SessionStart hooks #when inspected #then cold-start-prone hooks carry 15s timeout headroom", async () => {
+	// given
+	const manifests = await readAggregateHookManifests();
+
+	// when
+	const sessionStartHooks = manifests
+		.filter(({ hooks }) => hooks.hooks.SessionStart)
+		.flatMap(({ source, hooks }) =>
+			hooks.hooks.SessionStart.flatMap((group) =>
+				group.hooks.map((handler) => ({ source, command: handler.command, timeout: handler.timeout })),
+			),
+		);
+	const coldStartHooks = sessionStartHooks.filter(
+		({ command }) =>
+			command.includes("components/telemetry/dist/cli.js") ||
+			command.includes("scripts/auto-update.mjs") ||
+			command.includes("components/codegraph/dist/cli.js"),
+	);
+
+	// then
+	assert.equal(coldStartHooks.length, 3);
+	for (const hook of coldStartHooks) {
+		assert.equal(hook.timeout, 15, `${hook.source} must carry timeout 15 for cold-start headroom`);
+	}
+});
+
 test("#given aggregate PostToolUse hooks #when inspected #then CodeGraph init guidance is registered for CodeGraph tools", async () => {
 	// given
 	const commandHooks = await readAggregateCommandHooks();

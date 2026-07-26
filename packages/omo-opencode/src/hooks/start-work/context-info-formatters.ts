@@ -7,6 +7,7 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState, BoulderWorkResumeOption } from "../../features/boulder-state"
 import { createWorktreeActiveBlock } from "./worktree-block"
+import { ensureNotepadScaffold } from "./notepad-scaffold"
 
 export function buildAutoSelectedPlanContextInfoOnly(params: {
   readonly planPath: string
@@ -119,6 +120,8 @@ Looking for new plans...`
   } else if (!sessionAlreadyTracked) {
     appendSessionId(directory, sessionId)
   }
+
+  ensureNotepadScaffold({ directory, planName: existingState.plan_name })
 
   const worktreeDisplay = effectiveWorktree
     ? worktreeBlock || createWorktreeActiveBlock(effectiveWorktree)

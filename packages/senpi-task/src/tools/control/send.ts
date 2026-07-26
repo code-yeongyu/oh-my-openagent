@@ -8,8 +8,9 @@ import { renderTaskSendCall, renderTaskSendResult } from "./renderers"
 import { invalidArguments, mapSendOutcome, notFound, scopeDenied } from "./send-results"
 import { isStructuredMessage, TaskSendParams } from "./send-schema"
 import type { TaskSendInput } from "./send-schema"
-import { missingTeamRunId, resolveTeamRunId, routeStructuredMessage } from "./send-shutdown"
+import { resolveSendTeamRunId, routeStructuredMessage } from "./send-shutdown"
 import type { TaskSendTeamRouting } from "./send-shutdown"
+export type { DefaultTeamRunIdResolution } from "./send-shutdown"
 import { toolResult } from "./tool-result"
 import type { CallerSessionResolver, SendManager, SendResultDetails, SendToolResult } from "./types"
 export { TaskSendParams } from "./send-schema"
@@ -20,8 +21,10 @@ const DESCRIPTION = [
   "Send a message to a child task or team member, keyed by to.",
   "Use deliver_as='steer' to redirect a running child immediately; deliver_as='followUp' (default) queues a plain-text follow-up.",
   "Use deliver_as='interrupt' without a message to park a running child as interrupted while keeping its resident session.",
-  "A plain-text message to a finished resident child revives that same session as a follow-up; disposed, evicted, or cancelled children are not revived.",
-  "Structured shutdown messages are lead-only and route to the team shutdown protocol.",
+  "A plain-text message to a finished resident child revives that same session as a follow-up; disposed, evicted, cancelled, and terminal-errored children are not revived.",
+  "message is required unless deliver_as='interrupt', and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only, reject deliver_as, and need team_run_id (defaults to your single owned team).",
+  "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
+  "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
 ].join(" ")
 
@@ -75,10 +78,11 @@ export async function runTaskSend(
     if (outcome.kind !== "not_found") return mapSendOutcome(outcome)
     if (teamRouting === undefined) return notFound(manager, outcome.reason, callerSessionId)
 
-    const runId = resolveTeamRunId(params, teamRouting)
-    if (runId === undefined) return missingTeamRunId()
+    const resolution = await resolveSendTeamRunId(params, teamRouting)
+    if (resolution.kind === "none") return notFound(manager, outcome.reason, callerSessionId)
+    if (resolution.kind === "error") return invalidArguments(resolution.reason)
 
-    const teamResult = await runTeamSend(teamRouting.service, runId, teamRouting.from, {
+    const teamResult = await runTeamSend(teamRouting.service, resolution.teamRunId, teamRouting.from, {
       to: params.to,
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),

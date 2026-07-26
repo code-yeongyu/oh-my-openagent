@@ -40,20 +40,20 @@ function requireCondition(condition: boolean, message: string): void {
   }
 }
 
-const happy = resolveCategory("ultrabrain", {}, registry([model("openai", "gpt-5.5")]))
+const happy = resolveCategory("ultrabrain", {}, registry([model("openai", "gpt-5.6-sol")]))
 requireCondition(happy.kind === "resolved", "happy scenario did not resolve")
 if (happy.kind !== "resolved") {
   throw new Error("happy scenario did not resolve")
 }
 requireCondition(happy.spec.provider === "openai", "happy provider mismatch")
-requireCondition(happy.spec.modelId === "gpt-5.5", "happy model mismatch")
+requireCondition(happy.spec.modelId === "gpt-5.6-sol", "happy model mismatch")
 requireCondition(happy.spec.variant === "xhigh", "happy variant mismatch")
 requireCondition(happy.spec.prompt_append?.includes("DEEP LOGICAL REASONING") === true, "happy prompt missing")
 
 const disabled = resolveCategory(
   "ultrabrain",
   { categories: { ultrabrain: { disable: true } } },
-  registry([model("openai", "gpt-5.5")]),
+  registry([model("openai", "gpt-5.6-sol")]),
 )
 requireCondition(disabled.kind === "disabled", "disabled scenario did not return disabled")
 

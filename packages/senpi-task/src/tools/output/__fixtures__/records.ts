@@ -1,14 +1,16 @@
-import type { TaskRecord, TaskStatus } from "../../../state"
+import type { ResolvedModelRecord, TaskRecord, TaskStatus } from "../../../state"
 
 export type RecordOverrides = {
   readonly task_id?: string
   readonly name?: string
+  readonly description?: string
   readonly status?: TaskStatus
   readonly parent_session_id?: string
   readonly execution_mode?: string
   readonly model?: string
   readonly agent_type?: string
   readonly category?: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly pid?: number
   readonly child_session_id?: string
   readonly created_at?: string
@@ -25,6 +27,7 @@ export function makeRecord(overrides: RecordOverrides = {}): TaskRecord {
   const timestamp = overrides.updated_at ?? "2024-12-03T14:00:00.000Z"
   return {
     task_id: overrides.task_id ?? "st_0000000000000000",
+    ...(overrides.description === undefined ? {} : { description: overrides.description }),
     parent_session_id: overrides.parent_session_id ?? "session-parent",
     root_session_id: "session-root",
     depth: 0,
@@ -39,6 +42,7 @@ export function makeRecord(overrides: RecordOverrides = {}): TaskRecord {
       notified_epoch: overrides.notified_epoch ?? -1,
     },
     ...(overrides.name !== undefined ? { name: overrides.name } : {}),
+    ...(overrides.resolved_model === undefined ? {} : { resolved_model: overrides.resolved_model }),
     ...(overrides.agent_type !== undefined ? { agent_type: overrides.agent_type } : {}),
     ...(overrides.category !== undefined ? { category: overrides.category } : {}),
     ...(overrides.pid !== undefined ? { pid: overrides.pid } : {}),

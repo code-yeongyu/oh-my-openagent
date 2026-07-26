@@ -72,9 +72,9 @@ describe("createChildHandle revive", () => {
     expect(await handle.waitForIdle()).toEqual({ status: "completed", finalResponse: "first" })
     expect(fake.promptCalls()).toBe(1)
 
-    // when a follow-up revives the idle child
-    fake.lastText.value = "second"
+    // when a follow-up revives the idle child and the new turn produces fresh output
     await handle.followUp("again")
+    fake.lastText.value = "second"
 
     // then a fresh turn is driven and waitForIdle re-arms to the SECOND turn's outcome
     expect(fake.promptCalls()).toBe(2)

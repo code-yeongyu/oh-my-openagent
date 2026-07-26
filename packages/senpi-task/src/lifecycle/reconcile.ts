@@ -20,7 +20,7 @@ export async function reconcileOnSessionStart(context: LifecycleContext): Promis
 }
 
 async function reconcileRecord(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (context.registry.get(record.task_id) !== undefined) {
+  if (hasLiveResidentHandle(context, record.task_id)) {
     return { task_id: record.task_id, kind: "resumed", reason: "owned by this process" }
   }
 
@@ -29,6 +29,18 @@ async function reconcileRecord(context: LifecycleContext, record: TaskRecord): P
   }
 
   if (record.execution_mode !== "process") {
+    // The project store is shared by every senpi process in this project. A record owned by a LIVE
+    // sibling process is not orphaned: marking it lost here would clobber that process's running
+    // child (its completion would then be dropped as a late transition). Only a dead owner - or a
+    // legacy record with no owner pid - is genuinely unreachable from any process.
+    const ownerPid = record.host_pid
+    if (ownerPid !== undefined && ownerPid !== context.hostPid && context.signaller.isAlive(ownerPid)) {
+      return {
+        task_id: record.task_id,
+        kind: "foreign_live_owner",
+        reason: `in-process child owned by live process pid=${ownerPid}`,
+      }
+    }
     await markLost(context, record, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }
@@ -147,6 +159,14 @@ async function reconcileTerminalRecord(context: LifecycleContext, record: TaskRe
     return reattachRecord(context, record, sessionPath)
   }
   return { task_id: record.task_id, kind: "resumed" }
+}
+
+function hasLiveResidentHandle(context: LifecycleContext, taskId: string): boolean {
+  // The adapter registry is a view over the manager and can briefly expose an incomplete keyed
+  // lookup while a session transition is publishing its new epoch. The entries snapshot is the
+  // authoritative same-process ownership witness; never classify that resident as a prior-process
+  // task merely because the point lookup missed it.
+  return context.registry.get(taskId) !== undefined || context.registry.entries().some((handle) => handle.task_id === taskId)
 }
 
 function newestSessionPath(context: LifecycleContext, taskId: string): string | undefined {

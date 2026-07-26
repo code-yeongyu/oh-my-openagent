@@ -2,12 +2,14 @@ export const START_WORK_TEMPLATE = `You are starting an Atlas work session.
 
 ## ARGUMENTS
 
-- \`/start-work [plan-name] [--worktree <path>]\`
+- \`/start-work [plan-name] [--worktree <path>] [--make-pr] [--ship]\`
   - \`plan-name\` (optional): name or partial match of the plan to start
   - \`--worktree <path>\` (optional): absolute path to an existing git worktree to work in
     - If specified and valid: hook pre-sets worktree_path in boulder.json
     - If specified but invalid: you must run \`git worktree add <path> <branch>\` first
     - If omitted: work directly in the current project directory (no worktree)
+  - \`--make-pr\` (optional): deliver the work as a pull request. IMPLIES worktree mode - when \`--worktree\` is omitted, create a task-owned worktree before implementation. On completion push the branch, open a reviewer-readable PR, and hand off with the PR URL (merge only on explicit user ask)
+  - \`--ship\` (optional): full delivery lifecycle; implies \`--make-pr\`. After the PR opens, keep working until it is MERGED (CI + review gates, feedback addressed), then clean up the worktree and sync \`.omo/\` state back
 
 ## WHAT TO DO
 
@@ -94,9 +96,13 @@ Reading plan and beginning execution...
 - Read the FULL plan file before delegating any tasks
 - Follow atlas delegation protocols (7-section format)
 
-## TASK BREAKDOWN (MANDATORY)
+## GOAL + TASK BREAKDOWN (MANDATORY)
 
-After reading the plan file, you MUST decompose every plan task into granular, implementation-level sub-steps and register ALL of them as task/todo items BEFORE starting any work.
+Do BOTH of these immediately after reading the plan file, BEFORE starting any work. Skipping either is a defect.
+
+**1. Set the goal, in detail.** When a goal tool is available (\`create_goal\`), call it with a DETAILED objective: the plan name and path, the concrete end state, the phase/task counts, the delivery mode (direct, \`--make-pr\`, or \`--ship\`), and how completion will be verified. One work session = one goal. No goal tool -> record the same objective as the first \`.omo/start-work/ledger.jsonl\` entry.
+
+**2. Register every phase and task as todos.** Decompose every plan task into granular, implementation-level sub-steps and register ALL of them as task/todo items, grouped phase by phase (one phase per plan wave), BEFORE starting any work. Keep them current at every moment: mark in_progress when work dispatches and done immediately after its verification passes - never batch-complete at the end, never execute work that is not a registered todo. Discovered work is appended as a todo before it runs.
 
 **How to break down**:
 - Each plan checkbox item (e.g., \`- [ ] Add user authentication\`) must be split into concrete, actionable sub-tasks
@@ -129,4 +135,4 @@ When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL pl
 5. If merge succeeds, clean up: \`git worktree remove <worktree-path>\`
 6. Remove the boulder.json state
 
-This is the DEFAULT behavior when \`--worktree\` was used. Skip merge only if the user explicitly instructs otherwise (e.g., asks to create a PR instead).`
+This is the DEFAULT behavior when \`--worktree\` was used alone. When \`--make-pr\` or \`--ship\` is active, skip the local merge and follow the PR Delivery Mode instructions in the session context instead: push the branch and open a PR (\`--make-pr\` hands off with the PR URL; \`--ship\` keeps working until the PR is merged), then clean up. Otherwise skip merge only if the user explicitly instructs otherwise (e.g., asks to create a PR instead).`

@@ -1,6 +1,6 @@
 import type { RuntimeState, Task } from "@oh-my-opencode/team-core/types"
 
-import type { CreateTeamResult, DeleteTeamResult, SendTeamMessageResult } from "../../../team"
+import type { CreateTeamResult, CreatedMemberInfo, DeleteTeamResult, SendTeamMessageResult } from "../../../team"
 import type { ActiveTeamSummary, TeamToolsService } from "../types"
 
 export type ServiceCall = { readonly method: string; readonly args: readonly unknown[] }
@@ -74,8 +74,26 @@ export function fakeTask(overrides: Partial<Task> = {}): Task {
   }
 }
 
+export function fakeCreatedMember(overrides: Partial<CreatedMemberInfo> = {}): CreatedMemberInfo {
+  return {
+    name: "alpha",
+    taskId: "st_a",
+    status: "running",
+    role: { kind: "category", category: "deep" },
+    ...overrides,
+  }
+}
+
 export function fakeCreateResult(overrides: Partial<CreateTeamResult> = {}): CreateTeamResult {
-  return { runtimeState: fakeRuntimeState(), memberTaskIds: { alpha: "st_a", beta: "st_b" }, ...overrides }
+  return {
+    runtimeState: fakeRuntimeState(),
+    memberTaskIds: { alpha: "st_a", beta: "st_b" },
+    members: [
+      fakeCreatedMember(),
+      fakeCreatedMember({ name: "beta", taskId: "st_b", status: "idle", role: { kind: "subagent_type", subagentType: "sisyphus" } }),
+    ],
+    ...overrides,
+  }
 }
 
 export function fakeDeleteResult(overrides: Partial<DeleteTeamResult> = {}): DeleteTeamResult {

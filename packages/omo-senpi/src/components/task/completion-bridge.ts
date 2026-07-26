@@ -1,6 +1,7 @@
 import type {
   CompletionNotifier,
   ParentState,
+  TaskRecord,
   TaskRecordStore,
   TaskStatus,
   TaskTransition,
@@ -18,6 +19,7 @@ export interface CompletionBridgeDeps {
   readonly notifier: CompletionNotifier
   readonly parentState: () => ParentState
   readonly wasBackground: (taskId: string) => boolean
+  readonly onTerminal?: (record: TaskRecord) => void
 }
 
 /**
@@ -43,6 +45,7 @@ export function createCompletionObservingStore(backing: TaskRecordStore, deps: C
           parentState: deps.parentState(),
           runInBackground: deps.wasBackground(taskId),
         })
+        deps.onTerminal?.(result.record)
       }
       return result
     },

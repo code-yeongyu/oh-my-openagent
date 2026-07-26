@@ -121,6 +121,38 @@ describe("resolveCategory", () => {
     })
   })
 
+  test("#given writing's Kimi for Coding default is available #when resolved #then its canonical Kimi K3 id is selected", () => {
+    // given
+    const models = registry([model("kimi-for-coding", "kimi-k3")])
+
+    // when
+    const result = resolveCategory("writing", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("kimi-for-coding")
+    expect(resolved.spec.modelId).toBe("kimi-k3")
+    expect(resolved.modelSelection.matchedFallback).toBe(false)
+  })
+
+  test("#given writing's provider default is unavailable and Kimi K3 is available #when resolved #then the K3 fallback is selected", () => {
+    // given
+    const models = registry([model("opencode-go", "kimi-k3")])
+
+    // when
+    const result = resolveCategory("writing", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("opencode-go")
+    expect(resolved.spec.modelId).toBe("kimi-k3")
+    expect(resolved.modelSelection.matchedFallback).toBe(true)
+    expect(resolved.modelSelection.fallbackEntry).toEqual({
+      providers: ["opencode-go", "vercel"],
+      model: "kimi-k3",
+    })
+  })
+
   test("#given ultrabrain primary is unavailable and hardcoded Google fallback is available #when resolved #then delegate-core fallback chain preserves the high variant", () => {
     // given
     const models = registry([model("google", "gemini-3.1-pro")])
@@ -192,17 +224,10 @@ describe("resolveCategory", () => {
     }
   })
 
-  test("#given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the legacy medium fallback remains", () => {
-    const result = expectResolved(resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")])))
+  test("#given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the retired rung is not selected", () => {
+    const result = resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")]))
 
-    expect(result.spec.provider).toBe("github-copilot")
-    expect(result.spec.modelId).toBe("gpt-5.5")
-    expect(result.spec.variant).toBe("medium")
-    expect(result.modelSelection.fallbackEntry).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
-    })
+    expect(result.kind).toBe("model_unavailable")
   })
 
   test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {

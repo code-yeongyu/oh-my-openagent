@@ -98,6 +98,27 @@ describe("buildChildArgs", () => {
     // then
     expect(args).toEqual(["--no-extensions"])
   })
+
+  test("#given a spec with a valid variant #when building child args #then --thinking follows --model", () => {
+    // when
+    const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "xhigh" })
+    // then
+    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "xhigh"])
+  })
+
+  test("#given the omo.json reasoningEffort none as variant #when building child args #then it maps to senpi off", () => {
+    // when
+    const args = buildChildArgs({ ...baseSpec, variant: "none" })
+    // then
+    expect(args).toEqual(["--no-extensions", "--thinking", "off"])
+  })
+
+  test("#given an unknown variant #when building child args #then no --thinking flag is emitted", () => {
+    // when
+    const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "ultra" })
+    // then
+    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1"])
+  })
 })
 
 describe("buildRpcSpawn spawn strategy", () => {

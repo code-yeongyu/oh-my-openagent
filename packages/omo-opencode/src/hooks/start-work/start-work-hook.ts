@@ -13,7 +13,7 @@ import {
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
-import { createWorktreeActiveBlock } from "./worktree-block"
+import { createPrDeliveryBlock, createWorktreeActiveBlock } from "./worktree-block"
 import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
@@ -187,8 +187,9 @@ export function createStartWorkHook(ctx: PluginInput) {
     const sessionId = normalizeSessionId(input.sessionID, "opencode")
     const timestamp = new Date().toISOString()
 
-    const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
-    const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
+    const { planName: explicitPlanName, explicitWorktreePath, makePr, ship } = parseUserRequest(promptText)
+    const { worktreePath, block } = resolveWorktreeContext(explicitWorktreePath)
+    const worktreeBlock = block + createPrDeliveryBlock({ makePr, ship }, worktreePath)
     const preferredPlanPath = explicitPlanName
       ? null
       : await findRecentSessionPlanPath({

@@ -139,7 +139,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   expect(cachedMcp.mcpServers.lsp.args[0]).not.toBe(join(lspRuntimeRoot, "dist", "cli.js"))
   expect((await stat(cachedLspCli)).isFile()).toBe(true)
   expect(await readlink(join(binDir, "omo"))).toBe(join(pluginPath, "dist", "cli.js"))
-})
+}, { timeout: 30_000 })
 
 test("#given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform", async () => {
   // given

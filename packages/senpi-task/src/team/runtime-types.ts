@@ -1,11 +1,12 @@
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
-import type { TaskRecord } from "../state"
+import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering"
 import type { StateDirConfig } from "../store"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { MemberTaskMap } from "./member-map"
+import type { RuntimeMemberStatus } from "./member-projection"
 
 export type SenpiTeamRuntimeErrorCode =
   | "bounds_exceeded"
@@ -62,9 +63,25 @@ export type CreateTeamDeps = {
   readonly writeMemberMap?: (runtimeDir: string, map: MemberTaskMap) => Promise<void>
 }
 
+export type CreatedMemberRole =
+  | { readonly kind: "category"; readonly category: string }
+  | { readonly kind: "subagent_type"; readonly subagentType: string }
+
+// Caller-facing view of one spawned member: identity and live status from the runtime state, the
+// role from the spec, the resolved model captured at spawn, and a bounded prompt excerpt.
+export type CreatedMemberInfo = {
+  readonly name: string
+  readonly taskId: string
+  readonly status: RuntimeMemberStatus
+  readonly role: CreatedMemberRole
+  readonly model?: ResolvedModelRecord
+  readonly promptExcerpt?: string
+}
+
 export type CreateTeamResult = {
   readonly runtimeState: RuntimeState
   readonly memberTaskIds: MemberTaskMap
+  readonly members: readonly CreatedMemberInfo[]
 }
 
 export type DeleteTeamDeps = {

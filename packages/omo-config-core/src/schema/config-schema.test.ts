@@ -40,6 +40,7 @@ describe("omo config schema", () => {
           disable: false,
         },
       },
+      codegraph: { daemon: true },
       task: {},
       teams: {
         builders: {
@@ -55,6 +56,7 @@ describe("omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
+    expect(result.data.codegraph?.daemon).toBe(true)
     expect(result.data.task?.default_execution_mode).toBe("in-process")
     expect(result.data.task?.default_concurrency).toBe(5)
     expect(result.data.task?.residency_max_children).toBe(8)
@@ -62,6 +64,19 @@ describe("omo config schema", () => {
     expect(result.data.categories?.deep?.reasoningEffort).toBe("high")
     expect(result.data.categories?.deep?.textVerbosity).toBe("medium")
     expect(result.data.categories?.deep?.thinking?.budgetTokens).toBe(2048)
+  })
+
+  test("#given an empty codegraph config #when parsed #then daemon defaults off", () => {
+    // given
+    const config = { codegraph: {} }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error(result.error.message)
+    expect(result.data.codegraph?.daemon).toBe(false)
   })
 
   test("#given an unknown root key #when parsed #then the schema rejects the config", () => {
@@ -73,6 +88,20 @@ describe("omo config schema", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("#given a wrong typed codegraph daemon setting #when parsed #then the issue path identifies the bad field", () => {
+    // given
+    const config = { codegraph: { daemon: "yes" } }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected config parsing to fail")
+    const issuePaths = result.error.issues.map((issue) => issue.path.join("."))
+    expect(issuePaths).toContain("codegraph.daemon")
   })
 
   test("#given a wrong typed task setting #when parsed #then the issue path identifies the bad field", () => {
