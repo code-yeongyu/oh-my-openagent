@@ -85,6 +85,20 @@ export class ParentWakeDispatchedTracker {
     this.dispatchedParentWakes.delete(sessionID)
   }
 
+  removeLatestOnlyNotifications(sessionID: string, keys: readonly string[]): void {
+    const wake = this.dispatchedParentWakes.get(sessionID)
+    if (!wake?.latestOnlyNotifications) return
+    for (const key of keys) {
+      const notification = wake.latestOnlyNotifications.get(key)
+      wake.latestOnlyNotifications.delete(key)
+      if (notification !== undefined && ![...wake.latestOnlyNotifications.values()].includes(notification)) {
+        wake.notifications = wake.notifications.filter((candidate) => candidate !== notification)
+      }
+    }
+    if (wake.latestOnlyNotifications.size === 0) delete wake.latestOnlyNotifications
+    if (wake.notifications.length === 0) this.clearWake(sessionID)
+  }
+
   trackWake(sessionID: string, wake: PendingParentWake, dispatchedAt: number): void {
     this.clearWake(sessionID)
     const dispatchedWake = cloneParentWake(wake)

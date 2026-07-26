@@ -8,8 +8,15 @@ import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../
 import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
-import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
+import {
+  cloneParentWake,
+  isManagedBashCheckpointNotification,
+  isRedundantParentWake,
+  type PendingParentWake,
+} from "./parent-wake-dedupe"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
+
+const MAX_CHECKPOINT_PARENT_PROMPT_BYTES = 1_024
 
 type ParentWakePromptDispatchInput = {
   readonly client: PromptDispatchClient
@@ -29,7 +36,9 @@ type ParentWakePromptDispatchInput = {
 }
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
-  const notificationContent = input.latestWake.notifications.join("\n\n")
+  const noReply = input.forceNoReply === true || !input.latestWake.shouldReply
+  const dispatchWake = createBoundedCheckpointDispatchWake(input.latestWake, noReply)
+  const promptPart = createParentWakePromptPart(dispatchWake.notifications, noReply)
   let dispatchStartedAt = Date.now()
   try {
     dispatchStartedAt = Date.now()
@@ -48,24 +57,20 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       input: {
         path: { id: input.sessionID },
         body: {
-          noReply: input.forceNoReply === true || !input.latestWake.shouldReply,
+          noReply,
           ...input.latestWake.promptContext,
-          parts: [
-            input.forceNoReply === true || !input.latestWake.shouldReply
-              ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
-              : createInternalAgentTextPart(notificationContent),
-          ],
+          parts: [promptPart],
         },
         query: { directory: input.directory },
       },
     })
     if (promptResult.status === "failed") {
       if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
-        const dispatchedWake = cloneParentWake(input.latestWake)
+        const dispatchedWake = cloneParentWake(dispatchWake)
         dispatchedWake.dispatchedAt = dispatchStartedAt
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
           markRetainedNoReplyAdmission(input, dispatchStartedAt)
-          input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
+          trackAcceptedWake(input, dispatchWake, dispatchStartedAt)
           log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
             sessionID: input.sessionID,
             error: promptResult.error,
@@ -102,13 +107,50 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     log("[background-agent] Sent deferred parent wake:", { sessionID: input.sessionID })
     delete input.latestWake.allowEmptyAssistantTurnRetry
     markRetainedNoReplyAdmission(input, dispatchStartedAt)
-    input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
+    trackAcceptedWake(input, dispatchWake, dispatchStartedAt)
   } catch (error) {
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
     input.requeueWake(input.latestWake)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })
   }
+}
+
+function createParentWakePromptPart(notifications: readonly string[], noReply: boolean) {
+  const part = createInternalAgentTextPart(notifications.join("\n\n"))
+  return noReply ? withInternalNoReplyMarker(part) : part
+}
+
+function createBoundedCheckpointDispatchWake(wake: PendingParentWake, noReply: boolean): PendingParentWake {
+  const notifications = [...wake.notifications]
+  let promptPart = createParentWakePromptPart(notifications, noReply)
+  while (Buffer.byteLength(promptPart.text, "utf8") > MAX_CHECKPOINT_PARENT_PROMPT_BYTES) {
+    const checkpointIndex = notifications.findIndex(isManagedBashCheckpointNotification)
+    if (checkpointIndex === -1) break
+    notifications.splice(checkpointIndex, 1)
+    promptPart = createParentWakePromptPart(notifications, noReply)
+  }
+  if (notifications.length === wake.notifications.length) return wake
+
+  const boundedWake = cloneParentWake(wake)
+  boundedWake.notifications = notifications
+  if (boundedWake.latestOnlyNotifications) {
+    const retained = new Set(notifications)
+    for (const [key, notification] of boundedWake.latestOnlyNotifications) {
+      if (!retained.has(notification)) boundedWake.latestOnlyNotifications.delete(key)
+    }
+    if (boundedWake.latestOnlyNotifications.size === 0) delete boundedWake.latestOnlyNotifications
+  }
+  return boundedWake
+}
+
+function trackAcceptedWake(
+  input: ParentWakePromptDispatchInput,
+  wake: PendingParentWake,
+  dispatchedAt: number,
+): void {
+  if (!input.latestWake.shouldReply && wake.notifications.every(isManagedBashCheckpointNotification)) return
+  input.trackDispatchedWake(createTrackedDispatchedWake(wake, input.forceNoReply), dispatchedAt)
 }
 
 function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, dispatchStartedAt: number): void {
