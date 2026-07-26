@@ -58,3 +58,16 @@ describe("renderTranscript", () => {
     expect(rendered.text.length).toBeGreaterThan(0)
   })
 })
+
+describe("renderTranscript error entries", () => {
+  test("#given an error transcript entry #when rendered #then it is shown as an error line", () => {
+    // given
+    const entries = [{ kind: "error", message: "upstream gateway timeout" }] as unknown as Parameters<typeof renderTranscript>[0]
+
+    // when
+    const rendered = renderTranscript(entries, { mode: "full", tailLines: 0 })
+
+    // then
+    expect(rendered.text).toBe("error: upstream gateway timeout")
+  })
+})

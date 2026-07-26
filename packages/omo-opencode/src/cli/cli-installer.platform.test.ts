@@ -202,7 +202,9 @@ describe("runCliInstaller platform branching", () => {
     const result = await runCliInstaller({ tui: false, platform: "codex" }, "3.4.0")
 
     // then
+    const output = consoleLogMock.mock.calls.map((call) => call.join(" ")).join("\n")
     expect(result).toBe(1)
+    expect(output).toContain("Codex install failed: codex failed")
   })
 
   test("keeps OpenCode success when Codex fails for platform=both", async () => {
@@ -214,7 +216,9 @@ describe("runCliInstaller platform branching", () => {
     const result = await runCliInstaller(createOpenCodeArgs("both"), "3.4.0")
 
     // then
+    const output = consoleLogMock.mock.calls.map((call) => call.join(" ")).join("\n")
     expect(result).toBe(0)
+    expect(output).toContain("Codex install failed (OpenCode install is still complete): codex failed")
   })
 
   test("does not print star commands in noninteractive installs", async () => {

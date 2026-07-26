@@ -63,6 +63,10 @@ describe("createSisyphusAgent", () => {
           promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-8"],
         },
         {
+          model: "anthropic/claude-opus-5",
+          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-5"],
+        },
+        {
           model: "anthropic/claude-fable-5",
           promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-fable-5"],
         },
@@ -76,6 +80,25 @@ describe("createSisyphusAgent", () => {
         for (const promptAnchor of promptAnchors) {
           expect(agent.prompt).toContain(promptAnchor);
         }
+      }
+    });
+
+    test("#when selecting a tracking mode #then wires the matching tool contract", () => {
+      // given
+      const models = ["openai/gpt-5.5", "openai/gpt-5.6-sol"];
+
+      for (const model of models) {
+        // when
+        const taskAgent = createSisyphusAgent(model, undefined, undefined, undefined, undefined, true);
+        const todoAgent = createSisyphusAgent(model, undefined, undefined, undefined, undefined, false);
+
+        // then
+        expect(taskAgent.prompt).toContain("task_create");
+        expect(taskAgent.prompt).toContain("task_update");
+        expect(taskAgent.prompt).not.toContain("todowrite");
+        expect(todoAgent.prompt).toContain("todowrite");
+        expect(todoAgent.prompt).not.toContain("task_create");
+        expect(todoAgent.prompt).not.toContain("task_update");
       }
     });
   });
@@ -124,12 +147,14 @@ describe("createSisyphusAgent", () => {
       // given
       const opus47Agent = createSisyphusAgent("anthropic/claude-opus-4-7");
       const opus48Agent = createSisyphusAgent("anthropic/claude-opus-4-8");
+      const opus5Agent = createSisyphusAgent("anthropic/claude-opus-5");
       const fable5Agent = createSisyphusAgent("anthropic/claude-fable-5");
       const sonnetAgent = createSisyphusAgent("anthropic/claude-sonnet-4-6");
 
       // then
       expect(opus47Agent.thinking).toBeUndefined();
       expect(opus48Agent.thinking).toBeUndefined();
+      expect(opus5Agent.thinking).toBeUndefined();
       expect(fable5Agent.thinking).toBeUndefined();
       expect(sonnetAgent.thinking).toEqual({
         type: "enabled",

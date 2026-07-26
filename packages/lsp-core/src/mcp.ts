@@ -10,6 +10,7 @@ import {
 	type JsonRpcResponse,
 	type JsonRpcResult,
 	type McpToolDescriptor,
+	type ParentWatchdogConfig,
 } from "@oh-my-opencode/mcp-stdio-core";
 import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS } from "./tools.js";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "./request-context.js";
@@ -21,6 +22,12 @@ const SERVER_VERSION = "0.1.0";
 
 export interface HandleLspMcpRequestOptions {
 	readonly signal?: AbortSignal;
+}
+
+export interface LspMcpStdioServerOptions {
+	// Test seam: production callers leave this unset so the watchdog uses its
+	// defaults (parentPid = process.ppid, 30s poll).
+	readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 export async function handleLspMcpRequest(
@@ -58,12 +65,14 @@ export async function handleLspMcpRequest(
 export async function runMcpStdioServer(
 	input: Readable = process.stdin,
 	output: Writable = process.stdout,
+	options: LspMcpStdioServerOptions = {},
 ): Promise<void> {
 	const requestContext = createStandaloneMcpRequestContext();
 	await runJsonRpcStdioServer({
 		input,
 		output,
 		idleTimeoutMs: 0,
+		parentWatchdog: options.parentWatchdog ?? {},
 		handler: (request) => runWithRequestContext(requestContext, () => handleLspMcpRequest(request)),
 		handlerOptions: undefined,
 	});

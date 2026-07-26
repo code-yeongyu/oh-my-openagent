@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import { runCodegraphSessionStartWorker } from "../src/hook.ts";
 import { runCodegraphServe } from "../src/serve.ts";
 
@@ -41,7 +42,12 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 
 		try {
 			mkdirSync(join(installDir, "bin"), { recursive: true });
+			mkdirSync(join(installDir, ".provisioned"), { recursive: true });
 			writeFileSync(binPath, "");
+			writeFileSync(
+				join(installDir, ".provisioned", `codegraph-${CODEGRAPH_PINNED_VERSION}.json`),
+				`${JSON.stringify({ binPath, version: CODEGRAPH_PINNED_VERSION })}\n`,
+			);
 
 			// when
 			const result = await runCodegraphSessionStartWorker({

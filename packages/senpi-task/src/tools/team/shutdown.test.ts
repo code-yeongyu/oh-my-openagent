@@ -14,6 +14,9 @@ describe("shutdown request route", () => {
     const result = await runTeamShutdownRequest(service, { team_run_id: "run-1", member: "alpha" })
     expect(result.details).toMatchObject({ kind: "requested", member: "alpha" })
     expect(service.calls[0]).toMatchObject({ method: "requestShutdown", args: ["run-1", "alpha"] })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("'alpha'")
+    expect(text).toContain("run-1")
   })
 
   test("#given an unknown member #when request runs #then it reports unknown_member", async () => {
@@ -32,6 +35,9 @@ describe("shutdown approve route", () => {
     const service = createFakeTeamService({ approveShutdown: async () => fakeRuntimeState() })
     const result = await runTeamApproveShutdown(service, { team_run_id: "run-1", member: "alpha" })
     expect(result.details).toMatchObject({ kind: "approved", member: "alpha" })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("'alpha'")
+    expect(text).toContain("run-1")
   })
 
   test("#given no pending request #when approve runs #then it reports no_pending_request", async () => {
@@ -51,6 +57,10 @@ describe("shutdown reject route", () => {
     const result = await runTeamRejectShutdown(service, { team_run_id: "run-1", member: "alpha", reason: "keep going" })
     expect(result.details).toMatchObject({ kind: "rejected", member: "alpha", reason: "keep going" })
     expect(service.calls[0]).toMatchObject({ method: "rejectShutdown", args: ["run-1", "alpha", "keep going"] })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("'alpha'")
+    expect(text).toContain("run-1")
+    expect(text).toContain("keep going")
   })
 
   test("#given no pending request #when reject runs #then it reports no_pending_request", async () => {

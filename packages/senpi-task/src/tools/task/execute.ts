@@ -2,9 +2,10 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 
 import { resolveExecutionMode, type ExecutionMode, type ManagerStartSpec, type StartResult } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { createChildProgress, type ToolProgressDetails } from "../../progress"
 import { executeBatch } from "./execute-batch"
+import { buildStartSpec, singleSpawnParams } from "./execute-spec"
 import type { TaskToolParamsStatic } from "./params"
-import { createFsSkillLoader } from "./skills"
 import type { ResolvedSpawnItem, TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
 import { resolveSpawnItems, validateBatchShape, validateTaskTarget } from "./validation"
 
@@ -23,6 +24,7 @@ type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { read
 type RunSpawnInput = {
   readonly params: SingleSpawnParams
   readonly signal: AbortSignal | undefined
+  readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
   readonly ctx: TaskToolContext
 }
 
@@ -45,6 +47,7 @@ function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails 
     execution_mode: record.execution_mode,
     model: record.model,
     ...(record.resolved_model !== undefined && { resolved_model: record.resolved_model }),
+    ...(record.run_stats !== undefined && { run_stats: record.run_stats }),
     run_in_background: false,
   }
 }
@@ -52,59 +55,6 @@ function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails 
 function syncResult(record: TaskRecord, mode: TaskToolMode): AgentToolResult<TaskToolDetails> {
   const body = record.final_response ?? record.error_message ?? `Task ${record.status}`
   return result(body + continuationFooter(record.task_id), recordDetails(record, mode))
-}
-
-function buildStartSpec(
-  params: SingleSpawnParams,
-  target: { readonly category: string } | { readonly subagentType: string },
-  parentSessionId: string,
-  deps: TaskToolDeps,
-  cwd: string,
-): ResolvedManagerStartSpec {
-  const ancestry = deps.resolveAncestry?.(parentSessionId)
-  const loadSkills = deps.loadSkills ?? createFsSkillLoader()
-  const skills = loadSkills(params.load_skills ?? [], cwd)
-  const executionMode = resolvedTaskExecutionMode(target, deps)
-  return {
-    prompt: skills.prepend + params.prompt,
-    parent_session_id: parentSessionId,
-    root_session_id: ancestry?.rootSessionId ?? parentSessionId,
-    depth: (ancestry?.depth ?? 0) + 1,
-    ...("category" in target ? { category: target.category } : { subagent_type: target.subagentType }),
-    execution_mode: executionMode,
-    ...(params.model !== undefined && { model: params.model }),
-    ...(params.name !== undefined && { name: params.name }),
-    ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),
-  }
-}
-
-function toExecutionMode(value: string | undefined): ExecutionMode | undefined {
-  switch (value) {
-    case "in-process":
-    case "process":
-      return value
-    default:
-      return undefined
-  }
-}
-
-function resolvedAgentMode(
-  target: { readonly category: string } | { readonly subagentType: string },
-  deps: TaskToolDeps,
-): ExecutionMode | undefined {
-  if (!("subagentType" in target)) return undefined
-  return toExecutionMode(deps.agents[target.subagentType]?.executionMode) ?? deps.omoConfig.agents?.[target.subagentType]?.execution_mode
-}
-
-function resolvedTaskExecutionMode(
-  target: { readonly category: string } | { readonly subagentType: string },
-  deps: TaskToolDeps,
-): ExecutionMode {
-  const agentMode = resolvedAgentMode(target, deps)
-  return resolveExecutionMode({
-    ...(agentMode !== undefined && { agentMode }),
-    configMode: deps.omoConfig.task?.default_execution_mode,
-  })
 }
 
 function startedDetails(
@@ -127,16 +77,29 @@ function startedDetails(
   }
 }
 
-function backgroundStartText(started: Extract<StartResult, { kind: "started" }>): string {
+function partialDetails(
+  started: Extract<StartResult, { kind: "started" }>,
+  params: SingleSpawnParams,
+  executionMode: ExecutionMode,
+  progress: ToolProgressDetails,
+): TaskToolDetails & ToolProgressDetails {
+  return { ...startedDetails(started, params, executionMode), ...progress }
+}
+
+function backgroundStartText(started: Extract<StartResult, { kind: "started" }>, description: string | undefined): string {
   const queue = started.queue_position !== undefined ? ` queued at position ${started.queue_position}` : ""
-  return `Started task ${started.task_id} (${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
+  const label = description ?? started.name
+  if (label === started.task_id) {
+    return `Started task ${started.task_id} (${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
+  }
+  return `Started task ${label} (${started.task_id}, ${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
 }
 
 async function runSpawn(
   deps: TaskToolDeps,
   input: RunSpawnInput,
 ): Promise<AgentToolResult<TaskToolDetails>> {
-  const { params, signal, ctx } = input
+  const { params, signal, onUpdate, ctx } = input
   if (signal?.aborted) {
     const reason = "Parent aborted before spawn"
     return result(reason, { task_id: "", status: "cancelled", mode: "spawn", reason })
@@ -149,9 +112,18 @@ async function runSpawn(
   const spec = buildStartSpec(params, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
-    const available = started.error.availableCategories
-    const suffix = available && available.length > 0 ? ` Available categories: ${available.join(", ")}.` : ""
-    return result(started.error.message + suffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
+    const agents = started.error.availableAgents
+    const categories = started.error.availableCategories
+    const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
+    // A model_unavailable failure means the category name IS valid; labeling the list "Available
+    // categories" told models to retry the same broken binding. Name the vocabulary honestly and
+    // surface the explicit-model escape hatch.
+    const categorySuffix = categories && categories.length > 0
+      ? started.error.code === "model_unavailable"
+        ? ` Valid category names: ${categories.join(", ")}. Pass model: "<provider>/<model>" to override the category default.`
+        : ` Available categories: ${categories.join(", ")}.`
+      : ""
+    return result(started.error.message + agentSuffix + categorySuffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
   }
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
@@ -176,10 +148,74 @@ async function runSpawn(
   }
   // Background children intentionally outlive the parent turn; only the synchronous wait is abort-scoped.
   if (params.run_in_background === true) {
-    return result(backgroundStartText(started), startedDetails(started, params, spec.execution_mode))
+    return result(backgroundStartText(started, params.description), startedDetails(started, params, spec.execution_mode))
+  }
+
+  const startedAt = Date.now()
+  const progress = createChildProgress(
+    started.task_id,
+    {
+      ...(params.category !== undefined && { category: params.category }),
+      ...(params.subagent_type !== undefined && { agentType: params.subagent_type }),
+      ...(started.resolved_model !== undefined && { resolvedModel: started.resolved_model }),
+      ...(params.model !== undefined && { model: params.model }),
+      name: started.name,
+      ...(params.description !== undefined && { description: params.description }),
+    },
+    startedAt,
+  )
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let emittedAt = 0
+  let receivedChildEvent = false
+  let closed = false
+  const emit = (): void => {
+    if (closed || onUpdate === undefined) return
+    emittedAt = Date.now()
+    onUpdate({
+      content: [{ type: "text", text: progress.contentText() }],
+      details: partialDetails(started, params, spec.execution_mode, progress.details()),
+    })
+  }
+  const schedule = (): void => {
+    if (closed || onUpdate === undefined) return
+    if (!receivedChildEvent) {
+      receivedChildEvent = true
+      emit()
+      return
+    }
+    const remaining = 250 - (Date.now() - emittedAt)
+    if (remaining <= 0) {
+      emit()
+    } else if (timer === undefined) {
+      timer = setTimeout(() => {
+        timer = undefined
+        emit()
+      }, remaining)
+      timer.unref?.()
+    }
+  }
+  const unsubscribe = deps.manager.subscribeChild(started.task_id, (event) => {
+    if (progress.accept(event)) schedule()
+  })
+  if (started.status === "pending") {
+    onUpdate?.({
+      content: [{ type: "text", text: "" }],
+      details: partialDetails(started, params, spec.execution_mode, {
+        progress: { activity: "queued · waiting for slot", startedAt },
+        childId: started.task_id,
+        turns: 0,
+      }),
+    })
+  } else {
+    emit()
   }
   try {
     const final = await deps.manager.waitFor(started.task_id, { signal })
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+      emit()
+    }
     return syncResult(final, "spawn")
   } catch (error) {
     if (!signal?.aborted || error !== signal.reason) throw error
@@ -190,18 +226,10 @@ async function runSpawn(
       status: "cancelled",
       reason,
     })
-  }
-}
-
-function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: boolean | undefined): SingleSpawnParams {
-  return {
-    prompt: item.prompt,
-    ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
-    ...(item.description !== undefined && { description: item.description }),
-    ...(item.name !== undefined && { name: item.name }),
-    ...(item.model !== undefined && { model: item.model }),
-    load_skills: [...item.load_skills],
-    ...(runInBackground !== undefined && { run_in_background: runInBackground }),
+  } finally {
+    closed = true
+    if (timer !== undefined) clearTimeout(timer)
+    unsubscribe()
   }
 }
 
@@ -210,7 +238,7 @@ function invalidArguments(message: string): AgentToolResult<TaskToolDetails> {
 }
 
 export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
-  return async (_toolCallId, params, signal, _onUpdate, ctx) => {
+  return async (_toolCallId, params, signal, onUpdate, ctx) => {
     const shape = validateBatchShape(params)
     if (shape.kind === "error") return invalidArguments(shape.error.message)
 
@@ -226,7 +254,7 @@ export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
     const first = resolved.items[0]
     if (first === undefined) return invalidArguments("Provide at least one task item.")
     if (resolved.items.length === 1) {
-      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, ctx })
+      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, onUpdate, ctx })
     }
 
     const parentSessionId = ctx.sessionManager.getSessionId()

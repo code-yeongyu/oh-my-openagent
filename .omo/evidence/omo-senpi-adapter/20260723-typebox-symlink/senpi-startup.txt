@@ -1,0 +1,21 @@
+Targeted real Senpi extension driver
+command:
+  SENPI_BIN=/opt/homebrew/bin/senpi node packages/omo-senpi/scripts/qa/ulw-prompts-e2e.mjs
+observed:
+  {"result":"PASS","ultraworkInjected":true,"missingMarkers":[],"forbiddenHits":[],"ulwResearchExists":true,"ulwResearchNative":true,"ultraworkDescriptionOk":true,"realSenpiUntouched":false}
+
+Isolation clarification:
+  The whole ~/.senpi directory changes while this active Senpi session records its own transcript.
+  A targeted startup hash check was therefore run against the durable user settings file.
+
+Targeted settings-isolation control
+command:
+  SENPI_CODING_AGENT_DIR=<temp> senpi --no-extensions --extension packages/omo-senpi/plugin/extensions/omo.js --version
+observed:
+  2026.7.23
+  SENPI_GREEN_EXIT=0
+  real_settings_unchanged=true
+  cleanup: removed temporary agent directory
+
+Note:
+  `--version` exits before normal extension discovery. It proves that the isolated invocation does not touch the real settings file, not that the extension loaded. The `ulw-prompts-e2e.mjs` PASS above is the actual extension-load proof.

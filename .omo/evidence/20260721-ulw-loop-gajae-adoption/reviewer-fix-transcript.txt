@@ -1,0 +1,67 @@
+# Reviewer-fix transcript - independent review blockers
+
+Branch HEAD before fix: 26f929b3314525acae7e6bddfdbd940665f16cd2
+Fix commit: 80a57345f fix(ulw-loop): close independent review blockers
+
+## RED: failing-first blockers
+
+$ cd packages/omo-codex/plugin/components/ulw-loop && npm test -- steering-batch cli-steering-batch validation-batch cli-validation-batch
+Result: failed before implementation.
+Observed failures included:
+- rejected batch appended zero steering_rejected entries where the new test expected exactly one with every rejected item index;
+- accepted batch audit append count was 3 where the new durability-seam test expected one plural append;
+- CLI simultaneous --kind and --proposals-json returned a batch rejection payload instead of typed ULW_LOOP_STEERING_BATCH_CONFLICT;
+- validation-batch branch tests received ULW_LOOP_VALIDATION_BATCH_INVALID instead of MEMBER_UNKNOWN / FINAL_NOT_MEMBER / OVERLAP.
+
+$ cd packages/omo-codex/plugin/components/ulw-loop && npm test -- steering-batch
+Result: failed after syntax cleanup, still RED for the new behavior.
+Observed failures:
+- steering_rejected_count expected 1, got 0;
+- appendFile call count expected 1, got 3;
+- CLI conflict code missing.
+
+## GREEN: focused/component gates
+
+$ cd packages/omo-codex/plugin/components/ulw-loop && npm test -- steering-batch cli-steering-batch validation-batch cli-validation-batch
+Result: passed, 5 files / 22 tests.
+
+$ cd packages/omo-codex/plugin/components/ulw-loop && npm run check
+Result: passed: tsc --noEmit, biome check ., tsc -p tsconfig.build.json.
+
+$ cd packages/omo-codex/plugin/components/ulw-loop && npm test
+Result: passed, 40 files / 418 tests.
+
+## Hands-on QA reproduction
+
+REVIEW_FIX_QA_WORK=/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.q8CGMWc1hV
+CODEX_CONFIG_BEFORE=780c740e287bda48609b5c9d5ee3ee2fc20434ce1a58c36692ec07e279a161d5  /Users/yeongyu/.codex/config.toml
+
+rejected_exit=1 accepted=false reasons=unknown pending id
+rejected_goals_byte_identical=true
+steering_rejected_count=1
+steering_rejected_message=index 1: unknown pending id; index 2: split_subgoal requires target
+
+accepted_batch=true results=3 order=G003,G001-goal-alpha,G002-goal-beta
+replay_dedup=true,true,true ledger_count_before=3 ledger_count_after=3
+
+conflict_exit=1 code=ULW_LOOP_STEERING_BATCH_CONFLICT goals_same=true
+
+member_unknown_exit=1 code=ULW_LOOP_VALIDATION_BATCH_MEMBER_UNKNOWN
+final_not_member_exit=1 code=ULW_LOOP_VALIDATION_BATCH_FINAL_NOT_MEMBER
+overlap_exit=1 code=ULW_LOOP_VALIDATION_BATCH_OVERLAP
+duplicate_invalid_exit=1 code=ULW_LOOP_VALIDATION_BATCH_INVALID
+too_small_invalid_exit=1 code=ULW_LOOP_VALIDATION_BATCH_INVALID
+
+REVIEW_FIX_QA_CLEANUP=removed /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.q8CGMWc1hV exists=no
+CODEX_CONFIG_AFTER=780c740e287bda48609b5c9d5ee3ee2fc20434ce1a58c36692ec07e279a161d5  /Users/yeongyu/.codex/config.toml
+CODEX_CONFIG_UNCHANGED=yes
+
+Failed QA attempt cleanup receipt:
+CLEANUP_FAILED_QA=removed /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.fCBvMuWI5m exists=no
+
+## Root gate
+
+$ cd /Users/yeongyu/local-workspaces/omo-wt/ulw-loop-batch-efficiency-v2 && bun run test:codex
+Result: passed, 510 tests, 0 failures.
+
+Scope note: this root gate rewrote generated comments in packages/omo-codex/plugin/components/codegraph/dist/cli.js. Per scope alert, that file was restored byte-for-byte from the clean main worktree path /Users/yeongyu/local-workspaces/omo/packages/omo-codex/plugin/components/codegraph/dist/cli.js using structured edit operations only; subsequent git diff for that path was empty.

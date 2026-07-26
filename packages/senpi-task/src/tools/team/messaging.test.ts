@@ -19,7 +19,7 @@ describe("team messaging route", () => {
 
     const result = await runTeamSend(service, "run-1", TEAM_LEAD_SENTINEL, { to: "lead", body: "hi" })
 
-    expect(result.content).toEqual([{ type: "text", text: "Message enqueued to lead." }])
+    expect(result.content).toEqual([{ type: "text", text: "Message enqueued to lead (id: m1)." }])
     expect(result.details).toEqual({ kind: "to_lead", message_id: "m1" })
   })
 
@@ -32,7 +32,7 @@ describe("team messaging route", () => {
       }),
     })
     const result = await runTeamSend(service, "run-1", TEAM_LEAD_SENTINEL, { to: "beta", body: "go" })
-    expect(result.content).toEqual([{ type: "text", text: "Message enqueued to 1 recipient(s)." }])
+    expect(result.content).toEqual([{ type: "text", text: "Message enqueued to 1 recipient(s): beta (id: m2)." }])
     expect(result.details).toEqual({ kind: "to_members", message_id: "m2", recipients: ["beta"] })
   })
 

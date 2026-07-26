@@ -18,6 +18,7 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/jsonio.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/kiro_scanner.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/opencode.py",
+  "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/pi_family.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/scanners.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/sqlite_optional_scanners.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/sqlite_scanners.py",

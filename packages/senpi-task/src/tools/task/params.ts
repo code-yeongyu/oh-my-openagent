@@ -4,21 +4,21 @@ export const MAX_TASK_BATCH_ITEMS = 16
 
 export const TaskToolParams = Type.Object({
   prompt: Type.Optional(
-    Type.String({ description: "The instruction for the child task. MUST be written in English." }),
+    Type.String({ description: "The instruction for the child task. MUST be written in English. Mutually exclusive with tasks; provide exactly one of prompt or tasks." }),
   ),
   description: Type.Optional(
     Type.String({ description: "Short human label for this task, shown in status views." }),
   ),
   category: Type.Optional(
-    Type.String({ description: "Category name to route through Sisyphus-Junior. Mutually exclusive with subagent_type." }),
+    Type.String({ description: "Category name to route through Sisyphus-Junior. Mutually exclusive with subagent_type; required unless subagent_type is given." }),
   ),
   subagent_type: Type.Optional(
-    Type.String({ description: "Agent name to invoke directly (e.g. oracle). Mutually exclusive with category." }),
+    Type.String({ description: "Agent name to invoke directly (e.g. oracle). Mutually exclusive with category; required unless category is given." }),
   ),
   run_in_background: Type.Optional(
     Type.Boolean({ description: "true returns a child task id immediately; false (default) waits and returns the final response." }),
   ),
-  name: Type.Optional(Type.String({ description: "Optional stable name for this task within the current session." })),
+  name: Type.Optional(Type.String({ description: "Optional stable name for this task within the current session; must be unique within the session." })),
   model: Type.Optional(Type.String({ description: "Override the resolved model, e.g. anthropic/claude-opus-4." })),
   load_skills: Type.Optional(
     Type.Array(Type.String(), {
@@ -36,7 +36,11 @@ export const TaskToolParams = Type.Object({
         model: Type.Optional(Type.String({ description: "Model override for this task." })),
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),
       }),
-      { minItems: 1, maxItems: MAX_TASK_BATCH_ITEMS },
+      {
+        minItems: 1,
+        maxItems: MAX_TASK_BATCH_ITEMS,
+        description: "Batch of 1-16 child tasks to spawn in one call. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them.",
+      },
     ),
   ),
 })

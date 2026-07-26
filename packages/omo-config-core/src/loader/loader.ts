@@ -1,5 +1,5 @@
 import { parseJsoncSafe } from "@oh-my-opencode/utils"
-import { OmoConfigLayerSchema, OmoConfigSchema, OmoTaskSettingsSchema, type OmoConfig } from "../schema"
+import { OmoCodegraphSettingsSchema, OmoConfigLayerSchema, OmoConfigSchema, OmoTaskSettingsSchema, type OmoConfig } from "../schema"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
 import {
@@ -14,6 +14,7 @@ import {
 const DEFAULT_RAW_CONFIG: Record<string, unknown> = {
   agents: {},
   categories: {},
+  codegraph: OmoCodegraphSettingsSchema.parse({}),
   task: OmoTaskSettingsSchema.parse({}),
   teams: {},
 }

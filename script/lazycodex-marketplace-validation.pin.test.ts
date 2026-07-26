@@ -169,6 +169,63 @@ describe("lazycodex marketplace validation guards", () => {
     }
   })
 
+  test("#given a managed bin target is missing #when validating the plugin bundle #then the bin target is rejected once", async () => {
+    // given
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-missing-bin-"))
+    await writeRootCliRuntime(pluginRoot)
+    await mkdir(join(pluginRoot, "components", "ulw-loop"), { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "package.json"),
+      `${JSON.stringify(
+        {
+          name: "@code-yeongyu/codex-ulw-loop",
+          bin: { "omo-ulw-loop": "./dist/cli.js", ulw: "./dist/cli.js", "ulw-loop": "./dist/cli.js" },
+        },
+        null,
+        2,
+      )}\n`,
+    )
+
+    try {
+      // when
+      const validated = validateLazycodexPluginBundle(pluginRoot)
+
+      // then
+      await expect(validated).rejects.toThrow("missing managed bin target: components/ulw-loop/dist/cli.js")
+    } finally {
+      await rm(pluginRoot, { recursive: true, force: true })
+    }
+  })
+
+  test("#given managed bin targets exist #when validating the plugin bundle #then the bin targets are accepted", async () => {
+    // given
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-bin-"))
+    await writeRootCliRuntime(pluginRoot)
+    await mkdir(join(pluginRoot, "components", "start-work-continuation", "dist"), { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "start-work-continuation", "package.json"),
+      `${JSON.stringify(
+        {
+          name: "@code-yeongyu/codex-start-work-continuation",
+          bin: { "omo-start-work-continuation": "./dist/cli.js" },
+        },
+        null,
+        2,
+      )}\n`,
+    )
+    await writeFile(join(pluginRoot, "components", "start-work-continuation", "dist", "cli.js"), "#!/usr/bin/env node\n")
+
+    try {
+      // when
+      const validated = validateLazycodexPluginBundle(pluginRoot)
+
+      // then
+      await expect(validated).resolves.toBeUndefined()
+    } finally {
+      await rm(pluginRoot, { recursive: true, force: true })
+    }
+  })
+
   test("#given an array mcpServers manifest #when validating the plugin bundle #then the manifest is rejected", async () => {
     // given
     const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-array-manifest-"))

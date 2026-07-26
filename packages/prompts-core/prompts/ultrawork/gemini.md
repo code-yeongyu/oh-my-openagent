@@ -207,6 +207,10 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 **YOUR SELF-ASSESSMENT IS UNRELIABLE.** What feels like 95% confidence = ~60% actual correctness. Constraints in this prompt are NOT suggestions; they are HARD GATES. You may not skip any.
 
+### GOAL REGISTRATION (BINDING)
+
+When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation: the full objective, the scenario contract below, and one line "I'll stop right away when <the exact observable state that ends this run>". Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
+
 ### SCENARIO CONTRACT (binding, defined BEFORE coding)
 
 Define 3+ scenarios, each with a binary pass condition, the real surface that proves it, AND the test file+test id (test-first). Required classes:
@@ -234,6 +238,10 @@ Every production change — features, fixes, refactors, perf, glue, config-with-
 **Exemption whitelist**: pure formatting, comment-only edits, version bumps with no behavior delta, rename-only moves. Each MUST be justified in writing. Unjustified exemption = rejection.
 
 **If you typed production code without a failing test preceding it: STOP, revert, write the test, watch it fail, then redo.** No exceptions — "obvious" / "one-liner" / "too small" do NOT exempt you.
+
+### COMMIT DISCIPLINE (MANDATORY)
+
+Commit frequently: one atomic commit per verified increment (RED→GREEN + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Skip committing only when the user forbade commits this session.
 
 ### Evidence Gates
 

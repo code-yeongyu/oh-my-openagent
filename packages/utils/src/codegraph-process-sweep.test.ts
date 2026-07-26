@@ -164,6 +164,167 @@ describe("CodeGraph zombie process selection", () => {
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([333])
   })
 
+  it("#given a detached upstream daemon with a --path argument #when selecting zombies #then it is matched as daemon-shaped with the project root extracted", () => {
+    // given
+    const omoRoot = "/tmp/omo"
+    const projectRoot = "/tmp/proj-a"
+    const processes = [
+      {
+        command: `${process.execPath} ${omoRoot}/node_modules/@colbymchenry/codegraph/bin/codegraph.js serve --mcp --path ${projectRoot}`,
+        pid: 341,
+        ppid: 1,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
+
+    // then
+    expect(zombies).toEqual([
+      {
+        command: processes[0]?.command,
+        daemonProjectRoot: projectRoot,
+        matchKind: "upstream-daemon",
+        matchedRoot: omoRoot,
+        pid: 341,
+        ppid: 1,
+      },
+    ])
+  })
+
+  it("#given provisioned standalone daemon shapes #when selecting zombies #then both launcher and post-exec bundle forms are daemon-shaped", () => {
+    // given
+    const installDir = "/tmp/omo-install"
+    const projectRoot = "/tmp/proj-b"
+    const launcher = `${installDir}/bin/codegraph serve --mcp --path ${projectRoot}`
+    const bundle = `${installDir}/node --liftoff-only ${installDir}/lib/dist/bin/codegraph.js serve --mcp --path ${projectRoot}`
+    const processes = [
+      { command: launcher, pid: 351, ppid: 1 },
+      { command: bundle, pid: 352, ppid: 1 },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [installDir], platform: "linux" })
+
+    // then
+    expect(zombies.map((processInfo) => [processInfo.pid, processInfo.matchKind, processInfo.daemonProjectRoot])).toEqual([
+      [351, "upstream-daemon", projectRoot],
+      [352, "upstream-daemon", projectRoot],
+    ])
+  })
+
+  it("#given a Windows standalone daemon shape #when selecting zombies #then it is daemon-shaped with the raw --path value preserved", () => {
+    // given
+    const installDir = "C:\\Users\\runner\\.omo\\codegraph"
+    const processes = [
+      {
+        command: `${installDir}\\bin\\codegraph.exe serve --mcp --path C:\\proj\\app`,
+        pid: 353,
+        ppid: 1,
+      },
+      {
+        command: `C:\\node\\node.exe ${installDir}\\lib\\dist\\bin\\codegraph.js serve --mcp --path C:\\proj\\app`,
+        pid: 354,
+        ppid: 1,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [installDir], platform: "win32" })
+
+    // then
+    expect(zombies.map((processInfo) => [processInfo.pid, processInfo.matchKind, processInfo.daemonProjectRoot])).toEqual([
+      [353, "upstream-daemon", "C:\\proj\\app"],
+      [354, "upstream-daemon", "C:\\proj\\app"],
+    ])
+  })
+
+  it("#given an upstream serve process without --path #when selecting zombies #then it stays a plain upstream-codegraph zombie", () => {
+    // given
+    const omoRoot = "/tmp/omo"
+    const processes = [
+      {
+        command: `${process.execPath} ${omoRoot}/node_modules/@colbymchenry/codegraph/bin/codegraph.js serve --mcp`,
+        pid: 355,
+        ppid: 1,
+      },
+      {
+        command: `${process.execPath} ${omoRoot}/node_modules/@colbymchenry/codegraph/bin/codegraph.js serve --mcp --path`,
+        pid: 356,
+        ppid: 1,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
+
+    // then
+    expect(zombies.map((processInfo) => [processInfo.pid, processInfo.matchKind])).toEqual([
+      [355, "upstream-codegraph"],
+      [356, "upstream-codegraph"],
+    ])
+  })
+
+  it("#given a daemon-shaped process with a live parent #when selecting zombies #then it is not a candidate", () => {
+    // given
+    const installDir = "/tmp/omo-install"
+    const processes = [
+      { command: "codex app-server", pid: 200, ppid: 1 },
+      {
+        command: `${installDir}/bin/codegraph serve --mcp --path /tmp/proj-c`,
+        pid: 357,
+        ppid: 200,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [installDir], platform: "linux" })
+
+    // then
+    expect(zombies).toEqual([])
+  })
+
+  it("#given a daemon-shaped command outside any owned root #when selecting zombies #then it is ignored", () => {
+    // given
+    const omoRoot = "/tmp/omo"
+    const processes = [
+      {
+        command: `/opt/not-omo/bin/codegraph serve --mcp --path /tmp/proj-d`,
+        pid: 358,
+        ppid: 1,
+      },
+      {
+        command: `/opt/not-omo/node /opt/not-omo/lib/dist/bin/codegraph.js serve --mcp --path /tmp/proj-d`,
+        pid: 359,
+        ppid: 1,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
+
+    // then
+    expect(zombies).toEqual([])
+  })
+
+  it("#given a quoted --path value with spaces #when selecting zombies #then the quoted project root is extracted", () => {
+    // given
+    const installDir = "/tmp/omo-install"
+    const processes = [
+      {
+        command: `${installDir}/bin/codegraph serve --mcp --path "/tmp/proj with spaces"`,
+        pid: 360,
+        ppid: 1,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [installDir], platform: "linux" })
+
+    // then
+    expect(zombies.map((processInfo) => processInfo.daemonProjectRoot)).toEqual(["/tmp/proj with spaces"])
+  })
+
   it("#given a POSIX ps table #when parsing process rows #then pid ppid and full command are preserved", () => {
     // given
     const output = [

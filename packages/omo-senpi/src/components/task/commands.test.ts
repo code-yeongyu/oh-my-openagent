@@ -150,6 +150,39 @@ describe("registerTaskCommands", () => {
     expect(manager.cancelled).toEqual(["st_kill"])
   })
 
+  it("#given a task with a description #when /task-kill lists options #then the human label leads and the id trails", async () => {
+    // given
+    const running = record({ task_id: "st_kill", name: "task-1", description: "Audit the waiting line", status: "running" })
+    const manager = fakeManager([running])
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, manager)
+    const { ctx, ui } = commandCtx("session-a", "tui", { select: () => Promise.resolve(undefined) })
+
+    // when
+    await invoke(pi, "task-kill", "", ctx)
+
+    // then
+    expect(ui.selectCalls[0]?.options[0]).toBe("Audit the waiting line (st_kill) running")
+  })
+
+  it("#given a multi-word description #when /task-kill selects and confirms #then cancelTask runs for the task id, not a word of the label", async () => {
+    // given
+    const running = record({ task_id: "st_kill", name: "task-1", description: "Audit the waiting line", status: "running" })
+    const manager = fakeManager([running])
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, manager)
+    const { ctx } = commandCtx("session-a", "tui", {
+      select: (_title, options) => Promise.resolve(options[0]),
+      confirm: () => Promise.resolve(true),
+    })
+
+    // when
+    await invoke(pi, "task-kill", "", ctx)
+
+    // then
+    expect(manager.cancelled).toEqual(["st_kill"])
+  })
+
   it("#given the selector is dismissed #when /task-kill runs #then nothing is cancelled", async () => {
     // given a user who escapes the selector (undefined)
     const running = record({ task_id: "st_kill", status: "running" })

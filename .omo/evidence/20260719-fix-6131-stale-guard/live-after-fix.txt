@@ -1,0 +1,22 @@
+initialize: {"name":"lsp","version":"0.1.0"}
+workspace: /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-6131-live-8eltZI
+marksman: /opt/homebrew/bin/marksman
+elapsedMs: 3485
+lsp_diagnostics result:
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "No diagnostics found"
+    }
+  ],
+  "isError": false,
+  "details": {
+    "filePath": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-6131-live-8eltZI/README.md",
+    "severity": "all",
+    "mode": "file",
+    "diagnostics": [],
+    "totalDiagnostics": 0,
+    "truncated": false
+  }
+}

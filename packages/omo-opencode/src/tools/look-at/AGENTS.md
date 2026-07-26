@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-14 files. The `look_at` tool delegates image, PDF, and diagram analysis to the `multimodal-looker` subagent. Conditional gate: tool is only registered when `multimodal-looker` is not in `disabled_agents`. Default subagent model: gpt-5.5 medium. This is a summary extractor, not a precise reader.
+14 files. The `look_at` tool delegates image, PDF, and diagram analysis to the `multimodal-looker` subagent. Conditional gate: tool is only registered when `multimodal-looker` is not in `disabled_agents`. Default subagent route: GPT-5.6 Sol at low effort through OpenAI, OpenCode, or Vercel. This is a summary extractor, not a precise reader.
 
 ## EXECUTION FLOW
 
@@ -30,7 +30,7 @@
 | `mime-type-inference.ts` | Detect MIME from file extension or Base64 header |
 | `missing-file-error.ts` | Clear `ENOENT` error message when file is missing |
 | `multimodal-agent-metadata.ts` | Resolve actual model for multimodal-looker from config or dynamic pipeline |
-| `multimodal-fallback-chain.ts` | Build vision-capable fallback chain: kimi-k2.6, glm-4.6v, gpt-5-nano |
+| `multimodal-fallback-chain.ts` | Build vision-capable fallback chain: GPT-5.6 Sol, Kimi K3, GLM-4.6V, GPT-5 Nano |
 | `constants.ts` | `MULTIMODAL_LOOKER_AGENT`, `LOOK_AT_DESCRIPTION` |
 | `types.ts` | `LookAtArgs` interface |
 

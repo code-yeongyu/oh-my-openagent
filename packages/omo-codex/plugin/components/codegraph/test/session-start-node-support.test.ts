@@ -52,7 +52,7 @@ describe("CodeGraph SessionStart worker Node support", () => {
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-provision-home-"));
 		const binPath = join(homeDir, ".omo", "codegraph", "bin", "codegraph");
 		const calls: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
-		const provisionCalls: Array<{ readonly installDir?: string; readonly lockDir: string; readonly version: "1.0.1" }> = [];
+		const provisionCalls: Array<{ readonly installDir?: string; readonly lockDir: string; readonly version: "1.4.1" }> = [];
 		const outcomes: unknown[] = [];
 
 		try {
@@ -90,7 +90,7 @@ describe("CodeGraph SessionStart worker Node support", () => {
 				{ args: ["init"], command: binPath },
 			]);
 			expect(provisionCalls).toEqual([
-				{ installDir: join(homeDir, ".omo", "codegraph"), lockDir: join(homeDir, ".omo", "codegraph", ".locks"), version: "1.0.1" },
+				{ installDir: join(homeDir, ".omo", "codegraph"), lockDir: join(homeDir, ".omo", "codegraph", ".locks"), version: "1.4.1" },
 			]);
 			expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "provisioned", timedOut: false }]);
 		} finally {

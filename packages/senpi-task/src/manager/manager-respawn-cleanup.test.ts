@@ -209,3 +209,63 @@ describe("TaskManager team-member respawn", () => {
     expect(startedSpec?.memberEnv).toEqual(trustedLaunch.memberEnv)
   })
 })
+
+describe("TaskManager respawn variant", () => {
+  test("#given a record whose resolved model carried a variant #when respawned #then the variant reaches the rpc runner spec", async () => {
+    // given
+    const record: TaskRecord = {
+      ...respawnRecord(),
+      resolved_model: {
+        source: "agent",
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "openai/gpt-5.6-sol",
+        variant: "xhigh",
+      },
+    }
+    const handle = {
+      task_id: record.task_id,
+      sessionId: "respawned-session",
+      pid: 4321,
+      steer: () => Promise.resolve(),
+      followUp: () => Promise.resolve(),
+      abort: () => Promise.resolve(),
+      subscribe: () => () => {},
+      waitForIdle: () => Promise.resolve(),
+      lastAssistantText: () => undefined,
+      dispose: () => Promise.resolve(),
+      terminate: () => Promise.resolve(),
+      exitOutcome: () => undefined,
+      waitForExit: () => Promise.resolve({
+        kind: "clean" as const,
+        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+      }),
+      lastSeen: () => undefined,
+      switchSession: () => Promise.resolve({ cancelled: false }),
+    } satisfies RpcChildHandle
+    let startedSpec: RpcRunnerSpec | undefined
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const runner = new FakeRunner()
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": runner, process: runner },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      rpcRespawnRunner: {
+        start: (spec: RpcRunnerSpec) => {
+          startedSpec = spec
+          return handle
+        },
+      },
+    })
+
+    // when
+    const result = await manager.respawn(record, "/tmp/session.jsonl")
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(startedSpec?.variant).toBe("xhigh")
+  })
+})

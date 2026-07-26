@@ -20,6 +20,7 @@ import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./de
 import { executeActions, executeAction } from "./action-executor"
 import { TmuxPollingManager } from "./polling-manager"
 import { createTrackedSession, markTrackedSessionClosePending } from "./tracked-session-state"
+import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 import { waitForSessionReady } from "./session-ready-waiter"
 import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusResponse } from "./session-status-parser"
@@ -759,6 +760,8 @@ export class TmuxSessionManager {
     if (isolatedPaneId) {
       this.sessions.set(
         sessionId,
+        // TODO(#5809): isolated-window/session paths do not support eager cmux attach yet.
+        // cmux attach for isolated paths requires native cmux window management — out of scope.
         createTrackedSession({ sessionId, paneId: isolatedPaneId, description: title }),
       )
       this.pollingManager.startPolling()
@@ -859,6 +862,7 @@ export class TmuxSessionManager {
           sessionId,
           paneId: result.spawnedPaneId,
           description: title,
+          attachActivated: isCmuxCompatEnvironment(),
         }),
       )
       this.failedReadinessCache.clear(sessionId)
@@ -998,6 +1002,8 @@ export class TmuxSessionManager {
         if (isolatedPaneId) {
           this.sessions.set(
             sessionId,
+            // TODO(#5809): isolated-window/session paths do not support eager cmux attach yet.
+            // cmux attach for isolated paths requires native cmux window management — out of scope.
             createTrackedSession({
               sessionId,
               paneId: isolatedPaneId,
@@ -1084,6 +1090,7 @@ export class TmuxSessionManager {
           sessionId,
           paneId: result.spawnedPaneId,
           description: deferred.title,
+          attachActivated: isCmuxCompatEnvironment(),
         }),
       )
       this.removeDeferredSession(sessionId)

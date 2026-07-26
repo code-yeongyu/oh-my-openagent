@@ -25,6 +25,7 @@ export function startSenpiRun(input) {
     env: {
       ...process.env,
       SENPI_CODING_AGENT_DIR: input.sandbox.agentDir,
+      XDG_CONFIG_HOME: input.sandbox.xdgConfigHome,
       SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
       OMO_SENPI_QA: "1",
       ...(input.obsDir === undefined ? {} : { OMO_TEAM_E2E_OBS: input.obsDir }),

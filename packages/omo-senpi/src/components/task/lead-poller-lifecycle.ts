@@ -3,13 +3,15 @@ import {
   createLeadPoller,
   readMemberTaskMap,
   type ActiveTeamSummary,
+  type DefaultTeamRunIdResolution,
+  type LeadDeliveryJournal,
   type LeadInjection,
+  type LeadInjectionSink,
   type LeadPoller,
   type LeadPollerDeps,
   type ParentState,
   type PersistedTaskEvent,
   type TeamCoreConfig,
-  type WaitRegistry,
 } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
@@ -24,7 +26,7 @@ export type LeadPollerLifecycleDeps = {
   readonly runtime: Pick<TaskRuntimeContext, "sessionId" | "sessionFile" | "parentState">
   readonly config: TeamCoreConfig
   readonly runtimeDir: (teamRunId: string) => string
-  readonly waitRegistry: WaitRegistry<Message>
+  readonly deliveryJournal?: LeadDeliveryJournal
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
   readonly pi: Pick<SenpiExtensionAPI, "sendUserMessage">
   readonly logger: ComponentLogger
@@ -41,6 +43,7 @@ export type LeadPollerLifecycle = {
     | { readonly ok: true; readonly teamRunId: string }
     | { readonly ok: false; readonly reason: string }
   >
+  resolveDefaultTeamRunId(): Promise<DefaultTeamRunIdResolution>
   shutdown(): void
 }
 
@@ -82,6 +85,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       if (entry.ownerSessionId === sessionId && ownedIds.has(teamRunId)) continue
       entry.poller.shutdown()
       pollers.delete(teamRunId)
+      deps.deliveryJournal?.dropTeam(teamRunId)
     }
 
     if (sessionId === undefined || deps.runtime.sessionFile() === undefined) return owned
@@ -93,7 +97,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
         teamRunId: team.teamRunId,
         config: deps.config,
         coordinator: sink,
-        waitRegistry: deps.waitRegistry,
+        ...(deps.deliveryJournal !== undefined ? { deliveryJournal: deps.deliveryJournal } : {}),
         appendEvent: deps.appendTaskEvent,
         eventTaskId: (message) => memberTaskMap[message.from],
         leadSessionFile: () => deps.runtime.sessionFile(),
@@ -142,7 +146,15 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     const onlyTeam = owned[0]
     if (owned.length === 1 && onlyTeam !== undefined) return { ok: true, teamRunId: onlyTeam.teamRunId }
     if (owned.length === 0) return { ok: false, reason: "No active team is owned by the current session." }
-    return { ok: false, reason: "Multiple teams are owned by the current session; pass team_run_id." }
+    return { ok: false, reason: multipleOwnedReason(owned) }
+  }
+
+  const resolveDefaultTeamRunId = async (): Promise<DefaultTeamRunIdResolution> => {
+    const owned = await synchronize()
+    const onlyTeam = owned[0]
+    if (owned.length === 1 && onlyTeam !== undefined) return { kind: "resolved", teamRunId: onlyTeam.teamRunId }
+    if (owned.length === 0) return { kind: "none" }
+    return { kind: "ambiguous", reason: multipleOwnedReason(owned) }
   }
 
   const disposeInterval = (deps.scheduleInterval ?? scheduleInterval)(() => {
@@ -157,6 +169,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     tick,
     resolveLeadPoller,
     resolveTeamRunId,
+    resolveDefaultTeamRunId,
     shutdown() {
       if (stopped) return
       stopped = true
@@ -166,7 +179,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     },
   }
 
-  function createInjectionSink(input: LeadPollerLifecycleDeps): { enqueue(injection: LeadInjection): void } {
+  function createInjectionSink(input: LeadPollerLifecycleDeps): LeadInjectionSink {
     return {
       enqueue(injection) {
         if (input.coordinator === undefined) {
@@ -193,6 +206,11 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       },
     }
   }
+}
+
+function multipleOwnedReason(owned: readonly ActiveTeamSummary[]): string {
+  const listed = owned.map((team) => `${team.teamRunId} ('${team.teamName}')`).join(", ")
+  return `Multiple teams are owned by the current session: ${listed}. Pass team_run_id.`
 }
 
 function isTransition(state: ParentState): boolean {

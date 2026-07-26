@@ -1,6 +1,7 @@
 import { composeOmoSenpiExtension } from "./compose"
 import type { OmoSenpiComponent } from "./types"
 import { createCommentCheckerComponent } from "../components/comment-checker"
+import { createConfigWatchComponent } from "../components/config-watch"
 import { createLspComponent } from "../components/lsp"
 import { createCodegraphComponent } from "../components/codegraph"
 import { createSenpiTelemetryComponent } from "../components/telemetry"
@@ -18,6 +19,7 @@ const components: OmoSenpiComponent[] = [
   createLspComponent(),
   createCodegraphComponent(),
   createTaskComponent(),
+  createConfigWatchComponent(),
 ]
 
 export default composeOmoSenpiExtension(components)

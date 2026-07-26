@@ -168,6 +168,17 @@ Runs in parallel; ALL must APPROVE; surface results and wait for the user's expl
 - CLEAR with `review_required: true`: run the high-accuracy review before delivery, record receipts, then present the plan summary and review result. Do not ask whether to run the review; the user already asked.
 - UNCLEAR: run the high-accuracy review AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
 
+### Handoff explanation (the mandatory shape of every plan summary)
+
+Every "present the plan summary/brief" above delivers THIS structure, in the user's language, derived from the finished plan file (COUNT the rows - never estimate):
+
+1. **What this plan drives** - the work it performs, in 1-2 sentences.
+2. **End state** - the concrete things that will exist or behave differently once execution finishes.
+3. **Shape** - how many phases/waves and how many tasks: N implementation todos (`- [ ] N.` rows) + F final-verification tasks (`- [ ] F<n>.` rows).
+4. **Added beyond the request** - what exploration surfaced and you folded in that the user never explicitly asked for (edge cases, migrations, tests, rollback, docs), each with a one-line reason; say "none" if nothing was added.
+5. **Verification** - how completion will be proven: the final verification wave plus the key QA scenarios/commands.
+6. **Execution handoff** - the plan runs in a worker session via `$start-work <plan-name>`; introduce the options: `--worktree <absolute-path>` (task-owned worktree; required for PR/branch work), `--make-pr` (deliver as a PR; auto-creates a task-owned worktree), `--ship` (implies `--make-pr`, keeps working until the PR is reviewed and MERGED).
+
 ### High-accuracy review (dual review)
 The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Oracle review via `task(subagent_type="oracle", ...)` on the strongest available reasoning model, in a fully isolated sub-session with normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. Momus runs at High and may take substantially longer than other agents. One round = exactly ONE `momus` + ONE independent review, dispatched together against the COMPLETE plan file (todos + TL;DR filled) at the draft's exact recorded `plan_path`. Keep Momus in flight and wait for its terminal result: elapsed time alone never justifies cancelling, duplicating, replacing, or treating it as failed. After both verdicts return, fix every cited issue and resubmit both fresh until each approves. CLEAR: runs when the user opts in or `review_required: true`. UNCLEAR: runs automatically unless Classify=Trivial.
 
@@ -210,6 +221,6 @@ task(subagent_type="explore", description="Map the implementation surface", prom
 Roles - the ONLY spawnable subagents (all read-only, plus `oracle` for the high-accuracy review): `explore`, `librarian`, `metis`, `momus`. Never dispatch with `category=` and never instruct a child to edit files. Spawn long plan/reviewer agents in the background through the OpenCode task surface; between waits, back off — double the timeout up to ~5 minutes — instead of spinning short cycles. Require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A timeout only means no new update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller delegated job. Close each agent after integrating its result.
 
 ## Stop rules
-- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts recorded: present the summary, then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. Execution belongs to the worker, never to you.
+- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts recorded: present the handoff explanation (Phase 4 format), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. Execution belongs to the worker, never to you.
 - Brief presented and `status: awaiting-approval` recorded: wait. Do not re-explore unless the user changes scope.
 - Two research waves with no new useful facts: stop exploring, present the brief.

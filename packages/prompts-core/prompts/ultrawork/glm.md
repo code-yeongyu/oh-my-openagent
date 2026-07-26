@@ -148,6 +148,14 @@ For each scenario, capture:
 
 If a verification command is unavailable or not applicable, state the exact reason and run the nearest truthful substitute.
 
+## GOAL REGISTRATION
+
+When a `create_goal` tool exists, register the run's goal with it before implementation: the objective, the scenario contract, and one WHEN TO STOP line naming the observable end state. Without the tool, record the same contract in your working notes and treat it as binding.
+
+## TODO DISCIPLINE
+
+Track every multi-step task in a live todo list: one atomic item per action with its verification, exactly one item in progress, status updated the instant it changes, newly discovered work added immediately. Never batch completions.
+
 ## SCENARIO CONTRACT
 
 Before production changes, define scenarios covering:
@@ -171,6 +179,10 @@ TDD is mandatory on production behavior changes.
 5. REGRESSION: rerun the scenario list.
 
 Exemptions: pure prompt text, formatting, comment-only edits, version bumps with no behavior delta, and rename-only moves. Justify every exemption in the final report.
+
+## COMMIT DISCIPLINE
+
+Commit one atomic commit per verified increment; never one end-of-run omnibus. Before composing each message, read `git log --oneline -20` and `git log -5 -- <touched paths>`, then match the observed subject shape, scope names, message language, body style, and commit size. Skip only when the user forbade commits this session.
 
 ## MANUAL QA MANDATE
 

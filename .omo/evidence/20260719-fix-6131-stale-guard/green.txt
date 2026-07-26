@@ -1,0 +1,21 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/lsp-core/src/lsp/client-diagnostics-freshness.integration.test.ts:
+(pass) LspClient diagnostics freshness > #given concurrent diagnostics on a cold file and an exact didOpen publish #when pull is not advertised #then one didOpen opens the file and both requests receive the current diagnostics [48.69ms]
+(pass) LspClient diagnostics freshness > #given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload [2069.69ms]
+(pass) LspClient diagnostics freshness > #given only a pre-generation versionless publish #when a newer local version asks for diagnostics #then the stale versionless publish is ignored and the request does not resolve clean [348.18ms]
+(pass) LspClient diagnostics freshness > #given stale and future publish versions #when diagnostics target the current version #then neither stale nor future diagnostics satisfy the request [147.45ms]
+(pass) LspClient diagnostics freshness > #given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version [247.21ms]
+(pass) LspClient diagnostics freshness > #given a full pull report followed by an unchanged report for the same version and resultId #when diagnostics repeat without a local change #then the cached full items are reused [49.83ms]
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/lsp-apply-edit-itxxFq exited with code 0
+(pass) LspClient diagnostics freshness > #given a server that claims pull support but closes instead of answering #when diagnostics run #then the transport failure is not labeled clean [541.05ms]
+(pass) LspClient diagnostics freshness > #given an advertised pull method that is explicitly unsupported and a matching push publish #when diagnostics run #then the client falls back to push diagnostics [533.26ms]
+(pass) LspClient diagnostics freshness > #given a diagnostic pull request times out #when the fake server keeps it pending #then the client sends cancel for the LSP request id [99.12ms]
+(pass) LspClient diagnostics freshness > #given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout [99.35ms]
+(pass) LspClient diagnostics freshness > #given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics [103.07ms]
+(pass) LspClient diagnostics freshness > #given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics [106.85ms]
+
+ 12 pass
+ 0 fail
+ 29 expect() calls
+Ran 12 tests across 1 file. [4.48s]

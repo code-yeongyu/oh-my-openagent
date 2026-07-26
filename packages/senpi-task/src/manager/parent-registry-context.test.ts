@@ -135,6 +135,30 @@ describe("createParentRegistrySessionContext", () => {
     expect(context.model).toBeUndefined()
   })
 
+  test("#given a spec carrying a valid resolved variant #when the context is built #then it maps to the senpi thinking level", () => {
+    // given
+    const registry = registryWithMockProvider()
+    const provide = createParentRegistrySessionContext(() => registry)
+
+    // when
+    const context = provide(baseSpec({ model: "omo-mock/mock-1", variant: "xhigh" }))
+
+    // then
+    expect(context.thinkingLevel).toBe("xhigh")
+  })
+
+  test("#given a spec carrying an unknown variant #when the context is built #then no thinking level is threaded", () => {
+    // given
+    const registry = registryWithMockProvider()
+    const provide = createParentRegistrySessionContext(() => registry)
+
+    // when
+    const context = provide(baseSpec({ model: "omo-mock/mock-1", variant: "ultra" }))
+
+    // then
+    expect(context.thinkingLevel).toBeUndefined()
+  })
+
   test("#given a model reference absent from the parent registry #when the context is built #then registry is still threaded but no Model is set", () => {
     // given
     const registry = registryWithMockProvider()

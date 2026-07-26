@@ -25,7 +25,11 @@ async function loadKillTmuxSessionIfExists(): Promise<typeof import("./session-k
 }
 
 function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
+	mock.module(environmentSpecifier, () => ({
+		isInsideTmux: isInsideTmuxMock,
+		isNativeTmux: isInsideTmuxMock,
+		isTmuxPaneCompatible: isInsideTmuxMock,
+	}))
 	mock.module(loggerSpecifier, () => ({ log: logMock }))
 	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
 	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))

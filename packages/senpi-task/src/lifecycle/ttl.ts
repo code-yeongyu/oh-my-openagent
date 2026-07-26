@@ -7,6 +7,8 @@ import type { CleanupResult } from "./types"
  * `lost` process record is NEVER deleted without pid-dead proof (its breadcrumbs may still be
  * needed). Records with a live resident handle in this process are also retained: deleting them
  * would orphan an in-memory handle and allow late transcript appends to recreate the deleted log.
+ * The same protection extends across processes: a resident record owned by a LIVE sibling process
+ * (host_pid alive) is that process's revivable handle and must not be expunged from under it.
  */
 export function cleanupExpiredRecords(context: LifecycleContext): CleanupResult {
   const deleted: string[] = []
@@ -26,10 +28,20 @@ export function cleanupExpiredRecords(context: LifecycleContext): CleanupResult 
 
 function isExpungeable(context: LifecycleContext, record: TaskRecord, cutoff: number): boolean {
   if (context.registry.get(record.task_id) !== undefined) return false
+  if (hasLiveForeignOwner(context, record)) return false
   if (!TERMINAL_STATUSES.has(record.status)) return false
   if (Date.parse(record.updated_at) > cutoff) return false
   if (record.status === "lost" && record.execution_mode === "process") {
     return record.pid !== undefined && !context.signaller.isAlive(record.pid)
   }
   return true
+}
+
+function hasLiveForeignOwner(context: LifecycleContext, record: TaskRecord): boolean {
+  return (
+    record.residency_state === "resident" &&
+    record.host_pid !== undefined &&
+    record.host_pid !== context.hostPid &&
+    context.signaller.isAlive(record.host_pid)
+  )
 }

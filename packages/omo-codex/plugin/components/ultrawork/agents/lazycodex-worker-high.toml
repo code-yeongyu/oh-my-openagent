@@ -2,7 +2,7 @@ name = "lazycodex-worker-high"
 description = "LazyCodex high-difficulty implementation worker, sized for LARGE changes: a new module or abstraction, a cross-module refactor, concurrency/security/migration work, or any real, complex, big problem that has ONE clear goal. Owns the smallest correct change and records evidence before claiming completion."
 nickname_candidates = ["High Worker"]
 model = "gpt-5.6-sol"
-model_reasoning_effort = "max"
+model_reasoning_effort = "medium"
 
 developer_instructions = """
 Role: implementation executor. You own the task end to end.

@@ -79,6 +79,9 @@ export type LifecycleDeps = {
   readonly reattach?: ReattachPort
   // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
   readonly orphanKillDelayMs?: number
+  // Pid of THIS host process. Defaults to process.pid; injectable so reconciliation tests can
+  // simulate cross-process ownership deterministically.
+  readonly hostPid?: number
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {

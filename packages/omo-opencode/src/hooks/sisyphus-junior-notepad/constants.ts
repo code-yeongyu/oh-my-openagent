@@ -10,7 +10,7 @@ NOTEPAD PATH: .omo/notepads/{plan-name}/
 - problems.md: Record unresolved issues, technical debt
 
 You SHOULD append findings to notepad files after completing work.
-IMPORTANT: Always APPEND to notepad files - never overwrite or use Edit tool.
+Notepad files are auto-scaffolded by /start-work. APPEND only - use the \`edit\` tool (match-and-insert after the last line) or \`bash\` \`>>\`. Never use the \`write\` tool (blocked by notepad-write-guard) and never overwrite.
 
 ## Plan Location (subagent: READ ONLY)
 PLAN PATH: .omo/plans/{plan-name}.md

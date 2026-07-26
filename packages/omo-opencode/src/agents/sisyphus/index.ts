@@ -5,6 +5,7 @@
  * - default.ts: Base implementation for Claude and general models
  * - claude-opus-4-7.ts: Native Claude Opus 4.7 prompt with literal-instruction tuning
  * - claude-opus-4-8.ts: Native Claude Opus 4.8 prompt with silence-default + autonomy tuning
+ * - claude-opus-5.ts: Native Claude Opus 5 prompt with scope/delegation/verification caps
  * - claude-fable-5.ts: Native Claude Fable 5 prompt (Opus 4.8 direction, top-tier model)
  * - gemini.ts: Corrective overlays for Gemini's aggressive tendencies
  * - gpt-5-4.ts: Native GPT-5.4 prompt with block-structured guidance
@@ -17,6 +18,7 @@
 export { buildDefaultSisyphusPrompt, buildTaskManagementSection } from "./default";
 export { buildClaudeOpus47SisyphusPrompt } from "./claude-opus-4-7";
 export { buildClaudeOpus48SisyphusPrompt } from "./claude-opus-4-8";
+export { buildClaudeOpus5SisyphusPrompt } from "./claude-opus-5";
 export { buildClaudeFable5SisyphusPrompt } from "./claude-fable-5";
 export {
   buildGeminiToolMandate,

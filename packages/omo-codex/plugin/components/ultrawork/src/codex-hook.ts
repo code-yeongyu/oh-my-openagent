@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { buildUltraworkAdditionalContext, type UltraworkAdditionalContextOptions } from "./skill-pointer.js";
 
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i;
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw(?!-(?:plan|research)))/i;
 const ULTRAWORK_DIRECTIVE_MARKER = "<ultrawork-mode>";
 const TRANSCRIPT_SEARCH_BYTES = 512_000;
 const CONTEXT_PRESSURE_MARKERS = [

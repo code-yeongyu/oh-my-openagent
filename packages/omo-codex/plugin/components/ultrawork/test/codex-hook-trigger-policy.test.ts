@@ -88,6 +88,48 @@ describe("codex ultrawork trigger policy", () => {
 		expect(isUltraworkPrompt(prompt)).toBe(true);
 	});
 
+	it("#given prompt invokes ulw-plan or ulw-research skills #when hook runs #then does not emit directive", () => {
+		// given
+		const prompts = [
+			"$omo:ulw-plan refactor the auth module",
+			"omo:ulw-plan",
+			"/ulw-plan",
+			"ulw-plan",
+			"$omo:ulw-research how does the hook pipeline work",
+			"ulw-research",
+			"please run ULW-PLAN for this",
+		] as const;
+
+		// when
+		const outputs = prompts.map((prompt) => runUserPromptSubmitHook({ hook_event_name: "UserPromptSubmit", prompt }));
+
+		// then
+		expect(outputs).toEqual(["", "", "", "", "", "", ""]);
+		expect(prompts.map((prompt) => isUltraworkPrompt(prompt))).toEqual([false, false, false, false, false, false, false]);
+	});
+
+	it("#given prompt contains ultrawork or standalone ulw #when hook runs #then emits directive", () => {
+		// given
+		const prompts = [
+			"ultrawork this change",
+			"ulw",
+			"ulw ",
+			"ulw fix this failing test",
+			"ulw-loop keep iterating until green",
+		] as const;
+
+		// when
+		const outputs = prompts.map((prompt) => runUserPromptSubmitHook({ hook_event_name: "UserPromptSubmit", prompt }));
+
+		// then
+		for (const output of outputs) {
+			const parsed = parseHookOutput(output);
+			expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+			expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+		}
+		expect(prompts.map((prompt) => isUltraworkPrompt(prompt))).toEqual([true, true, true, true, true]);
+	});
+
 	it("#given prior transcript contains triggers but current prompt does not #when hook runs #then does not emit directive", () => {
 		// given
 		const payload = {

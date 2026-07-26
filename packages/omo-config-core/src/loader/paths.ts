@@ -29,7 +29,7 @@ export function resolveUserOmoConfigPath(
   return join(resolveUserOmoConfigDirectory(env, platform), "omo.jsonc")
 }
 
-function resolveUserOmoConfigDirectory(
+export function resolveUserOmoConfigDirectory(
   env: OmoConfigEnv = process.env,
   platform: NodeJS.Platform = process.platform,
 ): string {
@@ -77,7 +77,7 @@ function detectOmoJsonPath(dir: string, fileSystem: OmoConfigReadFileSystem): st
   return isLoadableProjectConfigFile(jsonPath, fileSystem) ? jsonPath : null
 }
 
-function findProjectConfigPathsFarthestFirst(
+export function findProjectConfigPathsFarthestFirst(
   cwd: string,
   homeDir: string,
   fileSystem: OmoConfigReadFileSystem,

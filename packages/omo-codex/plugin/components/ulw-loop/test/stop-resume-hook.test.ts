@@ -179,6 +179,35 @@ describe("runStopResumeHook", () => {
 		expect(JSON.parse(output).reason).toContain("--session-id s1");
 	});
 
+	it("#given a goal id with path traversal #when the hook runs #then nothing is written outside the state dir and the resume is denied", () => {
+		writeGoals([pendingGoal("../../../escaped-marker")]);
+		const outsideDir = join(workDir, ".omo", "ulw-loop");
+		const sentinel = join(outsideDir, "escaped-marker.json");
+		writeFileSync(sentinel, "sentinel\n");
+
+		const output = runStopResumeHook(stopPayload());
+
+		expect(output).toBe("");
+		expect(readFileSync(sentinel, "utf8")).toBe("sentinel\n");
+		expect(existsSync(join(outsideDir, "escaped-marker.stuck"))).toBe(false);
+		expect(existsSync(join(outsideDir, "auto-resume-escaped-marker.json"))).toBe(false);
+	});
+
+	it("#given a normal goal id #when the hook runs past the cap #then the counter and stuck marker are written inside the state dir", () => {
+		writeGoals([pendingGoal("goal-abc")]);
+
+		runStopResumeHook(stopPayload());
+		runStopResumeHook(stopPayload());
+		const third = runStopResumeHook(stopPayload());
+
+		expect(third).toBe("");
+		const counter = JSON.parse(readFileSync(join(sessionDir(), "auto-resume-goal-abc.json"), "utf8"));
+		expect(counter.count).toBe(2);
+		expect(readFileSync(join(sessionDir(), "auto-resume-goal-abc.stuck"), "utf8")).toBe(
+			"no ledger progress after 2 resumes\n",
+		);
+	});
+
 	it("#given ledger movement between stops #when the hook fires again #then the cap resets", () => {
 		writeGoals([pendingGoal()]);
 

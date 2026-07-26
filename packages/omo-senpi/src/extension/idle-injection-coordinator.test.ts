@@ -27,7 +27,7 @@ describe("IdleInjectionCoordinator", () => {
     expect(collapsed).toBe(2)
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("task st_1 completed\n\ncontinue the run")
-    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
+    expect(calls[0]?.options).toEqual({ deliverAs: "followUp" })
   })
 
   it("#given repeated continuation enqueues #when flushed #then they collapse to one keyed injection", () => {
@@ -45,6 +45,18 @@ describe("IdleInjectionCoordinator", () => {
     // then the latest continuation content wins, delivered once
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("continue B")
+  })
+
+  it("#given a queued injection #when removed by key #then the flush no-ops and removal reports true only once", () => {
+    // given
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({ key: "team-message:m1", source: "team-message", content: "x" })
+
+    // when / then
+    expect(coordinator.remove("team-message:m1")).toBe(true)
+    expect(coordinator.remove("team-message:m1")).toBe(false)
+    expect(coordinator.flushOnIdle()).toBe(0)
+    expect(calls).toHaveLength(0)
   })
 
   it("#given an empty queue #when flushed #then nothing is delivered", () => {
@@ -80,6 +92,7 @@ describe("IdleInjectionCoordinator", () => {
     // then it is delivered exactly once
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("continue")
+    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
   })
 
   it("#given a deferred continuation #when a synchronous wake flushOnIdle drains first #then the deferred pass no-ops", () => {

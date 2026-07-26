@@ -65,6 +65,42 @@ describe("parseUserRequest", () => {
     })
   })
 
+  describe("when PR delivery flags are present", () => {
+    test("#given --make-pr alone #when parsing #then makePr is true with null plan name", () => {
+      const result = parseUserRequest("<user-request>--make-pr</user-request>")
+      expect(result.planName).toBeNull()
+      expect(result.makePr).toBe(true)
+      expect(result.ship).toBe(false)
+    })
+
+    test("#given plan name with --make-pr #when parsing #then strips flag from plan name", () => {
+      const result = parseUserRequest("<user-request>my-plan --make-pr</user-request>")
+      expect(result.planName).toBe("my-plan")
+      expect(result.makePr).toBe(true)
+    })
+
+    test("#given --ship with plan name and worktree #when parsing #then all parts parsed", () => {
+      const result = parseUserRequest("<user-request>my-plan --ship --worktree /path/to/wt</user-request>")
+      expect(result.planName).toBe("my-plan")
+      expect(result.ship).toBe(true)
+      expect(result.makePr).toBe(false)
+      expect(result.explicitWorktreePath).toBe("/path/to/wt")
+    })
+
+    test("#given --make-pr and --ship together #when parsing #then both flags true", () => {
+      const result = parseUserRequest("<user-request>--make-pr --ship my-plan</user-request>")
+      expect(result.planName).toBe("my-plan")
+      expect(result.makePr).toBe(true)
+      expect(result.ship).toBe(true)
+    })
+
+    test("#given no delivery flags #when parsing #then flags default false", () => {
+      const result = parseUserRequest("<user-request>my-plan</user-request>")
+      expect(result.makePr).toBe(false)
+      expect(result.ship).toBe(false)
+    })
+  })
+
   describe("when ultrawork keywords are present", () => {
     test("#given plan name with ultrawork keyword #when parsing #then strips keyword from plan name", () => {
       const result = parseUserRequest("<user-request>my-plan ultrawork</user-request>")

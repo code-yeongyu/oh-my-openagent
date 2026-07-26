@@ -7,6 +7,7 @@ import {
   linesComponent,
   normalizeRendererText,
   renderTaskCallLines,
+  renderTaskResultComponent,
   renderTaskResultLines,
   rendererVisibleWidth,
   statusThemeColor,
@@ -45,7 +46,18 @@ describe("taskCallLines", () => {
     const lines = taskCallLines(args)
 
     // then
-    expect(lines).toEqual(['task agent:atlas "ship it" foreground'])
+    expect(lines).toEqual(['task "ship it" foreground'])
+  })
+
+  test("#given a category spawn call #when rendered #then its current target prompt and mode stay stable through extraction", () => {
+    // given
+    const args = { prompt: "inspect task rendering", category: "quick", run_in_background: false }
+
+    // when
+    const lines = taskCallLines(args)
+
+    // then
+    expect(lines).toEqual(['task "inspect task rendering" foreground'])
   })
 
   test("#given a spawn call #when rendered #then target and mode are summarized", () => {
@@ -53,7 +65,7 @@ describe("taskCallLines", () => {
     const lines = taskCallLines({ prompt: "x", category: "quick", run_in_background: true })
 
     // then
-    expect(lines.join(" ")).toContain("quick")
+    expect(lines.join(" ")).not.toContain("quick")
     expect(lines.join(" ")).toContain("background")
   })
 
@@ -77,21 +89,25 @@ describe("taskCallLines", () => {
 
     // then
     expect(line).toContain("실제 프롬프트")
+    expect(line).toContain("Second line")
     expect(line).not.toContain("\n")
     expect(line).toContain("...")
-    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
+    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(100)
   })
 
   test("#given a long Korean prompt #when excerpted #then truncation backs up to a word boundary", () => {
     // given
-    const prompt = "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트를 확인하세요."
+    const sentence = "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트를 확인하세요."
+    const prompt = `${sentence} ${sentence}`
 
     // when
     const [line = ""] = taskCallLines({ prompt, category: "missing-cat", run_in_background: false })
 
     // then
-    expect(line).toContain('"한국어로 긴 작업 지시를..."')
-    expect(line).not.toContain("작...")
+    expect(line).toContain('"한국어로 긴 작업 지시를')
+    expect(line).toContain("...")
+    expect(line).not.toContain("한국...")
+    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(100)
   })
 })
 
@@ -131,7 +147,7 @@ describe("taskResultLines", () => {
     expect(lines.join(" ")).toContain("completed")
   })
 
-  test("#given resolved category metadata #when rendered #then target, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {
+  test("#given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {
     // given
     const details = {
       task_id: "st_0000000c",
@@ -156,9 +172,7 @@ describe("taskResultLines", () => {
     const row = taskResultLines(details).join(" ")
 
     // then
-    expect(row).toContain("category:ultrabrain")
-    expect(row).toContain("GPT-5.6 Sol")
-    expect(row).toContain("reasoning:xhigh")
+    expect(row).toContain("category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh)")
     expect(row.match(/xhigh/gu)).toHaveLength(1)
     expect(row).toContain("background")
     expect(row).toContain("pending")
@@ -187,30 +201,56 @@ describe("taskResultLines", () => {
     expect(row).not.toContain("[object Object]")
   })
 
-  test("#given long result context #when rendered at width 72 #then every ANSI-aware row is bounded and truncated with an ellipsis", () => {
+  test("#given a persisted display already prefixed by the provider #when full and compact rows render #then the provider is not duplicated", () => {
     // given
-    const lines = taskResultLines({
+    const details = {
       task_id: "st_0000000e",
       status: "pending",
-      mode: "spawn",
+      mode: "spawn" as const,
       category: "ultrabrain",
       resolved_model: {
         provider: "openai",
         model_id: "gpt-5.6-sol",
-        display: "GPT-5.6 Sol Extended Display",
+        display: "OpenAI GPT-5.6 SOL",
         reasoning_effort: "xhigh",
-        source: "category",
+        source: "category" as const,
+      },
+      run_in_background: true,
+    }
+
+    // when
+    const plain = taskResultLines(details).join(" ")
+    const compact = renderTaskResultComponent(details, ANSI_THEME).render(96).join(" ")
+
+    // then
+    expect(plain).toContain("(OpenAI GPT-5.6 SOL reasoning:xhigh)")
+    expect(compact).toContain("(OpenAI GPT-5.6 SOL xhigh)")
+  })
+
+  test("#given resolved category context #when the real result component renders at width 72 #then provider, friendly model, and reasoning stay visible within bounds", () => {
+    // given
+    const details = {
+      task_id: "st_0000000e",
+      status: "pending",
+      mode: "spawn" as const,
+      category: "ultrabrain",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        reasoning_effort: "xhigh",
+        source: "category" as const,
       },
       run_in_background: true,
       queue_position: 12,
       reason: "긴 대기열 사유입니다. Provider capacity is constrained for this request.",
-    })
+    }
 
     // when
-    const rendered = linesComponent(lines).render(72)
+    const rendered = renderTaskResultComponent(details, ANSI_THEME).render(72)
 
     // then
-    expect(rendered.some((line) => line.includes("..."))).toBe(true)
+    expect(rendered.join(" ")).toContain("(openai GPT-5.6 Sol xhigh)")
     for (const line of rendered) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
   })
 })
@@ -312,5 +352,45 @@ describe("linesComponent", () => {
     expect(rendered).toHaveLength(1)
     expect(rendered[0]).toContain("...")
     expect(rendererVisibleWidth(rendered[0])).toBeLessThanOrEqual(72)
+  })
+})
+
+describe("taskResultLines run stats", () => {
+  test("#given terminal details with run stats #when rendered #then runtime and tps tokens are appended", () => {
+    // given
+    const details = {
+      task_id: "st_00000009",
+      status: "completed",
+      mode: "spawn" as const,
+      category: "deep",
+      execution_mode: "in-process",
+      model: "apitopia/kimi-k3-unlocked",
+      run_in_background: false,
+      run_stats: {
+        runtime_ms: 134_000,
+        turns: 3,
+        tool_calls: 5,
+        output_tokens: 900,
+        total_tokens: 4_200,
+        generation_ms: 7_600,
+        tokens_per_second: 118,
+      },
+    }
+
+    // when
+    const [line = ""] = taskResultLines(details)
+
+    // then
+    expect(line).toContain("ran:2m14s")
+    expect(line).toContain("tps:118")
+  })
+
+  test("#given details without run stats #when rendered #then no runtime tokens appear", () => {
+    // when
+    const [line = ""] = taskResultLines({ task_id: "st_00000009", status: "completed", mode: "spawn" as const })
+
+    // then
+    expect(line).not.toContain("ran:")
+    expect(line).not.toContain("tps:")
   })
 })

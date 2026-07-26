@@ -5,7 +5,7 @@ import { UlwLoopError } from "./types.js";
 
 type RecordEvidenceCliArgs = { readonly goalId: string; readonly criterionId: string; readonly status: "pass" | "fail" | "blocked"; readonly evidence: string; readonly notes?: string };
 
-const VALUE_FLAGS = new Set("--brief --brief-file --session-id --codex-goal-mode --goal --goal-id --criterion-id --status --evidence --notes --codex-goal-json --quality-gate-json --kind --rationale --title --objective --target-goal-id --source --after-json --directive-json --directive-file --idempotency-key".split(" "));
+const VALUE_FLAGS = new Set("--brief --brief-file --session-id --codex-goal-mode --validation-batch-json --goal --goal-id --criterion-id --status --evidence --notes --codex-goal-json --quality-gate-json --kind --rationale --title --objective --target-goal-id --source --after-json --directive-json --directive-file --idempotency-key --proposals-json".split(" "));
 const SUBCOMMANDS = new Set("create-goals status complete-goals criteria record-evidence checkpoint steer add-goal record-review-blockers".split(" "));
 
 export function hasFlag(argv: readonly string[], flag: string): boolean { return argv.includes(flag); }
