@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { readContinuationMarker } from "../run-continuation-state"
 import { BackgroundManager } from "./manager"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeNotifier } from "./parent-wake-notifier"
@@ -298,9 +301,10 @@ describe("BackgroundManager managed-bash checkpoint events", () => {
     }
   })
 
-  test("#given queued checkpoint progress #when cancellation skips notification #then observer and wake state are purged", async () => {
+  test("#given queued checkpoint progress #when cancellation skips notification #then wake state is purged and the persisted marker is idle", async () => {
     // given
-    const manager = new BackgroundManager({ pluginContext: createPluginContext() })
+    const directory = mkdtempSync(join(tmpdir(), "omo-bg-checkpoint-marker-"))
+    const manager = new BackgroundManager({ pluginContext: createPluginContext(undefined, directory) })
     const internals = unsafeTestValue<CheckpointManager>(manager)
     const task = createRunningTask()
     internals.tasks.set(task.id, task)
@@ -313,8 +317,12 @@ describe("BackgroundManager managed-bash checkpoint events", () => {
       // then
       expect(cancelled).toBe(true)
       expect(internals.parentWakeNotifier.getPendingParentWakes().has(task.parentSessionId)).toBe(false)
+      const marker = readContinuationMarker(directory, task.parentSessionId)
+      expect(marker?.sources["background-task"]?.state).toBe("idle")
+      expect(marker?.sources["background-task"]?.reason).toBeUndefined()
     } finally {
       await manager.shutdown()
+      rmSync(directory, { recursive: true, force: true })
     }
   })
 })

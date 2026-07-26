@@ -2454,6 +2454,7 @@ The task was re-queued on a fallback model after a retryable failure.
         await this.purgeManagedBashCheckpointAttempt(task, checkpointAttemptID)
       }
       this.cleanupPendingByParent(task)
+      this.updateBackgroundTaskMarker(task.parentSessionId)
       this.scheduleTaskRemoval(task.id)
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
