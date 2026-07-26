@@ -57,13 +57,15 @@ export function createAtlasEventHandler(input: {
       if (state) {
         state.lastEventWasAbortError = false
         state.skipNextIdleAfterRuntimeErrorRetry = false
-        if (role === "user") {
+      }
+      if (role === "user") {
+        if (state) {
           state.waitingForFinalWaveApproval = false
-          clearBoulderPause(ctx.directory, {
-            reason: "final_wave_approval",
-            sessionId: sessionID,
-          })
         }
+        clearBoulderPause(ctx.directory, {
+          reason: "final_wave_approval",
+          sessionId: sessionID,
+        })
       }
       return
     }
