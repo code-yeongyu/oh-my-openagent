@@ -243,6 +243,20 @@ describe("resolveActualContextLimit", () => {
     })).toBe(1_000_000)
   })
 
+  it("keeps non-Claude Amazon Bedrock models on their cached limit", () => {
+    process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
+    process.env[VERTEX_CONTEXT_ENV_KEY] = "true"
+    const modelID = "openai.gpt-5.6-sol"
+    const modelContextLimitsCache = new Map<string, number>([
+      [`amazon-bedrock/${modelID}`, 272_000],
+    ])
+
+    expect(resolveActualContextLimit("amazon-bedrock", modelID, {
+      anthropicContext1MEnabled: true,
+      modelContextLimitsCache,
+    })).toBe(272_000)
+  })
+
   it("uses a cached context limit for a regional AWS Bedrock Opus 5 model ID", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]

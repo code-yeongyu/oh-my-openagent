@@ -4,14 +4,16 @@ Harness:
 - OpenCode health: {"healthy": true, "version": "0.0.0-codeg/v1.18.5-adjacency-leading-v4-202607260248"}
 - Plugin: file:///Volumes/DATA/tmp/omo-opus5-1m-101314/packages/omo-opencode/src/index.ts
 - Isolated XDG config, data, state, and cache: yes
+- Amazon Bedrock catalog identities loaded: openai.gpt-5.6-sol, us.anthropic.claude-opus-5
 
 Observed:
 - GET /global/health returned healthy=true.
-- GET /config contained the worktree plugin URI: True.
+- GET /config contained the worktree plugin URI: True
+- GET /config loaded both the Claude and non-Claude Amazon Bedrock model identities.
 - Host OpenCode database session count before: 4329
 - Host OpenCode database session count after: 4329
 - Host database unchanged: True
 
-This final-code smoke proves the updated resolver loads through the real OpenCode plugin entry without touching host state. Bedrock threshold behavior is covered by the focused resolver and production-hook tests in focused-tests.txt.
+This final-code smoke proves the restricted Amazon Bedrock classification revision loads through the real OpenCode plugin entry without touching host state. The exact Claude identity remains covered end to end in real-opencode-amazon-bedrock.txt; focused-tests.txt covers the non-Claude cached-limit regression under all Anthropic 1M flags.
 
 QA_RESULT=PASS
