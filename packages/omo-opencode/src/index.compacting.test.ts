@@ -4,8 +4,24 @@ import {
   createCompactionAutocontinueHandler,
   createSessionCompactingHandler,
 } from "./plugin/session-compacting"
+import { createCompactionRequestTracker } from "./plugin/compaction-request-tracker"
 
 describe("experimental.session.compacting handler", () => {
+  it("keeps the compaction marker active across request retries", async () => {
+    //#given
+    const tracker = createCompactionRequestTracker()
+    const handler = createSessionCompactingHandler({}, {
+      markCompactionRequest: tracker.mark,
+    })
+
+    //#when
+    await handler({ sessionID: "ses_compaction" }, { context: [] })
+
+    //#then
+    expect(tracker.isActive("ses_compaction")).toBe(true)
+    expect(tracker.isActive("ses_compaction")).toBe(true)
+  })
+
   //#given all three hooks are present
   //#when compacting handler is invoked
   //#then all hooks are called in order: capture → PreCompact → contextInjector
@@ -160,6 +176,21 @@ describe("experimental.session.compacting handler", () => {
 })
 
 describe("experimental.compaction.autocontinue handler", () => {
+  it("clears the operation-scoped compaction marker", async () => {
+    //#given
+    const tracker = createCompactionRequestTracker()
+    tracker.mark("ses_compaction")
+    const handler = createCompactionAutocontinueHandler({}, {
+      clearCompactionRequest: tracker.clear,
+    })
+
+    //#when
+    await handler({ sessionID: "ses_compaction" }, { enabled: true })
+
+    //#then
+    expect(tracker.isActive("ses_compaction")).toBe(false)
+  })
+
   it("disables OpenCode autocontinue when the compaction agent would continue itself", async () => {
     //#given
     const restoreContextMock = mock(async () => true)
@@ -186,7 +217,7 @@ describe("experimental.compaction.autocontinue handler", () => {
       callOrder.push("context")
       return true
     })
-    const restoreMock = mock(async () => {})
+    const restoreMock = mock(async (_sessionID: string) => {})
     const handler = createCompactionAutocontinueHandler({
       compactionContextInjector: { restore: restoreContextMock },
       compactionTodoPreserver: {
