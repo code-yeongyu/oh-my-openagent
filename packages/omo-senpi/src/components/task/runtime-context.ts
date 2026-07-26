@@ -1,4 +1,11 @@
+import type { ThemeColor } from "@code-yeongyu/senpi"
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
+
+// Structural slice of senpi's Theme the status UI paints with. The real Theme instance exposed on
+// ExtensionUIContext satisfies it; headless/test fakes simply omit it and get plain text.
+export interface StatusTheme {
+  fg(color: ThemeColor, text: string): string
+}
 
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,
@@ -23,6 +30,7 @@ export interface LiveTaskContext {
 // footer + below-editor widget, select/confirm power /task-kill, notify powers headless-safe warnings).
 // senpi's real ExtensionUIContext satisfies this structurally.
 export interface CapturedUi {
+  readonly theme?: StatusTheme
   notify(message: string, type?: "info" | "warning" | "error"): void
   setStatus(key: string, text: string | undefined): void
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void

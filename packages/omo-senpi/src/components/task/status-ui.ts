@@ -1,9 +1,11 @@
+import type { ThemeColor } from "@code-yeongyu/senpi"
 import {
   assistantLastLine,
   excerptRendererText,
   formatToolActivity,
   normalizeRendererText,
   rendererVisibleWidth,
+  statusThemeColor,
   taskIdentityLabel,
   toolCountSuffix,
   type ListScope,
@@ -14,7 +16,7 @@ import {
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
 
-import type { CapturedUi } from "./runtime-context"
+import type { CapturedUi, StatusTheme } from "./runtime-context"
 
 const UI_KEY = "omo-task"
 const MAX_WIDGET_ROWS = 5
@@ -26,7 +28,31 @@ const LIVE_DESCRIPTION_MAX = 18
 // With turn/tool/tok-s tokens on the row, the identity yields width so the stats stay readable.
 const LIVE_DESCRIPTION_MAX_WITH_STATS = 11
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
+// Glyphs follow senpi TUI house style (selectors already use ○/✓/✗/·); all render 1 column wide.
+const GLYPH_ACTIVE = "●"
+const GLYPH_PENDING = "○"
+const GLYPH_DONE = "✓"
+const GLYPH_FAIL = "✗"
+const SEPARATOR = "·"
 type TimerHandle = ReturnType<typeof setTimeout> | number
+
+// Paints one token with a theme color; the plain painter (no captured theme) is the identity so
+// headless/test paths and width budgeting stay byte-exact ANSI-free.
+type Painter = (color: ThemeColor, text: string) => string
+
+const paintPlain: Painter = (_color, text) => text
+
+function painterOf(theme: StatusTheme | undefined): Painter {
+  if (theme === undefined) return paintPlain
+  return (color, text) => theme.fg(color, text)
+}
+
+function statusGlyph(status: TaskStatus): string {
+  if (status === "pending") return GLYPH_PENDING
+  if (status === "completed") return GLYPH_DONE
+  if (TERMINAL_STATUSES.has(status)) return GLYPH_FAIL
+  return GLYPH_ACTIVE
+}
 
 const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
 const ERROR_STATUSES: ReadonlySet<TaskStatus> = new Set(["error", "lost"])
@@ -120,38 +146,55 @@ export function formatFooterStatus(
   liveActivity?: ReadonlyMap<string, string>,
   now = Date.now(),
   liveStats?: (taskId: string) => TaskRunStats | undefined,
+  theme?: StatusTheme,
 ): string | undefined {
   if (records.length === 0) return undefined
+  const paint = painterOf(theme)
   const running = records.filter((record) => record.status === "running").length
   const done = records.filter((record) => isTerminal(record.status)).length
   const errored = records.filter((record) => ERROR_STATUSES.has(record.status)).length
-  const pieces = [`tasks:${records.length}`, `run:${running}`, `done:${done}`, `err:${errored}`]
   const active = records.find((record) => !isTerminal(record.status))
-  if (active === undefined) return excerptRendererText(pieces.join(" "), STATUS_LINE_MAX)
-  const compactCounts = [`t${records.length}`, `r${running}`]
-  if (done > 0) compactCounts.push(`d${done}`)
-  if (errored > 0) compactCounts.push(`e${errored}`)
-  const prefix = compactCounts.join("/")
-  const activity = liveActivity?.get(active.task_id)
-  if (activity !== undefined) {
-    const rowWidth = STATUS_LINE_MAX - rendererVisibleWidth(prefix) - 1
-    return excerptRendererText(`${prefix} ${formatLiveBackgroundRow(active, activity, now, rowWidth, liveStats?.(active.task_id))}`, STATUS_LINE_MAX)
+  if (active === undefined) {
+    // Everything settled: counts are small bounded tokens, well inside STATUS_LINE_MAX.
+    return compactTokens([
+      errored > 0 ? paint("error", GLYPH_FAIL) : paint("success", GLYPH_DONE),
+      paint(errored > 0 ? "muted" : "success", `${done} done`),
+      errored > 0 ? paint("dim", SEPARATOR) : undefined,
+      errored > 0 ? paint("error", `${errored} err`) : undefined,
+    ])
   }
-  const rowWidth = STATUS_LINE_MAX - rendererVisibleWidth(prefix) - 1
-  return excerptRendererText(`${prefix} ${formatCompactTaskRow(active, rowWidth, true)}`, STATUS_LINE_MAX)
+  // Width budgeting happens on plain tokens; painting is applied last and never widens a line.
+  const glyphPlain = running > 0 ? GLYPH_ACTIVE : GLYPH_PENDING
+  const ratioPlain = `${running}/${records.length}`
+  const donePlain = done > 0 ? `${GLYPH_DONE}${done}` : undefined
+  const errPlain = errored > 0 ? `${GLYPH_FAIL}${errored}` : undefined
+  const prefixWidth = rendererVisibleWidth(compactTokens([glyphPlain, ratioPlain, donePlain, errPlain]))
+  const rowWidth = STATUS_LINE_MAX - prefixWidth - 1
+  const countColor: ThemeColor = running > 0 ? "accent" : "muted"
+  const activity = liveActivity?.get(active.task_id)
+  const row =
+    activity === undefined
+      ? formatCompactTaskRow(active, rowWidth, { includeName: true, withGlyph: false, paint })
+      : formatLiveBackgroundRow(active, activity, now, rowWidth, liveStats?.(active.task_id), paint)
+  return compactTokens([
+    paint(countColor, glyphPlain),
+    paint(countColor, ratioPlain),
+    donePlain === undefined ? undefined : paint("success", donePlain),
+    errPlain === undefined ? undefined : paint("error", errPlain),
+    row,
+  ])
 }
 
-export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
+export function buildWidgetRows(records: readonly TaskRecord[], theme?: StatusTheme): string[] {
+  const paint = painterOf(theme)
   const active = records.filter((record) => !isTerminal(record.status))
   if (active.length === 0) return []
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map(formatWidgetRow)
+  const shown = active
+    .slice(0, MAX_WIDGET_ROWS)
+    .map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, { includeName: true, withGlyph: true, paint }))
   const overflow = active.length - MAX_WIDGET_ROWS
-  if (overflow > 0) shown.push(`+${overflow} more`)
+  if (overflow > 0) shown.push(paint("dim", `  +${overflow} more`))
   return shown
-}
-
-function formatWidgetRow(record: TaskRecord): string {
-  return formatCompactTaskRow(record, WIDGET_LINE_MAX, true)
 }
 
 function liveStatsTokens(stats: TaskRunStats | undefined): string[] {
@@ -167,6 +210,7 @@ function formatLiveBackgroundRow(
   now: number,
   maxWidth = WIDGET_LINE_MAX,
   stats?: TaskRunStats,
+  paint: Painter = paintPlain,
 ): string {
   const identity = excerptRendererText(
     taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description }),
@@ -174,8 +218,16 @@ function formatLiveBackgroundRow(
   )
   const elapsed = formatElapsed(record.created_at, now)
   const frame = SPINNER_FRAMES[Math.floor(now / DEFAULT_DEBOUNCE_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
-  const parts = [frame, identity, ...liveStatsTokens(stats), activity, elapsed]
-  return excerptRendererText(parts.join(" · ").replace(`${frame} · `, `${frame} `), maxWidth)
+  const statsTokens = liveStatsTokens(stats)
+  const plain = [frame, identity, ...statsTokens, activity, elapsed].join(" · ").replace(`${frame} · `, `${frame} `)
+  if (rendererVisibleWidth(plain) > maxWidth) {
+    // Over budget: keep the plain excerpted row so truncation never cuts a painted token.
+    return excerptRendererText(plain, maxWidth)
+  }
+  const statusColor = statusThemeColor(record.status)
+  const paintedFrame = paint(statusColor, frame)
+  const painted = [paintedFrame, paint("dim", identity), ...statsTokens.map((token) => paint("muted", token)), activity, paint("dim", elapsed)]
+  return painted.join(" · ").replace(`${paintedFrame} · `, `${paintedFrame} `)
 }
 
 function formatElapsed(createdAt: string, now: number): string {
@@ -191,30 +243,54 @@ function backgroundWidgetRows(
   activity: ReadonlyMap<string, string>,
   now: number,
   liveStats?: (taskId: string) => TaskRunStats | undefined,
+  theme?: StatusTheme,
 ): string[] {
+  const paint = painterOf(theme)
   const active = records.filter((record) => !isTerminal(record.status))
   if (active.length === 0) return []
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map((record) =>
-    formatLiveBackgroundRow(record, activity.get(record.task_id) ?? "running", now, WIDGET_LINE_MAX, liveStats?.(record.task_id)),
-  )
+  const shown = active
+    .slice(0, MAX_WIDGET_ROWS)
+    .map((record) =>
+      formatLiveBackgroundRow(record, activity.get(record.task_id) ?? "running", now, WIDGET_LINE_MAX, liveStats?.(record.task_id), paint),
+    )
   const overflow = active.length - MAX_WIDGET_ROWS
-  if (overflow > 0) shown.push(`+${overflow} more`)
+  if (overflow > 0) shown.push(paint("dim", `  +${overflow} more`))
   return shown
 }
 
-function formatCompactTaskRow(record: TaskRecord, maxWidth: number, includeName: boolean): string {
-  const context = compactTaskContext(record)
-  const identityWidth = Math.max(0, maxWidth - rendererVisibleWidth(context) - 1)
-  if (identityWidth === 0) return excerptRendererText(context, maxWidth)
-  const identity = compactTaskIdentity(record, identityWidth, includeName)
-  return excerptRendererText(`${identity}|${context}`, maxWidth)
+interface CompactRowOptions {
+  readonly includeName: boolean
+  readonly withGlyph: boolean
+  readonly paint: Painter
 }
 
-function compactTaskIdentity(record: TaskRecord, maxWidth: number, includeName: boolean): string {
-  if (!includeName) return excerptRendererText(record.task_id, maxWidth)
-  return excerptRendererText(
-    taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description }),
-    maxWidth,
+function formatCompactTaskRow(record: TaskRecord, maxWidth: number, options: CompactRowOptions): string {
+  const { includeName, withGlyph, paint } = options
+  const context = compactTaskContext(record)
+  const status = excerptRendererText(record.status, 7)
+  const glyphCost = withGlyph ? 2 : 0
+  const identityWidth = Math.max(
+    0,
+    maxWidth - glyphCost - rendererVisibleWidth(context) - rendererVisibleWidth(status) - 2,
+  )
+  if (identityWidth === 0) return excerptRendererText(`${context} ${status}`, maxWidth)
+  const statusColor = statusThemeColor(record.status)
+  return compactTokens([
+    withGlyph ? paint(statusColor, statusGlyph(record.status)) : undefined,
+    compactTaskIdentity(record, identityWidth, includeName, paint),
+    paint("muted", context),
+    paint(statusColor, status),
+  ])
+}
+
+function compactTaskIdentity(record: TaskRecord, maxWidth: number, includeName: boolean, paint: Painter): string {
+  if (!includeName) return paint("dim", excerptRendererText(record.task_id, maxWidth))
+  return paint(
+    "dim",
+    excerptRendererText(
+      taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description }),
+      maxWidth,
+    ),
   )
 }
 
@@ -227,7 +303,6 @@ function compactTaskContext(record: TaskRecord): string {
     excerptRendererText(modelDisplay(record), 15),
     reasoning === undefined ? undefined : excerptRendererText(reasoning, 5),
     excerptRendererText(record.execution_mode, 10),
-    excerptRendererText(record.status, 7),
   ])
 }
 
@@ -240,6 +315,15 @@ const globalTimers: StatusUiTimers = {
   clear: (handle) => clearTimeout(handle),
 }
 
+// Last payload actually handed to the UI. Skipping identical re-renders keeps the widget's Text
+// component caches warm (setWidget rebuilds components) and avoids no-op render requests.
+interface RenderedState {
+  readonly ui: CapturedUi
+  readonly sessionId: string | undefined
+  readonly footer: string | undefined
+  readonly rowsKey: string | undefined
+}
+
 export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   const timers = deps.timers ?? globalTimers
   const debounceMs = deps.debounceMs ?? DEFAULT_DEBOUNCE_MS
@@ -247,10 +331,15 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   const liveActivity = new Map<string, string>()
   const subscriptions = new Map<string, () => void>()
   let pending: TimerHandle | undefined
+  let rendered: RenderedState | undefined
 
   function syncNow(): void {
     const ui = deps.runtime.ui()
-    if (ui === undefined) return
+    if (ui === undefined) {
+      // The captured UI was cleared (switch/shutdown); forget the memo so a recapture re-renders.
+      rendered = undefined
+      return
+    }
     const mode = deps.runtime.mode()
     if (mode !== undefined && mode !== "tui") return
     const sessionId = deps.runtime.sessionId()
@@ -261,11 +350,22 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       : records.filter((record) => deps.manager.wasBackground?.(record.task_id) === true)
     const renderedAt = now()
     const liveStats = deps.manager.runStatsSnapshot?.bind(deps.manager)
-    const footer = formatFooterStatus(deps.manager.wasBackground === undefined ? records : background, liveActivity, renderedAt, liveStats)
-    ui.setStatus(UI_KEY, footer)
+    const footer = formatFooterStatus(deps.manager.wasBackground === undefined ? records : background, liveActivity, renderedAt, liveStats, ui.theme)
     const rows = deps.manager.wasBackground === undefined
-      ? buildWidgetRows(records)
-      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats)
+      ? buildWidgetRows(records, ui.theme)
+      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, ui.theme)
+    const rowsKey = rows.length === 0 ? undefined : rows.join("\n")
+    if (
+      rendered !== undefined &&
+      rendered.ui === ui &&
+      rendered.sessionId === sessionId &&
+      rendered.footer === footer &&
+      rendered.rowsKey === rowsKey
+    ) {
+      return
+    }
+    rendered = { ui, sessionId, footer, rowsKey }
+    ui.setStatus(UI_KEY, footer)
     if (rows.length === 0) {
       ui.setWidget(UI_KEY, undefined)
       return
