@@ -178,6 +178,30 @@ describe("resolveActualContextLimit", () => {
     })).toBe(1_000_000)
   })
 
+  it("returns GA 1M for supported Opus 5 aliases", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of ["claude-opus-5-0", "claude-opus-5.0", "claude-opus-5[1m]"]) {
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
+  it("uses a cached context limit for supported Opus 5 aliases", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>([
+      ["anthropic/claude-opus-5-0", 900_000],
+    ])
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5-0", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(900_000)
+  })
+
   it("applies the -high variant suffix to 5-series models", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
