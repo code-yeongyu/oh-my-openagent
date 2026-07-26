@@ -10,6 +10,7 @@ export type ParentWakePromptContext = {
 export type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
+  latestOnlyNotifications?: Map<string, string>
   shouldReply: boolean
   queuedAt?: number
   dispatchedAt?: number
@@ -34,6 +35,9 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
   return {
     promptContext,
     notifications: [...wake.notifications],
+    ...(wake.latestOnlyNotifications
+      ? { latestOnlyNotifications: new Map(wake.latestOnlyNotifications) }
+      : {}),
     shouldReply: wake.shouldReply,
     ...(wake.queuedAt !== undefined ? { queuedAt: wake.queuedAt } : {}),
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
@@ -63,6 +67,7 @@ export function mergeParentWakeNotifications(existingNotifications: readonly str
       ...existingNotifications.filter((notification) =>
         notification !== nextNotification
         && !isBackgroundTaskProgressNotification(notification)
+        && !isManagedBashCheckpointNotification(notification)
       ),
     ]
   }
@@ -72,13 +77,17 @@ export function mergeParentWakeNotifications(existingNotifications: readonly str
   }
 
   if (
-    isBackgroundTaskProgressNotification(nextNotification)
+    (isBackgroundTaskProgressNotification(nextNotification) || isManagedBashCheckpointNotification(nextNotification))
     && existingNotifications.some(isFinalBackgroundTaskNotification)
   ) {
     return [...existingNotifications]
   }
 
   return [...existingNotifications, nextNotification]
+}
+
+export function isManagedBashCheckpointNotification(notification: string): boolean {
+  return getSystemReminderHeaderLines(notification).includes("[MANAGED BASH CHECKPOINT]")
 }
 
 function parentWakePromptContextMatches(left: PendingParentWake, right: PendingParentWake): boolean {

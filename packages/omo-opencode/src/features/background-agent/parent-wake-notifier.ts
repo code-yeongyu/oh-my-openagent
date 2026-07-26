@@ -15,6 +15,14 @@ import {
 
 export type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
 
+type LatestParentWakeInput = {
+  readonly sessionID: string
+  readonly notification: string
+  readonly promptContext: ParentWakePromptContext
+  readonly latestOnlyKey: string
+  readonly delayMs?: number
+}
+
 export class ParentWakeNotifier {
   private readonly pendingQueue: ParentWakePendingQueue
   private readonly dispatchedTracker: ParentWakeDispatchedTracker
@@ -114,6 +122,16 @@ export class ParentWakeNotifier {
   ): void {
     this.pendingQueue.queueWake(sessionID, notification, promptContext, shouldReply)
     this.schedulePendingParentWakeFlush(sessionID, delayMs)
+  }
+
+  queueLatestParentWake(input: LatestParentWakeInput): void {
+    this.pendingQueue.queueLatestWake({ ...input, shouldReply: false })
+    this.schedulePendingParentWakeFlush(input.sessionID, input.delayMs)
+  }
+
+  removeLatestParentWakes(sessionID: string, keys: readonly string[]): void {
+    this.pendingQueue.removeLatestOnlyNotifications(sessionID, keys)
+    this.dispatchedTracker.removeLatestOnlyNotifications(sessionID, keys)
   }
 
   async flushPendingParentWake(sessionID: string): Promise<void> {
