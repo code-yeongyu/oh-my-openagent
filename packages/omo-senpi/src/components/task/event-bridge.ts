@@ -31,7 +31,12 @@ export function wireEventBridge(
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onSessionStart(engine.runtime.sessionId())
-    await engine.lifecycle.reconcileOnSessionStart()
+    const reconciliation = await engine.lifecycle.reconcileOnSessionStart()
+    for (const outcome of reconciliation.outcomes) {
+      if ((outcome.kind !== "lost" && outcome.kind !== "lost_and_terminated") || outcome.reason === "already lost") continue
+      const record = engine.manager.get(outcome.task_id)
+      if (record !== undefined) engine.memberLiveness.notifyTerminal(record)
+    }
     const cleanup = engine.lifecycle.cleanupExpiredRecords()
     if (cleanup.deleted.length > 0) {
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })

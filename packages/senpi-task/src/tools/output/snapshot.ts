@@ -19,12 +19,14 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     root_session_id: record.root_session_id,
     age_ms: ageMs(record, now),
     ...(record.name !== undefined ? { name: record.name } : {}),
+    ...(record.description !== undefined ? { description: record.description } : {}),
     ...(record.agent_type !== undefined ? { agent_type: record.agent_type } : {}),
     ...(record.category !== undefined ? { category: record.category } : {}),
     ...(record.pid !== undefined ? { pid: record.pid } : {}),
     ...(record.child_session_id !== undefined ? { child_session_id: record.child_session_id } : {}),
     ...(record.final_response !== undefined ? { final_response: record.final_response } : {}),
     ...(record.error_message !== undefined ? { error_message: record.error_message } : {}),
+    ...(record.run_stats !== undefined ? { run_stats: record.run_stats } : {}),
     ...(record.status === "lost" ? { lost: lostBreadcrumbs(record, stateDir) } : {}),
   }
 }

@@ -4,6 +4,7 @@ export type HarnessId = (typeof HARNESS_IDS)[number]
 
 export interface CodegraphConfig {
   readonly auto_provision?: boolean
+  readonly daemon?: boolean
   readonly enabled?: boolean
   readonly excluded_roots?: readonly string[]
   readonly install_dir?: string
@@ -26,8 +27,9 @@ type SettingPath = `codegraph.${CodegraphSettingKey}`
 
 export const SETTING_HARNESS_SUPPORT: Record<SettingPath, readonly HarnessId[]> = {
   "codegraph.auto_provision": HARNESS_IDS,
+  "codegraph.daemon": ["codex", "opencode"],
   "codegraph.enabled": HARNESS_IDS,
-  "codegraph.excluded_roots": ["codex"],
+  "codegraph.excluded_roots": ["codex", "opencode"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"],
@@ -46,6 +48,7 @@ const HARNESS_BLOCK_KEYS: Record<string, HarnessId> = {
 
 const CODEGRAPH_VALUE_TYPES: Record<CodegraphSettingKey, "boolean" | "number" | "string" | "string_array"> = {
   auto_provision: "boolean",
+  daemon: "boolean",
   enabled: "boolean",
   excluded_roots: "string_array",
   install_dir: "string",

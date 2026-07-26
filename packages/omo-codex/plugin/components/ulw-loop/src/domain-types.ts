@@ -55,6 +55,12 @@ export interface UlwLoopAggregateCompletion {
 	codexGoal?: unknown;
 }
 
+export interface UlwLoopValidationBatch {
+	readonly batchId: string;
+	readonly memberIds: readonly string[];
+	readonly finalGoalId: string;
+}
+
 export interface UlwLoopPlan {
 	version: 1;
 	evidenceLayoutVersion?: 2;
@@ -68,6 +74,7 @@ export interface UlwLoopPlan {
 	codexObjectiveAliases?: string[];
 	aggregateCompletion?: UlwLoopAggregateCompletion;
 	activeGoalId?: string;
+	validationBatches?: readonly UlwLoopValidationBatch[];
 	goals: UlwLoopItem[];
 }
 

@@ -113,9 +113,9 @@ If `ULW_LOOP_CLI` is empty, open the durable notepad first, record the missing C
 
 Run one form:
 ```sh
-omo ulw-loop create-goals --brief "<brief>" --json
-omo ulw-loop create-goals --brief-file <path> --json
-cat <brief> | omo ulw-loop create-goals --from-stdin --json
+omo ulw-loop create-goals --brief "<brief>" [--validation-batch-json <json-or-path>] --json
+omo ulw-loop create-goals --brief-file <path> [--validation-batch-json <json-or-path>] --json
+cat <brief> | omo ulw-loop create-goals --from-stdin [--validation-batch-json <json-or-path>] --json
 ```
 If the existing aggregate is already complete, do not steer or force the
 completed default state for unrelated new work. Start a fresh run with
@@ -145,7 +145,7 @@ Read pending goals, criteria IDs, current ledger head, blockers, and aggregate C
 Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures at 3.
 
 ### Acquire Next Goal
-1. Run `omo ulw-loop complete-goals --json` and read the handoff, including criteria.
+1. Run `omo ulw-loop complete-goals --json` and read the handoff, including criteria. After the first goal starts, a successful complete checkpoint normally prints the next goal instruction directly; use `complete-goals` as the manual fallback/resume path.
 2. Call `get_goal` and inspect active Codex state.
 3. Apply this table exactly:
 
@@ -177,7 +177,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ### Goal Completion
 1. Non-final aggregate goal: confirm every `essential` criterion is `pass`; non-essential criteria may remain pending. Final aggregate goal: confirm every criterion across the whole plan is `pass`.
 2. Call `get_goal` for a fresh snapshot.
-3. Run `omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<criteria evidence summary>" --codex-goal-json <snapshot> --json`.
+3. Run `omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<criteria evidence summary>" --codex-goal-json <snapshot> --json`; on success it auto-starts and prints the next eligible goal unless `--no-advance` is passed.
 4. If blocked or failed, checkpoint with `--status blocked` or `--status failed` and include diagnosis evidence.
 5. If this is the final goal, run the final quality gate first and pass `--quality-gate-json`.
 
@@ -219,7 +219,9 @@ Use steering only for structured evidence-backed mutation. Reject natural-langua
 | annotate_ledger | Audit-only note | `--evidence`, `--rationale` |
 | mark_blocked_superseded | Old story replaced by new evidence | `--goal-id`, `--replacements?`, `--evidence`, `--rationale` |
 
-Command form: `omo ulw-loop steer --kind <kind> [<kind-specific-fields>] --evidence "<...>" --rationale "<...>" --json`.
+Command form: `omo ulw-loop steer --kind <kind> [<kind-specific-fields>] --evidence "<...>" --rationale "<...>" --json`. For multiple evidence-backed plan-shape changes discovered together, pass `--proposals-json <json-or-path>` with an array of proposals; the batch applies atomically or rejects without partial plan mutation.
+
+Validation batches are optional aggregate-mode review boundaries declared at create time with `--validation-batch-json`. A batch-final member requires all other members resolved, all member criteria pass, and a member-spanning quality gate; split/supersede steering keeps batch membership updated.
 Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-loop.steer: {...}`, `omo ulw-loop steer: {...}`.
 
 ## Constraints

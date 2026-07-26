@@ -23,7 +23,13 @@ function defaultFileExists(filePath: string): boolean {
 }
 
 function defaultVersionProbe(binaryPath: string): string {
-  return String(execFileSync(binaryPath, ["--version"], { encoding: "utf8", timeout: 5_000 }))
+  return String(
+    execFileSync(binaryPath, ["--version"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+    }),
+  )
 }
 
 function isAstGrepVersionOutput(output: string): boolean {
@@ -39,8 +45,8 @@ function hasAstGrepVersion(binaryPath: string, runVersionProbeSync: (binaryPath:
   }
 }
 
-function pathCommandCandidates(platform: NodeJS.Platform): readonly string[] {
-  return platform === "linux" ? ["ast-grep", "sg"] : ["sg", "ast-grep"]
+function pathCommandCandidates(): readonly string[] {
+  return ["ast-grep", "sg"]
 }
 
 export function findSgBinarySync(options: SgResolverOptions = {}): string | null {
@@ -59,7 +65,7 @@ export function findSgBinarySync(options: SgResolverOptions = {}): string | null
       if (fileExists(runtimeCandidate)) return runtimeCandidate
     }
 
-    for (const commandName of pathCommandCandidates(platform)) {
+    for (const commandName of pathCommandCandidates()) {
       const pathCandidate = which(commandName)
       if (pathCandidate === null || !fileExists(pathCandidate)) continue
       if (commandName !== "sg" || hasAstGrepVersion(pathCandidate, runVersionProbeSync)) return pathCandidate

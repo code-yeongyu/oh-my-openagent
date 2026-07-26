@@ -21,10 +21,19 @@ export function createTaskTool(deps: TaskToolDeps): ToolDefinition<typeof TaskTo
     promptGuidelines: [...TASK_PROMPT_GUIDELINES],
     parameters: TaskToolParams,
     execute: (toolCallId, params, signal, onUpdate, ctx) => execute(toolCallId, params, signal, onUpdate, ctx),
-    renderCall: (args, theme) => {
-      const lines = renderTaskCallLines(args, theme)
-      return linesComponent(lines.map((line) => theme.fg("toolTitle", line)))
+    renderCall: (args, theme) =>
+      linesComponent((width) => renderTaskCallLines(args, theme, width).map((line) => theme.fg("toolTitle", line))),
+    renderResult: (result, options, theme) => {
+      if (options.isPartial) {
+        // The live status line is drawn by senpi's own tool-progress renderer from
+        // details.progress; the partial content carries only the last-assistant row.
+        const liveText = result.content.find((part) => part.type === "text")?.text
+        if (liveText !== undefined && liveText.length > 0) {
+          return linesComponent(liveText.split("\n").map((line) => theme.fg("muted", line)))
+        }
+        return linesComponent([])
+      }
+      return renderTaskResultComponent(result.details, theme)
     },
-    renderResult: (result, _options, theme) => renderTaskResultComponent(result.details, theme),
   })
 }

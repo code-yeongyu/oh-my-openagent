@@ -19,6 +19,10 @@
  * Usage:
  *   bun run scripts/check-no-excuse-rules.ts <file-or-dir>...
  *
+ * The `typescript` package is resolved from the caller project (process.cwd()),
+ * not from this script's location, so the script works when executed from an
+ * installed skill-cache path (e.g. ~/.codex/...) against a project checkout.
+ *
  * Exit codes:
  *   0 - no violations
  *   1 - violations found
@@ -26,9 +30,41 @@
  */
 
 import fs from "node:fs"
+import { createRequire } from "node:module"
 import path from "node:path"
 import process from "node:process"
-import ts from "typescript"
+import type * as tsTypes from "typescript/unstable/ast"
+
+type TsApiModule = typeof import("typescript/unstable/async")
+type TsAstModule = typeof import("typescript/unstable/ast")
+type TsModule = {
+  readonly api: TsApiModule
+  readonly ast: TsAstModule
+}
+
+function loadTypescriptFromCaller(): TsModule {
+  // A static import resolves from this script's installed skill-cache path
+  // instead of the caller project. Resolve each TypeScript 7 API subpath from
+  // the caller so the script uses the project it audits.
+  const callerRequire = createRequire(path.join(process.cwd(), "no-excuse-anchor.cjs"))
+  try {
+    const api: Partial<TsApiModule> = callerRequire("typescript/unstable/async")
+    const ast: Partial<TsAstModule> = callerRequire("typescript/unstable/ast")
+    if (typeof api.API === "function" && typeof ast.isAsExpression === "function") {
+      return { api: api as TsApiModule, ast: ast as TsAstModule }
+    }
+  } catch { // no-excuse-ok: catch
+    // fall through to the clear error below
+  }
+  console.error(
+    `error: cannot resolve "typescript" from the caller project (${process.cwd()}). ` +
+      "Install it in the project being checked (e.g. `bun add -d typescript`) and re-run.",
+  )
+  process.exit(2)
+}
+
+const typescript = loadTypescriptFromCaller()
+const ts = typescript.ast
 
 type RuleId =
   | "no-any-assertion"
@@ -95,29 +131,50 @@ function discoverFiles(inputs: string[]): string[] {
   return files
 }
 
-function getLineText(sourceFile: ts.SourceFile, line: number): string {
+function getLineText(sourceFile: tsTypes.SourceFile, line: number): string {
   const lineStarts = sourceFile.getLineStarts()
   const start = lineStarts[line]
   const end = line + 1 < lineStarts.length ? lineStarts[line + 1] : sourceFile.getEnd()
   return sourceFile.text.slice(start, end)
 }
 
-function analyzeFile(filePath: string): Violation[] {
+async function parseSourceFiles(filePaths: readonly string[]): Promise<ReadonlyMap<string, tsTypes.SourceFile>> {
+  const compiler = new typescript.api.API({ cwd: process.cwd() })
+  try {
+    const snapshot = await compiler.updateSnapshot({ openFiles: [...filePaths] })
+    try {
+      const sourceFiles = await Promise.all(filePaths.map(async (filePath) => {
+        const project = await snapshot.getDefaultProjectForFile(filePath)
+        const sourceFile = await project?.program.getSourceFile(filePath)
+        if (!sourceFile) {
+          throw new Error(`TypeScript did not parse ${filePath}`)
+        }
+        return [filePath, sourceFile] as const
+      }))
+      return new Map(sourceFiles)
+    } finally {
+      await snapshot.dispose()
+    }
+  } finally {
+    await compiler.close()
+  }
+}
+
+function analyzeFile(filePath: string, sourceFile: tsTypes.SourceFile): Violation[] {
   const source = fs.readFileSync(filePath, "utf-8")
-  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true)
   const violations: Violation[] = []
 
-  function pos(node: ts.Node): { line: number; column: number } {
+  function pos(node: tsTypes.Node): { line: number; column: number } {
     const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
     return { line: line + 1, column: character + 1 }
   }
 
-  function lineHasOptOut(node: ts.Node): boolean {
+  function lineHasOptOut(node: tsTypes.Node): boolean {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
     return OPT_OUT_RE.test(getLineText(sourceFile, line))
   }
 
-  function visit(node: ts.Node): void {
+  function visit(node: tsTypes.Node): void {
     // ── as any / as unknown ──
     if (ts.isAsExpression(node)) {
       const typeText = node.type.getText(sourceFile)
@@ -221,7 +278,7 @@ function analyzeFile(filePath: string): Violation[] {
       }
     }
 
-    ts.forEachChild(node, visit)
+    node.forEachChild(visit)
   }
 
   visit(sourceFile)
@@ -252,7 +309,7 @@ function formatViolation(v: Violation): string {
   return `${v.filePath}:${v.line}:${v.column}: [${v.ruleId}] ${v.message}`
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2)
   if (args.length === 0) {
     console.error("usage: check-no-excuse-rules.ts <file-or-dir>...")
@@ -265,7 +322,14 @@ function main(): void {
     process.exit(2)
   }
 
-  const violations = files.flatMap((f) => analyzeFile(f))
+  const sourceFiles = await parseSourceFiles(files)
+  const violations = files.flatMap((filePath) => {
+    const sourceFile = sourceFiles.get(filePath)
+    if (!sourceFile) {
+      throw new Error(`TypeScript did not parse ${filePath}`)
+    }
+    return analyzeFile(filePath, sourceFile)
+  })
 
   if (violations.length === 0) {
     console.log(`No violations in ${files.length} file(s).`)
@@ -279,4 +343,4 @@ function main(): void {
   process.exit(1)
 }
 
-main()
+await main()

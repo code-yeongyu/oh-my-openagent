@@ -1,0 +1,44 @@
+WORK=/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.zfDGIZoOCs
+CODEX_CONFIG_BEFORE=780c740e287bda48609b5c9d5ee3ee2fc20434ce1a58c36692ec07e279a161d5  /Users/yeongyu/.codex/config.toml
+
+$ create-goals --validation-batch-json VB001
+created goals=3 batch=VB001 version=1
+
+$ record G001 essential and checkpoint complete (auto-advance expected)
+checkpoint=G001-goal-alpha->complete next=G002-goal-beta:in_progress active=G002-goal-beta
+
+$ steer --proposals-json 2 items without explicit source (CLI defaults source=cli)
+steer accepted=true results=2 acceptedItems=2
+
+$ complete G002 non-final batch member
+checkpoint=G002-goal-beta->complete next=G003-goal-gamma:in_progress
+
+$ record remaining criteria and final quality gate artifacts
+quality gate artifacts=.omo/evidence/ulw/session/G003-goal-gamma/a1 coverage=6/6
+
+$ checkpoint G003 final (batch close + aggregate complete)
+checkpoint=G003-goal-gamma->complete aggregate=complete next=omitted
+
+$ final status --json aggregate check
+status aggregate=complete complete=3/3 criteriaPass=9/9
+
+$ ledger batch_closed lines
+{"at":"2026-07-21T07:32:13.174Z","kind":"batch_closed","goalId":"G003-goal-gamma","message":"VB001"}
+
+$ fail-closed scenario in same temp repo under isolated session
+FAIL_CODE=1
+{
+  "ok": false,
+  "error": {
+    "code": "ULW_LOOP_VALIDATION_BATCH_OPEN",
+    "message": "Validation batch has unresolved members.",
+    "details": {
+      "batchId": "VB001",
+      "open": [
+        "G001-goal-alpha"
+      ]
+    }
+  }
+}
+CLEANUP=removed /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.zfDGIZoOCs
+CODEX_CONFIG_AFTER=780c740e287bda48609b5c9d5ee3ee2fc20434ce1a58c36692ec07e279a161d5  /Users/yeongyu/.codex/config.toml

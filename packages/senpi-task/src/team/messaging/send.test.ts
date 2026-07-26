@@ -47,8 +47,38 @@ function deps(
 }
 
 function unreadPath(stateDir: ReturnType<typeof stateDirConfig>, recipient: string, messageId: string): string {
-  return join(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient), `${messageId}.json`)
-}
+  return join(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient), `${messageId}.json`)}
+
+describe("sendTeamMessage recipient guidance", () => {
+  test("#given an unknown recipient #when the lead sends #then the error names the team members and valid forms", async () => {
+    // given
+    const memberMap = { alpha: "st_alpha", beta: "st_beta" }
+    const { stateDir, config } = await setup(memberMap)
+
+    // when / then
+    await expect(
+      sendTeamMessage({ from: "lead", to: "ghost", body: "hello" }, deps(stateDir, config, memberMap)),
+    ).rejects.toThrow(/ghost[\s\S]*alpha[\s\S]*beta/)
+  })
+
+  test("#given an unknown recipient #when the lead sends #then the stable InvalidRecipientError name survives for the tool-layer mapping", async () => {
+    // given
+    const memberMap = { alpha: "st_alpha" }
+    const { stateDir, config } = await setup(memberMap)
+
+    // when
+    let caught: unknown
+    try {
+      await sendTeamMessage({ from: "lead", to: "ghost", body: "hello" }, deps(stateDir, config, memberMap))
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(Error)
+    if (caught instanceof Error) expect(caught.name).toBe("InvalidRecipientError")
+  })
+})
 
 function processedPath(stateDir: ReturnType<typeof stateDirConfig>, recipient: string, messageId: string): string {
   return join(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient), "processed", `${messageId}.json`)

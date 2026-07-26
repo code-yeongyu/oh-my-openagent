@@ -1,0 +1,24 @@
+Review round 3 RED:
+
+Background producer gate:
+- Extracted both background launch callbacks into
+  `spawner/tmux-callback-invoker.ts` while preserving the old literal-tmux gate.
+- Characterization: 2 pass.
+- Changed the exact edge assertion so an enabled callback outside literal tmux
+  must delegate eligibility to `TmuxSessionManager`.
+- RED: 1 pass, 1 fail.
+- Failure: callback expected one call, received zero.
+
+Authenticated cmux security:
+- Added `pane-auth-cmux.test.ts` with metacharacters in both username and
+  password.
+- RED: 0 pass, 3 fail.
+- Spawn, activate, and replace returned success and called the command runner,
+  demonstrating credentials could enter cmux command metadata.
+
+External branch refresh:
+- Contributor PR head advanced to `709bf027b`.
+- Merged it without force-push.
+- Retained its pane-spawn compatibility improvement.
+- Reconciled its broad manager eligibility with the review-approved
+  inline-only predicate selection.

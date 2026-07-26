@@ -34,6 +34,19 @@ export function removeStaleManagedAgentBlocks(config: string, keepAgentNames: Se
     .replace(/\n{3,}/g, "\n\n")
 }
 
+// A runtime mirror (e.g. Orca copying the system [agents.*] entries into a
+// runtime CODEX_HOME without the agents directory) already declares the role
+// name, pointing at a different file. Re-stamping our own registration on top
+// collides with that entry once Codex also discovers
+// <codexHome>/agents/<name>.toml, and upstream warns on two different file
+// paths declaring the same role. Callers use this to leave the foreign block
+// untouched; directory discovery still picks up the linked toml.
+export function hasForeignAgentRegistration(config: string, agentConfig: CodexAgentConfig): boolean {
+  const section = findTomlSection(config, `agents.${tomlKeySegment(agentConfig.name)}`)
+  if (!section) return false
+  return !section.text.includes(`config_file = ${JSON.stringify(agentConfig.configFile)}`)
+}
+
 export function ensureAgentConfig(config: string, agentConfig: CodexAgentConfig): string {
   const header = `agents.${tomlKeySegment(agentConfig.name)}`
   const section = findTomlSection(config, header)

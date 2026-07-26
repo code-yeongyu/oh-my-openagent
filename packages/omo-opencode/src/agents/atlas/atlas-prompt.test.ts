@@ -6,6 +6,8 @@ const ALL_VARIANTS: Array<[string, string]> = [
   ["gpt", getAtlasPrompt("openai/gpt-5.5")],
   ["gemini", getAtlasPrompt("google/gemini-3.1-pro")],
   ["kimi", getAtlasPrompt("moonshotai/kimi-k2.6")],
+  ["kimi-k2-7", getAtlasPrompt("opencode-go/kimi-k2.7")],
+  ["kimi-k3", getAtlasPrompt("opencode-go/kimi-k3")],
   ["opus-4-7", getAtlasPrompt("anthropic/claude-opus-4-7")],
 ]
 

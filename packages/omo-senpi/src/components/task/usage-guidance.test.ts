@@ -3,7 +3,10 @@ import { describe, expect, test } from "bun:test"
 import { TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 describe("task usage guidance", () => {
-  test("#given the once-per-session task hint #when snapshotted #then batch spawn and durable team wait stay advertised", () => {
-    expect(TASK_USAGE_GUIDANCE).toMatchSnapshot()
+  test("#given the once-per-session task hint #when rendered #then it teaches injection-driven member delivery without a blocking wait", () => {
+    expect(TASK_USAGE_GUIDANCE).toContain("Team mail is injected into recipient sessions.")
+    expect(TASK_USAGE_GUIDANCE).toContain("task_send")
+    expect(TASK_USAGE_GUIDANCE).toContain("end your turn")
+    expect(TASK_USAGE_GUIDANCE).not.toContain("team_wait")
   })
 })

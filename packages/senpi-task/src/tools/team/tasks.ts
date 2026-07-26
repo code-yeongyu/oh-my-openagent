@@ -32,13 +32,13 @@ export const TeamTaskListParams = Type.Object({
 })
 
 export const TeamTaskGetParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  task_id: Type.String({ description: "Task id." }),
+  team_run_id: Type.String({ description: "Team run id (returned by team_create)." }),
+  task_id: Type.String({ description: "Team tasklist task id (not a child st_... id)." }),
 })
 
 export const TeamTaskUpdateParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  task_id: Type.String({ description: "Task id." }),
+  team_run_id: Type.String({ description: "Team run id (returned by team_create)." }),
+  task_id: Type.String({ description: "Team tasklist task id (not a child st_... id)." }),
   status: TaskStatusSchema,
   owner: Type.Optional(Type.String({ description: "Owning member (defaults to the lead)." })),
 })
@@ -58,6 +58,14 @@ export type TeamTaskUpdateDetails =
   | { readonly kind: "invalid_transition"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "cross_owner"; readonly task_id: string; readonly reason: string }
 
+const ECHO_TEXT_MAX = 160
+const ECHO_DESCRIPTION_MAX = 1_000
+
+function collapseEcho(value: string, max = ECHO_TEXT_MAX): string {
+  const collapsed = value.replace(/\s+/g, " ").trim()
+  return collapsed.length <= max ? collapsed : `${collapsed.slice(0, max)}...`
+}
+
 export async function runTeamTaskCreate(service: TeamToolsService, params: TeamTaskCreateInput): Promise<AgentToolResult<TeamTaskCreateDetails>> {
   const task = await service.createTask(params.team_run_id, {
     subject: params.subject,
@@ -65,7 +73,8 @@ export async function runTeamTaskCreate(service: TeamToolsService, params: TeamT
     status: "pending",
     ...(params.blocked_by !== undefined ? { blockedBy: params.blocked_by } : {}),
   })
-  return toolResult(`Created task ${task.id}.`, { kind: "created", task })
+  const blockers = task.blockedBy.length > 0 ? `, blocked by: ${collapseEcho(task.blockedBy.join(", "))}` : ""
+  return toolResult(`Created task ${task.id}: '${collapseEcho(task.subject)}' (status: ${task.status}${blockers}).`, { kind: "created", task })
 }
 
 export async function runTeamTaskList(service: TeamToolsService, params: TeamTaskListInput): Promise<AgentToolResult<TeamTaskListDetails>> {
@@ -74,13 +83,26 @@ export async function runTeamTaskList(service: TeamToolsService, params: TeamTas
     ...(params.owner !== undefined ? { owner: params.owner } : {}),
   }
   const tasks = await service.listTasks(params.team_run_id, filter)
-  return toolResult(`${tasks.length} task(s).`, { kind: "list", tasks })
+  const lines = tasks.map((task) => {
+    const owner = task.owner === undefined ? "" : ` owner:${collapseEcho(task.owner)}`
+    const blockers = task.blockedBy.length > 0 ? ` (blocked by: ${collapseEcho(task.blockedBy.join(", "))})` : ""
+    return `- ${task.id} [${task.status}]${owner} '${collapseEcho(task.subject)}'${blockers}`
+  })
+  return toolResult([`${tasks.length} task(s).`, ...lines].join("\n"), { kind: "list", tasks })
 }
 
 export async function runTeamTaskGet(service: TeamToolsService, params: TeamTaskGetInput): Promise<AgentToolResult<TeamTaskGetDetails>> {
   try {
     const task = await service.getTask(params.team_run_id, params.task_id)
-    return toolResult(`Task ${task.id}: ${task.status}.`, { kind: "task", task })
+    const lines = [
+      `Task ${task.id}: ${task.status}.`,
+      `subject: ${collapseEcho(task.subject)}`,
+      ...(task.owner === undefined ? [] : [`owner: ${collapseEcho(task.owner)}`]),
+      `description: ${collapseEcho(task.description, ECHO_DESCRIPTION_MAX)}`,
+      ...(task.blocks.length > 0 ? [`blocks: ${collapseEcho(task.blocks.join(", "))}`] : []),
+      ...(task.blockedBy.length > 0 ? [`blocked by: ${collapseEcho(task.blockedBy.join(", "))}`] : []),
+    ]
+    return toolResult(lines.join("\n"), { kind: "task", task })
   } catch (error) {
     if (isMissingStateError(error)) return toolResult(`No task '${params.task_id}'.`, { kind: "not_found", task_id: params.task_id })
     throw error
@@ -95,7 +117,8 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
       status: params.status,
       ...(params.owner !== undefined ? { owner: params.owner } : {}),
     })
-    return toolResult(`Updated task ${task.id} to ${task.status}.`, { kind: "updated", task })
+    const owner = task.owner === undefined ? "" : ` (owner: ${collapseEcho(task.owner)})`
+    return toolResult(`Updated task ${task.id} to ${task.status}${owner}: '${collapseEcho(task.subject)}'.`, { kind: "updated", task })
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     if (error instanceof TeamTaskAlreadyClaimedError) return toolResult(reason, { kind: "already_claimed", task_id: params.task_id, reason })
@@ -107,17 +130,23 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
 }
 
 export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_create", label: "Task Create", description: "Create a task on the team tasklist.", parameters: TeamTaskCreateParams, execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params) }
+  return {
+    name: "task_create",
+    label: "Task Create",
+    description: "Create an entry on the team tasklist (starts pending). Does NOT spawn an agent; use the 'task' tool to spawn child work.",
+    parameters: TeamTaskCreateParams,
+    execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params),
+  }
 }
 
 export function createTeamTaskListTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_list", label: "Task List", description: "List the team tasklist, optionally filtered by status or owner.", parameters: TeamTaskListParams, execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params) }
+  return { name: "task_list", label: "Task List", description: "Team tasklist: list entries, optionally filtered by status (pending, claimed, in_progress, completed, deleted) or owner. Child-agent state lives in task_output, not here.", parameters: TeamTaskListParams, execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params) }
 }
 
 export function createTeamTaskGetTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_get", label: "Task Get", description: "Read a single team task by id.", parameters: TeamTaskGetParams, execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params) }
+  return { name: "task_get", label: "Task Get", description: "Read one team tasklist entry by id; returns not_found if absent. The task_id is a tasklist id, not a child st_... id; use task_output for child agents.", parameters: TeamTaskGetParams, execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params) }
 }
 
 export function createTeamTaskUpdateTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_update", label: "Task Update", description: "Update a team task's status (status='claimed' claims it for the owner).", parameters: TeamTaskUpdateParams, execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params) }
+  return { name: "task_update", label: "Task Update", description: "Update a team tasklist entry's status. Transitions run pending -> claimed -> in_progress -> completed, with deleted allowed from any state; status='claimed' claims it for owner (defaults to the lead). Illegal moves return already_claimed, blocked_by, invalid_transition, or cross_owner.", parameters: TeamTaskUpdateParams, execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params) }
 }

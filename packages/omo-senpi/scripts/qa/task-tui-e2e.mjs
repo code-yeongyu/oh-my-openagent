@@ -79,6 +79,7 @@ function childEnv(baseEnv, sandbox, sessionDir, senpiBin) {
     ...env,
     SENPI_BIN: senpiBin,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
     OMO_SENPI_QA: "1",
     OMO_SENPI_DISABLE_POSTHOG: "1",

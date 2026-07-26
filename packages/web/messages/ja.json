@@ -97,7 +97,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "アクティブな作業はboulder.jsonに追跡されます。停電？システムクラッシュ？関係ありません。止まったそのままの場所から再開できます。",
-      "model": "Claude Opus 4.7 Max"
+      "model": "Claude Opus 5 High"
     },
     "prometheusAtlas": {
       "badge": "オーケストレーションワークフロー",
@@ -106,7 +106,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.7 Max",
+        "model": "Claude Fable 5 XHigh",
         "description": "設計者。あなたとインタビューし、コードベースを探索し、詳細な実行計画を作成します。コードは絶対に書きません。MetisとMomusを品質ゲートとして使用します。",
         "features": [
           "知的なインタビューモード",

@@ -16,6 +16,7 @@ export type {
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
+  TaskRunStats,
   TaskStatus,
   TaskTransition,
   TaskTransitionAudit,
@@ -29,6 +30,14 @@ export type {
   TaskRecordDiagnostic,
   TaskRecordStore,
 } from "./store"
+export {
+  composeStatusLine,
+  formatStatusTarget,
+  taskIdentityLabel,
+  toolCountSuffix,
+} from "./status-line"
+export type { StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export { assistantLastLine, formatToolActivity } from "./progress"
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
 export {
@@ -174,8 +183,21 @@ export type {
   TrustedRespawnLaunch,
   TrustedRespawnLaunchResolver,
 } from "./manager"
-export { defineAgent, loadAgents, mapOmoConfigAgents, registerAgent, resolveToolRule } from "./agents"
+export {
+  BUILTIN_AGENTS,
+  BUILTIN_AGENT_DEFAULTS,
+  CURATED_READONLY_AGENT_NAMES,
+  defineAgent,
+  loadAgents,
+  mapOmoConfigAgents,
+  registerAgent,
+  resolveAgent,
+  resolveToolRule,
+} from "./agents"
 export type {
+  AgentModelUnavailableResult,
+  AgentNotFoundResult,
+  AgentResolutionResult,
   AgentDefinition,
   AgentDefinitionInput,
   AgentLoaderDiagnostic,
@@ -183,6 +205,8 @@ export type {
   AgentToolRule,
   LoadAgentsOptions,
   LoadAgentsResult,
+  ResolveAgentOptions,
+  ResolvedAgentResult,
 } from "./agents"
 export {
   buildCompletionDetails,
@@ -309,6 +333,7 @@ export type {
   SendManager,
   SendResultDetails,
   SendToolResult,
+  DefaultTeamRunIdResolution,
   SessionIdCarrier,
   TaskCancelDeps,
   TaskCancelInput,
@@ -355,13 +380,15 @@ export {
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   resolveMemberExtensionEntryPath,
+  createLeadDeliveryJournal,
   createTeamMemberRespawnLaunchResolver,
   TeamMemberRespawnLaunchError,
   sendTeamMessage,
-  WaitRegistry,
 } from "./team"
 export type {
   BuildTeamMessageOptions,
+  LeadDeliveryJournal,
+  LeadDeliveryJournalOptions,
   LeadInjection,
   LeadInjectionSink,
   LeadPollFilter,
@@ -374,10 +401,6 @@ export type {
   ReconcileTeamMailboxDeps,
   SendTeamMessageInput,
   SendTeamMessageResult,
-  WaitClaim,
-  WaitFilter,
-  WaitMessage,
-  WaitRegistration,
 } from "./team"
 export {
   approveShutdown,
@@ -420,6 +443,7 @@ export {
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
   DeleteTeamDeps,
   DeleteTeamResult,
   MemberStatusPort,

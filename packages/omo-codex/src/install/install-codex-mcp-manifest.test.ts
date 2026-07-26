@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 30_000
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 

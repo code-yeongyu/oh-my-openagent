@@ -300,4 +300,33 @@ describe("buildTaskExecute batch fanout", () => {
     expect(output.details.status).toBe("error")
     expect(output.details.items?.map((item) => item.error_message)).toEqual(IDS.map((taskId) => `failed:${taskId}`))
   })
+
+  test(" w2batch #given a model_unavailable start failure #when executed #then the error names valid category names with an override hint", async () => {
+    // given
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => ({
+        kind: "plan_unresolved",
+        error: {
+          code: "model_unavailable",
+          message: 'No available model for category "quick" (attempted opengateway/glm-5.2-ultrafast).',
+          availableCategories: ["deep", "quick"],
+        },
+      }),
+    })
+
+    // when
+    const output = await buildTaskExecute(makeDeps(manager))(
+      "model-unavailable-batch",
+      { category: "quick", run_in_background: true, tasks: [{ prompt: "one" }] },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    // then
+    const text = textOf(output)
+    expect(text).toContain("Valid category names: deep, quick")
+    expect(text).toContain("model:")
+    expect(text).not.toContain("Available categories:")
+  })
 })

@@ -1,0 +1,5 @@
+omo-senpi codegraph skipped: running inside a senpi-task RPC child { component: 'codegraph' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }

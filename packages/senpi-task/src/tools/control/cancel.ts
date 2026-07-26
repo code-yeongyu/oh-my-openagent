@@ -8,8 +8,8 @@ import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
-  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel." })),
-  name: Type.Optional(Type.String({ description: "Canonical task name, as an alternative to task_id." })),
+  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel. Provide exactly one of task_id or name." })),
+  name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
   reason: Type.Optional(Type.String({ description: "Optional human-readable reason recorded on the cancelled task." })),
 })
 

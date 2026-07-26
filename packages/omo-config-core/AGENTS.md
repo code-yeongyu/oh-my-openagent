@@ -11,8 +11,9 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | Path | Purpose |
 |------|---------|
 | `src/index.ts` | Barrel re-exporting `./schema`, `./loader`, `./writer`. |
-| `src/schema/config.ts` | Root `OmoConfigSchema` + `OmoConfigLayerSchema` (`.strict()`; `$schema`, `categories`, `agents`, `task`, `teams`). `OmoConfig` type. |
+| `src/schema/config.ts` | Root `OmoConfigSchema` + `OmoConfigLayerSchema` (`.strict()`; `$schema`, `categories`, `agents`, `codegraph`, `task`, `teams`). `OmoConfig` type. |
 | `src/schema/category.ts` | `OmoCategoryConfigSchema` / `OmoCategoriesConfigSchema`. Keeps the OpenCode camelCase keys (`maxTokens`, `reasoningEffort`, `textVerbosity`) verbatim for parity. |
+| `src/schema/codegraph.ts` | `OmoCodegraphSettingsSchema` (`daemon`, default `false`) for CodeGraph MCP daemon selection. |
 | `src/schema/agent.ts` | `OmoAgentDefSchema` / `OmoAgentsConfigSchema` (`execution_mode`, `max_depth`, `allowed_subagents`, ...). |
 | `src/schema/task.ts` | `OmoTaskSettingsSchema` + nested `OmoTaskNotificationSchema`, `OmoTaskWaitSchema`, `OmoTaskTeamSettingsSchema`, all with defaults. |
 | `src/schema/team.ts` | `OmoTeamSpecSchema` (discriminated `category` / `subagent_type` members) + `OmoTeamsConfigSchema`; `*Layer` partial variants for per-file overrides. |
@@ -28,7 +29,7 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 
 | Module | Key exports |
 |--------|-------------|
-| `schema/` | `OmoConfigSchema`, `OmoConfigLayerSchema`, `OmoCategoryConfigSchema`, `OmoAgentDefSchema`, `OmoTaskSettingsSchema`, `OmoTeamSpecSchema`, `OmoFallbackModelsSchema`; types `OmoConfig`, `OmoCategoryConfig`, `OmoAgentDef`, `OmoTaskSettings`, `OmoTeamSpec`, ... |
+| `schema/` | `OmoConfigSchema`, `OmoConfigLayerSchema`, `OmoCategoryConfigSchema`, `OmoCodegraphSettingsSchema`, `OmoAgentDefSchema`, `OmoTaskSettingsSchema`, `OmoTeamSpecSchema`, `OmoFallbackModelsSchema`; types `OmoConfig`, `OmoCategoryConfig`, `OmoCodegraphSettings`, `OmoAgentDef`, `OmoTaskSettings`, `OmoTeamSpec`, ... |
 | `loader/` | `loadOmoConfig`, `resolveOmoConfigPaths`, `resolveUserOmoConfigPath`, `resolveHomeDir`; types `LoadOmoConfigResult`, `OmoConfigDiagnostic`, `OmoConfigSource`, `OmoConfigReadFileSystem` |
 | `writer/` | `updateOmoConfig`, `OmoConfigWriteError`, `DEFAULT_WRITE_FILE_SYSTEM`; types `OmoConfigEdit`, `UpdateOmoConfigOptions`, `UpdateOmoConfigResult` |
 
@@ -53,7 +54,7 @@ Recursively deep-merges plain objects; scalars and arrays replace. `__proto__`, 
 ## DEPENDENCIES & CONSUMERS
 
 - **Depends on:** `@oh-my-opencode/utils` (`parseJsoncSafe`, `isPlainObject`, `isUnsafeObjectKey`), `jsonc-parser`, `zod`.
-- **Consumed by:** `packages/senpi-task` (schema types re-used by the task/team config surface) and `packages/omo-senpi/src/components/task` (`loadOmoConfig` at component register, `coexistence.ts` reads `OmoConfigSource`).
+- **Consumed by:** `packages/senpi-task` (schema types re-used by the task/team config surface) and `packages/omo-senpi/src/components/task` plus `components/codegraph` (`loadOmoConfig` at component registration; `coexistence.ts` reads `OmoConfigSource`).
 
 ## QA
 

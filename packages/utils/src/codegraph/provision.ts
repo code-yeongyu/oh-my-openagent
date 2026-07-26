@@ -6,7 +6,7 @@ import { homedir, hostname } from "node:os"
 import { basename, join } from "node:path"
 import { promisify } from "node:util"
 
-import { CODEGRAPH_PROVISION_MANIFEST } from "./manifest"
+import { CODEGRAPH_PINNED_VERSION, CODEGRAPH_PROVISION_MANIFEST } from "./manifest"
 
 export interface CodegraphProvisionAsset {
   readonly executableName: string
@@ -29,7 +29,7 @@ export interface EnsureCodegraphProvisionedOptions {
   readonly lockWaitMs?: number
   readonly manifest?: CodegraphProvisionManifest
   readonly platformKey?: string
-  readonly version: "1.0.1"
+  readonly version: typeof CODEGRAPH_PINNED_VERSION
 }
 
 export interface CodegraphProvisionResult {

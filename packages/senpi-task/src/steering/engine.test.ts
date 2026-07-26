@@ -255,6 +255,7 @@ describe("steering pending cancellation", () => {
         dequeued.push(taskId)
         return true
       },
+      runStatsSnapshot: () => undefined,
       destruction: {
         destroyResidentTask: async (taskId) => {
           destroyed.push(taskId)

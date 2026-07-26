@@ -1,5 +1,6 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
@@ -61,6 +62,12 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+		log("[spawnTmuxWindow] SKIP: authenticated cmux windows are unsupported")
+		return { success: false }
+	}
+
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxWindow] SKIP: tmux not found")
@@ -70,7 +77,6 @@ export async function spawnTmuxWindow(
 	log("[spawnTmuxWindow] all checks passed, creating isolated window...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const args = [
 		"new-window",

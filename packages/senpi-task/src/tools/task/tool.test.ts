@@ -37,8 +37,10 @@ function fakeManager(overrides: Partial<TaskManager>): TaskManager {
     waitFor: () => notImplemented("waitFor"),
     forget: () => {},
     getResidentHandle: () => undefined,
+    subscribeChild: () => () => {},
     residentTaskIds: () => [],
     wasBackground: () => false,
+    runStatsSnapshot: () => undefined,
     ...overrides,
   }
 }
@@ -117,6 +119,82 @@ describe("createTaskTool", () => {
     expect(row).toContain("실제 프롬프트")
     expect(row).toContain(`${ANSI_ITALIC}background${ANSI_ITALIC_END}`)
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
+  })
+
+  test("#given a category task call #when rendered #then the call row is prompt-only without category or model", () => {
+    // given
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderCall = tool.renderCall
+    if (renderCall === undefined) throw new Error("task renderCall is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderCall, undefined, [
+      { prompt: "Inspect task rendering", category: "quick", run_in_background: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 120)
+
+    // then
+    expect(row).toContain('task "Inspect task rendering"')
+    expect(row).not.toContain("quick")
+    expect(row).not.toContain("category:")
+    expect(row).toContain(`${ANSI_ITALIC}foreground${ANSI_ITALIC_END}`)
+  })
+
+  test("#given an agent task call #when rendered #then the call row is prompt-only without the agent target", () => {
+    // given
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderCall = tool.renderCall
+    if (renderCall === undefined) throw new Error("task renderCall is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderCall, undefined, [
+      { prompt: "Inspect task rendering", subagent_type: "atlas", run_in_background: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 120)
+
+    // then
+    expect(row).toContain('task "Inspect task rendering"')
+    expect(row).not.toContain("agent:atlas")
+  })
+
+  test("#given a partial child progress result #when rendered #then only the last-line row renders (status lives in senpi's progress line)", () => {
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderResult = tool.renderResult
+    if (renderResult === undefined) throw new Error("task renderResult is missing")
+
+    const component: unknown = Reflect.apply(renderResult, undefined, [
+      {
+        content: [{ type: "text", text: "↳ last: found it" }],
+        details: { task_id: "st_1", status: "running", mode: "spawn" },
+      },
+      { expanded: false, isPartial: true },
+      RENDERER_THEME,
+      {},
+    ])
+
+    expect(renderedLines(component, 120)).toEqual(["\u001b[36m↳ last: found it\u001b[39m"])
+  })
+
+  test("#given a partial result with empty content #when rendered #then no extra rows render below the call line", () => {
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderResult = tool.renderResult
+    if (renderResult === undefined) throw new Error("task renderResult is missing")
+
+    const component: unknown = Reflect.apply(renderResult, undefined, [
+      {
+        content: [{ type: "text", text: "" }],
+        details: { task_id: "st_1", status: "running", mode: "spawn" },
+      },
+      { expanded: false, isPartial: true },
+      RENDERER_THEME,
+      {},
+    ])
+
+    expect(renderedLines(component, 120)).toEqual([])
   })
 
   test("#given the real task result renderer #when a category result is rendered #then resolved context and italic foreground mode are visible", () => {

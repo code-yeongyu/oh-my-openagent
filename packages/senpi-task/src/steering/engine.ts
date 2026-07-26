@@ -162,10 +162,12 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
     // Transition BEFORE abort so this cancel is the single terminal write; the tracker's later
     // complete/cancel transition (settled by abort) is rejected by terminal idempotence.
+    const runStats = port.runStatsSnapshot(record.task_id)
     const result = port.store.transition(record.task_id, {
       type: "cancel",
       timestamp: nowIso(),
       ...(reason !== undefined ? { error_message: reason } : {}),
+      ...(runStats !== undefined ? { run_stats: runStats } : {}),
     })
     if (!result.applied) {
       return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from running.` }
@@ -210,7 +212,9 @@ function notContinuableReason(record: TaskRecord): string {
 }
 
 function buildRevived(record: TaskRecord, timestamp: string): TaskRecord {
-  const { final_response: _final, error_message: _error, ...rest } = record
+  // run_stats describes the FINISHED run; carrying it into the revived one would let a later
+  // terminal transition report stale throughput for a run that produced nothing yet.
+  const { final_response: _final, error_message: _error, run_stats: _stats, ...rest } = record
   return {
     ...rest,
     status: "running",

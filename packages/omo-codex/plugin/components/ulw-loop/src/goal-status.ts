@@ -21,6 +21,10 @@ function isResolvedStatus(status: UlwLoopStatus): boolean {
 	return status === "complete";
 }
 
+export function isMemberResolved(goal: UlwLoopItem, plan: UlwLoopPlan): boolean {
+	return isResolvedStatus(goal.status) || isSupersededResolved(goal, plan);
+}
+
 function isSupersededResolved(goal: UlwLoopItem, plan: UlwLoopPlan): boolean {
 	if (goal.steeringStatus !== "superseded") return false;
 	const replacements = goal.supersededBy ?? [];

@@ -2,7 +2,6 @@ import type { OhMyOpenCodeConfig } from "../../config"
 
 import { parseGoalCommand } from "../../hooks/goal/command-arguments"
 import { log } from "../../shared"
-import { NATIVE_LOOP_TRIGGERED_FLAG } from "../command-execute-before"
 import { extractPromptText } from "./prompt-text"
 import type { ChatMessageHooks, ChatMessageHandlerOutput, ChatMessageInput } from "./types"
 
@@ -12,9 +11,10 @@ export function handleGoalMessage(args: {
   readonly output: ChatMessageHandlerOutput
   readonly isFirstMessage: boolean
   readonly pluginConfig: OhMyOpenCodeConfig
+  readonly nativeGoalCommand: boolean
 }): void {
-  const { hooks, input, output, isFirstMessage, pluginConfig } = args
-  if (!hooks.goal || output.message[NATIVE_LOOP_TRIGGERED_FLAG] === true) {
+  const { hooks, input, output, isFirstMessage, pluginConfig, nativeGoalCommand } = args
+  if (!hooks.goal || nativeGoalCommand) {
     return
   }
 

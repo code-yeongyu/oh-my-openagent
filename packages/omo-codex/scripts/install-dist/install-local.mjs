@@ -15,7 +15,7 @@ var __export = (target, all) => {
 };
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 
-// packages/utils/src/xdg-data-dir.ts
+// ../../omo/packages/utils/src/xdg-data-dir.ts
 import { accessSync as accessSync2, constants as constants2, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -40,7 +40,7 @@ function resolveWritableDirectory(preferredDir, fallbackSuffix, osProvider) {
 }
 var init_xdg_data_dir = () => {};
 
-// packages/utils/src/atomic-write.ts
+// ../../omo/packages/utils/src/atomic-write.ts
 import {
   closeSync,
   fsyncSync,
@@ -94,7 +94,7 @@ var init_atomic_write = __esm(() => {
   ]);
 });
 
-// packages/telemetry-core/src/activity-state.ts
+// ../../omo/packages/telemetry-core/src/activity-state.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
 import { basename as basename7, join as join33 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
@@ -175,10 +175,10 @@ var init_activity_state = __esm(() => {
   init_xdg_data_dir();
 });
 
-// packages/telemetry-core/src/constants.ts
+// ../../omo/packages/telemetry-core/src/constants.ts
 var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
 
-// packages/telemetry-core/src/diagnostics.ts
+// ../../omo/packages/telemetry-core/src/diagnostics.ts
 import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
 import { join as join34 } from "node:path";
 function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
@@ -296,7 +296,7 @@ var init_diagnostics = __esm(() => {
   DIAGNOSTICS_MAX_BYTES = 256 * 1024;
 });
 
-// packages/telemetry-core/src/env.ts
+// ../../omo/packages/telemetry-core/src/env.ts
 function normalizeEnvValue(value) {
   return value?.trim().toLowerCase();
 }
@@ -336,7 +336,7 @@ var init_env = __esm(() => {
   SEND_OPT_OUT_VALUES = ["0", "false", "no", "yes"];
 });
 
-// packages/telemetry-core/src/machine-id.ts
+// ../../omo/packages/telemetry-core/src/machine-id.ts
 import { createHash as createHash3 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
@@ -347,7 +347,7 @@ function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetr
 }
 var init_machine_id = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
 import { dirname as dirname10, posix as posix2, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
@@ -384,7 +384,7 @@ function normalizeWindowsPath(path2) {
 }
 var init_module_node = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/featureFlagUtils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/featureFlagUtils.mjs
 function getFlagDetailFromFlagAndPayload(key, value, payload) {
   return {
     key,
@@ -452,7 +452,7 @@ var normalizeFlagsResponse = (flagsResponse) => {
 };
 var init_featureFlagUtils = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/types.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/types.mjs
 var types_PostHogPersistedProperty;
 var init_types = __esm(() => {
   types_PostHogPersistedProperty = /* @__PURE__ */ function(PostHogPersistedProperty) {
@@ -489,7 +489,7 @@ var init_types = __esm(() => {
   }({});
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/gzip.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/gzip.mjs
 function isGzipSupported() {
   return "CompressionStream" in globalThis && "TextEncoder" in globalThis && "Response" in globalThis && typeof Response.prototype.blob == "function";
 }
@@ -557,7 +557,7 @@ var init_gzip = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bot-detection.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bot-detection.mjs
 var DEFAULT_BLOCKED_UA_STRS, isBlockedUA = function(ua, customBlockedUserAgents = []) {
   if (!ua)
     return false;
@@ -649,10 +649,10 @@ var init_bot_detection = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/string-utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/string-utils.mjs
 var init_string_utils = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/type-utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/type-utils.mjs
 function isPrimitive(value) {
   return value === null || typeof value != "object";
 }
@@ -688,7 +688,7 @@ var init_type_utils = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/number-utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/number-utils.mjs
 function clampToRange(value, min, max, logger, fallbackValue) {
   if (min > max) {
     logger.warn("min cannot be greater than max.");
@@ -711,7 +711,7 @@ var init_number_utils = __esm(() => {
   init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bucketed-rate-limiter.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bucketed-rate-limiter.mjs
 class BucketedRateLimiter {
   constructor(options) {
     this._buckets = {};
@@ -758,7 +758,7 @@ var init_bucketed_rate_limiter = __esm(() => {
   init_number_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/vendor/uuidv7.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/vendor/uuidv7.mjs
 class UUID {
   constructor(bytes) {
     this.bytes = bytes;
@@ -933,7 +933,7 @@ var init_uuidv7 = __esm(() => {
   /*! For license information please see uuidv7.mjs.LICENSE.txt */
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/promise-queue.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/promise-queue.mjs
 class PromiseQueue {
   add(promise) {
     const promiseUUID = uuidv7();
@@ -963,7 +963,7 @@ var init_promise_queue = __esm(() => {
   init_uuidv7();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/logger.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/logger.mjs
 function createConsole(consoleLike = console) {
   const lockedMethods = {
     log: consoleLike.log.bind(consoleLike),
@@ -1005,7 +1005,7 @@ var _createLogger = (prefix, maybeCall, consoleLike) => {
 }, passThrough = (fn) => fn();
 var init_logger = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/user-agent-utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/user-agent-utils.mjs
 var MOBILE = "Mobile", IOS = "iOS", ANDROID = "Android", TABLET = "Tablet", ANDROID_TABLET, APPLE = "Apple", APPLE_WATCH, SAFARI = "Safari", BLACKBERRY = "BlackBerry", SAMSUNG = "Samsung", SAMSUNG_BROWSER, SAMSUNG_INTERNET, CHROME = "Chrome", CHROME_OS, CHROME_IOS, INTERNET_EXPLORER = "Internet Explorer", INTERNET_EXPLORER_MOBILE, OPERA = "Opera", OPERA_MINI, EDGE = "Edge", MICROSOFT_EDGE, FIREFOX = "Firefox", FIREFOX_IOS, NINTENDO = "Nintendo", PLAYSTATION = "PlayStation", XBOX = "Xbox", ANDROID_MOBILE, MOBILE_SAFARI, WINDOWS = "Windows", WINDOWS_PHONE, GENERIC = "Generic", GENERIC_MOBILE, GENERIC_TABLET, KONQUEROR = "Konqueror", OCULUS_BROWSER = "Oculus Browser", VIVALDI = "Vivaldi", YANDEX = "Yandex", WHALE = "Whale", DUCKDUCKGO = "DuckDuckGo", PALE_MOON = "Pale Moon", WATERFOX = "Waterfox", BRAVE = "Brave", BROWSER_VERSION_REGEX_SUFFIX = "(\\d+(\\.\\d+)?)", DEFAULT_BROWSER_VERSION_REGEX, XBOX_REGEX, PLAYSTATION_REGEX, NINTENDO_REGEX, BLACKBERRY_REGEX, windowsVersionMap, versionRegexes, osMatchers;
 var init_user_agent_utils = __esm(() => {
   init_string_utils();
@@ -1271,7 +1271,7 @@ var init_user_agent_utils = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/index.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/index.mjs
 function removeTrailingSlash(url) {
   return url?.replace(/\/+$/, "");
 }
@@ -1320,7 +1320,7 @@ var init_utils = __esm(() => {
   init_user_agent_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/logs-utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/logs-utils.mjs
 var OTLP_SEVERITY_MAP, DEFAULT_OTLP_SEVERITY;
 var init_logs_utils = __esm(() => {
   init_utils();
@@ -1353,25 +1353,25 @@ var init_logs_utils = __esm(() => {
   DEFAULT_OTLP_SEVERITY = OTLP_SEVERITY_MAP.info;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/index.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/index.mjs
 var init_logs = __esm(() => {
   init_logs_utils();
   init_types();
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/surveys/validation.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/surveys/validation.mjs
 var init_validation = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/cookie.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/cookie.mjs
 var init_cookie = __esm(() => {
   init_utils();
   init_uuidv7();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/eventemitter.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/eventemitter.mjs
 class SimpleEventEmitter {
   constructor() {
     this.events = {};
@@ -1394,7 +1394,7 @@ class SimpleEventEmitter {
 }
 var init_eventemitter = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/chunk-ids.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/chunk-ids.mjs
 function getFilenameToChunkIdMap(stackParser) {
   const chunkIdMap = globalThis._posthogChunkIds;
   if (!chunkIdMap)
@@ -1432,7 +1432,7 @@ function getFilenameToChunkIdMap(stackParser) {
 var parsedStackResults, lastKeysCount, cachedFilenameChunkIds;
 var init_chunk_ids = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/error-properties-builder.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/error-properties-builder.mjs
 class ErrorPropertiesBuilder {
   constructor(coercers, stackParser, modifiers = []) {
     this.coercers = coercers;
@@ -1558,7 +1558,7 @@ var init_error_properties_builder = __esm(() => {
   init_chunk_ids();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/base.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/base.mjs
 function createFrame(platform, filename, func, lineno, colno) {
   const frame = {
     platform,
@@ -1577,7 +1577,7 @@ var init_base = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/safari.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/safari.mjs
 var extractSafariExtensionDetails = (func, filename) => {
   const isSafariExtension = func.indexOf("safari-extension") !== -1;
   const isSafariWebExtension = func.indexOf("safari-web-extension") !== -1;
@@ -1593,7 +1593,7 @@ var init_safari = __esm(() => {
   init_base();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/chrome.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/chrome.mjs
 var chromeRegexNoFnName, chromeRegex, chromeEvalRegex, chromeStackLineParser = (line, platform) => {
   const noFnParts = chromeRegexNoFnName.exec(line);
   if (noFnParts) {
@@ -1623,7 +1623,7 @@ var init_chrome = __esm(() => {
   chromeEvalRegex = /\((\S*)(?::(\d+))(?::(\d+))\)/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/gecko.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/gecko.mjs
 var geckoREgex, geckoEvalRegex, geckoStackLineParser = (line, platform) => {
   const parts = geckoREgex.exec(line);
   if (parts) {
@@ -1650,7 +1650,7 @@ var init_gecko = __esm(() => {
   geckoEvalRegex = /(\S+) line (\d+)(?: > eval line \d+)* > eval/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
 var winjsRegex, winjsStackLineParser = (line, platform) => {
   const parts = winjsRegex.exec(line);
   return parts ? createFrame(platform, parts[2], parts[1] || UNKNOWN_FUNCTION, +parts[3], parts[4] ? +parts[4] : undefined) : undefined;
@@ -1660,7 +1660,7 @@ var init_winjs = __esm(() => {
   winjsRegex = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:[-a-z]+):.*?):(\d+)(?::(\d+))?\)?\s*$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
 var opera10Regex, opera10StackLineParser = (line, platform) => {
   const parts = opera10Regex.exec(line);
   return parts ? createFrame(platform, parts[2], parts[3] || UNKNOWN_FUNCTION, +parts[1]) : undefined;
@@ -1674,7 +1674,7 @@ var init_opera = __esm(() => {
   opera11Regex = / line (\d+), column (\d+)\s*(?:in (?:<anonymous function: ([^>]+)>|([^)]+))\(.*\))? in (.*):\s*$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
 function filenameIsInApp(filename, isNative = false) {
   const isInternal = isNative || filename && !filename.startsWith("/") && !filename.match(/^[A-Z]:/) && !filename.startsWith(".") && !filename.match(/^[a-zA-Z]([a-zA-Z0-9.\-+])*:\/\//);
   return !isInternal && filename !== undefined && !filename.includes("node_modules/");
@@ -1746,7 +1746,7 @@ var init_node = __esm(() => {
   FULL_MATCH = /at (?:async )?(?:(.+?)\s+\()?(?:(.+):(\d+):(\d+)?|([^)]+))\)?/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/index.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/index.mjs
 function reverseAndStripFrames(stack) {
   if (!stack.length)
     return [];
@@ -1800,7 +1800,7 @@ var init_parsers = __esm(() => {
   WEBPACK_ERROR_REGEXP = /\(error: (.*)\)/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
 class DOMExceptionCoercer {
   match(err) {
     return this.isDOMException(err) || this.isDOMError(err);
@@ -1834,7 +1834,7 @@ var init_dom_exception_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-coercer.mjs
 class ErrorCoercer {
   match(err) {
     return isPlainError(err);
@@ -1865,7 +1865,7 @@ var init_error_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
 class ErrorEventCoercer {
   constructor() {}
   match(err) {
@@ -1887,7 +1887,7 @@ var init_error_event_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/string-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/string-coercer.mjs
 class StringCoercer {
   match(input) {
     return typeof input == "string";
@@ -1920,7 +1920,7 @@ var init_string_coercer = __esm(() => {
   ERROR_TYPES_PATTERN = /^(?:[Uu]ncaught (?:exception: )?)?(?:((?:Eval|Internal|Range|Reference|Syntax|Type|URI|)Error): )?(.*)$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/types.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/types.mjs
 var severityLevels;
 var init_types2 = __esm(() => {
   severityLevels = [
@@ -1933,7 +1933,7 @@ var init_types2 = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/utils.mjs
 function extractExceptionKeysForMessage(err, maxLength = 40) {
   const keys = Object.keys(err);
   keys.sort();
@@ -1951,7 +1951,7 @@ function extractExceptionKeysForMessage(err, maxLength = 40) {
 }
 var init_utils2 = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/object-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/object-coercer.mjs
 class ObjectCoercer {
   match(candidate) {
     return typeof candidate == "object" && candidate !== null;
@@ -2010,7 +2010,7 @@ var init_object_coercer = __esm(() => {
   init_utils2();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/event-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/event-coercer.mjs
 class EventCoercer {
   match(err) {
     return isEvent(err);
@@ -2030,7 +2030,7 @@ var init_event_coercer = __esm(() => {
   init_utils2();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/primitive-coercer.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/primitive-coercer.mjs
 class PrimitiveCoercer {
   match(candidate) {
     return isPrimitive(candidate);
@@ -2048,7 +2048,7 @@ var init_primitive_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
 class PromiseRejectionEventCoercer {
   match(err) {
     return isBuiltin(err, "PromiseRejectionEvent") || this.isCustomEventWrappingRejection(err);
@@ -2088,7 +2088,7 @@ var init_promise_rejection_event = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/index.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/index.mjs
 var init_coercers = __esm(() => {
   init_dom_exception_coercer();
   init_error_coercer();
@@ -2100,7 +2100,7 @@ var init_coercers = __esm(() => {
   init_promise_rejection_event();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/utils.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/utils.mjs
 class ReduceableCache {
   constructor(_maxSize) {
     this._maxSize = _maxSize;
@@ -2127,7 +2127,7 @@ class ReduceableCache {
 }
 var init_utils3 = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
 function resolveExceptionStepsConfig(config) {
   if (!config)
     return {
@@ -2289,7 +2289,7 @@ var init_exception_steps = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
 var exports_error_tracking = {};
 __export(exports_error_tracking, {
   winjsStackLineParser: () => winjsStackLineParser,
@@ -2326,7 +2326,7 @@ var init_error_tracking = __esm(() => {
   init_exception_steps();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core-stateless.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core-stateless.mjs
 async function logFlushError(err) {
   if (err instanceof PostHogFetchHttpError) {
     let text = "";
@@ -3127,7 +3127,7 @@ var init_posthog_core_stateless = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core.mjs
 var init_posthog_core = __esm(() => {
   init_featureFlagUtils();
   init_types();
@@ -3136,12 +3136,12 @@ var init_posthog_core = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/tracing-headers.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/tracing-headers.mjs
 var init_tracing_headers = __esm(() => {
   init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/index.mjs
+// ../../omo/node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/index.mjs
 var init_dist = __esm(() => {
   init_featureFlagUtils();
   init_gzip();
@@ -3158,7 +3158,7 @@ var init_dist = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 async function addSourceContext(frames) {
@@ -3377,7 +3377,7 @@ var init_context_lines_node = __esm(() => {
   LRU_FILE_CONTENTS_FS_READ_FAILED = new exports_error_tracking.ReduceableCache(20);
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
 import { isAbsolute as isAbsolute7, relative as relative4, sep as sep8 } from "node:path";
 function createRelativePathModifier(basePath = process.cwd()) {
   const isWindows = sep8 === "\\";
@@ -3394,11 +3394,11 @@ function createRelativePathModifier(basePath = process.cwd()) {
 }
 var init_relative_path_node = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/version.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/version.mjs
 var version = "5.35.12";
 var init_version = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/types.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/types.mjs
 var FeatureFlagError2;
 var init_types3 = __esm(() => {
   FeatureFlagError2 = {
@@ -3409,7 +3409,7 @@ var init_types3 = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
 class FeatureFlagEvaluations {
   constructor(init) {
     this._host = init.host;
@@ -3543,7 +3543,7 @@ var init_feature_flag_evaluations = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/crypto.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/crypto.mjs
 async function hashSHA1(text) {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle)
@@ -3554,7 +3554,7 @@ async function hashSHA1(text) {
 }
 var init_crypto = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
 class FeatureFlagsPoller {
   constructor({ pollingInterval, personalApiKey, projectApiKey, timeout, host, customHeaders, ...options }) {
     this.debugMode = false;
@@ -4455,7 +4455,7 @@ var init_feature_flags = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
 function makeUncaughtExceptionHandler(captureFn, onFatalFn) {
   let calledFatalError = false;
   return Object.assign((error) => {
@@ -4488,7 +4488,7 @@ function addUnhandledRejectionListener(captureFn) {
 }
 var init_autocapture = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
 class ErrorTracking {
   constructor(client, options, _logger) {
     this.client = client;
@@ -4560,7 +4560,7 @@ var init_error_tracking2 = __esm(() => {
   init_dist();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/storage-memory.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/storage-memory.mjs
 class PostHogMemoryStorage {
   getProperty(key) {
     return this._memoryStorage[key];
@@ -4574,7 +4574,7 @@ class PostHogMemoryStorage {
 }
 var init_storage_memory = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/client.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/client.mjs
 function emitDeprecationWarningOnce(id, message) {
   if (_emittedDeprecations.has(id))
     return;
@@ -5567,7 +5567,7 @@ var init_client = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/context/context.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/context/context.mjs
 import { AsyncLocalStorage } from "node:async_hooks";
 
 class PostHogContext {
@@ -5599,7 +5599,7 @@ class PostHogContext {
 }
 var init_context = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
 function createEventProcessor(_posthog, { organization, projectId, prefix, severityAllowList = [
   "error"
 ], sendExceptionsToPostHog = true } = {}) {
@@ -5670,16 +5670,16 @@ var init_sentry_integration = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
 var init_tracing_headers2 = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/express.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/express.mjs
 var init_express = __esm(() => {
   init_error_tracking2();
   init_tracing_headers2();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/exports.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/exports.mjs
 var init_exports = __esm(() => {
   init_feature_flag_evaluations();
   init_dist();
@@ -5688,7 +5688,7 @@ var init_exports = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/entrypoints/index.node.mjs
+// ../../omo/node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/entrypoints/index.node.mjs
 var PostHog;
 var init_index_node = __esm(() => {
   init_module_node();
@@ -5721,7 +5721,7 @@ var init_index_node = __esm(() => {
   };
 });
 
-// packages/telemetry-core/src/posthog-client.ts
+// ../../omo/packages/telemetry-core/src/posthog-client.ts
 class PostHogTelemetryTransport {
   #client;
   constructor(apiKey, options) {
@@ -5885,10 +5885,10 @@ var init_posthog_client = __esm(() => {
   };
 });
 
-// packages/telemetry-core/src/record-daily-active.ts
+// ../../omo/packages/telemetry-core/src/record-daily-active.ts
 var init_record_daily_active = () => {};
 
-// packages/telemetry-core/src/index.ts
+// ../../omo/packages/telemetry-core/src/index.ts
 var init_src = __esm(() => {
   init_activity_state();
   init_diagnostics();
@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.18.2",
+    version: "4.19.1",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6280,156 +6280,8 @@ function spawn(cmdOrOpts, opts) {
     throw new Error("spawn requires a command");
   return wrapNodeProcess(nodeSpawn(bin, args, createNodeSpawnOptions(options)));
 }
-
-// packages/utils/src/runtime/which.ts
-import { accessSync, constants } from "node:fs";
-import { delimiter, join } from "node:path";
-var runtime2 = globalThis;
-function isUnsafeCommandName(commandName) {
-  if (commandName.includes("/") || commandName.includes("\\"))
-    return true;
-  if (commandName === "." || commandName === ".." || commandName.includes(".."))
-    return true;
-  if (/^[a-zA-Z]:/.test(commandName))
-    return true;
-  if (commandName.includes("\x00"))
-    return true;
-  return false;
-}
-function isExecutable(filePath) {
-  try {
-    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return true;
-  } catch (error) {
-    if (!(error instanceof Error) && Object.prototype.toString.call(error) !== "[object Error]") {
-      throw error;
-    }
-    return false;
-  }
-}
-function resolvePathValue() {
-  if (process.platform === "win32")
-    return process.env["Path"] ?? process.env["PATH"];
-  return process.env["PATH"];
-}
-function getWindowsCandidates(commandName) {
-  if (process.platform !== "win32")
-    return [commandName];
-  if (/\.[^\\/]+$/.test(commandName))
-    return [commandName];
-  return [commandName, `${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`];
-}
-function bunWhich(commandName) {
-  if (!commandName)
-    return null;
-  if (isUnsafeCommandName(commandName))
-    return null;
-  const candidateNames = getWindowsCandidates(commandName);
-  for (const candidateName of candidateNames) {
-    const resolvedPath = runtime2.Bun?.which(candidateName) ?? null;
-    if (resolvedPath !== null)
-      return resolvedPath;
-  }
-  const pathValue = resolvePathValue();
-  if (!pathValue)
-    return null;
-  const pathEntries = pathValue.split(delimiter).filter((pathEntry) => pathEntry.length > 0);
-  if (pathEntries.length === 0)
-    return null;
-  for (const pathEntry of pathEntries) {
-    for (const candidateName of candidateNames) {
-      const candidatePath = join(pathEntry, candidateName);
-      if (isExecutable(candidatePath))
-        return candidatePath;
-    }
-  }
-  return null;
-}
-
-// packages/utils/src/runtime/git-bash.ts
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-var GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH";
-var PROGRAM_FILES_GIT_BASH = "C:\\Program Files\\Git\\bin\\bash.exe";
-var PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe";
-var NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS = ["\\windows\\system32\\", "\\microsoft\\windowsapps\\"];
-function resolveGitBash(input) {
-  if (input.platform !== "win32")
-    return { found: true, path: null, source: "not-required", checkedPaths: [] };
-  const checkedPaths = [];
-  const envPath = nonEmptyEnvValue(input.env, GIT_BASH_ENV_KEY);
-  if (envPath !== undefined) {
-    checkedPaths.push(envPath);
-    if (isBashExePath(envPath) && input.exists(envPath)) {
-      return { found: true, path: envPath, source: "env", checkedPaths };
-    }
-    return missingGitBash(checkedPaths);
-  }
-  for (const candidate of [
-    { path: PROGRAM_FILES_GIT_BASH, source: "program-files" },
-    { path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" }
-  ]) {
-    checkedPaths.push(candidate.path);
-    if (input.exists(candidate.path))
-      return { found: true, path: candidate.path, source: candidate.source, checkedPaths };
-  }
-  for (const pathCandidate of input.where("bash")) {
-    const candidate = pathCandidate.trim();
-    if (candidate.length === 0)
-      continue;
-    checkedPaths.push(candidate);
-    if (isKnownNonGitBashLauncher(candidate))
-      continue;
-    if (isBashExePath(candidate) && input.exists(candidate))
-      return { found: true, path: candidate, source: "path", checkedPaths };
-  }
-  return missingGitBash(checkedPaths);
-}
-var resolveGitBashForCurrentProcess = (input = {}) => {
-  return resolveGitBash({
-    platform: input.platform ?? process.platform,
-    env: input.env ?? process.env,
-    exists: existsSync,
-    where: whereCommand
-  });
-};
-function missingGitBash(checkedPaths) {
-  return {
-    found: false,
-    checkedPaths,
-    installHint: [
-      "Git Bash is required on native Windows.",
-      "Install it with: winget install --id Git.Git -e --source winget",
-      `For a custom install, set ${GIT_BASH_ENV_KEY}=C:\\path\\to\\bash.exe`
-    ].join(`
-`)
-  };
-}
-function nonEmptyEnvValue(env, key) {
-  const value = env[key];
-  if (value === undefined)
-    return;
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? undefined : trimmed;
-}
-function isBashExePath(path) {
-  return path.toLowerCase().endsWith("bash.exe");
-}
-function isKnownNonGitBashLauncher(path) {
-  const normalized = path.replaceAll("/", "\\").toLowerCase();
-  return NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS.some((segment) => normalized.includes(segment));
-}
-function whereCommand(command) {
-  try {
-    return execFileSync("where", [command], { encoding: "utf8" }).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
-  } catch (error) {
-    if (error instanceof Error)
-      return [];
-    throw error;
-  }
-}
 // packages/omo-codex/src/install/codex-process.ts
-var WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"]);
+var WINDOWS_CMD_SHIM_COMMANDS = new Set(["codex", "npm", "npx"]);
 function resolveRunCommandInvocation(command, args, platform = process.platform) {
   if (platform !== "win32" || !WINDOWS_CMD_SHIM_COMMANDS.has(command.toLowerCase())) {
     return { command, args: [...args] };
@@ -6462,7 +6314,7 @@ import { homedir as homedir2 } from "node:os";
 
 // packages/omo-codex/src/install/codex-cache-bins.ts
 import { chmod, lstat as lstat4, mkdir, readFile as readFile3, readdir as readdir2, readlink as readlink3, rm as rm3, stat as stat2, symlink, writeFile } from "node:fs/promises";
-import { basename, isAbsolute as isAbsolute2, join as join5, relative, resolve as resolve2, sep } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join4, relative, resolve as resolve2, sep } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-command-shim.ts
 var COMMAND_SHIM_MARKER = ":: generated by oh-my-openagent Codex installer";
@@ -6507,7 +6359,7 @@ function windowsCommandShim(targetPath) {
 
 // packages/omo-codex/src/install/codex-cache-dangling-bins.ts
 import { lstat as lstat2, readFile, readdir, readlink, rm, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join as join2, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-fs.ts
 import { lstat } from "node:fs/promises";
@@ -6535,7 +6387,7 @@ async function removeDanglingManagedComponentBins(binDir, platform, managedBinNa
     const binName = managedBinNameForEntry(entry.name, platform);
     if (binName === null || !managedBinNames.has(binName))
       continue;
-    const linkPath = join2(binDir, entry.name);
+    const linkPath = join(binDir, entry.name);
     if (platform === "win32") {
       await removeDanglingGeneratedCommandShim(linkPath);
       continue;
@@ -6617,7 +6469,7 @@ function hasOmoCodexPluginPrefix(parts, endExclusive) {
 
 // packages/omo-codex/src/install/codex-cache-legacy-bins.ts
 import { lstat as lstat3, readFile as readFile2, readlink as readlink2, rm as rm2 } from "node:fs/promises";
-import { join as join3 } from "node:path";
+import { join as join2 } from "node:path";
 var LEGACY_CODEX_COMPONENT_BINS = [
   { name: "omo", component: "ulw-loop" },
   { name: "codex-comment-checker", component: "comment-checker" },
@@ -6629,7 +6481,7 @@ var LEGACY_CODEX_COMPONENT_BINS = [
 ];
 async function removeLegacyCodexComponentBins(binDir, platform) {
   for (const entry of LEGACY_CODEX_COMPONENT_BINS) {
-    const linkPath = join3(binDir, platform === "win32" ? `${entry.name}.cmd` : entry.name);
+    const linkPath = join2(binDir, platform === "win32" ? `${entry.name}.cmd` : entry.name);
     await removeLegacyCodexComponentBin(linkPath, entry.component, platform);
   }
 }
@@ -6680,10 +6532,10 @@ function isNodeErrorWithCode2(error) {
 }
 
 // packages/omo-codex/src/install/codex-cache-runtime-wrapper.ts
-import { join as join4 } from "node:path";
+import { join as join3 } from "node:path";
 var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";
 function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = toPosixPath(join4(binDir, "omo-ulw-loop"));
+  const ulwLoopBin = toPosixPath(join3(binDir, "omo-ulw-loop"));
   const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath));
   const escapedCliPath = escapePosixDoubleQuoted(toPosixPath(cliPath));
   const escapedCodexHome = escapePosixDoubleQuoted(toPosixPath(codexHome));
@@ -6728,7 +6580,7 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
 `);
 }
 function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = join4(binDir, "omo-ulw-loop.cmd");
+  const ulwLoopBin = join3(binDir, "omo-ulw-loop.cmd");
   return [
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
@@ -6788,40 +6640,40 @@ async function removeCachedManagedNpmBinShims(pluginRoot) {
   const binLinks = await discoverPackageBins(pluginRoot);
   if (binLinks.length === 0)
     return;
-  const npmBinDir = join5(pluginRoot, "node_modules", ".bin");
+  const npmBinDir = join4(pluginRoot, "node_modules", ".bin");
   if (!await isFileSystemEntry2(npmBinDir))
     return;
   const managedBinNames = new Set(binLinks.map((link) => link.name));
   for (const name of managedBinNames) {
     for (const suffix of ["", ".cmd", ".ps1"]) {
-      await rm3(join5(npmBinDir, `${name}${suffix}`), { force: true });
+      await rm3(join4(npmBinDir, `${name}${suffix}`), { force: true });
     }
   }
 }
 async function linkRootRuntimeBin(input) {
-  const cliPath = join5(input.repoRoot, "dist", "cli", "index.js");
+  const cliPath = join4(input.repoRoot, "dist", "cli", "index.js");
   if (!await isFile(cliPath))
     return null;
-  const nodeCliPath = join5(input.repoRoot, "dist", "cli-node", "index.js");
+  const nodeCliPath = join4(input.repoRoot, "dist", "cli-node", "index.js");
   const platform = input.platform ?? process.platform;
   await mkdir(input.binDir, { recursive: true });
   if (platform === "win32") {
-    const linkPath2 = join5(input.binDir, "omo.cmd");
+    const linkPath2 = join4(input.binDir, "omo.cmd");
     await replaceRuntimeWrapper(linkPath2, windowsRuntimeWrapper(cliPath, input.codexHome, input.binDir, nodeCliPath));
     return { name: "omo", path: linkPath2, target: cliPath };
   }
-  const linkPath = join5(input.binDir, "omo");
+  const linkPath = join4(input.binDir, "omo");
   await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(cliPath, input.codexHome, input.binDir, nodeCliPath));
   await chmod(linkPath, 493);
   return { name: "omo", path: linkPath, target: cliPath };
 }
 async function linkCachedPluginBin(binDir, link, platform) {
   if (platform === "win32") {
-    const linkPath2 = join5(binDir, `${link.name}.cmd`);
+    const linkPath2 = join4(binDir, `${link.name}.cmd`);
     await replaceCommandShim(linkPath2, link.target);
     return linkPath2;
   }
-  const linkPath = join5(binDir, link.name);
+  const linkPath = join4(binDir, link.name);
   await replaceSymlink(linkPath, link.target);
   return linkPath;
 }
@@ -6852,14 +6704,14 @@ async function discoverPackageBins(root) {
 async function collectPackageBins(directory, root, links) {
   const entries = await readdir2(directory, { withFileTypes: true });
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
-    await appendPackageBinLinks(join5(directory, "package.json"), directory, root, links);
+    await appendPackageBinLinks(join4(directory, "package.json"), directory, root, links);
   }
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist")
       continue;
-    const childPath = join5(directory, entry.name);
+    const childPath = join4(directory, entry.name);
     if (!childPath.startsWith(root))
       continue;
     await collectPackageBins(childPath, root, links);
@@ -6975,7 +6827,7 @@ import { basename as basename3, dirname as dirname5, join as join12, sep as sep5
 
 // packages/omo-codex/src/install/codex-cache-bundled-mcps.ts
 import { cp, mkdir as mkdir2, readFile as readFile4, stat as stat3 } from "node:fs/promises";
-import { dirname as dirname2, join as join6, resolve as resolve3 } from "node:path";
+import { dirname as dirname2, join as join5, resolve as resolve3 } from "node:path";
 var BUNDLED_MCP_RUNTIMES = [
   {
     label: "Git Bash MCP",
@@ -6993,23 +6845,23 @@ var BUNDLED_MCP_RUNTIMES = [
   }
 ];
 async function copyBundledMcpRuntimeDists(input) {
-  const sourceArgs = await readSourceMcpArgs(join6(input.sourceRoot, ".mcp.json"));
-  for (const runtime3 of BUNDLED_MCP_RUNTIMES) {
-    if (!sourceArgs.has(runtime3.sourceArg))
+  const sourceArgs = await readSourceMcpArgs(join5(input.sourceRoot, ".mcp.json"));
+  for (const runtime2 of BUNDLED_MCP_RUNTIMES) {
+    if (!sourceArgs.has(runtime2.sourceArg))
       continue;
-    await copyBundledMcpRuntimeDist(input.pluginRoot, input.sourceRoot, runtime3);
+    await copyBundledMcpRuntimeDist(input.pluginRoot, input.sourceRoot, runtime2);
   }
 }
 function resolveBundledMcpRuntimeArg(pluginRoot, arg) {
-  const runtime3 = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg);
-  return runtime3 ? join6(pluginRoot, runtime3.destinationArg) : null;
+  const runtime2 = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg);
+  return runtime2 ? join5(pluginRoot, runtime2.destinationArg) : null;
 }
-async function copyBundledMcpRuntimeDist(pluginRoot, sourceRoot, runtime3) {
-  const sourcePath = resolve3(sourceRoot, runtime3.sourceDistFromPlugin);
+async function copyBundledMcpRuntimeDist(pluginRoot, sourceRoot, runtime2) {
+  const sourcePath = resolve3(sourceRoot, runtime2.sourceDistFromPlugin);
   if (!await isDirectory(sourcePath)) {
-    throw new Error(`missing built ${runtime3.label} dist at ${sourcePath}`);
+    throw new Error(`missing built ${runtime2.label} dist at ${sourcePath}`);
   }
-  const destinationPath = join6(pluginRoot, runtime3.destinationDistFromPlugin);
+  const destinationPath = join5(pluginRoot, runtime2.destinationDistFromPlugin);
   await mkdir2(dirname2(destinationPath), { recursive: true });
   await cp(sourcePath, destinationPath, { recursive: true });
 }
@@ -7048,10 +6900,10 @@ async function isDirectory(path) {
 // packages/omo-codex/src/install/codex-cache-local-dependencies.ts
 import { realpathSync } from "node:fs";
 import { readFile as readFile5, readdir as readdir3, writeFile as writeFile2 } from "node:fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute4, join as join8, relative as relative3, resolve as resolve5, sep as sep2 } from "node:path";
+import { dirname as dirname3, isAbsolute as isAbsolute4, join as join7, relative as relative3, resolve as resolve5, sep as sep2 } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-paths.ts
-import { isAbsolute as isAbsolute3, join as join7, relative as relative2, resolve as resolve4 } from "node:path";
+import { isAbsolute as isAbsolute3, join as join6, relative as relative2, resolve as resolve4 } from "node:path";
 function resolveCachedRuntimePath(pluginRoot, sourceRoot, runtimePath) {
   const targetPath = resolve4(pluginRoot, runtimePath);
   if (isPathInside(targetPath, pluginRoot))
@@ -7068,13 +6920,14 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
   const packageJsonPaths = [];
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths);
   const packageLock = await readPackageLock(pluginRoot);
+  let rewroteAnyPackageJson = false;
   for (const packageJsonPath of packageJsonPaths) {
     const raw = await readFile5(packageJsonPath, "utf8");
     const parsed = JSON.parse(raw);
     if (!isPlainRecord(parsed))
       continue;
     const packageDir = dirname3(packageJsonPath);
-    const sourcePackageDir = join8(sourceRoot, relative3(pluginRoot, packageDir));
+    const sourcePackageDir = join7(sourceRoot, relative3(pluginRoot, packageDir));
     let changed = false;
     for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
       const dependencies = parsed[field];
@@ -7103,16 +6956,19 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
         changed = true;
       }
     }
-    if (changed)
+    if (changed) {
       await writeFile2(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}
 `);
+      rewroteAnyPackageJson = true;
+    }
   }
   if (packageLock.changed)
     await writeFile2(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}
 `);
+  return rewroteAnyPackageJson;
 }
 async function readPackageLock(pluginRoot) {
-  const path = join8(pluginRoot, "package-lock.json");
+  const path = join7(pluginRoot, "package-lock.json");
   try {
     const parsed = JSON.parse(await readFile5(path, "utf8"));
     return { path, value: isPlainRecord(parsed) ? parsed : null, changed: false };
@@ -7173,14 +7029,14 @@ function canonicalizeExistingPath(path) {
 async function collectPackageJsonPaths(directory, root, paths) {
   const entries = await readdir3(directory, { withFileTypes: true });
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
-    paths.push(join8(directory, "package.json"));
+    paths.push(join7(directory, "package.json"));
   }
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist")
       continue;
-    const childPath = join8(directory, entry.name);
+    const childPath = join7(directory, entry.name);
     if (!isPathInside(childPath, root))
       continue;
     await collectPackageJsonPaths(childPath, root, paths);
@@ -7191,13 +7047,78 @@ async function collectPackageJsonPaths(directory, root, paths) {
 import { readFile as readFile6, writeFile as writeFile3 } from "node:fs/promises";
 import { join as join10, sep as sep3 } from "node:path";
 
-// packages/utils/src/codegraph/resolve.ts
-import { existsSync as existsSync2 } from "node:fs";
+// ../../omo/packages/utils/src/codegraph/resolve.ts
+import { existsSync } from "node:fs";
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { basename as basename2, dirname as dirname4, join as join9 } from "node:path";
 import { createRequire } from "node:module";
 
-// packages/utils/src/codegraph/node-support.ts
+// ../../omo/packages/utils/src/runtime/which.ts
+import { accessSync, constants } from "node:fs";
+import { delimiter, join as join8 } from "node:path";
+var runtime2 = globalThis;
+function isUnsafeCommandName(commandName) {
+  if (commandName.includes("/") || commandName.includes("\\"))
+    return true;
+  if (commandName === "." || commandName === ".." || commandName.includes(".."))
+    return true;
+  if (/^[a-zA-Z]:/.test(commandName))
+    return true;
+  if (commandName.includes("\x00"))
+    return true;
+  return false;
+}
+function isExecutable(filePath) {
+  try {
+    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK);
+    return true;
+  } catch (error) {
+    if (!(error instanceof Error) && Object.prototype.toString.call(error) !== "[object Error]") {
+      throw error;
+    }
+    return false;
+  }
+}
+function resolvePathValue() {
+  if (process.platform === "win32")
+    return process.env["Path"] ?? process.env["PATH"];
+  return process.env["PATH"];
+}
+function getWindowsCandidates(commandName) {
+  if (process.platform !== "win32")
+    return [commandName];
+  if (/\.[^\\/]+$/.test(commandName))
+    return [commandName];
+  return [commandName, `${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`];
+}
+function bunWhich(commandName) {
+  if (!commandName)
+    return null;
+  if (isUnsafeCommandName(commandName))
+    return null;
+  const candidateNames = getWindowsCandidates(commandName);
+  for (const candidateName of candidateNames) {
+    const resolvedPath = runtime2.Bun?.which(candidateName) ?? null;
+    if (resolvedPath !== null)
+      return resolvedPath;
+  }
+  const pathValue = resolvePathValue();
+  if (!pathValue)
+    return null;
+  const pathEntries = pathValue.split(delimiter).filter((pathEntry) => pathEntry.length > 0);
+  if (pathEntries.length === 0)
+    return null;
+  for (const pathEntry of pathEntries) {
+    for (const candidateName of candidateNames) {
+      const candidatePath = join8(pathEntry, candidateName);
+      if (isExecutable(candidatePath))
+        return candidatePath;
+    }
+  }
+  return null;
+}
+
+// ../../omo/packages/utils/src/codegraph/node-support.ts
 var CODEGRAPH_MIN_NODE_MAJOR = 20;
 var CODEGRAPH_BLOCKED_NODE_MAJOR = 25;
 var CODEGRAPH_UNSAFE_NODE_ENV = "CODEGRAPH_ALLOW_UNSAFE_NODE";
@@ -7221,7 +7142,7 @@ function parseNodeMajor(version) {
   return Number.isNaN(major) ? 0 : major;
 }
 
-// packages/utils/src/codegraph/resolve.ts
+// ../../omo/packages/utils/src/codegraph/resolve.ts
 var CODEGRAPH_NODE_CANDIDATES = ["node24", "node22", "node20", "node"];
 var CODEGRAPH_NODE_PATH_CANDIDATES = [
   "/opt/homebrew/opt/node@24/bin/node",
@@ -7293,7 +7214,7 @@ function defaultNodeRuntime(env, fileExists, which, nodeVersion) {
 }
 function resolveCodegraphNodeRuntime(options = {}) {
   const env = options.env ?? process.env;
-  return defaultNodeRuntime(env, options.fileExists ?? existsSync2, options.which ?? bunWhich, options.nodeVersion ?? defaultNodeVersion);
+  return defaultNodeRuntime(env, options.fileExists ?? existsSync, options.which ?? bunWhich, options.nodeVersion ?? defaultNodeVersion);
 }
 function resolveCodegraphNodeSupport(options = {}) {
   const env = options.env ?? process.env;
@@ -7530,10 +7451,11 @@ async function installCachedPlugin(input) {
   await rm4(tempPath, { recursive: true, force: true });
   try {
     await copyDirectory(input.sourcePath, tempPath);
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
+    const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
-    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"]);
+    const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
       await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
@@ -7803,7 +7725,7 @@ async function isDirectory2(path) {
 }
 
 // packages/omo-codex/src/install/codex-package-layout.ts
-import { existsSync as existsSync3 } from "node:fs";
+import { existsSync as existsSync2 } from "node:fs";
 import { readFile as readFile9 } from "node:fs/promises";
 import { join as join15 } from "node:path";
 var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
@@ -7815,10 +7737,10 @@ var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
   "oh-my-openagent"
 ]);
 async function shouldBuildSourcePackages(repoRoot) {
-  if (existsSync3(join15(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
+  if (existsSync2(join15(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
     return true;
   const packageJsonPath = join15(repoRoot, "package.json");
-  if (!existsSync3(packageJsonPath))
+  if (!existsSync2(packageJsonPath))
     return true;
   const packageJson = JSON.parse(await readFile9(packageJsonPath, "utf8"));
   if (!isPlainRecord(packageJson) || typeof packageJson.name !== "string")
@@ -9321,6 +9243,89 @@ async function exists(path) {
   }
 }
 
+// ../../omo/packages/utils/src/runtime/git-bash.ts
+import { execFileSync } from "node:child_process";
+import { existsSync as existsSync3 } from "node:fs";
+var GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH";
+var PROGRAM_FILES_GIT_BASH = "C:\\Program Files\\Git\\bin\\bash.exe";
+var PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe";
+var NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS = ["\\windows\\system32\\", "\\microsoft\\windowsapps\\"];
+function resolveGitBash(input) {
+  if (input.platform !== "win32")
+    return { found: true, path: null, source: "not-required", checkedPaths: [] };
+  const checkedPaths = [];
+  const envPath = nonEmptyEnvValue(input.env, GIT_BASH_ENV_KEY);
+  if (envPath !== undefined) {
+    checkedPaths.push(envPath);
+    if (isBashExePath(envPath) && input.exists(envPath)) {
+      return { found: true, path: envPath, source: "env", checkedPaths };
+    }
+    return missingGitBash(checkedPaths);
+  }
+  for (const candidate of [
+    { path: PROGRAM_FILES_GIT_BASH, source: "program-files" },
+    { path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" }
+  ]) {
+    checkedPaths.push(candidate.path);
+    if (input.exists(candidate.path))
+      return { found: true, path: candidate.path, source: candidate.source, checkedPaths };
+  }
+  for (const pathCandidate of input.where("bash")) {
+    const candidate = pathCandidate.trim();
+    if (candidate.length === 0)
+      continue;
+    checkedPaths.push(candidate);
+    if (isKnownNonGitBashLauncher(candidate))
+      continue;
+    if (isBashExePath(candidate) && input.exists(candidate))
+      return { found: true, path: candidate, source: "path", checkedPaths };
+  }
+  return missingGitBash(checkedPaths);
+}
+var resolveGitBashForCurrentProcess = (input = {}) => {
+  return resolveGitBash({
+    platform: input.platform ?? process.platform,
+    env: input.env ?? process.env,
+    exists: existsSync3,
+    where: whereCommand
+  });
+};
+function missingGitBash(checkedPaths) {
+  return {
+    found: false,
+    checkedPaths,
+    installHint: [
+      "Git Bash is required on native Windows.",
+      "Install it with: winget install --id Git.Git -e --source winget",
+      `For a custom install, set ${GIT_BASH_ENV_KEY}=C:\\path\\to\\bash.exe`
+    ].join(`
+`)
+  };
+}
+function nonEmptyEnvValue(env, key) {
+  const value = env[key];
+  if (value === undefined)
+    return;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+function isBashExePath(path) {
+  return path.toLowerCase().endsWith("bash.exe");
+}
+function isKnownNonGitBashLauncher(path) {
+  const normalized = path.replaceAll("/", "\\").toLowerCase();
+  return NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS.some((segment) => normalized.includes(segment));
+}
+function whereCommand(command) {
+  try {
+    return execFileSync("where", [command], { encoding: "utf8" }).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+  } catch (error) {
+    if (error instanceof Error)
+      return [];
+    throw error;
+  }
+}
+
 // packages/omo-codex/src/install/git-bash.ts
 var resolveGitBashForCurrentProcess2 = (input = {}) => {
   return toCodexResolution(resolveGitBashForCurrentProcess(input));
@@ -9392,6 +9397,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.5", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "ultra" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "ultra" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9401,6 +9410,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
       }
     ]
   ],
@@ -9410,6 +9423,37 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
         current: { model: "gpt-5.6-luna", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "max" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-high",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-code-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-clone-fidelity-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9428,6 +9472,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "high" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-sol", effort: "low" }
       }
     ]
   ]
@@ -10657,7 +10705,7 @@ async function seedAndMigrateOmoSot(input) {
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
 import { join as join32 } from "node:path";
 
-// packages/utils/src/ast-grep/sg-manifest.ts
+// ../../omo/packages/utils/src/ast-grep/sg-manifest.ts
 function normalizeRuntimePlatform(platform = process.platform) {
   if (platform === "darwin" || platform === "linux" || platform === "win32")
     return platform;
@@ -10672,7 +10720,7 @@ function runtimeSlug(platform = process.platform, arch = process.arch) {
   return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
 }
 
-// packages/utils/src/ast-grep/install-script.ts
+// ../../omo/packages/utils/src/ast-grep/install-script.ts
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync4 } from "node:fs";
 import { join as join31 } from "node:path";

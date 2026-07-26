@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 describe("member extension lifecycle", () => {
-  test("#given unread mail during extension loading #when session_start fires #then runtime actions wait for the lifecycle edge", async () => {
+  test("#given unread mail during extension loading #when session_start fires #then runtime actions defer to the lifecycle edge", async () => {
     const root = mkdtempSync(join(tmpdir(), "senpi-member-extension-"))
     roots.push(root)
     const stateDir = join(root, "state")
@@ -37,9 +37,7 @@ describe("member extension lifecycle", () => {
 
     const handlers = new Map<string, Array<() => unknown | Promise<unknown>>>()
     const toolNames: string[] = []
-    const injected: string[] = []
-    let reportInjection = (): void => undefined
-    const injection = new Promise<void>((resolve) => { reportInjection = resolve })
+    const injected: Array<{ content: string; deliverAs: string | undefined }> = []
     let loading = true
     const api = {
       on(event: string, handler: () => unknown | Promise<unknown>) {
@@ -50,10 +48,9 @@ describe("member extension lifecycle", () => {
       registerTool(tool: { name: string }) {
         toolNames.push(tool.name)
       },
-      sendUserMessage(content: string) {
+      sendUserMessage(content: string, options?: { deliverAs?: string }) {
         if (loading) throw new Error("runtime action called during extension loading")
-        injected.push(content)
-        reportInjection()
+        injected.push({ content, deliverAs: options?.deliverAs })
       },
     } as unknown as ExtensionAPI
     const previous = captureMemberEnv()
@@ -64,7 +61,6 @@ describe("member extension lifecycle", () => {
         ...config,
         stateDir,
         members: ["alice"],
-        wait: { min_ms: 5, default_ms: 50, max_ms: 100 },
       }),
       SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
     })
@@ -72,14 +68,16 @@ describe("member extension lifecycle", () => {
     try {
       await registerMemberExtension(api)
       expect(injected).toEqual([])
-      expect(toolNames).toEqual(["task_send", "team_wait"])
+      expect(toolNames).toEqual(["task_send"])
 
       loading = false
       await dispatch(handlers, "session_start")
-      await withTimeout(injection, 1_500)
 
       expect(injected).toHaveLength(1)
-      expect(injected[0]).toContain(MESSAGE_ID)
+      expect(injected[0]).toEqual({
+        content: expect.stringContaining(MESSAGE_ID),
+        deliverAs: "followUp",
+      })
     } finally {
       await dispatch(handlers, "session_shutdown")
       restoreMemberEnv(previous)
@@ -116,16 +114,4 @@ async function dispatch(
   event: string,
 ): Promise<void> {
   for (const handler of handlers.get(event) ?? []) await handler()
-}
-
-async function withTimeout(completion: Promise<void>, timeoutMs: number): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error("member poll interval did not inject unread mail")), timeoutMs)
-  })
-  try {
-    await Promise.race([completion, timeout])
-  } finally {
-    if (timer !== undefined) clearTimeout(timer)
-  }
 }

@@ -3,7 +3,7 @@ import { basename, delimiter, dirname, isAbsolute } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
-import { jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
+import { jsonRpcId, type ParentWatchdogConfig, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
 import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
 
 import { type CallToolOptions, callToolViaDaemon, type DaemonToolContext } from "./daemon-client.js";
@@ -20,6 +20,11 @@ export interface ProxyOptions {
 	homeDir?: string;
 	ensure?: CallToolOptions["ensure"];
 	startupTimeoutMs?: number;
+	// Test seam: production callers leave this unset so the watchdog uses its
+	// defaults (parentPid = process.ppid, 30s poll). The watchdog is a third,
+	// independent exit path next to idle timeout and stdin end/close: it saves
+	// us when the parent dies while holding the proxy's stdin open.
+	parentWatchdog?: ParentWatchdogConfig;
 }
 
 const DEFAULT_STARTUP_TIMEOUT_MS = 10_000;
@@ -83,6 +88,7 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 			input,
 			output,
 			idleTimeoutMs: 0,
+			parentWatchdog: options.parentWatchdog ?? {},
 			handler: (request, requestOptions) => {
 				clearStartupWatchdog();
 				return runWithRequestContext(context, () => handleProxyRequest(request, requestOptions));

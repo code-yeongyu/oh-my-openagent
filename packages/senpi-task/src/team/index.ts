@@ -24,6 +24,8 @@ export { createTeam, deleteTeam, SenpiTeamRuntimeError } from "./runtime"
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
+  CreatedMemberRole,
   DeleteTeamDeps,
   DeleteTeamResult,
   TeamRuntimeManagerPort,
@@ -46,15 +48,17 @@ export type { TeamMemberRespawnLaunchErrorCode, TeamMemberRespawnLaunchResolverO
 export {
   buildPeerMessageEnvelope,
   buildTeamMessage,
+  createLeadDeliveryJournal,
   createLeadPoller,
   DEFAULT_STALE_RESERVATION_TTL_MS,
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   sendTeamMessage,
-  WaitRegistry,
 } from "./messaging"
 export type {
   BuildTeamMessageOptions,
+  LeadDeliveryJournal,
+  LeadDeliveryJournalOptions,
   LeadInjection,
   LeadInjectionSink,
   LeadPollFilter,
@@ -65,10 +69,6 @@ export type {
   ReconcileTeamMailboxDeps,
   SendTeamMessageInput,
   SendTeamMessageResult,
-  WaitClaim,
-  WaitFilter,
-  WaitMessage,
-  WaitRegistration,
 } from "./messaging"
 export {
   MEMBER_EXTENSION_BUNDLE_NAME,

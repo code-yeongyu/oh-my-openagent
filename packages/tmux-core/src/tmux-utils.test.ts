@@ -8,7 +8,10 @@ import {
   closeTmuxPane,
   applyLayout,
 } from "./tmux-utils"
-import { isInsideTmuxEnvironment } from "./tmux-utils/environment"
+import {
+  isInsideTmuxEnvironment,
+  isTmuxPaneCompatibleEnvironment,
+} from "./tmux-utils/environment"
 import { createServerHealthStateForTesting } from "./tmux-utils/server-health"
 
 function createFetchRecorder(responseFactory: () => Promise<Response>): typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> } {
@@ -32,6 +35,31 @@ describe("isInsideTmux", () => {
 
     // when
     const result = isInsideTmuxEnvironment(environment)
+
+    // then
+    expect(result).toBe(true)
+  })
+
+  test("returns false when only CMUX_SOCKET_PATH is set", () => {
+    // given
+    const environment = { CMUX_SOCKET_PATH: "/tmp/cmux.sock" }
+
+    // when
+    const result = isInsideTmuxEnvironment(environment)
+
+    // then
+    expect(result).toBe(false)
+  })
+
+  test("pane compatibility returns true when CMUX_SOCKET_PATH is set without TMUX", () => {
+    // given
+    const environment = {
+      CMUX_SOCKET_PATH: "/tmp/cmux.sock",
+      TMUX_PANE: "%0",
+    }
+
+    // when
+    const result = isTmuxPaneCompatibleEnvironment(environment)
 
     // then
     expect(result).toBe(true)

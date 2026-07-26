@@ -192,6 +192,10 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 **NOTHING is "done" without PROOF it works.**
 
+### Goal Registration (BINDING)
+
+When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation: the full objective, the scenario contract below, and one line "I'll stop right away when <the exact observable state that ends this run>". Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
+
 ### Pre-Implementation: Scenario Contract (BINDING)
 
 BEFORE writing ANY code, define **3+ realistic scenarios** covering:
@@ -287,6 +291,10 @@ Test-first is not optional. Every behavior change — features, fixes, refactors
 **Exemption whitelist** (no new test required): pure formatting, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption MUST be justified in `## Findings` with the exact reason. Unjustified exemption is rejection.
 
 **If you typed production code without a failing test preceding it in the notepad: STOP, revert, write the test, watch it fail, then redo.**
+
+### Commit Discipline (MANDATORY)
+
+Commit frequently: one atomic commit per verified increment (RED→GREEN + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Load the `git-master` skill for the commit workflow when available. Skip committing only when the user forbade commits this session.
 
 ### Verification Anti-Patterns (BLOCKING)
 

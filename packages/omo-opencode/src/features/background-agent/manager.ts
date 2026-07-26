@@ -32,7 +32,6 @@ import {
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { isInsideTmux } from "../../shared/tmux"
 import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -99,6 +98,7 @@ import {
 } from "./session-stream-activity"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
+import { invokeTmuxSessionCreatedCallback } from "./spawner/tmux-callback-invoker"
 import {
   createSubagentDepthLimitError,
   getMaxSubagentDepth,
@@ -1029,28 +1029,15 @@ The fallback retry session is now created and can be inspected directly.
       }
     })
 
-    log("[background-agent] tmux callback check", {
-      hasCallback: !!this.onSubagentSessionCreated,
+    invokeTmuxSessionCreatedCallback({
+      callback: this.onSubagentSessionCreated,
       tmuxEnabled: this.tmuxEnabled,
-      isInsideTmux: isInsideTmux(),
+      suppress: input.suppressTmuxSpawn === true,
       sessionID,
       parentID: input.parentSessionId,
+      title: input.description,
+      log,
     })
-
-    if (!input.suppressTmuxSpawn && this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
-      log("[background-agent] Invoking tmux callback (fire-and-forget)", { sessionID })
-      void this.onSubagentSessionCreated({
-        sessionID,
-        parentID: input.parentSessionId,
-        title: input.description,
-      }).catch((err) => {
-        log("[background-agent] Failed to spawn tmux pane:", err)
-      })
-    } else {
-      log("[background-agent] SKIP tmux callback - conditions not met", {
-        suppressTmuxSpawn: !!input.suppressTmuxSpawn,
-      })
-    }
   }
 
   getTask(id: string): BackgroundTask | undefined {

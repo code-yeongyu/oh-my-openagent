@@ -1,6 +1,6 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
 
-import type { StartResult, TaskManager } from "../../manager"
+import type { PlanResolutionError, StartResult, TaskManager } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { MAX_TASK_BATCH_ITEMS } from "./params"
 import type { ResolvedSpawnItem, TaskToolDetails, TaskToolItemDetail } from "./types"
@@ -37,9 +37,7 @@ function continuationFooter(taskId: string): string {
 function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult): TaskToolItemDetail {
   switch (start.kind) {
     case "plan_unresolved": {
-      const available = start.error.availableCategories
-      const suffix = available !== undefined && available.length > 0 ? ` Available categories: ${available.join(", ")}.` : ""
-      return itemError(item, "", start.error.message + suffix)
+      return itemError(item, "", start.error.message + categoryListSuffix(start.error))
     }
     case "depth_denied":
       return itemError(item, "", start.reason)
@@ -84,6 +82,18 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
     }
   }
   return starts
+}
+
+function categoryListSuffix(error: PlanResolutionError): string {
+  const available = error.availableCategories
+  if (available === undefined || available.length === 0) return ""
+  // A model_unavailable failure means the category name IS valid; listing it under "Available
+  // categories" told models to retry the same broken binding. Name the vocabulary honestly and
+  // surface the explicit-model escape hatch.
+  if (error.code === "model_unavailable") {
+    return ` Valid category names: ${available.join(", ")}. Pass model: "<provider>/<model>" to override the category default.`
+  }
+  return ` Available categories: ${available.join(", ")}.`
 }
 
 function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {

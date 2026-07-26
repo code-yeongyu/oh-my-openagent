@@ -14,6 +14,7 @@ import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
+import { buildClaudeOpus5SisyphusPrompt } from "./sisyphus/claude-opus-5";
 import { buildGlm52SisyphusPrompt } from "./sisyphus/glm-5-2";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
@@ -25,6 +26,7 @@ import {
   isClaudeFable5Model,
   isClaudeOpus47Model,
   isClaudeOpus48Model,
+  isClaudeOpus5Model,
   isGlmModel,
   isGpt5_5Model,
   isGpt5_6Model,
@@ -51,6 +53,7 @@ export type SisyphusPromptFamily =
   | "gpt-5-5"
   | "gpt-5-4"
   | "claude-fable-5"
+  | "claude-opus-5"
   | "claude-opus-4-8"
   | "claude-opus-4-7"
   | "glm-5-2"
@@ -63,6 +66,7 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isGpt5_5Model(model) || isGpt5_6Model(model)) return "gpt-5-5";
   if (isGptNativeSisyphusModel(model)) return "gpt-5-4";
   if (isClaudeFable5Model(model)) return "claude-fable-5";
+  if (isClaudeOpus5Model(model)) return "claude-opus-5";
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
   if (isGlmModel(model)) return "glm-5-2";
@@ -118,6 +122,12 @@ export function createSisyphusAgent(
         MODE,
         model,
         buildClaudeFable5SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "claude-opus-5":
+      return buildClaudeSisyphusAgentConfig(
+        MODE,
+        model,
+        buildClaudeOpus5SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
     case "claude-opus-4-8":
       return buildClaudeSisyphusAgentConfig(

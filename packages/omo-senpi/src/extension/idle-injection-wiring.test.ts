@@ -44,7 +44,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
           name: "bg",
           status: "completed",
           duration_ms: 1,
-          final_response_head: "",
+          final_response: "",
           continuation_hint: "",
         },
       ],

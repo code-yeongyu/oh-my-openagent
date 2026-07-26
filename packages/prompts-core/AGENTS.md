@@ -11,7 +11,7 @@ Owns all static markdown prompt content (`prompts/` tree), bundles it at build t
 | Family | Variants |
 |--------|----------|
 | `ultrawork/` | `default`, `gpt`, `gemini`, `glm`, `planner`, `codex` (6) |
-| `atlas/` | `default`, `gpt`, `gemini`, `glm`, `kimi`, `kimi-k2-7`, `opus-4-7` (7) |
+| `atlas/` | `default`, `gpt`, `gemini`, `glm`, `kimi`, `kimi-k2-7`, `kimi-k3`, `opus-4-7` (8) |
 | `prometheus/` | `default` only (no model routing) |
 | `mode/` | `hyperplan`, `team` |
 

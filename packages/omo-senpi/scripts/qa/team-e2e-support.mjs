@@ -12,19 +12,7 @@ const RESERVED_PREFIX = ".delivering-"
 // The Metis #7/#8 credential-isolation guarantee: these four files in the real ~/.senpi/agent must be
 // byte-unchanged across a QA run. The whole-dir digest is informational only (a live dev machine writes
 // senpi-debug.log + concurrent session JSONL), so allPass gates on THIS scoped digest, never the dir.
-const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
-
-export function credentialDigest(agentDir) {
-  const hash = createHash("sha256")
-  for (const name of CREDENTIAL_FILES) {
-    const path = join(agentDir, name)
-    hash.update(name)
-    hash.update("\0")
-    hash.update(existsSync(path) ? readFileSync(path) : Buffer.from("absent"))
-    hash.update("\0")
-  }
-  return hash.digest("hex")
-}
+export { credentialDigest } from "./drive.mjs"
 
 export function parseEvents(stdout) {
   const events = []

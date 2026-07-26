@@ -48,7 +48,7 @@ function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: Idle
 }
 
 const completionDetails = [
-  { task_id: "st_1", name: "worker", status: "completed" as const, duration_ms: 10, final_response_head: "ok", continuation_hint: "continue" },
+  { task_id: "st_1", name: "worker", status: "completed" as const, duration_ms: 10, final_response: "ok", continuation_hint: "continue" },
 ]
 
 function completionMessage(taskId: string) {
@@ -61,7 +61,7 @@ function completionMessage(taskId: string) {
   }
 }
 
-describe("createParentNotifier batched steer delivery", () => {
+describe("createParentNotifier batched injection delivery", () => {
   test("#given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer", () => {
     // given
     const delivered: Delivered[] = []
@@ -121,7 +121,7 @@ describe("createParentNotifier batched steer delivery", () => {
     expect(delivered[0]?.content.match(/st_1 completed/g)).toHaveLength(1)
   })
 
-  test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
+  test("#given an IDLE parent #when two completions land in the same tick #then one microtask followUp carries both", async () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
     const delivered: Delivered[] = []
     const coordinator = new IdleInjectionCoordinator(
@@ -135,9 +135,9 @@ describe("createParentNotifier batched steer delivery", () => {
     expect(delivered).toHaveLength(0)
     await Promise.resolve()
 
-    // then delivery is immediate (no exit race in print mode) and still batched into ONE steer
+    // then delivery is immediate (no exit race in print mode) and still batched into ONE follow-up
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]?.deliverAs).toBe("steer")
+    expect(delivered[0]?.deliverAs).toBe("followUp")
     expect(delivered[0]?.content).toContain("st_1 completed")
     expect(delivered[0]?.content).toContain("st_2 completed")
   })

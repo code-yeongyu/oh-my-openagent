@@ -2,11 +2,12 @@
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
 import {
   changedRealPaths,
+  classifyRealSenpiChanges,
   findBatchFanout,
   findCategoryListingError,
   findInlineFinal,
@@ -71,7 +72,7 @@ function driveSenpi(senpiBin, scenario, prompt, pids) {
     ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", scenario.sessionDir, prompt],
     {
       cwd: scenario.sandbox.cwd,
-      env: { ...process.env, SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
+      env: { ...process.env, SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
       encoding: "utf8",
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,
@@ -114,8 +115,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   checks.spawn_background = run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
   checks.followup_revive = findRevived(events) && JSON.stringify(events).includes(CHILD_SECOND) ? "PASS" : "FAIL"
-  checks.task_output_full = findTranscript(events, CHILD_FIRST) ? "PASS" : "FAIL"
-  checks.task_output_block = findBlockingTaskOutput(events) && checks.task_output_full === "PASS" ? "PASS" : "FAIL"
+  checks.task_output_peek = findTranscript(events, CHILD_FIRST) && findPeekTaskOutput(events) ? "PASS" : "FAIL"
   checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE) ? "PASS" : "FAIL"
   checks.extension_suppression = markerCount(scenario.markerLog) === 1 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
@@ -166,16 +166,21 @@ function main() {
   const checks = {}
   const capture = {}
   const pids = []
+  const sandboxes = []
   try {
-    for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) runner(senpiBin, checks, capture, pids)
+    for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) {
+      sandboxes.push(runner(senpiBin, checks, capture, pids))
+    }
   } finally {
     for (const pid of pids) if (isAlive(pid)) killTree(pid)
   }
 
   const leakedPids = pids.filter(isAlive).length
   const afterDigest = digestDirectory(realSenpiAgentDir)
-  const changedReal = changedRealPaths(beforeSnapshot, snapshotDir(realSenpiAgentDir))
-  const realSenpiUntouched = changedReal.length === 0
+  const allChangedRealPaths = changedRealPaths(beforeSnapshot, snapshotDir(realSenpiAgentDir))
+  const sandboxTokens = sandboxes.map((sandbox) => basename(sandbox.root))
+  const { qaAttributedPaths, concurrentSessionPaths } = classifyRealSenpiChanges(allChangedRealPaths, sandboxTokens)
+  const realSenpiUntouched = qaAttributedPaths.length === 0
   checks.real_senpi_untouched = realSenpiUntouched ? "PASS" : "FAIL"
   checks.no_leaked_pids = leakedPids === 0 ? "PASS" : "FAIL"
 
@@ -187,9 +192,14 @@ function main() {
     leakedPids,
     spawnedPids: pids,
     realSenpiUntouched,
-    realSenpiChangedPaths: changedReal,
+    realSenpiChangedPaths: qaAttributedPaths,
+    concurrentRealSenpiChangedPaths: concurrentSessionPaths,
+    allRealSenpiChangedPaths: allChangedRealPaths,
     realSenpiDigestUnchanged: beforeDigest === afterDigest,
     providedAgentDir,
+    sandboxAgentDirs: sandboxes.map((sandbox) => sandbox.agentDir),
+    sandboxCwds: sandboxes.map((sandbox) => sandbox.cwd),
+    sandboxTokens,
     markerChildExtensions: capture.markerCount,
     mainTaskId: capture.mainTaskId,
     mainSignatures: capture.mainSignatures,
@@ -212,8 +222,9 @@ function writeEvidenceMaybe(outDir, capture, payload) {
   writeFileSync(join(outDir, "negative.stdout.json.log"), capture.negativeStdout ?? "")
 }
 
-function findBlockingTaskOutput(events) {
-  return JSON.stringify(events).includes('"name":"task_output"') && JSON.stringify(events).includes('"block":true')
+function findPeekTaskOutput(events) {
+  const output = JSON.stringify(events)
+  return output.includes('"name":"task_output"') && !output.includes('"block"') && !output.includes('"timeout_ms"')
 }
 
 function batchChildrenCompleted(events, items) {
@@ -225,13 +236,14 @@ function batchChildrenCompleted(events, items) {
 function runSelfTest() {
   const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({
     type: "custom",
-    content: "task completion name:e2echild id:st_abc status:completed duration:3ms\nresult:\"done\"\nnext:Use task_send({ to: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result.",
+    content: "task completion name:e2echild id:st_abc status:completed duration:3ms\nresult:\"done\"\nnext:Use task_send({ to: \"st_abc\", message: \"...\" }) to continue.",
   })}`)
   if (!findWakeNotification(wakeEvents, "st_abc").ok) throw new Error("self-test: wake notification must be detected")
   if (findWakeNotification(wakeEvents, "st_missing").ok) throw new Error("self-test: wake must not match a foreign task id")
   if (!findRevived(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } })))) throw new Error("self-test: revived must be detected")
   if (!findTranscript(parseJsonEvents(JSON.stringify({ type: "toolResult", content: `st_abc [completed] transcript via jsonl:\n${CHILD_FIRST}` })), CHILD_FIRST)) throw new Error("self-test: transcript must be detected")
-  if (!findBlockingTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: blocking output call must be detected")
+  if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: non-blocking output peek must be detected")
+  if (findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: legacy blocking output call must not count as a peek")
   if (!findInlineFinal(parseJsonEvents(JSON.stringify({ type: "text", text: SYNC_FINAL })), SYNC_FINAL)) throw new Error("self-test: inline final must be detected")
   if (!findCategoryListingError(parseJsonEvents(JSON.stringify({ type: "toolResult", content: "Unknown category. Available categories: quick, deep." })))) throw new Error("self-test: category listing error must be detected")
   const batchItems = findBatchFanout(parseJsonEvents(JSON.stringify({

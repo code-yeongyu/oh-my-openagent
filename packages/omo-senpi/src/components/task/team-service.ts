@@ -97,6 +97,21 @@ function toTeams(rows: Awaited<ReturnType<typeof listActiveTeams>>): readonly Ac
   }))
 }
 
+// Scoped team surfaces must behave like team_wait: a run id owned by another session is rejected,
+// never answered with misleading data (task_list once returned "0 task(s)." for a foreign team).
+// Headless/uncaptured sessions stay permissive, and unknown run ids fall through to the existing
+// missing-state handling downstream.
+async function assertOwnedTeam(deps: TeamServiceDeps, config: TeamCoreConfig, teamRunId: string): Promise<void> {
+  const leadSessionId = deps.runtime.sessionId()
+  if (leadSessionId === undefined) return
+  const rows = await listActiveTeams(config)
+  const owned = rows.find((row) => row.teamRunId === teamRunId)
+  if (owned === undefined || owned.leadSessionId === undefined) return
+  if (owned.leadSessionId !== leadSessionId) {
+    throw new Error(`Team ${teamRunId} is not owned by the current session.`)
+  }
+}
+
 export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
@@ -123,8 +138,12 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         },
       })
     },
-    deleteTeam: (input) => deleteTeam(input.teamRunId, { manager: deps.manager, stateDir, taskSettings: deps.settings }),
+    deleteTeam: async (input) => {
+      await assertOwnedTeam(deps, config, input.teamRunId)
+      return deleteTeam(input.teamRunId, { manager: deps.manager, stateDir, taskSettings: deps.settings })
+    },
     sendMessage: async (teamRunId, input) => {
+      await assertOwnedTeam(deps, config, teamRunId)
       const runtimeState = await loadRuntimeState(teamRunId, config)
       return sendTeamMessage(input, {
         teamRunId,
@@ -136,44 +155,62 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         ...(deps.newMessageId !== undefined ? { newMessageId: deps.newMessageId } : {}),
       })
     },
-    status: (teamRunId) => refreshTeamMemberStatuses(teamRunId, { manager: deps.manager, config, runtimeDir: runtimeDir(teamRunId) }),
+    status: async (teamRunId) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return refreshTeamMemberStatuses(teamRunId, { manager: deps.manager, config, runtimeDir: runtimeDir(teamRunId) })
+    },
     listTeams: async () => toTeams(await listActiveTeams(config)),
-    createTask: (teamRunId, input) =>
-      createTeamTask({ teamRunId, config }, {
+    createTask: async (teamRunId, input) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return createTeamTask({ teamRunId, config }, {
         subject: input.subject,
         description: input.description,
         status: input.status,
         ...(input.owner !== undefined ? { owner: input.owner } : {}),
         ...(input.blockedBy !== undefined ? { blockedBy: input.blockedBy } : {}),
-      }),
-    listTasks: (teamRunId, filter) => listTeamTasks({ teamRunId, config }, filter),
-    updateTask: (input) => {
+      })
+    },
+    listTasks: async (teamRunId, filter) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return listTeamTasks({ teamRunId, config }, filter)
+    },
+    updateTask: async (input) => {
+      await assertOwnedTeam(deps, config, input.teamRunId)
       const ctx = { teamRunId: input.teamRunId, config }
       const owner = input.owner ?? TEAM_LEAD_SENTINEL
       return input.status === "claimed"
         ? claimTeamTask(ctx, input.taskId, owner)
         : updateTeamTaskStatus(ctx, input.taskId, input.status, owner)
     },
-    getTask: (teamRunId, taskId) => getTeamTask({ teamRunId, config }, taskId),
-    requestShutdown: (teamRunId, member) =>
-      requestShutdown(teamRunId, member, {
+    getTask: async (teamRunId, taskId) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return getTeamTask({ teamRunId, config }, taskId)
+    },
+    requestShutdown: async (teamRunId, member) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return requestShutdown(teamRunId, member, {
         config,
         sendMessage: makeShutdownMessenger(deps.manager, stateDir, teamRunId),
         ...(deps.now !== undefined ? { now: deps.now } : {}),
-      }),
-    approveShutdown: (teamRunId, member) =>
-      approveShutdown(teamRunId, member, {
+      })
+    },
+    approveShutdown: async (teamRunId, member) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return approveShutdown(teamRunId, member, {
         config,
         sendMessage: makeShutdownMessenger(deps.manager, stateDir, teamRunId),
         cancelMemberTask: makeCancelMemberTask(deps.manager, stateDir, teamRunId),
         ...(deps.now !== undefined ? { now: deps.now } : {}),
-      }),
-    rejectShutdown: (teamRunId, member, reason) =>
-      rejectShutdown(teamRunId, member, reason, {
+      })
+    },
+    rejectShutdown: async (teamRunId, member, reason) => {
+      await assertOwnedTeam(deps, config, teamRunId)
+      return rejectShutdown(teamRunId, member, reason, {
         config,
         sendMessage: makeShutdownMessenger(deps.manager, stateDir, teamRunId),
         ...(deps.now !== undefined ? { now: deps.now } : {}),
-      }),
+      })
+    },
   }
   return service
 }

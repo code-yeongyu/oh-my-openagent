@@ -140,7 +140,7 @@ describe("formatFooterStatus", () => {
     // then
     expect(footer).not.toContain("\n")
     for (const columns of [72, 120]) expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(columns)
-    expect(footer).toBe("\u25cf 1/1 st_01acti... c:ultrabrain omo-mock/mock-1 xhigh in-process running")
+    expect(footer).toBe("\u25cf 1/1 ac... category:ultrabrain omo-mock/mock-1 xhigh in-process running")
   })
 })
 
@@ -175,8 +175,8 @@ describe("buildWidgetRows", () => {
     const row = buildWidgetRows(records)[0] ?? ""
 
     // then
-    expect(row).toContain("st_row")
-    expect(row).toContain("a:explore")
+    expect(row).toContain("finder")
+    expect(row).toContain("agent:explore")
     expect(row).toContain("anthropic/")
     expect(row).toContain("in-process")
     expect(row).toContain("running")
@@ -190,7 +190,7 @@ describe("buildWidgetRows", () => {
     // then
     expect(row).not.toContain("\n")
     for (const columns of [70, 72, 120]) expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(columns)
-    expect(row).toContain("c:ultrabrain")
+    expect(row).toContain("category:ultrabrain")
     expect(row).toContain("omo-mock/mock-1")
     expect(row).toContain("xhigh")
     expect(row).toContain("in-process")
@@ -223,8 +223,25 @@ describe("formatTaskRow", () => {
 
     // then
     expect(row).toBe(
-      "st_resolved planner category:ultrabrain model:openai/gpt-5.6-sol reasoning:xhigh variant:sol mode:rpc status:running",
+      "planner (st_resolved) category:ultrabrain model:openai/gpt-5.6-sol reasoning:xhigh variant:sol mode:rpc status:running",
     )
+  })
+
+  it("#given a task with a description #when formatting #then the human label leads and name and id trail", () => {
+    // given
+    const task = record({
+      task_id: "st_described",
+      name: "task-2",
+      description: "Audit the waiting line",
+      status: "running",
+      category: "quick",
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toStartWith("Audit the waiting line (st_described) category:quick")
   })
 
   it("#given a legacy task without resolved model metadata #when formatting #then raw model is preserved as the model label", () => {
@@ -338,7 +355,7 @@ describe("createTaskStatusUi.syncNow", () => {
     expect(rendererVisibleWidth(widgetRow)).toBeLessThanOrEqual(70)
     expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(72)
     expect(widgetRow).toContain("한")
-    expect(widgetRow).toContain("c:ultrabrain")
+    expect(widgetRow).toContain("category:ultrabrain")
     expect(widgetRow).toContain("GPT-5.6 Sol")
     expect(widgetRow).toContain("xhigh")
     expect(widgetRow).toContain("in-process")
@@ -361,11 +378,11 @@ describe("createTaskStatusUi.syncNow", () => {
     const row = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
     expect(row).toContain("\u001b[35m")
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(70)
-    // glyph and status word are painted with the running status color; id is dimmed; context muted
+    // glyph and status word are painted with the running status color; identity is dimmed; context muted
     expect(theme.calls).toContainEqual({ color: "accent", text: "\u25cf" })
     expect(theme.calls).toContainEqual({ color: "accent", text: "running" })
-    expect(theme.calls).toContainEqual({ color: "dim", text: "st_paint" })
-    expect(theme.calls.some((call) => call.color === "muted" && call.text.includes("c:quick"))).toBe(true)
+    expect(theme.calls).toContainEqual({ color: "dim", text: "painter" })
+    expect(theme.calls.some((call) => call.color === "muted" && call.text.includes("category:quick"))).toBe(true)
     // footer painted too and width-safe
     const footer = ui.statusCalls.at(-1) ?? ""
     expect(footer).toContain("\u001b[35m")
@@ -441,7 +458,96 @@ describe("createTaskStatusUi.syncNow", () => {
   })
 })
 
+describe("createTaskStatusUi.background progress", () => {
+  it("#given two background children #when their latest task events arrive within one debounce window #then footer and widget show truncated descriptions, activity, elapsed time, and spinner frames", () => {
+    // given a controllable 250ms debounce and two active background children created 65 seconds ago
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const first = record({
+      task_id: "st_first",
+      name: "Investigate the unexpectedly long background child description",
+      status: "running",
+      created_at: "2026-07-07T00:00:00.000Z",
+    })
+    const second = record({ task_id: "st_second", name: "Review tests", status: "running", created_at: "2026-07-07T00:00:00.000Z" })
+    const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([first, second]),
+      wasBackground: () => true,
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+      runStatsSnapshot: (taskId) =>
+        taskId === "st_first"
+          ? { runtime_ms: 65_000, turns: 3, tool_calls: 7, tokens_per_second: 42 }
+          : { runtime_ms: 65_000, turns: 1, tool_calls: 2 },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({
+      manager,
+      runtime: runtimeOf(ui, "session-a", "tui"),
+      timers,
+      now: () => Date.parse("2026-07-07T00:01:05.000Z"),
+    })
+
+    // when the manager-handle subscriptions receive child tool events in one debounce window
+    statusUi.syncNow()
+    listeners.get("st_first")?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/foo.ts" } })
+    listeners.get("st_second")?.({ type: "tool_execution_start", toolName: "bash", args: { command: "bun test" } })
+    expect(active.size).toBe(1)
+    for (const callback of active.values()) callback()
+
+    // then each active background child has a compact, single-line live row in the widget and active footer
+    const rows = ui.widgetCalls.at(-1)?.content ?? []
+    expect(rows).toEqual([
+      "⠋ Investig... · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠋ Review t... · turn 1 (2 tools) · bash bun test · 1m 5s",
+    ])
+    expect(ui.statusCalls.at(-1)).toContain("Investig...")
+    expect(ui.statusCalls.at(-1)).toContain("read src/foo.ts")
+  })
+})
+
 describe("createTaskStatusUi.scheduleSync", () => {
+  it("#given a just-started background child #when the store mutation schedules a render #then it subscribes before the debounce fires", () => {
+    // given a task that can emit its first tool event immediately after the start mutation
+    const active = new Map<number, () => void>()
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        active.set(1, callback)
+        return 1
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const listeners = new Map<string, (event: { readonly type: string }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([record({ task_id: "st_background", status: "running" })]),
+      wasBackground: (taskId) => taskId === "st_background",
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+
+    // when the store mutation schedules the debounced render
+    statusUi.scheduleSync()
+
+    // then the child subscription is already installed, before its first tool event can be emitted
+    expect(listeners.has("st_background")).toBe(true)
+    expect(active.size).toBe(1)
+  })
+
   it("#given several rapid schedule calls #when the debounce fires #then syncNow runs once (250ms debounce)", () => {
     // given a controllable timer
     const active = new Map<number, () => void>()

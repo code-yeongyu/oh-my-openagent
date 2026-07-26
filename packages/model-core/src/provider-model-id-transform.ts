@@ -11,7 +11,7 @@ function inferSubProvider(model: string): string | undefined {
 
 const CLAUDE_VERSION_DOT = /claude-(\w+)-(\d+)-(\d+)/g
 const GEMINI_31_PRO_PREVIEW = /gemini-3\.1-pro(?!-)/g
-const GEMINI_3_FLASH_PREVIEW = /gemini-3-flash(?!-)/g
+const GEMINI_3_FLASH_PREVIEW = /(?<!antigravity-)gemini-3-flash(?!-)/g
 
 function claudeVersionDot(model: string): string {
 	return model.replace(CLAUDE_VERSION_DOT, "claude-$1-$2.$3")

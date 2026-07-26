@@ -29,9 +29,15 @@ const { pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 // parent's task tool-call arguments never contain it, so this is a leak-proof parent/child selector.
 const CHILD_IDENTITY = "running as an omo senpi-task child"
 
+interface MockStepUsage {
+  input?: number
+  output?: number
+  totalTokens?: number
+}
+
 type MockStep =
-  | { type: "text"; text: string }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
+  | { type: "text"; text: string; usage?: MockStepUsage }
+  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string; usage?: MockStepUsage }
 
 interface MockScript {
   parentSteps: MockStep[]
@@ -121,7 +127,7 @@ const model: MockModel = {
   reasoning: false,
   input: ["text"],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  contextWindow: 16_000,
+  contextWindow: 200_000,
   maxTokens: 4096,
 }
 
@@ -181,7 +187,7 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
     api: "openai-completions",
     provider: "omo-mock",
     model: "mock-1",
-    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0, ...step.usage },
     stopReason: step.type === "tool_call" ? "toolUse" : "stop",
     timestamp: Date.now(),
   }
@@ -193,7 +199,10 @@ let childCallCount = 0
 function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const stream = createLocalAssistantMessageEventStream()
   const script = loadMockScript(context.cwd ?? process.cwd())
-  const isChild = messagesContainChild(context)
+  // RPC children (--mode rpc) never see the in-process subagent identity line in their
+  // message context, so argv mode is the structural child signal; the identity line stays the
+  // in-process signal.
+  const isChild = messagesContainChild(context) || process.argv.includes("rpc")
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount
   const step = steps[Math.min(index, steps.length - 1)]

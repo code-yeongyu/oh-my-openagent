@@ -49,7 +49,7 @@
 
 </div>
 
-> これは oh-my-openagent の Team Mode 実行中の様子です。Kimi K2.6 と GPT-5.5 で動いています。
+> これは oh-my-openagent の Team Mode 実行中の様子です。Kimi K3 と GPT-5.6 Sol で動いています。
 
 > Anthropic は [**私たちのせいで OpenCode をブロックしました。**](https://x.com/thdxr/status/2010149530486911014) **これは本当の話です。**
 > 彼らはあなたを囲い込みたいのです。Claude Code は居心地の良い牢獄ですが、牢獄であることには変わりありません。
@@ -193,17 +193,17 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-8` / `claude-opus-4-7` / **`kimi-k3`** / **`kimi-k2.6`** / **`glm-5`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。thinking token のコストを許容できる場合は **Kimi K3** を、そうでなければ **Claude Opus 4.8 / 4.7** または **Kimi K2.6** を推奨します。
+**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`glm-5`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。Claude Opus 5 と Kimi K3 が推奨デフォルトです。
 
-**Hephaestus** (OpenAI または Vercel では `gpt-5.6-sol`、その次に `gpt-5.5`) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。*正当なる職人 (The Legitimate Craftsman).*
+**Hephaestus** (OpenAI、GitHub Copilot、Vercel、または OpenCode 経由で medium effort の `gpt-5.6-sol` のみを使う) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。*正当なる職人 (The Legitimate Craftsman).*
 
-**Prometheus** (`claude-opus-4-7` / **`gpt-5.5`** / **`glm-5.2`**) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。
+**Prometheus** (`claude-fable-5` / **`kimi-k3`**) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。
 
 すべてのエージェントは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[詳しくはこちら →](docs/guide/overview.md)
 
 > Anthropic が [私たちのせいで OpenCode をブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそ Hephaestus は「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
 >
-> Opus または Kimi K3 で最もよく動きますが、Kimi K2.6 + GPT-5.5 の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
+> Opus または Kimi K3 で最もよく動きますが、Kimi K3 + GPT-5.6 Sol の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
 
 ### Team Mode (v4.0)
 
@@ -240,7 +240,7 @@ Sisyphus がサブエージェントにタスクを委任する際、モデル�
 | `quick`              | 単一ファイルの変更、タイポの修正     |
 | `ultrabrain`         | ハードロジック、アーキテクチャの決定 |
 
-エージェントは作業の種類を伝えるだけで、ハーネスが適切なモデルを選びます。`ultrabrain` は OpenAI または Vercel で利用可能な場合は GPT-5.6 Sol xhigh に、その次に GPT-5.5 xhigh にルーティングされます。あなたが触るものは何もありません。
+エージェントは作業の種類を伝えるだけで、ハーネスが適切なモデルを選びます。`ultrabrain` は OpenAI または Vercel で利用可能な場合は GPT-5.6 Sol xhigh に、その次に GPT-5.6 Sol xhigh にルーティングされます。あなたが触るものは何もありません。
 
 ### Claude Code 互換性
 

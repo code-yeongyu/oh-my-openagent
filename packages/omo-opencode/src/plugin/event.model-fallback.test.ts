@@ -122,12 +122,12 @@ describe("createEventHandler - model fallback", () => {
               name: "APIError",
               data: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
                 isRetryable: true,
               },
             },
             parentID: "msg_user_1",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             mode: "Sisyphus - Ultraworker",
             agent: "Sisyphus - Ultraworker",
@@ -167,12 +167,12 @@ describe("createEventHandler - model fallback", () => {
               name: "APIError",
               data: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
                 isRetryable: true,
               },
             },
             parentID: "msg_user_eof",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -212,7 +212,7 @@ describe("createEventHandler - model fallback", () => {
             data: {
               error: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
               },
             },
           },
@@ -260,7 +260,7 @@ describe("createEventHandler - model fallback", () => {
       name: "APIError",
       data: {
         message:
-          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
         isRetryable: true,
       },
     }
@@ -275,7 +275,7 @@ describe("createEventHandler - model fallback", () => {
             sessionID,
             role: "assistant",
             error: assistantError,
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -289,7 +289,7 @@ describe("createEventHandler - model fallback", () => {
         properties: {
           sessionID,
           providerID: "anthropic",
-          modelID: "claude-opus-4-7-thinking",
+          modelID: "claude-opus-4-8-thinking",
           error: assistantError,
         },
       },
@@ -325,7 +325,7 @@ describe("createEventHandler - model fallback", () => {
       name: "APIError",
       data: {
         message:
-          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
         isRetryable: true,
       },
     }
@@ -339,7 +339,7 @@ describe("createEventHandler - model fallback", () => {
             sessionID,
             role: "assistant",
             error: assistantError,
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -387,7 +387,7 @@ describe("createEventHandler - model fallback", () => {
       name: "APIError",
       data: {
         message:
-          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
         isRetryable: true,
       },
     }
@@ -402,7 +402,7 @@ describe("createEventHandler - model fallback", () => {
             sessionID,
             role: "assistant",
             error: assistantError,
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -437,7 +437,7 @@ describe("createEventHandler - model fallback", () => {
       name: "APIError",
       data: {
         message:
-          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
         isRetryable: true,
       },
     }
@@ -451,7 +451,7 @@ describe("createEventHandler - model fallback", () => {
             sessionID,
             role: "assistant",
             error: assistantError,
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -466,7 +466,7 @@ describe("createEventHandler - model fallback", () => {
         properties: {
           sessionID,
           providerID: "quotio",
-          modelID: "claude-opus-4-7-thinking",
+          modelID: "claude-opus-4-8-thinking",
           error: assistantError,
         },
       },
@@ -521,7 +521,7 @@ describe("createEventHandler - model fallback", () => {
             role: "user",
             time: { created: 1 },
             content: [],
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -540,7 +540,7 @@ describe("createEventHandler - model fallback", () => {
             type: "retry",
             attempt: 1,
             message:
-              "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+              "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
             next: 1234,
           },
         },
@@ -552,7 +552,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
       },
       output,
     )
@@ -561,10 +561,10 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k3",
+      providerID: "anthropic",
+      modelID: "claude-opus-5",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(output.message["variant"]).toBe("max")
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -583,7 +583,7 @@ describe("createEventHandler - model fallback", () => {
             id: "msg_user_status_dedup",
             sessionID,
             role: "user",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -601,7 +601,7 @@ describe("createEventHandler - model fallback", () => {
             type: "retry",
             attempt: 1,
             message:
-              "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+              "All credentials for model claude-opus-4-8-thinking are cooling down [retrying in ~5 days attempt #1]",
             next: 300,
           },
         },
@@ -616,7 +616,7 @@ describe("createEventHandler - model fallback", () => {
             type: "retry",
             attempt: 1,
             message:
-              "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~4 days attempt #1]",
+              "All credentials for model claude-opus-4-8-thinking are cooling down [retrying in ~4 days attempt #1]",
             next: 299,
           },
         },
@@ -666,7 +666,7 @@ describe("createEventHandler - model fallback", () => {
           type: "retry",
           attempt: 1,
           message:
-            "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+            "All credentials for model claude-opus-4-8-thinking are cooling down [retrying in ~5 days attempt #1]",
           next: 300,
         },
       },
@@ -680,7 +680,7 @@ describe("createEventHandler - model fallback", () => {
             id: "msg_user_status_idle_reset",
             sessionID,
             role: "user",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -694,7 +694,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
       },
       { message: {}, parts: [] },
     )
@@ -704,7 +704,34 @@ describe("createEventHandler - model fallback", () => {
         properties: { sessionID },
       },
     })
-    await handler({ event: retryStatus })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_idle_reset_opus5",
+            sessionID,
+            role: "user",
+            modelID: "claude-opus-5",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        ...retryStatus,
+        properties: {
+          ...retryStatus.properties,
+          status: {
+            ...retryStatus.properties.status,
+            message:
+              "All credentials for model claude-opus-5 are cooling down [retrying in ~5 days attempt #1]",
+          },
+        },
+      },
+    })
 
     //#then
     expect(abortCalls).toEqual([sessionID, sessionID])
@@ -754,11 +781,11 @@ describe("createEventHandler - model fallback", () => {
               name: "APIError",
               data: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
                 isRetryable: true,
               },
             },
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -771,7 +798,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
       },
       output,
     )
@@ -787,7 +814,7 @@ describe("createEventHandler - model fallback", () => {
             data: {
               error: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
               },
             },
           },
@@ -835,7 +862,7 @@ describe("createEventHandler - model fallback", () => {
             id: "msg_user_status_runtime_enabled",
             sessionID,
             role: "user",
-            modelID: "claude-opus-4-7",
+            modelID: "claude-opus-4-8",
             providerID: "quotio",
             agent: "Sisyphus - Ultraworker",
           },
@@ -853,7 +880,7 @@ describe("createEventHandler - model fallback", () => {
             type: "retry",
             attempt: 1,
             message:
-              "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+              "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 56s attempt #1]",
             next: 476,
           },
         },
@@ -915,7 +942,7 @@ describe("createEventHandler - model fallback", () => {
             role: "user",
             time: { created: 1 },
             content: [],
-            modelID: "claude-opus-4-7",
+            modelID: "claude-opus-4-8",
             providerID: "quotio",
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -934,7 +961,7 @@ describe("createEventHandler - model fallback", () => {
             type: "retry",
             attempt: 1,
             message:
-              "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+              "All credentials for model claude-opus-4-8-thinking are cooling down [retrying in ~5 days attempt #1]",
             next: 300,
           },
         },
@@ -946,7 +973,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "quotio", modelID: "claude-opus-4-7" },
+        model: { providerID: "quotio", modelID: "claude-opus-4-8" },
       },
       output,
     )
@@ -1060,7 +1087,7 @@ describe("createEventHandler - model fallback", () => {
         {
           sessionID,
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+          model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
         },
         output,
       )
@@ -1068,26 +1095,27 @@ describe("createEventHandler - model fallback", () => {
     }
 
     //#when - first retry cycle
-    const first = await triggerRetryCycle("anthropic", "claude-opus-4-7-thinking")
+    const first = await triggerRetryCycle("anthropic", "claude-opus-4-8-thinking")
 
-    //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
-    expect(first.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k3",
-    })
-    expect(first.message["variant"]).toBeUndefined()
+    //#then - first Opus 5 fallback entry is applied to the legacy Opus 4.8 input
+    expect(first.message["model"]).toMatchObject({ providerID: "anthropic", modelID: "claude-opus-5" })
+    expect(first.message["variant"]).toBe("max")
 
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k3")
 
-    //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k3)
-    expect(second.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.6",
-    })
-    expect(second.message["variant"]).toBeUndefined()
-    expect(abortCalls).toEqual([sessionID, sessionID])
-    expect(promptCalls).toEqual([sessionID, sessionID])
+    //#then - restored Sol entry applied after the consolidated Kimi rung
+    expect(second.message["model"]).toMatchObject({ providerID: "openai", modelID: "gpt-5.6-sol" })
+    expect(second.message["variant"]).toBe("medium")
+
+    //#when - third retry cycle
+    const third = await triggerRetryCycle("openai", "gpt-5.6-sol")
+
+    //#then - fallback continues to GLM after the restored Sol rung
+    expect(third.message["model"]).toMatchObject({ providerID: "zai-coding-plan", modelID: "glm-5" })
+    expect(third.message["variant"]).toBeUndefined()
+    expect(abortCalls).toEqual([sessionID, sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
   })
 
@@ -1111,12 +1139,12 @@ describe("createEventHandler - model fallback", () => {
               name: "APIError",
               data: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
                 isRetryable: true,
               },
             },
             parentID: "msg_user_disabled_1",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -1138,7 +1166,7 @@ describe("createEventHandler - model fallback", () => {
             data: {
               error: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
               },
             },
           },
