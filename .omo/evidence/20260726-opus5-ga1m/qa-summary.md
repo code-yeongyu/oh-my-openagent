@@ -3,7 +3,7 @@
 ## What was tested
 
 - Loaded this branch's `packages/omo-opencode/src/index.ts` in a real OpenCode server under isolated XDG data, config, cache, and state directories.
-- Drove `anthropic/claude-opus-5` through a local isolated provider and the real OpenCode message and bash-tool path at 200,000 and 790,000 input tokens.
+- Drove `anthropic/claude-opus-5` and, after the final suffix fix, `anthropic/claude-opus-5-fast` through local isolated providers and the real OpenCode message and bash-tool path at 200,000 and 790,000 input tokens.
 - Captured SSE proving no auto-compaction after the below-threshold turn, then an `auto: true` compaction part and `session.compacted` after the above-threshold turn.
 - Added a production-hook regression test for the preemptive-compaction path. The same `claude-opus-5` session remains below the 78% threshold at 200,000 input and cache-read tokens, then triggers exactly one summarize call at 790,000 tokens.
 - Ran the focused resolver and preemptive-compaction suites.
@@ -12,21 +12,22 @@
 ## What was observed
 
 - Real OpenCode v1.18.5 reported `healthy: true` with the worktree plugin URI present in `/config`.
-- Session `ses_06373d6f5ffehNws4s2eB0K01l` completed the 200K and 790K tool turns; SSE then emitted an automatic compaction part and `session.compacted`.
+- Sessions `ses_06373d6f5ffehNws4s2eB0K01l` (base ID) and `ses_0635f34beffeeBQQfxCFgG0Gev` (`-fast` alias, final code) completed the 200K and 790K tool turns; SSE then emitted an automatic compaction part and `session.compacted`.
 - The real OpenCode database session count stayed at 4,329 before and after the isolated server run.
-- Focused tests: 32 pass, 0 fail. This includes `claude-opus-5`, the 5-series `-high` variants, genuine 200K-model guards, and the production compaction decision path.
+- Focused tests on the final code: 35 pass, 0 fail. This includes `claude-opus-5`, `-0`, `.0`, `[1m]`, `-high`, `-fast`, and `@default`, cached-limit lookup, genuine 200K-model guards, and the production compaction decision path.
 - Package typecheck exited successfully.
 
 Exact captured output:
 
 - `opencode-source-load.txt`
 - `real-opencode-compaction.txt`
+- `real-opencode-fast-alias.txt` (fresh final-code alias run)
 - `focused-tests.txt`
 - `typecheck-packages.txt`
 
 ## Why it is enough
 
-The resolver tests pin the model-ID classification, while the hook-level test pins the user-visible consequence: 200K usage must not cause premature compaction for a GA 1M Opus 5 session, and usage above 78% of 1M must still compact. The isolated OpenCode interaction now proves the same decision through real message, tool, SSE, and `session.summarize` paths without touching the user's OpenCode state.
+The resolver tests pin the model-ID classification, while the hook-level test pins the user-visible consequence: 200K usage must not cause premature compaction for a GA 1M Opus 5 session, and usage above 78% of 1M must still compact. The isolated OpenCode interactions prove the same decision through real message, tool, SSE, and `session.summarize` paths without touching the user OpenCode state. The fresh final-code run specifically proves the catalogued `claude-opus-5-fast` alias takes the 1M threshold path; focused tests cover `@default` and the remaining aliases.
 
 ## What was omitted
 

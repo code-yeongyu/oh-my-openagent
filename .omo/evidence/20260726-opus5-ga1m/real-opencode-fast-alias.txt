@@ -1,0 +1,37 @@
+PR 6340 final real OpenCode alias QA
+
+Harness:
+- OpenCode: 0.0.0-codeg/v1.18.5-adjacency-leading-v4-202607260248
+- Plugin: file:///Volumes/DATA/tmp/omo-opus5-1m-101314/packages/omo-opencode/src/index.ts
+- OpenCode model identity: anthropic/claude-opus-5-fast
+- Transport request: model=claude-opus-5 with speed=fast (OpenCode variant normalization)
+- Provider: isolated local @ai-sdk/openai-compatible fake provider
+- XDG config/data/state/cache: /tmp/pr6340-final-qa/*
+- Session: ses_0635f34beffeeBQQfxCFgG0Gev
+
+Exact drive:
+1. Started the final branch plugin in an isolated real OpenCode server.
+2. POSTed a real message for anthropic/claude-opus-5-fast.
+3. The local provider returned 200000 input tokens, then 790000 input tokens, through real message and bash-tool events.
+4. SSE showed no compaction after the 200000-token turn; after the 790000-token turn it emitted an auto compaction part and session.compacted.
+
+Provider receipts (request bodies intentionally omitted):
+2026-07-26T04:13:47.924Z request=1 summary=false tools=317 user=execute the three harmless bash tool calls returned by the isolated provider, then stop. path=/v1/chat/completions bytes=441585
+2026-07-26T04:13:49.087Z request=2 summary=false tools=317 user=execute the three harmless bash tool calls returned by the isolated provider, then stop. path=/v1/chat/completions bytes=441907
+2026-07-26T04:13:49.833Z request=3 summary=false tools=317 user=execute the three harmless bash tool calls returned by the isolated provider, then stop. path=/v1/chat/completions bytes=442192
+2026-07-26T04:14:50.752Z request=4 summary=true tools=none user=rt.** each listed delegated task retains full context. after compaction, use `task_id` to continue existing delegated work instead of spawning new tasks. this saves tokens, preserves learned context, and prevents duplicate work.  this context is critical for maintaining continuity after compaction.  path=/v1/chat/completions bytes=6477
+2026-07-26T04:14:51.090Z request=5 summary=false tools=317 user=what did we do so far? continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed. path=/v1/chat/completions bytes=441768
+
+Selected exact SSE records:
+{"type":"message.part.updated","properties":{"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","part":{"type":"tool","tool":"bash","callID":"call_1","state":{"status":"completed","input":{"command":"printf BELOW_THRESHOLD_TOOL","description":"BELOW_THRESHOLD_TOOL"},"output":"BELOW_THRESHOLD_TOOL","metadata":{"output":"BELOW_THRESHOLD_TOOL","exit":0,"truncated":false},"title":"printf BELOW_THRESHOLD_TOOL","time":{"start":1785039228610,"end":1785039228983}},"id":"prt_f9ca10c66001t3kNczrmrPiqKM","sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","messageID":"msg_f9ca0f146001m0vK29c5tpZ8kZ"},"time":1785039228983}}
+{"type":"message.updated","properties":{"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","info":{"id":"msg_f9ca0f146001m0vK29c5tpZ8kZ","parentID":"msg_f9ca0ebf5001N3l7g5iR70WCog","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-final-qa/project","root":"/"},"cost":2.00025,"tokens":{"total":200005,"input":200000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"claude-opus-5-fast","providerID":"anthropic","time":{"created":1785039221062,"completed":1785039229004},"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","finish":"tool-calls"}}}
+{"type":"message.part.updated","properties":{"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","part":{"type":"tool","tool":"bash","callID":"call_2","state":{"status":"completed","input":{"command":"printf ABOVE_THRESHOLD_TOOL","description":"ABOVE_THRESHOLD_TOOL"},"output":"ABOVE_THRESHOLD_TOOL","metadata":{"output":"ABOVE_THRESHOLD_TOOL","exit":0,"truncated":false},"title":"printf ABOVE_THRESHOLD_TOOL","time":{"start":1785039229422,"end":1785039229750}},"id":"prt_f9ca110a8001aBcIkXBIWBn096","sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","messageID":"msg_f9ca11052001E5a8a1D0BtlWyp"},"time":1785039229750}}
+{"type":"message.updated","properties":{"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","info":{"id":"msg_f9ca11052001E5a8a1D0BtlWyp","parentID":"msg_f9ca0ebf5001N3l7g5iR70WCog","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-final-qa/project","root":"/"},"cost":7.90025,"tokens":{"total":790005,"input":790000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"claude-opus-5-fast","providerID":"anthropic","time":{"created":1785039229010,"completed":1785039229761},"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","finish":"tool-calls"}}}
+{"type":"message.part.updated","properties":{"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","part":{"id":"prt_f9ca115ea001ECJbWB8odHLmsU","messageID":"msg_f9ca115e800184lJBn33wGg3KF","sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev","type":"compaction","auto":true},"time":1785039230442}}
+{"type":"session.compacted","properties":{"sessionID":"ses_0635f34beffeeBQQfxCFgG0Gev"}}
+
+Isolation receipt:
+real_before=4329
+real_after=4329
+
+QA_RESULT=PASS

@@ -189,17 +189,38 @@ describe("resolveActualContextLimit", () => {
     }
   })
 
+  it("returns GA 1M for catalogued Opus 5 suffixes", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of ["claude-opus-5-fast", "claude-opus-5@default"]) {
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
   it("uses a cached context limit for supported Opus 5 aliases", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>([
       ["anthropic/claude-opus-5-0", 900_000],
+      ["anthropic/claude-opus-5-fast", 910_000],
+      ["anthropic/claude-opus-5@default", 920_000],
     ])
 
     expect(resolveActualContextLimit("anthropic", "claude-opus-5-0", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })).toBe(900_000)
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5-fast", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(910_000)
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5@default", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(920_000)
   })
 
   it("applies the -high variant suffix to 5-series models", () => {
