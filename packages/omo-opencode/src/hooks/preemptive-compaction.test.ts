@@ -797,6 +797,70 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 
+  it("should use the GA 1M limit for claude-opus-5 compaction decisions", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache: new Map(),
+    })
+    const sessionID = "ses_opus_5_ga_1m"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 190000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_below_1m_threshold" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 780000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_above_1m_threshold" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
   it("should ignore stale cached Anthropic limits for older models", async () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 500000)

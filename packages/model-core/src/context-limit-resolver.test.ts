@@ -169,4 +169,46 @@ describe("resolveActualContextLimit", () => {
       anthropicContext1MEnabled: false,
     })).toBe(1_000_000)
   })
+  it("returns GA 1M for claude-opus-5", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("applies the -high variant suffix to 5-series models", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5-high", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-sonnet-5-high", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-fable-5-high", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("keeps 200K models on the default limit", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-haiku-4-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(200_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-4-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(200_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-4-1", {
+      anthropicContext1MEnabled: false,
+    })).toBe(200_000)
+  })
 })

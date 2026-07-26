@@ -1,0 +1,12 @@
+command: isolated XDG opencode serve --hostname 127.0.0.1 --port 56123
+OpenCode version: 0.0.0-codeg/v1.18.5-adjacency-leading-v4-202607260248
+server-output: Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+server-output: opencode server listening on http://127.0.0.1:56123
+GET /global/health: {"healthy":true,"version":"0.0.0-codeg/v1.18.5-adjacency-leading-v4-202607260248"}
+GET /config plugin: ["file:///Volumes/DATA/tmp/omo-opus5-1m-101314/packages/omo-opencode/src/index.ts"]
+PASS: branch plugin source configured and isolated server healthy
+real-db-session-count-before=4329
+real-db-session-count-after=4329
+PASS: real OpenCode DB unchanged
+sandbox: /tmp/omo-pr6340-qa (removed after capture)
+QA_RESULT=PASS
