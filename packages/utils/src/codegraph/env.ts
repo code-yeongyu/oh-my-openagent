@@ -48,11 +48,11 @@ const SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
 
 export interface BuildCodegraphEnvOptions {
   readonly homeDir?: string
-  // When false (default), the child env pins CODEGRAPH_NO_DAEMON=1 so upstream
-  // never spawns its daemon. When true, the key is OMITTED entirely (never set
-  // to "0" — upstream treats any value except '0'/'false' as opt-out) so the
-  // daemon may run and an ambient CODEGRAPH_NO_DAEMON=1 can still escape-hatch
-  // back to daemon-off.
+  // When false, the child env pins CODEGRAPH_NO_DAEMON=1 so upstream never
+  // spawns its daemon. When true or omitted (default), the key is OMITTED
+  // entirely (never set to "0" — upstream treats any value except '0'/'false'
+  // as opt-out) so the daemon may run and an ambient CODEGRAPH_NO_DAEMON=1 can
+  // still escape-hatch back to daemon-off.
   readonly daemon?: boolean
 }
 
@@ -75,7 +75,7 @@ export function buildCodegraphEnv(options: BuildCodegraphEnvOptions = {}): Codeg
 
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
-    ...(options.daemon === true ? {} : { [CODEGRAPH_NO_DAEMON_ENV]: "1" as const }),
+    ...(options.daemon === false ? { [CODEGRAPH_NO_DAEMON_ENV]: "1" as const } : {}),
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1",

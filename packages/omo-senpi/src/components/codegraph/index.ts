@@ -39,7 +39,7 @@ function resolveDaemon(
 	env: Record<string, string | undefined>,
 	configuredDaemon: boolean | undefined,
 ): boolean {
-	return resolveDaemonEnvironmentOverride(env) ?? configuredDaemon ?? false
+	return resolveDaemonEnvironmentOverride(env) ?? configuredDaemon ?? true
 }
 
 export function createCodegraphComponent(options: CodegraphComponentOptions = {}): OmoSenpiComponent {

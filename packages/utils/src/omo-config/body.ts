@@ -13,6 +13,7 @@ import {
 export const BUILT_IN_DEFAULTS: OmoConfig = {
   codegraph: {
     auto_provision: true,
+    daemon: true,
     enabled: true,
     telemetry: false,
   },

@@ -215,6 +215,7 @@ describe("CodeGraph SessionStart hook", () => {
 		// given
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
+		const statusProbeDaemonValues: boolean[] = [];
 		const workspace = createAllowedWorkspace("codegraph-workspace");
 
 		try {
@@ -226,12 +227,16 @@ describe("CodeGraph SessionStart hook", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
+				statusProbe: (options) => {
+					statusProbeDaemonValues.push(options.daemon);
+					return Promise.resolve(false);
+				},
 				workerCliPath: "/plugin/components/codegraph/dist/cli.js",
 			});
 
 			// then
 			expect(result).toEqual({ action: "spawned", exitCode: 0 });
+			expect(statusProbeDaemonValues).toEqual([true]);
 			expect(spawned).toEqual([
 				{
 					args: ["/plugin/components/codegraph/dist/cli.js", "hook", "session-start-worker"],

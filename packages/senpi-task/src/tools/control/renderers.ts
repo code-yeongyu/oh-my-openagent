@@ -11,7 +11,7 @@ import {
   statusThemeColor,
 } from "../task/renderers"
 import type { TaskCancelInput } from "./cancel"
-import type { TaskSendInput, StructuredMessageInput } from "./send-schema"
+import type { MemberScopedTaskSendInput, TaskSendInput, StructuredMessageInput } from "./send-schema"
 import type { CancelResultDetails, SendResultDetails } from "./types"
 
 export type ControlRenderTheme = Pick<Theme, "fg" | "italic">
@@ -33,6 +33,10 @@ const MIN_MEANINGFUL_TRUNCATED_EXCERPT_WIDTH = 8
 
 export function renderTaskSendCall(args: TaskSendInput, theme: ControlRenderTheme): RenderComponent {
   return widthComponent((width) => theme.fg("toolTitle", taskSendCallLine(args, theme, width)))
+}
+
+export function renderMemberScopedTaskSendCall(args: MemberScopedTaskSendInput, theme: ControlRenderTheme): RenderComponent {
+  return renderTaskSendCall({ ...args, deliver_as: "steer" }, theme)
 }
 
 export function renderTaskSendResult(

@@ -175,14 +175,14 @@ CodeGraph MCP settings consumed by the Senpi `codegraph` component when the exte
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `daemon` | boolean | `false` | When `false`, the managed MCP environment pins `CODEGRAPH_NO_DAEMON=1`, so each Senpi session uses its own in-process CodeGraph server. When `true`, the pin is omitted so upstream CodeGraph may use its shared daemon. |
+| `daemon` | boolean | `true` | When `true`, the pin is omitted so upstream CodeGraph may use its shared daemon. When `false`, the managed MCP environment pins `CODEGRAPH_NO_DAEMON=1`, so each Senpi session uses its own in-process CodeGraph server. |
 
-`OMO_CODEGRAPH_DAEMON` overrides `codegraph.daemon`, which overrides the default: **environment > config > default (`false`)**. The environment values `1`, `true`, and `yes` select daemon mode; `0`, `false`, and `no` select no-daemon mode. An unset, empty, or unrecognized value defers to `codegraph.daemon`.
+`OMO_CODEGRAPH_DAEMON` overrides `codegraph.daemon`, which overrides the default: **environment > config > default (`true`)**. The environment values `1`, `true`, and `yes` select daemon mode; `0`, `false`, and `no` select no-daemon mode. An unset, empty, or unrecognized value defers to `codegraph.daemon`.
 
 ```jsonc
 {
   "codegraph": {
-    "daemon": true
+    "daemon": false
   }
 }
 ```

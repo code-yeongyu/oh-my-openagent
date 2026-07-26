@@ -38,7 +38,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 
 ### Team tools (6, lead-only)
 
-`buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`. Child/member sessions never receive the lead family. Each process member loads the bundled member extension in-child and receives only team-scoped `task_send`; lead mail arrives as injected follow-ups that revive the resident member. It never receives lead lifecycle or tasklist tools.
+`buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`. Child/member sessions never receive the lead family. Each process member loads the bundled member extension in-child and receives only team-scoped `task_send`; lead mail is steered into the resident member's running turn. It never receives lead lifecycle or tasklist tools.
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this package.
 
@@ -52,7 +52,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 
 ## TEAM DELIVERY MODEL
 
-Team messaging is injection-driven over durable mailboxes. A send writes a durable unread JSON file and returns; delivery injects the message into the recipient session and revives resident members with follow-up work. The current lead owns one `createLeadPoller` per team whose durable `leadSessionId` matches the current session. The adapter ticks owned lead pollers on `session_start` and every second, but suspends ticks during compaction, session switching, and shutdown. Member inboxes are never polled by the adapter: each process member loads `member-extension/`, which owns that member's poller and scoped tools inside the child process.
+Team messaging is injection-driven over durable mailboxes. A send writes a durable unread JSON file and returns; delivery steers the message into the recipient's running turn without queuing an editable follow-up. The current lead owns one `createLeadPoller` per team whose durable `leadSessionId` matches the current session. The adapter ticks owned lead pollers on `session_start` and every second, but suspends ticks during compaction, session switching, and shutdown. Member inboxes are never polled by the adapter: each process member loads `member-extension/`, which owns that member's poller and scoped tools inside the child process.
 
 Delivery is reservation-based: unread `<messageId>.json` becomes `.delivering-<messageId>.json`, then commits to `processed/<messageId>.json` only after the message is observed in the recipient session (the pre-injection `team_wait` claim path was removed). The processed file is the durable exactly-once ledger.
 

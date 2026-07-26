@@ -103,7 +103,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 function registerRemovedTeamWaitHint(pi: SenpiExtensionAPI): void {
   pi.registerRemovedToolHint?.(
     "team_wait",
-    "team_wait was removed - team messages arrive as injected notifications; send updates with task_send and end your turn.",
+    "team_wait was removed - team messages arrive as steered notifications; send updates with task_send and end your turn.",
   )
 }
 

@@ -13,7 +13,7 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/index.ts` | Barrel re-exporting `./schema`, `./loader`, `./writer`. |
 | `src/schema/config.ts` | Root `OmoConfigSchema` + `OmoConfigLayerSchema` (`.strict()`; `$schema`, `categories`, `agents`, `codegraph`, `task`, `teams`). `OmoConfig` type. |
 | `src/schema/category.ts` | `OmoCategoryConfigSchema` / `OmoCategoriesConfigSchema`. Keeps the OpenCode camelCase keys (`maxTokens`, `reasoningEffort`, `textVerbosity`) verbatim for parity. |
-| `src/schema/codegraph.ts` | `OmoCodegraphSettingsSchema` (`daemon`, default `false`) for CodeGraph MCP daemon selection. |
+| `src/schema/codegraph.ts` | `OmoCodegraphSettingsSchema` (`daemon`, default `true`) for CodeGraph MCP daemon selection. |
 | `src/schema/agent.ts` | `OmoAgentDefSchema` / `OmoAgentsConfigSchema` (`execution_mode`, `max_depth`, `allowed_subagents`, ...). |
 | `src/schema/task.ts` | `OmoTaskSettingsSchema` + nested `OmoTaskNotificationSchema`, `OmoTaskWaitSchema`, `OmoTaskTeamSettingsSchema`, all with defaults. |
 | `src/schema/team.ts` | `OmoTeamSpecSchema` (discriminated `category` / `subagent_type` members) + `OmoTeamsConfigSchema`; `*Layer` partial variants for per-file overrides. |

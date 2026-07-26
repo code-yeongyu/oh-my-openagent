@@ -657,11 +657,11 @@ The `codegraph` MCP ships a pinned CodeGraph 1.4.1 binary; project stores built 
 ```jsonc
 {
   "codegraph": {
-    // Opt into the upstream shared daemon: one detached daemon per project
-    // serves every client, exits after about five minutes idle, and runs
-    // under an upstream PPID watchdog. Default false: each MCP process runs
-    // the index in-process (CODEGRAPH_NO_DAEMON=1 stays pinned).
-    "daemon": false,
+    // The upstream shared daemon is on by default: one detached daemon per
+    // project serves every client, exits after about five minutes idle, and
+    // runs under an upstream PPID watchdog. Set false to keep the index
+    // in-process with CODEGRAPH_NO_DAEMON=1 pinned.
+    "daemon": true,
 
     // Extra exclude-only roots. Projects under these skip CodeGraph entirely.
     // Entries may be absolute, ~-relative, or relative to the home directory.

@@ -143,7 +143,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	}
 
 	const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
-	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon === true, options.buildEnv);
+	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon !== false, options.buildEnv);
 	const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
 	return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
 		cwd: projectCwd,

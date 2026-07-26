@@ -71,23 +71,22 @@ Add extra exclude-only roots with `codegraph.excluded_roots`:
 
 Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
 
-CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment, plus `CODEGRAPH_NO_DAEMON=1` unless the shared daemon is opted in (see below). OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
+CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. The shared daemon is enabled by default; setting `codegraph.daemon` to `false` adds `CODEGRAPH_NO_DAEMON=1`. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
 
-### CodeGraph daemon (opt-in)
+### CodeGraph daemon
 
-By default every CodeGraph MCP process runs the index in-process and exits with its client. Set `codegraph.daemon` to `true` in the OMO config (`~/.omo/config.jsonc`, or `.omo/config.jsonc` in a project) to opt into the upstream shared daemon:
+By default CodeGraph uses the upstream shared daemon. Set `codegraph.daemon` to `false` in the OMO config (`~/.omo/config.jsonc`, or `.omo/config.jsonc` in a project) to keep each MCP process in-process:
 
 ```jsonc
 {
   "codegraph": {
-    // Default false. When true, one detached daemon per project serves every
-    // CodeGraph client instead of each client loading the index in-process.
-    "daemon": true
+    // Default true. Set false to keep the index inside each MCP client.
+    "daemon": false
   }
 }
 ```
 
-With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. Opting in trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. It ships off by default so no process outlives the client that started it.
+With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. The default trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. Set `daemon: false` when strict client-scoped process lifetime is preferred.
 
 Inspect or stop running daemons with the upstream manager:
 

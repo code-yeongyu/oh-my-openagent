@@ -88,7 +88,7 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	}
 
 	const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
-		daemon: config.codegraph?.daemon === true,
+		daemon: config.codegraph?.daemon !== false,
 		env,
 		homeDir,
 		projectRoot,

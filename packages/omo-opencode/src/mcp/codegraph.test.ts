@@ -194,7 +194,7 @@ describe("createCodegraphMcpConfig", () => {
     }
   })
 
-  it("pins CODEGRAPH_NO_DAEMON=1 in the MCP environment when daemon is not opted in", () => {
+  it("omits CODEGRAPH_NO_DAEMON from the MCP environment by default", () => {
     // given
     const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
 
@@ -210,17 +210,17 @@ describe("createCodegraphMcpConfig", () => {
 
     // then
     expect(config.enabled).toBe(true)
-    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBe("1")
+    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBeUndefined()
   })
 
-  it("omits CODEGRAPH_NO_DAEMON from the MCP environment when daemon=true", () => {
+  it("pins CODEGRAPH_NO_DAEMON=1 in the MCP environment when daemon=false", () => {
     // given
     const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
 
     // when
     const config = createCodegraphMcpConfig({
       cwd: "/workspace/project",
-      config: { daemon: true, enabled: true },
+      config: { daemon: false, enabled: true },
       env: { OMO_CODEGRAPH_BIN: codegraphPath },
       fileExists: (filePath) => filePath === codegraphPath,
       homeDir: "/tmp/omo-codegraph-test-home",
@@ -229,7 +229,7 @@ describe("createCodegraphMcpConfig", () => {
 
     // then
     expect(config.enabled).toBe(true)
-    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBeUndefined()
+    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBe("1")
   })
 
   it("keeps the registration disabled when the project is under a configured excluded root", () => {

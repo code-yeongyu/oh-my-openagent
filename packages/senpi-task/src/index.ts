@@ -312,6 +312,7 @@ export type {
 } from "./tools/task"
 export {
   TaskCancelParams,
+  MemberScopedTaskSendParams,
   TaskSendParams,
   clampWaitTimeout,
   createMemberScopedTaskSendTool,
@@ -330,6 +331,7 @@ export type {
   CancelResultDetails,
   CancelToolResult,
   MemberScopedTaskSendDeps,
+  MemberScopedTaskSendInput,
   SendManager,
   SendResultDetails,
   SendToolResult,

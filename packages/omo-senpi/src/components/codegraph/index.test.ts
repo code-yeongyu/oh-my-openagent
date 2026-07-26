@@ -34,7 +34,7 @@ function fakeNodeSupport(overrides: Partial<CodegraphNodeSupport> = {}): Codegra
 	}
 }
 
-function loadedConfig(daemon: boolean = false) {
+function loadedConfig(daemon: boolean = true) {
 	return { config: { codegraph: { daemon } }, diagnostics: [], sources: [] }
 }
 
@@ -92,7 +92,6 @@ describe("createCodegraphComponent", () => {
 					lifecycle: "eager",
 					env: {
 						CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph",
-						CODEGRAPH_NO_DAEMON: "1",
 						CODEGRAPH_NO_DOWNLOAD: "1",
 						CODEGRAPH_TELEMETRY: "0",
 						DO_NOT_TRACK: "1",
@@ -259,10 +258,23 @@ describe("createCodegraphComponent", () => {
 		expect("CODEGRAPH_NO_DAEMON" in env).toBe(false)
 	})
 
-	it("#given no daemon opt-in and default env builder #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
+	it("#given no daemon override and default config #when registered #then omits CODEGRAPH_NO_DAEMON", async () => {
 		const pi = new FakeExtensionAPI()
 		const component = createDefaultEnvComponent({
 			env: {},
+		})
+
+		await component.register(pi, fakeContext())
+
+		const env = (pi.mcpServers[0]?.config.env ?? {}) as Record<string, string>
+		expect(env.CODEGRAPH_NO_DAEMON).toBeUndefined()
+	})
+
+	it("#given codegraph.daemon=false #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
+		const pi = new FakeExtensionAPI()
+		const component = createDefaultEnvComponent({
+			env: {},
+			loadConfig: () => loadedConfig(false),
 		})
 
 		await component.register(pi, fakeContext())

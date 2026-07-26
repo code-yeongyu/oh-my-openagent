@@ -155,7 +155,7 @@ describe("omo-senpi task component wiring", () => {
     expect(registered).not.toContain("team_wait")
   })
 
-  it("#given the removed-tool hint capability #when the task component registers #then team_wait receives injection guidance", () => {
+  it("#given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance", () => {
     // given
     const pi = new FakeExtensionAPI() as FakeExtensionAPI & {
       registerRemovedToolHint: (name: string, hint: string) => void
@@ -170,7 +170,7 @@ describe("omo-senpi task component wiring", () => {
     // then
     expect(hints).toEqual([{
       name: "team_wait",
-      hint: "team_wait was removed - team messages arrive as injected notifications; send updates with task_send and end your turn.",
+      hint: "team_wait was removed - team messages arrive as steered notifications; send updates with task_send and end your turn.",
     }])
   })
 

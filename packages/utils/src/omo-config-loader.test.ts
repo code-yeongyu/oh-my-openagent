@@ -29,6 +29,7 @@ describe("loadOmoConfig", () => {
       expect(result.config).toEqual({
         codegraph: {
           auto_provision: true,
+          daemon: true,
           enabled: true,
           telemetry: false,
         },
@@ -73,6 +74,7 @@ describe("loadOmoConfig", () => {
       // then
       expect(result.config.codegraph).toEqual({
         auto_provision: true,
+        daemon: true,
         enabled: false,
         install_dir: "/base",
         telemetry: false,
@@ -99,6 +101,7 @@ describe("loadOmoConfig", () => {
       // then
       expect(result.config.codegraph).toEqual({
         auto_provision: false,
+        daemon: true,
         enabled: true,
         install_dir: "/child",
         telemetry: false,

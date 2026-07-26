@@ -66,7 +66,7 @@ describe("omo config schema", () => {
     expect(result.data.categories?.deep?.thinking?.budgetTokens).toBe(2048)
   })
 
-  test("#given an empty codegraph config #when parsed #then daemon defaults off", () => {
+  test("#given an empty codegraph config #when parsed #then daemon defaults on", () => {
     // given
     const config = { codegraph: {} }
 
@@ -76,7 +76,7 @@ describe("omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.codegraph?.daemon).toBe(false)
+    expect(result.data.codegraph?.daemon).toBe(true)
   })
 
   test("#given an unknown root key #when parsed #then the schema rejects the config", () => {

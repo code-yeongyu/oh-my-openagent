@@ -49,7 +49,6 @@ describe("runCodegraphServe", () => {
 				cwd: resolve(runCwd),
 				env: {
 					CODEGRAPH_INSTALL_DIR: join("/tmp/home", ".omo", "codegraph"),
-					CODEGRAPH_NO_DAEMON: "1",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
 					DO_NOT_TRACK: "1",
@@ -62,7 +61,7 @@ describe("runCodegraphServe", () => {
 		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 	});
 
-	it("#given codegraph.daemon=true #when serving MCP #then CODEGRAPH_NO_DAEMON is omitted so the daemon may run", async () => {
+	it("#given codegraph.daemon=false #when serving MCP #then CODEGRAPH_NO_DAEMON pins daemon-off", async () => {
 		// given
 		const runCwd = componentRoot;
 		const calls: Array<{
@@ -75,7 +74,7 @@ describe("runCodegraphServe", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
-			config: { codegraph: { daemon: true, enabled: true }, sources: [], warnings: [] },
+			config: { codegraph: { daemon: false, enabled: true }, sources: [], warnings: [] },
 			cwd: runCwd,
 			env: { CUSTOM: "drop", HOME: "/tmp/home", OPENAI_API_KEY: "sk-test-secret" },
 			nodeVersion: "22.14.0",
@@ -101,6 +100,7 @@ describe("runCodegraphServe", () => {
 				cwd: resolve(runCwd),
 				env: {
 					CODEGRAPH_INSTALL_DIR: join("/tmp/home", ".omo", "codegraph"),
+					CODEGRAPH_NO_DAEMON: "1",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
 					DO_NOT_TRACK: "1",
@@ -109,7 +109,7 @@ describe("runCodegraphServe", () => {
 				stdio: "pipe",
 			},
 		]);
-		expect(calls[0]?.env["CODEGRAPH_NO_DAEMON"]).toBeUndefined();
+		expect(calls[0]?.env["CODEGRAPH_NO_DAEMON"]).toBe("1");
 		expect(calls[0]?.env["CUSTOM"]).toBeUndefined();
 		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 	});
@@ -183,7 +183,7 @@ describe("runCodegraphServe", () => {
 		expect(spawned).toEqual([{ args: ["serve", "--mcp"], command: commandPath }]);
 	});
 
-	it("#given Codex SOT install_dir has the pinned platform launcher and daemon is off by default #when serving MCP #then it resolves there, exports CODEGRAPH_INSTALL_DIR, and pins CODEGRAPH_NO_DAEMON=1", async () => {
+	it("#given Codex SOT install_dir has the pinned launcher and daemon is omitted #when serving MCP #then it defaults daemon-on", async () => {
 		await withProcessPlatform(process.platform, async () => {
 			// given
 			const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-"));
@@ -229,7 +229,6 @@ describe("runCodegraphServe", () => {
 						command: binPath,
 						env: {
 							CODEGRAPH_INSTALL_DIR: installDir,
-							CODEGRAPH_NO_DAEMON: "1",
 							CODEGRAPH_NO_DOWNLOAD: "1",
 							CODEGRAPH_TELEMETRY: "0",
 							DO_NOT_TRACK: "1",
@@ -243,7 +242,7 @@ describe("runCodegraphServe", () => {
 		});
 	});
 
-	it("#given Codex SOT install_dir with codegraph.daemon=true #when serving MCP #then CODEGRAPH_NO_DAEMON is omitted so the daemon may run", async () => {
+	it("#given Codex SOT install_dir with codegraph.daemon=false #when serving MCP #then CODEGRAPH_NO_DAEMON pins daemon-off", async () => {
 		await withProcessPlatform(process.platform, async () => {
 			// given
 			const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-daemon-"));
@@ -266,7 +265,7 @@ describe("runCodegraphServe", () => {
 
 				// when
 				const exitCode = await runCodegraphServe({
-					config: { codegraph: { daemon: true, enabled: true, install_dir: installDir }, sources: [], trustedCodegraphInstallDir: installDir, warnings: [] },
+					config: { codegraph: { daemon: false, enabled: true, install_dir: installDir }, sources: [], trustedCodegraphInstallDir: installDir, warnings: [] },
 					env: { HOME: "/tmp/home" },
 					nodeVersion: "22.14.0",
 					homeDir: "/tmp/home",
@@ -289,6 +288,7 @@ describe("runCodegraphServe", () => {
 						command: binPath,
 						env: {
 							CODEGRAPH_INSTALL_DIR: installDir,
+							CODEGRAPH_NO_DAEMON: "1",
 							CODEGRAPH_NO_DOWNLOAD: "1",
 							CODEGRAPH_TELEMETRY: "0",
 							DO_NOT_TRACK: "1",
@@ -296,7 +296,7 @@ describe("runCodegraphServe", () => {
 						},
 					},
 				]);
-				expect(calls[0]?.env["CODEGRAPH_NO_DAEMON"]).toBeUndefined();
+				expect(calls[0]?.env["CODEGRAPH_NO_DAEMON"]).toBe("1");
 			} finally {
 				rmSync(tempRoot, { recursive: true, force: true });
 			}

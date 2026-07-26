@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 describe("member extension lifecycle", () => {
-  test("#given unread mail during extension loading #when session_start fires #then runtime actions defer to the lifecycle edge", async () => {
+  test("#given unread mail during extension loading #when session_start fires #then inbound team mail steers at the lifecycle edge", async () => {
     const root = mkdtempSync(join(tmpdir(), "senpi-member-extension-"))
     roots.push(root)
     const stateDir = join(root, "state")
@@ -76,7 +76,7 @@ describe("member extension lifecycle", () => {
       expect(injected).toHaveLength(1)
       expect(injected[0]).toEqual({
         content: expect.stringContaining(MESSAGE_ID),
-        deliverAs: "followUp",
+        deliverAs: "steer",
       })
     } finally {
       await dispatch(handlers, "session_shutdown")
