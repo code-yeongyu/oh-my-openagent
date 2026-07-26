@@ -112,7 +112,7 @@ const STOP_MESSAGE_PATTERNS = [
   // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
   "daily call limit",
   "daily limit",
-  "usage limit reached for",
+  "usage limit reached for this month",
   "in arrears",
   "fair use policy",
   "recharge and try",
@@ -165,6 +165,14 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // Check message patterns for unknown errors
   const msg = error.message?.toLowerCase() ?? ""
+  // Transient rolling-window usage limits reset within hours/minutes and must
+  // trigger model fallback. Example (Z.ai coding plan):
+  // "Usage limit reached for 5 hour. Your limit will reset at 2026-07-26 20:10:18"
+  if (
+    /usage limit reached for \d+\s*(hours?|hrs?|minutes?|mins?)\b/i.test(msg)
+  ) {
+    return true
+  }
 
   // STOP patterns take precedence over retryable patterns
   if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
