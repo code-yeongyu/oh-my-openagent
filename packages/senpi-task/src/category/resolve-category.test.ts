@@ -105,18 +105,18 @@ describe("resolveCategory", () => {
 
   test("#given quick primary is unavailable and hardcoded fallback is available #when resolved #then delegate-core fallback chain reaches Anthropic Haiku", () => {
     // given
-    const models = registry([model("anthropic", "claude-haiku-4-5")])
+    const models = registry([model("anthropic-api", "claude-haiku-4-5")])
 
     // when
     const result = resolveCategory("quick", {}, models)
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("anthropic")
+    expect(resolved.spec.provider).toBe("anthropic-api")
     expect(resolved.spec.modelId).toBe("claude-haiku-4-5")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["anthropic", "github-copilot", "vercel"],
+      providers: ["anthropic-api", "anthropic", "github-copilot", "vercel"],
       model: "claude-haiku-4-5",
     })
   })
@@ -266,7 +266,7 @@ describe("resolveCategory", () => {
 
   test("#given category params in omo overlay #when resolved #then child spec carries generation params and prompt append", () => {
     // given
-    const models = registry([model("openai", "gpt-5.4-mini")])
+    const models = registry([model("apitopia", "kimi-for-coding-highspeed")])
 
     // when
     const result = resolveCategory(
