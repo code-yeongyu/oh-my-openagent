@@ -93,19 +93,39 @@ makes them host-independent rather than accidentally green.
 `runner.test.ts` additionally clears `CMUX_OMO_CMUX_BIN` / `CMUX_BUNDLED_CLI_PATH` in `beforeEach`
 so the suite does not read the host's cmux configuration.
 
-## Pre-existing failures (reproduced on clean `upstream/dev`, unrelated to this change)
+## Whole-repo run on the CI-pinned Bun
 
-Each was confirmed by stashing this branch's changes and re-running the identical command.
+The machine's default Bun is 1.3.13 while CONTRIBUTING pins 1.3.12, and `bun test` segfaults on
+1.3.13 even on clean `upstream/dev` (`preexisting-full-test-segfault.log`). Bun 1.3.12 was
+fetched into a scratch directory and used to reproduce CI conditions.
+
+That run caught a real defect in this branch that the per-package sweep could not see:
+`script/package-registration-audit.test.ts` requires every exact re-export shim to be listed in
+`docs/reference/re-export-shim-inventory.md`, and the new
+`packages/omo-opencode/src/shared/tmux/cmux-cli.ts` shim was missing (`Expected: 318, Received:
+317`). Registering it makes that suite 6 pass / 0 fail.
+
+After that fix, the whole-repo run on Bun 1.3.12 reports exactly two failures:
+
+```
+(fail) #given the generated Codex installer #when release versions are synchronized ...
+(fail) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting ...
+```
+
+Both reproduce identically on a detached checkout of clean `upstream/dev`
+(`full-test-bun-1.3.12.log`), so they are pre-existing and unrelated. The summary line is not
+reachable locally because Bun crashes during teardown on this host on both versions.
+
+## Other pre-existing failures (reproduced on clean `upstream/dev`)
 
 | Command | Result | Clean-dev result | Log |
 | --- | --- | --- | --- |
 | `bun run typecheck` | `senpi-task ... Cannot find module 'typebox/value'` | identical | `preexisting-senpi-task-typecheck.log` |
-| `bun test` (whole repo, single process) | Bun segfault | identical | `preexisting-full-test-segfault.log` |
 | per-package sweep | 3176 pass / 92 fail in `omo-senpi`, `pi-goal`, `pi-webfetch`, `senpi-task`, `team-core` | identical counts | `preexisting-package-failures.log` |
 | `bun run test:codex` | 47 pass / 31 fail | identical | `preexisting-codex-test.log` |
 
-Local Bun is 1.3.13 while CONTRIBUTING pins 1.3.12, which likely explains the whole-repo
-segfault; the per-package sweep was used instead so the suite still ran end to end.
+The per-package sweep and `test:codex` were run with the machine default Bun 1.3.13; the counts
+above are a like-for-like comparison against clean `upstream/dev` on the same version.
 
 ## Residual
 
