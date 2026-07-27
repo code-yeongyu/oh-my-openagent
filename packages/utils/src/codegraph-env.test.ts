@@ -12,7 +12,7 @@ import {
 } from "./codegraph/env"
 
 describe("buildCodegraphEnv", () => {
-  it("forces telemetry off and scopes the CodeGraph install cache under ~/.omo/codegraph", () => {
+  it("defaults to daemon-on while forcing telemetry off and scoping the install cache", () => {
     // given
     const homeDir = "/Users/alice"
 
@@ -22,11 +22,11 @@ describe("buildCodegraphEnv", () => {
     // then
     expect(result).toEqual({
       [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
-      [CODEGRAPH_NO_DAEMON_ENV]: "1",
       [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
       [CODEGRAPH_TELEMETRY_ENV]: "0",
       [DO_NOT_TRACK_ENV]: "1",
     })
+    expect(CODEGRAPH_NO_DAEMON_ENV in result).toBe(false)
     expect("CODEGRAPH_DIR" in result).toBe(false)
   })
 
@@ -82,7 +82,7 @@ describe("buildCodegraphEnv", () => {
   })
 
   describe("CODEGRAPH_NO_DAEMON merge precedence", () => {
-    it("defaults to daemon-off when daemon is unset and ambient does not override", () => {
+    it("defaults to daemon-on when daemon is unset and ambient does not override", () => {
       // given
       const codegraphEnv = buildCodegraphEnv({ homeDir: "/Users/alice" })
 
@@ -90,7 +90,7 @@ describe("buildCodegraphEnv", () => {
       const result = buildCodegraphChildEnv({ codegraphEnv, runtimeEnv: {} })
 
       // then
-      expect(result[CODEGRAPH_NO_DAEMON_ENV]).toBe("1")
+      expect(CODEGRAPH_NO_DAEMON_ENV in result).toBe(false)
     })
 
     it("keeps daemon-off even when ambient CODEGRAPH_NO_DAEMON is '0'", () => {

@@ -268,8 +268,54 @@
           "models": {
             "type": "array",
             "items": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "model"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
             }
+          },
+          "variant": {
+            "type": "string"
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "minimal",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
           },
           "tools": {
             "type": "object",
@@ -301,6 +347,17 @@
               "type": "string"
             }
           },
+          "disallowed_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_turns": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "temperature": {
             "type": "number",
             "minimum": 0,
@@ -316,13 +373,45 @@
     "codegraph": {
       "type": "object",
       "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "auto_provision": {
+          "default": true,
+          "type": "boolean"
+        },
         "daemon": {
+          "default": true,
+          "type": "boolean"
+        },
+        "telemetry": {
           "default": false,
           "type": "boolean"
+        },
+        "install_dir": {
+          "type": "string"
+        },
+        "watch_debounce_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "excluded_roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "session_start_cooldown_ms": {
+          "type": "number",
+          "minimum": 60000
         }
       },
       "required": [
-        "daemon"
+        "enabled",
+        "auto_provision",
+        "daemon",
+        "telemetry"
       ],
       "additionalProperties": false
     },
@@ -637,7 +726,3582 @@
         ],
         "additionalProperties": false
       }
+    },
+    "models": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "minimal",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "[opencode]": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "[senpi]": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "fallback_models": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "variant": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        },
+                        "temperature": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 2
+                        },
+                        "top_p": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "maxTokens": {
+                          "type": "number"
+                        },
+                        "thinking": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "enabled",
+                                "disabled"
+                              ]
+                            },
+                            "budgetTokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "model": {
+                              "type": "string"
+                            },
+                            "variant": {
+                              "type": "string"
+                            },
+                            "reasoningEffort": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max"
+                              ]
+                            },
+                            "temperature": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 2
+                            },
+                            "top_p": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "maxTokens": {
+                              "type": "number"
+                            },
+                            "thinking": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "enabled",
+                                    "disabled"
+                                  ]
+                                },
+                                "budgetTokens": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "model"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "variant": {
+                "type": "string"
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "top_p": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "maxTokens": {
+                "type": "number"
+              },
+              "thinking": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "enabled",
+                      "disabled"
+                    ]
+                  },
+                  "budgetTokens": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              "textVerbosity": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "prompt_append": {
+                "type": "string"
+              },
+              "max_prompt_tokens": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "is_unstable_agent": {
+                "type": "boolean"
+              },
+              "disable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "agents": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "variant": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "variant": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "execution_mode": {
+                "type": "string",
+                "enum": [
+                  "in-process",
+                  "process"
+                ]
+              },
+              "background": {
+                "type": "boolean"
+              },
+              "max_depth": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "allowed_subagents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "disallowed_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max_turns": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "disable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "codegraph": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "auto_provision": {
+              "type": "boolean"
+            },
+            "daemon": {
+              "type": "boolean"
+            },
+            "telemetry": {
+              "type": "boolean"
+            },
+            "install_dir": {
+              "type": "string"
+            },
+            "watch_debounce_ms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "excluded_roots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "session_start_cooldown_ms": {
+              "type": "number",
+              "minimum": 60000
+            }
+          },
+          "additionalProperties": false
+        },
+        "task": {
+          "type": "object",
+          "properties": {
+            "default_execution_mode": {
+              "type": "string",
+              "enum": [
+                "in-process",
+                "process"
+              ]
+            },
+            "default_concurrency": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "provider_concurrency": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "model_concurrency": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "residency_max_children": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "ttl_ms": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "state_dir": {
+              "type": "string"
+            },
+            "reattach_on_reconcile": {
+              "type": "boolean"
+            },
+            "wait": {
+              "type": "object",
+              "properties": {
+                "min_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "default_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "team": {
+              "type": "object",
+              "properties": {
+                "max_members": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "max_parallel_members": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "max_wall_clock_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "teams": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "default": 1,
+                "type": "number",
+                "const": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "leadAgentId": {
+                "type": "string"
+              },
+              "teamAllowedPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sessionPermission": {
+                "type": "string"
+              },
+              "members": {
+                "minItems": 1,
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[a-z0-9-]+$"
+                        },
+                        "cwd": {
+                          "type": "string"
+                        },
+                        "worktreePath": {
+                          "type": "string"
+                        },
+                        "subscriptions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "backendType": {
+                          "default": "in-process",
+                          "type": "string",
+                          "enum": [
+                            "in-process",
+                            "tmux"
+                          ]
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "isActive": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "const": "category"
+                        },
+                        "category": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "backendType",
+                        "isActive",
+                        "kind",
+                        "category",
+                        "prompt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[a-z0-9-]+$"
+                        },
+                        "cwd": {
+                          "type": "string"
+                        },
+                        "worktreePath": {
+                          "type": "string"
+                        },
+                        "subscriptions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "backendType": {
+                          "default": "in-process",
+                          "type": "string",
+                          "enum": [
+                            "in-process",
+                            "tmux"
+                          ]
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "isActive": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "const": "subagent_type"
+                        },
+                        "subagent_type": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "prompt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "backendType",
+                        "isActive",
+                        "kind",
+                        "subagent_type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "models": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "[codex]": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "fallback_models": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "variant": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        },
+                        "temperature": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 2
+                        },
+                        "top_p": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "maxTokens": {
+                          "type": "number"
+                        },
+                        "thinking": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "enabled",
+                                "disabled"
+                              ]
+                            },
+                            "budgetTokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "model": {
+                              "type": "string"
+                            },
+                            "variant": {
+                              "type": "string"
+                            },
+                            "reasoningEffort": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max"
+                              ]
+                            },
+                            "temperature": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 2
+                            },
+                            "top_p": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "maxTokens": {
+                              "type": "number"
+                            },
+                            "thinking": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "enabled",
+                                    "disabled"
+                                  ]
+                                },
+                                "budgetTokens": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "model"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "variant": {
+                "type": "string"
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "top_p": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "maxTokens": {
+                "type": "number"
+              },
+              "thinking": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "enabled",
+                      "disabled"
+                    ]
+                  },
+                  "budgetTokens": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              "textVerbosity": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "prompt_append": {
+                "type": "string"
+              },
+              "max_prompt_tokens": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "is_unstable_agent": {
+                "type": "boolean"
+              },
+              "disable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "agents": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "variant": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "variant": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "execution_mode": {
+                "type": "string",
+                "enum": [
+                  "in-process",
+                  "process"
+                ]
+              },
+              "background": {
+                "type": "boolean"
+              },
+              "max_depth": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "allowed_subagents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "disallowed_tools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max_turns": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "disable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "codegraph": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "auto_provision": {
+              "type": "boolean"
+            },
+            "daemon": {
+              "type": "boolean"
+            },
+            "telemetry": {
+              "type": "boolean"
+            },
+            "install_dir": {
+              "type": "string"
+            },
+            "watch_debounce_ms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "excluded_roots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "session_start_cooldown_ms": {
+              "type": "number",
+              "minimum": 60000
+            }
+          },
+          "additionalProperties": false
+        },
+        "task": {
+          "type": "object",
+          "properties": {
+            "default_execution_mode": {
+              "type": "string",
+              "enum": [
+                "in-process",
+                "process"
+              ]
+            },
+            "default_concurrency": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "provider_concurrency": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "model_concurrency": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "residency_max_children": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "ttl_ms": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "state_dir": {
+              "type": "string"
+            },
+            "reattach_on_reconcile": {
+              "type": "boolean"
+            },
+            "wait": {
+              "type": "object",
+              "properties": {
+                "min_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "default_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "team": {
+              "type": "object",
+              "properties": {
+                "max_members": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "max_parallel_members": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "max_wall_clock_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "teams": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "default": 1,
+                "type": "number",
+                "const": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "leadAgentId": {
+                "type": "string"
+              },
+              "teamAllowedPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sessionPermission": {
+                "type": "string"
+              },
+              "members": {
+                "minItems": 1,
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[a-z0-9-]+$"
+                        },
+                        "cwd": {
+                          "type": "string"
+                        },
+                        "worktreePath": {
+                          "type": "string"
+                        },
+                        "subscriptions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "backendType": {
+                          "default": "in-process",
+                          "type": "string",
+                          "enum": [
+                            "in-process",
+                            "tmux"
+                          ]
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "isActive": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "const": "category"
+                        },
+                        "category": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "backendType",
+                        "isActive",
+                        "kind",
+                        "category",
+                        "prompt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[a-z0-9-]+$"
+                        },
+                        "cwd": {
+                          "type": "string"
+                        },
+                        "worktreePath": {
+                          "type": "string"
+                        },
+                        "subscriptions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "backendType": {
+                          "default": "in-process",
+                          "type": "string",
+                          "enum": [
+                            "in-process",
+                            "tmux"
+                          ]
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "isActive": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "const": "subagent_type"
+                        },
+                        "subagent_type": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "prompt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "backendType",
+                        "isActive",
+                        "kind",
+                        "subagent_type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "models": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "profiles": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "fallback_models": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "variant": {
+                            "type": "string"
+                          },
+                          "reasoningEffort": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "minimal",
+                              "low",
+                              "medium",
+                              "high",
+                              "xhigh",
+                              "max"
+                            ]
+                          },
+                          "temperature": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 2
+                          },
+                          "top_p": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "maxTokens": {
+                            "type": "number"
+                          },
+                          "thinking": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "enabled",
+                                  "disabled"
+                                ]
+                              },
+                              "budgetTokens": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "model"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max"
+                                ]
+                              },
+                              "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "top_p": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "maxTokens": {
+                                "type": "number"
+                              },
+                              "thinking": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "enabled",
+                                      "disabled"
+                                    ]
+                                  },
+                                  "budgetTokens": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "variant": {
+                  "type": "string"
+                },
+                "temperature": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2
+                },
+                "top_p": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "maxTokens": {
+                  "type": "number"
+                },
+                "thinking": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "enabled",
+                        "disabled"
+                      ]
+                    },
+                    "budgetTokens": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "reasoningEffort": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "textVerbosity": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high"
+                  ]
+                },
+                "tools": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
+                },
+                "prompt_append": {
+                  "type": "string"
+                },
+                "max_prompt_tokens": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "is_unstable_agent": {
+                  "type": "boolean"
+                },
+                "disable": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "agents": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "variant": {
+                            "type": "string"
+                          },
+                          "reasoningEffort": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "minimal",
+                              "low",
+                              "medium",
+                              "high",
+                              "xhigh",
+                              "max"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "model"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "variant": {
+                  "type": "string"
+                },
+                "reasoningEffort": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "tools": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
+                },
+                "execution_mode": {
+                  "type": "string",
+                  "enum": [
+                    "in-process",
+                    "process"
+                  ]
+                },
+                "background": {
+                  "type": "boolean"
+                },
+                "max_depth": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "allowed_subagents": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "disallowed_tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_turns": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "temperature": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2
+                },
+                "disable": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "codegraph": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "auto_provision": {
+                "type": "boolean"
+              },
+              "daemon": {
+                "type": "boolean"
+              },
+              "telemetry": {
+                "type": "boolean"
+              },
+              "install_dir": {
+                "type": "string"
+              },
+              "watch_debounce_ms": {
+                "type": "number",
+                "minimum": 0
+              },
+              "excluded_roots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "session_start_cooldown_ms": {
+                "type": "number",
+                "minimum": 60000
+              }
+            },
+            "additionalProperties": false
+          },
+          "task": {
+            "type": "object",
+            "properties": {
+              "default_execution_mode": {
+                "type": "string",
+                "enum": [
+                  "in-process",
+                  "process"
+                ]
+              },
+              "default_concurrency": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "provider_concurrency": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "model_concurrency": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "max_depth": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "residency_max_children": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "ttl_ms": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "state_dir": {
+                "type": "string"
+              },
+              "reattach_on_reconcile": {
+                "type": "boolean"
+              },
+              "wait": {
+                "type": "object",
+                "properties": {
+                  "min_ms": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "default_ms": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_ms": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "team": {
+                "type": "object",
+                "properties": {
+                  "max_members": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "max_parallel_members": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "max_wall_clock_minutes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "teams": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "default": 1,
+                  "type": "number",
+                  "const": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9-]+$"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "leadAgentId": {
+                  "type": "string"
+                },
+                "teamAllowedPaths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sessionPermission": {
+                  "type": "string"
+                },
+                "members": {
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9-]+$"
+                          },
+                          "cwd": {
+                            "type": "string"
+                          },
+                          "worktreePath": {
+                            "type": "string"
+                          },
+                          "subscriptions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "backendType": {
+                            "default": "in-process",
+                            "type": "string",
+                            "enum": [
+                              "in-process",
+                              "tmux"
+                            ]
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "isActive": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "const": "category"
+                          },
+                          "category": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "backendType",
+                          "isActive",
+                          "kind",
+                          "category",
+                          "prompt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9-]+$"
+                          },
+                          "cwd": {
+                            "type": "string"
+                          },
+                          "worktreePath": {
+                            "type": "string"
+                          },
+                          "subscriptions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "backendType": {
+                            "default": "in-process",
+                            "type": "string",
+                            "enum": [
+                              "in-process",
+                              "tmux"
+                            ]
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "isActive": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "const": "subagent_type"
+                          },
+                          "subagent_type": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "prompt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "backendType",
+                          "isActive",
+                          "kind",
+                          "subagent_type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "models": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                },
+                "reasoningEffort": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "[opencode]": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "[senpi]": {
+            "type": "object",
+            "properties": {
+              "categories": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "fallback_models": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max"
+                                ]
+                              },
+                              "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "top_p": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "maxTokens": {
+                                "type": "number"
+                              },
+                              "thinking": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "enabled",
+                                      "disabled"
+                                    ]
+                                  },
+                                  "budgetTokens": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "model": {
+                                    "type": "string"
+                                  },
+                                  "variant": {
+                                    "type": "string"
+                                  },
+                                  "reasoningEffort": {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "minimal",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "xhigh",
+                                      "max"
+                                    ]
+                                  },
+                                  "temperature": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 2
+                                  },
+                                  "top_p": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "maxTokens": {
+                                    "type": "number"
+                                  },
+                                  "thinking": {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "enabled",
+                                          "disabled"
+                                        ]
+                                      },
+                                      "budgetTokens": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "type"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "model"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 2
+                    },
+                    "top_p": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "maxTokens": {
+                      "type": "number"
+                    },
+                    "thinking": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "enabled",
+                            "disabled"
+                          ]
+                        },
+                        "budgetTokens": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    },
+                    "textVerbosity": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "tools": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "prompt_append": {
+                      "type": "string"
+                    },
+                    "max_prompt_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "is_unstable_agent": {
+                      "type": "boolean"
+                    },
+                    "disable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "agents": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    },
+                    "tools": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "execution_mode": {
+                      "type": "string",
+                      "enum": [
+                        "in-process",
+                        "process"
+                      ]
+                    },
+                    "background": {
+                      "type": "boolean"
+                    },
+                    "max_depth": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "allowed_subagents": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "disallowed_tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "max_turns": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 2
+                    },
+                    "disable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "codegraph": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "auto_provision": {
+                    "type": "boolean"
+                  },
+                  "daemon": {
+                    "type": "boolean"
+                  },
+                  "telemetry": {
+                    "type": "boolean"
+                  },
+                  "install_dir": {
+                    "type": "string"
+                  },
+                  "watch_debounce_ms": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "excluded_roots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "session_start_cooldown_ms": {
+                    "type": "number",
+                    "minimum": 60000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "default_execution_mode": {
+                    "type": "string",
+                    "enum": [
+                      "in-process",
+                      "process"
+                    ]
+                  },
+                  "default_concurrency": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "provider_concurrency": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "model_concurrency": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "max_depth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "residency_max_children": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "ttl_ms": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "state_dir": {
+                    "type": "string"
+                  },
+                  "reattach_on_reconcile": {
+                    "type": "boolean"
+                  },
+                  "wait": {
+                    "type": "object",
+                    "properties": {
+                      "min_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "default_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "team": {
+                    "type": "object",
+                    "properties": {
+                      "max_members": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      },
+                      "max_parallel_members": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      },
+                      "max_wall_clock_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "teams": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "default": 1,
+                      "type": "number",
+                      "const": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9-]+$"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "leadAgentId": {
+                      "type": "string"
+                    },
+                    "teamAllowedPaths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sessionPermission": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "minItems": 1,
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9-]+$"
+                              },
+                              "cwd": {
+                                "type": "string"
+                              },
+                              "worktreePath": {
+                                "type": "string"
+                              },
+                              "subscriptions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "backendType": {
+                                "default": "in-process",
+                                "type": "string",
+                                "enum": [
+                                  "in-process",
+                                  "tmux"
+                                ]
+                              },
+                              "color": {
+                                "type": "string"
+                              },
+                              "isActive": {
+                                "default": true,
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "const": "category"
+                              },
+                              "category": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "prompt": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "backendType",
+                              "isActive",
+                              "kind",
+                              "category",
+                              "prompt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9-]+$"
+                              },
+                              "cwd": {
+                                "type": "string"
+                              },
+                              "worktreePath": {
+                                "type": "string"
+                              },
+                              "subscriptions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "backendType": {
+                                "default": "in-process",
+                                "type": "string",
+                                "enum": [
+                                  "in-process",
+                                  "tmux"
+                                ]
+                              },
+                              "color": {
+                                "type": "string"
+                              },
+                              "isActive": {
+                                "default": true,
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "const": "subagent_type"
+                              },
+                              "subagent_type": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "prompt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "backendType",
+                              "isActive",
+                              "kind",
+                              "subagent_type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "models": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "[codex]": {
+            "type": "object",
+            "properties": {
+              "categories": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "fallback_models": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max"
+                                ]
+                              },
+                              "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "top_p": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "maxTokens": {
+                                "type": "number"
+                              },
+                              "thinking": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "enabled",
+                                      "disabled"
+                                    ]
+                                  },
+                                  "budgetTokens": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "model": {
+                                    "type": "string"
+                                  },
+                                  "variant": {
+                                    "type": "string"
+                                  },
+                                  "reasoningEffort": {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "minimal",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "xhigh",
+                                      "max"
+                                    ]
+                                  },
+                                  "temperature": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 2
+                                  },
+                                  "top_p": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "maxTokens": {
+                                    "type": "number"
+                                  },
+                                  "thinking": {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "enabled",
+                                          "disabled"
+                                        ]
+                                      },
+                                      "budgetTokens": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "type"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "model"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 2
+                    },
+                    "top_p": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "maxTokens": {
+                      "type": "number"
+                    },
+                    "thinking": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "enabled",
+                            "disabled"
+                          ]
+                        },
+                        "budgetTokens": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    },
+                    "textVerbosity": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "tools": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "prompt_append": {
+                      "type": "string"
+                    },
+                    "max_prompt_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "is_unstable_agent": {
+                      "type": "boolean"
+                    },
+                    "disable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "agents": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    },
+                    "tools": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "execution_mode": {
+                      "type": "string",
+                      "enum": [
+                        "in-process",
+                        "process"
+                      ]
+                    },
+                    "background": {
+                      "type": "boolean"
+                    },
+                    "max_depth": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "allowed_subagents": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "disallowed_tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "max_turns": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 2
+                    },
+                    "disable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "codegraph": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "auto_provision": {
+                    "type": "boolean"
+                  },
+                  "daemon": {
+                    "type": "boolean"
+                  },
+                  "telemetry": {
+                    "type": "boolean"
+                  },
+                  "install_dir": {
+                    "type": "string"
+                  },
+                  "watch_debounce_ms": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "excluded_roots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "session_start_cooldown_ms": {
+                    "type": "number",
+                    "minimum": 60000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "default_execution_mode": {
+                    "type": "string",
+                    "enum": [
+                      "in-process",
+                      "process"
+                    ]
+                  },
+                  "default_concurrency": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "provider_concurrency": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "model_concurrency": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "max_depth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "residency_max_children": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "ttl_ms": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "state_dir": {
+                    "type": "string"
+                  },
+                  "reattach_on_reconcile": {
+                    "type": "boolean"
+                  },
+                  "wait": {
+                    "type": "object",
+                    "properties": {
+                      "min_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "default_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "team": {
+                    "type": "object",
+                    "properties": {
+                      "max_members": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      },
+                      "max_parallel_members": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      },
+                      "max_wall_clock_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "teams": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "default": 1,
+                      "type": "number",
+                      "const": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9-]+$"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "leadAgentId": {
+                      "type": "string"
+                    },
+                    "teamAllowedPaths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sessionPermission": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "minItems": 1,
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9-]+$"
+                              },
+                              "cwd": {
+                                "type": "string"
+                              },
+                              "worktreePath": {
+                                "type": "string"
+                              },
+                              "subscriptions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "backendType": {
+                                "default": "in-process",
+                                "type": "string",
+                                "enum": [
+                                  "in-process",
+                                  "tmux"
+                                ]
+                              },
+                              "color": {
+                                "type": "string"
+                              },
+                              "isActive": {
+                                "default": true,
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "const": "category"
+                              },
+                              "category": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "prompt": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "backendType",
+                              "isActive",
+                              "kind",
+                              "category",
+                              "prompt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9-]+$"
+                              },
+                              "cwd": {
+                                "type": "string"
+                              },
+                              "worktreePath": {
+                                "type": "string"
+                              },
+                              "subscriptions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "backendType": {
+                                "default": "in-process",
+                                "type": "string",
+                                "enum": [
+                                  "in-process",
+                                  "tmux"
+                                ]
+                              },
+                              "color": {
+                                "type": "string"
+                              },
+                              "isActive": {
+                                "default": true,
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "const": "subagent_type"
+                              },
+                              "subagent_type": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "prompt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "backendType",
+                              "isActive",
+                              "kind",
+                              "subagent_type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "models": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "_migrations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "legacy_migrations": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
     }
   },
+  "required": [
+    "profiles"
+  ],
   "additionalProperties": false
 }

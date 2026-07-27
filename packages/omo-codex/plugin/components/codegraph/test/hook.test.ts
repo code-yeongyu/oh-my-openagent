@@ -39,8 +39,8 @@ describe("CodeGraph SessionStart hook", () => {
 				env: { HOME: homeDir },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
+				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
 			});
 
 			// then
@@ -216,32 +216,31 @@ describe("CodeGraph SessionStart hook", () => {
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
 		const workspace = createAllowedWorkspace("codegraph-workspace");
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-spawn-home-"));
 
 		try {
 			// when
 			const result = await executeCodegraphSessionStartHook({
+				ancestorProbe: () => ({ kind: "uninitialized" }),
 				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
 				cwd: workspace,
-				env: { HOME: "/tmp/home", KEEP: "1", OPENAI_API_KEY: "sk-test-secret" },
+				env: { HOME: homeDir, KEEP: "1", OPENAI_API_KEY: "sk-test-secret" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
-				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
+				spawnWorker: (invocation) => {
+					spawned.push(invocation);
+				},
 				workerCliPath: "/plugin/components/codegraph/dist/cli.js",
 			});
 
 			// then
 			expect(result).toEqual({ action: "spawned", exitCode: 0 });
-			expect(spawned).toEqual([
-				{
-					args: ["/plugin/components/codegraph/dist/cli.js", "hook", "session-start-worker"],
-					command: process.execPath,
-					env: {
-						HOME: "/tmp/home",
-						OMO_CODEGRAPH_SESSION_START_CWD: workspace,
-					},
-				},
-			]);
+			expect(spawned).toHaveLength(1);
+			expect(spawned[0]?.args).toEqual(["/plugin/components/codegraph/dist/cli.js", "hook", "session-start-worker"]);
+			expect(spawned[0]?.command).toBe(process.execPath);
+			expect(spawned[0]?.env["HOME"]).toBe(homeDir);
+			expect(spawned[0]?.env["OMO_CODEGRAPH_SESSION_START_CWD"]).toBe(workspace);
+			expect(spawned[0]?.env["OMO_CODEGRAPH_SESSION_START_LOCK_TOKEN"]).toMatch(/^[0-9a-f-]{36}$/);
 			expect(spawned[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 			expect(spawned[0]?.env["KEEP"]).toBeUndefined();
 			expect(JSON.parse(stdout.join(""))).toEqual({
@@ -251,6 +250,7 @@ describe("CodeGraph SessionStart hook", () => {
 				},
 			});
 		} finally {
+			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(workspace, { recursive: true, force: true });
 		}
 	});
@@ -260,17 +260,23 @@ describe("CodeGraph SessionStart hook", () => {
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
 		const workspace = createAllowedWorkspace("codegraph-initialized-workspace");
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-initialized-home-"));
 
 		try {
+			mkdirSync(join(workspace, ".codegraph"), { recursive: true });
+			writeFileSync(join(workspace, ".codegraph", "codegraph.db"), "fixture");
+
 			// when
 			const result = await executeCodegraphSessionStartHook({
+				ancestorProbe: () => {
+					throw new Error("an initialized exact root must not invoke any fallback probe");
+				},
 				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
 				cwd: workspace,
-				env: { HOME: "/tmp/home", KEEP: "1" },
+				env: { HOME: homeDir, KEEP: "1" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(true),
 			});
 
 			// then
@@ -278,6 +284,7 @@ describe("CodeGraph SessionStart hook", () => {
 			expect(spawned).toEqual([]);
 			expect(stdout.join("")).toBe("");
 		} finally {
+			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(workspace, { recursive: true, force: true });
 		}
 	});

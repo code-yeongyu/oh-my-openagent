@@ -2,6 +2,7 @@ import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
 
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import type { ResolvedModelRecord } from "../state"
+import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
 import {
   findExactAgentModel,
   parseAvailableAgentModels,
@@ -86,7 +87,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     const fallbackHead = fallbackChain?.[0]
     const fallbackProvider = fallbackHead?.providers[0]
     const attemptedModel = definition.model
-      ?? definition.models?.[0]
+      ?? firstConfiguredModel(definition)
       ?? (fallbackHead !== undefined && fallbackProvider !== undefined
         ? `${fallbackProvider}/${fallbackHead.model}`
         : undefined)
@@ -99,16 +100,17 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   // unparseable available set keeps the find-only behavior rather than failing every resolution.
   const availableModels = parseAvailableAgentModels(registry.getAvailable())
   let attemptedModel: string | undefined
-  const directModels = [
-    ...(definition.model === undefined ? [] : [definition.model]),
-    ...(definition.models ?? []),
-  ]
+  const configuredTuning = {
+    ...(definition.variant === undefined ? {} : { variant: definition.variant }),
+    ...(definition.reasoningEffort === undefined ? {} : { reasoningEffort: definition.reasoningEffort }),
+  }
+  const directModels = agentModelCandidates(definition.model, definition.models, configuredTuning)
   for (const candidate of directModels) {
-    attemptedModel = candidate
-    const found = findExactAgentModel(candidate, registry)
+    attemptedModel = candidate.model
+    const found = findExactAgentModel(candidate.model, registry)
     if (found === undefined) continue
     if (availableModels !== undefined && !availableModels.includes(`${found.provider}/${found.modelId}`)) continue
-    return resolvedAgent(context, found)
+    return resolvedAgent(context, found, candidate.variant, candidate.reasoningEffort)
   }
 
   if (availableModels !== undefined && fallbackChain !== undefined) {
@@ -124,7 +126,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       attemptedModel = resolution.model
       const found = findExactAgentModel(resolution.model, registry)
       if (found !== undefined) {
-        return resolvedAgent(context, found, resolution.variant)
+        // A builtin chain rung carries its own variant, but an agent that configured tuning without
+        // naming a model still resolves here, so the configured values must win over the rung's.
+        return resolvedAgent(
+          context,
+          found,
+          configuredTuning.variant ?? resolution.variant,
+          configuredTuning.reasoningEffort,
+        )
       }
     }
   }
@@ -147,10 +156,17 @@ function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
   }
 }
 
+function firstConfiguredModel(definition: AgentDefinition): string | undefined {
+  const entry = definition.models?.[0]
+  if (entry === undefined) return undefined
+  return typeof entry === "string" ? entry : entry.model
+}
+
 function resolvedAgent(
   context: AgentResolutionContext,
   model: ParsedAgentModel,
   variant?: string,
+  reasoningEffort?: AgentModelCandidate["reasoningEffort"],
 ): ResolvedAgentResult {
   const display = `${model.provider}/${model.modelId}`
   return {
@@ -163,6 +179,7 @@ function resolvedAgent(
       model_id: model.modelId,
       display,
       ...(variant !== undefined ? { variant } : {}),
+      ...(reasoningEffort !== undefined ? { reasoning_effort: reasoningEffort } : {}),
     },
     availableAgents: context.availableAgents,
     ...context.persona,

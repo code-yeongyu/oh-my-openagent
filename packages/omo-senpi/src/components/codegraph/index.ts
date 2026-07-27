@@ -1,4 +1,4 @@
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { loadSenpiOmoConfig } from "../config-resolution"
 import {
 	buildCodegraphEnv,
 	resolveCodegraphCommand,
@@ -15,7 +15,7 @@ export interface CodegraphComponentOptions {
 	readonly resolveCommand?: (options: ResolveCodegraphCommandOptions) => CodegraphCommandResolution
 	readonly resolveNodeSupport?: (options: ResolveCodegraphNodeSupportOptions) => CodegraphNodeSupport
 	readonly buildCodegraphEnv?: (options: { readonly daemon: boolean }) => Record<string, string>
-	readonly loadConfig?: typeof loadOmoConfig
+	readonly loadConfig?: typeof loadSenpiOmoConfig
 	readonly resolveCwd?: () => string
 	readonly platform?: NodeJS.Platform
 	readonly env?: Record<string, string | undefined>
@@ -39,14 +39,14 @@ function resolveDaemon(
 	env: Record<string, string | undefined>,
 	configuredDaemon: boolean | undefined,
 ): boolean {
-	return resolveDaemonEnvironmentOverride(env) ?? configuredDaemon ?? false
+	return resolveDaemonEnvironmentOverride(env) ?? configuredDaemon ?? true
 }
 
 export function createCodegraphComponent(options: CodegraphComponentOptions = {}): OmoSenpiComponent {
 	const resolveCommand = options.resolveCommand ?? resolveCodegraphCommand
 	const resolveNodeSupport = options.resolveNodeSupport ?? resolveCodegraphNodeSupport
 	const buildEnv = options.buildCodegraphEnv ?? buildCodegraphEnv
-	const loadConfig = options.loadConfig ?? loadOmoConfig
+	const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
 	const resolveCwd = options.resolveCwd ?? (() => process.cwd())
 	const env = options.env ?? process.env
 	const platform = options.platform ?? process.platform
@@ -68,12 +68,7 @@ export function createCodegraphComponent(options: CodegraphComponentOptions = {}
 				return
 			}
 
-			const loaded = loadConfig({ cwd: resolveCwd() })
-			if (loaded.diagnostics.length > 0) {
-				ctx.logger.warn("omo-senpi codegraph component using resolved config after omo.json load issues", {
-					diagnostics: loaded.diagnostics.map((diagnostic) => diagnostic.message),
-				})
-			}
+			const loaded = loadConfig({ cwd: resolveCwd(), env })
 			const daemon = resolveDaemon(env, loaded.config.codegraph?.daemon)
 
 			const resolved = resolveCommand({ env })

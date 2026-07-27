@@ -1,0 +1,88 @@
+bun test v1.3.9 (cf6cdbbb)
+Bundled 633 modules in 55ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 11ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 23ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 16ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 23ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 12ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 21ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 11ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 22ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 9ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 25ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 12ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 21ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 11ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+Bundled 633 modules in 24ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 11ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+
+packages/omo-senpi/src/extension/compose.test.ts:
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+
+packages/omo-senpi/src/extension/index.test.ts:
+omo-senpi ulw-loop inactive; omo binary not found undefined
+config-watch skipped: events capability missing undefined
+
+ 416 pass
+ 0 fail
+ 1209 expect() calls
+Ran 416 tests across 72 files. [2.36s]
+Bundled 633 modules in 25ms
+
+  omo.js  0.63 MB  (entry point)
+
+Bundled 276 modules in 10ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+omo-senpi extension build is current: /mnt/data/code/oh-my-opencode/fix-atlas-reviewer-loop/packages/omo-senpi/plugin/extensions/omo.js

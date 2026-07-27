@@ -26,6 +26,32 @@ export const CATEGORY_PROMPT_APPENDS: Readonly<Record<string, string>> = Object.
   BUILTIN_CATEGORY_DEFAULTS.map((definition) => [definition.name, definition.promptAppend]),
 )
 
+function hasRequiresModel(
+  definition: BuiltinCategoryDefinition,
+): definition is BuiltinCategoryDefinition & { readonly requiresModel: string } {
+  return definition.requiresModel !== undefined
+}
+
+export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, string>> = Object.fromEntries(
+  BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [definition.name, definition.requiresModel]),
+)
+
+export function categoryGateModel(categoryName: string): string | undefined {
+  return Object.hasOwn(BUILTIN_CATEGORY_REQUIRES_MODEL, categoryName)
+    ? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
+    : undefined
+}
+
+export function isCategoryGateSatisfied(
+  categoryName: string,
+  hasExplicitUserConfig: boolean,
+  availableModelIds: ReadonlySet<string>,
+): boolean {
+  const gateModel = categoryGateModel(categoryName)
+  if (gateModel === undefined || hasExplicitUserConfig) return true
+  return availableModelIds.has(gateModel)
+}
+
 export const CATEGORY_PROMPT_APPEND_RESOLVERS: Readonly<Record<string, (model: string | undefined) => string>> =
   Object.fromEntries(
     BUILTIN_CATEGORY_DEFAULTS

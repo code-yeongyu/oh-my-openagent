@@ -1,4 +1,4 @@
-import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
+import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
@@ -20,6 +20,10 @@ export type CompletionDetails = {
   readonly task_id: string
   readonly name: string
   readonly status: TaskStatus
+  readonly category?: string
+  readonly agent_type?: string
+  readonly model: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly duration_ms: number
   readonly tokens?: number
   readonly run_stats?: TaskRunStats

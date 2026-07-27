@@ -94,7 +94,7 @@ export function findWakeNotification(events, taskId) {
   }
 }
 
-// task_send(deliver_as:"followUp") on a completed-resident child REVIVES it. Proof is the send tool
+// task_send on a completed-resident child REVIVES it. Proof is the send tool
 // result / details reporting kind "revived".
 export function findRevived(events) {
   return /"kind"\s*:\s*"revived"|Revived st_/.test(JSON.stringify(events))

@@ -18,7 +18,7 @@ export type TaskCancelInput = Static<typeof TaskCancelParams>
 const DESCRIPTION = [
   "Cancel a running child task and release its resources; the cancelled status is preserved so task_output can still report the outcome.",
   "Cancel is terminal and NOT resumable; cancelling a child that is not running is a no-op that reports its unchanged status.",
-  'Use this to end work you no longer need; to stop-but-keep the current child, use task_send(deliver_as:"interrupt").',
+  "Use this to end work you no longer need.",
 ].join(" ")
 
 export type TaskCancelDeps = {

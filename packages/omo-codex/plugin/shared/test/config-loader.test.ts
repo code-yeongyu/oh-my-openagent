@@ -45,6 +45,7 @@ describe("getCodexOmoConfig", () => {
 		// then
 		expect(result.codegraph).toEqual({
 			auto_provision: true,
+			daemon: true,
 			enabled: false,
 			install_dir: "/base",
 			telemetry: false,
@@ -85,7 +86,21 @@ describe("getCodexOmoConfig", () => {
 		expect(result.codegraph?.excluded_roots).toEqual(["/tmp/omo-research", "/private/tmp/omo-research"])
 	})
 
-	it("#given no codegraph.daemon key #when loading config #then daemon defaults to off", () => {
+	it("#given codex SOT sets the SessionStart cooldown #when loading config #then the configured base interval is returned", () => {
+		// given
+		const homeDir = createTemporaryDirectory("omo-codex-shared-cooldown-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-cooldown-project-")
+		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { session_start_cooldown_ms: 900_000 } } }))
+
+		// when
+		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
+
+		// then
+		expect(result.codegraph?.session_start_cooldown_ms).toBe(900_000)
+		expect(result.warnings).toEqual([])
+	})
+
+	it("#given no codegraph.daemon key #when loading config #then daemon defaults to on", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-shared-daemon-default-home-")
 		const cwd = createTemporaryDirectory("omo-codex-shared-daemon-default-project-")
@@ -95,22 +110,21 @@ describe("getCodexOmoConfig", () => {
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph?.daemon).toBeUndefined()
-		expect(result.codegraph?.daemon === true).toBe(false)
+		expect(result.codegraph?.daemon).toBe(true)
 		expect(result.warnings).toEqual([])
 	})
 
-	it("#given codex SOT sets codegraph.daemon=true #when loading config #then daemon opt-in is returned", () => {
+	it("#given codex SOT sets codegraph.daemon=false #when loading config #then daemon opt-out is returned", () => {
 		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-daemon-on-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-daemon-on-project-")
-		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: true } } }))
+		const homeDir = createTemporaryDirectory("omo-codex-shared-daemon-off-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-daemon-off-project-")
+		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: false } } }))
 
 		// when
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph?.daemon).toBe(true)
+		expect(result.codegraph?.daemon).toBe(false)
 		expect(result.warnings).toEqual([])
 	})
 
@@ -124,7 +138,7 @@ describe("getCodexOmoConfig", () => {
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph?.daemon).toBeUndefined()
+		expect(result.codegraph?.daemon).toBe(true)
 		expect(result.warnings).toContain("config.[codex].codegraph.daemon must be a boolean")
 	})
 
@@ -156,6 +170,7 @@ describe("getCodexOmoConfig", () => {
 		// then
 		expect(result.codegraph).toEqual({
 			auto_provision: true,
+			daemon: true,
 			enabled: true,
 			telemetry: false,
 		})

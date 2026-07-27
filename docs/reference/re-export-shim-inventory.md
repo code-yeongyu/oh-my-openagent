@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-06-13. Total shim exports found: 317.
+Snapshot date: 2026-06-13. Total shim exports found: 316.
 
 ## Aggregate By Target Package
 
@@ -30,7 +30,7 @@ Snapshot date: 2026-06-13. Total shim exports found: 317.
 | `@oh-my-opencode/skills-loader-core` | 65 |
 | `@oh-my-opencode/team-core` | 45 |
 | `@oh-my-opencode/tmux-core` | 3 |
-| `@oh-my-opencode/utils` | 54 |
+| `@oh-my-opencode/utils` | 53 |
 
 ## Exhaustive Shim Paths
 
@@ -308,7 +308,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 317.
 | `packages/omo-opencode/src/shared/git-worktree/types.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/internal-initiator-marker.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/migration/agent-names.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/migration/config-migration.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/migration/hook-names.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/migration/migrations-sidecar.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/migration/model-versions.ts` | `@oh-my-opencode/utils` |

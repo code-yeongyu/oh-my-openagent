@@ -143,7 +143,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
 }
 
 // Every member bootstrap frames the injection protocol FIRST so members end their initial turn while
-// remaining resident; later lead mail is injected into that same session as follow-up work.
+// remaining resident; later lead mail steers into that same session's running turn.
 function buildMemberPrompt(spec: TeamSpec, member: TeamMember): string {
   const role = member.prompt ?? `You are team member '${member.name}' in team '${spec.name}'.`
   return [

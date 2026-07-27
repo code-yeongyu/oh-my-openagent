@@ -7,7 +7,20 @@ const mockInitConfigContext = mock(() => {})
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRunOpenCodeStartupMigration = mock(() => ({
+  journalResumed: false,
+  migratedFrom: [],
+  reloadRequired: false,
+  results: [],
+  skippedConflictCount: 0,
+}))
 const mockLoadPluginConfig = mock(() => ({}))
+const mockLoadConfigChain = mock((directory: string) => ({
+  config: mockLoadPluginConfig(directory, {}),
+  messages: [],
+  path: null,
+  valid: true,
+}))
 const mockIsTmuxIntegrationEnabled = mock(() => false)
 const mockCreateRuntimeTmuxConfig = mock(() => ({
   enabled: false,
@@ -63,6 +76,8 @@ function createTestPluginModule(overrides: Partial<PluginModuleDeps> = {}): Retu
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
+    loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,

@@ -13,7 +13,7 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/index.ts` | Barrel re-exporting `./schema`, `./loader`, `./writer`. |
 | `src/schema/config.ts` | Root `OmoConfigSchema` + `OmoConfigLayerSchema` (`.strict()`; `$schema`, `categories`, `agents`, `codegraph`, `task`, `teams`). `OmoConfig` type. |
 | `src/schema/category.ts` | `OmoCategoryConfigSchema` / `OmoCategoriesConfigSchema`. Keeps the OpenCode camelCase keys (`maxTokens`, `reasoningEffort`, `textVerbosity`) verbatim for parity. |
-| `src/schema/codegraph.ts` | `OmoCodegraphSettingsSchema` (`daemon`, default `false`) for CodeGraph MCP daemon selection. |
+| `src/schema/codegraph.ts` | `OmoCodegraphSettingsSchema` (`daemon`, default `true`) for CodeGraph MCP daemon selection. |
 | `src/schema/agent.ts` | `OmoAgentDefSchema` / `OmoAgentsConfigSchema` (`execution_mode`, `max_depth`, `allowed_subagents`, ...). |
 | `src/schema/task.ts` | `OmoTaskSettingsSchema` + nested `OmoTaskNotificationSchema`, `OmoTaskWaitSchema`, `OmoTaskTeamSettingsSchema`, all with defaults. |
 | `src/schema/team.ts` | `OmoTeamSpecSchema` (discriminated `category` / `subagent_type` members) + `OmoTeamsConfigSchema`; `*Layer` partial variants for per-file overrides. |
@@ -35,12 +35,12 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 
 ### Layer precedence (`resolveOmoConfigPaths` + `loadOmoConfig`)
 
-`resolveOmoConfigPaths` returns the user layer first, then project layers farthest-first (`paths.ts:108`). `loadOmoConfig` folds each layer onto the accumulator in order (`loader.ts:104`), so the last-merged layer wins: **nearest project `.omo/omo.jsonc` beats a farther ancestor, and any loaded project layer beats the user layer**. Missing or unparseable layers become `diagnostics` and are skipped; the accumulator starts from `DEFAULT_RAW_CONFIG` (task defaults parsed from the schema). If the merged result fails final validation the loader returns the all-default config plus a `validation` diagnostic (`loader.ts:116`) rather than throwing.
+`resolveOmoConfigPaths` returns the user layer first, then project layers farthest-first (`paths.ts:98`). It is the single owner of this name: `packages/utils/src/omo-config/resolve.ts` keeps a same-named helper for the separate legacy `config.jsonc` codegraph surface, but it is no longer re-exported from the `@oh-my-opencode/utils` barrel (`resolver-name-collision.test.ts`). `loadOmoConfig` folds each layer onto the accumulator in order (`loader.ts:104`), so the last-merged layer wins: **nearest project `.omo/omo.jsonc` beats a farther ancestor, and any loaded project layer beats the user layer**. Missing or unparseable layers become `diagnostics` and are skipped; the accumulator starts from `DEFAULT_RAW_CONFIG` (task defaults parsed from the schema). If the merged result fails final validation the loader returns the all-default config plus a `validation` diagnostic (`loader.ts:116`) rather than throwing.
 
-### Filename + platform resolution (`paths.ts`)
+### Filename resolution (`paths.ts`)
 
-- User dir: `%APPDATA%\omo` on win32, else `$XDG_CONFIG_HOME/omo`, else `~/.config/omo`; prefers `omo.jsonc`, falls back to `omo.json` (`paths.ts:45`).
-- Project layers: `<dir>/.omo/omo.jsonc` (then `omo.json`) walked from `cwd` up to `$HOME` (`paths.ts:80`).
+- User dir: `~/.omo` on every platform; prefers `omo.jsonc`, falls back to `omo.json` (`paths.ts:29`). There is no `$XDG_CONFIG_HOME` / `%APPDATA%` / `~/.config/omo` branch, and `legacy-user-config-purge.test.ts` fails the suite if one returns.
+- Project layers: `<dir>/.omo/omo.jsonc` (then `omo.json`) walked from `cwd` up to `$HOME`, skipping `$HOME` itself so the `~/.omo` user layer is not also counted as a project layer (`paths.ts:76`).
 - Symlinked project `.omo` dirs and symlinked project config files are refused as a load source (`paths.ts:57`).
 
 ### Merge safety (`merge.ts`)

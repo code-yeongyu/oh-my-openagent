@@ -2,13 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import { defaultResolveCallerSessionId } from "./caller-session"
 import { TaskCancelParams, createTaskCancelTool } from "./cancel"
-import { TaskSendParams, createMemberScopedTaskSendTool, createTaskSendTool } from "./send"
+import { MemberScopedTaskSendParams, TaskSendParams, createMemberScopedTaskSendTool, createTaskSendTool } from "./send"
 import { createFakeTeamService } from "../team/__fixtures__/team-tool-fakes"
 import type { CancelManager, SendManager } from "./types"
 
 const sendManager: SendManager = {
   sendToTask: () => Promise.reject(new Error("unused")),
-  interruptTask: () => Promise.reject(new Error("unused")),
   list: () => [],
 }
 const cancelManager: CancelManager = { cancelTask: () => Promise.reject(new Error("unused")), get: () => undefined }
@@ -29,7 +28,7 @@ describe("control tool factories", () => {
     expect(send.name).toBe("task_send")
     expect(send.parameters).toBe(TaskSendParams)
     expect(memberSend.name).toBe("task_send")
-    expect(memberSend.parameters).toBe(TaskSendParams)
+    expect(memberSend.parameters).toBe(MemberScopedTaskSendParams)
     expect(cancel.name).toBe("task_cancel")
     expect(cancel.parameters).toBe(TaskCancelParams)
     for (const tool of [send, memberSend, cancel]) {

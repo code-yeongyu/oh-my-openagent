@@ -7,6 +7,7 @@ export type BuiltinCategoryDefinition = {
   readonly description: string
   readonly promptAppend: string
   readonly resolvePromptAppend?: (model: string | undefined) => string
+  readonly requiresModel?: string
 }
 
 export type SenpiModelPort = {

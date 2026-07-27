@@ -1,0 +1,31 @@
+RED
+Command:
+  cd /Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts
+
+Observed before production changes:
+  (pass) terminal background tasks leave no timer active
+  (fail) idle parent with running background task refreshes live status
+  Expected: 1
+  Received: 0
+  at packages/omo-senpi/src/components/task/status-ui-background.test.ts:118
+  2 pass
+  1 fail
+
+Failure reason:
+  `createTaskStatusUi.syncNow()` renders the current spinner, elapsed time, turn/tool count, and tok/s snapshot but schedules no future render for a still-running background task. The deterministic timer map remains empty.
+
+GREEN
+Command:
+  cd /Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts
+
+Observed after implementation:
+  (pass) terminal background tasks leave no timer active
+  (pass) idle parent with running background task refreshes live status
+  (pass) child activity rows still show identity, model, stats, activity, and elapsed time
+  3 pass
+  0 fail
+
+Behavior proven:
+  One live refresh timer remains active while a background task is non-terminal. Advancing the injected clock by one second and firing that timer changes the spinner and elapsed field from 0s to 1s, and rereads stats from turn 1 / 2 tools / 40 tok/s to turn 2 / 3 tools / 42 tok/s.

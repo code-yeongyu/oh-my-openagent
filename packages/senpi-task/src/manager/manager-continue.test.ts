@@ -22,7 +22,7 @@ describe("TaskManager.continueTask", () => {
     expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual(["keep going"])
   })
 
-  test("#given a running resident child #when continued with no deliver_as #then followUp is the default", async () => {
+  test("#given a running resident child #when continued with no delivery override #then followUp is the default", async () => {
     // given
     const inProcess = new FakeRunner()
     const { manager } = makeManager({ inProcess })

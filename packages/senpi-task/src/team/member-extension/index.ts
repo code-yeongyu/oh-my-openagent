@@ -123,7 +123,7 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
     memberName: parsed.memberName,
     config: parsed.config,
     sessionDir: parsed.sessionDir,
-    sendUserMessage: (content) => pi.sendUserMessage(content, { deliverAs: "followUp" }),
+    sendUserMessage: (content) => pi.sendUserMessage(content, { deliverAs: "steer" }),
     appendEvent,
     ...(afterInject !== undefined ? { afterInject } : {}),
   })

@@ -195,6 +195,8 @@ export {
   resolveToolRule,
 } from "./agents"
 export type {
+  AgentModelCandidate,
+  AgentModelEntry,
   AgentModelUnavailableResult,
   AgentNotFoundResult,
   AgentResolutionResult,
@@ -312,6 +314,7 @@ export type {
 } from "./tools/task"
 export {
   TaskCancelParams,
+  MemberScopedTaskSendParams,
   TaskSendParams,
   clampWaitTimeout,
   createMemberScopedTaskSendTool,
@@ -330,6 +333,7 @@ export type {
   CancelResultDetails,
   CancelToolResult,
   MemberScopedTaskSendDeps,
+  MemberScopedTaskSendInput,
   SendManager,
   SendResultDetails,
   SendToolResult,

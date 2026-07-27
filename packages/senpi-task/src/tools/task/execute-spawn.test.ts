@@ -37,6 +37,36 @@ describe("buildTaskExecute spawn", () => {
     expect(result.content[0]?.type).toBe("text")
   })
 
+  test("#given a background task #when the start result is rendered #then it directs the parent to yield instead of polling", async () => {
+    // given
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => ({
+        kind: "started",
+        task_id: "st_00000015",
+        status: "running",
+        name: "background-research",
+      }),
+    })
+    const execute = buildTaskExecute(makeDeps(manager))
+
+    // when
+    const result = await execute(
+      "call-background-guidance",
+      { prompt: "research", category: "deep", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    const normalized = text.toLowerCase()
+    expect(normalized).toContain("automatically delivered")
+    expect(normalized).toContain("end your turn")
+    expect(normalized).toContain("independent work")
+    expect(normalized).not.toContain("read progress")
+  })
+
   test("#given the caller session #when spawning #then callerSessionId is injected as parent_session_id", async () => {
     let captured: ManagerStartSpec | undefined
     const manager = createFakeManager({
@@ -166,7 +196,7 @@ describe("buildTaskExecute spawn", () => {
     })
     const execute = buildTaskExecute(makeDeps(manager))
 
-    const result = await execute("c", { prompt: "p", subagent_type: "oracle" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
 
     expect(waitForId).toBe("st_00000004")
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
@@ -226,7 +256,7 @@ describe("buildTaskExecute spawn", () => {
 
     const result = await execute(
       "c",
-      { prompt: "p", category: "quick", subagent_type: "oracle" },
+      { prompt: "p", category: "quick", subagent_type: "momus" },
       undefined,
       undefined,
       CTX,

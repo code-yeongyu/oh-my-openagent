@@ -22,10 +22,6 @@ export const TaskOutputParams = Type.Object({
   tail_lines: Type.Optional(
     Type.Integer({ minimum: 1, description: "Lines to keep in tail mode. Defaults to 60." }),
   ),
-  block: Type.Optional(Type.Boolean({ description: "Removed. Completion arrives as a notification; use mode:'tail' to peek." })),
-  timeout_ms: Type.Optional(
-    Type.Integer({ minimum: 0, description: "Removed with blocking reads. Completion arrives as a notification; use mode:'tail' to peek." }),
-  ),
 })
 
 export type TaskOutputInput = Static<typeof TaskOutputParams>
@@ -57,8 +53,8 @@ export function runTaskOutput(
   return Promise.resolve(outputForRecord(deps, record, params))
 }
 
-function hasLegacyBlockingParam(params: TaskOutputInput): boolean {
-  return params.block !== undefined || params.timeout_ms !== undefined
+function hasLegacyBlockingParam(params: object): boolean {
+  return Reflect.get(params, "block") !== undefined || Reflect.get(params, "timeout_ms") !== undefined
 }
 
 function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskOutputInput): TaskOutputToolResult {

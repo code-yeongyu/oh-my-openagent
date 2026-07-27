@@ -140,20 +140,20 @@ describe("resolveAgent", () => {
     // given
     const agents = roster(
       { name: "explore", disable: true },
-      { name: "oracle", model: "openai/oracle" },
+      { name: "momus", model: "openai/momus" },
     )
 
     // when
     const result = resolveAgent("explore", agents, registry([]))
 
     // then
-    expect(result).toEqual({ kind: "not_found", agent: "explore", availableAgents: ["oracle"] })
+    expect(result).toEqual({ kind: "not_found", agent: "explore", availableAgents: ["momus"] })
   })
 
   test("#given an unknown agent name #when resolved #then it returns the active sorted roster", () => {
     // given
     const agents = roster(
-      { name: "oracle", model: "openai/oracle" },
+      { name: "momus", model: "openai/momus" },
       { name: "explore", model: "openai/explore" },
     )
 
@@ -164,7 +164,7 @@ describe("resolveAgent", () => {
     expect(result).toEqual({
       kind: "not_found",
       agent: "missing",
-      availableAgents: ["explore", "oracle"],
+      availableAgents: ["explore", "momus"],
     })
   })
 
@@ -187,7 +187,7 @@ describe("resolveAgent", () => {
   test("#given a model override without a registry #when resolved #then it returns persona fields and filters the tool allowlist", () => {
     // given
     const agents = roster({
-      name: "oracle",
+      name: "momus",
       prompt: "Advise only",
       executionMode: "in-process",
       allowedSubagents: ["explore"],
@@ -203,7 +203,7 @@ describe("resolveAgent", () => {
 
     // when
     const result = expectResolved(
-      resolveAgent("oracle", agents, undefined, { modelOverride: "openai/explicit" }),
+      resolveAgent("momus", agents, undefined, { modelOverride: "openai/explicit" }),
     )
 
     // then

@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { OmoFallbackModelsSchema, OmoThinkingConfigSchema } from "./fallback-models"
+import { OmoFallbackModelsSchema, OmoReasoningEffortSchema, OmoThinkingConfigSchema } from "./fallback-models"
 
 /**
  * Category config intentionally keeps the OpenCode category key set verbatim.
@@ -16,7 +16,7 @@ export const OmoCategoryConfigSchema = z.object({
   top_p: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
   thinking: OmoThinkingConfigSchema.optional(),
-  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
+  reasoningEffort: OmoReasoningEffortSchema.optional(),
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),

@@ -12,6 +12,7 @@ describe("validateOmoConfig", () => {
         install_dir: "~/.omo/codegraph",
         excluded_roots: ["/tmp/omo-scratch"],
         telemetry: false,
+        session_start_cooldown_ms: 900_000,
         watch_debounce_ms: 2_000,
       },
       "[codex]": {
@@ -33,6 +34,18 @@ describe("validateOmoConfig", () => {
     expect(result).toEqual({ errors: [], ok: true })
   })
 
+  it("rejects a SessionStart cooldown below the safety floor", () => {
+    // given
+    const config = { "[codex]": { codegraph: { session_start_cooldown_ms: 59_999 } } }
+
+    // when
+    const result = validateOmoConfig(config)
+
+    // then
+    expect(result.ok).toBe(false)
+    expect(result.errors).toContain("[codex].codegraph.session_start_cooldown_ms must be a finite number of at least 60000")
+  })
+
   it("rejects unknown harness override blocks", () => {
     // given
     const config = { "[android]": {} }
@@ -51,10 +64,12 @@ describe("validateOmoConfig", () => {
 
     // when
     const enabledSupport = SETTING_HARNESS_SUPPORT["codegraph.enabled"]
+    const cooldownSupport = SETTING_HARNESS_SUPPORT["codegraph.session_start_cooldown_ms"]
 
     // then
     expect(harnesses).toEqual(["codex", "opencode", "omo"])
     expect(enabledSupport).toEqual(["codex", "opencode", "omo"])
+    expect(cooldownSupport).toEqual(["codex"])
   })
 
   it("flags settings used under unsupported harness blocks", () => {

@@ -116,6 +116,7 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/omo-config-core": "workspace:*",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1"
   },

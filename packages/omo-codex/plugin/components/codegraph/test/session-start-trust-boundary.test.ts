@@ -45,7 +45,9 @@ describe("CodeGraph SessionStart trust boundary", () => {
 					},
 					runCommand: (_projectRoot, _command, _args, options) => {
 						calls.push({ env: options.env });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 2 ? '{"initialized":false}' : "", timedOut: false });
+						mkdirSync(join(workspace, ".codegraph"), { recursive: true });
+						writeFileSync(join(workspace, ".codegraph", "codegraph.db"), "fixture");
+						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
 					},
 				},
 			});

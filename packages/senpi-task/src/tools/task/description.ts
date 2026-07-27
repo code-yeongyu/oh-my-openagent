@@ -34,9 +34,9 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
   CORRECT - using a category:
     task(category="quick", description="Fix type error", prompt="...")
   CORRECT - direct agent with background parallelism:
-    task(subagent_type="oracle", description="Review design", prompt="...", run_in_background=true)
+    task(subagent_type="momus", description="Review design", prompt="...", run_in_background=true)
   CORRECT - batch fan-out (1-16 children in one call, mutually exclusive with prompt):
-    task(tasks=[{category="quick", prompt="..."}, {subagent_type="oracle", prompt="..."}], run_in_background=true)
+    task(tasks=[{category="quick", prompt="..."}, {subagent_type="momus", prompt="..."}], run_in_background=true)
     Top-level category/subagent_type/model/load_skills are inherited by batch items that omit them.
 
   REQUIRED: provide exactly ONE of:

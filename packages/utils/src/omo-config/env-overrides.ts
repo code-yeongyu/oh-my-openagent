@@ -9,6 +9,7 @@ const CODEGRAPH_ENV_KEYS: readonly [CodegraphSettingKey, string, "boolean" | "nu
   ["auto_provision", "AUTO_PROVISION", "boolean"],
   ["enabled", "ENABLED", "boolean"],
   ["install_dir", "INSTALL_DIR", "string"],
+  ["session_start_cooldown_ms", "SESSION_START_COOLDOWN_MS", "number"],
   ["telemetry", "TELEMETRY", "boolean"],
   ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"],
 ]
@@ -45,6 +46,9 @@ function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSetti
     case "install_dir":
       if (typeof value === "string") config.install_dir = value
       return
+    case "session_start_cooldown_ms":
+      if (typeof value === "number" && value >= 60_000) config.session_start_cooldown_ms = value
+      return
     case "telemetry":
       if (typeof value === "boolean") config.telemetry = value
       return
@@ -69,7 +73,9 @@ export function buildEnvOverrides(
       if (rawValue === undefined) continue
 
       const parsed = parseEnvValue(rawValue, kind)
-      if (parsed === null) {
+      const cooldownIsValid = settingKey !== "session_start_cooldown_ms"
+        || (typeof parsed === "number" && parsed >= 60_000)
+      if (parsed === null || !cooldownIsValid) {
         warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`)
         continue
       }

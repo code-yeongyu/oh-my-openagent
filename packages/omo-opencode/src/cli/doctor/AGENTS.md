@@ -41,7 +41,7 @@ checks/
 ├── tools-mcp.ts                           # Built-in + user MCP reachability
 ├── model-resolution.ts                    # Main Models aggregator
 ├── model-resolution-cache.ts              # models.json presence + freshness
-├── model-resolution-config.ts             # oh-my-opencode.jsonc parse
+├── model-resolution-config.ts             # unified OMO config resolution
 ├── model-resolution-effective-model.ts    # Per-agent fallback chain trace
 ├── model-resolution-variant.ts            # Model variant (max, high, medium) handling
 ├── model-resolution-details.ts            # Verbose output formatter

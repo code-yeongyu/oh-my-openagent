@@ -1,11 +1,11 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`builtin category defaults #given ported builtin defaults #when snapshotted #then all eight category defaults stay pinned 1`] = `
+exports[`builtin category defaults #given ported builtin defaults #when snapshotted #then all nine category defaults stay pinned 1`] = `
 "[
   {
     "name": "visual-engineering",
     "config": {
-      "model": "google/gemini-3.1-pro",
+      "model": "anthropic/claude-opus-5",
       "variant": "high"
     },
     "description": "Frontend, UI/UX, design, styling, animation",
@@ -24,7 +24,7 @@ exports[`builtin category defaults #given ported builtin defaults #when snapshot
     "name": "ultrabrain",
     "config": {
       "model": "openai/gpt-5.6-sol",
-      "variant": "xhigh"
+      "variant": "max"
     },
     "description": "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     "promptAppend": "<Category_Context>\\nYou are working on DEEP LOGICAL REASONING / COMPLEX ARCHITECTURE tasks.\\n\\n**CRITICAL - CODE STYLE REQUIREMENTS (NON-NEGOTIABLE)**:\\n1. BEFORE writing ANY code, SEARCH the existing codebase to find similar patterns/styles\\n2. Your code MUST match the project's existing conventions - blend in seamlessly\\n3. Write READABLE code that humans can easily understand - no clever tricks\\n4. If unsure about style, explore more files until you find the pattern\\n\\nStrategic advisor mindset:\\n- Bias toward simplicity: least complex solution that fulfills requirements\\n- Leverage existing code/patterns over new components\\n- Prioritize developer experience and maintainability\\n- One clear recommendation with effort estimate (Quick/Short/Medium/Large)\\n- Signal when advanced approach warranted\\n\\nResponse format:\\n- Bottom line (2-3 sentences)\\n- Action plan (numbered steps)\\n- Risks and mitigations (if relevant)\\n</Category_Context>"
@@ -41,7 +41,7 @@ exports[`builtin category defaults #given ported builtin defaults #when snapshot
   {
     "name": "quick",
     "config": {
-      "model": "openai/gpt-5.4-mini"
+      "model": "apitopia/kimi-for-coding-highspeed"
     },
     "description": "Trivial tasks - single file changes, typo fixes, simple modifications",
     "promptAppend": "<Category_Context>\\nYou are working on SMALL / QUICK tasks.\\n\\nEfficient execution mindset:\\n- Fast, focused, minimal overhead\\n- Get to the point immediately\\n- No over-engineering\\n- Simple solutions for simple problems\\n\\nApproach:\\n- Minimal viable implementation\\n- Skip unnecessary abstractions\\n- Direct and concise\\n</Category_Context>\\n\\n<Caller_Warning>\\nTHIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.4-mini).\\n\\nThe model executing this task is optimized for speed over depth. Your prompt MUST be:\\n\\n**EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:\\n1. MUST DO: List every required action as atomic, numbered steps\\n2. MUST NOT DO: Explicitly forbid likely mistakes and deviations\\n3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples\\n\\n**WHY THIS MATTERS:**\\n- Smaller models benefit from explicit guardrails\\n- Vague instructions may lead to unpredictable results\\n- Implicit expectations may be missed\\n**PROMPT STRUCTURE (MANDATORY):**\\n\`\`\`\\nTASK: [One-sentence goal]\\n\\nMUST DO:\\n1. [Specific action with exact details]\\n2. [Another specific action]\\n...\\n\\nMUST NOT DO:\\n- [Forbidden action + why]\\n- [Another forbidden action]\\n...\\n\\nEXPECTED OUTPUT:\\n- [Exact deliverable description]\\n- [Success criteria / verification method]\\n\`\`\`\\n\\nIf your prompt lacks this structure, REWRITE IT before delegating.\\n</Caller_Warning>"
@@ -56,9 +56,18 @@ exports[`builtin category defaults #given ported builtin defaults #when snapshot
     "promptAppend": "<Category_Context>\\nYou are working on tasks that don't fit specific categories but require moderate effort.\\n\\n<Selection_Gate>\\nBEFORE selecting this category, VERIFY ALL conditions:\\n1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)\\n2. Task requires more than trivial effort but is NOT system-wide\\n3. Scope is contained within a few files/modules\\n\\nIf task fits ANY other category, DO NOT select unspecified-low.\\nThis is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.\\n</Selection_Gate>\\n</Category_Context>\\n\\n<Caller_Warning>\\nTHIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).\\n\\n**PROVIDE CLEAR STRUCTURE:**\\n1. MUST DO: Enumerate required actions explicitly\\n2. MUST NOT DO: State forbidden actions to prevent scope creep\\n3. EXPECTED OUTPUT: Define concrete success criteria\\n</Caller_Warning>"
   },
   {
+    "name": "architect",
+    "config": {
+      "model": "anthropic/claude-fable-5",
+      "variant": "xhigh"
+    },
+    "description": "Big-picture system design: survey the whole architecture, weigh trade-offs, and propose designs rather than implement",
+    "promptAppend": "<Category_Context>\\nYou are a big-picture system design consultant, NOT an implementer.\\n\\n<Method>\\n1. Survey the WHOLE architecture end to end before proposing anything: module boundaries, data flow, ownership, and the blast radius of the area in question.\\n2. Produce at least TWO viable designs and state the trade-offs of each in concrete terms (coupling, testability, migration cost, failure modes).\\n3. Recommend ONE of them with the reasoning that decided it, the boundaries it assumes, and the risks it carries.\\n4. Demand the SIMPLEST architecture that handles the actual requirements. Reject enterprise patterns that do not pay for themselves.\\n</Method>\\n\\n<Advisory_Mode>\\nWhen the caller marks the task advisory-only, produce NO file edits: return the analysis, options, recommendation, and risks as structured text.\\n</Advisory_Mode>\\n</Category_Context>"
+  },
+  {
     "name": "unspecified-high",
     "config": {
-      "model": "anthropic/claude-opus-4-8",
+      "model": "apitopia/kimi-k3",
       "variant": "max"
     },
     "description": "Tasks that don't fit other categories, high effort required",

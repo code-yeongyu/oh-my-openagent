@@ -13,7 +13,7 @@ describe("buildTaskExecute plan errors", () => {
         error: {
           code: "unknown_target",
           message: 'Target "nope" not found.',
-          availableAgents: ["explore", "oracle"],
+          availableAgents: ["explore", "momus"],
           availableCategories: ["deep", "quick"],
         },
       }),
@@ -26,7 +26,7 @@ describe("buildTaskExecute plan errors", () => {
     // then
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toBe(
-      'Target "nope" not found. Available agents: explore, oracle. Available categories: deep, quick.',
+      'Target "nope" not found. Available agents: explore, momus. Available categories: deep, quick.',
     )
   })
 

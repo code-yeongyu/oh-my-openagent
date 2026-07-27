@@ -1,0 +1,18 @@
+Second published-branch base update:
+
+- `dev` advanced again while the previous head's CI was running.
+- Latest `origin/dev` was merged normally; remote history was not rewritten.
+- The sole conflict was again the generated Senpi extension bundle.
+- `bun run build:senpi-plugin`: exit 0.
+- Conflict-marker scan and `git diff --check`: clean.
+- `bun run --cwd packages/senpi-task test`: 554 pass, 0 fail.
+- `bun run test:senpi`: 403 pass, 0 fail.
+
+The superseded head's macOS root test later failed in an unrelated upstream codegraph bootstrap test:
+
+```text
+packages/omo-opencode/src/hooks/codegraph-bootstrap/command-runner.test.ts:86
+ENOENT: no such file or directory
+```
+
+That failure is outside senpi-task and occurs on the superseded head; the new base update restarts CI on the current merged codegraph state.

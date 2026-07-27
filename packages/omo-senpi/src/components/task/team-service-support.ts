@@ -85,13 +85,13 @@ async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberN
   return map[memberName]
 }
 
-// Delivers a shutdown-protocol notice to the target member's background child as a follow-up, resolving
+// Delivers a shutdown-protocol notice to the target member's background child as a steer, resolving
 // the member->task mapping from the run sidecar. A member with no live task is a silent no-op.
 export function makeShutdownMessenger(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): ShutdownMessenger {
   return async (message) => {
     const taskId = await memberTaskId(stateDir, teamRunId, message.to)
     if (taskId === undefined) return
-    await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "followUp" })
+    await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "steer" })
   }
 }
 

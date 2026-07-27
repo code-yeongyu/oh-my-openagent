@@ -1,5 +1,6 @@
 import {
   hasExecutableToken,
+  hasExecutableTokenUnderRootWithSuffix,
   normalizeForComparison,
   normalizeRoots,
   splitCommandTokens,
@@ -24,7 +25,7 @@ export interface SelectZombieCodegraphProcessesOptions {
 }
 
 const SERVE_WRAPPER_SUFFIX = "/components/codegraph/dist/serve.js"
-const UPSTREAM_PACKAGE_SEGMENT = "/@colbymchenry/codegraph/"
+const UPSTREAM_PACKAGE_PATTERN = /\/@colbymchenry\/codegraph(?:-(?:darwin|linux|win32)-(?:arm64|x64))?\//g
 
 export function selectZombieCodegraphProcesses(
   processes: readonly ProcessInfo[],
@@ -32,12 +33,26 @@ export function selectZombieCodegraphProcesses(
 ): CodegraphZombieProcess[] {
   const platform = options.platform ?? process.platform
   const livePids = new Set(processes.map((processInfo) => processInfo.pid))
+  const processByPid = new Map(processes.map((processInfo) => [processInfo.pid, processInfo]))
   const roots = normalizeRoots(options.ownedRoots, platform)
+  const daemonMatches = new Map<number, { readonly projectRoot: string; readonly root: string }>()
+  const workerMatches = new Map<number, { readonly kind: CodegraphProcessMatchKind; readonly root: string }>()
+  const ancestry = { livePids, processByPid, workerMatches }
   const zombies: CodegraphZombieProcess[] = []
 
   for (const processInfo of processes) {
     const daemon = matchDaemonCommand(processInfo.command, roots, platform)
     if (daemon !== null) {
+      daemonMatches.set(processInfo.pid, daemon)
+      continue
+    }
+    const worker = matchOwnedCodegraphCommand(processInfo.command, roots, platform)
+    if (worker !== null) workerMatches.set(processInfo.pid, worker)
+  }
+
+  for (const processInfo of processes) {
+    const daemon = daemonMatches.get(processInfo.pid)
+    if (daemon !== undefined) {
       if (!isOrphaned(processInfo, livePids)) continue
       zombies.push({
         ...processInfo,
@@ -47,10 +62,10 @@ export function selectZombieCodegraphProcesses(
       })
       continue
     }
-    const match = matchOwnedCodegraphCommand(processInfo.command, roots, platform)
-    if (match === null) continue
-    if (!isOrphaned(processInfo, livePids)) continue
-    zombies.push({ ...processInfo, matchedRoot: match.root, matchKind: match.kind })
+    const worker = workerMatches.get(processInfo.pid)
+    if (worker === undefined) continue
+    if (!isOrphaned(processInfo, livePids) && !hasOrphanedWorkerAncestor(processInfo, ancestry)) continue
+    zombies.push({ ...processInfo, matchedRoot: worker.root, matchKind: worker.kind })
   }
 
   return zombies
@@ -82,7 +97,7 @@ function matchDaemonCommand(
     for (const suffix of STANDALONE_LAUNCHER_SUFFIXES) {
       if (hasExecutableToken(normalizedCommand, `${root}${suffix}`)) return { projectRoot, root }
     }
-    if (hasExecutableToken(normalizedCommand, `${root}${BUNDLE_SCRIPT_SUFFIX}`)) return { projectRoot, root }
+    if (hasExecutableTokenUnderRootWithSuffix(normalizedCommand, root, BUNDLE_SCRIPT_SUFFIX)) return { projectRoot, root }
   }
   return null
 }
@@ -106,7 +121,9 @@ function matchOwnedCodegraphCommand(
     if (root.length === 0) continue
     const serveWrapper = `${root}${SERVE_WRAPPER_SUFFIX}`
     if (hasExecutableToken(normalizedCommand, serveWrapper)) return { kind: "serve-wrapper", root }
-    if (upstreamPackagePathIsUnderRoot(normalizedCommand, root)) {
+    if (hasExecutableTokenUnderRootWithSuffix(normalizedCommand, root, BUNDLE_SCRIPT_SUFFIX)
+      || hasExecutableToken(normalizedCommand, `${root}/npm-shim.js`)
+      || upstreamPackagePathIsUnderRoot(normalizedCommand, root)) {
       return { kind: "upstream-codegraph", root }
     }
   }
@@ -114,12 +131,31 @@ function matchOwnedCodegraphCommand(
 }
 
 function upstreamPackagePathIsUnderRoot(command: string, root: string): boolean {
-  let searchFrom = 0
+  UPSTREAM_PACKAGE_PATTERN.lastIndex = 0
   for (;;) {
-    const packageIndex = command.indexOf(UPSTREAM_PACKAGE_SEGMENT, searchFrom)
-    if (packageIndex < 0) return false
-    const tokenStart = findTokenStart(command, packageIndex)
+    const match = UPSTREAM_PACKAGE_PATTERN.exec(command)
+    if (match === null) return false
+    const tokenStart = findTokenStart(command, match.index)
     if (command.slice(tokenStart).startsWith(`${root}/`) && tokenLooksExecutable(command, tokenStart)) return true
-    searchFrom = packageIndex + UPSTREAM_PACKAGE_SEGMENT.length
+  }
+}
+
+function hasOrphanedWorkerAncestor(
+  processInfo: ProcessInfo,
+  ancestry: {
+    readonly livePids: ReadonlySet<number>
+    readonly processByPid: ReadonlyMap<number, ProcessInfo>
+    readonly workerMatches: ReadonlyMap<number, { readonly kind: CodegraphProcessMatchKind; readonly root: string }>
+  },
+): boolean {
+  const visited = new Set<number>()
+  let parentPid = processInfo.ppid
+  for (;;) {
+    if (visited.has(parentPid)) return false
+    visited.add(parentPid)
+    const parent = ancestry.processByPid.get(parentPid)
+    if (parent === undefined || !ancestry.workerMatches.has(parent.pid)) return false
+    if (isOrphaned(parent, ancestry.livePids)) return true
+    parentPid = parent.ppid
   }
 }

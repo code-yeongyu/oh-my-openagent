@@ -301,7 +301,7 @@ describe("runTuiInstaller Codex install failure exit status", () => {
       }),
       spyOn(configManager, "writeOmoConfig").mockReturnValue({
         success: true,
-        configPath: "/tmp/oh-my-opencode.jsonc",
+        configPath: "/tmp/omo.jsonc",
       }),
       spyOn(tuiConfig, "ensureTuiPluginEntry").mockReturnValue({ changed: false, reason: "no-server-entry" }),
       spyOn(codexInstaller, "detectCodexInstallation").mockResolvedValue({

@@ -7,7 +7,6 @@ import type { LeadTeamToolDeps } from "./types"
 
 const fakeSendManager: SendManager = {
   sendToTask: async () => ({ kind: "not_found", reason: "missing", suggestion: "none" }),
-  interruptTask: async () => ({ kind: "not_found", reason: "missing" }),
   list: () => [],
 }
 

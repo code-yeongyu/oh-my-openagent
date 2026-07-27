@@ -173,9 +173,9 @@ describe("buildTaskExecute batch fanout", () => {
     // then
     expect(output.details).toMatchObject({ task_id: IDS[0], status: "running", run_in_background: true })
     expect(output.details.items).toEqual([
-      { task_id: IDS[0], name: "one", status: "running" },
-      { task_id: IDS[1], name: "two", status: "pending", queue_position: 1 },
-      { task_id: IDS[2], name: "three", status: "pending", queue_position: 2 },
+      { task_id: IDS[0], name: "one", category: "quick", status: "running" },
+      { task_id: IDS[1], name: "two", category: "quick", status: "pending", queue_position: 1 },
+      { task_id: IDS[2], name: "three", category: "quick", status: "pending", queue_position: 2 },
     ])
     for (const taskId of IDS) expect(textOf(output)).toContain(`task_send(to="${taskId}"`)
   })

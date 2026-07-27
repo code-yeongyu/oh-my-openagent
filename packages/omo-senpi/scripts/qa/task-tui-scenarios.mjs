@@ -6,14 +6,13 @@ export const OMO_CONFIG = {
 
 export const SCENARIOS = {
   full: {
-    prompt: "Use the omo task tools to spawn a background child, interrupt it, continue it, read its output, and cancel it.",
+    prompt: "Use the omo task tools to spawn a background child, continue its resident session, read its output, and cancel it.",
     parentSteps: [
       { type: "tool_call", name: "task", arguments: { category: "ultrabrain", prompt: "Inspect the isolated Senpi task lifecycle, report the initial result clearly, and remain ready for a continuation that verifies resident-session revival.", run_in_background: true, name: "tui-child" } },
       { type: "text", text: "tui parent observed the initial child completion" },
-      { type: "tool_call", name: "task_send", arguments: { to: "tui-child", deliver_as: "interrupt" } },
-      { type: "tool_call", name: "task_send", arguments: { to: "tui-child", deliver_as: "followUp", message: "Continue in the same resident child session, verify that revival preserved the initial task context, and produce a concise second-stage report describing what changed after the follow-up instruction." } },
+      { type: "tool_call", name: "task_send", arguments: { to: "tui-child", message: "Continue in the same resident child session, verify that revival preserved the initial task context, and produce a concise second-stage report describing what changed after the follow-up instruction." } },
       { type: "text", text: "tui parent observed the continuation completion" },
-      { type: "tool_call", name: "task_output", arguments: { name: "tui-child", mode: "full", block: true } },
+      { type: "tool_call", name: "task_output", arguments: { name: "tui-child", mode: "full" } },
       { type: "tool_call", name: "task_cancel", arguments: { name: "tui-child", reason: "TUI QA cleanup after the complete transcript was captured" } },
       { type: "text", text: "tui full scenario complete" },
     ],
@@ -27,10 +26,10 @@ export const SCENARIOS = {
     parentSteps: [
       { type: "tool_call", name: "task", arguments: { category: "missing-cat", prompt: "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트가 72열 터미널에서 안전하게 줄임표 처리되는지 확인하세요.\nThen inspect the missing-category routing error and summarize the English continuation without overflowing the interactive xterm row.", name: "edge-missing-child" } },
       { type: "tool_call", name: "task_send", arguments: { to: "edge-missing-child", message: " \n\t " } },
-      { type: "tool_call", name: "task_send", arguments: { to: "edge-missing-child", deliver_as: "interrupt" } },
+      { type: "tool_call", name: "task_send", arguments: { to: "edge-missing-child", message: "edge missing child steer probe" } },
       { type: "tool_call", name: "task_send", arguments: { team_run_id: "edge-team-72", to: "edge-member", message: { type: "shutdown_request", reason: "Renderer QA request after the mixed Korean and English edge pass" } } },
       { type: "tool_call", name: "task_send", arguments: { team_run_id: "edge-team-72", to: "edge-member", message: { type: "shutdown_response", request_id: "edge-request-72", approve: false, reason: "Keep the member active until the compact renderer rows are verified" } } },
-      { type: "tool_call", name: "task_output", arguments: { name: "edge-missing-child", mode: "status", block: false } },
+      { type: "tool_call", name: "task_output", arguments: { name: "edge-missing-child", mode: "status" } },
       { type: "tool_call", name: "task_cancel", arguments: { name: "edge-missing-child", reason: " \n\t " } },
       { type: "text", text: "tui edge scenario complete" },
     ],

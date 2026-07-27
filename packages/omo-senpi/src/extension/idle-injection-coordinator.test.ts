@@ -27,7 +27,42 @@ describe("IdleInjectionCoordinator", () => {
     expect(collapsed).toBe(2)
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("task st_1 completed\n\ncontinue the run")
-    expect(calls[0]?.options).toEqual({ deliverAs: "followUp" })
+    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
+  })
+
+  it("#given one task completion on an idle edge #when flushed #then it steers immediately", () => {
+    // given
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
+
+    // when
+    coordinator.flushOnIdle()
+
+    // then
+    expect(calls).toEqual([
+      {
+        content: "task st_1 completed",
+        options: { deliverAs: "steer" },
+      },
+    ])
+  })
+
+  it("#given two task completions on one idle edge #when flushed #then one steer carries both", () => {
+    // given
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
+    coordinator.enqueue({ key: "st_2", source: "task-completion", content: "task st_2 completed" })
+
+    // when
+    coordinator.flushOnIdle()
+
+    // then
+    expect(calls).toEqual([
+      {
+        content: "task st_1 completed\n\ntask st_2 completed",
+        options: { deliverAs: "steer" },
+      },
+    ])
   })
 
   it("#given repeated continuation enqueues #when flushed #then they collapse to one keyed injection", () => {

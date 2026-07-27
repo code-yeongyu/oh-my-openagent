@@ -118,10 +118,13 @@ function resolveAgentTarget(
 
 function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
+  // Identical precedence to the category path below: reasoningEffort outranks variant, and either
+  // one becomes the child's thinking level through asSenpiThinkingLevel.
+  const appliedVariant = resolution.resolved_model?.reasoning_effort ?? resolution.resolved_model?.variant
   return {
     model: resolution.model,
     ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
-    ...(resolution.resolved_model?.variant !== undefined ? { variant: resolution.resolved_model.variant } : {}),
+    ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
     agentType: resolution.agentType,
     ...(resolution.instructions !== undefined ? { instructions: resolution.instructions } : {}),
     ...(resolution.toolAllowlist !== undefined ? { toolAllowlist: resolution.toolAllowlist } : {}),

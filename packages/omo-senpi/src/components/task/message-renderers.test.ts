@@ -99,6 +99,7 @@ describe("task-family custom message renderers", () => {
       task_id: "st_1",
       name: "작업자",
       status: "completed" as const,
+      model: "quotio-openai/gpt-5.4-mini-fast",
       duration_ms: 10,
       final_response: ADVERSARIAL_CONTENT,
       continuation_hint: "task_send로 계속",
@@ -119,6 +120,14 @@ describe("task-family custom message renderers", () => {
       task_id: "st_done",
       name: "worker",
       status: "completed" as const,
+      category: "quick",
+      model: "requested/model",
+      resolved_model: {
+        source: "category" as const,
+        provider: "quotio-openai",
+        model_id: "gpt-5.4-mini-fast",
+        display: "quotio-openai/gpt-5.4-mini-fast",
+      },
       duration_ms: 1250,
       tokens: 321,
       final_response: "검증 작업을 완료했습니다.",
@@ -138,6 +147,8 @@ describe("task-family custom message renderers", () => {
     expect(text).toContain("task completion")
     expect(text).toContain("name:worker")
     expect(text).toContain("id:st_done")
+    expect(text).toContain("category:quick")
+    expect(text).toContain("model:quotio-openai/gpt-5.4-mini-fast")
     expect(text).toContain("status:completed")
     expect(text).toContain("duration:1.25s")
     expect(text).toContain("tokens:321")
@@ -177,6 +188,7 @@ describe("task-family custom message renderers", () => {
       task_id: "st_done",
       name: "worker",
       status: "completed" as const,
+      model: "quotio-openai/gpt-5.4-mini-fast",
       duration_ms: 1250,
       final_response: "검증 작업을 완료했습니다.",
       continuation_hint: 'Use task_send({ to: "st_done", message: "continue with the remaining evidence and report the result" }) to continue.',

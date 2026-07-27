@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs"
 
-import { isPlainObject, isUnsafeObjectKey } from "../deep-merge"
+import { mergeOmoConfigRecords, resolveOmoConfigView } from "@oh-my-opencode/omo-config-core"
+
+import { isPlainObject } from "../deep-merge"
 import { parseJsoncSafe } from "../jsonc-parser"
 import {
   HARNESS_IDS,
@@ -13,6 +15,7 @@ import {
 export const BUILT_IN_DEFAULTS: OmoConfig = {
   codegraph: {
     auto_provision: true,
+    daemon: true,
     enabled: true,
     telemetry: false,
   },
@@ -35,6 +38,7 @@ const CODEGRAPH_SETTING_KEYS: readonly CodegraphSettingKey[] = [
   "enabled",
   "excluded_roots",
   "install_dir",
+  "session_start_cooldown_ms",
   "telemetry",
   "watch_debounce_ms",
 ]
@@ -51,42 +55,8 @@ function isCodegraphSettingKey(key: string): key is CodegraphSettingKey {
   return CODEGRAPH_SETTING_KEYS.some((candidate) => candidate === key)
 }
 
-function mergeValues(base: unknown, override: unknown): unknown {
-  if (override === undefined) return base
-  if (Array.isArray(base) && Array.isArray(override)) {
-    return [...new Set([...base, ...override])]
-  }
-  if (isPlainObject(base) && isPlainObject(override)) {
-    const result: Record<string, unknown> = { ...base }
-    for (const [key, value] of Object.entries(override)) {
-      if (isUnsafeObjectKey(key)) continue
-      result[key] = mergeValues(result[key], value)
-    }
-    return result
-  }
-  return override
-}
-
-function mergeCodegraphConfig(
-  base: Partial<CodegraphConfig> | undefined,
-  override: Partial<CodegraphConfig> | undefined,
-): Partial<CodegraphConfig> | undefined {
-  const merged = mergeValues(base, override)
-  if (!isRecord(merged)) return undefined
-
-  const codegraph: MutableCodegraphConfig = {}
-  for (const key of CODEGRAPH_SETTING_KEYS) {
-    if (!hasOwn(merged, key)) continue
-    setCodegraphSetting(codegraph, key, merged[key])
-  }
-  return Object.keys(codegraph).length > 0 ? codegraph : undefined
-}
-
 export function mergeOmoConfig(base: OmoConfig, override: OmoConfig): OmoConfig {
-  const codegraph = mergeCodegraphConfig(base.codegraph, override.codegraph)
-  return {
-    ...(codegraph === undefined ? {} : { codegraph }),
-  }
+  return normalizeConfigBody(mergeOmoConfigRecords(base, override), "config", [])
 }
 
 function isHarnessBlockKey(key: string): boolean {
@@ -104,6 +74,11 @@ function validateCodegraphValue(key: CodegraphSettingKey, value: unknown): strin
       : "must be an array of strings"
   }
   if (key === "install_dir") return typeof value === "string" ? null : "must be a string"
+  if (key === "session_start_cooldown_ms") {
+    return typeof value === "number" && Number.isFinite(value) && value >= 60_000
+      ? null
+      : "must be a finite number of at least 60000"
+  }
   if (key === "watch_debounce_ms") {
     return typeof value === "number" && Number.isFinite(value) && value >= 0
       ? null
@@ -130,6 +105,9 @@ function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSetti
       return
     case "install_dir":
       if (typeof value === "string") config.install_dir = value
+      return
+    case "session_start_cooldown_ms":
+      if (typeof value === "number") config.session_start_cooldown_ms = value
       return
     case "telemetry":
       if (typeof value === "boolean") config.telemetry = value
@@ -222,8 +200,13 @@ export function loadConfigFile(
     const baseConfig = normalizeConfigBody(parsed.data, "config", warnings)
     const harnessConfig = normalizeActiveHarnessBlock(parsed.data, harness, "config", warnings)
 
+    const resolved = resolveOmoConfigView({
+      config: { ...baseConfig, [`[${harness}]`]: harnessConfig },
+      harness,
+    })
+
     return {
-      config: mergeOmoConfig(baseConfig, harnessConfig),
+      config: normalizeConfigBody(resolved.config, "config", []),
       loaded: true,
       warnings,
     }

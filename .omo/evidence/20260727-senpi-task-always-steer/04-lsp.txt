@@ -1,0 +1,19 @@
+Changed-file diagnostics were requested through `lsp_diagnostics` for the senpi-task control files and omo-senpi usage guidance.
+
+Result:
+
+The repository LSP daemon repeatedly timed out waiting for fresh diagnostics, including on the primary checkout's unchanged `packages/senpi-task/src/tools/control/send.ts`. The daemon log reported Deno language-server startup for these TypeScript paths, then no response within the tool deadline.
+
+Representative result:
+
+```text
+Timed out waiting for fresh diagnostics for .../packages/senpi-task/src/tools/control/send.ts within 3000ms.
+```
+
+This is an unavailable validation surface, not a clean diagnostic claim. The independent compiler replacement is:
+
+```bash
+bun run --cwd <worktree> typecheck:packages
+```
+
+and the package-specific `tsgo --noEmit` gates recorded later in this evidence directory. No TypeScript suppression was added.

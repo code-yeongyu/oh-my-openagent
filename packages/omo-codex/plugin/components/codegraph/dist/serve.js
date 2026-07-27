@@ -62,7 +62,7 @@ function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
-    ...options.daemon === true ? {} : { [CODEGRAPH_NO_DAEMON_ENV]: "1" },
+    ...options.daemon === false ? { [CODEGRAPH_NO_DAEMON_ENV]: "1" } : {},
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
@@ -99,50 +99,57 @@ function isPlainRecord(value) {
 }
 
 // ../../../../utils/src/codegraph/manifest.ts
-var CODEGRAPH_PINNED_VERSION = "1.4.1";
+var CODEGRAPH_PINNED_VERSION = "1.5.0";
 var CODEGRAPH_PROVISION_MANIFEST = {
   assets: {
     "darwin-arm64": {
       executableName: "codegraph",
-      sha256: "4a679ae5a5cb9fff900dd59bb786da6a581b7f68f4cf713bdedd137e347d34dc",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-darwin-arm64.tar.gz"
+      sha256: "cf5ee435a6e44d097b2f98f2b7b8b9422bb1094844404efed82519c5da1af2cf",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-darwin-arm64.tar.gz"
     },
     "darwin-x64": {
       executableName: "codegraph",
-      sha256: "436f96943cfd926ea6d0a8454f18833d21254d5fd9b3d224317b1426132def95",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-darwin-x64.tar.gz"
+      sha256: "0a0ccc29bf7da9d10be1458d89d7e15c55927ae24cd95e9fa3de4bdfea059dde",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-darwin-x64.tar.gz"
     },
     "linux-arm64": {
       executableName: "codegraph",
-      sha256: "0d62c5eb2722f8d19d20f7a1bd974445e18d5294cb59be116a0c3d55ce87591f",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-linux-arm64.tar.gz"
+      sha256: "9f17750aedf45d51f68caae39ed21d6e2a7290b2326e5c53f95a165918ebd1d8",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-linux-arm64.tar.gz"
     },
     "linux-x64": {
       executableName: "codegraph",
-      sha256: "fb585ff5018d6faaa46d282b61f4f689bc7967ed8a1b467a5c556dd7ced9b542",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-linux-x64.tar.gz"
+      sha256: "2ba65e87a1210b706bb1e67d5e48b5fc4a1935e43dbb3fb5f31c5597840d2e58",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-linux-x64.tar.gz"
     },
     "win32-arm64": {
       executableName: "codegraph.cmd",
-      sha256: "e2a2a28c802a79804c7df203afa50bd461309c6c180ce3f76079fdc7cddc7697",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.4.1.tgz"
+      sha256: "19e0237ea5d8928f705d60e339eb319e7ec37490a69585712933c1534f3c0bc2",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.5.0.tgz"
     },
     "win32-x64": {
       executableName: "codegraph.cmd",
-      sha256: "4f08700fda5f4a03ad5b2956135c5788d739a351b3433db2b5820e5d5224c30d",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.4.1.tgz"
+      sha256: "ef64c878acb129885c2d8306ddec6674af865810b4c0f6a9ba9fcd61e21ff9d8",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.5.0.tgz"
     }
   },
   version: CODEGRAPH_PINNED_VERSION
 };
 
 // ../../../../utils/src/codegraph/managed-runtime.ts
+function managedBinPath(installDir, platform) {
+  return join2(installDir, "bin", platform === "win32" ? "codegraph.cmd" : "codegraph");
+}
+function hasCodegraphManagedInstall(installDir, options = {}) {
+  const fileExists = options.fileExists ?? existsSync;
+  return fileExists(managedBinPath(installDir, options.platform ?? process.platform)) || fileExists(join2(installDir, ".provisioned"));
+}
 function resolvePinnedCodegraphBin(installDir, options = {}) {
   if (installDir === undefined)
     return null;
   const fileExists = options.fileExists ?? existsSync;
   const readText = options.readText ?? ((filePath) => readFileSync(filePath, "utf8"));
-  const expectedBin = join2(installDir, "bin", (options.platform ?? process.platform) === "win32" ? "codegraph.cmd" : "codegraph");
+  const expectedBin = managedBinPath(installDir, options.platform ?? process.platform);
   const markerPath = join2(installDir, ".provisioned", `codegraph-${CODEGRAPH_PINNED_VERSION}.json`);
   if (!fileExists(expectedBin) || !fileExists(markerPath))
     return null;
@@ -266,14 +273,14 @@ function forcedBadChecksumOptions(options) {
     platformKey: key
   };
 }
-async function readMarker(path) {
+async function readMarker(path, version) {
   if (!existsSync2(path))
     return null;
   try {
     const raw = JSON.parse(await readFile(path, "utf8"));
-    if (typeof raw === "object" && raw !== null && "binPath" in raw) {
-      const value = raw.binPath;
-      return typeof value === "string" && existsSync2(value) ? value : null;
+    if (typeof raw === "object" && raw !== null && "binPath" in raw && "version" in raw) {
+      const binPath = raw.binPath;
+      return raw.version === version && typeof binPath === "string" && existsSync2(binPath) ? binPath : null;
     }
     return null;
   } catch (error) {
@@ -356,7 +363,7 @@ async function ensureCodegraphProvisioned(options) {
   const activePlatformKey = forced?.platformKey ?? options.platformKey ?? platformKey();
   const downloader = forced?.downloader ?? options.downloader ?? ((asset) => defaultDownloader(asset, options.downloadTimeoutMs));
   const marker = markerPath(installDir, options.version);
-  const existing = await readMarker(marker);
+  const existing = await readMarker(marker, options.version);
   if (existing !== null)
     return { binPath: existing, provisioned: true };
   const lockPath = join3(options.lockDir, `codegraph-${hostname()}.lock`);
@@ -364,7 +371,7 @@ async function ensureCodegraphProvisioned(options) {
   if (release === null)
     return { error: "timed out waiting for codegraph provisioning lock", provisioned: false };
   try {
-    const lockedExisting = await readMarker(marker);
+    const lockedExisting = await readMarker(marker, options.version);
     if (lockedExisting !== null)
       return { binPath: lockedExisting, provisioned: true };
     if (manifest.version !== options.version) {
@@ -666,7 +673,7 @@ function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
 }
 
-// ../../../../../../../omo/node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
 function createScanner(text, ignoreTrivia = false) {
   const len = text.length;
   let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
@@ -1081,7 +1088,7 @@ var CharacterCodes;
   CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
 })(CharacterCodes || (CharacterCodes = {}));
 
-// ../../../../../../../omo/node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
 var cachedSpaces = new Array(20).fill(0).map((_, index) => {
   return " ".repeat(index);
 });
@@ -1115,7 +1122,7 @@ var cachedBreakLinesWithSpaces = {
   }
 };
 
-// ../../../../../../../omo/node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
 var ParseOptions;
 (function(ParseOptions2) {
   ParseOptions2.DEFAULT = {
@@ -1418,7 +1425,7 @@ function visit(text, visitor, options = ParseOptions.DEFAULT) {
   return true;
 }
 
-// ../../../../../../../omo/node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
 var ScanError;
 (function(ScanError2) {
   ScanError2[ScanError2["None"] = 0] = "None";
@@ -1536,6 +1543,7 @@ var SETTING_HARNESS_SUPPORT = {
   "codegraph.enabled": HARNESS_IDS,
   "codegraph.excluded_roots": ["codex", "opencode"],
   "codegraph.install_dir": HARNESS_IDS,
+  "codegraph.session_start_cooldown_ms": ["codex"],
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
 };
@@ -1544,6 +1552,7 @@ var SETTING_HARNESS_SUPPORT = {
 var BUILT_IN_DEFAULTS = {
   codegraph: {
     auto_provision: true,
+    daemon: true,
     enabled: true,
     telemetry: false
   }
@@ -1555,6 +1564,7 @@ var CODEGRAPH_SETTING_KEYS = [
   "enabled",
   "excluded_roots",
   "install_dir",
+  "session_start_cooldown_ms",
   "telemetry",
   "watch_debounce_ms"
 ];
@@ -1614,6 +1624,9 @@ function validateCodegraphValue(key, value) {
   }
   if (key === "install_dir")
     return typeof value === "string" ? null : "must be a string";
+  if (key === "session_start_cooldown_ms") {
+    return typeof value === "number" && Number.isFinite(value) && value >= 60000 ? null : "must be a finite number of at least 60000";
+  }
   if (key === "watch_debounce_ms") {
     return typeof value === "number" && Number.isFinite(value) && value >= 0 ? null : "must be a non-negative finite number";
   }
@@ -1641,6 +1654,10 @@ function setCodegraphSetting(config, key, value) {
     case "install_dir":
       if (typeof value === "string")
         config.install_dir = value;
+      return;
+    case "session_start_cooldown_ms":
+      if (typeof value === "number")
+        config.session_start_cooldown_ms = value;
       return;
     case "telemetry":
       if (typeof value === "boolean")
@@ -1753,6 +1770,7 @@ var CODEGRAPH_ENV_KEYS = [
   ["auto_provision", "AUTO_PROVISION", "boolean"],
   ["enabled", "ENABLED", "boolean"],
   ["install_dir", "INSTALL_DIR", "string"],
+  ["session_start_cooldown_ms", "SESSION_START_COOLDOWN_MS", "number"],
   ["telemetry", "TELEMETRY", "boolean"],
   ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
 ];
@@ -1792,6 +1810,10 @@ function setCodegraphSetting2(config, key, value) {
       if (typeof value === "string")
         config.install_dir = value;
       return;
+    case "session_start_cooldown_ms":
+      if (typeof value === "number" && value >= 60000)
+        config.session_start_cooldown_ms = value;
+      return;
     case "telemetry":
       if (typeof value === "boolean")
         config.telemetry = value;
@@ -1812,7 +1834,8 @@ function buildEnvOverrides(harness, env, warnings, merge) {
       if (rawValue === undefined)
         continue;
       const parsed = parseEnvValue(rawValue, kind);
-      if (parsed === null) {
+      const cooldownIsValid = settingKey !== "session_start_cooldown_ms" || typeof parsed === "number" && parsed >= 60000;
+      if (parsed === null || !cooldownIsValid) {
         warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
         continue;
       }
@@ -2551,10 +2574,12 @@ function requestedProtocolVersion(params) {
   return params["protocolVersion"];
 }
 
+// src/session-start-cooldown.ts
+var DEFAULT_SESSION_START_COOLDOWN_MS = 15 * 60 * 1000;
+var MAX_SESSION_START_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 // src/session-start-worker.ts
 var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
-var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
-var WINDOWS_NODE_SCRIPT_EXTENSIONS2 = new Set([".cjs", ".js", ".mjs"]);
 
 // src/serve.ts
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
@@ -2584,12 +2609,29 @@ async function runCodegraphServe(options = {}) {
     return runUnavailableMcp(CODEGRAPH_EXCLUDED_HINT, options);
   }
   const trustedInstallDir = config.trustedCodegraphInstallDir;
+  const installDir = trustedInstallDir ?? join8(homeDir, ".omo", "codegraph");
   const resolutionOptions = {
     env,
     homeDir,
-    provisioned: () => provisionedBinFromInstallDir(trustedInstallDir)
+    provisioned: () => provisionedBinFromInstallDir(installDir)
   };
   let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+  const resolveManagedBin = options.resolveManagedBin ?? (options.resolve === undefined ? provisionedBinFromInstallDir : () => null);
+  const managedInstallExists = options.managedInstallExists ?? (options.resolve === undefined ? hasCodegraphManagedInstall : () => false);
+  const managedBin = resolveManagedBin(installDir);
+  if (resolution.source !== "env" && managedBin !== null) {
+    resolution = { argsPrefix: [], command: managedBin, exists: true, source: "provisioned" };
+  } else if (resolution.source !== "env" && codegraphConfig.auto_provision !== false && managedInstallExists(installDir)) {
+    const upgraded = await provisionMissingCodegraph({
+      config: codegraphConfig,
+      ensureProvisioned: options.ensureProvisioned ?? ensureCodegraphProvisioned,
+      homeDir,
+      resolution,
+      ...trustedInstallDir === undefined ? {} : { trustedInstallDir }
+    });
+    if (upgraded !== null)
+      resolution = upgraded;
+  }
   const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
   if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync6)) {
     if (resolution.source === "path" && !nodeSupport.supported) {
@@ -2611,7 +2653,7 @@ async function runCodegraphServe(options = {}) {
     return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
   }
   const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
-  const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon === true, options.buildEnv);
+  const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon !== false, options.buildEnv);
   const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
     cwd: projectCwd,

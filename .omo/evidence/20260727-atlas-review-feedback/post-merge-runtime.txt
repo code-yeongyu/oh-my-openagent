@@ -1,0 +1,8 @@
+{
+  "syntheticAttachmentTextPreservedCorrelation": true,
+  "attachmentPreservedCorrelation": true,
+  "laterTextCleared": true,
+  "unknownCouldNotMutatePause": true,
+  "untrackedUsedStandaloneVerification": true
+}
+{"prompt_async_status":204,"message_updated":3,"message_part_updated":1,"updated_user_role":2,"part_with_text":1,"part_info_count":0,"part_user_role_count":0,"verdict_pass":1}
