@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
+import { resolveCmuxCliExecutable } from "../../shared/tmux/cmux-cli"
 import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 import {
   BLOCKED_TMUX_SUBCOMMANDS,
@@ -22,7 +23,7 @@ function resolveTmuxExecutable(tmuxPath: string): string[] {
   }
 
   const executableName = tmuxPath.split(/[\\/]/).pop()
-  const cmuxExecutable = executableName === "cmux" ? tmuxPath : "cmux"
+  const cmuxExecutable = executableName === "cmux" ? tmuxPath : resolveCmuxCliExecutable()
   return [cmuxExecutable, "__tmux-compat"]
 }
 
