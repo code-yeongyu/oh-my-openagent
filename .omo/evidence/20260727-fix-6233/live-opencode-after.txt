@@ -1,0 +1,65 @@
+### real-OpenCode harness capture for issue #6233
+### opencode: 1.18.6
+### plan-checklist.ts diff vs upstream/dev at capture time:
+ packages/boulder-state/src/plan-checklist.ts | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+### (empty above == unmodified base; non-empty == fix applied)
+
+--- the plan under test (every task user-blocked) ---
+# Blocked Plan
+
+## Todos
+- [~] 1. Blocked on a decision only the user can make
+
+## Final verification wave
+- [~] F1. Blocked on unavailable credentials
+
+=== $ opencode debug paths   (isolation: all inside the sandbox) ===
+home       C:/Users/pss/AppData/Local/Temp/omo-6233-oc-d6H5oV/home
+data       C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.local\share\opencode
+bin        C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.cache\opencode\bin
+log        C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.local\share\opencode\log
+repos      C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.local\share\opencode\repos
+cache      C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.cache\opencode
+config     C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.config\opencode
+state      C:\Users\pss\AppData\Local\Temp\omo-6233-oc-d6H5oV\home\.local\state\opencode
+tmp        C:\Users\pss\AppData\Local\Temp\opencode
+EXIT=0
+
+=== $ opencode debug config  -> plugin loads with this change ===
+EXIT=0
+  OMO plugin loaded (agent count): 12
+  agents: Hephaestus - Deep Agent, Metis - Plan Consultant, Momus - Plan Critic, Prometheus - Plan Builder, Sisyphus - ultraworker, Sisyphus-Junior, build, explore, librarian, multimodal-looker, oracle, plan
+
+=== $ omo boulder --json   (real CLI, same isolated sandbox) ===
+{
+  "works": [
+    {
+      "work_id": "work-blocked",
+      "plan_name": "blocked-plan",
+      "active_plan": ".omo/plans/blocked-plan.md",
+      "status": "active",
+      "started_at": "2026-07-27T00:00:00.000Z",
+      "ended_at": "2026-07-27T00:10:00.000Z",
+      "elapsed_ms": 600000,
+      "elapsed_human": "10m 0s",
+      "total_tasks": 2,
+      "completed_tasks": 2,
+      "remaining_tasks": 0,
+      "percentage": 100,
+      "session_count": 1
+    }
+  ]
+}
+EXIT=0
+
+=== $ omo boulder   (text surface) ===
+boulder progress
+[2m----------------------------------------[22m
+plan: blocked-plan
+status: [36mactive[39m
+progress: 100% (2/2)
+elapsed: 10m 0s
+sessions: 1
+current task: -
+EXIT=0

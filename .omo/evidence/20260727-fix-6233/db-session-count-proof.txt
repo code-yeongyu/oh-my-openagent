@@ -1,0 +1,15 @@
+### MANDATED DB-UNTOUCHED PROOF - issue #6233 - 2026-07-27T09:27:11Z
+### AGENTS.md: SELECT count(*) FROM session on the REAL database, before/after
+### any QA that spawns opencode.
+
+real database: C:\Users\pss\.local\share\opencode\opencode.db
+  count BEFORE both opencode captures = 2722
+  count AFTER  both opencode captures = 2722    (driver delta = 0)
+  count AFTER  a 20s ambient control  = 2722    (ambient delta = 0)
+
+Both captures spawned real opencode (debug paths + debug config) with the OMO
+plugin loaded from the locally built dist. The sandbox redirects HOME /
+USERPROFILE / APPDATA / LOCALAPPDATA and every XDG_* into a mktemp dir removed
+on exit, which 'opencode debug paths' in each capture confirms. This QA runs
+from inside a live opencode session writing to the same database, so an ambient
+control gap is included to separate driver writes from ambient writes.
