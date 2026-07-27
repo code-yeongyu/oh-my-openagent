@@ -1,0 +1,5 @@
+  omo-senpi        pass=289    fail=19
+  pi-goal          pass=37     fail=2
+  pi-webfetch      pass=0      fail=3
+  senpi-task       pass=540    fail=67
+  team-core        pass=156    fail=1

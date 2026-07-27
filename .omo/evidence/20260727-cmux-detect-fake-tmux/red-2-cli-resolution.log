@@ -1,0 +1,11 @@
+error: expect(received).toBe(expected)
+(fail) resolveCmuxCliExecutable > #given CMUX_OMO_CMUX_BIN set #when resolveCmuxCliExecutable called #then returns that path [3.08ms]
+error: expect(received).toBe(expected)
+(fail) resolveCmuxCliExecutable > #given only CMUX_BUNDLED_CLI_PATH set #when resolveCmuxCliExecutable called #then falls back to it [0.19ms]
+error: expect(received).toBe(expected)
+(fail) resolveCmuxCliExecutable > #given empty CMUX_OMO_CMUX_BIN #when resolveCmuxCliExecutable called #then skips it instead of returning an empty executable [0.09ms]
+error: Executable not found in $PATH: "cmux"
+(fail) runTmuxCommand > #given cmux fake TMUX and cmux CLI reachable only through CMUX_OMO_CMUX_BIN #when run #then delegates through that binary [0.82ms]
+ 10 pass
+ 4 fail
+Ran 14 tests across 2 files. [544.00ms]

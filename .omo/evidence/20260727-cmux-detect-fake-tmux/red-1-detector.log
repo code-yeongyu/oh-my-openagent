@@ -1,0 +1,5 @@
+(fail) isCmuxCompatEnvironment > #given cmux injected TMUX under a cmux socket directory #when isCmuxCompatEnvironment called #then returns true [0.94ms]
+(fail) runTmuxCommand > #given cmux fake TMUX and cmux CLI reachable only through CMUX_OMO_CMUX_BIN #when run #then delegates through that binary [1.43ms]
+ 15 pass
+ 2 fail
+Ran 17 tests across 2 files. [558.00ms]

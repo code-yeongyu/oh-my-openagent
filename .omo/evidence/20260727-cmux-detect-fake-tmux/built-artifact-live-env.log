@@ -1,0 +1,11 @@
+실행 중인 실제 cmux 환경:
+  TMUX = "/tmp/cmux-omo/EA1B0811-BF91-41C9-B103-835E19BBFD5D,EEC79E0A-E474-4386-B185-8B6652A9E55F,3547666270389273888"
+  >>> isCmuxCompatEnvironment() = true
+  >>> resolveCmuxCliExecutable() = /Applications/cmux.app/Contents/Resources/bin/cmux
+
+회귀 가드:
+  tmux | real tmux(밖)
+  tmux | cmux 안 real tmux 중첩
+  cmux | cmuxterm 빌드
+  cmux | headless cmux
+  tmux | 아무것도 없음

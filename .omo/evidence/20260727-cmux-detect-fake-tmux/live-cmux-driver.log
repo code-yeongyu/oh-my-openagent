@@ -1,0 +1,16 @@
+environment
+  TMUX                        = /tmp/cmux-omo/EA1B0811-BF91-41C9-B103-835E19BBFD5D,EEC79E0A-E474-4386-B185-8B6652A9E55F,3547666270389273888
+  CMUX_SOCKET_PATH            = /Users/Yoonki/.local/state/cmux/cmux-501.sock
+  isCmuxCompatEnvironment()   = true
+  resolveCmuxCliExecutable()  = /Applications/cmux.app/Contents/Resources/bin/cmux
+
+spawnTmuxPane -> {
+  success: true,
+  paneId: "%5955808489771334554",
+}
+
+pane content contains placeholder text = false
+attach process observed                = true
+attach process                         = opencode attach http://127.0.0.1:53592 --session ses_05dc70edbffeZO2S1a3zsApmjz --dir /private/var/folders/kb/jc18wgpx14l08nddfsthz7jc0000gn/T/opencode/oh-my-openagent
+
+closeTmuxPane -> true
