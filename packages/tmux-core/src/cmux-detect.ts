@@ -1,3 +1,16 @@
+const CMUX_SOCKET_SEGMENT_PATTERN = /^cmux([-.]|$)/
+
+/**
+ * cmux injects `TMUX` as `<socket path>,<...>` with the socket under a `cmux*`
+ * directory (`/tmp/cmux-omo/<workspace>,<surface>,<pane>`); a real tmux socket
+ * lives under `tmux-<uid>` (`/private/tmp/tmux-501/default,123,0`). The socket
+ * path, not the presence of `TMUX`, is what tells the two apart.
+ */
+function hasCmuxSocketPath(tmuxEnvironment: string): boolean {
+	const socketPath = tmuxEnvironment.split(",")[0] ?? ""
+	return socketPath.split(/[\\/]/).some((segment) => CMUX_SOCKET_SEGMENT_PATTERN.test(segment))
+}
+
 /**
  * Detect whether we are running inside cmux (cmux omo).
  * When cmux-omo sets up the environment it injects a tmux shim and sets
@@ -9,6 +22,8 @@ export function isCmuxCompatEnvironment(
 	environment: Record<string, string | undefined> = process.env,
 ): boolean {
 	const tmuxEnvironment = environment.TMUX
-	return tmuxEnvironment?.includes("cmuxterm") === true ||
-		(Boolean(environment.CMUX_SOCKET_PATH) && !tmuxEnvironment)
+	if (tmuxEnvironment?.includes("cmuxterm") === true) return true
+	if (!environment.CMUX_SOCKET_PATH) return false
+	if (!tmuxEnvironment) return true
+	return hasCmuxSocketPath(tmuxEnvironment)
 }
