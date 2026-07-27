@@ -60,41 +60,37 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(opusFallback?.variant).toBe("max")
   })
 
-  test("visual-engineering keeps gemini, glm, opus, opencode-go, and Kimi K3 fallback order", () => {
+  test("visual-engineering keeps the prior Gemini and GLM tail after the new prefix", () => {
     // given
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when
-    const [primary, second, third, fourth, fifth] = visualEngineering.fallbackChain
+    const legacyTail = visualEngineering.fallbackChain.slice(3)
 
     // then
-    expect(visualEngineering.fallbackChain).toHaveLength(5)
-    expect(primary?.providers[0]).toBe("google")
-    expect(primary?.model).toBe("gemini-3.1-pro")
-    expect(primary?.variant).toBe("high")
-    expect(second?.providers[0]).toBe("zai-coding-plan")
-    expect(second?.model).toBe("glm-5")
-    expect(third?.model).toBe("claude-opus-5")
-    expect(third?.variant).toBe("max")
-    expect(fourth?.providers[0]).toBe("opencode-go")
-    expect(fourth?.model).toBe("glm-5.2")
-    expect(fifth?.providers[0]).toBe("kimi-for-coding")
-    expect(fifth?.model).toBe("kimi-k3")
+    expect(legacyTail).toEqual([
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+    ])
   })
 
-  test("quick keeps gpt-5.4-mini primary before claude-haiku-4-5", () => {
+  test("quick keeps the prior lightweight tail after Haiku", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
     // when
-    const [primary, secondary] = quick.fallbackChain
+    const firstLegacyFallback = quick.fallbackChain[3]
 
     // then
-    expect(quick.fallbackChain.length).toBeGreaterThan(1)
-    expect(primary?.model).toBe("gpt-5.4-mini")
-    expect(primary?.providers).toContain("openai")
-    expect(secondary?.model).toBe("claude-haiku-4-5")
-    expect(secondary?.providers).toContain("anthropic")
+    expect(firstLegacyFallback).toEqual({
+      providers: ["google", "github-copilot", "opencode", "vercel"],
+      model: "gemini-3-flash",
+    })
   })
 
   test("unspecified-low keeps native gpt-5.6-luna xhigh before Copilot high", () => {
@@ -123,21 +119,15 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("unspecified-high keeps opus primary before gpt-5.6-sol high", () => {
+  test("unspecified-high keeps gpt-5.6-sol high after the new Kimi and Opus prefix", () => {
     // given
     const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
     // when
-    const [primary, secondary] = unspecifiedHigh.fallbackChain
+    const solFallback = unspecifiedHigh.fallbackChain[2]
 
     // then
-    expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
-    expect(primary).toEqual({
-      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-5",
-      variant: "max",
-    })
-    expect(secondary).toEqual({
+    expect(solFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.6-sol",
       variant: "high",
