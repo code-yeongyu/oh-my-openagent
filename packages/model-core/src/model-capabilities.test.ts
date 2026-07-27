@@ -144,6 +144,40 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("marks custom models with runtime provider metadata as runtime-backed", () => {
+    const result = getModelCapabilities({
+      providerID: "olmx",
+      modelID: "North-Mini-Code-1.0-4bit",
+      runtimeModel: {
+        capabilities: {
+          toolcall: true,
+          input: {
+            text: true,
+          },
+          output: {
+            text: true,
+          },
+        },
+      },
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "north-mini-code-1.0-4bit",
+      toolCall: true,
+      modalities: {
+        input: ["text"],
+        output: ["text"],
+      },
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "runtime-backed",
+      snapshot: { source: "none" },
+      toolCall: { source: "runtime" },
+      modalities: { source: "runtime" },
+    })
+  })
+
   test("respects root-level thinking flags when providers do not nest them under capabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({

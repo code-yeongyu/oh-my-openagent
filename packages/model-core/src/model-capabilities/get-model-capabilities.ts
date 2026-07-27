@@ -41,6 +41,19 @@ function getProviderOverride(providerID: string, modelID: string): ModelCapabili
 		: undefined
 }
 
+function hasRuntimeCapabilityEvidence(sources: {
+	variants: ModelCapabilitiesDiagnostics["variants"]["source"]
+	reasoning: ModelCapabilitiesDiagnostics["reasoning"]["source"]
+	supportsThinking: ModelCapabilitiesDiagnostics["supportsThinking"]["source"]
+	supportsTemperature: ModelCapabilitiesDiagnostics["supportsTemperature"]["source"]
+	supportsTopP: ModelCapabilitiesDiagnostics["supportsTopP"]["source"]
+	maxOutputTokens: ModelCapabilitiesDiagnostics["maxOutputTokens"]["source"]
+	toolCall: ModelCapabilitiesDiagnostics["toolCall"]["source"]
+	modalities: ModelCapabilitiesDiagnostics["modalities"]["source"]
+}): boolean {
+	return Object.values(sources).some((source) => source === "runtime")
+}
+
 export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCapabilities {
 	const canonicalization = resolveModelIDAlias(input.modelID, input.providerID)
 	const override = getOverride(input.modelID)
@@ -107,13 +120,25 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		runtimeToolCall !== undefined ? "runtime" : snapshotEntry?.toolCall !== undefined ? snapshotSource : "none"
 	const modalitiesSource: ModelCapabilitiesDiagnostics["modalities"]["source"] =
 		runtimeModalities !== undefined ? "runtime" : snapshotEntry?.modalities !== undefined ? snapshotSource : "none"
+	const runtimeCapabilityBacked = hasRuntimeCapabilityEvidence({
+		variants: variantsSource,
+		reasoning: reasoningSource,
+		supportsThinking: supportsThinkingSource,
+		supportsTemperature: supportsTemperatureSource,
+		supportsTopP: supportsTopPSource,
+		maxOutputTokens: maxOutputTokensSource,
+		toolCall: toolCallSource,
+		modalities: modalitiesSource,
+	})
 	const resolutionMode: ModelCapabilitiesDiagnostics["resolutionMode"] =
 		snapshotSource !== "none" && canonicalization.source === "canonical"
 			? "snapshot-backed"
-			: snapshotSource !== "none"
+		: snapshotSource !== "none"
 			? "alias-backed"
-			: familySource === "heuristic" || variantsSource === "heuristic" || reasoningEffortsSource === "heuristic"
+		: familySource === "heuristic" || variantsSource === "heuristic" || reasoningEffortsSource === "heuristic"
 			? "heuristic-backed"
+		: runtimeCapabilityBacked
+			? "runtime-backed"
 			: "unknown"
 
 	return {

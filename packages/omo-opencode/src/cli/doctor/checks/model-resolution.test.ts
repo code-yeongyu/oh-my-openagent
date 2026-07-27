@@ -337,6 +337,34 @@ describe("model-resolution check", () => {
       const atlas = expectDefined(info.agents.find((agent) => agent.name === "atlas"), "atlas agent resolution")
       expect(atlas.capabilityDiagnostics?.resolutionMode).toBe("snapshot-backed")
     })
+
+    it("does not warn when custom local overrides are backed by runtime provider metadata", async () => {
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      // #given a custom local model override with runtime-backed diagnostics from model-core
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          atlas: { model: "olmx/North-Mini-Code-1.0-4bit" },
+        },
+      })
+      const atlasIndex = info.agents.findIndex((agent) => agent.name === "atlas")
+      expect(atlasIndex).toBeGreaterThanOrEqual(0)
+      const atlas = expectDefined(info.agents[atlasIndex], "atlas agent resolution")
+      info.agents[atlasIndex] = {
+        ...atlas,
+        capabilityDiagnostics: {
+          ...expectDefined(atlas.capabilityDiagnostics, "atlas capability diagnostics"),
+          resolutionMode: "runtime-backed",
+        },
+      }
+
+      // #when collecting doctor capability issues
+      const issues = collectCapabilityResolutionIssues(info)
+
+      // #then runtime-backed metadata is enough to avoid a compatibility fallback warning
+      expect(issues).toHaveLength(0)
+      expect(info.agents[atlasIndex]?.capabilityDiagnostics?.resolutionMode).toBe("runtime-backed")
+    })
   })
 
 })

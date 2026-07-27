@@ -24,7 +24,7 @@ export type ModelCapabilitiesSnapshot = {
 }
 
 export type ModelCapabilitiesDiagnostics = {
-	resolutionMode: "snapshot-backed" | "alias-backed" | "heuristic-backed" | "unknown"
+	resolutionMode: "snapshot-backed" | "alias-backed" | "heuristic-backed" | "runtime-backed" | "unknown"
 	canonicalization: {
 		source: "canonical" | "exact-alias" | "pattern-alias"
 		ruleID?: string
