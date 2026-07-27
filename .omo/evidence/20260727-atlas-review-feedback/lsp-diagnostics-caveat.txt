@@ -1,0 +1,16 @@
+WHAT WAS ATTEMPTED
+- lsp_diagnostics was run after every changed TypeScript file edit.
+- lsp_status was retried after the final typecheck and regression suite.
+
+WHAT WAS OBSERVED
+- Initial diagnostics were clean on the first four changed files.
+- Mid-session, the ambient published plugin cache path used by this already-running OpenCode process disappeared.
+- Subsequent calls could not start ~/.omo/lsp-daemon/v0.1.0/daemon.sock because its configured runtime file no longer existed under the vanished cache package.
+- The final whole-repository `bun run typecheck` passed, including packages/omo-opencode and packages/boulder-state.
+
+WHY THIS IS ENOUGH
+- The unavailable LSP proxy is environmental and occurred after clean diagnostics had already run on the original changes.
+- The same strict TypeScript projects were checked by the repository's canonical tsgo gate after every final source change.
+
+WHAT WAS OMITTED
+- No host configuration, cache contents, credentials, or private environment values were copied into evidence.

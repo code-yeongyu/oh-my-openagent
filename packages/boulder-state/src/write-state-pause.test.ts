@@ -6,8 +6,8 @@ import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
 import type { BoulderState, BoulderWorkState } from "./types"
-import { readBoulderState } from "./storage/read-state"
-import { clearBoulderPause, selectActiveWork, setBoulderPause, writeBoulderState } from "./storage/write-state"
+import { isBoulderPausedForSession, readBoulderState } from "./storage/read-state"
+import { clearBoulderPause, selectActiveWork, setBoulderPause } from "./storage/write-state"
 
 function createTempDirectory(): string {
   return mkdtempSync(join(tmpdir(), "boulder-write-state-pause-"))
@@ -49,7 +49,7 @@ function createStateWithTwoWorks(): BoulderState {
       }),
       "work-b": createWork({
         workId: "work-b",
-        sessionIds: ["opencode:session-b"],
+        sessionIds: ["opencode:session-b", "opencode:session-b-appended"],
         startedAt: "2026-06-05T02:00:00.000Z",
         updatedAt: "2026-06-05T02:00:00.000Z",
       }),
@@ -63,6 +63,14 @@ function createStateWithTwoWorks(): BoulderState {
     session_origins: {},
     task_sessions: {},
   }
+}
+
+function readRequiredState(directory: string): BoulderState {
+  const state = readBoulderState(directory)
+  if (state === null) {
+    throw new Error("Expected persisted Boulder state")
+  }
+  return state
 }
 
 describe("setBoulderPause / clearBoulderPause multi-work semantics", () => {
@@ -79,7 +87,7 @@ describe("setBoulderPause / clearBoulderPause multi-work semantics", () => {
 
     // then
     expect(result).not.toBeNull()
-    const state = readBoulderState(directory)!
+    const state = readRequiredState(directory)
     expect(state.works?.["work-b"].pause?.reason).toBe("final_wave_approval")
     expect(state.works?.["work-b"].pause?.session_id).toBe("opencode:session-b")
     expect(state.works?.["work-a"].pause).toBeUndefined()
@@ -99,11 +107,57 @@ describe("setBoulderPause / clearBoulderPause multi-work semantics", () => {
     selectActiveWork(directory, "work-b")
 
     // then
-    const state = readBoulderState(directory)!
+    const state = readRequiredState(directory)
     expect(state.works?.["work-b"].pause?.reason).toBe("final_wave_approval")
     expect(state.works?.["work-b"].pause?.session_id).toBe("opencode:session-b")
     expect(state.pause?.reason).toBe("final_wave_approval")
     expect(state.pause?.session_id).toBe("opencode:session-b")
+  })
+
+  test("#given work B is paused by one session #when checking its sibling session #then the pause applies to every session of B only", () => {
+    // given
+    const directory = createTempDirectory()
+    writeState(directory, createStateWithTwoWorks())
+    setBoulderPause(directory, {
+      reason: "final_wave_approval",
+      sessionId: "opencode:session-b",
+    })
+
+    // when
+    const siblingIsPaused = isBoulderPausedForSession(directory, {
+      reason: "final_wave_approval",
+      sessionId: "opencode:session-b-appended",
+    })
+    const unrelatedWorkIsPaused = isBoulderPausedForSession(directory, {
+      reason: "final_wave_approval",
+      sessionId: "opencode:session-a",
+    })
+
+    // then
+    expect(siblingIsPaused).toBe(true)
+    expect(unrelatedWorkIsPaused).toBe(false)
+  })
+
+  test("#given a sibling observes work B's pause #when it tries to clear #then creator-session ownership is preserved", () => {
+    // given
+    const directory = createTempDirectory()
+    writeState(directory, createStateWithTwoWorks())
+    setBoulderPause(directory, {
+      reason: "final_wave_approval",
+      sessionId: "opencode:session-b",
+    })
+
+    // when
+    clearBoulderPause(directory, {
+      reason: "final_wave_approval",
+      sessionId: "opencode:session-b-appended",
+    })
+
+    // then
+    expect(isBoulderPausedForSession(directory, {
+      reason: "final_wave_approval",
+      sessionId: "opencode:session-b-appended",
+    })).toBe(true)
   })
 
   test("#given pause set on non-active work B #when clearing via B session #then only B pause is cleared and A is untouched", () => {
@@ -123,7 +177,7 @@ describe("setBoulderPause / clearBoulderPause multi-work semantics", () => {
     })
 
     // then
-    const state = readBoulderState(directory)!
+    const state = readRequiredState(directory)
     expect(state.works?.["work-b"].pause).toBeUndefined()
     expect(state.works?.["work-a"].pause).toBeUndefined()
     expect(state.pause).toBeUndefined()
@@ -146,7 +200,7 @@ describe("setBoulderPause / clearBoulderPause multi-work semantics", () => {
     })
 
     // then
-    const state = readBoulderState(directory)!
+    const state = readRequiredState(directory)
     expect(state.works?.["work-a"].pause).toBeUndefined()
     expect(state.pause).toBeUndefined()
   })
@@ -173,7 +227,7 @@ describe("setBoulderPause / clearBoulderPause multi-work semantics", () => {
     })
 
     // then
-    const state = readBoulderState(directory)!
+    const state = readRequiredState(directory)
     expect(state.pause?.reason).toBe("final_wave_approval")
     expect(state.pause?.session_id).toBe("opencode:legacy-session")
   })

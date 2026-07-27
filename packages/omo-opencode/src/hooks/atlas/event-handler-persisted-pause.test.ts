@@ -9,6 +9,7 @@ import {
   setBoulderPause,
   writeBoulderState,
 } from "../../features/boulder-state"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { createAtlasEventHandler } from "./event-handler"
 import type { SessionState } from "./types"
 
@@ -21,10 +22,8 @@ describe("createAtlasEventHandler persisted final-wave pause", () => {
     }
   })
 
-  test("clears the pause when the first user message arrives after restart", async () => {
-    // given
+  function createPausedHandler(sessionID: string) {
     directory = mkdtempSync(join(tmpdir(), "atlas-persisted-pause-"))
-    const sessionID = "atlas-restarted-final-wave-session"
     writeBoulderState(directory, {
       active_plan: join(directory, "plan.md"),
       plan_name: "plan",
@@ -35,25 +34,125 @@ describe("createAtlasEventHandler persisted final-wave pause", () => {
       reason: "final_wave_approval",
       sessionId: sessionID,
     })
-    const sessions = new Map<string, SessionState>()
-    const handler = createAtlasEventHandler({
+    return createAtlasEventHandler({
       ctx: unsafeTestValue<PluginInput>({ directory }),
-      sessions,
+      sessions: new Map<string, SessionState>(),
       getState: () => ({ promptFailureCount: 0 }),
     })
+  }
+
+  function finalWavePauseIsActive(sessionID: string): boolean {
+    if (directory === undefined) {
+      return false
+    }
+    return isBoulderPausedForSession(directory, {
+      reason: "final_wave_approval",
+      sessionId: sessionID,
+    })
+  }
+
+  test("#given a persisted pause after restart #when a complete real user message arrives #then clears the pause", async () => {
+    // given
+    const sessionID = "atlas-restarted-final-wave-session"
+    const handler = createPausedHandler(sessionID)
 
     // when
     await handler({
       event: {
         type: "message.updated",
-        properties: { sessionID, info: { role: "user" } },
+        properties: {
+          sessionID,
+          info: { id: "msg-real-user", role: "user" },
+          parts: [{ type: "text", text: "Continue the final wave." }],
+        },
       },
     })
 
     // then
-    expect(isBoulderPausedForSession(directory, {
-      reason: "final_wave_approval",
-      sessionId: sessionID,
-    })).toBe(false)
+    expect(finalWavePauseIsActive(sessionID)).toBe(false)
+  })
+
+  test("#given a persisted pause after restart #when a complete internal user message arrives #then preserves the pause", async () => {
+    // given
+    const sessionID = "atlas-internal-final-wave-session"
+    const handler = createPausedHandler(sessionID)
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          sessionID,
+          info: { id: "msg-internal-user", role: "user" },
+          parts: [{ type: "text", text: `Keep working.\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+        },
+      },
+    })
+
+    // then
+    expect(finalWavePauseIsActive(sessionID)).toBe(true)
+  })
+
+  test("#given a persisted pause after restart #when an internal user message arrives as split events #then preserves the pause", async () => {
+    // given
+    const sessionID = "atlas-split-internal-final-wave-session"
+    const messageID = "msg-split-internal-user"
+    const handler = createPausedHandler(sessionID)
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { sessionID, info: { id: messageID, role: "user" } },
+      },
+    })
+    await handler({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          sessionID,
+          part: {
+            messageID,
+            type: "text",
+            text: `Keep working.\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          },
+        },
+      },
+    })
+
+    // then
+    expect(finalWavePauseIsActive(sessionID)).toBe(true)
+  })
+
+  test("#given a persisted pause after restart #when a real user message arrives as split events #then clears only after the part arrives", async () => {
+    // given
+    const sessionID = "atlas-split-real-final-wave-session"
+    const messageID = "msg-split-real-user"
+    const handler = createPausedHandler(sessionID)
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { sessionID, info: { id: messageID, role: "user" } },
+      },
+    })
+
+    // then
+    expect(finalWavePauseIsActive(sessionID)).toBe(true)
+
+    // when
+    await handler({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          sessionID,
+          part: { messageID, type: "text", text: "Continue the final wave." },
+        },
+      },
+    })
+
+    // then
+    expect(finalWavePauseIsActive(sessionID)).toBe(false)
   })
 })

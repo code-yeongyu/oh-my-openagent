@@ -2,10 +2,13 @@ import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
 import type { BoulderPauseReason, BoulderPauseState, BoulderState, BoulderWorkState } from "../types"
+import { generateWorkId as generateBoulderWorkId } from "./create-state"
 import { getBoulderFilePath } from "./path"
 import { getPlanName } from "./plan-progress"
 import { getBoulderWorks, getWorkForSession, readBoulderState } from "./read-state"
 import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
+
+export { createBoulderState, generateWorkId } from "./create-state"
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
   const filePath = getBoulderFilePath(directory)
@@ -62,47 +65,6 @@ export function clearBoulderState(directory: string): boolean {
   }
 }
 
-export function generateWorkId(planName: string): string {
-  const slug = planName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-  const randomHex = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, "0")
-  return `${slug.length > 0 ? slug : "work"}-${randomHex}`
-}
-
-export function createBoulderState(planPath: string, sessionId: string, agent?: string, worktreePath?: string): BoulderState {
-  const startedAt = nowIsoString()
-  const normalizedSessionId = normalizeSessionId(sessionId)
-  const workId = generateWorkId(getPlanName(planPath))
-  const work: BoulderWorkState = {
-    work_id: workId,
-    active_plan: planPath,
-    plan_name: getPlanName(planPath),
-    status: "active",
-    started_at: startedAt,
-    updated_at: startedAt,
-    session_ids: [normalizedSessionId],
-    session_origins: { [normalizedSessionId]: "direct" },
-    ...(agent !== undefined ? { agent } : {}),
-    ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
-    task_sessions: {},
-  }
-
-  return {
-    schema_version: 2,
-    active_work_id: workId,
-    works: { [workId]: work },
-    active_plan: planPath,
-    started_at: startedAt,
-    status: "active",
-    updated_at: startedAt,
-    session_ids: [normalizedSessionId],
-    session_origins: { [normalizedSessionId]: "direct" },
-    plan_name: getPlanName(planPath),
-    task_sessions: {},
-    ...(agent !== undefined ? { agent } : {}),
-    ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
-  }
-}
-
 export function setBoulderPause(
   directory: string,
   input: { reason: BoulderPauseReason; sessionId: string; createdAt?: string },
@@ -121,7 +83,11 @@ export function setBoulderPause(
 
   // Persist on the work owning the session; mirror only when that work is active,
   // otherwise selecting the owning work later would drop the pause.
-  const owningWorkId = getWorkForSession(directory, input.sessionId)?.work_id
+  const owningWork = getWorkForSession(directory, input.sessionId)
+  if (!owningWork) {
+    return state
+  }
+  const owningWorkId = owningWork.work_id
   const targetWork = owningWorkId ? state.works?.[owningWorkId] : undefined
 
   if (targetWork) {
@@ -131,10 +97,12 @@ export function setBoulderPause(
       state.pause = pause
       state.updated_at = now
     }
-  } else {
+  } else if (!state.works) {
     // Legacy single-work state: pause lives only on the top-level mirror.
     state.pause = pause
     state.updated_at = now
+  } else {
+    return state
   }
 
   return writeBoulderState(directory, state) ? state : null
@@ -150,10 +118,17 @@ export function clearBoulderPause(
   }
 
   const normalizedSessionId = normalizeSessionId(input.sessionId)
-  const owningWorkId = getWorkForSession(directory, input.sessionId)?.work_id
+  const owningWork = getWorkForSession(directory, input.sessionId)
+  if (!owningWork) {
+    return state
+  }
+  const owningWorkId = owningWork.work_id
   const targetWork = owningWorkId ? state.works?.[owningWorkId] : undefined
 
-  // Match the lookup path used by isBoulderPausedForSession() so clear/set stay symmetric.
+  if (!targetWork && state.works) {
+    return state
+  }
+
   const pause = targetWork?.pause ?? state.pause
   if (pause?.reason !== input.reason || pause.session_id !== normalizedSessionId) {
     return state
@@ -206,7 +181,7 @@ export function addBoulderWork(
     return null
   }
 
-  const workId = generateWorkId(getPlanName(input.planPath))
+  const workId = generateBoulderWorkId(getPlanName(input.planPath))
   const startedAt = input.startedAt ?? nowIsoString()
   const normalizedSessionId = normalizeSessionId(input.sessionId)
   const nextWork: BoulderWorkState = {

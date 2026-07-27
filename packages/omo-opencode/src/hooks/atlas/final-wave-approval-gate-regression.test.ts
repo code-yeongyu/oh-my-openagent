@@ -315,7 +315,11 @@ session_id: ses_nested_scope_review
     await atlasHook.handler({
       event: {
         type: "message.updated",
-        properties: { sessionID, info: { role: "user" } },
+        properties: {
+          sessionID,
+          info: { id: "msg-final-wave-approval", role: "user" },
+          parts: [{ type: "text", text: "Continue after final-wave approval." }],
+        },
       },
     })
     expect(readBoulderState(testDirectory)?.pause).toBeUndefined()

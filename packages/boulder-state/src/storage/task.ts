@@ -15,7 +15,7 @@ export function upsertTaskSessionState(
   },
 ): BoulderState | null {
   const stateForWork = readBoulderState(directory)
-  if (stateForWork?.active_work_id) {
+  if (stateForWork?.active_work_id && stateForWork.works?.[stateForWork.active_work_id]) {
     return upsertTaskSessionStateForWork(directory, stateForWork.active_work_id, input)
   }
 

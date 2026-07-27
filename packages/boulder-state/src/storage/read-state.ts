@@ -173,15 +173,8 @@ export function isBoulderPausedForSession(
   directory: string,
   input: { sessionId: string; reason: BoulderPauseReason },
 ): boolean {
-  const state = readBoulderState(directory)
-  if (!state) {
-    return false
-  }
-
-  const normalizedSessionId = normalizeSessionId(input.sessionId)
   const work = getWorkForSession(directory, input.sessionId)
-  const pause = work?.pause ?? state.pause
-  return pause?.reason === input.reason && pause.session_id === normalizedSessionId
+  return work?.pause?.reason === input.reason
 }
 
 export function getWorkResumeOptions(directory: string): BoulderWorkResumeOption[] {

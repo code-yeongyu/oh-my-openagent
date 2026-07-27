@@ -1,0 +1,7 @@
+{
+  "syntheticAttachmentTextPreservedCorrelation": true,
+  "attachmentPreservedCorrelation": true,
+  "laterTextCleared": true,
+  "unknownCouldNotMutatePause": true,
+  "untrackedUsedStandaloneVerification": true
+}

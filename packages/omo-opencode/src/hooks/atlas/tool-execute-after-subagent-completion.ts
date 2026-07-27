@@ -96,8 +96,11 @@ export async function handleSubagentCompletionAfter(input: {
   const gitStats = collectGitDiffStatsImpl(verificationDirectory)
   const fileChanges = formatFileChangesImpl(gitStats)
   const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(outputStr)
+  const owningWork = boulderState && toolInput.sessionID
+    ? getWorkForSession(ctx.directory, toolInput.sessionID)
+    : null
 
-  if (!boulderState) {
+  if (!boulderState || (toolInput.sessionID !== undefined && !owningWork)) {
     const lineageSessionIDs = toolInput.sessionID ? [toolInput.sessionID] : []
     const subagentSessionId = await validateSubagentSessionId({
       client: ctx.client,
@@ -118,9 +121,7 @@ export async function handleSubagentCompletionAfter(input: {
     return
   }
 
-  const sessionWork = toolInput.sessionID
-    ? getWorkForSession(ctx.directory, toolInput.sessionID)
-    : null
+  const sessionWork = boulderState.works ? owningWork : null
   const planPath = sessionWork
     ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
     : resolveBoulderPlanPath(ctx.directory, boulderState)

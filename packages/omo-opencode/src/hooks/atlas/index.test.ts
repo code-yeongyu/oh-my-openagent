@@ -154,7 +154,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -215,7 +215,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -254,7 +254,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "metadata-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -339,7 +339,7 @@ session_id: ses_standalone_def
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "complete-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -376,7 +376,7 @@ session_id: ses_standalone_def
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -412,7 +412,7 @@ session_id: ses_standalone_def
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -489,7 +489,7 @@ session_id: ses_standalone_def
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "my-feature",
       }
       writeBoulderState(TEST_DIR, state)
@@ -526,7 +526,7 @@ session_id: ses_standalone_def
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -567,7 +567,7 @@ session_id: ses_standalone_def
       writeBoulderState(TEST_DIR, {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "background-cleanup-plan",
       })
 
@@ -627,7 +627,7 @@ session_id: ses_standalone_def
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID, "session-1"],
         plan_name: "task-session-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -678,7 +678,7 @@ session_id: ses_auth_flow_123
       writeBoulderState(TEST_DIR, {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID, "session-1"],
         plan_name: "stable-task-key-plan",
       })
 
@@ -738,7 +738,7 @@ session_id: ses_auth_flow_123
       writeBoulderState(TEST_DIR, {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "cross-task-resume-plan",
       })
 
@@ -791,7 +791,7 @@ session_id: ses_old_task_111
       writeBoulderState(TEST_DIR, {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "explicit-resume-reminder-plan",
         task_sessions: {
           "todo:2": {
@@ -848,7 +848,7 @@ session_id: ses_old_task_111
       writeBoulderState(TEST_DIR, {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "parallel-task-collision-plan",
       })
 
@@ -925,7 +925,7 @@ session_id: ses_parallel_collision_222
       writeBoulderState(TEST_DIR, {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "untrusted-session-id-plan",
       })
 
@@ -982,7 +982,7 @@ session_id: ses_untrusted_999
         const state: BoulderState = {
           active_plan: planPath,
           started_at: "2026-01-02T10:00:00Z",
-          session_ids: ["session-1"],
+          session_ids: [COMPLETION_GATE_SESSION],
           plan_name: "test-plan",
         }
         writeBoulderState(TEST_DIR, state)
@@ -1017,7 +1017,7 @@ session_id: ses_untrusted_999
         const state: BoulderState = {
           active_plan: planPath,
           started_at: "2026-01-02T10:00:00Z",
-          session_ids: ["session-1"],
+          session_ids: [COMPLETION_GATE_SESSION],
           plan_name: "test-plan",
         }
         writeBoulderState(TEST_DIR, state)

@@ -1,24 +1,41 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isSyntheticOrInternalTextPart } from "../../shared/internal-initiator-marker"
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { createGoalHook } from "./index"
 
-function makePluginInput(): PluginInput {
-  return {
+type PromptCall = {
+  readonly body: {
+    readonly parts: Array<{ type?: string; text?: string; synthetic?: boolean }>
+  }
+}
+
+function unsafeTestValue<T>(value: unknown): T {
+  return value as T
+}
+
+function makePluginInput(promptCalls: PromptCall[] = []): PluginInput {
+  return unsafeTestValue<PluginInput>({
     directory: mkdtempSync(join(tmpdir(), "goal-hook-")),
     client: {
       session: {
-        messages: {
-          create: async () => ({ id: "msg-1" }),
+        promptAsync: async (input: PromptCall) => {
+          promptCalls.push(input)
+          return { id: "msg-1" }
         },
       },
     },
-  } as unknown as PluginInput
+  })
 }
 
 describe("createGoalHook", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   test("setGoal and getGoal round trip", () => {
     const ctx = makePluginInput()
     const hook = createGoalHook(ctx, { projectDir: ctx.directory })
@@ -50,13 +67,15 @@ describe("createGoalHook", () => {
   })
 
   test("session.idle injects continuation for active goal", async () => {
-    const ctx = makePluginInput()
+    const promptCalls: PromptCall[] = []
+    const ctx = makePluginInput(promptCalls)
     const hook = createGoalHook(ctx, { projectDir: ctx.directory })
     hook.setGoal("s1", "Ship it")
 
     await hook.event({ event: { type: "session.idle", properties: { sessionID: "s1" } } })
 
-    // No crash; injection is best-effort.
+    expect(promptCalls).toHaveLength(1)
+    expect(isSyntheticOrInternalTextPart(promptCalls[0]?.body.parts[0] ?? {})).toBe(true)
     expect(hook.getGoal("s1")?.status).toBe("active")
   })
 
