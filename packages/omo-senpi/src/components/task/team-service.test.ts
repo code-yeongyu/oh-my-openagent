@@ -148,7 +148,7 @@ describe("createTeamService curated agent gating", () => {
     const omoConfig = loadOmoConfig({ cwd }).config
     const engine = composeTaskEngine({ pi, omoConfig, cwd, sharedParentTools: () => [] })
     engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "lead-session" } })
-    expect(Object.keys(engine.agents)).toContain("oracle")
+    expect(Object.keys(engine.agents)).toContain("momus")
     const service = createTeamService({
       manager: engine.manager,
       runtime: engine.runtime,
@@ -163,10 +163,10 @@ describe("createTeamService curated agent gating", () => {
       service.createTeam({
         inlineSpec: {
           name: "curated-team",
-          members: [{ name: "oracle", kind: "subagent_type", subagent_type: "oracle", prompt: "review the plan" }],
+          members: [{ name: "momus", kind: "subagent_type", subagent_type: "momus", prompt: "review the plan" }],
         },
       }),
-    ).rejects.toThrow('curated read-only agent "oracle" cannot be a team member; delegate via the task tool instead')
+    ).rejects.toThrow('curated read-only agent "momus" cannot be a team member; delegate via the task tool instead')
   })
 })
 

@@ -195,6 +195,8 @@ export {
   resolveToolRule,
 } from "./agents"
 export type {
+  AgentModelCandidate,
+  AgentModelEntry,
   AgentModelUnavailableResult,
   AgentNotFoundResult,
   AgentResolutionResult,

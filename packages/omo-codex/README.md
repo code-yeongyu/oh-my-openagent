@@ -96,9 +96,9 @@ codegraph daemon   # interactive list of running daemons; pick one and press ent
 
 An ambient `CODEGRAPH_NO_DAEMON=1` in the environment still forces daemon-off when `codegraph.daemon` is `true`.
 
-### Process hygiene and the CodeGraph 1.4.1 upgrade
+### Process hygiene and the CodeGraph 1.5.0 upgrade
 
-CodeGraph is pinned to 1.4.1. Project stores built by older versions migrate automatically on first use; no manual re-index is needed.
+CodeGraph is pinned to 1.5.0. Managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index.
 
 Process lifecycle is self-cleaning and always on (no config keys):
 

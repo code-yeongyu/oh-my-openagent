@@ -163,7 +163,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "quick",
-    config: { model: "openai/gpt-5.4-mini" },
+    config: { model: "apitopia/kimi-for-coding-highspeed" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
   },

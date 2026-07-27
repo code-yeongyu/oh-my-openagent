@@ -9,22 +9,22 @@ import { executeCodegraphSessionStartHook, type WorkerSpawnInvocation } from "..
 
 const pluginRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 
-// Observed verbatim from a REAL codegraph 1.4.1 binary running `status --json` (exit 0)
+// Observed verbatim from a REAL codegraph 1.5.0 binary running `status --json` (exit 0)
 // against a project store built by a REAL codegraph 1.0.1 binary
-// (see .omo/evidence/codegraph-daemon-process-hygiene/task-2-store-upgrade.txt).
+// (see .omo/evidence/20260727-codegraph-1.5.0-bump/README.md).
 const MIGRATED_1_0_1_STORE_STATUS_JSON = JSON.stringify({
 	initialized: true,
-	version: "1.4.1",
-	projectPath: "/private/tmp/cg-task2/fixture",
-	indexPath: "/private/tmp/cg-task2/fixture/.codegraph",
-	lastIndexed: "2026-07-21T04:28:09.593Z",
-	fileCount: 2,
-	nodeCount: 5,
-	edgeCount: 4,
-	dbSizeBytes: 159744,
+	version: "1.5.0",
+	projectPath: "/private/tmp/omo-codegraph-store-upgrade-101-to-150",
+	indexPath: "/private/tmp/omo-codegraph-store-upgrade-101-to-150/.codegraph",
+	lastIndexed: "2026-07-27T08:27:41.599Z",
+	fileCount: 1,
+	nodeCount: 3,
+	edgeCount: 3,
+	dbSizeBytes: 143360,
 	backend: "node-sqlite",
 	journalMode: "wal",
-	nodesByKind: { file: 2, function: 3 },
+	nodesByKind: { file: 1, function: 2 },
 	languages: ["typescript"],
 	pendingChanges: { added: 0, modified: 0, removed: 0 },
 	worktreeMismatch: null,
@@ -88,8 +88,8 @@ function isProcessAlive(pid: number): boolean {
 	}
 }
 
-describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1.4.1 binary", () => {
-	it("#given a real 1.4.1 status payload for a migrated 1.0.1 store #when SessionStart probes via the default probe #then it stays silent without spawning a re-init worker", async () => {
+describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1.5.0 binary", () => {
+	it("#given a real 1.5.0 status payload for a migrated 1.0.1 store #when SessionStart probes via the default probe #then it stays silent without spawning a re-init worker", async () => {
 		// given
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];

@@ -6,7 +6,7 @@ const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/
 const EXPECTED_PLATFORMS = ["darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64", "win32-arm64", "win32-x64"] as const
 
 describe("CODEGRAPH_PROVISION_MANIFEST", () => {
-  it("pins CodeGraph 1.4.1 across the manifest version and every asset URL", () => {
+  it("pins CodeGraph 1.5.0 across the manifest version and every asset URL", () => {
     // given
     const manifest = CODEGRAPH_PROVISION_MANIFEST
 
@@ -15,11 +15,11 @@ describe("CODEGRAPH_PROVISION_MANIFEST", () => {
     const urls = Object.values(manifest.assets).map((asset) => asset.url)
 
     // then
-    expect(CODEGRAPH_PINNED_VERSION).toBe("1.4.1")
-    expect(manifest.version).toBe("1.4.1")
+    expect(CODEGRAPH_PINNED_VERSION).toBe("1.5.0")
+    expect(manifest.version).toBe("1.5.0")
     expect(platforms).toEqual([...EXPECTED_PLATFORMS].sort())
     for (const url of urls) {
-      expect(url).toContain("1.4.1")
+      expect(url).toContain("1.5.0")
     }
   })
 
@@ -51,25 +51,25 @@ describe("CODEGRAPH_PROVISION_MANIFEST", () => {
 
     // then
     expect(win32Arm64?.url).toBe(
-      "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.4.1.tgz",
+      "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.5.0.tgz",
     )
     expect(win32X64?.url).toBe(
-      "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.4.1.tgz",
+      "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.5.0.tgz",
     )
     expect(win32Arm64?.executableName).toBe("codegraph.cmd")
     expect(win32X64?.executableName).toBe("codegraph.cmd")
 
     expect(darwinArm64?.url).toBe(
-      "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-darwin-arm64.tar.gz",
+      "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-darwin-arm64.tar.gz",
     )
     expect(darwinX64?.url).toBe(
-      "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-darwin-x64.tar.gz",
+      "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-darwin-x64.tar.gz",
     )
     expect(linuxArm64?.url).toBe(
-      "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-linux-arm64.tar.gz",
+      "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-linux-arm64.tar.gz",
     )
     expect(linuxX64?.url).toBe(
-      "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-linux-x64.tar.gz",
+      "https://github.com/colbymchenry/codegraph/releases/download/v1.5.0/codegraph-linux-x64.tar.gz",
     )
   })
 })

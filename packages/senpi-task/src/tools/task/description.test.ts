@@ -6,7 +6,7 @@ import type { AgentDefinition } from "../../agents"
 import { TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskToolDescription } from "./description"
 
 const agents: Readonly<Record<string, AgentDefinition>> = {
-  oracle: { name: "oracle", description: "Deep reasoning" },
+  momus: { name: "momus", description: "Deep reasoning" },
 }
 
 describe("buildTaskToolDescription", () => {
@@ -58,7 +58,7 @@ describe("buildTaskToolDescription", () => {
     const description = buildTaskToolDescription({ omoConfig: config, agents })
 
     // then
-    expect(description).toContain("oracle")
+    expect(description).toContain("momus")
   })
 
   test("#given the prompt surfaces #when read #then snippet and guidelines are present", () => {

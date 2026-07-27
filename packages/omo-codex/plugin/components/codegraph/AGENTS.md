@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-`@sisyphuslabs/codex-codegraph` (private, Node >=20, bin `omo-codegraph`). Wraps the external CodeGraph CLI (`@colbymchenry/codegraph`, pinned `1.0.1` as optionalDependency + `CODEGRAPH_VERSION` constant) behind a stdio MCP server plus Codex lifecycle hooks. Two committed dists ship in the published payload; rebuild `dist/` in the same change as `src/` edits.
+`@sisyphuslabs/codex-codegraph` (private, Node >=20, bin `omo-codegraph`). Wraps the external CodeGraph CLI (`@colbymchenry/codegraph`, pinned `1.5.0` through the shared `CODEGRAPH_PINNED_VERSION` and the component optionalDependency) behind a stdio MCP server plus Codex lifecycle hooks. Two committed dists ship in the published payload; rebuild `dist/` in the same change as `src/` edits.
 
 Codex wiring (all repo-relative to `packages/omo-codex/plugin/`):
 - **MCP:** `.mcp.json` server `codegraph` → `node components/codegraph/dist/serve.js` (`required: false`).
@@ -46,7 +46,7 @@ Hook pipeline (`src/hook.ts` + `src/session-start-worker.ts`): `hook session-sta
 
 - This component tests with `bun test` (unlike the vitest-based `lsp` sibling); given/when/then style.
 - `src/` imports reach sibling packages via relative paths (`../../../../../utils/src/...`); they are inlined by `bun build`, so runtime `dist/` has zero deps beyond Node.
-- `CODEGRAPH_VERSION` is duplicated in `serve.ts` and `session-start-worker.ts` and must match the `@colbymchenry/codegraph` optionalDependency version.
+- `serve.ts` and `session-start-worker.ts` derive `CODEGRAPH_VERSION` from the shared `CODEGRAPH_PINNED_VERSION`; the component optionalDependency must match that pin.
 - `trustedCodegraphInstallDir` overrides the `~/.omo/codegraph` install dir and is forwarded to children as `CODEGRAPH_INSTALL_DIR`.
 - `resolution.source === "env"` is never auto-provisioned over: a user-set `OMO_CODEGRAPH_BIN` pointing at a missing file skips the MCP instead of silently substituting a download.
 - `runBridgedCodegraphProcess` awaits every stdio write and races `childExit` against response forwarding; a forwarding error (e.g. parent stdout `EPIPE`) rejects the serve promise, destroys the child pipes, and `SIGKILL`s the codegraph child if still alive so a held-open child is never orphaned. Pinned by `test/serve-mcp-bridge-lifecycle.test.ts` and the held-open case in `test/serve-mcp-bridge.test.ts`.

@@ -13,7 +13,7 @@ export const TaskToolParams = Type.Object({
     Type.String({ description: "Category name to route through Sisyphus-Junior. Mutually exclusive with subagent_type; required unless subagent_type is given." }),
   ),
   subagent_type: Type.Optional(
-    Type.String({ description: "Agent name to invoke directly (e.g. oracle). Mutually exclusive with category; required unless category is given." }),
+    Type.String({ description: "Agent name to invoke directly (e.g. momus). Mutually exclusive with category; required unless category is given." }),
   ),
   run_in_background: Type.Optional(
     Type.Boolean({ description: "true returns a child task id immediately; false (default) waits and returns the final response." }),

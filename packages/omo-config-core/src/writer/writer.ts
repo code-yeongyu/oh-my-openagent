@@ -52,7 +52,7 @@ function writeBackup(path: string, content: string, fileSystem: typeof DEFAULT_W
 function resolveWritePath(options: UpdateOmoConfigOptions): string {
   const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
   if (options.scope === "user") {
-    const jsoncPath = resolveUserOmoConfigPath(options.env, options.platform ?? process.platform)
+    const jsoncPath = resolveUserOmoConfigPath(options.env)
     if (fileSystem.existsSync(jsoncPath)) return jsoncPath
     const jsonPath = join(dirname(jsoncPath), "omo.json")
     return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath

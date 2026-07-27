@@ -360,7 +360,7 @@ tool call replays the entire accumulated context through the model.
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
-`oracle`, `metis`, `momus` work with zero configuration);
+`metis`, `momus` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
 child with skills, `name` to track it. Read a child back with
 `task_output`, steer with `task_send`, park it with
@@ -434,7 +434,7 @@ one line why the tier held.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "oracle"` for read-only
+   assignment in `prompt` — `subagent_type: "momus"` for read-only
    review, or a reviewer-shaped `category` when the review must run
    code. Pass: goal, success-criteria, scenario evidence, full diff,
    notepad path.

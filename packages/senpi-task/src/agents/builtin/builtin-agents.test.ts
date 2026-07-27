@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { BUILTIN_AGENTS, BUILTIN_AGENT_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "./index"
 
-const CURATED_AGENT_NAMES = ["explore", "librarian", "metis", "momus", "oracle"] as const
+const CURATED_AGENT_NAMES = ["explore", "librarian", "metis", "momus"] as const
 
 const EXPECTED_TOOL_ALLOWLIST = [
   "read",
@@ -34,20 +34,20 @@ const FORBIDDEN_PROMPT_TOKENS = [
 ] as const
 
 describe("builtin curated agents", () => {
-  test("#given the builtin defaults #when listing names sorted #then exactly the 5 curated agents are present", () => {
+  test("#given the builtin defaults #when listing names sorted #then exactly the 4 curated agents are present", () => {
     const names = BUILTIN_AGENT_DEFAULTS.map((definition) => definition.name).sort()
     expect(names).toEqual([...CURATED_AGENT_NAMES])
   })
 
-  test("#given the builtin record #when listing keys sorted #then exactly the 5 curated agents are present and map to their definitions", () => {
+  test("#given the builtin record #when listing keys sorted #then exactly the 4 curated agents are present and map to their definitions", () => {
     expect(Object.keys(BUILTIN_AGENTS).sort()).toEqual([...CURATED_AGENT_NAMES])
     for (const name of CURATED_AGENT_NAMES) {
       expect(BUILTIN_AGENTS[name]?.name).toBe(name)
     }
   })
 
-  test("#given the curated name set #when checking membership #then it contains exactly the 5 curated names", () => {
-    expect(CURATED_READONLY_AGENT_NAMES.size).toBe(5)
+  test("#given the curated name set #when checking membership #then it contains exactly the 4 curated names", () => {
+    expect(CURATED_READONLY_AGENT_NAMES.size).toBe(4)
     for (const name of CURATED_AGENT_NAMES) {
       expect(CURATED_READONLY_AGENT_NAMES.has(name)).toBe(true)
     }

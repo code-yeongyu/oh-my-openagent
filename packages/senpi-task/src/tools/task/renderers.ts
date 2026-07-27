@@ -29,6 +29,7 @@ type LinesComponent = {
 type WidthAwareLines = (width: number) => readonly string[]
 
 type RendererTheme = Pick<Theme, "fg" | "italic">
+type ModelIdentity = Pick<TaskToolDetails, "model" | "resolved_model">
 
 const STATUS_COLORS: Readonly<Record<string, ThemeColor>> = {
   completed: "success",
@@ -98,7 +99,7 @@ function taskTargetToken(args: Pick<TaskToolDetails, "category" | "subagent_type
   return target === "task" ? undefined : target
 }
 
-function resolvedModelToken(details: TaskToolDetails): string | undefined {
+function resolvedModelToken(details: ModelIdentity): string | undefined {
   const resolved = details.resolved_model
   if (resolved === undefined) return formatResolvedModel(details.model)
 
@@ -147,6 +148,8 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
   return joinRendererTokens([
     "item",
     name === undefined ? undefined : `name:${name}`,
+    taskTargetToken(item),
+    resolvedModelToken(item),
     formatTaskStatus(item.status),
     taskId === undefined ? undefined : `id:${taskId}`,
     item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
@@ -183,7 +186,7 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
   return line
 }
 
-function compactResolvedModelToken(details: TaskToolDetails, maxWidth: number): string | undefined {
+function compactResolvedModelToken(details: ModelIdentity, maxWidth: number): string | undefined {
   const resolved = details.resolved_model
   if (resolved === undefined) return formatResolvedModel(details.model)
   const reasoning = optionalRendererText(resolved.reasoning_effort)

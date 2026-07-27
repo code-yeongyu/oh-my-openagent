@@ -1029,7 +1029,7 @@ describe("shouldDeleteAgentConfig", () => {
     // given: Config with fields matching category defaults
     const config = {
       category: "visual-engineering",
-      model: "google/gemini-3.1-pro",
+      model: "anthropic/claude-opus-5",
     }
 
     // when: Check if config should be deleted

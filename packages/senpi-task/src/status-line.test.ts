@@ -46,7 +46,7 @@ describe("formatStatusTarget", () => {
 
   test("#given only an agent type #when formatted #then the agent name is the target", () => {
     // given / when / then
-    expect(formatStatusTarget({ agentType: "oracle" })).toBe("oracle")
+    expect(formatStatusTarget({ agentType: "momus" })).toBe("momus")
   })
 
   test("#given model metadata with terminal controls #when formatted #then every part is normalized", () => {

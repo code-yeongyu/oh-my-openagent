@@ -5,7 +5,7 @@ import { cwd as processCwd, env as processEnv, execPath as processExecPath, stde
 
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
-import { resolvePinnedCodegraphBin } from "../../../../../utils/src/codegraph/managed-runtime.ts";
+import { hasCodegraphManagedInstall, resolvePinnedCodegraphBin } from "../../../../../utils/src/codegraph/managed-runtime.ts";
 import { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
@@ -38,8 +38,10 @@ type CodegraphBootstrapConfig = CodegraphConfig & {
 const defaultDeps: CodegraphSessionStartDeps = {
 	ensureGitignored: ensureCodegraphGitignored,
 	ensureProvisioned: ensureCodegraphProvisioned,
+	managedInstallExists: hasCodegraphManagedInstall,
 	prepareWorkspace: prepareCodegraphWorkspace,
 	resolveCommand: resolveCodegraphCommand,
+	resolveManagedBin: provisionedBinFromInstallDir,
 	runCommand: runCodegraphCommand,
 };
 
@@ -59,7 +61,13 @@ export async function runCodegraphSessionStartWorker(options: SessionStartWorker
 		...(config.codegraph ?? {}),
 		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
 	};
-	return runBootstrap(projectRoot, bootstrapConfig, env, homeDir, nodeSupport, { ...defaultDeps, ...options.deps }, logOutcome);
+	const customResolutionDeps = options.deps?.resolveCommand === undefined
+		? {}
+		: {
+			managedInstallExists: options.deps.managedInstallExists ?? (() => false),
+			resolveManagedBin: options.deps.resolveManagedBin ?? (() => null),
+		};
+	return runBootstrap(projectRoot, bootstrapConfig, env, homeDir, nodeSupport, { ...defaultDeps, ...customResolutionDeps, ...options.deps }, logOutcome);
 }
 
 async function runBootstrap(
@@ -113,14 +121,24 @@ async function resolveOrProvisionCommand(
 	nodeSupport: CodegraphNodeSupport,
 ): Promise<ResolutionResult> {
 	const trustedInstallDir = config.trustedCodegraphInstallDir;
-	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(trustedInstallDir) });
+	const installDir = trustedInstallDir ?? join(homeDir, ".omo", "codegraph");
+	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(installDir) });
+	const managedBin = deps.resolveManagedBin(installDir);
+	if (resolved.source !== "env" && managedBin !== null) {
+		return { kind: "resolved", resolution: { argsPrefix: [], command: managedBin, exists: true, source: "provisioned" } };
+	}
+	if (resolved.source !== "env" && config.auto_provision !== false && deps.managedInstallExists(installDir)) {
+		const upgraded = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, ".locks"), version: CODEGRAPH_VERSION });
+		if (upgraded.provisioned && upgraded.binPath !== undefined) {
+			return { kind: "resolved", resolution: { argsPrefix: [], command: upgraded.binPath, exists: true, source: "provisioned" } };
+		}
+	}
 	if (resolved.exists && canUseResolvedCommand(resolved, nodeSupport)) {
 		return { kind: "resolved", resolution: resolved };
 	}
 	if (resolved.exists && config.auto_provision === false) return { kind: "unsupported-node" };
 	if (config.auto_provision === false) return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
 
-	const installDir = trustedInstallDir ?? join(homeDir, ".omo", "codegraph");
 	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, ".locks"), version: CODEGRAPH_VERSION });
 	if (!provisioned.provisioned || provisioned.binPath === undefined) {
 		return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };

@@ -63,7 +63,7 @@ describe("createTaskChildPlanner", () => {
     })
   })
 
-  test("#given ultrabrain falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata", () => {
+  test("#given visual-engineering falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata", () => {
     // given
     const planner = createTaskChildPlanner(
       {},
@@ -76,7 +76,7 @@ describe("createTaskChildPlanner", () => {
       prompt: "Think hard.",
       parent_session_id: "parent-1",
       depth: 0,
-      category: "ultrabrain",
+      category: "visual-engineering",
     })
 
     // then
@@ -177,7 +177,7 @@ describe("createTaskChildPlanner", () => {
       prompt: "Review this design.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "oracle",
+      subagent_type: "momus",
       model: "openai/gpt-5.5",
     })
 
@@ -190,7 +190,7 @@ describe("createTaskChildPlanner", () => {
       model_id: "gpt-5.5",
       display: "openai/gpt-5.5",
     })
-    expect(resolved.plan.agentType).toBe("oracle")
+    expect(resolved.plan.agentType).toBe("momus")
     expect(resolved.plan.instructions).toBeDefined()
     expect(resolved.plan.toolAllowlist).toHaveLength(9)
     expect(resolved.plan.agentExecutionMode).toBe("in-process")
@@ -231,13 +231,13 @@ describe("createTaskChildPlanner", () => {
       prompt: "Think hard.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "ultrabrain",
+      subagent_type: "visual-engineering",
     })
 
     // then
     const resolved = expectResolved(result)
     expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "google" })
-    expect(resolved.plan.category).toBe("ultrabrain")
+    expect(resolved.plan.category).toBe("visual-engineering")
   })
 
   test("#given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available", () => {
@@ -266,7 +266,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement", () => {
     // given
-    const agents = { ...BUILTIN_AGENTS, oracle: { name: "oracle", disable: true } }
+    const agents = { ...BUILTIN_AGENTS, momus: { name: "momus", disable: true } }
     const planner = createTaskChildPlanner({}, agents, () => undefined)
 
     // when
@@ -274,14 +274,14 @@ describe("createTaskChildPlanner", () => {
       prompt: "Review this design.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "oracle",
+      subagent_type: "momus",
       model: "openai/gpt-5.5",
     })
 
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis"])
   })
 
   test("#given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories", () => {
@@ -303,7 +303,7 @@ describe("createTaskChildPlanner", () => {
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
     expect(result.error.availableCategories).toContain("ultrabrain")
   })
 
@@ -327,7 +327,7 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.message).toContain('No available model for agent "explore"')
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
   })
 })
 
@@ -373,7 +373,7 @@ describe("createTaskChildPlanner plan variant", () => {
       prompt: "Think hard.",
       parent_session_id: "parent-1",
       depth: 0,
-      category: "ultrabrain",
+      category: "visual-engineering",
     })
 
     // then

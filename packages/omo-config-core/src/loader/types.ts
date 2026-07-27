@@ -21,10 +21,8 @@ export type OmoConfigSource = {
 
 export type OmoConfigEnv = {
   readonly [key: string]: string | undefined
-  readonly APPDATA?: string
   readonly HOME?: string
   readonly USERPROFILE?: string
-  readonly XDG_CONFIG_HOME?: string
 }
 
 export type OmoConfigReadFileSystem = {

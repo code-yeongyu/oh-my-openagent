@@ -65,7 +65,7 @@ export class IdleInjectionCoordinator {
     })
   }
 
-  // Immediate coalesced flush for an IDLE parent. A microtask is soon enough to land the follow-up before
+  // Immediate coalesced flush for an IDLE parent. A microtask is soon enough to land the steer before
   // senpi's print mode can decide the session is over (the windowed timer is not - live-driver proven),
   // while still batching every notification that becomes ready in the same tick into one injection.
   flushSoon(): void {
@@ -85,9 +85,9 @@ export class IdleInjectionCoordinator {
     return this.#pending.delete(key)
   }
 
-  // Flush the whole queue as one idle-edge follow-up. Returns how many queued items were collapsed (0 = no-op).
+  // Flush the whole queue as one idle-edge steer. Returns how many queued items were collapsed (0 = no-op).
   flushOnIdle(): number {
-    return this.#flush("followUp")
+    return this.#flush("steer")
   }
 
   #flush(deliverAs: "steer" | "followUp"): number {

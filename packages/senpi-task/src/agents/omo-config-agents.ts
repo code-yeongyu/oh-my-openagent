@@ -28,6 +28,8 @@ function toAgentDefinition(name: string, def: OmoAgentDef): AgentDefinition {
     ...(def.prompt === undefined ? {} : { prompt: def.prompt }),
     ...(def.model === undefined ? {} : { model: def.model }),
     ...(def.models === undefined ? {} : { models: def.models }),
+    ...(def.variant === undefined ? {} : { variant: def.variant }),
+    ...(def.reasoningEffort === undefined ? {} : { reasoningEffort: def.reasoningEffort }),
     ...(def.temperature === undefined ? {} : { temperature: def.temperature }),
     ...(tools === undefined ? {} : { tools }),
     ...(def.disable === undefined ? {} : { disable: def.disable }),

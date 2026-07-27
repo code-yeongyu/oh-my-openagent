@@ -69,7 +69,7 @@ describe("child task progress", () => {
 
   test("#given a running tool #when composed #then the activity names the tool and pluralizes tool counts", () => {
     // given
-    const progress = createChildProgress("st_00000002", { agentType: "oracle" }, 1_000, () => 2_000)
+    const progress = createChildProgress("st_00000002", { agentType: "momus" }, 1_000, () => 2_000)
 
     // when
     progress.accept({ type: "tool_execution_start", toolName: "read", args: { path: "a.ts" } })
@@ -82,7 +82,7 @@ describe("child task progress", () => {
 
     // then
     const details = progress.details()
-    expect(details.progress.activity).toBe("st_00000002 · oracle · turn 1 (2 tools) · running grep TODO")
+    expect(details.progress.activity).toBe("st_00000002 · momus · turn 1 (2 tools) · running grep TODO")
     expect(details.currentTool).toBe("grep TODO")
     expect(details.toolCalls).toBe(2)
   })

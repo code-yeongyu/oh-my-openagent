@@ -68,6 +68,10 @@ export type ResolvedSpawnItem =
 export type TaskToolItemDetail = {
   readonly task_id: string
   readonly name?: string
+  readonly category?: string
+  readonly subagent_type?: string
+  readonly model?: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly status: string
   readonly error_message?: string
   readonly queue_position?: number

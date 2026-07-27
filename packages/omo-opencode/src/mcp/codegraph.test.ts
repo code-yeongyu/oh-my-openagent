@@ -4,7 +4,7 @@ import { describe, expect, it } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { CODEGRAPH_NO_DAEMON_ENV, CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
+import { CODEGRAPH_NO_DAEMON_ENV, CODEGRAPH_PINNED_VERSION, CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
 import { createCodegraphMcpConfig } from "./codegraph"
 import type { RuntimeExecutable } from "./runtime-executable"
 
@@ -161,12 +161,12 @@ describe("createCodegraphMcpConfig", () => {
     // given
     const installDir = mkdtempSync(join(tmpdir(), "omo-codegraph-custom-install-"))
     const provisionedPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
-    const markerPath = join(installDir, ".provisioned", "codegraph-1.4.1.json")
+    const markerPath = join(installDir, ".provisioned", `codegraph-${CODEGRAPH_PINNED_VERSION}.json`)
     const nodePath = "/opt/node22/bin/node"
     mkdirSync(join(installDir, "bin"), { recursive: true })
     mkdirSync(join(installDir, ".provisioned"), { recursive: true })
     writeFileSync(provisionedPath, "")
-    writeFileSync(markerPath, `${JSON.stringify({ binPath: provisionedPath, version: "1.4.1" })}\n`)
+    writeFileSync(markerPath, `${JSON.stringify({ binPath: provisionedPath, version: CODEGRAPH_PINNED_VERSION })}\n`)
 
     try {
       // when

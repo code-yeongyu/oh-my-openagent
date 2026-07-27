@@ -3,12 +3,27 @@ import * as z from "zod"
 import { ToolsInputSchema, normalizeToolRules } from "./tools"
 import type { AgentDefinition, AgentDefinitionInput } from "./types"
 
+// Same effort levels omo-config-core enforces, so the markdown-frontmatter and overlay paths cannot
+// accept a value asSenpiThinkingLevel would silently drop.
+const ReasoningEffortSchema = z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"])
+
+const AgentModelEntrySchema = z.union([
+  z.string(),
+  z.object({
+    model: z.string(),
+    variant: z.string().optional(),
+    reasoningEffort: ReasoningEffortSchema.optional(),
+  }).passthrough(),
+])
+
 export const RawAgentDefinitionSchema = z.object({
   description: z.string().optional(),
   prompt: z.string().optional(),
   mode: z.string().optional(),
   model: z.string().optional(),
-  models: z.array(z.string()).optional(),
+  models: z.array(AgentModelEntrySchema).optional(),
+  variant: z.string().optional(),
+  reasoningEffort: ReasoningEffortSchema.optional(),
   temperature: z.number().min(0).max(2).optional(),
   tools: ToolsInputSchema.optional(),
   disable: z.boolean().optional(),
@@ -47,6 +62,8 @@ export function normalizeAgentDefinition(
     ...(raw.mode === undefined ? {} : { mode: raw.mode }),
     ...(raw.model === undefined ? {} : { model: raw.model }),
     ...(raw.models === undefined ? {} : { models: raw.models }),
+    ...(raw.variant === undefined ? {} : { variant: raw.variant }),
+    ...(raw.reasoningEffort === undefined ? {} : { reasoningEffort: raw.reasoningEffort }),
     ...(raw.temperature === undefined ? {} : { temperature: raw.temperature }),
     ...(raw.tools === undefined ? {} : { tools: normalizeToolRules(raw.tools) }),
     ...(raw.disable === undefined ? {} : { disable: raw.disable }),

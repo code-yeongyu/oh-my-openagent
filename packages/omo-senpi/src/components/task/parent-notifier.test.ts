@@ -48,7 +48,15 @@ function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: Idle
 }
 
 const completionDetails = [
-  { task_id: "st_1", name: "worker", status: "completed" as const, duration_ms: 10, final_response: "ok", continuation_hint: "continue" },
+  {
+    task_id: "st_1",
+    name: "worker",
+    status: "completed" as const,
+    model: "quotio-openai/gpt-5.4-mini-fast",
+    duration_ms: 10,
+    final_response: "ok",
+    continuation_hint: "continue",
+  },
 ]
 
 function completionMessage(taskId: string) {
@@ -121,7 +129,7 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(delivered[0]?.content.match(/st_1 completed/g)).toHaveLength(1)
   })
 
-  test("#given an IDLE parent #when two completions land in the same tick #then one microtask followUp carries both", async () => {
+  test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
     const delivered: Delivered[] = []
     const coordinator = new IdleInjectionCoordinator(
@@ -135,9 +143,9 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(delivered).toHaveLength(0)
     await Promise.resolve()
 
-    // then delivery is immediate (no exit race in print mode) and still batched into ONE follow-up
+    // then delivery is immediate (no exit race in print mode) and still batched into ONE steer
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]?.deliverAs).toBe("followUp")
+    expect(delivered[0]?.deliverAs).toBe("steer")
     expect(delivered[0]?.content).toContain("st_1 completed")
     expect(delivered[0]?.content).toContain("st_2 completed")
   })

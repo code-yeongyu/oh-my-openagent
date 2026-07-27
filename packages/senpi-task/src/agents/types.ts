@@ -1,3 +1,5 @@
+import type { AgentModelEntry } from "./agent-model-entry"
+
 export type AgentToolRule = {
   readonly pattern: string
   readonly allow: boolean
@@ -9,7 +11,9 @@ export type AgentDefinition = {
   readonly prompt?: string
   readonly mode?: string
   readonly model?: string
-  readonly models?: readonly string[]
+  readonly models?: readonly AgentModelEntry[]
+  readonly variant?: string
+  readonly reasoningEffort?: string
   readonly temperature?: number
   readonly tools?: readonly AgentToolRule[]
   readonly disable?: boolean

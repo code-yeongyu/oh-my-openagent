@@ -5,10 +5,10 @@ import { AGENT_FALLBACK_CHAINS } from "./fallback-chains"
 // Coupling guard: this test file must NEVER import @oh-my-opencode/model-core.
 // The chains are a hand transcription; the pins below catch transcription drift.
 
-const CURATED_AGENT_NAMES = ["explore", "librarian", "metis", "momus", "oracle"] as const
+const CURATED_AGENT_NAMES = ["explore", "librarian", "metis", "momus"] as const
 
 describe("AGENT_FALLBACK_CHAINS", () => {
-  test("#given the builtin chains #when listing keys #then exactly the 5 curated agent names are present", () => {
+  test("#given the builtin chains #when listing keys #then exactly the 4 curated agent names are present", () => {
     expect(Object.keys(AGENT_FALLBACK_CHAINS).sort()).toEqual([...CURATED_AGENT_NAMES])
   })
 
@@ -33,20 +33,6 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       librarian: 8,
       metis: 5,
       momus: 7,
-      oracle: 5,
-    })
-  })
-
-  test("#given the oracle chain #when reading the head entry #then it is the literal transcribed gpt-5.6-sol xhigh rung", () => {
-    expect(AGENT_FALLBACK_CHAINS.oracle?.[0]).toEqual({
-      providers: ["openai", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "xhigh",
-    })
-    expect(AGENT_FALLBACK_CHAINS.oracle?.[1]).toEqual({
-      providers: ["github-copilot"],
-      model: "gpt-5.6-sol",
-      variant: "high",
     })
   })
 
@@ -74,7 +60,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       ],
       metis: [
         { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
-        { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
+        { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-5", variant: "max" },
         { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
         { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
         { providers: ["kimi-for-coding"], model: "kimi-k3" },
@@ -84,15 +70,8 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
         { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
         { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
-        { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
+        { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-5", variant: "max" },
         { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-        { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
-      ],
-      oracle: [
-        { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
-        { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
-        { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-        { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
         { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
       ],
     })

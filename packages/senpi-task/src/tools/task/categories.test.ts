@@ -53,7 +53,7 @@ describe("listTaskAgents", () => {
   test("#given loaded agent definitions #when listed #then names and descriptions surface, disabled excluded", () => {
     // given
     const agents: Readonly<Record<string, AgentDefinition>> = {
-      oracle: { name: "oracle", description: "Deep reasoning" },
+      momus: { name: "momus", description: "Deep reasoning" },
       hidden: { name: "hidden", description: "n/a", disable: true },
     }
 
@@ -61,7 +61,7 @@ describe("listTaskAgents", () => {
     const listed = listTaskAgents(agents)
 
     // then
-    expect(listed).toContainEqual({ name: "oracle", description: "Deep reasoning" })
+    expect(listed).toContainEqual({ name: "momus", description: "Deep reasoning" })
     expect(listed.map((entry) => entry.name)).not.toContain("hidden")
   })
 })

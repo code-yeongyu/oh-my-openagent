@@ -17,18 +17,18 @@ describe("validateTaskTarget", () => {
 
   test("#given only subagent_type #when validated #then resolves to a subagent selection", () => {
     // given
-    const params = { prompt: "do it", subagent_type: "oracle" }
+    const params = { prompt: "do it", subagent_type: "momus" }
 
     // when
     const result = validateTaskTarget(params)
 
     // then
-    expect(result).toEqual({ kind: "subagent_type", subagentType: "oracle" })
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "momus" })
   })
 
   test("#given both category and subagent_type #when validated #then returns a typed both_targets error", () => {
     // given
-    const params = { prompt: "do it", category: "quick", subagent_type: "oracle" }
+    const params = { prompt: "do it", category: "quick", subagent_type: "momus" }
 
     // when
     const result = validateTaskTarget(params)
@@ -207,7 +207,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       category: "quick",
-      tasks: [{ prompt: "one" }, { prompt: "two", subagent_type: "oracle" }],
+      tasks: [{ prompt: "one" }, { prompt: "two", subagent_type: "momus" }],
     }
 
     // when
@@ -223,7 +223,7 @@ describe("resolveSpawnItems", () => {
     expect(inherited.category).toBe("quick")
     expect(suppressed.kind).toBe("subagent_type")
     if (suppressed.kind !== "subagent_type") throw new Error("expected subagent_type")
-    expect(suppressed.subagentType).toBe("oracle")
+    expect(suppressed.subagentType).toBe("momus")
     expect("category" in suppressed).toBe(false)
   })
 
@@ -271,7 +271,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       category: "quick",
-      tasks: [{ prompt: "ok" }, { prompt: "bad", category: "deep", subagent_type: "oracle" }],
+      tasks: [{ prompt: "ok" }, { prompt: "bad", category: "deep", subagent_type: "momus" }],
     }
 
     // when
@@ -294,7 +294,7 @@ describe("batch spawn types", () => {
       prompt: "p",
       load_skills: [],
       kind: "subagent_type",
-      subagentType: "oracle",
+      subagentType: "momus",
     }
     const detail: TaskToolItemDetail = { task_id: "t1", status: "completed" }
 

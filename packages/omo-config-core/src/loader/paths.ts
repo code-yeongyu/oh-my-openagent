@@ -22,32 +22,16 @@ export function resolveHomeDir(env: OmoConfigEnv = process.env): string {
   return resolve(env.HOME ?? env.USERPROFILE ?? process.cwd())
 }
 
-export function resolveUserOmoConfigPath(
-  env: OmoConfigEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-): string {
-  return join(resolveUserOmoConfigDirectory(env, platform), "omo.jsonc")
+export function resolveUserOmoConfigPath(env: OmoConfigEnv = process.env): string {
+  return join(resolveUserOmoConfigDirectory(env), "omo.jsonc")
 }
 
-export function resolveUserOmoConfigDirectory(
-  env: OmoConfigEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-): string {
-  if (platform === "win32" && env.APPDATA !== undefined && env.APPDATA.length > 0) {
-    return join(env.APPDATA, "omo")
-  }
-  if (env.XDG_CONFIG_HOME !== undefined && env.XDG_CONFIG_HOME.length > 0) {
-    return join(env.XDG_CONFIG_HOME, "omo")
-  }
-  return join(resolveHomeDir(env), ".config", "omo")
+export function resolveUserOmoConfigDirectory(env: OmoConfigEnv = process.env): string {
+  return join(resolveHomeDir(env), ".omo")
 }
 
-function detectUserOmoJsonPath(
-  env: OmoConfigEnv,
-  platform: NodeJS.Platform,
-  fileSystem: OmoConfigReadFileSystem,
-): string {
-  const configDir = resolveUserOmoConfigDirectory(env, platform)
+function detectUserOmoJsonPath(env: OmoConfigEnv, fileSystem: OmoConfigReadFileSystem): string {
+  const configDir = resolveUserOmoConfigDirectory(env)
   const jsoncPath = join(configDir, "omo.jsonc")
   if (fileSystem.existsSync(jsoncPath)) return jsoncPath
   const jsonPath = join(configDir, "omo.json")
@@ -83,12 +67,14 @@ export function findProjectConfigPathsFarthestFirst(
   fileSystem: OmoConfigReadFileSystem,
 ): readonly string[] {
   const startDir = resolve(cwd)
-  const stopDir = containsPath(resolve(homeDir), startDir) ? resolve(homeDir) : null
+  const resolvedHomeDir = resolve(homeDir)
+  const stopDir = containsPath(resolvedHomeDir, startDir) ? resolvedHomeDir : null
   const nearestFirst: string[] = []
   let currentDir = startDir
 
   while (true) {
-    const configPath = detectOmoJsonPath(currentDir, fileSystem)
+    // `$HOME/.omo` is the user layer, so the walk must not also claim it as a project layer.
+    const configPath = currentDir === resolvedHomeDir ? null : detectOmoJsonPath(currentDir, fileSystem)
     if (configPath !== null) nearestFirst.push(configPath)
     if (stopDir !== null && currentDir === stopDir) break
     const parentDir = dirname(currentDir)
@@ -103,7 +89,7 @@ export function resolveOmoConfigPaths(options: ResolveOmoConfigPathsOptions): re
   const fileSystem = options.fileSystem ?? DEFAULT_READ_FILE_SYSTEM
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
-  const userPath = detectUserOmoJsonPath(env, platform, fileSystem)
+  const userPath = detectUserOmoJsonPath(env, fileSystem)
   const projectPaths = findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), fileSystem)
   return [
     { path: userPath, scope: "user" },

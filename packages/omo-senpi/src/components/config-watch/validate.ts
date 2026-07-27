@@ -84,7 +84,7 @@ export function createOmoConfigValidator(options: CreateOmoConfigValidatorOption
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
   const loadConfig = options.loadConfig ?? loadOmoConfig
-  const userConfigDirectory = resolveUserOmoConfigDirectory(env, platform)
+  const userConfigDirectory = resolveUserOmoConfigDirectory(env)
   let baseline = new Set(loadConfig({ cwd: options.cwd, env, platform }).diagnostics.map(fingerprintDiagnostic))
   const unresolvedRejected = new Set<string>()
 

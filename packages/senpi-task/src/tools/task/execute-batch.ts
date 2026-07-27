@@ -57,10 +57,13 @@ function itemError(item: ResolvedSpawnItem, taskId: string, message: string): Ta
   }
 }
 
-function startedDetail(start: StartedResult): TaskToolItemDetail {
+function startedDetail(item: ResolvedSpawnItem, start: StartedResult): TaskToolItemDetail {
   return {
     task_id: start.task_id,
     name: start.name,
+    ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
+    ...(item.model === undefined ? {} : { model: item.model }),
+    ...(start.resolved_model === undefined ? {} : { resolved_model: start.resolved_model }),
     status: start.status,
     ...(start.queue_position !== undefined && { queue_position: start.queue_position }),
   }
@@ -116,7 +119,7 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
   const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
-  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.result) : start.detail)
+  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result) : start.detail)
   return result(backgroundText(starts, status), {
     task_id: taskId,
     status,

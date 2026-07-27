@@ -187,13 +187,13 @@ describe("taskResultLines", () => {
       task_id: "st_0000000d",
       status: "completed",
       mode: "spawn",
-      subagent_type: "oracle",
+      subagent_type: "momus",
       model: "openai/manual",
       run_in_background: false,
     }).join(" ")
 
     // then
-    expect(row).toContain("agent:oracle")
+    expect(row).toContain("agent:momus")
     expect(row).toContain("model:openai/manual")
     expect(row).toContain("foreground")
     expect(row).not.toContain("prompt:")

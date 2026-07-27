@@ -32,6 +32,7 @@ describe("omo-senpi extension entry", () => {
       expect.arrayContaining([
         "omo-senpi-ultrawork-disabled",
         "omo-senpi-ulw-loop-disabled",
+        "omo-senpi-fallback-architect-disabled",
         "omo-senpi-comment-checker-disabled",
         "omo-senpi-telemetry-disabled",
         "omo-senpi-lsp-disabled",
@@ -40,7 +41,7 @@ describe("omo-senpi extension entry", () => {
       ]),
     )
     expect(pi.handlers.map((handler) => handler.event)).toEqual(
-      expect.arrayContaining(["input", "tool_result", "session_start"]),
+      expect.arrayContaining(["input", "tool_result", "session_start", "model_select", "message_end"]),
     )
   })
 

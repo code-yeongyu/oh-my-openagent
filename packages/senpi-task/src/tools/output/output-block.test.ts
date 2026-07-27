@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { makeRecord } from "./__fixtures__/records"
-import { runTaskOutput } from "./output"
+import { runTaskOutput, TaskOutputParams } from "./output"
 import type { OutputManager, TaskOutputDeps, TaskOutputToolResult } from "./types"
 
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
@@ -45,6 +45,16 @@ function firstText(result: TaskOutputToolResult): string {
 }
 
 describe("runTaskOutput non-blocking peek", () => {
+  test("#given the task_output schema #when exposed to a model #then blocking controls are absent", () => {
+    // when
+    const properties = TaskOutputParams.properties
+
+    // then
+    expect(properties).not.toHaveProperty("block")
+    expect(properties).not.toHaveProperty("timeout_ms")
+    expect(properties).not.toHaveProperty("wait_for")
+  })
+
   test("#given a running child #when task_output reads its status #then it returns its running snapshot without waiting", async () => {
     // given
     const running = makeRecord({ task_id: "st_running", status: "running" })

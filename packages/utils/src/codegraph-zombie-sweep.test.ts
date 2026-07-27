@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } f
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { CODEGRAPH_PINNED_VERSION } from "./codegraph/manifest"
 import { sweepCodegraphZombies } from "./codegraph/process-sweep"
 
 function writeDaemonLock(projectDir: string, body: string): string {
@@ -13,7 +14,7 @@ function writeDaemonLock(projectDir: string, body: string): string {
   return lockFile
 }
 
-function daemonLockBody(pid: number, version = "1.4.1"): string {
+function daemonLockBody(pid: number, version = CODEGRAPH_PINNED_VERSION): string {
   return `${JSON.stringify({ pid, socketPath: "/tmp/daemon.sock", startedAt: 1784615252733, version }, null, 2)}\n`
 }
 

@@ -9,11 +9,13 @@ import { createTaskComponent } from "../components/task"
 import { createStartWorkContinuationComponent } from "../components/start-work-continuation"
 import { createUltraworkComponent } from "../components/ultrawork"
 import { createUlwLoopComponent } from "../components/ulw-loop"
+import { createFallbackArchitectComponent } from "../components/fallback-architect"
 
 const components: OmoSenpiComponent[] = [
   createUltraworkComponent(),
   createStartWorkContinuationComponent(),
   createUlwLoopComponent(),
+  createFallbackArchitectComponent(),
   createCommentCheckerComponent(),
   createSenpiTelemetryComponent(),
   createLspComponent(),
