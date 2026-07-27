@@ -1,0 +1,9 @@
+Bundled 593 modules in 53ms
+
+  omo.js  0.58 MB  (entry point)
+
+Bundled 237 modules in 10ms
+
+  omo-member.js  113.81 KB  (entry point)
+
+omo-senpi extension build is current: /mnt/data/code/oh-my-opencode/fix-atlas-reviewer-loop/packages/omo-senpi/plugin/extensions/omo.js
