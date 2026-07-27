@@ -127,6 +127,24 @@ reachable locally because Bun crashes during teardown on this host on both versi
 The per-package sweep and `test:codex` were run with the machine default Bun 1.3.13; the counts
 above are a like-for-like comparison against clean `upstream/dev` on the same version.
 
+## CI flake observed on macOS type check
+
+`typecheck (macos-latest)` failed once with a compiler crash rather than a type error:
+
+```
+panic: Unhandled case in Node.StatementList: Kind(28783) [recovered, repanicked]
+##[error]Process completed with exit code 2.
+```
+
+On the same commit, `typecheck (ubuntu-latest)`, `typecheck (windows-latest)` and
+`format-lint-typecheck-build` (which also runs the type check) all pass. Locally on macOS arm64,
+`tsgo --noEmit -p <tsconfig>` was run for every package and none panics; the only reported errors
+are the pre-existing dependency-resolution ones (`senpi-task` → `typebox/value`, `web` → `next`),
+both of which reproduce on clean `dev`.
+
+A type error introduced by this branch would surface as `error TSxxxx` on all three platforms, so
+this is treated as runner-side instability in the pinned `tsgo` dev build.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`
