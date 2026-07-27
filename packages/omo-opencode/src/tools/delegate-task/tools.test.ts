@@ -27,17 +27,17 @@ function resolveCategoryConfig(...args: Parameters<typeof import("./tools").reso
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
-const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai"]
+const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai", "apitopia"]
 const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-opus-4-7",
-  "anthropic/claude-opus-4-8",
+  "apitopia/kimi-k3",
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
   "google/gemini-3.1-pro",
   "google/gemini-3-flash",
   "openai/gpt-5.4-mini",
   "openai/gpt-5.6-sol",
-  "openai/gpt-5.5",
+  "apitopia/kimi-for-coding-highspeed",
   "openai/gpt-5.5",
 ])
 
@@ -137,14 +137,14 @@ describe("sisyphus-task", () => {
       MAX_POLL_TIME_MS: 50,
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
-    cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
+    cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai", "apitopia"])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-        google: ["gemini-3.1-pro", "gemini-3-flash"],
+        google: ["gemini-3.1-pro", "gemini-3-flash"], apitopia: ["kimi-k3", "kimi-for-coding-highspeed"],
         openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
       },
-      connected: ["anthropic", "google", "openai"],
+      connected: ["anthropic", "google", "openai", "apitopia"],
       updatedAt: "2026-01-01T00:00:00.000Z",
     })
   })
@@ -163,7 +163,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("google/gemini-3.1-pro")
+      expect(category.model).toBe("anthropic/claude-opus-5")
       expect(category.variant).toBe("high")
     })
 
@@ -187,13 +187,13 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("xhigh")
     })
 
-    test("unspecified-high category uses claude-opus-4-8 max as primary", () => {
+    test("unspecified-high category uses Kimi K3 max as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-opus-4-8")
+      expect(category.model).toBe("apitopia/kimi-k3")
       expect(category.variant).toBe("max")
     })
   })
@@ -918,7 +918,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("google/gemini-3.1-pro")
+      expect(resolved.config.model).toBe("anthropic/claude-opus-5")
       expect(resolved.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -1005,7 +1005,7 @@ describe("sisyphus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("google/gemini-3.1-pro")
+      expect(resolved.config.model).toBe("anthropic/claude-opus-5")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -1047,7 +1047,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("google/gemini-3.1-pro")
+      expect(resolved.config.model).toBe("anthropic/claude-opus-5")
     })
   })
 
@@ -1175,10 +1175,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-8 should be passed with max variant
+      // then - Kimi K3 should be passed with max variant
       expect(launchInput.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-opus-4-8",
+        providerID: "apitopia",
+        modelID: "kimi-k3",
         variant: "max",
       })
     }, { timeout: 20000 })
@@ -1236,10 +1236,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-8 should be passed with max variant
+      // then - Kimi K3 should be passed with max variant
       expect(promptBody.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-opus-4-8",
+        providerID: "apitopia",
+        modelID: "kimi-k3",
       })
       expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })
@@ -2483,12 +2483,12 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - using visual-engineering (gemini model) with run_in_background=false
+      // when - using artistry (gemini model) with run_in_background=false
       const result = await tool.execute(
         {
           description: "Test gemini forced background",
-          prompt: "Do something visual",
-          category: "visual-engineering",
+          prompt: "Do something creative",
+          category: "artistry",
           run_in_background: false,
           load_skills: ["git-master"],
         },
@@ -2976,10 +2976,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - model should be openai/gpt-5.4-mini from DEFAULT_CATEGORIES
+      // then - model should be apitopia/kimi-for-coding-highspeed from DEFAULT_CATEGORIES
       //         NOT anthropic/claude-sonnet-4-6 (system default)
-      expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.4-mini")
+      expect(launchInput.model.providerID).toBe("apitopia")
+      expect(launchInput.model.modelID).toBe("kimi-for-coding-highspeed")
     })
 
     test("category delegation ignores UI-selected (Kimi) system default model", async () => {
@@ -3042,8 +3042,8 @@ describe("sisyphus-task", () => {
       )
 
       // then - category model must win (not Kimi)
-      expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.4-mini")
+      expect(launchInput.model.providerID).toBe("apitopia")
+      expect(launchInput.model.modelID).toBe("kimi-for-coding-highspeed")
     })
 
     test("sisyphus-junior model override takes precedence over category model", async () => {
@@ -3916,9 +3916,9 @@ describe("sisyphus-task", () => {
       // when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then should use category's built-in model (gemini-3.1-pro for visual-engineering)
+      // then should use category's built-in model (Opus 5 high for visual-engineering)
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.model).toBe("google/gemini-3.1-pro")
+      expect(category.model).toBe("anthropic/claude-opus-5")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {

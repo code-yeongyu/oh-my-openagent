@@ -109,7 +109,7 @@ Approach:
 export const GOOGLE_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "visual-engineering",
-    config: { model: "google/gemini-3.1-pro", variant: "high" },
+    config: { model: "anthropic/claude-opus-5", variant: "high" },
     description: "Frontend, UI/UX, design, styling, animation",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },
