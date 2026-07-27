@@ -300,13 +300,13 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 
 | Category             | Default Model                   | Description                                    |
 | -------------------- | ------------------------------- | ---------------------------------------------- |
-| `visual-engineering` | `google/gemini-3.1-pro` (high)  | Frontend, UI/UX, design, animation             |
+| `visual-engineering` | `anthropic/claude-opus-5` (high) | Frontend, UI/UX, design, animation            |
 | `ultrabrain`         | `openai/gpt-5.6-sol` (xhigh)    | Deep logical reasoning, complex architecture   |
 | `deep`               | `openai/gpt-5.6-terra` (xhigh)  | Autonomous problem-solving, thorough research  |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
-| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
+| `quick`              | `apitopia/kimi-for-coding-highspeed` | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `openai/gpt-5.6-luna` (xhigh)   | General tasks, low effort                      |
-| `unspecified-high`   | `anthropic/claude-opus-5` (max) | General tasks, high effort                   |
+| `unspecified-high`   | `apitopia/kimi-k3` (max)        | General tasks, high effort                     |
 | `writing`            | `kimi-for-coding/kimi-k3`          | Documentation, prose, technical writing        |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
