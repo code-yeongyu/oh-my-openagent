@@ -1,0 +1,105 @@
+### PRE-EXISTING FAILURE BASELINE on clean upstream/dev (this PR's changes stashed away)
+### captured 2026-07-27T01:58:29Z  base upstream/dev @ 3f917a94c
+### boulder-state diff vs upstream/dev at capture time:
+### ---
+
+=== bun test packages/boulder-state ===
+bun test v1.3.14 (0d9b296a)
+
+ 31 pass
+ 0 fail
+ 37 expect() calls
+Ran 31 tests across 3 files. [434.00ms]
+EXIT=0 for packages/boulder-state
+
+=== bun test packages/omo-opencode/src/features/boulder-state ===
+bun test v1.3.14 (0d9b296a)
+
+ 75 pass
+ 0 fail
+ 161 expect() calls
+Ran 75 tests across 3 files. [844.00ms]
+EXIT=0 for packages/omo-opencode/src/features/boulder-state
+
+=== bun test packages/omo-opencode/src/hooks/atlas ===
+bun test v1.3.14 (0d9b296a)
+
+ 208 pass
+ 0 fail
+ 468 expect() calls
+Ran 208 tests across 26 files. [9.32s]
+EXIT=0 for packages/omo-opencode/src/hooks/atlas
+
+=== bun test packages/omo-opencode/src/hooks/start-work ===
+bun test v1.3.14 (0d9b296a)
+
+ 94 pass
+ 0 fail
+ 266 expect() calls
+Ran 94 tests across 7 files. [2.54s]
+EXIT=0 for packages/omo-opencode/src/hooks/start-work
+
+=== bun test packages/omo-opencode/src/cli/run ===
+bun test v1.3.14 (0d9b296a)
+
+  [36m⚙[39m [1mread_file[22m [2mfilePath=/src/index.ts[22m  
+
+packages\omo-opencode\src\cli\run\on-complete-hook.test.ts:
+129 |       messageCount: 10,
+130 |     }, deps)
+131 | 
+132 |     // then
+133 |     const [args] = spawnCalls[0]
+134 |     expect(args).toEqual(["powershell.exe", "-NoProfile", "-Command", "Write-Host done"])
+                       ^
+error: expect(received).toEqual(expected)
+
+@@ -1,5 +1,4 @@
+  [
+-   "powershell.exe",
+-   "-NoProfile",
+-   "-Command",
++   "sh",
++   "-c",
+    "Write-Host done",
+
+- Expected  - 3
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\cli\run\on-complete-hook.test.ts:134:18)
+(fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows [4.07ms]
+174 |       messageCount: 10,
+175 |     }, deps)
+176 | 
+177 |     // then
+178 |     const [args] = spawnCalls[0]
+179 |     expect(args).toEqual(["C:\\Windows\\System32\\cmd.exe", "/d", "/s", "/c", "echo done"])
+                       ^
+error: expect(received).toEqual(expected)
+
+@@ -1,6 +1,4 @@
+  [
+-   "C:\Windows\System32\cmd.exe",
+-   "/d",
+-   "/s",
+-   "/c",
++   "sh",
++   "-c",
+    "echo done",
+
+- Expected  - 4
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\cli\run\on-complete-hook.test.ts:179:18)
+(fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected [5.29ms]
+
+packages\omo-opencode\src\cli\run\runner.telemetry.test.ts:
+[2mSession: ses_test[22m
+[2mSession: ses_test[22m
+
+ 194 pass
+ 2 fail
+ 399 expect() calls
+Ran 196 tests across 28 files. [4.85s]
+EXIT=1 for packages/omo-opencode/src/cli/run
+

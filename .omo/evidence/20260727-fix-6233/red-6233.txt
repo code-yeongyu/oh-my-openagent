@@ -1,0 +1,163 @@
+### RED capture - issue #6233 - 2026-07-27T01:14:17Z
+### HEAD: 3f917a94c  branch: fix/6233-boulder-blocked-checkbox
+### base: upstream/dev @ 3f917a94c
+### product code UNMODIFIED at this point:
+### (empty above == no product change yet; only test files added)
+
+=== bun test packages/boulder-state/src/plan-checklist.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+packages\boulder-state\src\plan-checklist.test.ts:
+227 | 
+228 |     // when
+229 |     const checklist = parsePlanChecklist(markdown)
+230 | 
+231 |     // then
+232 |     expect(checklist).toEqual({ completed: 2, remaining: 0, total: 2, nextTaskLabel: null })
+                            ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "completed": 2,
++   "completed": 0,
+    "nextTaskLabel": null,
+    "remaining": 0,
+-   "total": 2,
++   "total": 0,
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\boulder-state\src\plan-checklist.test.ts:232:23)
+(fail) parsePlanChecklist > #given a heading-free plan whose every row is user-blocked #when parsed #then blocked rows are counted as discharged [2.34ms]
+244 | 
+245 |     // when
+246 |     const checklist = parsePlanChecklist(markdown)
+247 | 
+248 |     // then
+249 |     expect(checklist).toEqual({ completed: 3, remaining: 0, total: 3, nextTaskLabel: null })
+                            ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "completed": 3,
++   "completed": 1,
+    "nextTaskLabel": null,
+    "remaining": 0,
+-   "total": 3,
++   "total": 1,
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\boulder-state\src\plan-checklist.test.ts:249:23)
+(fail) parsePlanChecklist > #given user-blocked rows in both counted sections #when parsed #then they are counted as discharged [2.19ms]
+259 | 
+260 |     // when
+261 |     const checklist = parsePlanChecklist(markdown)
+262 | 
+263 |     // then
+264 |     expect(checklist).toEqual({
+                            ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "completed": 1,
++   "completed": 0,
+    "nextTaskLabel": "2. Still actionable",
+    "remaining": 1,
+-   "total": 2,
++   "total": 1,
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\boulder-state\src\plan-checklist.test.ts:264:23)
+(fail) parsePlanChecklist > #given a user-blocked row before an actionable row #when parsed #then the actionable row is next [2.22ms]
+
+ 13 pass
+ 3 fail
+ 17 expect() calls
+Ran 16 tests across 1 file. [865.00ms]
+EXIT_plan_checklist=1
+
+=== bun test packages/boulder-state/src/plan-progress.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+packages\boulder-state\src\plan-progress.test.ts:
+37 | 
+38 |     // when
+39 |     const progress = getPlanProgress(planPath)
+40 | 
+41 |     // then
+42 |     expect(progress).toEqual({ total: 2, completed: 2, isComplete: true })
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "completed": 2,
+-   "isComplete": true,
+-   "total": 2,
++   "completed": 0,
++   "isComplete": false,
++   "total": 0,
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\boulder-state\src\plan-progress.test.ts:42:22)
+(fail) getPlanProgress > #given a plan whose every task is user-blocked #when progress is read #then the plan reads complete instead of looping [375.36ms]
+56 | 
+57 |     // when
+58 |     const progress = getPlanProgress(planPath)
+59 | 
+60 |     // then
+61 |     expect(progress).toEqual({ total: 3, completed: 3, isComplete: true })
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "completed": 3,
++   "completed": 1,
+    "isComplete": true,
+-   "total": 3,
++   "total": 1,
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\boulder-state\src\plan-progress.test.ts:61:22)
+(fail) getPlanProgress > #given a plan mixing completed and user-blocked tasks #when progress is read #then blocked tasks stay visible in the totals [389.12ms]
+69 | 
+70 |     // when
+71 |     const progress = getPlanProgress(planPath)
+72 | 
+73 |     // then
+74 |     expect(progress).toEqual({ total: 2, completed: 1, isComplete: false })
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "completed": 1,
++   "completed": 0,
+    "isComplete": false,
+-   "total": 2,
++   "total": 1,
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\boulder-state\src\plan-progress.test.ts:74:22)
+(fail) getPlanProgress > #given a plan with a user-blocked task and an actionable task #when progress is read #then the plan reads incomplete [368.22ms]
+
+ 1 pass
+ 3 fail
+ 4 expect() calls
+Ran 4 tests across 1 file. [11.89s]
+EXIT_plan_progress=1

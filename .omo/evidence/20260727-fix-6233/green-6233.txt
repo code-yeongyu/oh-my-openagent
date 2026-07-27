@@ -1,0 +1,32 @@
+### GREEN capture - issue #6233 - 2026-07-27T01:22:16Z
+### branch: fix/6233-boulder-blocked-checkbox  base upstream/dev @ 3f917a94c
+### product diff (product files only):
+ packages/boulder-state/src/plan-checklist.ts | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+=== bun test packages/boulder-state/src/plan-checklist.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 16 pass
+ 0 fail
+ 17 expect() calls
+Ran 16 tests across 1 file. [1010.00ms]
+EXIT_plan_checklist=0
+
+=== bun test packages/boulder-state/src/plan-progress.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 4 pass
+ 0 fail
+ 4 expect() calls
+Ran 4 tests across 1 file. [1.61s]
+EXIT_plan_progress=0
+
+=== FULL boulder-state package suite ===
+bun test v1.3.14 (0d9b296a)
+
+ 38 pass
+ 0 fail
+ 44 expect() calls
+Ran 38 tests across 4 files. [5.84s]
+EXIT_boulder_state_pkg=0

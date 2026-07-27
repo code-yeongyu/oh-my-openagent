@@ -220,6 +220,54 @@ describe("parsePlanChecklist", () => {
     // then
     expect(checklist).toEqual({ completed: 0, remaining: 0, total: 0, nextTaskLabel: null })
   })
+
+  test("#given a heading-free plan whose every row is user-blocked #when parsed #then blocked rows are counted as discharged", () => {
+    // given
+    const markdown = ["# Plan", "- [~] Await customer credentials", "* [~] Await legal sign-off"].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 2, remaining: 0, total: 2, nextTaskLabel: null })
+  })
+
+  test("#given user-blocked rows in both counted sections #when parsed #then they are counted as discharged", () => {
+    // given
+    const markdown = [
+      "## Todos",
+      "- [~] 1. Blocked on a decision only the user can make",
+      "- [x] 2. Preserve completed implementation rows",
+      "## Final verification wave",
+      "- [~] F1. Blocked on unavailable credentials",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 3, remaining: 0, total: 3, nextTaskLabel: null })
+  })
+
+  test("#given a user-blocked row before an actionable row #when parsed #then the actionable row is next", () => {
+    // given
+    const markdown = [
+      "## Todos",
+      "- [~] 1. Blocked on a decision only the user can make",
+      "- [ ] 2. Still actionable",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({
+      completed: 1,
+      remaining: 1,
+      total: 2,
+      nextTaskLabel: "2. Still actionable",
+    })
+  })
 })
 
 describe("getPlanChecklist", () => {

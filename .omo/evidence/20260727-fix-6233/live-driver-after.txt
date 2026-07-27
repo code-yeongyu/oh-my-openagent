@@ -1,0 +1,83 @@
+### live-surface capture for issue #6233
+### surface: real boulder CLI -> bun packages/omo-opencode/src/cli/index.ts boulder
+### repo:    /c/Users/pss/.omo-contrib/work/omo
+### plan-checklist.ts diff vs upstream/dev at capture time:
+ packages/boulder-state/src/plan-checklist.ts | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+### (empty above == unmodified base; non-empty == fix applied)
+
+--- plan: blocked-plan.md (every task user-blocked, per the mandated '- [~]') ---
+# Blocked Plan
+
+## Todos
+- [~] 1. Blocked on a decision only the user can make
+
+## Final verification wave
+- [~] F1. Blocked on unavailable credentials
+
+--- plan: mixed-plan.md ---
+# Mixed Plan
+
+## Todos
+- [x] 1. Shipped
+- [~] 2. Blocked on a decision only the user can make
+- [ ] 3. Still actionable
+
+=== $ omo boulder --json ===
+{
+  "works": [
+    {
+      "work_id": "work-blocked",
+      "plan_name": "blocked-plan",
+      "active_plan": ".omo/plans/blocked-plan.md",
+      "status": "active",
+      "started_at": "2026-07-27T00:00:00.000Z",
+      "ended_at": "2026-07-27T00:10:00.000Z",
+      "elapsed_ms": 600000,
+      "elapsed_human": "10m 0s",
+      "total_tasks": 2,
+      "completed_tasks": 2,
+      "remaining_tasks": 0,
+      "percentage": 100,
+      "session_count": 1
+    },
+    {
+      "work_id": "work-mixed",
+      "plan_name": "mixed-plan",
+      "active_plan": ".omo/plans/mixed-plan.md",
+      "status": "active",
+      "started_at": "2026-07-27T00:00:00.000Z",
+      "ended_at": "2026-07-27T00:10:00.000Z",
+      "elapsed_ms": 600000,
+      "elapsed_human": "10m 0s",
+      "total_tasks": 3,
+      "completed_tasks": 2,
+      "remaining_tasks": 1,
+      "percentage": 67,
+      "session_count": 1,
+      "current_task": {
+        "task_key": "todo:3",
+        "task_title": "Still actionable"
+      }
+    }
+  ]
+}
+EXIT=0
+
+=== $ omo boulder   (human-readable text surface) ===
+boulder progress
+[2m----------------------------------------[22m
+plan: blocked-plan
+status: [36mactive[39m
+progress: 100% (2/2)
+elapsed: 10m 0s
+sessions: 1
+current task: -
+[2m----------------------------------------[22m
+plan: mixed-plan
+status: [36mactive[39m
+progress: 67% (2/3)
+elapsed: 10m 0s
+sessions: 1
+current task: Still actionable
+EXIT=0

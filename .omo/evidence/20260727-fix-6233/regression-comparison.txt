@@ -1,0 +1,80 @@
+### REGRESSION COMPARISON - issue #6233 - 2026-07-27T01:59:50Z
+
+Both sweeps run sequentially on a quiet host, same 5 suites, same machine.
+
+--- CLEAN BASE (upstream/dev) per-suite totals ---
+=== bun test packages/boulder-state ===
+ 31 pass
+ 0 fail
+Ran 31 tests across 3 files. [434.00ms]
+EXIT=0 for packages/boulder-state
+=== bun test packages/omo-opencode/src/features/boulder-state ===
+ 75 pass
+ 0 fail
+Ran 75 tests across 3 files. [844.00ms]
+EXIT=0 for packages/omo-opencode/src/features/boulder-state
+=== bun test packages/omo-opencode/src/hooks/atlas ===
+ 208 pass
+ 0 fail
+Ran 208 tests across 26 files. [9.32s]
+EXIT=0 for packages/omo-opencode/src/hooks/atlas
+=== bun test packages/omo-opencode/src/hooks/start-work ===
+ 94 pass
+ 0 fail
+Ran 94 tests across 7 files. [2.54s]
+EXIT=0 for packages/omo-opencode/src/hooks/start-work
+=== bun test packages/omo-opencode/src/cli/run ===
+ 194 pass
+ 2 fail
+Ran 196 tests across 28 files. [4.85s]
+EXIT=1 for packages/omo-opencode/src/cli/run
+
+--- WITH THIS PR per-suite totals ---
+=== bun test packages/boulder-state ===
+ 38 pass
+ 0 fail
+Ran 38 tests across 4 files. [464.00ms]
+EXIT=0 for packages/boulder-state
+=== bun test packages/omo-opencode/src/features/boulder-state ===
+ 75 pass
+ 0 fail
+Ran 75 tests across 3 files. [849.00ms]
+EXIT=0 for packages/omo-opencode/src/features/boulder-state
+=== bun test packages/omo-opencode/src/hooks/atlas ===
+ 207 pass
+ 1 fail
+Ran 208 tests across 26 files. [40.54s]
+EXIT=1 for packages/omo-opencode/src/hooks/atlas
+=== bun test packages/omo-opencode/src/hooks/start-work ===
+ 94 pass
+ 0 fail
+Ran 94 tests across 7 files. [2.64s]
+EXIT=0 for packages/omo-opencode/src/hooks/start-work
+=== bun test packages/omo-opencode/src/cli/run ===
+ 194 pass
+ 2 fail
+Ran 196 tests across 28 files. [4.69s]
+EXIT=1 for packages/omo-opencode/src/cli/run
+
+--- failing tests on CLEAN BASE (2) ---
+(fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected
+(fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows
+
+--- failing tests WITH THIS PR (3) ---
+(fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected
+(fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows
+(fail) resolveActiveBoulderSession > returns null for tracked work session when resolved work is abandoned
+
+--- NEW failures introduced by this PR (must be empty) ---
+(fail) resolveActiveBoulderSession > returns null for tracked work session when resolved work is abandoned
+--- end NEW failures ---
+
+NOTE ON AN EARLIER, DISCARDED SWEEP:
+A first consumer sweep on this host reported 53 failures. It was run while the
+machine was under heavy load: the atlas suite took 752s vs 9-13s quiet, and the
+run contained 49 'this test timed out after 5000ms' / 'beforeEach hook timed out'
+lines versus 1 at baseline, while executing the identical test count
+(Ran 208 tests across 26 files). Those failures were host-load timeouts, not
+regressions, and included tests with no causal path to checkbox parsing
+(e.g. 'executeOnCompleteHook > uses powershell when PowerShell is detected').
+The sweeps recorded here are the quiet-host re-runs.

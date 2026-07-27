@@ -1,0 +1,66 @@
+### FLAKE PROOF for 'resolveActiveBoulderSession > returns null for tracked work
+### session when resolved work is abandoned' - 2026-07-27T02:00:54Z
+
+WHY THIS IS NOT CAUSED BY THIS PR:
+ 1. The test's plan fixtures contain NO '~' character at all:
+      129:    writeFileSync(activePlanPath, "# Plan\n- [ ] Active task\n", "utf-8")
+      130:    writeFileSync(abandonedPlanPath, "# Plan\n- [ ] Abandoned task\n", "utf-8")
+    This PR only changes how a checkbox marker of '~' is parsed; a plan with no
+    '~' takes byte-identical code paths before and after.
+ 2. The recorded failure was [27086.93ms] with no assertion diff -> a hang/timeout,
+    not a wrong value. Quiet-host runs of this suite complete in ~9s total.
+ 3. Repeated isolated runs WITH this PR applied, below.
+
+boulder-state diff vs upstream/dev (fix IS applied):
+ packages/boulder-state/src/plan-checklist.test.ts | 48 +++++++++++++++++++++++
+ packages/boulder-state/src/plan-checklist.ts      | 15 ++++---
+ 2 files changed, 58 insertions(+), 5 deletions(-)
+
+grep -c '\[~\]' packages/omo-opencode/src/hooks/atlas/resolve-active-boulder-session.test.ts  ->  0 occurrences of a [~] checkbox in the whole file
+
+=== isolated run #1: bun test packages/omo-opencode/src/hooks/atlas/resolve-active-boulder-session.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [435.00ms]
+EXIT=0
+
+=== isolated run #2: bun test packages/omo-opencode/src/hooks/atlas/resolve-active-boulder-session.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [416.00ms]
+EXIT=0
+
+=== isolated run #3: bun test packages/omo-opencode/src/hooks/atlas/resolve-active-boulder-session.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [429.00ms]
+EXIT=0
+
+=== isolated run #4: bun test packages/omo-opencode/src/hooks/atlas/resolve-active-boulder-session.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [422.00ms]
+EXIT=0
+
+=== isolated run #5: bun test packages/omo-opencode/src/hooks/atlas/resolve-active-boulder-session.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [423.00ms]
+EXIT=0
+
+### RESULT: isolated runs with this PR applied -> PASS=5 FAIL=0 out of 5

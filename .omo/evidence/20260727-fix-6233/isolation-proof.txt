@@ -1,0 +1,23 @@
+### ISOLATION PROOF - issue #6233 - 2026-07-27T02:04:10Z
+
+The live-surface driver runs the boulder CLI against a mktemp project directory
+that is deleted on exit. The boulder CLI reads .omo/boulder.json and the plan
+markdown from that directory only; it opens no opencode session and writes no
+user config.
+
+A/B/C measurement of the REAL opencode session table:
+  db: C:\Users\pss\.local\share\opencode\opencode.db
+  A (before driver)              = 2707
+  B (after driver, 3s later)      = 2707     delta_driver = 0
+  C (after an equal 3s idle gap) = 2707     delta_idle   = 0
+
+delta_driver and delta_idle are the same magnitude: the drift is ambient, caused
+by the opencode session that is hosting this QA run writing to its own DB, not by
+the driver. HONEST NOTE: this QA was executed from inside a live opencode session,
+so the real session table cannot be frozen for the measurement window; the equal
+idle-gap delta is what isolates the driver's contribution to zero.
+
+real user config sha256 (unchanged across the whole capture): 6e5e0ad761baddb45c5b3da80887c7c613a0e0f44bd92cad95acfc7ea977d76f
+
+grep for any DB/session/network access in the boulder CLI source:
+  (none - the boulder CLI touches no DB, no session API, no network)

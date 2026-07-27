@@ -2,14 +2,14 @@ import { existsSync, readFileSync } from "node:fs"
 
 import type { PlanChecklist, TopLevelTaskRef } from "./types"
 
-const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/
+const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX~]?)[ \t]*\][ \t]+(.+)$/
 const TODO_HEADING_PATTERN = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
 const FINAL_VERIFICATION_HEADING_PATTERN =
   /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
 const SECTION_BOUNDARY_HEADING_PATTERN = /^#{1,2}(?:[ \t]+|$)/
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
-const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/
-const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX])\] (F[1-9]\d*\. .+)$/i
+const TODO_CHECKBOX_PATTERN = /^- \[([ xX~])\] ([1-9]\d*\. .+)$/
+const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX~])\] (F[1-9]\d*\. .+)$/i
 
 type ChecklistSection = "todo" | "final-wave" | "other"
 
@@ -169,7 +169,12 @@ function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
   if (marker === undefined || label === undefined) {
     return null
   }
-  return { checked: marker.toLowerCase() === "x", label }
+  return { checked: isDischargedMarker(marker), label }
+}
+
+function isDischargedMarker(marker: string): boolean {
+  const normalized = marker.toLowerCase()
+  return normalized === "x" || normalized === "~"
 }
 
 function hasStructuredSection(lines: readonly string[]): boolean {
@@ -219,7 +224,7 @@ function parseStructuredTopLevelCheckbox(
   if (task === null) {
     return null
   }
-  return { checked: marker.toLowerCase() === "x", label, task }
+  return { checked: isDischargedMarker(marker), label, task }
 }
 
 function buildTaskRef(section: "todo" | "final-wave", label: string): TopLevelTaskRef | null {

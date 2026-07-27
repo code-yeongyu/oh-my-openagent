@@ -1,0 +1,8 @@
+### TYPECHECK - issue #6233 - 2026-07-27T01:33:55Z
+### tool: tsgo (@typescript/native-preview), per repo convention (NOT tsc)
+
+=== tsgo --noEmit -p packages/boulder-state ===
+EXIT_boulder_state=0
+
+=== tsgo --noEmit -p packages/omo-opencode ===
+EXIT_omo_opencode=0
