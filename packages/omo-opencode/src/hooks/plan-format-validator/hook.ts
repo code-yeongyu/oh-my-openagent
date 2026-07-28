@@ -11,9 +11,11 @@ const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
 const SECTION_BOUNDARY_HEADING = /^#{1,2}(?:[ \t]+|$)/
 const HEADING_TODOS = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
 const HEADING_FINAL_WAVE = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
-const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX]?\]/
-const TODO_TASK = /^- \[[ xX]\] [1-9]\d*\. .+$/
-const FINAL_WAVE_TASK = /^- \[[ xX]\] F[1-9]\d*\. .+$/i
+// `~` is the blocked marker the boulder continuation directive requires an agent to
+// write, so these predicates must accept it or the validator flags an already-valid plan.
+const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX~]?\]/
+const TODO_TASK = /^- \[[ xX~]\] [1-9]\d*\. .+$/
+const FINAL_WAVE_TASK = /^- \[[ xX~]\] F[1-9]\d*\. .+$/i
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
 
 type SectionName = "todo" | "final-wave"

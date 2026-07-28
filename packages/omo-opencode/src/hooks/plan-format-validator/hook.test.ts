@@ -149,6 +149,51 @@ Describe the first implementation section here.
     }
   })
 
+  test("preserves a plan whose counted sections contain only user-blocked rows", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## Todos
+- [~] 1. Blocked on a decision only the user can make
+
+## Final Verification Wave
+- [~] F1. Blocked on unavailable credentials
+`)
+    const originalOutput = fixture.output.output
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toBe(originalOutput)
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("preserves a plan mixing user-blocked and canonical rows", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## Todos
+- [ ] 1. Implement the change
+- [~] 2. Blocked on a decision only the user can make
+- [x] 3. Review the change
+`)
+    const originalOutput = fixture.output.output
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toBe(originalOutput)
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
   test("warns when a structured plan has malformed checkboxes", async () => {
     // given
     const fixture = createFixture(`# Plan\n\n## Todos\n- [ ] missing a numeric task label`)
