@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test"
 
 import type { OpencodeClient } from "./opencode-client"
-import { checkSessionExistence, verifySessionExists } from "./session-existence"
+import { checkSessionExistence, sanitizeBareSessionId, verifySessionExists } from "./session-existence"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 describe("verifySessionExists", () => {
@@ -39,5 +39,38 @@ describe("verifySessionExists", () => {
     const result = await checkSessionExistence(client, "session-123")
 
     expect(result).toBe("unknown")
+  })
+})
+
+describe("sanitizeBareSessionId", () => {
+  test("strips known platform prefixes", () => {
+    // given / when / then
+    expect(sanitizeBareSessionId("opencode:ses_abc123")).toBe("ses_abc123")
+    expect(sanitizeBareSessionId("codex:ses_abc123")).toBe("ses_abc123")
+    expect(sanitizeBareSessionId("senpi:ses_abc123")).toBe("ses_abc123")
+  })
+
+  test("leaves bare session ids untouched", () => {
+    // given / when / then
+    expect(sanitizeBareSessionId("ses_abc123")).toBe("ses_abc123")
+  })
+
+  test("checkSessionExistence queries with the bare id", async () => {
+    // given
+    const get = mock(async () => ({ data: { id: "ses_abc123" } }))
+    const client = unsafeTestValue<OpencodeClient>({
+      session: {
+        get,
+      },
+    })
+
+    // when
+    const result = await checkSessionExistence(client, "opencode:ses_abc123")
+
+    // then
+    expect(result).toBe("exists")
+    expect(get).toHaveBeenCalledWith({
+      path: { id: "ses_abc123" },
+    })
   })
 })
