@@ -11,6 +11,7 @@ import {
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
+import { markProviderFailed, clearAllProviderFailures } from "../../shared/provider-failure-state"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
@@ -114,6 +115,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       }
       sessionStates.set(sessionID, state)
       sessionLastAccess.set(sessionID, Date.now())
+      clearAllProviderFailures()
+      log(`[${HOOK_NAME}] Cleared provider failure state for new session`, { sessionID })
     }
   }
 
@@ -257,6 +260,17 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
         errorType: classifyErrorType(error),
       })
       return
+    }
+
+    // Notify proactive model-fallback that this provider failed,
+    // so it can skip same-provider fallbacks on subsequent requests.
+    const failedProviderID = props?.providerID as string | undefined
+    if (failedProviderID) {
+      markProviderFailed(failedProviderID)
+      log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {
+        sessionID,
+        providerID: failedProviderID,
+      })
     }
 
     let state = sessionStates.get(sessionID)
