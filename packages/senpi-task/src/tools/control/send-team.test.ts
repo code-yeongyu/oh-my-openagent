@@ -17,7 +17,6 @@ function spyManager(outcome: SendOutcome): { manager: SendManager; sendCalls: Se
         sendCalls.push(input)
         return Promise.resolve(outcome)
       },
-      interruptTask: () => Promise.resolve({ kind: "not_found", reason: "unused" }),
       list: () => [],
     },
     sendCalls,
@@ -182,14 +181,14 @@ describe("runTaskSend team routing", () => {
     })
   })
 
-  test("#given a member-scoped peer send requesting followUp #when the recipient is running #then the steering engine delivers as steer", async () => {
+  test("#given a member-scoped peer send #when the recipient is running #then the steering engine delivers as steer", async () => {
     const { manager, inProcess } = makeManager()
     const started = await manager.start(baseSpec({ parent_session_id: "member-session", name: "lead" }))
     if (started.kind !== "started") throw new Error("expected started")
 
     const result = await runTaskSend(
       manager,
-      { to: "lead", message: "peer update", deliver_as: "followUp" },
+      { to: "lead", message: "peer update" },
       "member-session",
       { service: createFakeTeamService(), from: "alpha", teamRunId: "bound-run" },
     )
@@ -201,14 +200,14 @@ describe("runTaskSend team routing", () => {
     expect(handle.followUpCalls).toEqual([])
   })
 
-  test("#given a lead send with team_run_id requesting followUp #when the recipient is running #then the steering engine delivers as steer", async () => {
+  test("#given a lead send with team_run_id #when the recipient is running #then the steering engine delivers as steer", async () => {
     const { manager, inProcess } = makeManager()
     const started = await manager.start(baseSpec({ parent_session_id: "lead-session", name: "beta" }))
     if (started.kind !== "started") throw new Error("expected started")
 
     const result = await runTaskSend(
       manager,
-      { to: "beta", message: "lead update", deliver_as: "followUp", team_run_id: "run-1" },
+      { to: "beta", message: "lead update", team_run_id: "run-1" },
       "lead-session",
       { service: createFakeTeamService(), from: TEAM_LEAD_SENTINEL },
     )
@@ -220,13 +219,13 @@ describe("runTaskSend team routing", () => {
     expect(handle.followUpCalls).toEqual([])
   })
 
-  test("#given a team shutdown message requesting followUp #when lead routing sends it #then the delivery option is ignored", async () => {
+  test("#given a team shutdown message #when lead routing sends it #then no delivery option is needed", async () => {
     const { manager } = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
     const service = createFakeTeamService({ requestShutdown: async () => fakeRuntimeState() })
 
     const result = await runTaskSend(
       manager,
-      { to: "beta", message: { type: "shutdown_request" }, deliver_as: "followUp", team_run_id: "run-1" },
+      { to: "beta", message: { type: "shutdown_request" }, team_run_id: "run-1" },
       "lead-session",
       { service, from: TEAM_LEAD_SENTINEL },
     )

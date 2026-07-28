@@ -336,7 +336,7 @@ bunx oh-my-openagent install \
 
 | Platform | Writes |
 |----------|--------|
-| `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into `~/.config/opencode/oh-my-openagent.jsonc`. |
+| `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into the `[opencode]` block of `~/.omo/omo.jsonc` (legacy config files are migrated into the unified file first). |
 | `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 1000`, and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
 
 Both halves are independent and idempotent — re-running is safe.
@@ -414,7 +414,7 @@ First, add the `opencode-antigravity-auth` plugin entry to `opencode.json`:
 
 Then merge the full model configuration from the [opencode-antigravity-auth README](https://github.com/NoeFabris/opencode-antigravity-auth) into `opencode.json`. The plugin uses a **variant system** — models like `antigravity-gemini-3-pro` support `low`/`high` variants instead of separate `-low`/`-high` entries.
 
-Override the agent models in your plugin config file (`oh-my-openagent.jsonc` or legacy `oh-my-opencode.jsonc`):
+Override the agent models in the `[opencode]` block of `~/.omo/omo.jsonc` (or a project `.omo/omo.jsonc`):
 
 ```json
 {
@@ -616,7 +616,7 @@ Atlas still has model-family-specific prompt behavior. Prometheus does not switc
 
 #### Custom model configuration
 
-If the user wants to override which model an agent uses, edit the plugin config file (`oh-my-openagent.jsonc` or legacy `oh-my-opencode.jsonc`):
+If the user wants to override which model an agent uses, edit the `[opencode]` block of `~/.omo/omo.jsonc` (or a project `.omo/omo.jsonc`):
 
 ```jsonc
 {
@@ -637,7 +637,7 @@ If the user wants to override which model an agent uses, edit the plugin config 
 
 The independently maintained, experimental [oh-my-openagent VS Code extension](https://github.com/andersou/oh-my-openagent-vscode-extension) can edit user-level model assignments. It is a third-party configuration frontend, not an OMO runtime component; the OMO project does not maintain or support it, and compatibility is not guaranteed.
 
-Use external tools only with the canonical `oh-my-openagent.jsonc` fields described in [Configuration](../reference/configuration.md). Check which file the tool changed: a nearer project `.opencode/oh-my-openagent.jsonc` overrides user-level settings, and a coexisting legacy `oh-my-opencode.jsonc` is ignored when the canonical file exists.
+Use external tools only with the canonical `[opencode]` fields described in [Configuration](../reference/configuration.md). Check which file the tool changed: a nearer project `.omo/omo.jsonc` overrides user-level settings.
 
 After using an external UI to change models:
 
@@ -778,7 +778,7 @@ Off by default. Enables a lead-and-members multi-agent system with 12 dedicated 
 To enable, edit your plugin config:
 
 ```jsonc
-// ~/.config/opencode/oh-my-openagent.jsonc OR .opencode/oh-my-openagent.jsonc
+// ~/.omo/omo.jsonc "[opencode]" block OR <project>/.omo/omo.jsonc "[opencode]" block
 {
   "team_mode": {
     "enabled": true,
@@ -818,21 +818,21 @@ Full guide: [`docs/guide/team-mode.md`](team-mode.md).
 #### Config file precedence
 
 ```
-Walked configs (closer wins): <pwd up to $HOME>/.opencode/oh-my-openagent.json[c]
-                              (legacy basename: oh-my-opencode.json[c])
+Project layers (nearest wins): <pwd up to $HOME>/.omo/omo.json[c]
                             ↓ merged onto
-User config:               ~/.config/opencode/oh-my-openagent.json[c]
-                              (Windows: %APPDATA%\opencode\)
-                            ↓ falls back to
+User layer:                  ~/.omo/omo.json[c]
+                            ↓ resolved per harness, later wins
+Shared base → [opencode] block → profiles.<P> → profiles.<P>.[opencode]
+                            ↓ applied once at the end
 Defaults
 ```
 
 Merge rules:
 
-- `agents`, `categories`, `claude_code`: deep merged recursively (prototype-pollution safe)
-- `disabled_*` arrays: Set union (concatenated + deduplicated)
-- `mcp_env_allowlist`: **user-only** for security; walked configs cannot extend it
-- Everything else: override replaces base value
+- Plain objects: deep merged recursively (prototype-pollution safe)
+- Scalars and arrays: override replaces base value
+- `mcp_env_allowlist`: **user-layer only** for security; project layers cannot extend it
+- Profile activation: `OMO_PROFILE` > `OCX_PROFILE` > `OPENCODE_CONFIG_DIR` tail `profiles/<name>` > none
 
 Schema autocomplete in your editor:
 
@@ -948,12 +948,14 @@ jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencod
     ~/.config/opencode/opencode.json > /tmp/oc.json && \
     mv /tmp/oc.json ~/.config/opencode/opencode.json
 
-# 2. Remove plugin config files (optional)
-rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
+# 2. Remove the unified config and any leftover legacy plugin config files (optional)
+rm -f ~/.omo/omo.jsonc ~/.omo/omo.json \
+      ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
       ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json
 
 # 3. Remove project config (if you have one)
-rm -f .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
+rm -f .omo/omo.jsonc .omo/omo.json \
+      .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
       .opencode/oh-my-opencode.jsonc .opencode/oh-my-opencode.json
 
 # 4. Verify removal
@@ -982,4 +984,4 @@ If a workspace still has old project-local Codex state, run `npx lazycodex-ai un
 - Claude Code compatibility is supported (hooks, commands, skills, MCPs, plugins).
 - Claude Code plugin discovery load timeout is 10 seconds.
 - Runtime logger: `oh-my-opencode.log` in the OS temp dir (`/tmp` on Linux, `/var/folders/.../T/` on macOS, `%TEMP%` on Windows), 50 MB cap with `.1`/`.2` backup segments.
-- Dual-publish during the rename transition: `oh-my-opencode` and `oh-my-openagent` are both published. Inside `opencode.json`, the compatibility layer prefers the entry `"oh-my-openagent"`, while legacy `"oh-my-opencode"` entries still load with a warning. Plugin config loading recognises both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If `doctor` warns about the legacy package name, update your `opencode.json` plugin entry.
+- Dual-publish during the rename transition: `oh-my-opencode` and `oh-my-openagent` are both published. Inside `opencode.json`, the compatibility layer prefers the entry `"oh-my-openagent"`, while legacy `"oh-my-opencode"` entries still load with a warning. Plugin configuration lives in the unified `omo.jsonc`; legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and no longer read at runtime. If `doctor` warns about the legacy package name, update your `opencode.json` plugin entry.

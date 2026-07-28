@@ -264,3 +264,26 @@ describe("loadOmoConfig", () => {
     expect(result.config.$schema).toBe(schemaUrl)
   })
 })
+
+test("#given cwd outside home #when loading #then only cwd project config is read and ancestors are not walked", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "omo-config-outside-home-"))
+  const homeDir = join(root, "home")
+  const outsideProject = join(root, "elsewhere", "project")
+  mkdirSync(outsideProject, { recursive: true })
+  mkdirSync(homeDir, { recursive: true })
+  writeJsonc(join(homeDir, ".omo", "omo.jsonc"), `{"task":{"default_concurrency":2}}`)
+  writeJsonc(join(outsideProject, ".omo", "omo.jsonc"), `{"task":{"default_concurrency":7}}`)
+  writeJsonc(join(root, "elsewhere", ".omo", "omo.jsonc"), `{"task":{"default_concurrency":9}}`)
+
+  // when
+  const result = loadOmoConfig({
+    cwd: outsideProject,
+    env: { HOME: homeDir },
+    platform: "linux",
+  })
+
+  // then
+  expect(result.config.task?.default_concurrency).toBe(7)
+  expect(result.sources.some((source) => source.path.endsWith(join("elsewhere", ".omo", "omo.jsonc")))).toBe(false)
+})

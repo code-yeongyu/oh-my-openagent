@@ -1,11 +1,10 @@
 import { defineTool, type ToolDefinition } from "@code-yeongyu/senpi"
 
-import { DEFAULT_SEND_DELIVERY } from "../../steering"
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
 import { renderMemberScopedTaskSendCall, renderTaskSendCall, renderTaskSendResult } from "./renderers"
-import { invalidArguments, mapSendOutcome, notFound, scopeDenied } from "./send-results"
+import { invalidArguments, mapSendOutcome, notFound } from "./send-results"
 import { isStructuredMessage, MemberScopedTaskSendParams, TaskSendParams } from "./send-schema"
 import type { MemberScopedTaskSendInput, TaskSendInput } from "./send-schema"
 import { resolveSendTeamRunId, routeStructuredMessage } from "./send-shutdown"
@@ -19,14 +18,13 @@ export type { TaskSendTeamRouting } from "./send-shutdown"
 
 const DESCRIPTION = [
   "Send a message to a child task or team member, keyed by to.",
-  "Use deliver_as='steer' to redirect a running child immediately; deliver_as='followUp' (default) queues a plain-text follow-up.",
-  "Use deliver_as='interrupt' without a message to park a running child as interrupted while keeping its resident session.",
-  "A plain-text message to a finished resident child revives that same session as a follow-up; disposed, evicted, cancelled, and terminal-errored children are not revived.",
-  "message is required unless deliver_as='interrupt', and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only, always steer, and need team_run_id (defaults to your single owned team).",
+  "Plain-text messages always steer a running child immediately.",
+  "A plain-text message to a finished resident child revives that same session; disposed, evicted, cancelled, and terminal-errored children are not revived.",
+  "message is required and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
-  "Team messages always steer into the recipient's running turn, regardless of deliver_as.",
+  "Team messages always steer into the recipient's running turn.",
 ].join(" ")
 
 const MEMBER_SCOPED_DESCRIPTION = [
@@ -46,39 +44,14 @@ export async function runTaskSend(
   callerSessionId: string | undefined,
   teamRouting?: TaskSendTeamRouting,
 ): Promise<SendToolResult> {
-  const teamDelivery = isTeamDelivery(params, teamRouting)
-  const delivery = teamDelivery ? "steer" : params.deliver_as ?? DEFAULT_SEND_DELIVERY
-  const validation = validateParams(params, delivery, teamDelivery)
+  const validation = validateParams(params)
   if (validation !== undefined) return validation
-
-  if (delivery === "interrupt") {
-    const denied = scopeDenied(manager, params.to, callerSessionId, params.all_scope)
-    if (denied !== undefined) return denied
-    const outcome = await manager.interruptTask(params.to)
-    switch (outcome.kind) {
-      case "interrupted":
-        return toolResult(`Interrupted ${outcome.task_id}.`, {
-          kind: "interrupted",
-          task_id: outcome.task_id,
-          previous_status: outcome.previous_status,
-        })
-      case "noop":
-        return toolResult(`${outcome.reason} No change.`, {
-          kind: "noop",
-          task_id: outcome.task_id,
-          previous_status: outcome.status,
-          reason: outcome.reason,
-        })
-      case "not_found":
-        return notFound(manager, outcome.reason, callerSessionId)
-    }
-  }
 
   if (typeof params.message === "string") {
     const outcome = await manager.sendToTask({
       idOrName: params.to,
       message: params.message,
-      deliverAs: delivery,
+      deliverAs: "steer",
       ...(callerSessionId !== undefined ? { callerSessionId } : {}),
       ...(params.all_scope === true ? { allScope: true } : {}),
     })
@@ -103,29 +76,9 @@ export async function runTaskSend(
   return invalidArguments("message is required")
 }
 
-function isTeamDelivery(params: TaskSendInput, teamRouting: TaskSendTeamRouting | undefined): boolean {
-  return (
-    teamRouting?.teamRunId !== undefined
-    || params.team_run_id !== undefined
-    || (isStructuredMessage(params.message) && teamRouting !== undefined)
-  )
-}
-
-function validateParams(
-  params: TaskSendInput,
-  delivery: "steer" | "followUp" | "interrupt",
-  teamDelivery: boolean,
-): SendToolResult | undefined {
+function validateParams(params: TaskSendInput): SendToolResult | undefined {
   const message = params.message
-  if (isStructuredMessage(message) && params.deliver_as !== undefined && !teamDelivery) {
-    return invalidArguments("deliver_as applies only to plain-text messages")
-  }
-  if (delivery === "interrupt" && typeof message === "string") {
-    return invalidArguments("interrupt is a pure park and takes no message; send the follow-up in a second task_send (a message to an interrupted resident child revives it)")
-  }
-  if (message === undefined && delivery !== "interrupt") {
-    return invalidArguments("message is required")
-  }
+  if (message === undefined) return invalidArguments("message is required")
   if (isShutdownRejectWithoutReason(message)) {
     return invalidArguments("reason is required when rejecting a shutdown")
   }

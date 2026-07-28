@@ -1,3 +1,5 @@
+import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+
 import type { AgentModelEntry } from "./agent-model-entry"
 
 export type AgentToolRule = {
@@ -37,6 +39,7 @@ export type AgentLoaderDiagnostic = {
 }
 
 export type LoadAgentsOptions = {
+  readonly env?: OmoConfigEnv
   readonly homeDir?: string
   readonly projectDir?: string
 }

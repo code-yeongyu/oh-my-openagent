@@ -21,11 +21,6 @@ const Summary = Type.Optional(Type.String({ description: "Optional one-line summ
 export const TaskSendParams = Type.Object({
   to: Recipient,
   message: Type.Optional(Type.Union([PlainMessage, StructuredMessage])),
-  deliver_as: Type.Optional(
-    Type.Union([Type.Literal("steer"), Type.Literal("followUp"), Type.Literal("interrupt")], {
-      description: "steer interrupts the running turn immediately; followUp (default) queues a message; interrupt parks a running child and takes no message.",
-    }),
-  ),
   team_run_id: Type.Optional(Type.String({ description: "Team run id for lead-to-member messages or shutdown messages." })),
   summary: Summary,
   all_scope: Type.Optional(

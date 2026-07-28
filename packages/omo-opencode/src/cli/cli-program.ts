@@ -6,6 +6,7 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { configureRuntimeCommands } from "./runtime-commands"
+import { runConfigMigrate } from "./config-migrate"
 import { availableInstallPlatforms, isSenpiPlatformEnabled, SENPI_PLATFORM_ENV_FLAG } from "./senpi-platform-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -38,6 +39,11 @@ type InstallCommandOptions = {
 
 type RootCommandOptions = {
   readonly platform?: InstallArgs["platform"]
+}
+
+type ConfigMigrateCommandOptions = {
+  readonly dryRun?: boolean
+  readonly json?: boolean
 }
 
 type DoctorCommandOptions = {
@@ -170,7 +176,7 @@ Examples:
 Agent resolution order:
   1) --agent flag
   2) OPENCODE_DEFAULT_AGENT
-  3) oh-my-opencode.json "default_run_agent"
+  3) .omo/omo.jsonc "default_run_agent"
   4) Sisyphus (fallback)
 
 Available core agents:
@@ -252,6 +258,18 @@ Examples:
       json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME, options.platform ?? rootDoctorPlatform),
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("config")
+  .description("Manage unified OMO configuration")
+  .command("migrate")
+  .description("Migrate legacy OMO configuration into ~/.omo/omo.jsonc")
+  .option("--dry-run", "Print the transform, backup move plan, and conflicts without new migration writes")
+  .option("--json", "Print machine-readable migration output")
+  .action((options: ConfigMigrateCommandOptions) => {
+    const exitCode = runConfigMigrate({ dryRun: options.dryRun ?? false, json: options.json ?? false })
     process.exit(exitCode)
   })
 

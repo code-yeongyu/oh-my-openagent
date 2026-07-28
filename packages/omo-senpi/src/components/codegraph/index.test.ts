@@ -35,7 +35,12 @@ function fakeNodeSupport(overrides: Partial<CodegraphNodeSupport> = {}): Codegra
 }
 
 function loadedConfig(daemon: boolean = true) {
-	return { config: { codegraph: { daemon } }, diagnostics: [], sources: [] }
+	return {
+		config: { codegraph: { auto_provision: true, daemon, enabled: true, telemetry: false } },
+		diagnostics: [],
+		layers: [],
+		sources: [],
+	}
 }
 
 function testCodegraphEnv({ daemon }: { readonly daemon: boolean }): Record<string, string> {
@@ -195,6 +200,33 @@ describe("createCodegraphComponent", () => {
 		await component.register(pi, fakeContext())
 
 		expect(pi.mcpServers[0]?.config.args).toEqual(["--node-runtime", "node22", "serve", "--mcp"])
+	})
+
+	it("#given a Senpi harness codegraph override #when registered #then the resolved Senpi view configures the daemon", async () => {
+		// given
+		const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-codegraph-senpi-view-"))
+		const homeDir = join(cwd, "home")
+		mkdirSync(join(homeDir, ".omo"), { recursive: true })
+		writeFileSync(join(homeDir, ".omo", "omo.json"), JSON.stringify({
+			codegraph: { daemon: true },
+			"[senpi]": { codegraph: { daemon: false } },
+		}), "utf-8")
+
+		try {
+			// when
+			const pi = new FakeExtensionAPI()
+			await createCodegraphComponent({
+				resolveCommand: () => fakeResolution(),
+				resolveCwd: () => cwd,
+				resolveNodeSupport: () => fakeNodeSupport(),
+				env: { HOME: homeDir },
+			}).register(pi, fakeContext())
+
+			// then
+			expect((pi.mcpServers[0]?.config.env as Record<string, string>).CODEGRAPH_NO_DAEMON).toBe("1")
+		} finally {
+			rmSync(cwd, { force: true, recursive: true })
+		}
 	})
 
 	it("#given omo.json codegraph.daemon=true #when registered #then buildCodegraphEnv enables the daemon", async () => {

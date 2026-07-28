@@ -205,21 +205,26 @@ oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCo
 
 ## MULTI-LEVEL CONFIG
 
+One unified file configures every omo harness (OpenCode plugin, Senpi, Codex codegraph loader). Legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine.
+
 ```
-Walked configs (closer wins): <pwd up to $HOME>/.opencode/oh-my-openagent.json[c]   (legacy: oh-my-opencode.json[c])
+Project layers (nearest wins): <pwd up to $HOME>/.omo/omo.json[c]   ($HOME itself skipped)
                             ↓ merged onto
-User config:               ~/.config/opencode/oh-my-openagent.json[c]   (Windows: %APPDATA%\opencode\)
-                            ↓ falls back to
-Defaults                   (Zod safeParse fills omitted fields)
+User layer:                  ~/.omo/omo.json[c]   (same on every platform)
+                            ↓ resolved per harness, later wins
+Shared base → [harness] block → profiles.<P> → profiles.<P>.[harness]
+                            ↓ applied once at the end
+Defaults                   (Zod schema defaults)
 ```
 
-- `agents`, `categories`, `claude_code`: deep merged recursively (prototype-pollution safe)
-- `disabled_*` arrays: Set union (concatenated + deduplicated)
-- All other fields: override replaces base value
-- `mcp_env_allowlist`: **user-only** for security; walked configs cannot extend it
-- `migrateConfigFile()` rewrites legacy keys (idempotent via `_migrations` tracking + timestamped backups)
+- Harness blocks: `[opencode]` (freeform plugin config), `[senpi]` / `[codex]` (typed shared keys)
+- Profile activation: `OMO_PROFILE` > `OCX_PROFILE` (`ocx oc -p <name>`) > `OPENCODE_CONFIG_DIR` tail `profiles/<name>` > none; no default profiles ship
+- `models` catalog: a `model` string matching a catalog key resolves to the entry's model id and fills unset tuning; site tuning wins; `[harness]` blocks can override entries
+- Merge: plain objects deep-merge recursively (prototype-pollution safe); scalars and arrays replace
+- `mcp_env_allowlist` + `browser_automation_engine.playwright_mcp_args`: **user-layer only** (incl. the user's own profile block); project layers cannot extend them
+- Runtime migration (lock+journal, no-clobber, markers in `_migrations`): ids `2026-07-opencode-config-unification` (oh-my-* files) and `2026-07-codex-config-jsonc` (`~/.omo/config.jsonc`); backups at `~/.omo/migration-backup-<UTC-ts>-opencode-config/`; triggers at plugin startup (opencode + senpi), codex startup (config.jsonc group only), install, and `oh-my-openagent config migrate` (`--dry-run`/`--json`)
 
-Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"`
+Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"`
 
 ## THREE-TIER MCP SYSTEM
 

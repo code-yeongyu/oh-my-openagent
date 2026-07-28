@@ -30,6 +30,7 @@ describe("omo-senpi extension entry", () => {
 
     expect(pi.flags.map((flag) => flag.name)).toEqual(
       expect.arrayContaining([
+        "omo-senpi-config-startup-disabled",
         "omo-senpi-ultrawork-disabled",
         "omo-senpi-ulw-loop-disabled",
         "omo-senpi-fallback-architect-disabled",

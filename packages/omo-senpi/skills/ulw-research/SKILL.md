@@ -27,7 +27,7 @@ This skill is authored against the native senpi task + team tool surface. You co
 | Track shared research state | `task_create` / `task_list` / `task_update` / `task_get` | lead-only team tasklist |
 | Spawn a bounded recon / expansion / verification lane | `task` | `prompt` + `subagent_type: "explore" \| "librarian"` or a `category`; `run_in_background: true`; optional `load_skills`, `name` |
 | Read a finished lane back | `task_output` | task id or name |
-| End a lane / park it | `task_cancel` / `task_send({ deliver_as: "interrupt" })` | — |
+| End a lane | `task_cancel` | — |
 | Disband the team at the end | `team_delete` | `team_run_id`, `force: true` |
 
 Members receive your mail as injected follow-ups inside their child process; they report to you with `task_send({ to: "lead", message: "..." })`. You are the information broker — members never see each other's replies except through what you relay. The curated agents (`explore`, `librarian`, `metis`, `momus`) are read-only, in-process, and REJECTED as team members: route them through `task` lanes, never through `team_create`.

@@ -4239,7 +4239,7 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
 
     test("agentOverrides model takes priority over matchedAgent.model (#1357)", async () => {
-      // given - user configured oracle to use a specific model in oh-my-opencode.json
+      // given - user configured oracle to use a specific model in omo.json
       const { createDelegateTask } = require("./tools")
       let promptBody: CapturedPromptBody = {}
 

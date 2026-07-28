@@ -34,8 +34,8 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => {
-					throw new Error("excluded projects must not probe CodeGraph status");
+				ancestorProbe: () => {
+					throw new Error("excluded projects must not probe CodeGraph ancestors");
 				},
 				sweepZombies: () => {
 					sweepCalls += 1;
@@ -68,8 +68,8 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				env: { HOME: "/tmp/home" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
+				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
 			});
 
 			// then
@@ -97,8 +97,8 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				env: { HOME: "/tmp/home" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
+				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
 			});
 
 			// then

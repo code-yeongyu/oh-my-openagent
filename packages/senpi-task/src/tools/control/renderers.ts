@@ -36,7 +36,7 @@ export function renderTaskSendCall(args: TaskSendInput, theme: ControlRenderThem
 }
 
 export function renderMemberScopedTaskSendCall(args: MemberScopedTaskSendInput, theme: ControlRenderTheme): RenderComponent {
-  return renderTaskSendCall({ ...args, deliver_as: "steer" }, theme)
+  return renderTaskSendCall(args, theme)
 }
 
 export function renderTaskSendResult(
@@ -73,7 +73,6 @@ function taskSendCallLine(args: TaskSendInput, theme: ControlRenderTheme, width:
   const base = joinRendererTokens([
     "task_send",
     `to:${normalizeRendererText(args.to)}`,
-    `deliver:${args.deliver_as ?? "followUp"}`,
   ])
   if (typeof args.message === "string") return withExcerpt(base, "message", args.message, theme, width)
   return base
@@ -158,10 +157,6 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "error", text: notFoundText(details) }
     case "invalid_arguments":
       return { color: "error", text: `task_send invalid: ${details.reason}` }
-    case "interrupted":
-      return { color: "warning", text: `task_send interrupted ${details.task_id} (was ${details.previous_status})` }
-    case "noop":
-      return { color: statusThemeColor(details.previous_status), text: `task_send no change ${details.task_id} (${details.previous_status}): ${details.reason}` }
     case "team_message":
       return teamMessageRow(details.team)
     case "shutdown_requested":

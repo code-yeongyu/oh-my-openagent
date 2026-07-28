@@ -10,7 +10,13 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
-import { backgroundWidgetRows, buildWidgetRows, formatFooterStatus, isTerminal } from "./status-row-format"
+import {
+  backgroundWidgetRows,
+  buildWidgetRows,
+  formatFooterStatus,
+  isTerminal,
+  LIVE_STATUS_REFRESH_MS,
+} from "./status-row-format"
 
 export { buildWidgetRows, formatFooterStatus, formatTaskRow } from "./status-row-format"
 
@@ -47,7 +53,7 @@ export interface TaskStatusUiDeps {
   readonly runtime: StatusUiRuntime
   readonly debounceMs?: number
   readonly timers?: StatusUiTimers
-  // Local rendering time only: no timer emits updates merely to advance elapsed or spinner frames.
+  // Local rendering time used by the live-refresh timer and deterministic tests.
   readonly now?: () => number
 }
 
@@ -71,18 +77,42 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   const now = deps.now ?? Date.now
   const liveActivity = new Map<string, string>()
   const subscriptions = new Map<string, () => void>()
+  let cachedRecords: readonly TaskRecord[] = []
   let pending: TimerHandle | undefined
+  let liveRefresh: TimerHandle | undefined
 
   function syncNow(): void {
+    if (!refreshCachedRecords()) {
+      clearLiveRefresh()
+      return
+    }
+    renderCachedRecords()
+  }
+
+  function refreshCachedRecords(): boolean {
     const ui = deps.runtime.ui()
-    if (ui === undefined) return
+    if (ui === undefined) return false
     const mode = deps.runtime.mode()
-    if (mode !== undefined && mode !== "tui") return
-    const sessionId = deps.runtime.sessionId()
-    const records = scopedRecords(deps.manager, sessionId)
-    syncChildSubscriptions(records)
+    if (mode !== undefined && mode !== "tui") return false
+    cachedRecords = scopedRecords(deps.manager, deps.runtime.sessionId())
+    syncChildSubscriptions(cachedRecords)
+    return true
+  }
+
+  function renderCachedRecords(): void {
+    const ui = deps.runtime.ui()
+    if (ui === undefined) {
+      clearLiveRefresh()
+      return
+    }
+    const mode = deps.runtime.mode()
+    if (mode !== undefined && mode !== "tui") {
+      clearLiveRefresh()
+      return
+    }
+    const records = cachedRecords
     const background = deps.manager.wasBackground === undefined
-      ? records
+      ? []
       : records.filter((record) => deps.manager.wasBackground?.(record.task_id) === true)
     const renderedAt = now()
     const liveStats = deps.manager.runStatsSnapshot?.bind(deps.manager)
@@ -92,25 +122,28 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       ? buildWidgetRows(records)
       : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats)
     if (rows.length === 0) {
+      clearLiveRefresh()
       ui.setWidget(UI_KEY, undefined)
       return
     }
     ui.setWidget(UI_KEY, rows, { placement: "belowEditor" })
+    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status))) {
+      scheduleLiveRefresh()
+    } else clearLiveRefresh()
   }
 
   function scheduleSync(): void {
     // Store mutations happen synchronously before TaskManager starts the child. Attach here rather
     // than waiting for the debounced paint, otherwise a fast first tool_execution_start is lost.
-    if (deps.runtime.ui() !== undefined) {
-      const mode = deps.runtime.mode()
-      if (mode === undefined || mode === "tui") {
-        syncChildSubscriptions(scopedRecords(deps.manager, deps.runtime.sessionId()))
-      }
-    }
+    const recordsRefreshed = refreshCachedRecords()
+    // A live row already has a bounded 250ms repaint. Reuse it instead of adding a second timer
+    // for child events or store mutations; the next tick reads the latest records, activity, and stats.
+    if (liveRefresh !== undefined) return
     if (pending !== undefined) timers.clear(pending)
     pending = timers.set(() => {
       pending = undefined
-      syncNow()
+      if (recordsRefreshed) renderCachedRecords()
+      else syncNow()
     }, debounceMs)
   }
 
@@ -138,14 +171,33 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     }
   }
 
+  function scheduleLiveRefresh(): void {
+    if (liveRefresh !== undefined) return
+    const handle = timers.set(() => {
+      timers.clear(handle)
+      if (liveRefresh !== handle) return
+      liveRefresh = undefined
+      renderCachedRecords()
+    }, LIVE_STATUS_REFRESH_MS)
+    liveRefresh = handle
+  }
+
+  function clearLiveRefresh(): void {
+    if (liveRefresh === undefined) return
+    timers.clear(liveRefresh)
+    liveRefresh = undefined
+  }
+
   function dispose(): void {
     if (pending !== undefined) {
       timers.clear(pending)
       pending = undefined
     }
+    clearLiveRefresh()
     for (const unsubscribe of subscriptions.values()) unsubscribe()
     subscriptions.clear()
     liveActivity.clear()
+    cachedRecords = []
   }
 
   return { scheduleSync, syncNow, dispose }

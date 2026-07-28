@@ -36,6 +36,8 @@ function toAgentDefinition(name: string, def: OmoAgentDef): AgentDefinition {
     ...(def.background === undefined ? {} : { background: def.background }),
     ...(def.execution_mode === undefined ? {} : { executionMode: def.execution_mode }),
     ...(def.allowed_subagents === undefined ? {} : { allowedSubagents: def.allowed_subagents }),
+    ...(def.disallowed_tools === undefined ? {} : { disallowedTools: def.disallowed_tools }),
     ...(def.max_depth === undefined ? {} : { maxDepth: def.max_depth }),
+    ...(def.max_turns === undefined ? {} : { maxTurns: def.max_turns }),
   }
 }

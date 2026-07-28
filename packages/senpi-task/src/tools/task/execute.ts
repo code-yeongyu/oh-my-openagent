@@ -90,9 +90,9 @@ function backgroundStartText(started: Extract<StartResult, { kind: "started" }>,
   const queue = started.queue_position !== undefined ? ` queued at position ${started.queue_position}` : ""
   const label = description ?? started.name
   if (label === started.task_id) {
-    return `Started task ${started.task_id} (${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
+    return `Started task ${started.task_id} (${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
   }
-  return `Started task ${label} (${started.task_id}, ${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
+  return `Started task ${label} (${started.task_id}, ${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
 }
 
 async function runSpawn(

@@ -34,7 +34,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 | `task_cancel` | `createTaskCancelTool` | `tools/control/cancel.ts:61` |
 | `task_output` | `createTaskOutputTool` | `tools/output/output.ts` |
 
-`task` is spawn-only. It accepts either one `prompt` or a non-empty `tasks:[...]` batch; synchronous batches aggregate every child result, while background batches return item ids and queue positions. Continue, steer, park, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child status/transcript peeks go through `task_output`.
+`task` is spawn-only. It accepts either one `prompt` or a non-empty `tasks:[...]` batch; synchronous batches aggregate every child result, while background batches return item ids and queue positions. Steer, resident-session revival, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child status/transcript peeks go through `task_output`.
 
 ### Team tools (6, lead-only)
 

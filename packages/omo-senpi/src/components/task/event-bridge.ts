@@ -1,5 +1,4 @@
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
-import { DUAL_CONFIG_WARNING } from "./coexistence"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { LiveTaskContext } from "./runtime-context"
@@ -10,7 +9,6 @@ import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
-  readonly warnDualConfig: boolean
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
 }
@@ -25,7 +23,6 @@ export function wireEventBridge(
   transitions: SessionTransitionBridge,
   state: EventBridgeState,
 ): void {
-  let warnedDualConfig = false
   const guidanceGuard = createOncePerSessionGuard()
 
   pi.on("session_start", async (_payload, eventCtx) => {
@@ -47,10 +44,6 @@ export function wireEventBridge(
       engine.notifier.reconcileFailedNotifications({ sessionId, parentState: engine.runtime.parentState() })
     }
     await tickLeadPollersBestEffort(ctx, state)
-    if (state.warnDualConfig && !warnedDualConfig) {
-      warnedDualConfig = true
-      notifyOrLog(engine, ctx, DUAL_CONFIG_WARNING)
-    }
     statusUi.scheduleSync()
   })
 
@@ -124,15 +117,6 @@ async function tickLeadPollersBestEffort(ctx: ComponentContext, state: EventBrid
       error: error instanceof Error ? error.message : String(error),
     })
   }
-}
-
-function notifyOrLog(engine: TaskEngine, ctx: ComponentContext, message: string): void {
-  const ui = engine.runtime.ui()
-  if (ui !== undefined) {
-    ui.notify(message, "warning")
-    return
-  }
-  ctx.logger.warn(message)
 }
 
 function asLiveContext(value: unknown): LiveTaskContext {

@@ -39,13 +39,17 @@ function resolveListedTask(manager: SendManager, to: string): ReturnType<SendMan
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
   switch (outcome.kind) {
-    case "steered":
+    case "steered": {
+      if (outcome.delivered !== "steer") {
+        throw new Error(`task_send invariant violated: expected steer delivery, received ${outcome.delivered}`)
+      }
       return toolResult(`Delivered to ${outcome.task_id} as ${outcome.delivered}.`, {
         kind: "steered",
         task_id: outcome.task_id,
         status: outcome.status,
         delivered: outcome.delivered,
       })
+    }
     case "revived":
       return toolResult(`Revived ${outcome.task_id} (run epoch ${outcome.run_epoch}).`, {
         kind: "revived",

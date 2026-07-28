@@ -1,0 +1,38 @@
+PIN / CHARACTERIZATION
+Command:
+  cd /Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts
+
+Observed before production changes:
+  (pass) #given only terminal background tasks #when syncing #then no refresh timer remains active
+  (pass) #given two background children #when latest events arrive #then rows show identity, model, stats, activity, and elapsed time
+  2 pass
+  0 fail
+
+Why this pins adjacent behavior:
+  A terminal-only background task clears the widget and leaves no scheduled timer. The live-refresh fix must preserve that state instead of introducing a perpetual repaint loop.
+
+MUTATION RED
+Temporary uncommitted mutation:
+  Re-arm `scheduleLiveRefresh()` unconditionally after each live timer callback.
+
+Command:
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts --test-name-pattern "final background task completes"
+
+Observed:
+  Expected: 0
+  Received: 1
+  at packages/omo-senpi/src/components/task/status-ui-background.test.ts:164
+  0 pass
+  1 fail
+
+GREEN AFTER REVERTING MUTATION
+Command:
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts --test-name-pattern "final background task completes"
+
+Observed:
+  1 pass
+  0 fail
+
+Behavior proven:
+  The regression assertion fails if a completed task leaves a self-rearming refresh loop, and passes only when the final callback observes terminal state and leaves the timer map empty.

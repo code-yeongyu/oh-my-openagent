@@ -1,6 +1,6 @@
 # omo.json Configuration Reference
 
-`omo.json` (or `omo.jsonc`) is the harness-neutral configuration surface owned by [`@oh-my-opencode/omo-config-core`](../../packages/omo-config-core/AGENTS.md). Today it is read by the Senpi adapter's `task` and `codegraph` components; the schema, loader, and writer are shared code so other harnesses can adopt it later (see [Coexistence](#coexistence-omojson-vs-oh-my-openagentjson) and [`ROADMAP.md`](../../ROADMAP.md)).
+`omo.json` (or `omo.jsonc`) is the single harness-spanning configuration surface owned by [`@oh-my-opencode/omo-config-core`](../../packages/omo-config-core/AGENTS.md). It is the only config file read by the OpenCode plugin, by the Senpi adapter (task, codegraph, config-watch), and by the Codex codegraph loader. The legacy OpenCode-family files (`oh-my-openagent.json[c]` / `oh-my-opencode.json[c]`) and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration from legacy files](#migration-from-legacy-files)).
 
 Files may be JSONC: `//` comments and trailing commas are allowed. Every schema object is `.strict()`, so unknown keys are rejected and reported as a diagnostic rather than silently ignored.
 
@@ -32,6 +32,28 @@ A generated JSON schema artifact ships at `assets/omo.schema.json`, produced fro
 ```
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json
 ```
+
+## Resolution order
+
+After the file layers merge, each harness resolves its own view out of the merged document (`packages/omo-config-core/src/loader/resolution.ts`). Later layers win:
+
+1. **Shared base keys** (every top-level key except `profiles` and the bracketed harness blocks).
+2. **The `[harness]` block** for the current harness: `[opencode]`, `[senpi]`, or `[codex]`.
+3. **`profiles.<name>`** for the active profile.
+4. **`profiles.<name>.[harness]`** for the active profile.
+
+Schema defaults apply once at the very end, after all four layers fold. Control keys (`profiles`, `[opencode]`, `[senpi]`, `[codex]`) never leak into the resolved view. Activating a profile that does not exist yields a `profile` diagnostic and the base configuration.
+
+### Profile activation
+
+The active profile name comes from (`resolveOmoProfileName`), highest priority first:
+
+1. `OMO_PROFILE`
+2. `OCX_PROFILE` (set by `ocx oc -p <name>`)
+3. An `OPENCODE_CONFIG_DIR` whose lexical tail is `profiles/<name>`
+4. None (no profile layer applied)
+
+No default profiles ship. A profile exists only when you write one under `profiles.<name>` or the migration derives one from a legacy OpenCode profile directory.
 
 ### Example
 
@@ -71,16 +93,48 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.sc
 
 ```jsonc
 {
-  "$schema": "…",        // optional editor pointer
-  "categories": { … },   // record<string, CategoryConfig>
-  "agents": { … },       // record<string, AgentDef>
-  "codegraph": { … },    // CodeGraph MCP settings
-  "task": { … },         // task engine settings
-  "teams": { … }         // record<string, TeamSpec>
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json", // optional editor pointer
+  "categories": {},     // record<string, CategoryConfig>
+  "agents": {},         // record<string, AgentDef>
+  "codegraph": {},      // CodeGraph MCP settings
+  "task": {},           // task engine settings
+  "teams": {},          // record<string, TeamSpec>
+  "models": {},         // record<string, ModelCatalogEntry>, shared model catalog
+  "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
+  "[senpi]": {},        // Senpi-only overrides, typed base keys
+  "[codex]": {},        // Codex-only overrides, typed base keys
+  "profiles": {},       // record<string, Profile>, opt-in named profiles
+  "_migrations": [],    // applied migration ids, written by the migration engine
+  "legacy_migrations": {} // imported legacy migration history, engine-managed
 }
 ```
 
 Source: `packages/omo-config-core/src/schema/config.ts`.
+
+### Harness blocks
+
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[senpi]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `codegraph`, `task`, `teams`, `models`), so a harness-specific override stays schema-checked.
+
+Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
+
+### `models` (shared catalog)
+
+A record of short name to catalog entry (`schema/model-catalog.ts`). Each entry is `{ model, variant?, reasoningEffort? }` and must be `.strict()`-clean:
+
+```jsonc
+{
+  "models": {
+    "opus": { "model": "anthropic/claude-opus-4-8", "variant": "max" },
+    "fast": { "model": "anthropic/claude-haiku-4-5" }
+  },
+  "categories": {
+    "deep": { "model": "opus" },              // resolves to anthropic/claude-opus-4-8 at variant max
+    "quick": { "model": "fast", "variant": "high" } // site tuning wins over the entry
+  }
+}
+```
+
+When an agent or category `model` string matches a catalog key, resolution (`models/model-reference-resolution.ts`) swaps in the entry's model id and fills any unset `variant` / `reasoningEffort` from the entry. Tuning written at the use site always wins. A `[harness]` block (or a profile) can override individual catalog entries for its own view. Catalog cycles are detected and reported as `model_catalog_cycle` diagnostics instead of looping.
 
 ### `categories`
 
@@ -170,7 +224,7 @@ Team members always spawn in `process` mode, which cannot carry the curated pers
 
 ### `codegraph`
 
-CodeGraph MCP settings consumed by the Senpi `codegraph` component when the extension registers (`schema/codegraph.ts`).
+CodeGraph MCP settings (`schema/codegraph.ts`), read by all three harnesses. Defaults: `enabled`, `auto_provision`, and `daemon` default to `true`; `telemetry` defaults to `false`; `install_dir`, `watch_debounce_ms`, `excluded_roots`, and `session_start_cooldown_ms` (minimum 60000) are optional. Not every key applies to every harness (`schema/harness.ts` `SETTING_HARNESS_SUPPORT`): `daemon` and `excluded_roots` apply to Codex and OpenCode, `session_start_cooldown_ms` is Codex-only, and `watch_debounce_ms` applies to OpenCode and the legacy `omo` harness id; unsupported keys surface as diagnostics.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
@@ -229,6 +283,29 @@ Each member shares a base (`name` matching `^[a-z0-9-]+$`, optional `cwd`, `work
 - `kind: "category"` requires `category` and `prompt`.
 - `kind: "subagent_type"` requires `subagent_type`; `prompt` is optional.
 
+### `profiles`
+
+A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `codegraph`, `task`, `teams`, `models`) plus `[opencode]`, `[senpi]`, and `[codex]` blocks of its own:
+
+```jsonc
+{
+  "profiles": {
+    "kimi": {
+      "categories": {
+        "deep": { "model": "kimi-for-coding/kimi-k3" }
+      },
+      "[opencode]": {
+        "agents": {
+          "sisyphus": { "model": "kimi-for-coding/kimi-k3" }
+        }
+      }
+    }
+  }
+}
+```
+
+Profiles are inert until activated (see [Profile activation](#profile-activation)). When active, the profile's base keys fold over the shared base, and the profile's harness block folds over the top-level harness block.
+
 ### Fallback models
 
 `fallback_models` (on a category) and per-model fallback entries accept a union (`schema/fallback-models.ts`): a single model string, an array of model strings, an array of objects, or a mixed array. Each object is `{ model, variant?, reasoningEffort?, temperature?, top_p?, maxTokens?, thinking? }`.
@@ -286,18 +363,32 @@ For both categories and agents the resolved `variant` wins over `reasoningEffort
 }
 ```
 
-## Coexistence: `omo.json` vs `oh-my-openagent.json`
+## Migration from legacy files
 
-`omo.json` and the OpenCode-family config (`oh-my-openagent.json` / `oh-my-opencode.json`) have **zero interaction today**. They are separate files read by separate loaders:
+Before the unification, the OpenCode plugin read a walked `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` chain and the Codex/Senpi codegraph surface read `~/.omo/config.jsonc`. Those files are history: a lock-and-journal migration engine imports them into `omo.jsonc` once, and nothing reads them at runtime afterward.
 
-- The OpenCode plugin reads the walked `oh-my-openagent.json[c]` chain (see [`docs/reference/configuration.md`](./configuration.md)).
-- The Senpi `task` and `codegraph` components read `omo.json` through `@oh-my-opencode/omo-config-core`.
+- The legacy OpenCode user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy `profiles/<name>/` directory becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; project `.opencode/` files import into that project's `.omo/omo.jsonc`.
+- `~/.omo/config.jsonc` imports its shared `codegraph` settings and its `[opencode]` / `[codex]` blocks; a legacy `[omo]` block maps to `[senpi]`.
+- No-clobber: a value already present in the target wins, and skipped legacy values surface as diagnostics. Legacy migration history is preserved under `legacy_migrations`, and applied migrations are marked in the target's `_migrations` array (`2026-07-opencode-config-unification` for the `oh-my-*` files, `2026-07-codex-config-jsonc` for `~/.omo/config.jsonc`).
+- Sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`).
+- Triggers: OpenCode plugin startup, Senpi startup, and install run both migration groups; Codex startup runs only the `config.jsonc` group; `oh-my-openagent config migrate` runs both on demand (`--dry-run`, `--json`).
 
-There is no automatic migration or field bridging between the two. When a project contains BOTH an OpenCode-family config and an `omo.json` that contributed `categories`/`agents`, the Senpi task component emits a one-time warning on first session start noting that senpi reads `omo.json` only and ignores the OpenCode config for tasks (`packages/omo-senpi/src/components/task/coexistence.ts`).
+Full user-facing detail: [`docs/reference/configuration.md`](./configuration.md#migration).
 
-This is deliberate: `omo.json` landed **senpi-first**. Adopting it in the OpenCode edition, and any migration path from `oh-my-openagent.json`, is a later phase tracked in [`ROADMAP.md`](../../ROADMAP.md).
+## Mixed-version compatibility
+
+The unified file is read starting with oh-my-openagent 4.20.0: the OpenCode plugin, the Senpi adapter, and the Codex codegraph loader at 4.20.0 or later all load `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc` and nothing else. Harnesses older than 4.20.0 still read the legacy files, which the migration has moved into the backup directory.
+
+One sharp edge when mixing versions: every schema object is `.strict()`. A pre-4.20.0 copy of `@oh-my-opencode/omo-config-core` rejects an `omo.jsonc` that contains keys it does not know, which includes `models`, `profiles`, and the `[opencode]` / `[senpi]` / `[codex]` harness blocks. An older strict core handed a newer unified file fails validation on those keys instead of ignoring them.
+
+To downgrade:
+
+1. Quit every running harness so no migration or config write is in flight.
+2. Restore the legacy files from the newest `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` directory (and `<project>/.omo/migration-backup-<UTC timestamp>/` for project files): each backup holds the legacy sources at their original relative paths, so copy them back to where the backup tree mirrors them.
+3. Remove or rename `~/.omo/omo.jsonc` if the older harness must not see it, then install the older version.
+
+To re-upgrade later, delete the restored legacy files or let the migration re-import them; existing values in `omo.jsonc` still win under the no-clobber policy.
 
 ## Follow-ups
 
 - `member.backendType: "tmux"` and non-project (user-global) team storage are schema-level only and are not exercised by the current Senpi runtime; use `in-process` members in project `.omo/` teams.
-- OpenCode-edition adoption of `omo.json` and a `oh-my-openagent.json` migration path are not implemented.

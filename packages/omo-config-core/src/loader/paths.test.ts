@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
-import { resolveOmoConfigPaths, resolveUserOmoConfigDirectory, resolveUserOmoConfigPath } from "./paths"
+import { resolveHomeDir, resolveOmoConfigPaths, resolveUserOmoConfigDirectory, resolveUserOmoConfigPath } from "./paths"
 
 function makeHome(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-config-paths-"))
@@ -15,6 +15,12 @@ function writeFile(path: string, content: string): void {
   mkdirSync(join(path, ".."), { recursive: true })
   writeFileSync(path, content)
 }
+
+describe("resolveHomeDir", () => {
+  test("#given an absolute POSIX HOME #when resolving on any host #then its filesystem root is preserved", () => {
+    expect(resolveHomeDir({ HOME: "/home/alice" })).toBe("/home/alice")
+  })
+})
 
 describe("resolveUserOmoConfigDirectory", () => {
   test("#given a HOME #when resolving the user config directory #then it is ~/.omo", () => {

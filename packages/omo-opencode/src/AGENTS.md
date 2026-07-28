@@ -54,8 +54,8 @@ serverPlugin(input, options)
 
 ```
 loadPluginConfig(directory, ctx)
-  1. User: ~/.config/opencode/oh-my-openagent.jsonc (legacy: oh-my-opencode.jsonc)
-  2. Walked configs: <pwd up to $HOME>/.opencode/oh-my-openagent.jsonc
+  1. User: ~/.omo/omo.jsonc
+  2. Walked configs: <pwd up to $HOME>/.omo/omo.jsonc
   3. mergeConfigs(user, walked)
      - agents/categories/claude_code: deepMerge (recursive, prototype-pollution safe)
      - disabled_*: Set union
@@ -63,7 +63,7 @@ loadPluginConfig(directory, ctx)
      - playwright_mcp_args: user-only (security)
      - others: override replaces
   4. Zod safeParse → defaults for omitted fields
-  5. migrateConfigFile() → idempotent via _migrations tracking + timestamped backups
+  5. Legacy configuration is migrated once at startup into the unified OMO chain
 ```
 
 ## HOOK COMPOSITION (5-tier)

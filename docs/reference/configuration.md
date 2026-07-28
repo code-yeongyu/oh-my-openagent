@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete reference for Oh My OpenCode plugin configuration. During the rename transition, the runtime recognizes both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` files.
+Complete reference for Oh My OpenCode plugin configuration. Every omo harness reads one unified config file, `omo.jsonc`; the legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and are no longer read at runtime.
 
 ---
 
@@ -44,102 +44,138 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
 
 ### File Locations
 
-User config loads first. Project configs are discovered by walking from the working directory up to `$HOME`; closer configs win. If the working directory is outside `$HOME`, only that directory is checked.
+One unified file configures every omo harness: the OpenCode plugin, Senpi (task, codegraph, config-watch), and the Codex codegraph loader. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
 
-1. Walked configs: `.opencode/oh-my-openagent.json[c]` or legacy `.opencode/oh-my-opencode.json[c]`
-2. User config (`.jsonc` preferred over `.json`):
+1. User layer (lowest precedence): `~/.omo/omo.jsonc` on every platform (`omo.json` is accepted as a fallback basename).
+2. Project layers: `.omo/omo.jsonc` (then `.omo/omo.json`) in every directory from the working directory up to `$HOME`. Farther ancestors merge first, so the nearest project file wins and beats the user layer. `$HOME` itself is skipped by the walk because `~/.omo` is already the user layer. If the working directory is outside `$HOME`, only that directory is checked.
 
-| Platform    | Path candidates |
-| ----------- | --------------- |
-| macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
-| Windows     | `%APPDATA%\opencode\oh-my-openagent.json[c]`, `%APPDATA%\opencode\oh-my-opencode.json[c]` |
+#### Resolution Order
 
-**Security note:** `mcp_env_allowlist` is user-only. Walked configs cannot extend it.
+Within the merged document each harness resolves its own view VSCode-style, later layers winning:
 
-**Rename compatibility:** OpenCode plugin registration and new config writes prefer `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. If both plugin config basenames exist in the same directory, the canonical `oh-my-openagent.*` file wins; update the canonical file only.
+1. Shared base keys
+2. The `[harness]` block: `[opencode]`, `[senpi]`, or `[codex]`
+3. `profiles.<name>`
+4. `profiles.<name>.[harness]`
+
+Defaults apply once at the end. The option keys documented in this reference are the contents of the `[opencode]` block. `agents` and `categories` can also live at the shared base level so every harness sees them, using the shared field set documented in the [omo.json reference](./omo-json.md); OpenCode-specific agent options belong in `[opencode]`.
+
+#### Profiles
+
+No default profiles ship: a profile exists only when you write one under `profiles.<name>` or the migration derives one from a legacy profile directory. Activation, highest priority first:
+
+1. `OMO_PROFILE`
+2. `OCX_PROFILE` (set by `ocx oc -p <name>`)
+3. An `OPENCODE_CONFIG_DIR` whose path ends in `profiles/<name>`
+4. None
+
+Activating a profile that does not exist produces a diagnostic and falls back to the base configuration.
+
+#### Model Catalog
+
+A top-level `models` record maps a short name to `{ model, variant?, reasoningEffort? }`. When an agent or category `model` string matches a catalog key, it resolves to the entry's model id and fills any unset `variant` / `reasoningEffort` from the entry; tuning written at the use site always wins. `[harness]` blocks can override individual catalog entries for one harness.
+
+#### Security Invariants
+
+`mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` are honored only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
+
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
 }
 ```
 
 Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to list available models.
 
+#### Migration
+
+The first time a current harness starts (and again on install or via the CLI), a lock-and-journal migration engine imports the legacy files into the unified file:
+
+- Sources: `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` in the OpenCode user config directory, in each of its `profiles/<name>/` directories, and in walked project `.opencode/` directories, plus `~/.omo/config.jsonc`.
+- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its shared `codegraph` settings plus its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
+- Conflict policy: no-clobber. A value already present in the target wins, and every skipped legacy value is reported as a diagnostic instead of overwriting. Prior legacy migration history is preserved under the target's `legacy_migrations` key.
+- Markers: each applied migration records its id in the target's `_migrations` array, so re-runs are no-ops. `2026-07-opencode-config-unification` covers the `oh-my-*` files; `2026-07-codex-config-jsonc` covers `~/.omo/config.jsonc`. Codex startup runs only the second group; OpenCode plugin startup, Senpi startup, install, and the CLI run both groups, so whichever side runs first applies each group exactly once.
+- Backups: sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`). An interrupted run resumes from its journal on the next start.
+- Manual run: `oh-my-openagent config migrate`. `--dry-run` prints the transform, backup move plan, and conflicts without writing; `--json` prints machine-readable output.
+- Diagnostics surface once per startup: an OpenCode toast, a Senpi `session_start` notification, or Codex loader warnings.
+
 ### Quick Start Example
 
-Here's a practical starting configuration:
+Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live inside the `[opencode]` block:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
 
-  "agents": {
-    // Main orchestrator: Claude Opus or Kimi K3 work best
-    "sisyphus": {
-      "model": "kimi-for-coding/kimi-k3",
-      "ultrawork": { "model": "anthropic/claude-opus-5", "variant": "max" },
+  "[opencode]": {
+    "agents": {
+      // Main orchestrator: Claude Opus or Kimi K3 work best
+      "sisyphus": {
+        "model": "kimi-for-coding/kimi-k3",
+        "ultrawork": { "model": "anthropic/claude-opus-5", "variant": "max" },
+      },
+
+      // Research agents: cheap fast models are fine
+      "librarian": { "model": "google/gemini-3-flash" },
+      "explore": { "model": "github-copilot/grok-code-fast-1" },
+
+      // Architecture consultation: GPT-5.6 Sol or Claude Opus
+      "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high" },
+
+      // Prometheus inherits sisyphus model; just add prompt guidance
+      "prometheus": {
+        "prompt_append": "Leverage deep & quick agents heavily, always in parallel.",
+      },
     },
 
-    // Research agents: cheap fast models are fine
-    "librarian": { "model": "google/gemini-3-flash" },
-    "explore": { "model": "github-copilot/grok-code-fast-1" },
+    "categories": {
+      // quick - trivial tasks
+      "quick": { "model": "opencode/gpt-5-nano" },
 
-    // Architecture consultation: GPT-5.6 Sol or Claude Opus
-    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high" },
+      // unspecified-low - moderate tasks
+      "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
-    // Prometheus inherits sisyphus model; just add prompt guidance
-    "prometheus": {
-      "prompt_append": "Leverage deep & quick agents heavily, always in parallel.",
+      // unspecified-high - complex work
+      "unspecified-high": { "model": "anthropic/claude-opus-5", "variant": "max" },
+
+      // writing - docs/prose
+      "writing": { "model": "kimi-for-coding/kimi-k3" },
+
+      // visual-engineering - Gemini dominates visual tasks
+      "visual-engineering": {
+        "model": "google/gemini-3.1-pro",
+        "variant": "high",
+      },
+
+      // Custom category for git operations
+      "git": {
+        "model": "opencode/gpt-5-nano",
+        "description": "All git operations",
+        "prompt_append": "Focus on atomic commits, clear messages, and safe operations.",
+      },
     },
+
+    // Limit expensive providers; let cheap ones run freely
+    "background_task": {
+      "providerConcurrency": {
+        "anthropic": 3,
+        "openai": 3,
+        "opencode": 10,
+        "zai-coding-plan": 10,
+      },
+      "modelConcurrency": {
+        "anthropic/claude-opus-5": 2,
+        "opencode/gpt-5-nano": 20,
+      },
+    },
+
+    "experimental": { "aggressive_truncation": true, "task_system": true },
+    "tmux": { "enabled": false },
   },
-
-  "categories": {
-    // quick - trivial tasks
-    "quick": { "model": "opencode/gpt-5-nano" },
-
-    // unspecified-low - moderate tasks
-    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
-
-    // unspecified-high - complex work
-    "unspecified-high": { "model": "anthropic/claude-opus-5", "variant": "max" },
-
-    // writing - docs/prose
-    "writing": { "model": "kimi-for-coding/kimi-k3" },
-
-    // visual-engineering - Gemini dominates visual tasks
-    "visual-engineering": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
-    },
-
-    // Custom category for git operations
-    "git": {
-      "model": "opencode/gpt-5-nano",
-      "description": "All git operations",
-      "prompt_append": "Focus on atomic commits, clear messages, and safe operations.",
-    },
-  },
-
-  // Limit expensive providers; let cheap ones run freely
-  "background_task": {
-    "providerConcurrency": {
-      "anthropic": 3,
-      "openai": 3,
-      "opencode": 10,
-      "zai-coding-plan": 10,
-    },
-    "modelConcurrency": {
-      "anthropic/claude-opus-5": 2,
-      "opencode/gpt-5-nano": 20,
-    },
-  },
-
-  "experimental": { "aggressive_truncation": true, "task_system": true },
-  "tmux": { "enabled": false },
 }
 ```
 
@@ -634,9 +670,8 @@ Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library do
 ### LSP
 
 LSP tools are served by the built-in `lsp` MCP server (see [MCPs](#mcps)). The
-previous top-level `"lsp"` block in the plugin config is no longer read and is
-automatically stripped on next startup; existing configs containing it are
-silently migrated (see `packages/omo-opencode/src/shared/migration/config-migration.ts`).
+previous top-level `"lsp"` block in the plugin config is no longer read; the
+unified config migration strips it when importing a legacy file.
 
 To configure custom language servers, create `.opencode/lsp.json` at the project
 root. The MCP server is launched with `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json`
@@ -665,10 +700,16 @@ The `codegraph` MCP ships a pinned CodeGraph 1.5.0 binary; managed installs prov
 
     // Extra exclude-only roots. Projects under these skip CodeGraph entirely.
     // Entries may be absolute, ~-relative, or relative to the home directory.
-    "excluded_roots": ["~/scratch/codegraph"]
+    "excluded_roots": ["~/scratch/codegraph"],
+
+    // Codex only: failed SessionStart initialization attempts back off from
+    // this base interval, doubling to a 24-hour cap. Minimum: 60000.
+    "session_start_cooldown_ms": 900000
   }
 }
 ```
+
+The Codex SessionStart bootstrap checks only `<projectRoot>/.codegraph/codegraph.db`; it never calls `codegraph status`. An ancestor database covers nested projects, while per-project locks and persistent cooldown stamps suppress duplicate or repeatedly failing background initializers. Suppressions are recorded in `~/.omo/codegraph/session-start.jsonl` as actions including `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`.
 
 An ambient `CODEGRAPH_NO_DAEMON=1` forces daemon-off even when `codegraph.daemon` is `true`. Inspect or stop running daemons with the upstream `codegraph daemon` command, an interactive picker that lists running daemons and stops the one you select.
 

@@ -11,4 +11,15 @@ describe("task usage guidance", () => {
     expect(TASK_USAGE_GUIDANCE).not.toContain("revives resident members with follow-up work")
     expect(TASK_USAGE_GUIDANCE).not.toContain("team_wait")
   })
+
+  test("#given background task guidance #when rendered #then it makes idle wake unconditional and limits midpoint inspection", () => {
+    // given / when
+    const guidance = TASK_USAGE_GUIDANCE
+
+    // then
+    expect(guidance).toContain("idle session is always woken")
+    expect(guidance).toContain("one midpoint")
+    expect(guidance).toContain("end your turn")
+    expect(guidance).not.toContain("read progress")
+  })
 })

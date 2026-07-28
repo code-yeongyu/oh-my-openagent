@@ -16,7 +16,7 @@ const LIVE_WIDGET_LINE_MAX = 120
 const PROGRESS_HEAD_MAX = 60
 const LIVE_DESCRIPTION_MAX = 18
 const LIVE_DESCRIPTION_MAX_WITH_STATS = 11
-const SPINNER_INTERVAL_MS = 250
+export const LIVE_STATUS_REFRESH_MS = 250
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
 
 const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -122,7 +122,7 @@ function formatLiveBackgroundRow(
     stats === undefined ? LIVE_DESCRIPTION_MAX : LIVE_DESCRIPTION_MAX_WITH_STATS,
   )
   const elapsed = formatElapsed(record.created_at, now)
-  const frame = SPINNER_FRAMES[Math.floor(now / SPINNER_INTERVAL_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
+  const frame = SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
   const parts = [
     frame,
     identity,

@@ -69,6 +69,28 @@ function runtimeOf(ui: FakeUi | undefined, sessionId = "session-a", mode = "tui"
 }
 
 describe("createTaskStatusUi.syncNow", () => {
+  it("#given a list-only manager #when a static running row renders #then no animation timer starts", () => {
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const statusUi = createTaskStatusUi({
+      manager: fakeManager([record({ task_id: "st_static", status: "running" })]),
+      runtime: runtimeOf(fakeUi()),
+      timers,
+    })
+
+    statusUi.syncNow()
+
+    expect(active.size).toBe(0)
+  })
+
   it("#given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session", () => {
     const mine = [record({ task_id: "st_1", status: "running" }), record({ task_id: "st_2", status: "running" })]
     const other = record({ task_id: "st_other", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })

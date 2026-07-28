@@ -1,5 +1,6 @@
 import { composeOmoSenpiExtension } from "./compose"
 import type { OmoSenpiComponent } from "./types"
+import { createConfigStartupComponent } from "../components/config-startup"
 import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createLspComponent } from "../components/lsp"
@@ -12,6 +13,7 @@ import { createUlwLoopComponent } from "../components/ulw-loop"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 
 const components: OmoSenpiComponent[] = [
+  createConfigStartupComponent(),
   createUltraworkComponent(),
   createStartWorkContinuationComponent(),
   createUlwLoopComponent(),

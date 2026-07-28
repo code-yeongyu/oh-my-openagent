@@ -44,11 +44,11 @@ Team members always use process mode. Their child process loads a small member e
 
 Every control/read tool targets a child by id or by name:
 
-- **`task_send`** delivers a follow-up message or a steer. `to` accepts a child id/name or a team member name. `deliver_as` is `followUp` (queued for the child's next turn), `steer` (interrupt-and-inject), or `interrupt` (park a running resident child without ending it). Structured shutdown messages also route through this tool for lead sessions.
+- **`task_send`** always steers a plain-text message into a running child. `to` accepts a child id/name or a team member name. Sending to a finished resident child revives the same session. Structured shutdown messages also route through this tool for lead sessions.
 - **`task_output`** immediately returns a child snapshot (`mode:"status"`) or a transcript peek (`mode:"tail"` / `mode:"full"`). It never waits for completion; terminal results arrive through task-completion notifications. Committed `team_wait` recoveries appear as `[team message from <from>] <body>` lines.
 - **`task_cancel`** cancels a child terminally and stops its work.
 
-Parent-initiated park and cancel return their result synchronously in the tool response and never fire a completion notification.
+Parent-initiated cancel returns its result synchronously in the tool response and never fires a completion notification.
 
 ## Inspecting children
 
@@ -109,7 +109,7 @@ All defaults live in `omo.json` under `task` and `teams`. A minimal project conf
 }
 ```
 
-Full field reference, defaults, layer precedence, and the `omo.json` vs `oh-my-openagent.json` coexistence rules are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
+Full field reference, defaults, layer precedence, harness blocks, and profile resolution are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this Senpi guide.
 

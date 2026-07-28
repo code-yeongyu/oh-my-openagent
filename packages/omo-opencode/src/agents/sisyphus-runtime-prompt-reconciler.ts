@@ -27,7 +27,7 @@ export function clearSisyphusRuntimePromptContext(): void {
 
 /**
  * The Sisyphus prompt body is baked at registration from the *configured* model
- * in `oh-my-openagent.jsonc`. When the user switches to a different model family
+ * in `.omo/omo.jsonc`. When the user switches to a different model family
  * in the TUI, the entire baked body is the wrong family for the runtime model
  * (issue #5297/#5316): a GPT-configured agent run on a non-GPT model still
  * carries the whole GPT-5.5 body, not just one apply_patch line.

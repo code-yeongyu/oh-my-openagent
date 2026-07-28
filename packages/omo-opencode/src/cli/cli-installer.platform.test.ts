@@ -74,7 +74,7 @@ function stubOpenCodeSuccess(): void {
   })
   spyOn(configManager, "writeOmoConfig").mockReturnValue({
     success: true,
-    configPath: "/tmp/oh-my-opencode.jsonc",
+    configPath: "/tmp/omo.jsonc",
   })
 }
 

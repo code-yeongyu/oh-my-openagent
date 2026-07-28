@@ -18,7 +18,7 @@ const CHILD_STEPS_HANG = [{ type: "hang" }]
 
 export const SCENARIO_A_STEPS = [
   { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
-  { type: "tool_call", name: "task_send", arguments: { to: "p1", message: "steer: keep going", deliver_as: "steer" } },
+  { type: "tool_call", name: "task_send", arguments: { to: "p1", message: "steer: keep going" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   { type: "text", text: "rpc-process scenario A complete" },

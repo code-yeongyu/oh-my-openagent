@@ -85,7 +85,7 @@ describe("model-resolution check", () => {
   })
 
   describe("getModelResolutionInfoWithOverrides", () => {
-    // given: User has overrides in oh-my-opencode.json
+    // given: User has overrides in omo.json
     // when: Getting resolution info with config
     // then: Shows user override in Step 1 position
 

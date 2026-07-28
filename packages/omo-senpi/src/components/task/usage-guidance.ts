@@ -4,9 +4,9 @@ export const TASK_USAGE_GUIDANCE = [
   "<omo-senpi-task>",
   "You can delegate work to background subagents with the task tool family:",
   "- task({ prompt, category|subagent_type, run_in_background }) spawns one child; task({ tasks:[...], run_in_background:true }) fans out a batch.",
-  "- /tasks shows this session's child tasks; task_output immediately peeks a child's status or transcript (use mode:\"tail\" for recent output); task_send({ deliver_as:\"interrupt\" }) parks one, while task_cancel ends it.",
-  "- Team mail is steered into the recipient's running turn. Use task_send for updates, then end your turn; team mail never queues as editable follow-up work.",
-  "Background tasks notify you on completion with their final result; prefer them for parallelizable or long-running work.",
+  "- /tasks shows this session's children; task_output is for one midpoint status or transcript peek (mode:\"tail\" for recent output); task_send always steers a message into the addressed child, while task_cancel ends it.",
+  "- Team mail is steered into the recipient's running turn. Use task_send for updates; team mail never queues as editable follow-up work.",
+  "Background results are automatically delivered: an idle session is always woken, and a running turn receives them at its next tool boundary. If no independent work remains, end your turn.",
   "</omo-senpi-task>",
 ].join("\n")
 

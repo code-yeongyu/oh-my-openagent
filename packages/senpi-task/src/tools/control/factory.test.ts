@@ -8,7 +8,6 @@ import type { CancelManager, SendManager } from "./types"
 
 const sendManager: SendManager = {
   sendToTask: () => Promise.reject(new Error("unused")),
-  interruptTask: () => Promise.reject(new Error("unused")),
   list: () => [],
 }
 const cancelManager: CancelManager = { cancelTask: () => Promise.reject(new Error("unused")), get: () => undefined }
