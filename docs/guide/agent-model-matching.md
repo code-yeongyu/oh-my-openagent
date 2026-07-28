@@ -10,7 +10,7 @@
 
 **SISYPHUS IS ONLY MAINTAINER-VERIFIED ON THE EXACT MODELS LISTED IN THIS SUPPORTED SET — AND NOTHING, *NOTHING*, ELSE.** The supported set is narrow on purpose:
 
-- **Claude family:** Fable 5 · Opus 5 · Opus 5 · Sonnet 4.6
+- **Claude family:** Fable 5 · Opus 5 · Sonnet 4.6
 - **Kimi:** **K3** · K2.7 · K3 · K3
 - **GLM:** 5 / 5.1 *(acceptable — slightly looser on the long nested workflows)*
 - **GPT:** 5.4 / 5.5 / 5.6 Sol *(GPT-native prompt paths exist — supported, but still **NOT** the recommended default for the orchestrator)*

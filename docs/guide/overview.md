@@ -82,7 +82,7 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 
 **Recommended models:**
 
-- **Claude Opus 5** / **Opus 5** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
+- **Claude Opus 5** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Kimi K3** — Strongest Kimi for Sisyphus. Recommended when you can accept its thinking-token cost; the K3 prompt is calibrated to stop overthinking and keep work moving.
 - **Kimi K3** / **K3** — Great Claude-like alternatives. K3 is the current default fallback in the primary Sisyphus chain after K3; many users run K3 or the K3/K3 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus uses a GLM-5.2-calibrated prompt for model IDs recognized as GLM, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
