@@ -158,6 +158,7 @@ program
   .option("--attach <url>", "Attach to existing opencode server URL")
   .option("--on-complete <command>", "Shell command to run after completion")
   .option("--json", "Output structured JSON result to stdout")
+  .option("--output-schema <file>", "Constrain and return the terminal response using a JSON Schema file")
   .option("--no-timestamp", "Disable timestamp prefix in run output")
   .option("--verbose", "Show full event stream (default: messages/tools only)")
   .option("--session-id <id>", "Resume existing session instead of creating new one")
@@ -168,6 +169,7 @@ Examples:
   $ bunx oh-my-opencode run --port 4321 "Fix the bug"
   $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
   $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
+  $ bunx oh-my-opencode run --json --output-schema ./result.schema.json "Fix the bug" | jq .output
   $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
   $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
   $ bunx oh-my-opencode run --model anthropic/claude-sonnet-4 "Fix the bug"
@@ -203,6 +205,7 @@ Unlike 'opencode run', this command waits until:
       timestamp: options.timestamp ?? true,
       verbose: options.verbose ?? false,
       sessionId: options.sessionId,
+      outputSchema: options.outputSchema,
     }
     const exitCode = await run(runOptions)
     process.exit(exitCode)
