@@ -1,0 +1,19 @@
+Command:
+/tmp/omo-node-types-24/node_modules/.bin/tsc -p /tmp/omo-node-types-24/tsconfig.json
+
+Result: exit 0
+Output: none
+
+Command:
+/tmp/omo-process-cleanup-pr/node_modules/.bin/tsc -p /tmp/omo-process-cleanup-pr/tsconfig.json --emitDeclarationOnly
+
+Result: exit 0
+Output: none
+
+Command:
+bun test /tmp/omo-process-cleanup-pr/packages/omo-opencode/src/features/background-agent/process-cleanup.test.ts
+
+Result: exit 0
+44 pass
+0 fail
+83 expect() calls

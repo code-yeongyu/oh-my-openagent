@@ -1,0 +1,11 @@
+Command:
+/tmp/omo-node-types-24/node_modules/.bin/tsc -p /tmp/omo-node-types-24/tsconfig.json
+
+Result: exit 1
+
+../../../tmp/omo-process-cleanup-pr/packages/omo-opencode/src/features/background-agent/process-cleanup.test-helpers.ts(28,16): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'ProcessCleanupEvent' is not assignable to parameter of type 'Signals'.
+      Type '"beforeExit"' is not assignable to type 'Signals'.
+../../../tmp/omo-process-cleanup-pr/packages/omo-opencode/src/features/background-agent/process-cleanup.test-helpers.ts(35,3): error TS2322: Type 'BeforeExitListener' is not assignable to type '() => void'.
+  Target signature provides too few arguments. Expected 1 or more, but got 0.

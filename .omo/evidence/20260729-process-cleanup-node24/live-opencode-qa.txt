@@ -1,0 +1,30 @@
+Server:
+docker run --rm --name omo-process-cleanup-qa -p 127.0.0.1:56609:56609 -e OPENCODE_SERVER_PASSWORD=omo-qa omo-qa opencode serve --port 56609 --hostname 0.0.0.0
+
+Readiness:
+opencode server listening on http://0.0.0.0:56609
+
+Probe:
+curl -i --max-time 10 -u opencode:omo-qa http://127.0.0.1:56609/global/health
+
+Result:
+HTTP/1.1 200 OK
+{"healthy":true,"version":"1.18.9"}
+
+Probe:
+curl -sS --max-time 10 -u opencode:omo-qa http://127.0.0.1:56609/doc | jq '.paths | length'
+
+Result:
+162
+
+Probe:
+curl -i --max-time 10 'http://127.0.0.1:56609/session?directory=/tmp/omo-qa'
+
+Result:
+HTTP/1.1 401 Unauthorized
+www-authenticate: Basic realm="Secure Area"
+
+Cleanup:
+docker rm -f omo-process-cleanup-qa
+docker ps -a --filter name=omo-process-cleanup-qa --format '{{.ID}}' -> empty
+curl --max-time 2 http://127.0.0.1:56609/global/health -> exit 7 (connection refused)
