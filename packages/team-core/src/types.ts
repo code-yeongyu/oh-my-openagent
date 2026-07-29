@@ -27,6 +27,12 @@ const MemberBaseSchema = z.object({
   name: z.string().min(1).regex(/^[a-z0-9-]+$/),
   cwd: z.string().optional(),
   worktreePath: z.string().optional(),
+  // Inline-mode-only file protection: when set on an inline member (no worktreePath),
+  // the team-tool-gating hook (1) hard-gates the `edit` tool to these globs and
+  // (2) applies a best-effort destructive-command guardrail to the `bash` tool.
+  // Worktree members bypass (filesystem-isolated); unset = unrestricted (backward compatible).
+  // See packages/omo-opencode/src/hooks/team-tool-gating/hook.ts.
+  allowedPaths: z.array(z.string().min(1)).optional(),
   subscriptions: z.array(z.string()).optional(),
   backendType: z.enum(["in-process", "tmux"]).default("in-process"),
   color: z.string().optional(),
@@ -143,6 +149,7 @@ const RuntimeStateMemberSchema = z.object({
   status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
   color: z.string().optional(),
   worktreePath: z.string().optional(),
+  allowedPaths: z.array(z.string()).optional(),
   lastInjectedTurnMarker: z.string().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
 }).strict()
