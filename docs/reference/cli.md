@@ -259,15 +259,18 @@ bunx oh-my-openagent mcp oauth login <server-name> --server-url https://api.exam
 # Remove stored tokens
 bunx oh-my-openagent mcp oauth logout <server-name> --server-url https://api.example.com
 
-# Show token status
-bunx oh-my-openagent mcp oauth status [server-name]
+# Show all stored token statuses
+bunx oh-my-openagent mcp oauth status
+
+# Show the status for a named server whose token is stored under its URL
+bunx oh-my-openagent mcp oauth status github --server-url https://api.example.com
 ```
 
 ### Options
 
 | Option | Description |
 | --- | --- |
-| `--server-url <url>` | OAuth server URL (required by `login`, and required by `logout`) |
+| `--server-url <url>` | OAuth server URL (required by `login` and `logout`; use it with `status` when the server name differs from the URL) |
 | `--client-id <id>` | OAuth client ID (optional if server supports DCR) |
 | `--scopes <scopes...>` | OAuth scopes as variadic values |
 

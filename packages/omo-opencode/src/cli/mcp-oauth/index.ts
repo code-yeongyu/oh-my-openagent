@@ -31,8 +31,9 @@ export function createMcpOAuthCommand(): Command {
   oauth
     .command("status [server-name]")
     .description("Show OAuth token status for MCP servers")
-    .action(async (serverName: string | undefined) => {
-      const exitCode = await status(serverName)
+    .option("--server-url <url>", "OAuth server URL (use if server name differs from URL)")
+    .action(async (serverName: string | undefined, options) => {
+      const exitCode = await status(serverName, options)
       process.exit(exitCode)
     })
 
