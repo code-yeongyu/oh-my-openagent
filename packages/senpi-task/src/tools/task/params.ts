@@ -37,9 +37,8 @@ export const TaskToolParams = Type.Object({
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),
       }),
       {
-        minItems: 1,
         maxItems: MAX_TASK_BATCH_ITEMS,
-        description: "Batch of 1-16 child tasks to spawn in one call. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them.",
+        description: "Batch of up to 16 child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them.",
       },
     ),
   ),
