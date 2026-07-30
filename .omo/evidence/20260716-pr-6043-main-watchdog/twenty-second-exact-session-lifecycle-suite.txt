@@ -1,0 +1,67 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.66ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.08ms]
+
+packages/omo-opencode/src/plugin/event.monitor.test.ts:
+(pass) createEventHandler monitor wiring > #given a monitor manager #when session.deleted arrives #then it stops session monitors once [1.16ms]
+(pass) createEventHandler monitor wiring > #given a monitor manager #when session.idle arrives #then it handles the normalized idle event after idle hooks [0.32ms]
+(pass) createEventHandler monitor wiring > #given existing deleted-session cleanup state #when session.deleted arrives #then monitor teardown does not skip cleanup [0.25ms]
+
+packages/omo-opencode/src/plugin/event.test.ts:
+(pass) event error extraction > prefers nested APIError message over generic top-level message [0.22ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.idle arrives #then it forwards the event to tmuxSessionManager.onEvent [0.22ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.status reports idle #then synthetic idle forwards to tmuxSessionManager.onEvent [0.27ms]
+(pass) createEventHandler - idle deduplication > #given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane [5.68ms]
+(pass) createEventHandler - idle deduplication > #given session.status already emitted a synthetic idle #when real session.idle follows immediately #then hooks run once [0.21ms]
+(pass) createEventHandler - idle deduplication > keeps other session dedup state untouched when suppressing real-idle-after-synthetic-idle [0.25ms]
+(pass) createEventHandler - idle deduplication > dedups back-to-back real session.idle events for the same sessionID within 500ms [0.21ms]
+(pass) createEventHandler - idle deduplication > still dedups synthetic-idle-after-real-idle as before [0.12ms]
+(pass) createEventHandler - idle deduplication > does NOT dedup session.idle events for DIFFERENT sessionIDs [0.14ms]
+(pass) createEventHandler - idle deduplication > both maps pruned on every event [602.95ms]
+(pass) createEventHandler - idle deduplication > dispatches both idle events once the dedup window expires [603.28ms]
+(pass) createEventHandler - event forwarding > forwards message activity events to tmux session manager [1.41ms]
+(pass) createEventHandler - event forwarding > forwards legacy message.part.updated activity with part-only session id to tmux session manager [1.33ms]
+(pass) createEventHandler - event forwarding > does not forward tmux activity events when tmux integration is disabled [0.70ms]
+(pass) createEventHandler - event forwarding > does not forward session.created to tmux session manager when tmux integration is disabled [0.71ms]
+(pass) createEventHandler - event forwarding > skips tmux dispatch for subagent sessions marked only via subagentSessions (no parentID) [0.60ms]
+(pass) createEventHandler - event forwarding > still dispatches for a primary session not in subagentSessions [0.68ms]
+(pass) createEventHandler - event forwarding > Path A skips dispatch even when subagentSessions Set is populated only AFTER the event arrives (parentID covers it) [0.63ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw after session.created for main sessions (no parentID) [0.95ms]
+(pass) createEventHandler - event forwarding > does NOT dispatch OpenClaw for subagent sessions (with parentID) [0.54ms]
+(pass) createEventHandler - event forwarding > forwards session.deleted to write-existing-file-guard hook [1.17ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw for synthetic session.idle events [0.62ms]
+(pass) createEventHandler - event forwarding > clears stored prompt params on session.deleted [0.71ms]
+(pass) createEventHandler - retry dedupe lifecycle > re-handles same retry key after session recovers to idle status [324.83ms]
+(pass) createEventHandler - event hook isolation > continues dispatching later event hooks when an earlier hook throws [1.83ms]
+(pass) createEventHandler - event hook isolation > preserves hook fan-out order while isolating individual hook failures [1.11ms]
+
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:
+(pass) claude-code-session-state > setSessionAgent > should store agent for session [0.54ms]
+(pass) claude-code-session-state > setSessionAgent > should strip zero-width ordering prefixes before storing agent for session [0.51ms]
+(pass) claude-code-session-state > setSessionAgent > should NOT overwrite existing agent (first-write wins) [0.30ms]
+(pass) claude-code-session-state > setSessionAgent > should return undefined for unknown session [0.27ms]
+(pass) claude-code-session-state > updateSessionAgent > should overwrite existing agent [0.26ms]
+(pass) claude-code-session-state > updateSessionAgent > should strip zero-width ordering prefixes when overwriting existing agent [0.51ms]
+(pass) claude-code-session-state > clearSessionAgent > should remove agent from session [0.27ms]
+(pass) claude-code-session-state > mainSessionID > should store and retrieve main session ID [0.33ms]
+(pass) claude-code-session-state > mainSessionID > should return undefined when not set [0.20ms]
+(pass) claude-code-session-state > mainSessionID > should retain all active root sessions while exposing the latest one [0.24ms]
+(pass) claude-code-session-state > mainSessionID > should restore the previous active root when the latest root is removed [0.26ms]
+(pass) claude-code-session-state > agent registration > should register config-key lookup when given a display name [0.33ms]
+(pass) claude-code-session-state > agent registration > should resolve config keys back to the registered raw agent name [0.35ms]
+(pass) claude-code-session-state > agent registration > should resolve legacy parenthesized names to registered agent [0.31ms]
+(pass) claude-code-session-state > agent registration > should resolve bare lowercase name from historical session [0.33ms]
+(pass) claude-code-session-state > agent registration > should clear registered agent names without clearing session ownership [0.30ms]
+(pass) claude-code-session-state > agent registration > #given atlas display name with zero-width prefix > #when checking registration without the zero-width prefix > #then it treats the display name as registered [0.22ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should correctly identify Prometheus agent for permission checks [0.21ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should return undefined when agent not set (bug scenario) [0.20ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should preserve custom agent when default agent is sent on subsequent messages [0.25ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should allow explicit agent update via updateSessionAgent [0.28ms]
+(pass) claude-code-session-state > backward compatibility > strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259) [0.32ms]
+
+ 53 pass
+ 0 fail
+ 101 expect() calls
+Ran 53 tests across 4 files. [1.65s]

@@ -24,7 +24,7 @@ export async function dispatchFallbackRetry(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
   options: DispatchFallbackRetryOptions,
-): Promise<void> {
+): Promise<boolean> {
   const snapshot = snapshotFallbackState(options.state)
   const result = prepareFallback(
     options.sessionID,
@@ -58,7 +58,7 @@ export async function dispatchFallbackRetry(
         status: dispatchOutcome.status,
         reason: dispatchOutcome.reason,
       })
-      return
+      return false
     }
     if (deps.config.notify_on_fallback) {
       await deps.ctx.client.tui
@@ -72,7 +72,7 @@ export async function dispatchFallbackRetry(
         })
         .catch(() => {})
     }
-    return
+    return true
   }
 
   log(`[${HOOK_NAME}] Fallback preparation failed`, {
@@ -80,4 +80,5 @@ export async function dispatchFallbackRetry(
     source: options.source,
     error: result.error,
   })
+  return false
 }

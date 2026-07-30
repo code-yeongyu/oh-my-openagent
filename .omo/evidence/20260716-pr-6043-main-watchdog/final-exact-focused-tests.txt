@@ -1,0 +1,68 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts:
+(pass) first-prompt watchdog lifecycle > #given agent resolution is in flight #when the watchdog is disposed #then the stale callback cannot abort, dispatch, or recreate session state [2.73ms]
+(pass) first-prompt watchdog lifecycle > #given abort is in flight #when the watchdog is disposed and parent state is cleared #then the stale callback cannot dispatch or recreate cleared state [1.73ms]
+(pass) first-prompt watchdog lifecycle > #given the watchdog abort is in flight #when the session is cancelled before abort resolves #then no fallback is dispatched [1.47ms]
+(pass) first-prompt watchdog lifecycle > #given the watchdog abort is in flight #when OpenCode reports its internal completion and idle events #then the fallback is still dispatched [1.83ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts:
+(pass) hasVisibleAssistantResponse > #given only an old assistant reply before the latest user turn #when visibility is checked #then the stale reply is ignored [0.36ms]
+(pass) hasVisibleAssistantResponse > #given an assistant reply after the latest user turn #when visibility is checked #then the current reply is treated as visible [0.18ms]
+(pass) hasVisibleAssistantResponse > #given a too-many-requests assistant reply #when visibility is checked #then it is treated as an auto-retry signal [0.21ms]
+(pass) createMessageUpdateHandler runtime fallback dispatch > #given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast [0.93ms]
+(pass) createMessageUpdateHandler runtime fallback dispatch > #given a watchdog abort completed through a visible fallback response #when the user later cancels #then the stale internal-abort marker does not preserve retry state [0.48ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:
+(pass) first-prompt-watchdog > #given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model [0.45ms]
+(pass) first-prompt-watchdog > #given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request [0.13ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm [0.10ms]
+(pass) first-prompt-watchdog > #given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model [0.13ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active [0.10ms]
+(pass) first-prompt-watchdog > #given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched [0.09ms]
+(pass) first-prompt-watchdog > #given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn [0.12ms]
+(pass) first-prompt-watchdog > #given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer [0.17ms]
+(pass) first-prompt-watchdog > #given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress [0.11ms]
+(pass) first-prompt-watchdog > #given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed [0.09ms]
+(pass) first-prompt-watchdog > #given a subagent reaches a terminal session state before the threshold #when onSessionTerminal is called #then the watchdog is cancelled and no fallback is dispatched [0.08ms]
+(pass) first-prompt-watchdog > #given a main session is silent past the threshold with no fallback configured #when the watchdog fires #then it does not abort or dispatch (lets the existing error-event paths handle it if one arrives later) [0.09ms]
+(pass) observeEventForWatchdog > #given a message.updated event with role=user #when observed #then onUserMessage is called with sessionID/model/agent [0.08ms]
+(pass) observeEventForWatchdog > #given a compaction-agent message.updated event with role=user #when observed #then the watchdog does not arm [0.06ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=text #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.08ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=reasoning #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool_use #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool_result #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool-call #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=step-start #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=file #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=text #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=reasoning #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool #when observed #then onAssistantProgress is called [0.07ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool_use #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool_result #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool-call #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=step-start #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=file #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event with parts: [] and no error/finish #when observed #then no progress is signalled (no activity yet) [0.07ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event with info.error set #when observed #then onAssistantProgress is called (the existing error-handling path takes over from here) [0.07ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event with info.finish set #when observed #then onAssistantProgress is called [0.07ms]
+(pass) observeEventForWatchdog > #given a session.idle event #when observed #then onSessionTerminal is called [0.06ms]
+(pass) observeEventForWatchdog > #given a session.stop event #when observed #then onSessionTerminal is called [0.06ms]
+(pass) observeEventForWatchdog > #given a session.deleted event #when observed #then onSessionTerminal is called [0.04ms]
+(pass) observeEventForWatchdog > #given a session.error event #when observed #then onSessionTerminal is called [0.03ms]
+(pass) observeEventForWatchdog > #given a session.deleted event whose sessionID is carried under properties.info.id #when observed #then onSessionTerminal is still called (matches event-handler shape) [0.05ms]
+(pass) observeEventForWatchdog > #given an unrelated event type #when observed #then no watchdog method is called [0.04ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-provenance-race.test.ts:
+(pass) runtime-fallback abort provenance > #given an internal fallback user update precedes its delayed abort event #when both events are handled #then retry state remains owned by the internal abort [0.24ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:
+(pass) createFallbackTimeoutHelpers > #given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored [3.11ms]
+(pass) createFallbackTimeoutHelpers > #given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed [2.69ms]
+(pass) createFallbackTimeoutHelpers > #given timeout escalation cannot abort the active request #when the timeout fires #then it preserves retry ownership and does not dispatch a fallback [2.80ms]
+
+ 52 pass
+ 0 fail
+ 95 expect() calls
+Ran 52 tests across 5 files. [86.00ms]

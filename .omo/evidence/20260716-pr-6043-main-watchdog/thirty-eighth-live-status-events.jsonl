@@ -1,0 +1,27 @@
+{"type":"server.connected","session":null,"status":null,"role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"user","text":null}
+{"type":"message.part.updated","session":"<qa-session>","status":null,"role":null,"text":"Reply exactly QA_STATUS_FALLBACK_OK"}
+{"type":"session.status","session":"<qa-session>","status":"busy","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"user","text":null}
+{"type":"session.status","session":"<qa-session>","status":"busy","role":null,"text":null}
+{"type":"session.status","session":"<qa-session>","status":"retry","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"assistant","text":null}
+{"type":"session.status","session":"<qa-session>","status":"idle","role":null,"text":null}
+{"type":"session.idle","session":"<qa-session>","status":null,"role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"user","text":null}
+{"type":"message.part.updated","session":"<qa-session>","status":null,"role":null,"text":"Reply exactly QA_STATUS_FALLBACK_OK"}
+{"type":"session.status","session":"<qa-session>","status":"busy","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"user","text":null}
+{"type":"session.status","session":"<qa-session>","status":"busy","role":null,"text":null}
+{"type":"message.part.updated","session":"<qa-session>","status":null,"role":null,"text":null}
+{"type":"message.part.updated","session":"<qa-session>","status":null,"role":null,"text":""}
+{"type":"message.part.updated","session":"<qa-session>","status":null,"role":null,"text":"QA_STATUS_FALLBACK_OK"}
+{"type":"message.part.updated","session":"<qa-session>","status":null,"role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"assistant","text":null}
+{"type":"session.status","session":"<qa-session>","status":"busy","role":null,"text":null}
+{"type":"session.status","session":"<qa-session>","status":"idle","role":null,"text":null}
+{"type":"session.idle","session":"<qa-session>","status":null,"role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","status":null,"role":"user","text":null}

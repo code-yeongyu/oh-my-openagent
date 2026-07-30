@@ -1,0 +1,9 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts:
+(pass) runtime-fallback stale cleanup watchdog race > #given cleanup evicts a detached status watchdog #when the stale abort resolves #then rollback cannot restore the watchdog [2.72ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [67.00ms]

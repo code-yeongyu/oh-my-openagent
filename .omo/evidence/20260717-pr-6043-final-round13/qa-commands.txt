@@ -1,0 +1,43 @@
+PR #6043 round-13 exact QA command ledger
+
+Red lifecycle regression (run before repair commit 093efc8c7):
+bun test packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts
+
+Green lifecycle regression:
+bun test packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts
+
+Focused ownership/lifecycle matrix:
+bun test packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-races.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ordering.test.ts
+
+Complete runtime-fallback and lifecycle suite:
+bun test packages/omo-opencode/src/hooks/runtime-fallback packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts packages/omo-opencode/src/plugin/session-state.test.ts
+
+Complete plugin event/state suite:
+bun test packages/omo-opencode/src/plugin/event*.test.ts packages/omo-opencode/src/plugin/session-state.test.ts
+
+Exact-source smoke:
+bun test packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts
+
+OpenCode adapter typecheck:
+bun run --filter @oh-my-opencode/omo-opencode typecheck
+
+Pinned Biome 2.4.16 lint over repaired paths:
+bunx @biomejs/biome@2.4.16 check packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-types.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts packages/omo-opencode/src/plugin/event-session-lifecycle-queue.ts packages/omo-opencode/src/plugin/event.ts
+
+Repository-local no-excuse audit over all PR-changed TypeScript files:
+bun packages/omo-opencode/scripts/no-excuse.ts $(git diff --name-only origin/dev...HEAD -- '*.ts' '*.tsx')
+
+Pure-LOC audit over repaired paths:
+for file in packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-types.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts packages/omo-opencode/src/plugin/event-session-lifecycle-queue.ts packages/omo-opencode/src/plugin/event.ts; do awk 'BEGIN{count=0} /^[[:space:]]*$/ || /^[[:space:]]*\/\// || /^[[:space:]]*\/\*/ || /^[[:space:]]*\*/ || /^[[:space:]]*\*\// {next} {count++} END{print FILENAME, count}' "$file"; done
+
+OpenCode harness self-check:
+bash .agents/skills/opencode-qa/scripts/common.sh --self-test
+
+SSE self-test:
+bash .agents/skills/opencode-qa/scripts/sse-hook-probe.sh --self-test
+
+Isolated tmux TUI smoke:
+bash .agents/skills/opencode-qa/scripts/tui-smoke.sh
+
+Production-duration isolated source-plugin QA:
+bash .omo/evidence/20260717-pr-6043-final-round13/run-live-watchdog-qa.sh

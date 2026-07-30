@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event.test.ts:
+(pass) createEventHandler - event forwarding > #given an active root session #when session.created has no ID #then the root registry is preserved [1.19ms]
+
+ 1 pass
+ 27 filtered out
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [75.00ms]

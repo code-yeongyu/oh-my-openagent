@@ -1,0 +1,2 @@
+No violations in 4 file(s).
+exit=0

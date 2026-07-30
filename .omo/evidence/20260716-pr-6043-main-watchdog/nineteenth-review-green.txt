@@ -1,0 +1,32 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts:
+(pass) first-prompt watchdog deletion cleanup > #given a session has an armed watchdog #when the session is deleted #then its generation bookkeeping is removed [0.63ms]
+(pass) first-prompt watchdog deletion cleanup > #given a session is suspended for delayed-abort correlation #when the session is deleted #then its generation bookkeeping is removed [0.94ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts:
+(pass) runtime-fallback completed watchdog generations > #given two watchdog fallbacks completed visibly #when newest then oldest delayed aborts arrive #then latest fallback remains until a later real cancellation [1.58ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.test.ts:
+(pass) watchdog abort provenance > #given two watchdog generations completed visibly #when newest then oldest delayed terminals arrive #then each generation is consumed once [0.38ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-multiple-delayed-terminals.test.ts:
+(pass) runtime-fallback multiple delayed watchdog terminals > #given two prior watchdog aborts #when both terminals arrive before correlation #then the current watchdog and retry state are preserved [0.88ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [2.02ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [2.92ms]
+(pass) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [1.67ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-three-generation.test.ts:
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when progress cancels generation two before generation three arms #then generation three still recovers [3.01ms]
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when status resolution cancels generation two before generation three arms #then generation three still recovers [2.73ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts:
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given fallback dispatch completed visibly #when its delayed watchdog abort arrives #then fallback ownership remains intact [0.61ms]
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given the owned delayed watchdog abort was consumed #when a later generation is cancelled #then it remains external cancellation [0.24ms]
+
+ 12 pass
+ 0 fail
+ 63 expect() calls
+Ran 12 tests across 7 files. [78.00ms]

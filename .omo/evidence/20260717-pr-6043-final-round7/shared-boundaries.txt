@@ -1,0 +1,50 @@
+COMMAND: bun test shared prompt gates and model fallback
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/shared/prompt-async-gate-client-identity.test.ts:
+(pass) prompt-async-gate client-identity characterization > #given a recording fake client #when the gate dispatches #then status messages and promptAsync are all called on the same session object [1.70ms]
+(pass) prompt-async-gate client-identity characterization > #given checkStatus false and checkToolState false #when the gate dispatches #then status and messages are never invoked [0.14ms]
+(pass) prompt-async-gate client-identity characterization > #given session.status reports the session as busy #when the gate checks activity #then result is active and promptAsync is not called [0.13ms]
+(pass) prompt-async-gate client-identity characterization > #given a dispatch hold is active #when a second dispatch arrives before the hold expires #then it is coalesced and reports reserved or queued [0.22ms]
+(pass) prompt-async-gate client-identity characterization > #given promptAsync rejects after dispatch was attempted #when the result is classified #then status is failed dispatchAttempted is true and isAmbiguousPostDispatchPromptFailure is true [0.26ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate-path-compat.test.ts:
+(pass) dispatchInternalPrompt path compatibility > #given sync prompt rejects object-form session path #when dispatching #then it retries with string-form path [0.27ms]
+(pass) dispatchInternalPrompt path compatibility > #given async prompt rejects object-form session path #when dispatching #then it retries with string-form path [0.12ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn-metadata.test.ts:
+(pass) latestAssistantTurnBlocksInternalPrompt metadata-only messages > #given empty unknown assistant turn has no parts loaded #when checking prompt safety #then internal prompts stay blocked [0.14ms]
+(pass) latestAssistantTurnBlocksInternalPrompt metadata-only messages > #given completed tool-calls assistant turn has no parts loaded #when checking prompt safety #then internal prompts stay blocked [0.05ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn.test.ts:
+(pass) latestAssistantTurnBlocksInternalPrompt > #given completed assistant question tool has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.09ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal wake follows an unanswered question #when checking prompt safety #then the internal wake does not count as an answer [0.16ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given opencode question tool field has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.06ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given opencode ask-user-question tool field has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.07ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given answered question tool completed #when checking prompt safety #then internal prompts are not blocked by that question [0.08ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given real user answer follows a question #when checking prompt safety #then internal prompts are not blocked by that question [0.04ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given completed assistant is followed by an orphaned reply-required internal wake #when checking prompt safety #then internal prompts are admitted [0.06ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal continuation gets only an empty unknown assistant turn #when checking prompt safety #then internal prompts stay blocked [0.07ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal continuation receives assistant text #when checking prompt safety #then internal prompts are not blocked [0.05ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a completed assistant is followed by a noReply notification tail #when checking prompt safety #then internal prompts are not blocked [0.05ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a completed assistant is followed by several stacked noReply notification tails #when checking prompt safety #then internal prompts are not blocked [0.05ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a reply-expecting internal tail sits behind a noReply tail after completion #when checking prompt safety #then internal prompts are admitted [0.06ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given an actively waiting assistant sits behind a noReply tail #when checking prompt safety #then internal prompts stay blocked [0.05ms]
+
+packages/omo-opencode/src/hooks/model-fallback/hook.test.ts:
+(pass) model fallback hook > applies pending fallback on chat.message by overriding model [0.76ms]
+(pass) model fallback hook > preserves fallback progression across repeated session.error retries [0.18ms]
+(pass) model fallback hook > does not re-arm fallback when one is already pending [0.07ms]
+(pass) model fallback hook > isolates stored fallback chains from caller mutations on set and get [0.08ms]
+(pass) model fallback hook > skips no-op fallback entries that resolve to same provider/model [0.11ms]
+(pass) model fallback hook > skips no-op fallback entries even when variant differs [0.11ms]
+(pass) model fallback hook > uses connected preferred provider when fallback entry providers are disconnected [0.94ms]
+(pass) model fallback hook > does not fall back to hardcoded agent chain when session explicitly stores no fallback chain [regression #2941] [0.06ms]
+(pass) model fallback hook > shows toast when fallback is applied [0.17ms]
+(pass) model fallback hook > transforms model names for github-copilot provider via fallback chain [0.16ms]
+(pass) model fallback hook > preserves canonical google preview model names via fallback chain [0.11ms]
+
+ 33 pass
+ 0 fail
+ 61 expect() calls
+Ran 33 tests across 5 files. [70.00ms]

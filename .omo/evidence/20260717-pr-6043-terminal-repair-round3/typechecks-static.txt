@@ -1,0 +1,6 @@
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+No violations in 2 file(s).
+pure_loc session-status-handler=     172
+pure_loc terminal-races-test=     173

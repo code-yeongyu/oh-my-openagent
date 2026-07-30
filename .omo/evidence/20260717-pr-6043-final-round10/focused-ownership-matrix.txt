@@ -1,0 +1,33 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.79ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.08ms]
+(pass) main session lifecycle > #given deletion pauses during monitor cleanup #when the same ID is recreated #then stale cleanup cannot clear or disconnect replacement state [0.26ms]
+
+packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts:
+(pass) plugin session deletion ordering > #given deletion pauses in an earlier hook #when the same ID is recreated #then creation waits for lifecycle cleanup [1.32ms]
+(pass) plugin session deletion ordering > #given overlapping deletions for one ID #when recreation starts #then all cleanup completes before replacement creation [1.72ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-generation.test.ts:
+(pass) model-fallback continuation generation ownership > #given an old continuation is paused during abort #when the session ID is cleared and reused #then only the replacement continuation can dispatch and release ownership [154.50ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/session-stop-generation-ownership.test.ts:
+(pass) runtime-fallback session.stop generation ownership > #given stop awaits an old abort #when the ID is deleted and reused #then stale stop cannot clear replacement retry state [0.60ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/dispatch-generation-ownership.test.ts:
+(pass) runtime-fallback dispatch generation ownership > #given message loading belongs to an old generation #when a newer user turn arrives #then stale dispatch releases retry ownership [1.07ms]
+(pass) runtime-fallback dispatch generation ownership > #given a fallback prompt is accepted #when its user event advances generation before promptAsync resolves #then accepted ownership is committed and released [0.73ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-generation-ownership.test.ts:
+(pass) runtime-fallback event generation ownership > #given an old status handler is resolving its agent #when an identical retry arrives in a newer user turn #then the newer retry is not poisoned by stale dedupe [2.38ms]
+(pass) runtime-fallback event generation ownership > #given session.error is resolving an agent #when a newer user turn arrives #then the stale error cannot dispatch fallback [1.07ms]
+(pass) runtime-fallback event generation ownership > #given fallback completion visibility is pending #when the same user message is updated again #then the completion keeps generation ownership [3.55ms]
+(pass) runtime-fallback event generation ownership > #given an abort is pending for a deleted session #when the same ID is reused #then replacement abort issues a fresh wire request [0.86ms]
+(pass) runtime-fallback event generation ownership > #given an assistant quota error is awaiting abort #when a newer user turn arrives #then the stale message cannot dispatch fallback [1.15ms]
+(pass) runtime-fallback event generation ownership > #given an assistant error is resolving its agent #when a newer user turn arrives #then the stale message cannot create fallback state [0.69ms]
+
+ 15 pass
+ 0 fail
+ 41 expect() calls
+Ran 15 tests across 6 files. [262.00ms]

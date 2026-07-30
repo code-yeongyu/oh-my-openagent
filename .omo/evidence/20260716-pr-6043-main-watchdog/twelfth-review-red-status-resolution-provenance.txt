@@ -1,0 +1,29 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+312 |       sessionID,
+313 |     })
+314 |     await eventHandler(createAbortEvent(sessionID))
+315 |
+316 |     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-3")
+317 |     expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+                                                                               ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "kind": "defer-terminal",
+-   "sessionID": "session-status-cancellation-before-delayed-abort",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:317:74)
+(fail) first-prompt watchdog generation races > #given status resolution cancels generation two #when generation three arms before generation one's delayed abort #then generation three still recovers [3.01ms]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [64.00ms]

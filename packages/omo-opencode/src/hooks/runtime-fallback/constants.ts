@@ -58,8 +58,10 @@ export const HOOK_NAME = "runtime-fallback"
 
 /**
  * First-prompt watchdog: how long to wait for the first sign of progress
- * (assistant text/reasoning/finish) from a subagent session before assuming
- * the provider is silently stuck and dispatching the configured fallback.
+ * (assistant text/reasoning/finish) from a main or subagent session before
+ * assuming the provider is silently stuck and dispatching the configured
+ * fallback. Main sessions honor timeout_seconds=0; the historical subagent
+ * safety net remains active independently of that setting.
  *
  * Tuned to be longer than typical first-token latency (well under 30s in
  * practice) yet much shorter than the 30-minute outer poll timeout that

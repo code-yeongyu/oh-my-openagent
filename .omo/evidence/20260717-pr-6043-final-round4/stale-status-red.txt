@@ -1,0 +1,34 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [3.32ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [0.87ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.13ms]
+208 |       },
+209 |     })
+210 |     resolution.resolve("test")
+211 |     await pendingRetry
+212 |
+213 |     expect({ abortCalls, promptModels }).toEqual({ abortCalls: 0, promptModels: [] })
+                                               ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "abortCalls": 0,
+-   "promptModels": [],
++   "abortCalls": 1,
++   "promptModels": [
++     "openai/fallback-one",
++   ],
+  }
+
+- Expected  - 2
++ Received  + 4
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:213:42)
+(fail) runtime-fallback composed abort lifecycle races > #given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch [0.77ms]
+
+ 3 pass
+ 1 fail
+ 5 expect() calls
+Ran 4 tests across 1 file. [64.00ms]

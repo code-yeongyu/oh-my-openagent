@@ -1,0 +1,37 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [3.35ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [1.16ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.15ms]
+(pass) runtime-fallback composed abort lifecycle races > #given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch [0.53ms]
+281 |       cleanupStaleSessions?.()
+282 |       abortResponse.resolve({})
+283 |       await pendingRetry
+284 |       await timers.advanceBy(10)
+285 |
+286 |       expect({ abortCalls, promptModels, hasState: capturedDeps?.sessionStates.has(SESSION_ID) }).toEqual({
+                                                                                                        ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "abortCalls": 1,
+-   "hasState": false,
+-   "promptModels": [],
++   "abortCalls": 2,
++   "hasState": true,
++   "promptModels": [
++     "openai/fallback-one",
++   ],
+  }
+
+- Expected  - 3
++ Received  + 5
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:286:99)
+(fail) runtime-fallback composed abort lifecycle races > #given cleanup evicts a detached status watchdog #when the stale abort resolves #then rollback cannot restore the watchdog [1.04ms]
+
+ 4 pass
+ 1 fail
+ 6 expect() calls
+Ran 5 tests across 1 file. [66.00ms]

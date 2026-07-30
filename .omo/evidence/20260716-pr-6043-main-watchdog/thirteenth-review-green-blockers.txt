@@ -1,0 +1,21 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:
+(pass) first-prompt watchdog main-session identity > #given an authoritative main session exists #when an unregistered parent-linked child stays silent #then the main-session watchdog does not claim it [0.93ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts:
+(pass) first-prompt watchdog suspended generation ownership > #given generation two is suspended by generation one's delayed abort #when generation three arrives before correlation resolves #then generation three receives a fresh deadline [1.52ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [2.12ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [2.90ms]
+(pass) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [1.62ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-three-generation.test.ts:
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when progress cancels generation two before generation three arms #then generation three still recovers [3.02ms]
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when status resolution cancels generation two before generation three arms #then generation three still recovers [6.27ms]
+
+ 7 pass
+ 0 fail
+ 43 expect() calls
+Ran 7 tests across 4 files. [79.00ms]

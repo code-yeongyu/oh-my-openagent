@@ -1,0 +1,43 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.73ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.10ms]
+(pass) main session lifecycle > #given deletion pauses during monitor cleanup #when the same ID is recreated #then stale cleanup cannot clear or disconnect replacement state [0.31ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:
+(pass) createEventHandler - model fallback > triggers retry prompt for assistant message.updated APIError payloads (headless resume) [156.38ms]
+(pass) createEventHandler - model fallback > #given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated [153.41ms]
+(pass) createEventHandler - model fallback > triggers retry prompt for nested model error payloads [153.37ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when error events overlap [153.45ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when session.error omits provider after dispatch [153.68ms]
+(pass) createEventHandler - model fallback > #given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt [1.14ms]
+(pass) createEventHandler - model fallback > does not collapse fallback continuations for different providers with the same model id [307.71ms]
+(pass) createEventHandler - model fallback > triggers retry prompt on session.status retry events and applies fallback [157.78ms]
+(pass) createEventHandler - model fallback > does not spam abort/prompt when session.status retry countdown updates [153.33ms]
+(pass) createEventHandler - model fallback > re-handles the same retry key after session recovers through session.idle [309.44ms]
+(pass) createEventHandler - model fallback > does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied [153.61ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback from session.status when runtime_fallback is enabled [1.72ms]
+(pass) createEventHandler - model fallback > prefers user-configured fallback_models over hardcoded chain on session.status retry [154.67ms]
+(pass) createEventHandler - model fallback > advances main-session fallback chain across repeated session.error retries end-to-end [310.97ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default) [1.08ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-generation.test.ts:
+(pass) model-fallback continuation generation ownership > #given an old continuation is paused during abort #when the session ID is cleared and reused #then only the replacement continuation can dispatch and release ownership [153.05ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback-pin-agent.test.ts:
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins agent/model on promptAsync body when continuing after message.updated fallback [152.78ms]
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins agent/model on promptAsync body when continuing after session.error fallback [156.79ms]
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins agent/model on fallback prompt() body when promptAsync is not available (session.status) [156.44ms]
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins variant from agent config when present [152.05ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback-2941.test.ts:
+(pass) createEventHandler - category runtime fallback suppression > does not arm retry fallback when category session explicitly stores no fallback chain [regression #2941] [1.41ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts:
+(pass) model-fallback abort boundary > #given the SDK resolves a non-2xx abort #when continuation starts #then throwing semantics are requested and no prompt is injected [0.74ms]
+
+ 25 pass
+ 0 fail
+ 94 expect() calls
+Ran 25 tests across 6 files. [3.19s]

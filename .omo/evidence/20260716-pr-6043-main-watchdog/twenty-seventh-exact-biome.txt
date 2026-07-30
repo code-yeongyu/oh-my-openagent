@@ -1,0 +1,37 @@
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts:76:42 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    74 │     const sessionInfo = props ? props.info : undefined
+    75 │     const sessionRecord = isRuntimeFallbackRecord(sessionInfo) ? sessionInfo : undefined
+  > 76 │     const sessionModel = sessionRecord?.["model"]
+       │                                          ^^^^^^^
+    77 │     const sessionAgent = sessionRecord?.["agent"]
+    78 │     const model = normalizeModelToCanonicalString(sessionModel)
+
+  i Unsafe fix: Use a literal key instead.
+
+    76 │ ····const·sessionModel·=·sessionRecord?.["model"]
+       │                                         --     --
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts:77:42 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    75 │     const sessionRecord = isRuntimeFallbackRecord(sessionInfo) ? sessionInfo : undefined
+    76 │     const sessionModel = sessionRecord?.["model"]
+  > 77 │     const sessionAgent = sessionRecord?.["agent"]
+       │                                          ^^^^^^^
+    78 │     const model = normalizeModelToCanonicalString(sessionModel)
+    79 │     const agent = typeof sessionAgent === "string"
+
+  i Unsafe fix: Use a literal key instead.
+
+    77 │ ····const·sessionAgent·=·sessionRecord?.["agent"]
+       │                                         --     --
+
+Checked 12 files in 12ms. No fixes applied.
+Found 2 infos.

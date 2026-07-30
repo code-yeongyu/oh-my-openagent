@@ -8,6 +8,8 @@ import {
   updateSessionAgent,
   setMainSession,
   getMainSessionID,
+  isMainSession,
+  removeMainSession,
   registerAgentName,
   clearRegisteredAgentNames,
   isAgentRegistered,
@@ -130,6 +132,26 @@ describe("claude-code-session-state", () => {
       // then
       expect(getMainSessionID()).toBe(undefined)
     })
+
+    test("should retain all active root sessions while exposing the latest one", () => {
+      setMainSession("root-a")
+      setMainSession("root-b")
+
+      expect(getMainSessionID()).toBe("root-b")
+      expect(isMainSession("root-a")).toBe(true)
+      expect(isMainSession("root-b")).toBe(true)
+    })
+
+    test("should restore the previous active root when the latest root is removed", () => {
+      setMainSession("root-a")
+      setMainSession("root-b")
+
+      removeMainSession("root-b")
+
+      expect(getMainSessionID()).toBe("root-a")
+      expect(isMainSession("root-a")).toBe(true)
+      expect(isMainSession("root-b")).toBe(false)
+    })
   })
 
   describe("agent registration", () => {
@@ -216,7 +238,7 @@ describe("claude-code-session-state", () => {
       // then - getSessionAgent returns correct agent for prometheus-md-only hook
       const agent = getSessionAgent(sessionID)
       expect(agent).toBe("Prometheus - Plan Builder")
-      expect(["Prometheus - Plan Builder"].includes(agent!)).toBe(true)
+      expect(["Prometheus - Plan Builder"].includes(agent ?? "")).toBe(true)
     })
 
     test("should return undefined when agent not set (bug scenario)", () => {

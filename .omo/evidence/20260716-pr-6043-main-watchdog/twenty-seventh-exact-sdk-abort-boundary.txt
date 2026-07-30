@@ -1,0 +1,13 @@
+{
+  "sdkVersion": "1.15.13",
+  "runtime": {
+    "aborted": false,
+    "ownsInternalAbort": false,
+    "reservationSource": "model-suggestion-retry",
+    "reservationTokenUnchanged": true
+  },
+  "modelFallback": {
+    "promptCalls": 0,
+    "continuationStillInFlight": false
+  }
+}

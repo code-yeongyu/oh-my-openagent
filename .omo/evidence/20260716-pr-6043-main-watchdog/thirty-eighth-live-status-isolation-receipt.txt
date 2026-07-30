@@ -1,0 +1,9 @@
+source_head=f726df3f072865c4ccada3e81a246c0ac9daf544
+real_db_unchanged=yes
+sandbox_isolated=yes
+sandbox_session_count=1
+prompt_http_code=204
+session_status_retry_observed=yes
+status_fallback_requests=1
+stale_watchdog_fallback_requests=0
+ownership_transfer_logged=yes

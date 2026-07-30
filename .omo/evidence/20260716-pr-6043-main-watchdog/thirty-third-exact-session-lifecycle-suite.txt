@@ -1,0 +1,82 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.68ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.09ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:
+(pass) createEventHandler - model fallback > triggers retry prompt for assistant message.updated APIError payloads (headless resume) [154.99ms]
+(pass) createEventHandler - model fallback > #given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated [153.47ms]
+(pass) createEventHandler - model fallback > triggers retry prompt for nested model error payloads [153.35ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when error events overlap [154.65ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when session.error omits provider after dispatch [154.96ms]
+(pass) createEventHandler - model fallback > #given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt [0.39ms]
+(pass) createEventHandler - model fallback > does not collapse fallback continuations for different providers with the same model id [308.54ms]
+(pass) createEventHandler - model fallback > triggers retry prompt on session.status retry events and applies fallback [155.04ms]
+(pass) createEventHandler - model fallback > does not spam abort/prompt when session.status retry countdown updates [153.32ms]
+(pass) createEventHandler - model fallback > re-handles the same retry key after session recovers through session.idle [307.39ms]
+(pass) createEventHandler - model fallback > does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied [165.39ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback from session.status when runtime_fallback is enabled [1.00ms]
+(pass) createEventHandler - model fallback > prefers user-configured fallback_models over hardcoded chain on session.status retry [154.94ms]
+(pass) createEventHandler - model fallback > advances main-session fallback chain across repeated session.error retries end-to-end [319.05ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default) [1.84ms]
+
+packages/omo-opencode/src/plugin/event.test.ts:
+(pass) event error extraction > prefers nested APIError message over generic top-level message [1.86ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.idle arrives #then it forwards the event to tmuxSessionManager.onEvent [1.29ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.status reports idle #then synthetic idle forwards to tmuxSessionManager.onEvent [1.42ms]
+(pass) createEventHandler - idle deduplication > #given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane [15.84ms]
+(pass) createEventHandler - idle deduplication > #given session.status already emitted a synthetic idle #when real session.idle follows immediately #then hooks run once [0.42ms]
+(pass) createEventHandler - idle deduplication > keeps other session dedup state untouched when suppressing real-idle-after-synthetic-idle [0.50ms]
+(pass) createEventHandler - idle deduplication > dedups back-to-back real session.idle events for the same sessionID within 500ms [0.33ms]
+(pass) createEventHandler - idle deduplication > still dedups synthetic-idle-after-real-idle as before [0.23ms]
+(pass) createEventHandler - idle deduplication > does NOT dedup session.idle events for DIFFERENT sessionIDs [0.27ms]
+(pass) createEventHandler - idle deduplication > both maps pruned on every event [604.05ms]
+(pass) createEventHandler - idle deduplication > dispatches both idle events once the dedup window expires [606.59ms]
+(pass) createEventHandler - event forwarding > forwards message activity events to tmux session manager [0.80ms]
+(pass) createEventHandler - event forwarding > forwards legacy message.part.updated activity with part-only session id to tmux session manager [0.56ms]
+(pass) createEventHandler - event forwarding > does not forward tmux activity events when tmux integration is disabled [0.92ms]
+(pass) createEventHandler - event forwarding > does not forward session.created to tmux session manager when tmux integration is disabled [1.37ms]
+(pass) createEventHandler - event forwarding > skips tmux dispatch for subagent sessions marked only via subagentSessions (no parentID) [0.75ms]
+(pass) createEventHandler - event forwarding > still dispatches for a primary session not in subagentSessions [0.69ms]
+(pass) createEventHandler - event forwarding > Path A skips dispatch even when subagentSessions Set is populated only AFTER the event arrives (parentID covers it) [0.38ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw after session.created for main sessions (no parentID) [0.61ms]
+(pass) createEventHandler - event forwarding > does NOT dispatch OpenClaw for subagent sessions (with parentID) [0.57ms]
+(pass) createEventHandler - event forwarding > forwards session.deleted to write-existing-file-guard hook [0.68ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw for synthetic session.idle events [0.42ms]
+(pass) createEventHandler - event forwarding > clears stored prompt params on session.deleted [0.71ms]
+(pass) createEventHandler - retry dedupe lifecycle > re-handles same retry key after session recovers to idle status [315.17ms]
+(pass) createEventHandler - event hook isolation > continues dispatching later event hooks when an earlier hook throws [1.07ms]
+(pass) createEventHandler - event hook isolation > preserves hook fan-out order while isolating individual hook failures [0.86ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts:
+(pass) model-fallback abort boundary > #given the SDK resolves a non-2xx abort #when continuation starts #then throwing semantics are requested and no prompt is injected [0.88ms]
+
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:
+(pass) claude-code-session-state > setSessionAgent > should store agent for session [1.16ms]
+(pass) claude-code-session-state > setSessionAgent > should strip zero-width ordering prefixes before storing agent for session [0.68ms]
+(pass) claude-code-session-state > setSessionAgent > should NOT overwrite existing agent (first-write wins) [0.25ms]
+(pass) claude-code-session-state > setSessionAgent > should return undefined for unknown session [0.73ms]
+(pass) claude-code-session-state > updateSessionAgent > should overwrite existing agent [4.25ms]
+(pass) claude-code-session-state > updateSessionAgent > should strip zero-width ordering prefixes when overwriting existing agent [0.29ms]
+(pass) claude-code-session-state > clearSessionAgent > should remove agent from session [1.19ms]
+(pass) claude-code-session-state > mainSessionID > should store and retrieve main session ID [0.25ms]
+(pass) claude-code-session-state > mainSessionID > should return undefined when not set [0.21ms]
+(pass) claude-code-session-state > mainSessionID > should retain all active root sessions while exposing the latest one [0.68ms]
+(pass) claude-code-session-state > mainSessionID > should restore the previous active root when the latest root is removed [0.26ms]
+(pass) claude-code-session-state > agent registration > should register config-key lookup when given a display name [0.33ms]
+(pass) claude-code-session-state > agent registration > should resolve config keys back to the registered raw agent name [0.35ms]
+(pass) claude-code-session-state > agent registration > should resolve legacy parenthesized names to registered agent [0.24ms]
+(pass) claude-code-session-state > agent registration > should resolve bare lowercase name from historical session [0.19ms]
+(pass) claude-code-session-state > agent registration > should clear registered agent names without clearing session ownership [0.25ms]
+(pass) claude-code-session-state > agent registration > #given atlas display name with zero-width prefix > #when checking registration without the zero-width prefix > #then it treats the display name as registered [0.21ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should correctly identify Prometheus agent for permission checks [0.23ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should return undefined when agent not set (bug scenario) [0.29ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should preserve custom agent when default agent is sent on subsequent messages [2.44ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should allow explicit agent update via updateSessionAgent [1.49ms]
+(pass) claude-code-session-state > backward compatibility > strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259) [0.47ms]
+
+ 66 pass
+ 0 fail
+ 140 expect() calls
+Ran 66 tests across 5 files. [4.02s]

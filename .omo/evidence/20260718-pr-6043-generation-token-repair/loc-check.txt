@@ -1,0 +1,5 @@
+added=32
+deleted=16
+pure_loc=48
+limit=250
+status=pass

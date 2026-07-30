@@ -1,0 +1,13 @@
+base_head=aab0320002bb4df3cbdfcda630fbeb6a3151f4af
+source_diff_sha256=425e46be21c068b09a13ce781493c468c0ad07e9484e12af026549a1e96f1c29
+source_files_sha256_before=987624ffdf97015e75cc2c8f13058f85cfac267fed50e5a360693497002fdf96
+packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
+packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts
+packages/omo-opencode/src/hooks/runtime-fallback/session-retry-ownership.ts
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/session-retry-ownership.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts
+source_files_sha256_after=987624ffdf97015e75cc2c8f13058f85cfac267fed50e5a360693497002fdf96
+source_unchanged_during_qa=yes

@@ -1,0 +1,24 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts:
+56 |
+57 |     await Promise.resolve()
+58 |     creationHookRelease.resolve()
+59 |     await Promise.all([creation, deletion])
+60 |
+61 |     expect(getMainSessionID()).not.toBe(sessionID)
+                                        ^
+error: expect(received).not.toBe(expected)
+
+Expected: not "creation-before-delete-cleanup"
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts:61:36)
+(fail) plugin session deletion ordering > #given creation pauses before registration #when deletion arrives later #then the deleted ID is not resurrected [1.72ms]
+(pass) plugin session deletion ordering > #given deletion pauses in an earlier hook #when the same ID is recreated #then creation waits for lifecycle cleanup [0.33ms]
+(pass) plugin session deletion ordering > #given overlapping deletions for one ID #when recreation starts #then all cleanup completes before replacement creation [1.56ms]
+(pass) plugin session deletion ordering > #given deletion pauses before later hooks #when the same ID is recreated #then replacement hooks wait for deletion fan-out [1.52ms]
+
+ 3 pass
+ 1 fail
+ 11 expect() calls
+Ran 4 tests across 1 file. [81.00ms]

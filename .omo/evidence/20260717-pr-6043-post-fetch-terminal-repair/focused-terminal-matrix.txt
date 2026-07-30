@@ -1,0 +1,24 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts:
+(pass) first-prompt watchdog terminal races > #given the watchdog abort request succeeded #when an abort error arrives while fallback dispatch settles #then it remains external cancellation [3.41ms]
+(pass) first-prompt watchdog terminal races > #given the watchdog abort marker is set #when a non-abort session error arrives #then the watchdog callback is cancelled [1.56ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts:
+(pass) first-prompt watchdog message-fetch ordering > #given abort resolved while retry messages are pending #when its terminal arrives #then fallback ownership survives through dispatch [3.77ms]
+(pass) first-prompt watchdog message-fetch ordering > #given retry messages resolved and the fallback request is busy #when the watchdog terminal arrives #then status inspection preserves fallback ownership [1.61ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:
+(pass) runtime-fallback deferred watchdog terminal events > #given an ambiguous watchdog abort #when assistant parent correlation resolves it #then the deferred terminal event is handled before the message update [0.57ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given an old-parent terminal candidate #when the newer request is busy #then the deferred event resolves as internal before the message update [0.41ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given a current cancellation is deferred #when an old assistant abort arrives while the session is idle #then cancellation resets retry state [2.06ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [1.87ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [2.90ms]
+(pass) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [1.50ms]
+
+ 10 pass
+ 0 fail
+ 47 expect() calls
+Ran 10 tests across 4 files. [161.00ms]

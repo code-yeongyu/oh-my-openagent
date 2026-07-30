@@ -1,0 +1,7 @@
+source_head=1e0b44d5a8a08ec168a14d542456c11212a7c610
+origin_dev=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+merge_base=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+tracked_status=packages/omo-opencode/src/features/claude-code-session-state/state.ts_pure_loc=98
+packages/omo-opencode/src/plugin/event-session-lifecycle.ts_pure_loc=137
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts_pure_loc=250
+runtime_commit=1e0b44d5a8a08ec168a14d542456c11212a7c610 fix(runtime-fallback): retain active root watchdogs

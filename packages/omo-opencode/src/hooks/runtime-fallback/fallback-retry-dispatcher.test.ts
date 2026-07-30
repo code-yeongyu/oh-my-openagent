@@ -50,7 +50,7 @@ function createDeps(toastMessages: string[]): HookDeps {
 
 function createRejectedDispatchHelpers(dispatchCalls: string[]): AutoRetryHelpers {
   return {
-    abortSessionRequest: async () => {},
+    abortSessionRequest: async () => true,
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async (_sessionID, model) => {

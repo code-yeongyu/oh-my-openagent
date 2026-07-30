@@ -52,6 +52,7 @@ function createHelpers(abortCalls: Array<{ sessionID: string; source: string }>)
   return {
     abortSessionRequest: async (sessionID: string, source: string) => {
       abortCalls.push({ sessionID, source })
+      return true
     },
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},

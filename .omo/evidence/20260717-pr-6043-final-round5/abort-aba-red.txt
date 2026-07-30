@@ -1,0 +1,29 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:
+(pass) createAutoRetryHelpers > #given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted [2.40ms]
+(pass) createAutoRetryHelpers > #given an existing fallback result is pending #when a new fallback retry is skipped by the prompt gate #then the previous pending state is preserved [0.46ms]
+(pass) createAutoRetryHelpers > #given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085) [0.25ms]
+(pass) createAutoRetryHelpers > #given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids [0.26ms]
+(pass) createAutoRetryHelpers > #given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed [0.32ms]
+(pass) createAutoRetryHelpers > #given stale internal abort marker #when stale session cleanup runs #then the marker is cleared [0.14ms]
+(pass) createAutoRetryHelpers > #given a stale session has a pending internal abort #when cleanup evicts it #then a late response stays invalidated [0.15ms]
+260 |     while (abortCalls < 2) await Promise.resolve()
+261 |     staleResponse.resolve({})
+262 |
+263 |     // then
+264 |     expect(await staleAbort).toBe(false)
+265 |     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:265:59)
+(fail) createAutoRetryHelpers > #given cleanup permits a replacement abort #when the stale abort resolves #then replacement ownership remains intact [0.23ms]
+
+ 7 pass
+ 1 fail
+ 26 expect() calls
+Ran 8 tests across 1 file. [135.00ms]

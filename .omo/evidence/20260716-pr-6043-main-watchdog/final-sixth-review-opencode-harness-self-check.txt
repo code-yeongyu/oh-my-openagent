@@ -1,0 +1,9 @@
+HEAD=c4896f52a32bb429f4394d8041e8f8c159da02b7
+PASS: dependencies present (opencode sqlite3 curl jq tmux)
+PASS: oqa_db_path -> <redacted-path>
+PASS: oqa_sql_escape quotes single quotes
+PASS: oqa_free_port -> <port>
+PASS: isolated XDG sandbox auto-removed on exit (/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.TvZMwwVAsf)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+PASS: common.sh self-check

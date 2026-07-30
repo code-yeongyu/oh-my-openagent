@@ -1,0 +1,52 @@
+TESTED_SOURCE_HEAD=ec4beb1a5368a638167568759c5adb5a84ff1eb3
+RUNTIME_REPAIR=fffed869ef00426a3b8df905324d5edcbbf217a9
+MODEL_FALLBACK_REPAIR=473d6a9c2a1ab4dae356013c09776571eeadf77e
+LIFECYCLE_REPAIR=ec4beb1a5368a638167568759c5adb5a84ff1eb3
+BASE=14083b89f1cbf4680be13493a6c4afd67c957e8a
+PR_HEAD=72b6e1bf14e29a3300d8a4d64830083b45c59616
+DIFF_CHECK
+PASS git diff --check
+PURE_LOC
+44 packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-cleanup.ts
+244 packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+96 packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts
+227 packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
+175 packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+211 packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
+60 packages/omo-opencode/src/hooks/runtime-fallback/session-generation.ts
+174 packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+96 packages/omo-opencode/src/hooks/runtime-fallback/types.ts
+126 packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts
+44 packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts
+234 packages/omo-opencode/src/plugin/event-model-fallback-state.ts
+207 packages/omo-opencode/src/plugin/event-model-fallback.ts
+148 packages/omo-opencode/src/plugin/event-session-lifecycle.ts
+223 packages/omo-opencode/src/plugin/event.ts
+PASS pure LOC ceiling
+CLEANUP
+debug_journal=absent
+debug_exclude=absent
+task_tmp_count=0
+task_tmux_count=0
+task_process_count=0
+STATUS
+ M .omo/evidence/pr-6043-code-review.md
+ M packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-cleanup.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/session-generation.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/types.ts
+ M packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts
+ M packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts
+ M packages/omo-opencode/src/plugin/event-model-fallback-state.ts
+ M packages/omo-opencode/src/plugin/event-model-fallback.ts
+ M packages/omo-opencode/src/plugin/event-session-lifecycle.ts
+ M packages/omo-opencode/src/plugin/event.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/dispatch-generation-ownership.test.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/event-generation-ownership.test.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/session-retry-ownership.ts
+?? packages/omo-opencode/src/plugin/event-model-fallback-generation.test.ts

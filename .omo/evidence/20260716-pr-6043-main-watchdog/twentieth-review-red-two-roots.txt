@@ -1,0 +1,31 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:
+35 |
+36 |     try {
+37 |       watchdog.onUserMessage(olderRootSessionID, PRIMARY_MODEL, AGENT)
+38 |       await timers.advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+39 |
+40 |       expect(calls.abort).toEqual([
+                               ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "sessionID": "session-root-a",
+-     "source": "first-prompt-watchdog",
+-   },
+- ]
++ []
+
+- Expected  - 6
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:40:27)
+(fail) first-prompt watchdog main-session identity > #given two active root sessions #when the older root stays silent #then it still receives watchdog fallback [0.81ms]
+(pass) first-prompt watchdog main-session identity > #given an authoritative main session exists #when an unregistered parent-linked child stays silent #then the main-session watchdog does not claim it [0.14ms]
+
+ 1 pass
+ 1 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [66.00ms]

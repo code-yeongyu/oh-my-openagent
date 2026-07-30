@@ -10,17 +10,25 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
+import {
+  clearSessionRetryOwnershipIfUnchanged,
+  snapshotSessionRetryOwnership,
+} from "./session-retry-ownership"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  sessionStatusRetryKeys: Map<string, string>,
+  onFallbackOwnershipTransferred?: (sessionID: string) => FallbackOwnershipTransfer | undefined,
+  isSessionCancelled: (sessionID: string) => boolean = () => false,
 ) {
   const {
     pluginConfig,
     sessionStates,
     sessionLastAccess,
     sessionRetryInFlight,
+    sessionStatusRetryKeys,
   } = deps
 
   return async (props: Record<string, unknown> | undefined) => {
@@ -31,6 +39,10 @@ export function createSessionStatusHandler(
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
+    const sessionGeneration = getSessionGeneration(deps, sessionID)
+    const isCurrent = () => deps.isLifecycleActive?.() !== false
+      && !isSessionCancelled(sessionID)
+      && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
@@ -59,15 +71,36 @@ export function createSessionStatusHandler(
       return
     }
     sessionStatusRetryKeys.set(sessionID, retryKey)
+    const releaseRetryKey = () => {
+      if (isCurrent() && sessionStatusRetryKeys.get(sessionID) === retryKey) {
+        sessionStatusRetryKeys.delete(sessionID)
+      }
+    }
+    let requestAborted = false
+    const ownershipTransfer = sessionRetryInFlight.has(sessionID) && !timeoutEnabled
+      ? undefined
+      : onFallbackOwnershipTransferred?.(sessionID)
+    const rollbackOwnership = () => ownershipTransfer?.rollback()
 
     if (sessionRetryInFlight.has(sessionID)) {
       if (timeoutEnabled) {
+        const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
         log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
           sessionID,
           model,
         })
-        await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
-        sessionRetryInFlight.delete(sessionID)
+        requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+        if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
+        if (!requestAborted) {
+          releaseRetryKey()
+          rollbackOwnership()
+          return
+        }
+        if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+          releaseRetryKey()
+          ownershipTransfer?.commit()
+          return
+        }
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
         return
@@ -75,15 +108,42 @@ export function createSessionStatusHandler(
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+    if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
     if (fallbackModels.length === 0) {
       if (!sessionStates.has(sessionID)) {
         sessionStatusRetryKeys.delete(sessionID)
       }
+      rollbackOwnership()
       return
     }
 
     let state = sessionStates.get(sessionID)
+    if (state?.pendingFallbackModel && state.pendingFallbackPromptMayHaveBeenAccepted) {
+      log(`[${HOOK_NAME}] session.status retry skipped (pending fallback prompt may already be accepted)`, {
+        sessionID,
+        pendingFallbackModel: state.pendingFallbackModel,
+      })
+      rollbackOwnership()
+      return
+    }
+
+    if (!requestAborted) {
+      const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
+      requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+      if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
+      if (!requestAborted) {
+        releaseRetryKey()
+        rollbackOwnership()
+        return
+      }
+      if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+        releaseRetryKey()
+        ownershipTransfer?.commit()
+        return
+      }
+    }
+
     if (!state) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
@@ -94,6 +154,7 @@ export function createSessionStatusHandler(
       })
       if (!initialModel) {
         sessionStatusRetryKeys.delete(sessionID)
+        rollbackOwnership()
         log(`[${HOOK_NAME}] session.status retry missing model info, cannot fallback`, { sessionID })
         return
       }
@@ -105,13 +166,6 @@ export function createSessionStatusHandler(
     sessionLastAccess.set(sessionID, Date.now())
 
     if (state.pendingFallbackModel) {
-      if (state.pendingFallbackPromptMayHaveBeenAccepted) {
-        log(`[${HOOK_NAME}] session.status retry skipped (pending fallback prompt may already be accepted)`, {
-          sessionID,
-          pendingFallbackModel: state.pendingFallbackModel,
-        })
-        return
-      }
       if (timeoutEnabled) {
         log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
           sessionID,
@@ -124,6 +178,7 @@ export function createSessionStatusHandler(
           sessionID,
           pendingFallbackModel: state.pendingFallbackModel,
         })
+        rollbackOwnership()
         return
       }
     }
@@ -134,14 +189,20 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
-    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
-
-    await dispatchFallbackRetry(deps, helpers, {
+    if (!isCurrent()) { releaseRetryKey(); ownershipTransfer?.rollback(); return }
+    const dispatched = await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: "session.status",
     })
+    if (!isCurrent()) return
+    if (!dispatched) {
+      releaseRetryKey()
+      ownershipTransfer?.rollback()
+    } else {
+      ownershipTransfer?.commit()
+    }
   }
 }

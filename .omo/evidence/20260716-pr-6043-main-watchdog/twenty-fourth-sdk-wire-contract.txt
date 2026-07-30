@@ -1,0 +1,15 @@
+{
+  "sdkVersion": "1.15.13",
+  "defaultResult": {
+    "hasError": true,
+    "status": 404,
+    "dataIsUndefined": true
+  },
+  "throwOnErrorResult": {
+    "threw": true,
+    "error": {
+      "name": "Error",
+      "message": "missing test session"
+    }
+  }
+}

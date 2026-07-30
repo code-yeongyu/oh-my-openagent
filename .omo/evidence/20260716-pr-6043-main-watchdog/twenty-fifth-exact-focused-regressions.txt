@@ -1,0 +1,35 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:
+(pass) createEventHandler - model fallback > triggers retry prompt for assistant message.updated APIError payloads (headless resume) [154.63ms]
+(pass) createEventHandler - model fallback > #given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated [153.84ms]
+(pass) createEventHandler - model fallback > triggers retry prompt for nested model error payloads [156.52ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when error events overlap [153.57ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when session.error omits provider after dispatch [153.67ms]
+(pass) createEventHandler - model fallback > #given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt [0.61ms]
+(pass) createEventHandler - model fallback > #given the SDK resolves a non-2xx abort #when model-fallback handles an assistant error #then it requests throwing semantics and does not inject another prompt [0.39ms]
+(pass) createEventHandler - model fallback > does not collapse fallback continuations for different providers with the same model id [311.66ms]
+(pass) createEventHandler - model fallback > triggers retry prompt on session.status retry events and applies fallback [159.25ms]
+(pass) createEventHandler - model fallback > does not spam abort/prompt when session.status retry countdown updates [154.14ms]
+(pass) createEventHandler - model fallback > re-handles the same retry key after session recovers through session.idle [317.16ms]
+(pass) createEventHandler - model fallback > does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied [157.36ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback from session.status when runtime_fallback is enabled [1.14ms]
+(pass) createEventHandler - model fallback > prefers user-configured fallback_models over hardcoded chain on session.status retry [155.94ms]
+(pass) createEventHandler - model fallback > advances main-session fallback chain across repeated session.error retries end-to-end [315.82ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default) [1.23ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts:
+(pass) createAbortSessionRequest reservation release > #given a session reserved by model-suggestion-retry on a provider retry signal #when the runtime-fallback abort fires #then the reservation is released so the fallback dispatch can acquire the session [1.08ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by model-suggestion-retry:sync #when the runtime-fallback abort fires #then the reservation is released [0.28ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by the runtime-fallback path itself #when the abort fires #then the reservation is still released [0.20ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by an unrelated user prompt #when the runtime-fallback abort fires #then the reservation is preserved (abort must not steal a foreground user turn) [0.21ms]
+(pass) createAbortSessionRequest reservation release > #given a watchdog aborts a still-running session #when the abort fires #then the abort is marked internal for the resulting session.error [0.18ms]
+(pass) createAbortSessionRequest reservation release > #given a watchdog abort request fails #when the abort rejects #then no internal-abort marker remains [0.37ms]
+(pass) createAbortSessionRequest reservation release > #given the SDK resolves a non-2xx abort #when the watchdog aborts #then ownership and the prompt reservation are preserved [0.28ms]
+(pass) createAbortSessionRequest reservation release > #given two overlapping internal aborts #when the newer abort fails before the older abort succeeds #then the older abort keeps internal ownership [0.35ms]
+(pass) createAbortSessionRequest reservation release > #given an abort starts with one prompt reservation #when a newer reservation replaces it before abort completion #then the newer reservation remains owned [0.20ms]
+
+ 25 pass
+ 0 fail
+ 66 expect() calls
+Ran 25 tests across 2 files. [2.52s]

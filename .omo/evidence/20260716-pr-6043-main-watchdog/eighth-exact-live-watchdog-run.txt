@@ -1,0 +1,6 @@
+curl: (7) Failed to connect to 127.0.0.1 port 55551 after 0 ms: Couldn't connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 55552 after 0 ms: Couldn't connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 55552 after 0 ms: Couldn't connect to server
+curl: (28) Operation timed out after 2141 milliseconds with 0 bytes received
+PASS source_head=d4ab26633643e084931dd223c4c9f7c561fa050f real_db_unchanged=yes fallback_seen=yes fallback_watchdog_rearmed=no later_user_abort=external
+.omo/evidence/20260716-pr-6043-main-watchdog/run-live-watchdog-qa.sh: line 32: 86604 Terminated: 15          curl -sN -u "opencode:$SERVER_PASS" "http://127.0.0.1:${SERVER_PORT}/event?directory=${ENC_DIR}" > "$SSE_LOG"

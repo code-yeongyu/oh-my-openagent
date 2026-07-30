@@ -1,0 +1,15 @@
+head=0e7223d60b6cbbb04ddc92801f62fd6c09749e92
+origin_dev=16658f79c1155cb6f1b3bfaffa1f54ebd1469615
+merge_base=16658f79c1155cb6f1b3bfaffa1f54ebd1469615
+changed_paths_from_previous_remote_head:
+A	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts
+A	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts
+A	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts
+M	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts
+M	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+pure_loc:
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts=234
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts=223
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts=91
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts=42
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts=77

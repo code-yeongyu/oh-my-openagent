@@ -1,0 +1,32 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [4.12ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [1.08ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.17ms]
+(pass) runtime-fallback composed abort lifecycle races > #given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch [0.71ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a fallback timeout abort is pending #when a newer user turn arrives #then stale timeout completion cannot dispatch [3.00ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts:
+(pass) first-prompt watchdog message-fetch ordering > #given abort resolved while retry messages are pending #when its terminal arrives #then fallback ownership survives through dispatch [2.24ms]
+(pass) first-prompt watchdog message-fetch ordering > #given retry messages resolved and the fallback request is busy #when the watchdog terminal arrives #then status inspection preserves fallback ownership [2.35ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts:
+(pass) first-prompt watchdog ownership races > re-arms after an accepted abort when fallback dispatch is rejected [0.46ms]
+(pass) first-prompt watchdog ownership races > does not let a detached callback abort a replacement watchdog retry [0.26ms]
+(pass) first-prompt watchdog ownership races > restores suspended ownership without arming a new timer [0.18ms]
+(pass) first-prompt watchdog ownership races > discards inconclusive suspended ownership before a distinct user generation [0.20ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout-overlap.test.ts:
+(pass) stale same-generation timeout preserves replacement retry ownership [3.20ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:
+(pass) createFallbackTimeoutHelpers > #given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored [2.86ms]
+(pass) createFallbackTimeoutHelpers > #given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed [2.46ms]
+(pass) createFallbackTimeoutHelpers > #given timeout escalation cannot abort the active request #when the timeout fires #then it preserves retry ownership and does not dispatch a fallback [2.66ms]
+(pass) createFallbackTimeoutHelpers > #given an old timeout abort is pending #when a newer user generation starts #then stale completion preserves the newer owner and timer [2.83ms]
+
+ 16 pass
+ 0 fail
+ 61 expect() calls
+Ran 16 tests across 5 files. [126.00ms]

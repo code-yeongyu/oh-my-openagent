@@ -1,10 +1,15 @@
+import { getSessionActivity } from "../../shared/session-idle-settle"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
+import { clearAllInternalAbortOwnership } from "./internal-abort-ownership"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
+import { clearSessionGenerations } from "./session-generation"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
+import { clearAllSessionRetryOwnership } from "./session-retry-ownership"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
@@ -26,11 +31,23 @@ const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
   createFirstPromptWatchdog,
 }
 
+async function isCurrentRequestActive(ctx: RuntimeFallbackPluginInput, sessionID: string): Promise<boolean | undefined> {
+  const status = ctx.client.session.status
+  if (!status) return undefined
+  const activity = await getSessionActivity({
+    session: {
+      status: () => status({ query: { directory: ctx.directory } }),
+    },
+  }, sessionID)
+  return activity === "unknown" ? undefined : activity === "active"
+}
+
 export function createRuntimeFallbackHook(
   ctx: RuntimeFallbackPluginInput,
   options?: RuntimeFallbackOptions,
   factoryOverrides: Partial<RuntimeFallbackHookFactories> = {},
 ): RuntimeFallbackHook {
+  let disposed = false
   const factories = {
     ...defaultRuntimeFallbackHookFactories,
     ...factoryOverrides,
@@ -53,17 +70,28 @@ export function createRuntimeFallbackHook(
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
+    sessionRetryPayloadPending: new Map(),
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    isLifecycleActive: () => !disposed,
   }
 
   const helpers = factories.createAutoRetryHelpers(deps)
-  const baseEventHandler = factories.createEventHandler(deps, helpers)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const deferredTerminalEvents = new Map<string, { type: string; properties?: unknown }>()
+  deps.onStaleSessionCleanup = (sessionID) => {
+    firstPromptWatchdog.onSessionTerminal(sessionID, "session.deleted")
+    deferredTerminalEvents.delete(sessionID)
+  }
+  const baseEventHandler = factories.createEventHandler(
+    deps,
+    helpers,
+    (sessionID) => firstPromptWatchdog.onFallbackOwnershipTransferred(sessionID),
+  )
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -80,22 +108,67 @@ export function createRuntimeFallbackHook(
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    if (disposed) return
     ensureInterval()
 
+    let watchdogDecision: ReturnType<typeof observeEventForWatchdog>
     if (config.enabled) {
-      observeEventForWatchdog(event, firstPromptWatchdog)
+      watchdogDecision = observeEventForWatchdog(event, firstPromptWatchdog)
+    }
+
+    if (watchdogDecision?.kind === "defer-terminal") {
+      deferredTerminalEvents.set(watchdogDecision.sessionID, event)
+      return
+    }
+    if (watchdogDecision?.kind === "consume-terminal") return
+    if (watchdogDecision?.kind === "discard-terminal") {
+      deferredTerminalEvents.delete(watchdogDecision.sessionID)
+      watchdogDecision = undefined
+    }
+    if (watchdogDecision?.kind === "inspect-terminal") {
+      const inspectionGeneration = getSessionGeneration(deps, watchdogDecision.sessionID)
+      const currentRequestActive = await isCurrentRequestActive(ctx, watchdogDecision.sessionID)
+      if (disposed || !isSessionGenerationCurrent(deps, watchdogDecision.sessionID, inspectionGeneration)) return
+      watchdogDecision = firstPromptWatchdog.resolveDeferredTerminal(
+        watchdogDecision.sessionID,
+        currentRequestActive,
+      )
+    }
+    if (watchdogDecision?.kind === "defer-terminal") {
+      deferredTerminalEvents.set(watchdogDecision.sessionID, event)
+      return
+    }
+    if (watchdogDecision?.kind === "consume-terminal") return
+    if (watchdogDecision?.kind === "resolve-terminal") {
+      const deferredEvent = deferredTerminalEvents.get(watchdogDecision.sessionID)
+      deferredTerminalEvents.delete(watchdogDecision.sessionID)
+      if (deferredEvent) {
+        await baseEventHandler({ event: deferredEvent })
+      }
     }
 
     if (event.type === "message.updated") {
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
+      const info = props?.info as Record<string, unknown> | undefined
+      if (info?.role === "user") await baseEventHandler({ event })
+      const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
+      const awaitingFallback = sessionID !== undefined && deps.sessionAwaitingFallbackResult.has(sessionID)
       await messageUpdateHandler(props)
+      if (
+        awaitingFallback
+        && sessionID !== undefined
+        && info?.role === "assistant"
+        && info.error === undefined
+        && !deps.sessionAwaitingFallbackResult.has(sessionID)
+      ) firstPromptWatchdog.onFallbackCompleted(sessionID)
       return
     }
     await baseEventHandler({ event })
   }
 
   const dispose = () => {
+    disposed = true
     if (cleanupInterval) {
       clearInterval(cleanupInterval)
     }
@@ -105,19 +178,27 @@ export function createRuntimeFallbackHook(
     }
 
     firstPromptWatchdog.dispose()
+    delete deps.onStaleSessionCleanup
+    deferredTerminalEvents.clear()
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
-    deps.sessionRetryInFlight.clear()
+    clearAllSessionRetryOwnership(deps)
+    deps.sessionRetryPayloadPending?.clear()
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
-    deps.internallyAbortedSessions.clear()
+    deps.internalAbortRequests?.clear()
+    clearAllInternalAbortOwnership(deps)
+    clearSessionGenerations(deps)
   }
 
   return {
     event: eventHandler,
-    "chat.message": chatMessageHandler,
+    "chat.message": async (input, output) => {
+      if (disposed) return
+      await chatMessageHandler(input, output)
+    },
     dispose,
   } as RuntimeFallbackHook
 }

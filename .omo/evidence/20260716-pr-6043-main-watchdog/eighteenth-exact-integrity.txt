@@ -1,0 +1,13 @@
+SOURCE_HEAD=7020af726e1f21cea5eb1a57febd8bfa38832c1c
+ORIGIN_DEV=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+
+DIFF_CHECK
+
+TRACKED_STATUS
+
+PURE_LOC
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts 54
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts 250
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts 147
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts 229
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts 168

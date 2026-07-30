@@ -1,0 +1,49 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [1.00ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.12ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts:
+(pass) model-fallback abort boundary > #given the SDK resolves a non-2xx abort #when continuation starts #then throwing semantics are requested and no prompt is injected [0.76ms]
+
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:
+(pass) claude-code-session-state > setSessionAgent > should store agent for session [0.69ms]
+(pass) claude-code-session-state > setSessionAgent > should strip zero-width ordering prefixes before storing agent for session [0.16ms]
+(pass) claude-code-session-state > setSessionAgent > should NOT overwrite existing agent (first-write wins) [0.10ms]
+(pass) claude-code-session-state > setSessionAgent > should return undefined for unknown session [0.08ms]
+(pass) claude-code-session-state > updateSessionAgent > should overwrite existing agent [0.07ms]
+(pass) claude-code-session-state > updateSessionAgent > should strip zero-width ordering prefixes when overwriting existing agent [0.08ms]
+(pass) claude-code-session-state > clearSessionAgent > should remove agent from session [0.06ms]
+(pass) claude-code-session-state > mainSessionID > should store and retrieve main session ID [0.07ms]
+(pass) claude-code-session-state > mainSessionID > should return undefined when not set [0.07ms]
+(pass) claude-code-session-state > mainSessionID > should retain all active root sessions while exposing the latest one [0.08ms]
+(pass) claude-code-session-state > mainSessionID > should restore the previous active root when the latest root is removed [0.09ms]
+(pass) claude-code-session-state > agent registration > should register config-key lookup when given a display name [0.10ms]
+(pass) claude-code-session-state > agent registration > should resolve config keys back to the registered raw agent name [0.12ms]
+(pass) claude-code-session-state > agent registration > should resolve legacy parenthesized names to registered agent [0.09ms]
+(pass) claude-code-session-state > agent registration > should resolve bare lowercase name from historical session [0.08ms]
+(pass) claude-code-session-state > agent registration > should clear registered agent names without clearing session ownership [0.17ms]
+(pass) claude-code-session-state > agent registration > #given atlas display name with zero-width prefix > #when checking registration without the zero-width prefix > #then it treats the display name as registered [0.10ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should correctly identify Prometheus agent for permission checks [0.09ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should return undefined when agent not set (bug scenario) [0.07ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should preserve custom agent when default agent is sent on subsequent messages [0.11ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should allow explicit agent update via updateSessionAgent [0.09ms]
+(pass) claude-code-session-state > backward compatibility > strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259) [0.08ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [4.92ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [1.50ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.20ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-rejection-handlers.test.ts:
+(pass) runtime fallback abort rejection > #given a message retry signal while a retry is active #when abort is rejected #then ownership and the active retry are preserved [0.76ms]
+(pass) runtime fallback abort rejection > #given a quota error with a fallback #when abort is rejected #then no replacement request is dispatched [0.61ms]
+(pass) runtime fallback abort rejection > #given a session retry signal while a retry is active #when abort is rejected #then the active retry remains authoritative [0.13ms]
+(pass) runtime fallback abort rejection > #given a rejected session retry abort #when the same retry signal arrives again #then it can acquire ownership and dispatch fallback [0.20ms]
+(pass) runtime fallback abort rejection > #given a pending fallback and a newer session retry signal #when abort is rejected #then pending ownership is preserved [0.10ms]
+
+ 33 pass
+ 0 fail
+ 58 expect() calls
+Ran 33 tests across 5 files. [262.00ms]

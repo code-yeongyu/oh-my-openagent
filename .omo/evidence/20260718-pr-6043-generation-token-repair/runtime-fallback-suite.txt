@@ -1,0 +1,494 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts:
+(pass) first-prompt watchdog terminal races > #given the watchdog abort request succeeded #when an abort error arrives while fallback dispatch settles #then it remains external cancellation [3.42ms]
+(pass) first-prompt watchdog terminal races > #given the watchdog abort marker is set #when a non-abort session error arrives #then the watchdog callback is cancelled [1.56ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/quota-error-classifier.regression.test.ts:
+(pass) runtime-fallback quota error regressions > classifies subscription quota errors as quota_exceeded and triggers fallback [0.79ms]
+(pass) runtime-fallback quota error regressions > treats HTTP 402 payment required as fallback-eligible [0.16ms]
+(pass) runtime-fallback quota error regressions > keeps HTTP 429 rate limit retryable [0.15ms]
+(pass) runtime-fallback quota error regressions > classifies quota error names as quota_exceeded and triggers fallback [0.14ms]
+(pass) runtime-fallback quota error regressions > classifies Volcano Engine 'exceeded the usage quota' as quota_exceeded and retryable [0.10ms]
+(pass) runtime-fallback quota error regressions > classifies UnifyLLM pre-charge balance failures as quota_exceeded [0.20ms]
+(pass) runtime-fallback quota error regressions > classifies Google RESOURCE_EXHAUSTED (gRPC code 8) as quota_exceeded via error name only [0.08ms]
+(pass) runtime-fallback quota error regressions > classifies Google ResourceExhausted message without HTTP status as quota_exceeded [0.07ms]
+(pass) runtime-fallback quota error regressions > classifies snake_case OpenAI insufficient_quota error name as quota_exceeded via name only [0.06ms]
+(pass) runtime-fallback quota error regressions > classifies ZAI weekly/monthly Limit Exhausted as quota_exceeded and triggers fallback [0.06ms]
+(pass) runtime-fallback quota error regressions > classifies ZAI weekly-only Limit Exhausted variant as quota_exceeded [0.11ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [2.90ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [0.96ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.21ms]
+(pass) runtime-fallback composed abort lifecycle races > #given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch [0.61ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a fallback timeout abort is pending #when a newer user turn arrives #then stale timeout completion cannot dispatch [2.94ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:
+(pass) createAutoRetryHelpers > #given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted [17.08ms]
+(pass) createAutoRetryHelpers > #given an existing fallback result is pending #when a new fallback retry is skipped by the prompt gate #then the previous pending state is preserved [0.71ms]
+(pass) createAutoRetryHelpers > #given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085) [0.30ms]
+(pass) createAutoRetryHelpers > #given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids [0.19ms]
+(pass) createAutoRetryHelpers > #given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed [0.10ms]
+(pass) createAutoRetryHelpers > #given stale internal abort marker #when stale session cleanup runs #then the marker is cleared [0.13ms]
+(pass) createAutoRetryHelpers > #given a stale session has a pending internal abort #when cleanup evicts it #then a late response stays invalidated [0.15ms]
+(pass) createAutoRetryHelpers > #given cleanup permits a replacement abort #when the stale abort resolves #then replacement ownership remains intact [0.14ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts:
+(pass) createEventHandler > #given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared [0.29ms]
+(pass) createEventHandler > #given a session retry dedupe key without a pending fallback result #when session.idle fires #then the retry dedupe key is cleared [0.11ms]
+(pass) createEventHandler > #given a cancelled session #when session.error receives an abort error #then fallback retry state is reset [0.14ms]
+(pass) createEventHandler > #given a cancelled session #when session.idle fires #then fallback retry state stays cleared [0.10ms]
+(pass) createEventHandler > #given a session we aborted ourselves (internal abort flag set) #when session.error fires with isAbort #then fallback retry state is preserved (issue #4006) [0.28ms]
+(pass) createEventHandler > #given an external abort (no internal flag) #when session.error fires with isAbort #then state is still reset as a real cancellation [0.15ms]
+(pass) createEventHandler > #given two consecutive internal-abort cycles #when session.error fires each time #then attemptCount can progress past 1 [0.16ms]
+(pass) createEventHandler > #given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315) [0.21ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-dispose-cleanup.test.ts:
+(pass) createRuntimeFallbackHook dispose retry-key cleanup > #given a session.status retry key #when dispose() is called #then later events cannot restart the hook [1.15ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts:
+(pass) first-prompt watchdog deletion cleanup > #given a session has an armed watchdog #when the session is deleted #then its stale timer cannot dispatch [1.55ms]
+(pass) first-prompt watchdog deletion cleanup > #given a session is suspended for delayed-abort correlation #when the session is deleted #then deferred state cannot resume [0.37ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/subagent-quota-abort.test.ts:
+(pass) createMessageUpdateHandler subagent quota abort > #given a subagent session hits a quota error with no fallback configured #when the assistant error event fires #then the subagent session is aborted so the parent tool call can resolve [1.36ms]
+(pass) createMessageUpdateHandler subagent quota abort > #given a non-subagent (user) session hits the same quota error #when the assistant error event fires #then the user session is NOT aborted [1.27ms]
+(pass) createMessageUpdateHandler subagent quota abort > #given a subagent session hits a non-quota retryable error (rate limit) with no fallback configured #when the assistant error event fires #then the subagent is NOT aborted (preserves existing behavior for other error classes) [1.45ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:
+(pass) runtime-fallback > session.error handling > should detect retryable error with status code 429 [2.55ms]
+(pass) runtime-fallback > session.error handling > should detect retryable error with status code 503 [0.70ms]
+(pass) runtime-fallback > session.error handling > should detect retryable error with status code 529 [0.63ms]
+(pass) runtime-fallback > session.error handling > should skip non-retryable errors [0.56ms]
+(pass) runtime-fallback > session.error handling > should log missing API key errors with classification details [0.62ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback for missing API key errors when fallback models are configured [0.71ms]
+(pass) runtime-fallback > session.error handling > should detect retryable error from message pattern 'rate limit' [0.77ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback for quota exhaustion to try next configured model [1.42ms]
+(pass) runtime-fallback > session.error handling > should continue fallback chain when fallback model is not found [0.89ms]
+(pass) runtime-fallback > session.error handling > should continue fallback chain when ProviderModelNotFoundError occurs [1.08ms]
+(pass) runtime-fallback > session.error handling > should bootstrap session.error fallback from session category model and preserve variant [0.83ms]
+(pass) runtime-fallback > session.error handling > should retry delegated child session from bootstrap when history has no user prompt [1.12ms]
+(pass) runtime-fallback > session.error handling > should use persisted user prompt while preserving delegated bootstrap launch context [0.61ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback on Copilot auto-retry signal in message.updated [0.65ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback on OpenAI auto-retry signal in message.updated [0.56ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback on auto-retry signal in assistant text parts [0.63ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback when auto-retry text parts are nested under info.parts [0.56ms]
+(pass) runtime-fallback > session.error handling > should trigger fallback on session.status auto-retry signal [0.55ms]
+(pass) runtime-fallback > session.error handling > should deduplicate session.status countdown updates for the same retry attempt [0.55ms]
+(pass) runtime-fallback > session.error handling > should NOT trigger fallback on auto-retry signal when timeout_seconds is 0 [0.58ms]
+(pass) runtime-fallback > session.error handling > should log when no fallback models configured [0.43ms]
+(pass) runtime-fallback > disabled hook > should not process events when disabled [0.39ms]
+(pass) runtime-fallback > session lifecycle > should create state on session.created [0.58ms]
+(pass) runtime-fallback > session lifecycle > should cleanup state on session.deleted [0.89ms]
+(pass) runtime-fallback > session lifecycle > should handle session.error without prior session.created [1.19ms]
+(pass) runtime-fallback > error code extraction > should extract status code from error object [0.58ms]
+(pass) runtime-fallback > error code extraction > should extract status code from nested error.data [0.48ms]
+(pass) runtime-fallback > custom error codes > should support custom retry_on_errors configuration [0.50ms]
+(pass) runtime-fallback > message.updated handling > should handle assistant message errors [1.15ms]
+(pass) runtime-fallback > message.updated handling > should skip non-assistant message errors [0.50ms]
+(pass) runtime-fallback > message.updated handling > should trigger fallback when message.updated has missing API key error without model [0.59ms]
+(pass) runtime-fallback > message.updated handling > should bootstrap message.updated fallback from session category model and preserve variant [0.55ms]
+(pass) runtime-fallback > message.updated handling > should not advance fallback state from message.updated while retry is already in flight [2.40ms]
+(pass) runtime-fallback > message.updated handling > #given promptAsync fails after fallback retry may have been accepted #when the gate hold expires and the same error repeats #then the pending fallback state prevents a duplicate retry prompt [0.86ms]
+(pass) runtime-fallback > message.updated handling > should force advance fallback from message.updated when Copilot auto-retry signal appears during in-flight retry [2.19ms]
+(pass) runtime-fallback > message.updated handling > should advance fallback after session timeout when Copilot retry emits no retryable events [0.85ms]
+(pass) runtime-fallback > message.updated handling > should keep session timeout active after chat.message model override [1.11ms]
+(pass) runtime-fallback > message.updated handling > should abort in-flight fallback request before advancing on timeout [1.04ms]
+(pass) runtime-fallback > message.updated handling > should not advance fallback after session.stop cancels timeout-driven retry [0.60ms]
+(pass) runtime-fallback > message.updated handling > should not advance fallback timeout after completed subagent clears eligibility [0.53ms]
+(pass) runtime-fallback > message.updated handling > should not trigger second fallback after successful assistant reply [0.88ms]
+(pass) runtime-fallback > message.updated handling > should not clear fallback timeout on assistant non-error update with Copilot retry signal [0.86ms]
+(pass) runtime-fallback > message.updated handling > should not clear fallback timeout on assistant non-error update with OpenAI retry signal [0.73ms]
+(pass) runtime-fallback > message.updated handling > should not clear fallback timeout on assistant non-error update without user-visible content [0.87ms]
+(pass) runtime-fallback > message.updated handling > should not clear fallback timeout from info.message alone without persisted assistant text [0.63ms]
+(pass) runtime-fallback > message.updated handling > should keep timeout armed when session.idle fires before fallback result [1.32ms]
+(pass) runtime-fallback > message.updated handling > triggers fallback for quota exhaustion in error parts to try next model [1.11ms]
+(pass) runtime-fallback > message.updated handling > triggers fallback when message has mixed text and error parts [0.79ms]
+(pass) runtime-fallback > message.updated handling > does NOT trigger fallback for normal type:error-free messages [0.62ms]
+(pass) runtime-fallback > edge cases > should handle session.error without sessionID [0.64ms]
+(pass) runtime-fallback > edge cases > should handle error as string [0.46ms]
+(pass) runtime-fallback > edge cases > should handle null error [0.50ms]
+(pass) runtime-fallback > model switching via chat.message > should apply fallback model on next chat.message after error [0.60ms]
+(pass) runtime-fallback > model switching via chat.message > should restore configured primary when reopened on a configured fallback model [0.61ms]
+(pass) runtime-fallback > model switching via chat.message > should notify when fallback occurs [0.62ms]
+(pass) runtime-fallback > fallback models configuration > should use agent-level fallback_models [1.33ms]
+(pass) runtime-fallback > fallback models configuration > should detect agent from sessionID pattern [0.66ms]
+(pass) runtime-fallback > fallback models configuration > should preserve resolved agent during auto-retry [1.54ms]
+(pass) runtime-fallback > fallback models configuration > should not dispatch a second fallback prompt while the accepted retry session is still active [1.13ms]
+(pass) runtime-fallback > cooldown mechanism > should respect cooldown period before retrying failed model [0.50ms]
+(pass) runtime-fallback > max attempts limit > should stop after max_fallback_attempts [0.74ms]
+(pass) runtime-fallback > race condition guards > session.error is skipped while retry request is in flight [1.95ms]
+(pass) runtime-fallback > race condition guards > consecutive session.errors advance chain normally when retry completes between them [1.07ms]
+(pass) runtime-fallback > race condition guards > session.error is skipped while waiting for the dispatched fallback result [0.58ms]
+(pass) runtime-fallback > race condition guards > #given a dispatched fallback retry #when stale original assistant error arrives before duplicate session.error #then only one assistant retry prompt is sent [0.77ms]
+(pass) runtime-fallback > race condition guards > session.stop aborts when sessionAwaitingFallbackResult is set [0.59ms]
+(pass) runtime-fallback > race condition guards > pendingFallbackModel advances chain on subsequent error even when persisted [0.54ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:
+(pass) first-prompt watchdog main-session identity > #given two active root sessions #when the older root stays silent #then it still receives watchdog fallback [0.31ms]
+(pass) first-prompt watchdog main-session identity > #given an authoritative main session exists #when an unregistered parent-linked child stays silent #then the main-session watchdog does not claim it [1.55ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/fallback-retry-dispatcher.test.ts:
+(pass) dispatchFallbackRetry > #given fallback dispatch is blocked #when fallback retry runs #then state is restored and no success toast is shown [0.27ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts:
+(pass) first-prompt watchdog message-fetch ordering > #given abort resolved while retry messages are pending #when its terminal arrives #then fallback ownership survives through dispatch [2.54ms]
+(pass) first-prompt watchdog message-fetch ordering > #given retry messages resolved and the fallback request is busy #when the watchdog terminal arrives #then status inspection preserves fallback ownership [3.32ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-deferred-terminal.test.ts:
+(pass) runtime-fallback stale deferred terminal cleanup > #given an abort event is deferred #when stale cleanup evicts the session #then later resolution cannot replay the retained payload [0.42ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook.init.test.ts:
+(pass) createRuntimeFallbackHook initialization > #given injected pluginConfig #when the hook factory runs #then loadPluginConfig is not called [74.40ms]
+(pass) createRuntimeFallbackHook initialization > #given a fresh hook #when the first event arrives #then cleanup interval starts only once [0.87ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts:
+(pass) createSessionStatusHandler > #given pending fallback prompt may already be accepted #when provider retry status arrives #then it keeps waiting for that accepted prompt [0.25ms]
+(pass) createSessionStatusHandler > #given a pending fallback model #when a new provider cooldown retry arrives #then the handler overrides the pending fallback and advances the chain [0.17ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/retry-model-payload.test.ts:
+(pass) buildRetryModelPayload > should return undefined for empty model string [0.07ms]
+(pass) buildRetryModelPayload > should return undefined for model without provider prefix [0.04ms]
+(pass) buildRetryModelPayload > should parse provider and model ID [0.06ms]
+(pass) buildRetryModelPayload > should include variant from model string [0.07ms]
+(pass) buildRetryModelPayload > should use agent variant when model string has no variant [0.05ms]
+(pass) buildRetryModelPayload > should prefer model string variant over agent variant [0.05ms]
+(pass) buildRetryModelPayload > should include reasoningEffort from agent settings [0.04ms]
+(pass) buildRetryModelPayload > should not include reasoningEffort when agent settings has none [0.05ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts:
+(pass) runtime-fallback completed watchdog generations > #given two watchdog fallbacks completed visibly #when newest then oldest delayed aborts arrive #then latest fallback remains until a later real cancellation [0.68ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/ai-sdk-retryable-session-error.test.ts:
+(pass) runtime-fallback AI SDK retryable session errors > dispatches fallback for nested AI SDK retryable Cloudflare timeout errors [0.38ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts:
+(pass) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider error #then the fallback chain advances without resetting [1.03ms]
+(pass) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider session error #then the fallback chain advances without resetting [0.37ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:
+(pass) runtime-fallback deferred watchdog terminal events > #given an ambiguous watchdog abort #when assistant parent correlation resolves it #then the deferred terminal event is handled before the message update [0.22ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given an old-parent terminal candidate #when the newer request is busy #then the deferred event resolves as internal before the message update [0.24ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given a current cancellation is deferred #when an old assistant abort arrives while the session is idle #then cancellation resets retry state [1.81ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts:
+(pass) first-prompt watchdog lifecycle > #given agent resolution is in flight #when the watchdog is disposed #then the stale callback cannot abort, dispatch, or recreate session state [1.92ms]
+(pass) first-prompt watchdog lifecycle > #given abort is in flight #when the watchdog is disposed and parent state is cleared #then the stale callback cannot dispatch or recreate cleared state [1.51ms]
+(pass) first-prompt watchdog lifecycle > #given the watchdog abort is in flight #when the session is cancelled before abort resolves #then no fallback is dispatched [1.47ms]
+(pass) first-prompt watchdog lifecycle > #given the watchdog abort response is pending #when OpenCode publishes its abort event #then the owned fallback is still dispatched [1.49ms]
+(pass) first-prompt watchdog lifecycle > #given the watchdog abort is in flight #when OpenCode reports its internal completion and idle events #then the fallback is still dispatched [1.44ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts:
+(pass) first-prompt watchdog suspended generation ownership > #given generation two is suspended by generation one's delayed abort #when generation three arrives before correlation resolves #then generation three receives a fresh deadline [0.40ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.test.ts:
+(pass) watchdog abort provenance > #given two watchdog generations completed visibly #when newest then oldest delayed terminals arrive #then each generation is consumed once [0.48ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-multiple-delayed-terminals.test.ts:
+(pass) runtime-fallback multiple delayed watchdog terminals > #given two prior watchdog aborts #when both terminals arrive before correlation #then the current watchdog and retry state are preserved [0.57ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-progress-events.test.ts:
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with finished boolean #when observed #then onAssistantProgress is called [0.14ms]
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with completed boolean #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with completed time #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with false completion markers and no parts #when observed #then no progress is signalled [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.synthetic event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.shell.started event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.shell.ended event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.step.failed event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.text.delta event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.text.ended event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.reasoning.delta event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.reasoning.ended event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.input.started event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.input.delta event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.input.ended event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.called event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.progress event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.success event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.failed event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.step.ended event with a sessionID #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.prompted arrives without assistant output #then silence recovery still fires [0.18ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.step.started arrives without assistant output #then silence recovery still fires [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.text.started arrives without assistant output #then silence recovery still fires [0.07ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.reasoning.started arrives without assistant output #then silence recovery still fires [0.07ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.agent.switched arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.model.switched arrives without assistant output #then silence recovery still fires [0.07ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.text.delta arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.text.ended arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.reasoning.delta arrives without assistant output #then silence recovery still fires [0.07ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.reasoning.ended arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.tool.input.delta arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.tool.input.ended arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.synthetic arrives without assistant output #then silence recovery still fires [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.retried arrives without assistant output #then silence recovery still fires [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.compaction.started arrives without assistant output #then silence recovery still fires [0.06ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/dispose.test.ts:
+(pass) createRuntimeFallbackHook dispose > #given runtime-fallback hook handles its first event #when dispose() is called #then cleanup interval is cleared [0.26ms]
+(pass) createRuntimeFallbackHook dispose > #given hook with session state data #when dispose() is called #then all Maps and Sets are empty [0.10ms]
+(pass) createRuntimeFallbackHook dispose > #given hook with pending fallback timeouts #when dispose() is called #then timeouts are cleared before Map is emptied [0.06ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts:
+(pass) hasVisibleAssistantResponse > #given only an old assistant reply before the latest user turn #when visibility is checked #then the stale reply is ignored [0.59ms]
+(pass) hasVisibleAssistantResponse > #given an assistant reply after the latest user turn #when visibility is checked #then the current reply is treated as visible [0.09ms]
+(pass) hasVisibleAssistantResponse > #given a too-many-requests assistant reply #when visibility is checked #then it is treated as an auto-retry signal [0.08ms]
+(pass) createMessageUpdateHandler runtime fallback dispatch > #given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast [0.27ms]
+(pass) createMessageUpdateHandler runtime fallback dispatch > #given a watchdog abort completed through a visible fallback response #when the user later cancels #then the stale internal-abort marker does not preserve retry state [0.18ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/normalize-model.test.ts:
+(pass) normalizeModelToCanonicalString > #given a plain string model > #when called #then it returns the trimmed string [0.08ms]
+(pass) normalizeModelToCanonicalString > #given a plain string model > #when the string is empty #then it returns undefined [0.06ms]
+(pass) normalizeModelToCanonicalString > #given an object-shaped model from session.created > #when it has id + providerID #then it returns the canonical provider/id string [0.05ms]
+(pass) normalizeModelToCanonicalString > #given an object-shaped model from session.created > #when it exposes modelID instead of id #then it still resolves [0.05ms]
+(pass) normalizeModelToCanonicalString > #given an object-shaped model from session.created > #when providerID is missing #then it returns undefined [0.04ms]
+(pass) normalizeModelToCanonicalString > #given a non-model value > #when called with undefined #then it returns undefined [0.04ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts:
+(pass) createAbortSessionRequest reservation release > #given a session reserved by model-suggestion-retry on a provider retry signal #when the runtime-fallback abort fires #then the reservation is released so the fallback dispatch can acquire the session [0.18ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by model-suggestion-retry:sync #when the runtime-fallback abort fires #then the reservation is released [0.08ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by the runtime-fallback path itself #when the abort fires #then the reservation is still released [0.06ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by an unrelated user prompt #when the runtime-fallback abort fires #then the reservation is preserved (abort must not steal a foreground user turn) [0.07ms]
+(pass) createAbortSessionRequest reservation release > #given a watchdog aborts a still-running session #when the abort fires #then the abort is marked internal for the resulting session.error [0.07ms]
+(pass) createAbortSessionRequest reservation release > #given a watchdog abort request fails #when the abort rejects #then no internal-abort marker remains [0.13ms]
+(pass) createAbortSessionRequest reservation release > #given the SDK resolves a non-2xx abort #when the watchdog aborts #then ownership and the prompt reservation are preserved [0.13ms]
+(pass) createAbortSessionRequest reservation release > #given two overlapping internal abort callers #when the first request is still pending #then only the wire owner continues [0.12ms]
+(pass) createAbortSessionRequest reservation release > #given an abort starts with one prompt reservation #when a newer reservation replaces it before abort completion #then the newer reservation remains owned [0.08ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/session-stop-generation-ownership.test.ts:
+(pass) runtime-fallback session.stop generation ownership > #given stop awaits an old abort #when the ID is deleted and reused #then stale stop cannot clear replacement retry state [0.22ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts:
+(pass) stale session status abort preserves replacement retry ownership [0.67ms]
+(pass) stale message retry abort preserves replacement retry ownership [0.12ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts:
+(pass) first-prompt watchdog ownership races > re-arms after an accepted abort when fallback dispatch is rejected [0.32ms]
+(pass) first-prompt watchdog ownership races > does not let a detached callback abort a replacement watchdog retry [0.26ms]
+(pass) first-prompt watchdog ownership races > restores suspended ownership without arming a new timer [0.15ms]
+(pass) first-prompt watchdog ownership races > discards inconclusive suspended ownership before a distinct user generation [0.14ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts:
+(pass) runtime-fallback abort wire ordering > #given OpenCode publishes the watchdog abort before its HTTP response #when the event is observed #then fallback ownership survives and dispatch continues [2.09ms]
+(pass) runtime-fallback abort wire ordering > #given overlapping internal abort callers for one session #when OpenCode emits one internal terminal #then the next abort event remains a genuine cancellation [0.21ms]
+(pass) runtime-fallback abort wire ordering > #given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative [0.29ms]
+(pass) runtime-fallback abort wire ordering > #given a status fallback replaces the silent request #when the original watchdog deadline passes #then the accepted fallback is not aborted or advanced [0.26ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/dispatch-generation-ownership.test.ts:
+(pass) runtime-fallback dispatch generation ownership > #given message loading belongs to an old generation #when a newer user turn arrives #then stale dispatch releases retry ownership [0.17ms]
+(pass) runtime-fallback dispatch generation ownership > #given a fallback prompt is accepted #when its user event advances generation before promptAsync resolves #then accepted ownership is committed and released [0.23ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-event-observation.test.ts:
+(pass) observeEventForWatchdog > #given a message.updated event with role=user #when observed #then onUserMessage is called with sessionID/model/agent [0.16ms]
+(pass) observeEventForWatchdog > #given a compaction-agent message.updated event with role=user #when observed #then the watchdog does not arm [0.05ms]
+(pass) observeEventForWatchdog > #given a compaction-part user event retaining the original agent #when observed #then the watchdog does not arm [0.07ms]
+(pass) observeEventForWatchdog > #given empty event parts mask an info compaction marker #when observed #then the watchdog does not arm [0.05ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=text #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.06ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=reasoning #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool_use #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool_result #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=tool-call #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.04ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=step-start #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event whose only part is type=file #when observed #then onAssistantProgress is called (model is *working*, not silent) [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=text #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=reasoning #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool_use #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool_result #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=tool-call #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=step-start #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog > #given a message.part.updated event whose part is type=file #when observed #then onAssistantProgress is called [0.03ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event with parts: [] and no error/finish #when observed #then no progress is signalled (no activity yet) [0.05ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event with info.error set #when observed #then onAssistantProgress is called (the existing error-handling path takes over from here) [0.06ms]
+(pass) observeEventForWatchdog > #given a message.updated assistant event with info.finish set #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog > #given a session.idle event #when observed #then onSessionTerminal is called [0.04ms]
+(pass) observeEventForWatchdog > #given a session.stop event #when observed #then onSessionTerminal is called [0.03ms]
+(pass) observeEventForWatchdog > #given a session.deleted event #when observed #then onSessionTerminal is called [0.03ms]
+(pass) observeEventForWatchdog > #given a session.error event #when observed #then onSessionTerminal is called [0.04ms]
+(pass) observeEventForWatchdog > #given a session.deleted event whose sessionID is carried under properties.info.id #when observed #then onSessionTerminal is still called (matches event-handler shape) [0.04ms]
+(pass) observeEventForWatchdog > #given an unrelated event type #when observed #then no watchdog method is called [0.04ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.test.ts:
+(pass) runtime-fallback error classifier > detects cooling-down auto-retry status signals [0.08ms]
+(pass) runtime-fallback error classifier > detects single-word cooldown auto-retry status signals [0.10ms]
+(pass) runtime-fallback error classifier > detects too-many-requests auto-retry status signals without countdown text [0.06ms]
+(pass) runtime-fallback error classifier > treats cooling-down retry messages as retryable [0.10ms]
+(pass) runtime-fallback error classifier > treats localized transient provider messages as retryable [0.16ms]
+(pass) runtime-fallback error classifier > treats nested AI SDK retryable Cloudflare timeout errors as retryable [0.07ms]
+(pass) runtime-fallback error classifier > treats retryable AI SDK errors without configured status codes as retryable [0.06ms]
+(pass) runtime-fallback error classifier > isRetryableError REJECTS isRetryable=true when status code is 401 Unauthorized [0.06ms]
+(pass) runtime-fallback error classifier > isRetryableError REJECTS isRetryable=true when status code is 403 Forbidden [0.05ms]
+(pass) runtime-fallback error classifier > isRetryableError REJECTS isRetryable=true when status code is 404 Not Found [0.04ms]
+(pass) runtime-fallback error classifier > isRetryableError HONORS isRetryable=true when status code is 429 (rate-limit) [0.04ms]
+(pass) runtime-fallback error classifier > isRetryableError HONORS isRetryable=true when status code is 503 (service unavailable) [0.04ms]
+(pass) runtime-fallback error classifier > isRetryableError HONORS isRetryable=true when no status code is present (pure network error) [0.04ms]
+(pass) runtime-fallback error classifier > isRetryableError HONORS isRetryable=true when status code is in retryOnErrors list [0.04ms]
+(pass) runtime-fallback error classifier > ignores malformed retryable flags on otherwise non-retryable errors [0.05ms]
+(pass) runtime-fallback error classifier > classifies localized quota exhaustion messages as quota_exceeded [0.06ms]
+(pass) runtime-fallback error classifier > classifies ProviderModelNotFoundError as model_not_found [0.06ms]
+(pass) runtime-fallback error classifier > classifies nested AI_LoadAPIKeyError as missing_api_key [0.04ms]
+(pass) runtime-fallback error classifier > ignores non-retry assistant status text [0.05ms]
+(pass) extractStatusCode > extracts numeric statusCode from top-level [0.05ms]
+(pass) extractStatusCode > extracts numeric status from top-level [0.04ms]
+(pass) extractStatusCode > extracts statusCode from nested data [0.04ms]
+(pass) extractStatusCode > extracts statusCode from nested error [0.04ms]
+(pass) extractStatusCode > extracts statusCode from nested cause [0.04ms]
+(pass) extractStatusCode > skips non-numeric status and finds deeper numeric statusCode [0.05ms]
+(pass) extractStatusCode > skips non-numeric statusCode string and finds numeric in cause [0.04ms]
+(pass) extractStatusCode > returns undefined when no numeric status exists [0.04ms]
+(pass) extractStatusCode > returns undefined for null/undefined error [0.05ms]
+(pass) extractStatusCode > falls back to regex match in error message [0.07ms]
+(pass) extractStatusCode > prefers top-level numeric over nested numeric [0.04ms]
+(pass) model support fallback > detects model_not_supported errors as retryable for fallback chain [0.07ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-generation-ownership.test.ts:
+(pass) runtime-fallback event generation ownership > #given an old status handler is resolving its agent #when an identical retry arrives in a newer user turn #then the newer retry is not poisoned by stale dedupe [0.27ms]
+(pass) runtime-fallback event generation ownership > #given session.error is resolving an agent #when a newer user turn arrives #then the stale error cannot dispatch fallback [0.10ms]
+(pass) runtime-fallback event generation ownership > #given fallback completion visibility is pending #when the same user message is updated again #then the completion keeps generation ownership [0.13ms]
+(pass) runtime-fallback event generation ownership > #given an abort is pending for a deleted session #when the same ID is reused #then replacement abort issues a fresh wire request [0.11ms]
+(pass) runtime-fallback event generation ownership > #given an assistant quota error is awaiting abort #when a newer user turn arrives #then the stale message cannot dispatch fallback [0.12ms]
+(pass) runtime-fallback event generation ownership > #given an assistant error is resolving its agent #when a newer user turn arrives #then the stale message cannot create fallback state [0.09ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts:
+(pass) createChatMessageHandler runtime fallback model override > #given session is on an accepted fallback #when a later user message is transformed after cooldown #then it stays on the fallback model [0.13ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout-overlap.test.ts:
+(pass) stale same-generation timeout preserves replacement retry ownership [3.31ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts:
+(pass) runtime-fallback fallback state > #given object-shaped current model #when finding the next fallback #then equivalent models are skipped without crashing [0.11ms]
+(pass) runtime-fallback fallback state > #given model object without variant and top-level variant #when stringifying runtime model #then top-level variant is preserved [0.07ms]
+(pass) runtime-fallback fallback state > #given model object with its own variant #when stringifying with a top-level variant #then model variant wins [0.05ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [1.69ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [2.75ms]
+(pass) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [5.45ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:
+(pass) first-prompt-watchdog > #given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model [0.78ms]
+(pass) first-prompt-watchdog > #given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request [0.41ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm [0.86ms]
+(pass) first-prompt-watchdog > #given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model [0.23ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active [0.14ms]
+(pass) first-prompt-watchdog > #given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched [0.09ms]
+(pass) first-prompt-watchdog > #given a fallback dispatch is already awaiting its result #when its internal user update is observed #then the first-prompt watchdog does not arm for that retry [0.07ms]
+(pass) first-prompt-watchdog > #given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn [0.11ms]
+(pass) first-prompt-watchdog > #given a watchdog is armed for one user message #when a distinct user message arrives #then the deadline belongs to the newer turn [0.11ms]
+(pass) first-prompt-watchdog > #given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer [0.11ms]
+(pass) first-prompt-watchdog > #given the user prompt part arrives after the watchdog arms #when the provider stays silent #then the user part does not cancel fallback recovery [0.12ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts:
+(pass) runtime-fallback fallback-models > uses category fallback_models when session category is registered [0.14ms]
+(pass) runtime-fallback fallback-models > uses agent-specific fallback_models when agent is resolved [0.05ms]
+(pass) runtime-fallback fallback-models > inherits prometheus fallback_models for a replaced plan agent by default [0.05ms]
+(pass) runtime-fallback fallback-models > uses explicit plan fallback_models before prometheus inheritance [0.04ms]
+(pass) runtime-fallback fallback-models > explicit empty plan fallback_models suppresses prometheus inheritance [0.07ms]
+(pass) runtime-fallback fallback-models > does not inherit prometheus fallback_models when plan replacement is disabled: 0 [0.05ms]
+(pass) runtime-fallback fallback-models > does not inherit prometheus fallback_models when plan replacement is disabled: 1 [0.04ms]
+(pass) runtime-fallback fallback-models > does not inherit prometheus fallback_models when plan replacement is disabled: 2 [0.03ms]
+(pass) runtime-fallback fallback-models > does not fall back to another agent chain when agent cannot be resolved [0.05ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-provenance-race.test.ts:
+(pass) runtime-fallback abort provenance > #given an internal fallback user update precedes its delayed abort event #when both events are handled #then retry state remains owned by the internal abort [0.24ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-session-reuse.test.ts:
+(pass) runtime-fallback stale cleanup session reuse > #given a cleaned session ID is reused #when the old abort resolves #then rollback cannot revive its watchdog [0.62ms]
+(pass) runtime-fallback stale cleanup session reuse > #given a cleaned session ID is reused #when the old abort rejects #then rollback cannot revive its watchdog [0.18ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/context-overflow-compaction.test.ts:
+(pass) runtime-fallback context overflow handling > leaves native compaction active after the fallback timeout window [0.35ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts:
+(pass) first-prompt watchdog boundaries > #given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress [0.82ms]
+(pass) first-prompt watchdog boundaries > #given a delta belongs to the current user message #when observed #then it does not disarm silence recovery [0.16ms]
+(pass) first-prompt watchdog boundaries > #given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed [0.09ms]
+(pass) first-prompt watchdog boundaries > #given a subagent reaches a terminal session state before the threshold #when onSessionTerminal is called #then the watchdog is cancelled and no fallback is dispatched [0.09ms]
+(pass) first-prompt watchdog boundaries > #given a main session is silent past the threshold with no fallback configured #when the watchdog fires #then it does not abort or dispatch [0.07ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned [0.48ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the retried dispatch fails ambiguously after the reservation releases #when auto retry runs #then the pending fallback is preserved as possibly accepted [0.22ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the failed assistant is still active #when auto retry runs #then the fallback dispatch is queued until the assistant unblocks [0.38ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session WE internally aborted whose dangling assistant turn has no finish, no output and no terminal error #when auto retry runs #then the fallback dispatch fires immediately instead of looping forever on active-queue [0.12ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session NOT internally aborted whose assistant turn is genuinely active #when auto retry runs #then the dispatch is still withheld (active-check preserved for live turns) [0.14ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-three-generation.test.ts:
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when progress cancels generation two before generation three arms #then generation three still recovers [3.70ms]
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when status resolution cancels generation two before generation three arms #then generation three still recovers [2.70ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-signal.test.ts:
+(pass) extractAutoRetrySignal > detects Volcano Engine 'exceeded the usage quota' signal [0.09ms]
+(pass) extractAutoRetrySignal > detects standard 'quota exceeded' signal [0.05ms]
+(pass) extractAutoRetrySignal > returns undefined for non-retryable info [0.05ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-progress-delayed-terminal.test.ts:
+(pass) runtime-fallback progress before delayed terminal > #given generation two has assistant progress #when generation one's delayed abort arrives #then the accepted fallback state is preserved [1.87ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:
+(pass) createFallbackTimeoutHelpers > #given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored [2.83ms]
+(pass) createFallbackTimeoutHelpers > #given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed [2.83ms]
+(pass) createFallbackTimeoutHelpers > #given timeout escalation cannot abort the active request #when the timeout fires #then it preserves retry ownership and does not dispatch a fallback [2.70ms]
+(pass) createFallbackTimeoutHelpers > #given an old timeout abort is pending #when a newer user generation starts #then stale completion preserves the newer owner and timer [2.69ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts:
+(pass) runtime-fallback stale cleanup watchdog race > #given cleanup evicts a detached status watchdog #when the stale abort resolves #then rollback cannot restore the watchdog [0.50ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/runtime-fallback-terminal-races.test.ts:
+(pass) runtime fallback terminal ownership races > does not dispatch after session.stop wins a pending status transaction [0.29ms]
+(pass) runtime fallback terminal ownership races > does not re-arm when the same user event is replayed after assistant progress [0.12ms]
+(pass) runtime fallback terminal ownership races > re-arms silence protection when watchdog abort is rejected [0.18ms]
+(pass) runtime fallback terminal ownership races > restores watchdog ownership when a status replacement is rejected [0.16ms]
+(pass) runtime fallback terminal ownership races > restores watchdog ownership when the abort terminal precedes a rejected status replacement [0.16ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-rejection-handlers.test.ts:
+(pass) runtime fallback abort rejection > #given a message retry signal while a retry is active #when abort is rejected #then ownership and the active retry are preserved [0.23ms]
+(pass) runtime fallback abort rejection > #given a quota error with a fallback #when abort is rejected #then no replacement request is dispatched [0.13ms]
+(pass) runtime fallback abort rejection > #given a session retry signal while a retry is active #when abort is rejected #then the active retry remains authoritative [0.09ms]
+(pass) runtime fallback abort rejection > #given a rejected session retry abort #when the same retry signal arrives again #then it can acquire ownership and dispatch fallback [0.14ms]
+(pass) runtime fallback abort rejection > #given a pending fallback and a newer session retry signal #when abort is rejected #then pending ownership is preserved [0.08ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-status-continuation.test.ts:
+(pass) runtime-fallback stale status continuation > #given cleanup evicts a status retry during agent resolution #when resolution resumes #then it cannot abort or recreate state [0.32ms]
+(pass) runtime-fallback stale status continuation > #given cleanup evicts a status retry during message loading #when loading resumes #then it cannot dispatch or recreate state [0.28ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/provider-matrix.test.ts:
+(pass) runtime-fallback provider matrix quota tests > OpenAI provider > classifies OpenAI insufficient_quota error as quota_exceeded [0.10ms]
+(pass) runtime-fallback provider matrix quota tests > OpenAI provider > classifies OpenAI billing_hard_limit error as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > OpenAI provider > classifies OpenAI rate limit as retryable [0.05ms]
+(pass) runtime-fallback provider matrix quota tests > Anthropic provider > classifies Anthropic quota exceeded as retryable to trigger fallback [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Anthropic provider > classifies Anthropic subscription quota as retryable to trigger fallback [0.05ms]
+(pass) runtime-fallback provider matrix quota tests > Anthropic provider > classifies Anthropic cooling down with retry signal as retryable (auto-retry pattern) [0.05ms]
+(pass) runtime-fallback provider matrix quota tests > Google/Gemini provider > classifies Google API key missing as missing_api_key [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Google/Gemini provider > classifies Google quota exceeded as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Google/Gemini provider > classifies Google rate limit exceeded as retryable [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Generic provider patterns > classifies exhausted capacity as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Generic provider patterns > classifies out of credits as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Generic provider patterns > classifies payment required (402) as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Provider-specific error name patterns > classifies BillingError as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > Provider-specific error name patterns > classifies InsufficientQuota as quota_exceeded [0.03ms]
+(pass) runtime-fallback provider matrix quota tests > Provider-specific error name patterns > classifies QuotaExceeded as quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > HTTP status code matrix > 429 rate limit is retryable [0.03ms]
+(pass) runtime-fallback provider matrix quota tests > HTTP status code matrix > 402 payment required triggers fallback via quota_exceeded [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > HTTP status code matrix > 500 server error is retryable [0.04ms]
+(pass) runtime-fallback provider matrix quota tests > HTTP status code matrix > 503 service unavailable is retryable [0.03ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts:
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given fallback dispatch completed visibly #when its delayed watchdog abort arrives #then fallback ownership remains intact [0.47ms]
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given the owned delayed watchdog abort was consumed #when a later generation is cancelled #then it remains external cancellation [0.22ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/success-retry-key-cleanup.test.ts:
+(pass) createMessageUpdateHandler retry-key cleanup > #given a visible assistant reply after the latest user turn #when a non-error assistant update arrives #then the retry dedupe key is cleared with the fallback watchdog [0.81ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/catch-fallbacks.test.ts:
+(pass) runtime fallback catch fallbacks > getErrorMessage returns an empty fallback when JSON serialization throws an Error [0.14ms]
+(pass) runtime fallback catch fallbacks > getErrorMessage rethrows non-Error JSON serialization failures [0.07ms]
+(pass) runtime fallback catch fallbacks > hasVisibleAssistantResponse returns false when message loading throws an Error [0.12ms]
+(pass) runtime fallback catch fallbacks > hasVisibleAssistantResponse rethrows non-Error message loading failures [0.07ms]
+
+ 368 pass
+ 0 fail
+ 767 expect() calls
+Ran 368 tests across 60 files. [485.00ms]

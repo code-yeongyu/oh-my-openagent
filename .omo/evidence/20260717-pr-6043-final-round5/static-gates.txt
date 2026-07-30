@@ -1,0 +1,77 @@
+NO_EXCUSE_ALL_PR_CHANGED_TS
+No violations in 65 file(s).
+BIOME_LINT_CURRENT_REPAIR_FILES
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:138:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    136 │     expect(parts.length).toBe(1)
+    137 │     const firstPart = parts[0] ?? {}
+  > 138 │     expect(firstPart["type"]).toBe("text")
+        │                      ^^^^^^
+    139 │     // Without the marker + synthetic flag, OMO's continuation/keyword-detector
+    140 │     // hooks treat this as a real user prompt and the TUI shows a bare "continue"
+
+  i Unsafe fix: Use a literal key instead.
+
+    136 136 │       expect(parts.length).toBe(1)
+    137 137 │       const firstPart = parts[0] ?? {}
+    138     │ - ····expect(firstPart["type"]).toBe("text")
+        138 │ + ····expect(firstPart.type).toBe("text")
+    139 139 │       // Without the marker + synthetic flag, OMO's continuation/keyword-detector
+    140 140 │       // hooks treat this as a real user prompt and the TUI shows a bare "continue"
+
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:142:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    140 │     // hooks treat this as a real user prompt and the TUI shows a bare "continue"
+    141 │     // that the user never typed (see #4085 / Discord report).
+  > 142 │     expect(firstPart["synthetic"]).toBe(true)
+        │                      ^^^^^^^^^^^
+    143 │     expect(String(firstPart["text"] ?? "")).toContain("OMO_INTERNAL_INITIATOR")
+    144 │   })
+
+  i Unsafe fix: Use a literal key instead.
+
+    140 140 │       // hooks treat this as a real user prompt and the TUI shows a bare "continue"
+    141 141 │       // that the user never typed (see #4085 / Discord report).
+    142     │ - ····expect(firstPart["synthetic"]).toBe(true)
+        142 │ + ····expect(firstPart.synthetic).toBe(true)
+    143 143 │       expect(String(firstPart["text"] ?? "")).toContain("OMO_INTERNAL_INITIATOR")
+    144 144 │     })
+
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:143:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    141 │     // that the user never typed (see #4085 / Discord report).
+    142 │     expect(firstPart["synthetic"]).toBe(true)
+  > 143 │     expect(String(firstPart["text"] ?? "")).toContain("OMO_INTERNAL_INITIATOR")
+        │                             ^^^^^^
+    144 │   })
+    145 │
+
+  i Unsafe fix: Use a literal key instead.
+
+    141 141 │       // that the user never typed (see #4085 / Discord report).
+    142 142 │       expect(firstPart["synthetic"]).toBe(true)
+    143     │ - ····expect(String(firstPart["text"]·??·"")).toContain("OMO_INTERNAL_INITIATOR")
+        143 │ + ····expect(String(firstPart.text·??·"")).toContain("OMO_INTERNAL_INITIATOR")
+    144 144 │     })
+    145 145 │
+
+
+Checked 2 files in 12ms. No fixes applied.
+Found 3 infos.
+OPENCODE_TYPECHECK
+$ tsgo --noEmit -p tsconfig.json
+DIFF_CHECK
+PURE_LOC_CURRENT_REPAIR_FILES
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.ts 82
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts 202

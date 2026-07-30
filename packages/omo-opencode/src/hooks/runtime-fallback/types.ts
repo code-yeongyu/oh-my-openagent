@@ -1,4 +1,4 @@
-import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
 
 export interface RuntimeFallbackInterval {
   unref: () => void
@@ -9,8 +9,9 @@ export type RuntimeFallbackTimeout = object | number
 export interface RuntimeFallbackPluginInput {
   client: {
     session: {
-      abort: (input: { path: { id: string } }) => Promise<unknown>
+      abort: (input: { path: { id: string }; throwOnError?: boolean }) => Promise<unknown>
       messages: (input: { path: { id: string }; query: { directory: string } }) => Promise<unknown>
+      status?: (input?: { query: { directory: string } }) => Promise<unknown>
       promptAsync: (input: {
         path: { id: string }
         body: {
@@ -85,6 +86,8 @@ export interface HookDeps {
   sessionStates: Map<string, FallbackState>
   sessionLastAccess: Map<string, number>
   sessionRetryInFlight: Set<string>
+  sessionRetryOwners?: Map<string, symbol>
+  sessionRetryPayloadPending?: Map<string, symbol>
   sessionAwaitingFallbackResult: Set<string>
   sessionFallbackTimeouts: Map<string, RuntimeFallbackTimeout>
   sessionStatusRetryKeys: Map<string, string>
@@ -96,4 +99,8 @@ export interface HookDeps {
    * loop (every cycle started over at attempt:1). See issue #4006.
    */
   internallyAbortedSessions: Set<string>
+  internalAbortOwnershipCounts?: Map<string, number>
+  internalAbortRequests?: Map<string, Promise<boolean>>
+  onStaleSessionCleanup?: (sessionID: string) => void
+  isLifecycleActive?: () => boolean
 }

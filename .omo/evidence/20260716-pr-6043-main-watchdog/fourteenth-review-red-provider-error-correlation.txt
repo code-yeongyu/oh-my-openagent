@@ -1,0 +1,28 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts:
+110 |             },
+111 |           },
+112 |         },
+113 |       })
+114 |
+115 |       expect(dispatchedModels).toEqual([FIRST_FALLBACK, SECOND_FALLBACK])
+                                     ^
+error: expect(received).toEqual(expected)
+
+  [
+    "anthropic/fallback-1",
+-   "google/fallback-2",
++   "anthropic/fallback-1",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (<WORKTREE>/packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts:115:32)
+(fail) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider error #then the fallback chain advances without resetting [2.79ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [62.00ms]

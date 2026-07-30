@@ -54,6 +54,24 @@ function reserveSession(sessionID: string, source: string): void {
   })
 }
 
+function createDeferred<T>(): {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T) => void
+  readonly reject: (reason: Error) => void
+} {
+  let resolvePromise: ((value: T) => void) | undefined
+  let rejectPromise: ((reason: Error) => void) | undefined
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve
+    rejectPromise = reject
+  })
+  return {
+    promise,
+    resolve: (value) => resolvePromise?.(value),
+    reject: (reason) => rejectPromise?.(reason),
+  }
+}
+
 describe("createAbortSessionRequest reservation release", () => {
   afterEach(() => {
     releaseAllPromptAsyncReservationsForTesting()
@@ -113,5 +131,91 @@ describe("createAbortSessionRequest reservation release", () => {
 
     // then
     expect(getPromptReservation(sessionID)?.source).toBe("user-prompt")
+  })
+  test("#given a watchdog aborts a still-running session #when the abort fires #then the abort is marked internal for the resulting session.error", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog"
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    // when
+    const aborted = await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    // then
+    expect(aborted).toBe(true)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  test("#given a watchdog abort request fails #when the abort rejects #then no internal-abort marker remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog-abort-failed"
+    deps.ctx.client.session.abort = async () => {
+      throw new Error("abort failed")
+    }
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    const aborted = await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    expect(aborted).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given the SDK resolves a non-2xx abort #when the watchdog aborts #then ownership and the prompt reservation are preserved", async () => {
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog-abort-resolved-error"
+    let abortCalledWithThrowOnError = false
+    reserveSession(sessionID, "model-suggestion-retry")
+    deps.ctx.client.session.abort = async (input) => {
+      abortCalledWithThrowOnError = input.throwOnError === true
+      return {
+        data: undefined,
+        error: { name: "NotFoundError" },
+        response: new Response(null, { status: 404 }),
+      }
+    }
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    const aborted = await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    expect(aborted).toBe(false)
+    expect(abortCalledWithThrowOnError).toBe(true)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+    expect(getPromptReservation(sessionID)?.source).toBe("model-suggestion-retry")
+  })
+
+  test("#given two overlapping internal abort callers #when the first request is still pending #then only the wire owner continues", async () => {
+    const deps = createDeps()
+    const sessionID = "session-overlapping-internal-aborts"
+    const firstAbort = createDeferred<unknown>()
+    let abortCallCount = 0
+    deps.ctx.client.session.abort = () => {
+      abortCallCount += 1
+      return firstAbort.promise
+    }
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    const olderRequest = abortSessionRequest(sessionID, "session.status.retry-signal")
+    const newerRequest = abortSessionRequest(sessionID, "first-prompt-watchdog")
+    firstAbort.resolve({})
+    expect(await Promise.all([olderRequest, newerRequest])).toEqual([true, false])
+
+    expect(abortCallCount).toBe(1)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  test("#given an abort starts with one prompt reservation #when a newer reservation replaces it before abort completion #then the newer reservation remains owned", async () => {
+    const deps = createDeps()
+    const sessionID = "session-abort-reservation-aba"
+    const abortResult = createDeferred<unknown>()
+    reserveSession(sessionID, "model-suggestion-retry")
+    deps.ctx.client.session.abort = () => abortResult.promise
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    const request = abortSessionRequest(sessionID, "session.status.retry-signal")
+    reserveSession(sessionID, "runtime-fallback:new-owner")
+    abortResult.resolve({})
+    expect(await request).toBe(true)
+
+    expect(getPromptReservation(sessionID)?.source).toBe("runtime-fallback:new-owner")
   })
 })

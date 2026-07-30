@@ -1,0 +1,7 @@
+source_head=da10bb68a791be0a104c32f00f9d6acbf09a56b9
+base=5ef852a32c2c433386eb009bd92ca7c07359d0e6
+merge_base=5ef852a32c2c433386eb009bd92ca7c07359d0e6
+runtime_diff_from_premerge=none
+packages/omo-opencode/src/hooks/runtime-fallback/abort-rejection-handlers.test.ts pure_loc=152
+packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts pure_loc=198
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts pure_loc=137

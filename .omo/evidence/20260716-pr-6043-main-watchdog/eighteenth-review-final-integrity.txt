@@ -1,0 +1,18 @@
+PARENT_HEAD=31e9ce1d5b8fef9f86211993187e55bb87657f4b
+ORIGIN_DEV=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+
+DIFF_CHECK
+
+CHANGED_PATHS
+ M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts
+
+PURE_LOC
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts 54
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts 250
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts 147
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts 229
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts 168

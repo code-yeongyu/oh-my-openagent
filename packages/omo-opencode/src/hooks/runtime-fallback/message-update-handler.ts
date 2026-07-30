@@ -11,6 +11,13 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { clearInternalAbortOwnership } from "./internal-abort-ownership"
+import { isRuntimeFallbackActive } from "./lifecycle"
+import {
+  clearSessionRetryOwnershipIfUnchanged,
+  snapshotSessionRetryOwnership,
+} from "./session-retry-ownership"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -41,6 +48,18 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
     const model = normalizeModelToCanonicalString(info?.model)
+    const sessionGeneration = sessionID && role === "assistant" ? getSessionGeneration(deps, sessionID) : undefined
+    const isCurrent = () => sessionID !== undefined
+      && sessionGeneration !== undefined
+      && isRuntimeFallbackActive(deps)
+      && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
+
+    if (sessionID && role === "user") {
+      if (!sessionAwaitingFallbackResult.has(sessionID)) {
+        clearInternalAbortOwnership(deps, sessionID)
+      }
+      return
+    }
 
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {
@@ -48,6 +67,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       const hasVisible = await checkVisibleResponse(ctx, sessionID, info)
+      if (!isCurrent()) return
       if (!hasVisible) {
         log(`[${HOOK_NAME}] Assistant update observed without visible final response; keeping fallback timeout`, {
           sessionID,
@@ -59,7 +79,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       sessionAwaitingFallbackResult.delete(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
-      let state = sessionStates.get(sessionID)
+      const state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
         state.pendingFallbackPromptMayHaveBeenAccepted = false
@@ -70,6 +90,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
     if (sessionID && role === "assistant" && error) {
       let state = sessionStates.get(sessionID)
+      let requestAborted = false
       const pendingFallbackModel = state?.pendingFallbackModel
       const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
       if (
@@ -85,21 +106,28 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         })
         return
       }
-      if (wasAwaitingFallbackResult) {
-        sessionAwaitingFallbackResult.delete(sessionID)
-      }
       if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
         return
       }
 
       if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+        const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
         log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
           sessionID,
           model,
         })
-        await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
-        sessionRetryInFlight.delete(sessionID)
+        requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
+        if (!isCurrent()) return
+        if (!requestAborted) {
+          return
+        }
+        if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+          return
+        }
+      }
+      if (wasAwaitingFallbackResult) {
+        sessionAwaitingFallbackResult.delete(sessionID)
       }
 
       if (retrySignal && timeoutEnabled) {
@@ -130,6 +158,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+      if (!isCurrent()) return
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
@@ -144,6 +173,18 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
         }
         return
+      }
+
+      if (classifyErrorType(error) === "quota_exceeded" && !requestAborted) {
+        const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
+        requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
+        if (!isCurrent()) return
+        if (!requestAborted) {
+          return
+        }
+        if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+          return
+        }
       }
 
       if (!state) {
@@ -186,11 +227,6 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
             return
           }
         }
-      }
-
-      if (classifyErrorType(error) === "quota_exceeded") {
-        await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
-        sessionRetryInFlight.delete(sessionID)
       }
 
       await dispatchFallbackRetry(deps, helpers, {

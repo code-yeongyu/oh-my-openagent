@@ -1,0 +1,43 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-progress-events.test.ts:
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with finished boolean #when observed #then onAssistantProgress is called [0.65ms]
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with completed boolean #when observed #then onAssistantProgress is called [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with completed time #when observed #then onAssistantProgress is called [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given a message.updated assistant event with false completion markers and no parts #when observed #then no progress is signalled [0.10ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.synthetic event with a sessionID #when observed #then onAssistantProgress is called [0.11ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.shell.started event with a sessionID #when observed #then onAssistantProgress is called [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.shell.ended event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.step.failed event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.text.delta event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.text.ended event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.reasoning.delta event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.reasoning.ended event with a sessionID #when observed #then onAssistantProgress is called [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.input.started event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.input.delta event with a sessionID #when observed #then onAssistantProgress is called [0.06ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.input.ended event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.called event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.progress event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.success event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.tool.failed event with a sessionID #when observed #then onAssistantProgress is called [0.05ms]
+(pass) observeEventForWatchdog progress markers > #given a session.next.step.ended event with a sessionID #when observed #then onAssistantProgress is called [0.04ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.prompted arrives without assistant output #then silence recovery still fires [1.54ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.step.started arrives without assistant output #then silence recovery still fires [0.12ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.text.started arrives without assistant output #then silence recovery still fires [0.10ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.reasoning.started arrives without assistant output #then silence recovery still fires [0.09ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.agent.switched arrives without assistant output #then silence recovery still fires [0.07ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.model.switched arrives without assistant output #then silence recovery still fires [0.07ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.text.delta arrives without assistant output #then silence recovery still fires [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.text.ended arrives without assistant output #then silence recovery still fires [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.reasoning.delta arrives without assistant output #then silence recovery still fires [0.11ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.reasoning.ended arrives without assistant output #then silence recovery still fires [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.tool.input.delta arrives without assistant output #then silence recovery still fires [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.tool.input.ended arrives without assistant output #then silence recovery still fires [0.09ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.synthetic arrives without assistant output #then silence recovery still fires [0.11ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.retried arrives without assistant output #then silence recovery still fires [0.08ms]
+(pass) observeEventForWatchdog progress markers > #given an armed watchdog #when session.next.compaction.started arrives without assistant output #then silence recovery still fires [0.08ms]
+
+ 35 pass
+ 0 fail
+ 50 expect() calls
+Ran 35 tests across 1 file. [137.00ms]

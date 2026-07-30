@@ -1,0 +1,6 @@
+command=bunx @biomejs/biome lint --no-errors-on-unmatched <seven runtime-fallback source paths>
+biome_version=2.5.4
+files_checked=7
+fixes_applied=0
+verdict=PASS
+observed=Checked 7 files in 19ms. No fixes applied.

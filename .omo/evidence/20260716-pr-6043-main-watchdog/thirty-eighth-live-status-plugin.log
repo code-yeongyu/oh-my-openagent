@@ -1,0 +1,16 @@
+[2026-07-17T12:25:08.987Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"<qa-session>","model":"openai/primary","agent":"sisyphus","watchdogMs":90000}
+[2026-07-17T12:25:11.478Z] [runtime-fallback] Aborted in-flight session request (session.status.retry-signal) {"sessionID":"<qa-session>"}
+[2026-07-17T12:25:11.478Z] [runtime-fallback] Derived model from agent config for session.status {"sessionID":"<qa-session>","agent":"sisyphus","model":"openai/primary"}
+[2026-07-17T12:25:11.478Z] [runtime-fallback] Detected provider auto-retry signal in session.status {"sessionID":"<qa-session>","model":"openai/primary","retryAttempt":1}
+[2026-07-17T12:25:11.478Z] [runtime-fallback] first-prompt-watchdog: cancelled (fallback ownership transferred) {"sessionID":"<qa-session>"}
+[2026-07-17T12:25:11.478Z] [runtime-fallback] Preparing fallback {"sessionID":"<qa-session>","from":"openai/primary","to":"openai/fallback-one","attempt":1}
+[2026-07-17T12:25:11.482Z] [runtime-fallback] Auto-retrying with fallback model (session.status) {"sessionID":"<qa-session>","model":"openai/fallback-one"}
+[2026-07-17T12:25:11.484Z] [runtime-fallback] session.idle while awaiting fallback result; keeping timeout armed {"sessionID":"<qa-session>"}
+[2026-07-17T12:25:11.635Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"<qa-session>","source":"runtime-fallback:session.status"}
+[2026-07-17T12:25:11.635Z] [live-server-route] dispatch via live listener {"sessionID":"<qa-session>","source":"runtime-fallback:session.status"}
+[2026-07-17T12:25:11.640Z] [runtime-fallback] Applying fallback model override {"sessionID":"<qa-session>","from":{"providerID":"openai","modelID":"fallback-one"},"to":"openai/fallback-one"}
+[2026-07-17T12:25:11.641Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"<qa-session>","source":"runtime-fallback:session.status","holdMs":15000}
+[2026-07-17T12:25:11.641Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"<qa-session>","source":"runtime-fallback:session.status"}
+[2026-07-17T12:25:11.658Z] [runtime-fallback] Assistant update observed without visible final response; keeping fallback timeout {"sessionID":"<qa-session>"}
+[2026-07-17T12:25:11.688Z] [runtime-fallback] Assistant response observed; cleared fallback timeout {"sessionID":"<qa-session>"}
+[2026-07-17T12:25:11.689Z] [runtime-fallback] Assistant response observed; cleared fallback timeout {"sessionID":"<qa-session>"}

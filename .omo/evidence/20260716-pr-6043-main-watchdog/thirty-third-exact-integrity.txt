@@ -1,0 +1,8 @@
+HEAD=598eee0df138b81d6156a58895ebd7bc52cf18c4
+PARENTS=18c96c582a508efb3d2281d66f4ddaa55922c694 89fb8a42fdb55ef4672c89335ef15ffc71900695
+     200 packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts
+     221 packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts
+      97 packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.ts
+     135 packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts
+     130 packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts
+     783 total

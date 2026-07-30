@@ -1,0 +1,16 @@
+source_head=a5d9298c5581b90cad1822995456edb6f82a9268
+source_commit_subject=fix(runtime-fallback): make disposal terminal
+git_diff_check=pass
+real_db_session_count=5751
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.ts=89
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts=249
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts=95
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts=248
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts=249
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts=135
+packages/omo-opencode/src/hooks/runtime-fallback/hook-dispose-cleanup.test.ts=79
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts=157
+packages/omo-opencode/src/hooks/runtime-fallback/lifecycle.ts=4
+packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts=202
+packages/omo-opencode/src/hooks/runtime-fallback/types.ts=94
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts=108

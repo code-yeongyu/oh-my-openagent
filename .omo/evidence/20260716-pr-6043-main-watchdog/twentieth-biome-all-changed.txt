@@ -1,0 +1,62 @@
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:241:53 lint/style/noNonNullAssertion ━━━━━━━━━━
+
+  ! Forbidden non-null assertion.
+
+    239 │       const agent = getSessionAgent(sessionID)
+    240 │       expect(agent).toBe("Prometheus - Plan Builder")
+  > 241 │       expect(["Prometheus - Plan Builder"].includes(agent!)).toBe(true)
+        │                                                     ^^^^^^
+    242 │     })
+    243 │
+
+
+packages/omo-opencode/src/plugin/event.test.ts:575:3 lint/style/useConst  FIXABLE  ━━━━━━━━━━━━━━━━━
+
+  ! This let declares a variable that is only assigned once.
+
+    573 │ 		//#given
+    574 │ 		const originalDateNow = Date.now
+  > 575 │ 		let currentNow = 20_000
+        │ 		^^^
+    576 │ 		Date.now = () => currentNow
+    577 │ 		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+
+  i 'currentNow' is never reassigned.
+
+    573 │ 		//#given
+    574 │ 		const originalDateNow = Date.now
+  > 575 │ 		let currentNow = 20_000
+        │ 		    ^^^^^^^^^^
+    576 │ 		Date.now = () => currentNow
+    577 │ 		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+
+  i Safe fix: Use const instead.
+
+     573  573 │       //#given
+     574  574 │       const originalDateNow = Date.now
+     575      │ - → → let·currentNow·=·20_000
+          575 │ + → → const·currentNow·=·20_000
+     576  576 │       Date.now = () => currentNow
+     577  577 │       const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+
+
+packages/omo-opencode/src/features/claude-code-session-state/state.ts:38:45 lint/suspicious/noMisleadingCharacterClass ━━━━━━━━━━
+
+  × A character class cannot match a joined character sequence.
+
+    36 │ const registeredAgentAliases = new Map<string, string>()
+    37 │
+  > 38 │ const ZERO_WIDTH_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+       │                                             ^^^^^^^^^^^^^^^^^^
+    39 │
+    40 │ function normalizeRegisteredAgentName(name: string): string {
+
+  i A zero width joiner composes several emojis into a new one. Replace the character class with an alternation.
+
+
+Checked 6 files in 41ms. No fixes applied.
+Found 1 error.
+Found 2 warnings.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some warnings were emitted while running checks.

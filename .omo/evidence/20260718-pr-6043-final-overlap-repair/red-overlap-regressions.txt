@@ -1,0 +1,48 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-status-overlap-regression.test.ts:
+70 |       deps.sessionRetryOwners.set(sessionID, replacementOwner)
+71 |       abortResponse.resolve(true)
+72 |       await handling
+73 |       await timers.advanceBy(200)
+74 |
+75 |       expect(abortSources).toEqual(["session.status.retry-signal"])
+                                ^
+error: expect(received).toEqual(expected)
+
+  [
+    "session.status.retry-signal",
++   "first-prompt-watchdog",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/watchdog-status-overlap-regression.test.ts:75:28)
+(fail) runtime-fallback watchdog and status overlap > #given a replacement retry owner appears during status abort #when the old transaction settles #then the detached watchdog is committed [2.13ms]
+112 |       await abortStarted.promise
+113 |       const status = statusHandler(retryStatus(sessionID))
+114 |       abortResponse.resolve({})
+115 |       await Promise.all([...watchdogCallbacks, status])
+116 |
+117 |       expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+                                                                                 ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "kind": "consume-terminal",
++   "kind": "inspect-terminal",
+    "sessionID": "coalesced-watchdog-status-abort",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/watchdog-status-overlap-regression.test.ts:117:76)
+(fail) runtime-fallback watchdog and status overlap > #given watchdog and status coalesce one abort #when its terminal is consumed #then the next user abort remains external [0.72ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [59.00ms]
+expected_failure_exit=1

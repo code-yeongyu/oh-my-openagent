@@ -1,0 +1,7 @@
+249	packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts
+110	packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts
+86	packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout-overlap.test.ts
+111	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts
+123	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts
+152	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-test-helpers.ts
+249	packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts

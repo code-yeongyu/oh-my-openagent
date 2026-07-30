@@ -25,7 +25,7 @@ function createContext(promptCalls: unknown[]): RuntimeFallbackPluginInput {
 }
 
 describe("createRuntimeFallbackHook dispose retry-key cleanup", () => {
-  it("#given a session.status retry key #when dispose() is called #then the same retry event is not deduplicated afterward", async () => {
+  it("#given a session.status retry key #when dispose() is called #then later events cannot restart the hook", async () => {
     // given
     const promptCalls: unknown[] = []
     const sessionID = "session-dispose-retry-key"
@@ -84,6 +84,6 @@ describe("createRuntimeFallbackHook dispose retry-key cleanup", () => {
     await hook.event(retryEvent)
 
     // then
-    expect(promptCalls).toHaveLength(2)
+    expect(promptCalls).toHaveLength(1)
   })
 })

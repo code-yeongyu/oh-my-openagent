@@ -1,0 +1,15 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:
+(pass) runtime-fallback deferred watchdog terminal events > #given an ambiguous watchdog abort #when assistant parent correlation resolves it #then the deferred terminal event is handled before the message update [0.75ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given an old-parent terminal candidate #when the newer request is busy #then the deferred event resolves as internal before the message update [0.37ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given a current cancellation is deferred #when an old assistant abort arrives while the session is idle #then cancellation resets retry state [2.86ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts:
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given fallback dispatch completed visibly #when its delayed watchdog abort arrives #then fallback ownership remains intact [0.78ms]
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given the owned delayed watchdog abort was consumed #when a later generation is cancelled #then it remains external cancellation [0.26ms]
+
+ 5 pass
+ 0 fail
+ 19 expect() calls
+Ran 5 tests across 2 files. [64.00ms]

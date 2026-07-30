@@ -1,0 +1,88 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-compaction-agent.test.ts:
+(pass) createEventHandler compaction agent filtering > does not overwrite the stored session agent with compaction [1.35ms]
+(pass) createEventHandler compaction agent filtering > does not overwrite the stored session model with compaction [0.16ms]
+(pass) createEventHandler compaction agent filtering > does not overwrite the stored session model with whitespace around compaction marker [0.11ms]
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [1.17ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.10ms]
+(pass) main session lifecycle > #given deletion pauses during monitor cleanup #when the same ID is recreated #then stale cleanup cannot clear or disconnect replacement state [0.31ms]
+
+packages/omo-opencode/src/plugin/event.monitor.test.ts:
+(pass) createEventHandler monitor wiring > #given a monitor manager #when session.deleted arrives #then it stops session monitors once [0.46ms]
+(pass) createEventHandler monitor wiring > #given a monitor manager #when session.idle arrives #then it handles the normalized idle event after idle hooks [0.29ms]
+(pass) createEventHandler monitor wiring > #given existing deleted-session cleanup state #when session.deleted arrives #then monitor teardown does not skip cleanup [0.20ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:
+(pass) createEventHandler - model fallback > triggers retry prompt for assistant message.updated APIError payloads (headless resume) [153.85ms]
+(pass) createEventHandler - model fallback > #given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated [153.36ms]
+(pass) createEventHandler - model fallback > triggers retry prompt for nested model error payloads [151.65ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when error events overlap [153.37ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when session.error omits provider after dispatch [153.80ms]
+(pass) createEventHandler - model fallback > #given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt [1.26ms]
+(pass) createEventHandler - model fallback > does not collapse fallback continuations for different providers with the same model id [310.07ms]
+(pass) createEventHandler - model fallback > triggers retry prompt on session.status retry events and applies fallback [157.48ms]
+(pass) createEventHandler - model fallback > does not spam abort/prompt when session.status retry countdown updates [154.01ms]
+(pass) createEventHandler - model fallback > re-handles the same retry key after session recovers through session.idle [309.03ms]
+(pass) createEventHandler - model fallback > does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied [158.02ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback from session.status when runtime_fallback is enabled [1.26ms]
+(pass) createEventHandler - model fallback > prefers user-configured fallback_models over hardcoded chain on session.status retry [156.84ms]
+(pass) createEventHandler - model fallback > advances main-session fallback chain across repeated session.error retries end-to-end [312.21ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default) [1.21ms]
+
+packages/omo-opencode/src/plugin/event-team-handlers.test.ts:
+(pass) createEventTeamHandlers > #given team mode without promptAsync #when creating handlers #then idle wake hint handler is still installed [0.91ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-generation.test.ts:
+(pass) model-fallback continuation generation ownership > #given an old continuation is paused during abort #when the session ID is cleared and reused #then only the replacement continuation can dispatch and release ownership [153.05ms]
+
+packages/omo-opencode/src/plugin/event.test.ts:
+(pass) event error extraction > prefers nested APIError message over generic top-level message [0.49ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.idle arrives #then it forwards the event to tmuxSessionManager.onEvent [0.87ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.status reports idle #then synthetic idle forwards to tmuxSessionManager.onEvent [0.68ms]
+(pass) createEventHandler - idle deduplication > #given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane [11.40ms]
+(pass) createEventHandler - idle deduplication > #given session.status already emitted a synthetic idle #when real session.idle follows immediately #then hooks run once [0.59ms]
+(pass) createEventHandler - idle deduplication > keeps other session dedup state untouched when suppressing real-idle-after-synthetic-idle [0.75ms]
+(pass) createEventHandler - idle deduplication > dedups back-to-back real session.idle events for the same sessionID within 500ms [0.53ms]
+(pass) createEventHandler - idle deduplication > still dedups synthetic-idle-after-real-idle as before [0.39ms]
+(pass) createEventHandler - idle deduplication > does NOT dedup session.idle events for DIFFERENT sessionIDs [0.48ms]
+(pass) createEventHandler - idle deduplication > both maps pruned on every event [604.65ms]
+(pass) createEventHandler - idle deduplication > dispatches both idle events once the dedup window expires [605.14ms]
+(pass) createEventHandler - event forwarding > forwards message activity events to tmux session manager [0.90ms]
+(pass) createEventHandler - event forwarding > forwards legacy message.part.updated activity with part-only session id to tmux session manager [0.45ms]
+(pass) createEventHandler - event forwarding > does not forward tmux activity events when tmux integration is disabled [0.39ms]
+(pass) createEventHandler - event forwarding > does not forward session.created to tmux session manager when tmux integration is disabled [0.35ms]
+(pass) createEventHandler - event forwarding > skips tmux dispatch for subagent sessions marked only via subagentSessions (no parentID) [0.39ms]
+(pass) createEventHandler - event forwarding > still dispatches for a primary session not in subagentSessions [0.41ms]
+(pass) createEventHandler - event forwarding > Path A skips dispatch even when subagentSessions Set is populated only AFTER the event arrives (parentID covers it) [0.38ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw after session.created for main sessions (no parentID) [0.46ms]
+(pass) createEventHandler - event forwarding > does NOT dispatch OpenClaw for subagent sessions (with parentID) [0.35ms]
+(pass) createEventHandler - event forwarding > forwards session.deleted to write-existing-file-guard hook [0.59ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw for synthetic session.idle events [0.39ms]
+(pass) createEventHandler - event forwarding > clears stored prompt params on session.deleted [0.33ms]
+(pass) createEventHandler - retry dedupe lifecycle > re-handles same retry key after session recovers to idle status [311.14ms]
+(pass) createEventHandler - event hook isolation > continues dispatching later event hooks when an earlier hook throws [1.61ms]
+(pass) createEventHandler - event hook isolation > preserves hook fan-out order while isolating individual hook failures [0.95ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback-pin-agent.test.ts:
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins agent/model on promptAsync body when continuing after message.updated fallback [154.60ms]
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins agent/model on promptAsync body when continuing after session.error fallback [155.10ms]
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins agent/model on fallback prompt() body when promptAsync is not available (session.status) [159.29ms]
+(pass) createEventHandler - model-fallback auto-continuation pins agent/model/variant > pins variant from agent config when present [155.47ms]
+
+packages/omo-opencode/src/plugin/event-error-utils.test.ts:
+(pass) event error utilities > #given nested string error payload #when extracting message #then returns the nested provider message [0.52ms]
+(pass) event error utilities > #given mixed-case GPT model error #when resolving fallback agent #then chooses hephaestus [0.36ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback-2941.test.ts:
+(pass) createEventHandler - category runtime fallback suppression > does not arm retry fallback when category session explicitly stores no fallback chain [regression #2941] [1.72ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts:
+(pass) model-fallback abort boundary > #given the SDK resolves a non-2xx abort #when continuation starts #then throwing semantics are requested and no prompt is injected [0.90ms]
+
+ 60 pass
+ 0 fail
+ 163 expect() calls
+Ran 60 tests across 11 files. [4.76s]

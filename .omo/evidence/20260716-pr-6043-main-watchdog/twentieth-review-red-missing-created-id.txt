@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event.test.ts:
+1445 | 				type: "session.created",
+1446 | 				properties: { info: {} },
+1447 | 			},
+1448 | 		}))
+1449 |
+1450 | 		expect(getMainSessionID()).toBe(rootSessionID)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "ses_root_preserved"
+Received: undefined
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/plugin/event.test.ts:1450:30)
+(fail) createEventHandler - event forwarding > #given an active root session #when session.created has no ID #then the root registry is preserved [1.63ms]
+
+ 0 pass
+ 27 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [80.00ms]

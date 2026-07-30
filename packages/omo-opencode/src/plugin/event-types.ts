@@ -30,7 +30,7 @@ export type PluginEventContext = PluginContext & {
   directory: string;
   client: {
     session: {
-      abort: (input: { path: { id: string } }) => Promise<unknown>;
+      abort: (input: { path: { id: string }; throwOnError?: boolean }) => Promise<unknown>;
       promptAsync?: (input: InternalPromptInput) => Promise<unknown>;
       prompt: (input: InternalPromptInput) => Promise<unknown>;
       summarize: {

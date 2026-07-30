@@ -9,7 +9,7 @@ const mockCreateAutoRetryHelpers = mock((deps: HookDeps) => {
   capturedDeps = deps
 
   return {
-    abortSessionRequest: async () => {},
+    abortSessionRequest: async () => true,
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async () => {},

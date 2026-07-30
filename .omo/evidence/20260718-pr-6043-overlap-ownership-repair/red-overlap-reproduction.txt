@@ -1,0 +1,47 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts:
+(pass) first-prompt watchdog ownership races > re-arms after an accepted abort when fallback dispatch is rejected [1.54ms]
+81 |     expect(calls).toEqual({ aborts: 1, dispatches: 1 })
+82 |
+83 |     resolveFirstAgent?.(AGENT)
+84 |     await oldCallback
+85 |
+86 |     expect(calls).toEqual({ aborts: 1, dispatches: 1 })
+                       ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "aborts": 1,
++   "aborts": 2,
+    "dispatches": 1,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts:86:19)
+(fail) first-prompt watchdog ownership races > does not let a detached callback abort a replacement watchdog retry [0.45ms]
+(pass) first-prompt watchdog ownership races > restores suspended ownership without arming a new timer [0.32ms]
+(pass) first-prompt watchdog ownership races > discards inconclusive suspended ownership before a distinct user generation [0.22ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout-overlap.test.ts:
+80 |   helpers.scheduleSessionFallbackTimeout(sessionID)
+81 |   const replacementTimer = deps.sessionFallbackTimeouts.get(sessionID)
+82 |   resolveAbort?.(true)
+83 |   await new Promise((resolve) => setTimeout(resolve, 0))
+84 |
+85 |   expect(dispatchCount).toBe(0)
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout-overlap.test.ts:85:25)
+(fail) stale same-generation timeout preserves replacement retry ownership [3.14ms]
+
+ 3 pass
+ 2 fail
+ 12 expect() calls
+Ran 5 tests across 2 files. [75.00ms]

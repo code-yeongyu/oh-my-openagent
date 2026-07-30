@@ -1,0 +1,57 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts:
+139 |       capturedDeps?.sessionLastAccess.set(SESSION_ID, Date.now() - 31 * 60 * 1000)
+140 |       cleanupStaleSessions?.()
+141 |       agentResolution.resolve("sisyphus")
+142 |       await pendingRetry
+143 |
+144 |       expect({ abortCalls, promptModels, hasState: capturedDeps?.sessionStates.has(SESSION_ID) }).toEqual({
+                                                                                                        ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "abortCalls": 0,
+-   "hasState": false,
+-   "promptModels": [],
++   "abortCalls": 1,
++   "hasState": true,
++   "promptModels": [
++     "openai/fallback-one",
++   ],
+  }
+
+- Expected  - 3
++ Received  + 5
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts:144:99)
+(fail) runtime-fallback stale cleanup watchdog race > #given cleanup evicts a status retry during agent resolution #when resolution resumes #then it cannot abort or recreate state [3.95ms]
+214 |       messagesResponse.resolve({
+215 |         data: [{ info: { role: "user" }, parts: [{ type: "text", text: "retry this" }] }],
+216 |       })
+217 |       await pendingRetry
+218 |
+219 |       expect({ abortCalls, promptModels, hasState: capturedDeps?.sessionStates.has(SESSION_ID) }).toEqual({
+                                                                                                        ^
+error: expect(received).toEqual(expected)
+
+  {
+    "abortCalls": 1,
+    "hasState": false,
+-   "promptModels": [],
++   "promptModels": [
++     "openai/fallback-one",
++   ],
+  }
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts:219:99)
+(fail) runtime-fallback stale cleanup watchdog race > #given cleanup evicts a status retry during message loading #when loading resumes #then it cannot dispatch or recreate state [0.63ms]
+(pass) runtime-fallback stale cleanup watchdog race > #given cleanup evicts a detached status watchdog #when the stale abort resolves #then rollback cannot restore the watchdog [0.36ms]
+
+ 1 pass
+ 2 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [115.00ms]

@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts:
+(pass) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider error #then the fallback chain advances without resetting [2.49ms]
+(pass) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider session error #then the fallback chain advances without resetting [0.58ms]
+
+ 2 pass
+ 0 fail
+ 8 expect() calls
+Ran 2 tests across 1 file. [61.00ms]

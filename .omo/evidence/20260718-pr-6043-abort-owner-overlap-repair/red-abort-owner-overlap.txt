@@ -1,0 +1,46 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts:
+104 |   await deferred.abortStarted
+105 |   const replacementOwner = installReplacementOwner(deps)
+106 |   deferred.resolveAbort(true)
+107 |   await handling
+108 |
+109 |   expect(dispatches).toEqual([])
+                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "provider/fallback",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts:109:22)
+(fail) stale session status abort preserves replacement retry ownership [1.45ms]
+131 |   await deferred.abortStarted
+132 |   const replacementOwner = installReplacementOwner(deps)
+133 |   deferred.resolveAbort(true)
+134 |   await handling
+135 |
+136 |   expect(dispatches).toEqual([])
+                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "provider/fallback",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts:136:22)
+(fail) stale message retry abort preserves replacement retry ownership [0.80ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [58.00ms]

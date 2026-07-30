@@ -13,12 +13,13 @@ import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { extractErrorMessage, extractErrorName } from "./event-error-utils";
 import { createEventHookDispatcher, createEventHookRunner, getEventSessionID } from "./event-hook-dispatcher";
 import { createModelFallbackEventHandler } from "./event-model-fallback";
+import { createSessionLifecycleQueue } from "./event-session-lifecycle-queue";
 import {
   dispatchOpenClawSessionEvent,
   handleMessageRemovedEvent,
   handleMessageUpdatedSessionState,
   handleSessionCreatedEvent,
-  handleSessionDeletedEvent,
+  reserveSessionDeletedEvent,
   TMUX_ACTIVITY_EVENT_TYPES,
 } from "./event-session-lifecycle";
 import { createEventTeamHandlers } from "./event-team-handlers";
@@ -50,6 +51,8 @@ export function createEventHandler(args: {
   const recentAnyIdles = new Map<string, number>();
   const dedupWindowMs = 500;
   const teamHandlers = createEventTeamHandlers({ pluginConfig, pluginContext, managers });
+  const sessionDeletionTasks = new Map<string, Promise<void>>();
+  const runSessionLifecycle = createSessionLifecycleQueue();
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
     if (syncSubagentSessions.has(sessionID)) return true;
@@ -103,7 +106,7 @@ export function createEventHandler(args: {
     await dispatchIdleOnlyHooks(syntheticIdle);
   };
 
-  return async (input): Promise<void> => {
+  const handleEvent = async (input: EventInput): Promise<void> => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
@@ -128,12 +131,29 @@ export function createEventHandler(args: {
       }
     }
 
+    const { event } = input;
+    const props = event.properties as Record<string, unknown> | undefined;
+    if (event.type === "session.created") {
+      const sessionID = resolveSessionEventID(props);
+      if (sessionID) await sessionDeletionTasks.get(sessionID)?.catch(() => undefined);
+    }
+    const deletionReservation = event.type === "session.deleted"
+      ? reserveSessionDeletedEvent({
+          props,
+          tmuxIntegrationEnabled,
+          pluginConfig,
+          pluginContext,
+          managers,
+          firstMessageVariantGate,
+          clearModelFallbackSession: modelFallbackHandler.clearSession,
+          sessionDeletionTasks,
+        })
+      : undefined;
     await dispatchToHooks(input);
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
+    deletionReservation?.start();
 
-    const { event } = input;
     managers.tuiStateMirror?.onEvent(event);
-    const props = event.properties as Record<string, unknown> | undefined;
 
     if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
       managers.tmuxSessionManager.onEvent?.(event as { type: string; properties?: Record<string, unknown> });
@@ -148,19 +168,12 @@ export function createEventHandler(args: {
         pluginContext,
         managers,
         firstMessageVariantGate,
+        sessionDeletionTasks,
       });
     }
 
     if (event.type === "session.deleted") {
-      await handleSessionDeletedEvent({
-        props,
-        tmuxIntegrationEnabled,
-        pluginConfig,
-        pluginContext,
-        managers,
-        firstMessageVariantGate,
-        clearModelFallbackSession: modelFallbackHandler.clearSession,
-      });
+      await deletionReservation?.task;
       await runEventHookSafely("teamLeadOrphanHandler", teamHandlers.teamLeadOrphanHandler, input);
       await runEventHookSafely("teamMemberStatusHandler", teamHandlers.teamMemberStatusHandler, input);
     }
@@ -238,5 +251,17 @@ export function createEventHandler(args: {
 
       await runEventHookSafely("teamMemberErrorHandler", teamHandlers.teamMemberErrorHandler, input);
     }
+  };
+
+  return async (input): Promise<void> => {
+    const isLifecycleEvent = input.event.type === "session.created" || input.event.type === "session.deleted";
+    const sessionID = isLifecycleEvent
+      ? resolveSessionEventID(input.event.properties as Record<string, unknown> | undefined)
+      : undefined;
+    if (!sessionID) {
+      await handleEvent(input);
+      return;
+    }
+    await runSessionLifecycle(sessionID, () => handleEvent(input));
   };
 }

@@ -1,0 +1,19 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [4.23ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [1.13ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.15ms]
+(pass) runtime-fallback composed abort lifecycle races > #given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch [0.68ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a fallback timeout abort is pending #when a newer user turn arrives #then stale timeout completion cannot dispatch [2.88ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:
+(pass) createFallbackTimeoutHelpers > #given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored [3.52ms]
+(pass) createFallbackTimeoutHelpers > #given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed [2.80ms]
+(pass) createFallbackTimeoutHelpers > #given timeout escalation cannot abort the active request #when the timeout fires #then it preserves retry ownership and does not dispatch a fallback [2.77ms]
+(pass) createFallbackTimeoutHelpers > #given an old timeout abort is pending #when a newer user generation starts #then stale completion preserves the newer owner and timer [2.78ms]
+
+ 9 pass
+ 0 fail
+ 29 expect() calls
+Ran 9 tests across 2 files. [92.00ms]

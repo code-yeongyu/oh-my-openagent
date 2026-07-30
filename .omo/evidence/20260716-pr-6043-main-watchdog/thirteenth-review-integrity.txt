@@ -1,0 +1,5 @@
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts=     234
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts=     223
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts=      91
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts=      42
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts=      77

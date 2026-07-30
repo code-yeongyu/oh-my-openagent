@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts:
+114 |       expect(deps.sessionAwaitingFallbackResult.has(SESSION_ID)).toBe(true)
+115 |
+116 |       await harness.hook.event(abortTerminal())
+117 |
+118 |       expect(harness.dispatchedModels).toEqual([FALLBACK_MODEL])
+119 |       expect(deps.sessionStates.get(SESSION_ID)?.currentModel).toBe(FALLBACK_MODEL)
+                                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: "anthropic/fallback"
+Received: "openai/gpt-5.4-mini"
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts:119:64)
+(fail) runtime-fallback current-generation delayed watchdog terminal > #given fallback dispatch was accepted #when its delayed watchdog abort arrives #then fallback ownership remains intact [2.65ms]
+(pass) runtime-fallback current-generation delayed watchdog terminal > #given the owned delayed watchdog abort was consumed #when another abort arrives #then it remains external cancellation [0.28ms]
+
+ 1 pass
+ 1 fail
+ 9 expect() calls
+Ran 2 tests across 1 file. [367.00ms]

@@ -1,0 +1,12 @@
+source_head=243a25ca97c46cfbf5fdb472aeef3da37c301906
+origin_dev=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+merge_base=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+ M .omo/evidence/20260716-pr-6043-main-watchdog/live-fake-provider.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/live-isolation-receipt.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/live-plugin-watchdog.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/run-live-watchdog-qa.sh
+packages/omo-opencode/src/features/claude-code-session-state/state.ts_pure_loc=98
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts_pure_loc=177
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts_pure_loc=250
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts_pure_loc=66
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts_pure_loc=63

@@ -1,0 +1,7 @@
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts=      86
+packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts=     116
+base=fb7d4b66f541e22e9718a4f51314702c6ac68e53
+runtime_parent=6a98b166045b8839985ebeaf4babe93301303da3
+changed_paths:
+ M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts

@@ -48,6 +48,7 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
   return {
     abortSessionRequest: async (sessionID: string) => {
       abortCalls.push(sessionID)
+      return true
     },
     clearSessionFallbackTimeout: (sessionID: string) => {
       clearCalls.push(sessionID)
@@ -239,7 +240,8 @@ describe("createEventHandler", () => {
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
 
     // simulate the next retry signal advancing the counter
-    const advanced = deps.sessionStates.get(sessionID)!
+    const advanced = deps.sessionStates.get(sessionID)
+    if (advanced === undefined) throw new Error("expected fallback state after internal abort")
     advanced.attemptCount = 2
 
     // iteration 2: another internal abort
