@@ -40,7 +40,7 @@ function adapterVersionIfPresent(): string | undefined {
 }
 
 describe("OMO Senpi plugin manifest", () => {
-  it("#given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory", () => {
+  it("#given Senpi has a builtin goal extension #when loaded #then it does not shadow it with legacy ultragoal", () => {
     const manifest = readJsonObject(pluginManifestPath)
     const pi = manifest.pi
 

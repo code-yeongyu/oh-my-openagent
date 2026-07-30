@@ -1,6 +1,6 @@
 # omo-senpi
 
-`@code-yeongyu/omo-senpi` is the Senpi edition of OMO packaged as one Pi package. It loads one generated extension entry from `extensions/omo.js` and generated skills from `skills/`.
+`@code-yeongyu/omo-senpi` is the Senpi edition of OMO packaged as one Pi package. It loads one generated extension entry from `extensions/omo.js` and generated skills from `skills/`. Goal execution is provided by Senpi's builtin Goal extension; OMO does not bundle a second goal runtime.
 
 ## Shipped skills
 
