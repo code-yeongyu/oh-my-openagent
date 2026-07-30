@@ -5,6 +5,7 @@ export const DEFAULT_MAX_DIRECTORY_FILES = 50;
 
 export const REQUEST_TIMEOUT_MS = 15_000;
 export const INIT_TIMEOUT_MS = 60_000;
+export const START_TIMEOUT_MS = Number(process.env["OMO_LSP_START_TIMEOUT_MS"]) || 10_000;
 export const IDLE_TIMEOUT_MS = 5 * 60_000;
 export const REAPER_INTERVAL_MS = 60_000;
 export const STOP_HARD_KILL_TIMEOUT_MS = 5_000;

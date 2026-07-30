@@ -1,6 +1,6 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
 import { LspClient } from "./client.js";
-import { IDLE_TIMEOUT_MS, INIT_TIMEOUT_MS, REAPER_INTERVAL_MS } from "./constants.js";
+import { IDLE_TIMEOUT_MS, INIT_TIMEOUT_MS, REAPER_INTERVAL_MS, START_TIMEOUT_MS } from "./constants.js";
 import { installProcessSignalCleanup } from "./process-signal-cleanup.js";
 import type { ResolvedServer } from "./types.js";
 
@@ -31,6 +31,18 @@ export interface LspManagerOptions {
 	reaperIntervalMs?: number;
 	clientFactory?: (root: string, server: ResolvedServer) => LspClient;
 	now?: () => number;
+}
+
+function startAndInitializeClient(client: LspClient): Promise<void> {
+	return Promise.race([
+		(async () => {
+			await client.start();
+			await client.initialize();
+		})(),
+		new Promise<never>((_, reject) =>
+			setTimeout(() => reject(new Error("LSP start timed out")), START_TIMEOUT_MS).unref(),
+		),
+	]);
 }
 
 async function stopClientBestEffort(client: LspClient): Promise<void> {
@@ -199,10 +211,7 @@ export class LspManager {
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
-		const initPromise = (async () => {
-			await client.start();
-			await client.initialize();
-		})();
+		const initPromise = startAndInitializeClient(client);
 
 		const newManaged: ManagedClient = {
 			client,
@@ -266,10 +275,7 @@ export class LspManager {
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
-		const initPromise = (async () => {
-			await client.start();
-			await client.initialize();
-		})();
+		const initPromise = startAndInitializeClient(client);
 
 		const managed: ManagedClient = {
 			client,

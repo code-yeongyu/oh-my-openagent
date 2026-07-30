@@ -11,7 +11,9 @@ export interface SpawnedProcess {
 	stderr: NodeJS.ReadableStream;
 	pid: number | undefined;
 	exitCode: number | null;
+	spawnError: Error | null;
 	exited: Promise<number>;
+	onSpawnError(listener: (error: Error) => void): void;
 	kill(signal?: NodeJS.Signals): void;
 	killed: boolean;
 }
@@ -57,9 +59,18 @@ export function validateCwd(cwd: string): { valid: boolean; error?: string } {
 }
 
 function wrap(proc: ChildProcess): SpawnedProcess {
+	let spawnError: Error | null = null;
+	const spawnErrorListeners = new Set<(error: Error) => void>();
+
 	const exitedPromise = new Promise<number>((resolve) => {
 		proc.once("close", (code) => resolve(code ?? 0));
-		proc.once("error", () => resolve(1));
+		proc.once("error", (error) => {
+			spawnError = error;
+			for (const listener of spawnErrorListeners) {
+				listener(error);
+			}
+			resolve(1);
+		});
 	});
 
 	if (!proc.stdin || !proc.stdout || !proc.stderr) {
@@ -76,10 +87,20 @@ function wrap(proc: ChildProcess): SpawnedProcess {
 		get exitCode() {
 			return proc.exitCode;
 		},
+		get spawnError() {
+			return spawnError;
+		},
 		get killed() {
 			return proc.killed;
 		},
 		exited: exitedPromise,
+		onSpawnError(listener: (error: Error) => void) {
+			if (spawnError) {
+				listener(spawnError);
+				return;
+			}
+			spawnErrorListeners.add(listener);
+		},
 		kill(signal?: NodeJS.Signals) {
 			killProcessTree(proc, signal ?? "SIGTERM");
 		},
