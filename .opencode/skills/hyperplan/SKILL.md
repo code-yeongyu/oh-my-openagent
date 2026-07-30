@@ -1,6 +1,6 @@
 ---
 name: hyperplan
-description: "Adversarial multi-agent planning skill. Self-orchestrates 5 hostile category members (unspecified-low, unspecified-high, deep, ultrabrain, artistry) via team-mode for ruthless cross-critique debate, distills only the defensible insights, then MANDATORILY hands the distilled insight bundle to the `plan` agent for executable plan formalization. Use when planning needs maximum rigor and surfacing of weak assumptions, blind spots, and over-engineering. Triggers: 'hyperplan', 'hpp', '/hyperplan', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'."
+description: "Harness-neutral adversarial multi-agent planning skill for OpenCode, TraeX, traecli, trae-agent, and compatible agent harnesses. Orchestrates 5 hostile reviewer roles through independent analysis, cross-attack, and defense; distills only defensible insights; then MANDATORILY hands them to a dedicated planner agent. Use when planning needs maximum rigor and weak assumptions, blind spots, integration risks, or over-engineering must be surfaced. Triggers: 'hyperplan', 'hpp', '/hyperplan', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'."
 ---
 
 # HYPERPLAN — Adversarial Multi-Agent Planning
@@ -9,26 +9,40 @@ description: "Adversarial multi-agent planning skill. Self-orchestrates 5 hostil
 
 ## WHAT THIS IS
 
-You (the orchestrator) become the **Lead** of a 5-member adversarial team. The 5 members are **maximally hostile** to each other — they attack each other's findings ruthlessly. You then synthesize only the **defensible insights** that survived the attacks into a work plan.
+You (the orchestrator) become the **Lead** of a 5-reviewer adversarial panel. The reviewers are **maximally hostile** to each other's claims: they attack weak findings, defend or refine surviving ones, and concede defeated ones. You distill only the **defensible insights**, then a dedicated planner turns those insights into a work plan.
 
 This is not consensus building. This is intellectual combat. Weakness gets exposed. Lazy thinking gets eviscerated. Only what survives the gauntlet makes it into the plan.
+
+## HARNESS BACKEND SELECTION
+
+Select the backend from the tools actually available in the current session. Do not infer the harness from branding, environment variables, or directory names.
+
+1. If `spawn_agent`, `send_input`, `wait_agent`, and `close_agent` exist, use the **TraeX native subagent backend**. Read [references/traex.md](references/traex.md) before spawning anything. Its mechanics override OpenCode-specific examples below.
+2. Otherwise, if `team_create`, `team_send_message`, `team_status`, and `team_delete` exist, use the **OpenCode Team Mode backend** described in this file.
+3. Otherwise, STOP and tell the user which required orchestration capabilities are missing. Never fake a multi-agent debate with one agent.
+
+Use exactly one backend for the whole run. Do not mix `team_*` members with native subagent threads.
 
 ## HARD PRECONDITIONS
 
 Before starting, verify:
 
-1. **`team_*` tools must be available.** If they are not, STOP and tell the user:
-   > "Hyperplan requires team-mode. Set `team_mode.enabled: true` in `~/.config/opencode/oh-my-opencode.jsonc` and restart opencode, then retry."
-2. **You are running as `sisyphus` (or another lead-eligible agent).** If you are running as a planner (`prometheus`, `plan`), this skill is the wrong tool — direct the user to use `/start-work` instead.
-3. **You are in the main session** (not a background subagent). Hyperplan only works as a top-level orchestration.
+1. **Run as the top-level orchestrator.** Do not invoke Hyperplan from a reviewer, background subagent, or planner role.
+2. **The backend can run five independent reviewers.** Do not silently shrink the roster. The OpenCode backend may omit only the optional `deep` researcher when that category is unavailable; the TraeX backend keeps all five logical roles.
+3. **A dedicated planner role is available.** The Lead distills; the planner formalizes.
+4. **The request is for planning.** Hyperplan produces a plan and does not implement it unless the user separately requests execution.
 
-## THE 5 ADVERSARIAL MEMBERS — RnR & CHARACTERISTICS
+For OpenCode Team Mode, `team_*` tools must be enabled. If they are absent, tell the user:
 
-Each member is a `kind: "category"` team member. They route through `sisyphus-junior` with the category's model and prompt-append shaping their behavior. The `prompt` field below is the **system prompt** that establishes their adversarial identity.
+> "The OpenCode Hyperplan backend requires Team Mode. Set `team_mode.enabled: true` in `.omo/omo.jsonc` under the `opencode` block, restart OpenCode, and retry."
 
-Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep` only when that category is enabled; if `deep` is disabled or unavailable, retry without only the researcher member and state the degraded roster.
+## THE 5 ADVERSARIAL REVIEWERS — RnR & CHARACTERISTICS
 
-### CATEGORY CHARACTERISTICS REFERENCE
+The five logical roles and their prompts are backend-neutral. On OpenCode, each reviewer is a `kind: "category"` team member routed through `sisyphus-junior`. On TraeX, each is a persistent native `default` subagent inheriting the current model and harness. The prompt below establishes the reviewer's adversarial identity.
+
+For OpenCode only, required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep` only when enabled; if unavailable, retry without only the researcher and state the degraded roster.
+
+### OPENCODE CATEGORY ROUTING REFERENCE
 
 | Category | Model | Native Mindset | Why This Adversarial Role Fits |
 |----------|-------|----------------|--------------------------------|
@@ -188,7 +202,10 @@ Output format: numbered findings/critiques, each proposes a concrete alternative
 
 ## EXECUTION WORKFLOW
 
-You execute this in **7 phases**. End your turn at every phase boundary marked **[WAIT]** so the team's async messages can flow back to you. Resume on the next turn after `<peer_message>` blocks arrive.
+Execute the same **7 logical phases** on every backend.
+
+- **OpenCode Team Mode:** use the `team_*` calls shown below. End your turn at each **[WAIT: OpenCode]** boundary so asynchronous mailbox messages can arrive as `<peer_message>` blocks.
+- **TraeX native subagents:** follow [references/traex.md](references/traex.md). Use `wait_agent` at round boundaries and continue in the same turn after results arrive. Do not end the turn merely because an OpenCode wait marker appears below.
 
 **Critical separation**: You (the Lead) **distill** the surviving insights in Phase 5, but you DO NOT write the work plan. The work plan is produced by the `plan` agent in Phase 6 — this handoff is **mandatory**, not optional. Hyperplan = adversarial distillation + dedicated planner formalization. Skipping the handoff turns it back into vanilla orchestration.
 
@@ -198,9 +215,11 @@ You execute this in **7 phases**. End your turn at every phase boundary marked *
 2. Restate the user's planning request in 1 sentence so all members start with the same scope.
 3. Create your todo list for the 7 phases (the Phase 6 plan-agent handoff is mandatory — include it explicitly).
 
-### Phase 1: Spawn the adversarial team
+### Phase 1: Spawn the adversarial panel
 
-Call `team_create` ONCE with this exact inline_spec shape (substitute the prompt strings with the full system prompts above):
+On TraeX, spawn the persistent reviewer roster as defined in [references/traex.md](references/traex.md).
+
+On OpenCode, call `team_create` ONCE with this exact inline_spec shape (substitute the prompt strings with the full system prompts above):
 
 ```typescript
 team_create({
@@ -224,7 +243,9 @@ If `team_create` errors because `deep` is disabled or unavailable, retry once wi
 
 ### Phase 2: Round 1 — Independent analysis
 
-Send the same prompt to all 5 members via 5 parallel `team_send_message` calls. Each member receives:
+On TraeX, Round 1 is included in each initial `spawn_agent` message; wait for the five results as defined in the backend reference.
+
+On OpenCode, send the same prompt to all available members via parallel `team_send_message` calls. Each member receives:
 
 ```
 <hyperplan-round-1-task>
@@ -243,11 +264,11 @@ When done, send your findings back via team_send_message to "lead" with kind="me
 </hyperplan-round-1-task>
 ```
 
-**[WAIT]** End your turn. Members will reply asynchronously. The system will inject `<peer_message>` blocks into your context as replies arrive.
+**[WAIT: OpenCode]** End your turn. Members will reply asynchronously. The system will inject `<peer_message>` blocks into your context as replies arrive.
 
 ### Phase 3: Round 2 — Cross-attack
 
-When all 5 Round 1 replies have arrived, aggregate them into one bundle:
+When all available Round 1 replies have arrived, aggregate them into one bundle:
 
 ```
 === Round 1 Findings Bundle ===
@@ -269,7 +290,9 @@ When all 5 Round 1 replies have arrived, aggregate them into one bundle:
 === End ===
 ```
 
-Send this bundle to all 5 members via 5 parallel `team_send_message` calls. Each receives the SAME bundle, but the prompt is:
+On TraeX, send this bundle to the five persistent reviewer ids using parallel `send_input` calls as defined in the backend reference.
+
+On OpenCode, send this bundle to all available members via parallel `team_send_message` calls. Each receives the SAME bundle, but the prompt is:
 
 ```
 <hyperplan-round-2-task>
@@ -290,11 +313,11 @@ When done, send your attacks back to "lead".
 </hyperplan-round-2-task>
 ```
 
-**[WAIT]** End your turn. Wait for all 5 cross-attacks to arrive.
+**[WAIT: OpenCode]** End your turn. Wait for all available cross-attacks to arrive.
 
 ### Phase 4: Round 3 — Defense and refinement
 
-Aggregate the cross-attacks BY ORIGINAL FINDING. For each Round 1 finding, list all the attacks that targeted it. Then send each member ONLY the attacks against THEIR OWN findings:
+Aggregate the cross-attacks BY ORIGINAL FINDING. For each Round 1 finding, list all the attacks that targeted it. Then send each reviewer ONLY the attacks against THEIR OWN findings. Use `send_input` on TraeX or `team_send_message` on OpenCode:
 
 ```
 <hyperplan-round-3-task>
@@ -319,7 +342,7 @@ When done, send back to "lead".
 </hyperplan-round-3-task>
 ```
 
-**[WAIT]** End your turn. Wait for all 5 refinements.
+**[WAIT: OpenCode]** End your turn. Wait for all available refinements.
 
 ### Phase 5: Insight distillation (the Lead's job — YOU)
 
@@ -372,7 +395,9 @@ The team is done debating. Your job at this phase is **distillation only** — y
 
 You MUST dispatch the insight bundle to the `plan` agent. The Lead does NOT write executable plans in hyperplan — that responsibility is delegated, by contract, to the dedicated planner. This separation is non-negotiable.
 
-1. **Dispatch the handoff** as a foreground task (you wait for the plan):
+1. **Dispatch the handoff** and wait for the planner:
+   - On TraeX, close the reviewer threads, spawn `agent_type: "plan"`, and wait as defined in [references/traex.md](references/traex.md).
+   - On OpenCode, dispatch this foreground task:
 
 ```typescript
 task({
@@ -381,7 +406,7 @@ task({
   run_in_background: false,
   description: "Formalize hyperplan-distilled insights into executable plan",
   prompt: `<hyperplan-handoff>
-The following insight bundle survived an adversarial 5-member cross-critique debate (skeptic/validator/researcher/architect/creative). Every claim here was either uncontested OR defended/refined under attack — conceded findings were already filtered out.
+The following insight bundle survived an adversarial 5-reviewer cross-critique debate (skeptic/validator/researcher/architect/creative). Every claim here was either uncontested OR defended/refined under attack — conceded findings were already filtered out.
 
 Your task: produce an EXECUTABLE work plan from these insights. You do NOT need to re-explore the codebase or re-derive the constraints — they are already battle-tested. Your value is plan structure, sequencing, dependency analysis, parallelization opportunities, and explicit verification criteria per task.
 
@@ -401,7 +426,7 @@ Hard rules for your plan:
 3. **Present the plan agent's output to the user verbatim**, prefixed with one provenance line:
 
 ```
-*Plan derived from hyperplan adversarial review (5 members, 3 rounds) and formalized by the plan agent.*
+*Plan derived from hyperplan adversarial review (5 reviewers, 3 rounds) and formalized by the plan agent.*
 
 [plan agent output]
 ```
@@ -414,12 +439,12 @@ DO NOT save the plan to disk unless the user asks. Hyperplan is a planning consu
 
 After the plan agent's output has been presented to the user:
 
-1. Call `team_shutdown_request` for each of the 5 members.
-2. The Lead can `team_approve_shutdown` for each member (Lead has approval authority).
-3. Once all 5 are shut down, call `team_delete({ teamRunId })` to clean up runtime state.
-4. Confirm cleanup to the user with one line: "Hyperplan team disbanded."
+1. On TraeX, close every live reviewer or planner id as defined in [references/traex.md](references/traex.md).
+2. On OpenCode, call `team_shutdown_request` for each available member.
+3. On OpenCode, approve each shutdown, then call `team_delete({ teamRunId })`.
+4. Confirm cleanup to the user with one line: "Hyperplan panel disbanded."
 
-If any step fails, surface the error and suggest manual cleanup via `team_list` and `team_delete`.
+If cleanup fails, surface the exact live ids on TraeX. On OpenCode, surface the error and suggest manual cleanup via `team_list` and `team_delete`.
 
 ## ANTI-PATTERNS — DO NOT DO THESE
 
@@ -432,13 +457,14 @@ If any step fails, surface the error and suggest manual cleanup via `team_list` 
 | **Lead writing the plan in Phase 5 instead of handing off in Phase 6** | **The handoff is the contract. Hyperplan = adversarial distillation + dedicated planner formalization. Lead-written plans skip the planner's value-add (sequencing, dependencies, success criteria) and turn this back into vanilla orchestration.** |
 | **Skipping the `plan` agent dispatch ("the bundle is already a plan")** | **The bundle is INPUT, not output. The plan agent owns sequencing, parallelization, and verification gates. Without the dispatch, hyperplan loses half its value.** |
 | **Pre-writing tasks before dispatching to plan agent** | **Anchors the plan agent to your draft and undermines its independent judgment. Dispatch raw insights, let the planner structure.** |
-| Forgetting to clean up the team | Leaks runtime state. Always Phase 7. |
-| Calling `delegate_task` instead of `team_send_message` | These are different systems. `team_*` only for inter-member traffic. |
-| Calling `team_send_message` to ship the bundle to the plan agent | Wrong channel. Plan agent is NOT a team member. Use `task(subagent_type="plan", ...)` for the handoff. |
-| Running this from a planner agent (prometheus) | Planners cannot orchestrate teams. Must run from sisyphus. |
-| Running this in a non-main session | Team-mode is main-session-only. |
+| Forgetting to clean up reviewers | Leaks runtime state. Always Phase 7. |
+| Mixing backend tools | `team_*` members and TraeX native subagents have different lifecycle and waiting semantics. Pick one backend. |
+| Creating new TraeX reviewers for every round | Loses each reviewer's identity and its ownership of prior findings. Reuse the original five ids. |
+| Sending the bundle to a reviewer as the planner handoff | The planner is separate from the adversarial panel. Use the backend's dedicated `plan` role. |
+| Running this from a planner or reviewer | The top-level orchestrator must own fan-out, distillation, handoff, and cleanup. |
+| Running this in a non-main session | Hyperplan is main-session-only. |
 
-## NOTES FOR THE LEAD (YOU)
+## OPENCODE TEAM MODE NOTES FOR THE LEAD
 
 - Each `team_send_message` is **fire-and-forget** from your perspective. Members reply async.
 - After sending Round-N messages, **end your turn**. The system injects member replies on the next turn.
@@ -446,5 +472,5 @@ If any step fails, surface the error and suggest manual cleanup via `team_list` 
 - The members do not see each other's text responses directly — only what you forward via `team_send_message`. You are the information broker. The bundles you forward in Phases 3 and 4 are the entire context they have.
 - Keep bundles concise — ≤32KB per message. If aggregated findings exceed this, summarize before forwarding (preserve the spirit of each finding).
 - The skill explicitly forbids you from softening adversarial prompts. The hostility IS the mechanism.
-- The Phase 6 plan-agent handoff runs **synchronously** (`run_in_background: false`) — you wait for the planner before Phase 7 cleanup. Do NOT shut down the team until the plan agent has returned, in case the planner needs you to forward a clarifying question to a specific member (rare, but possible).
+- The Phase 6 plan-agent handoff runs **synchronously** (`run_in_background: false`) — you wait for the planner before Phase 7 cleanup.
 - The plan agent does NOT have access to the team mailbox. Everything it needs must be in the bundle you dispatch. If the planner asks for additional context, you fetch it (via explore/librarian/oracle) and re-dispatch with `task_id` resume — do NOT spin up a new plan agent.
