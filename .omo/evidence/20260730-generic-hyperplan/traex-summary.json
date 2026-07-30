@@ -1,0 +1,9 @@
+{
+  "required_banner_observed": true,
+  "traex_reference_read": true,
+  "completed_spawn_calls": 5,
+  "unique_reviewer_threads": 5,
+  "collective_wait_started": true,
+  "complete_three_rounds_observed": false,
+  "blocker": "TraeX model service returned no first token in a subsequent explicit six-thread run and in a minimal health probe."
+}

@@ -1,0 +1,5 @@
+real_db=/Users/bytedance/.local/share/opencode/opencode.db
+before=1900
+after=1900
+unchanged=true
+sandbox_removed_on_exit=true

@@ -1,0 +1,16 @@
+bun test v1.4.0-canary.1 (9a568e7d6)
+
+script/package-layout.test.ts:
+(pass) published package layout > #given vendored LSP MCP package #when inspecting tracked package files #then it is not a git submodule [73.54ms]
+(pass) published package layout > #given Codex LSP file dependency #when packing package #then lsp-tools-mcp package metadata ships [730.59ms]
+(pass) published package layout > #given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not [0.76ms]
+(pass) published package layout > #given Codex materialized runtime payloads #when packing package #then every current payload target ships [0.22ms]
+(pass) published package layout > #given shipped QA skills reference web terminal helpers #when packing package #then helper runtime ships [0.15ms]
+(pass) published package layout > #given shipped QA skills reference guidance docs #when packing package #then referenced docs ship [0.11ms]
+(pass) published package layout > #given Codex installer source tree #when checking obsolete forks #then hand-written install mjs files are absent [0.80ms]
+(pass) published package layout > #given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship [3.15ms]
+
+ 8 pass
+ 0 fail
+ 16 expect() calls
+Ran 8 tests across 1 file. [1190.00ms]

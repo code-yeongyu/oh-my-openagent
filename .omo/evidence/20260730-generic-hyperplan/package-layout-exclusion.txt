@@ -1,0 +1,10 @@
+bun test v1.4.0-canary.1 (9a568e7d6)
+
+script/package-layout-exclusion.test.ts:
+(pass) published package layout exclusions > #given internal-only skill assets #when packing package #then forbidden skill assets do not ship [896.68ms]
+(pass) published package layout exclusions > #given internal-only command assets #when packing package #then forbidden command assets do not ship [0.21ms]
+
+ 2 pass
+ 0 fail
+ 7 expect() calls
+Ran 2 tests across 1 file. [1255.00ms]

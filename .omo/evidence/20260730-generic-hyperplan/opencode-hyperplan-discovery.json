@@ -1,0 +1,11 @@
+{
+  "name": "hyperplan",
+  "description": "Harness-neutral adversarial multi-agent planning skill for OpenCode, TraeX, traecli, trae-agent, and compatible agent harnesses. Orchestrates 5 hostile reviewer roles through independent analysis, cross-attack, and defense; distills only defensible insights; then MANDATORILY hands them to a dedicated planner agent. Use when planning needs maximum rigor and weak assumptions, blind spots, integration risks, or over-engineering must be surfaced. Triggers: 'hyperplan', 'hpp', '/hyperplan', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'.",
+  "location": "/private/tmp/oh-my-openagent-wt-generic-hyperplan-traex/.opencode/skills/hyperplan/SKILL.md",
+  "checks": {
+    "has_harness_backend_selection": true,
+    "has_traex_reference": true,
+    "has_traex_send_input": true,
+    "has_opencode_team_create": true
+  }
+}

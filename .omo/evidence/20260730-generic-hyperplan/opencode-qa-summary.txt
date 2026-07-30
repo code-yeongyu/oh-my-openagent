@@ -1,0 +1,1 @@
+PASS: OpenCode discovered and loaded generic hyperplan in isolated XDG sandbox
