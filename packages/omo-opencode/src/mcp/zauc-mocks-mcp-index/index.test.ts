@@ -4,9 +4,12 @@ afterEach(() => {
   mock.restore()
 })
 
-function mockLocalMcps(): void {
+function mockLocalMcps(onLspConfig?: (options: { readonly cwd?: string }) => void): void {
   mock.module("../lsp", () => ({
-    createLspMcpConfig: () => ({ type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }),
+    createLspMcpConfig: (options: { readonly cwd?: string } = {}) => {
+      onLspConfig?.(options)
+      return { type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }
+    },
   }))
   mock.module("../codegraph", () => ({
     createCodegraphMcpConfig: () => ({ type: "local", command: ["codegraph", "serve", "--mcp"], enabled: true }),
@@ -61,6 +64,22 @@ describe("createBuiltinMcps", () => {
 
     // then
     expect(result.lsp).toBeDefined()
+  })
+
+  test("should forward cwd to the LSP config", () => {
+    // given
+    let receivedCwd: string | undefined
+    mockLocalMcps((options) => {
+      receivedCwd = options.cwd
+    })
+    const { createBuiltinMcps } = require("../index") as typeof import("../index")
+    const cwd = "/tmp/omo-lsp-request-cwd"
+
+    // when
+    createBuiltinMcps([], undefined, { cwd })
+
+    // then
+    expect(receivedCwd).toBe(cwd)
   })
 
   test("should return empty array when all MCPs are disabled", () => {
