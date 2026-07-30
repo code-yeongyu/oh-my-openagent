@@ -123,9 +123,9 @@ export default function (pi: ExtensionAPI): void {
 		},
 	});
 
-	pi.registerCommand("goal", {
+	const goalCommand = {
 		description: "Set, inspect, pause, resume, or clear the persistent goal",
-		handler: async (rawArgs, ctx) => {
+		handler: async (rawArgs: string, ctx: ExtensionContext) => {
 			const command = parseGoalCommand(rawArgs);
 			try {
 				switch (command.kind) {
@@ -173,6 +173,11 @@ export default function (pi: ExtensionAPI): void {
 				ctx.ui.notify(errorMessage(error), "error");
 			}
 		},
+	};
+	pi.registerCommand("goal", goalCommand);
+	pi.registerCommand("ultragoal", {
+		...goalCommand,
+		description: "Compatibility alias for /goal",
 	});
 
 	pi.on("session_start", async (event, ctx) => {

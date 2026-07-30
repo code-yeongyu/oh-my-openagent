@@ -319,6 +319,13 @@ describe("pi-goal extension command UI parity", () => {
 		await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 	});
 
+	it("registers /goal and keeps /ultragoal as a compatibility alias", () => {
+		const harness = createHarness();
+
+		expect(() => harness.command("goal")).not.toThrow();
+		expect(() => harness.command("ultragoal")).not.toThrow();
+	});
+
 	it("shows Codex-style usage text for a bare /goal without a goal", async () => {
 		const harness = createHarness();
 		const ui = createMockUi();

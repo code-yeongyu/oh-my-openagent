@@ -55,8 +55,8 @@ The goal tool contract is aligned with codex `codex-rs/ext/goal`:
   at a non-zero epoch because Bun's `setSystemTime(new Date(0))` acts as a reset.
 - Peer deps (`@mariozechner/pi-*`, `typebox`) resolve from the host Pi runtime; pinned
   devDependencies exist only for typecheck + tests + live QA.
-- This package is not wired into any OpenCode/Codex/omo-senpi component. It ships as a
-  standalone Pi package surface (`pi.extensions` manifest field).
+- The source remains usable as a standalone Pi extension. Senpi's builtin goal extension
+  is authoritative; omo-senpi ships only its adapter and does not bundle this extension.
 
 ## QA
 
