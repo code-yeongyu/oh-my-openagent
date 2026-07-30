@@ -92,6 +92,9 @@ export class LspClientTransport {
 		});
 		this.startStderrReading();
 
+		// Spawn failures surface as an async "error" event, so this handler flags the
+		// process dead for the manager's start timeout to observe. onSpawnError also
+		// fires synchronously if the error already landed, covering the fast-ENOENT case.
 		this.proc.onSpawnError((error) => {
 			this.spawnError = error;
 			this.processExited = true;

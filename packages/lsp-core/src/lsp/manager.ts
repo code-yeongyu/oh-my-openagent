@@ -28,19 +28,20 @@ export interface ClientSnapshot {
 export interface LspManagerOptions {
 	idleTimeoutMs?: number;
 	initTimeoutMs?: number;
+	startTimeoutMs?: number;
 	reaperIntervalMs?: number;
 	clientFactory?: (root: string, server: ResolvedServer) => LspClient;
 	now?: () => number;
 }
 
-function startAndInitializeClient(client: LspClient): Promise<void> {
+function startAndInitializeClient(client: LspClient, startTimeoutMs: number): Promise<void> {
 	return Promise.race([
 		(async () => {
 			await client.start();
 			await client.initialize();
 		})(),
 		new Promise<never>((_, reject) =>
-			setTimeout(() => reject(new Error("LSP start timed out")), START_TIMEOUT_MS).unref(),
+			setTimeout(() => reject(new Error("LSP start timed out")), startTimeoutMs).unref(),
 		),
 	]);
 }
@@ -92,6 +93,7 @@ export class LspManager {
 
 	private readonly idleTimeoutMs: number;
 	private readonly initTimeoutMs: number;
+	private readonly startTimeoutMs: number;
 	private readonly reaperIntervalMs: number;
 	private readonly clientFactory: (root: string, server: ResolvedServer) => LspClient;
 	private readonly now: () => number;
@@ -99,6 +101,7 @@ export class LspManager {
 	constructor(options: LspManagerOptions = {}) {
 		this.idleTimeoutMs = options.idleTimeoutMs ?? IDLE_TIMEOUT_MS;
 		this.initTimeoutMs = options.initTimeoutMs ?? INIT_TIMEOUT_MS;
+		this.startTimeoutMs = options.startTimeoutMs ?? START_TIMEOUT_MS;
 		this.reaperIntervalMs = options.reaperIntervalMs ?? REAPER_INTERVAL_MS;
 		this.clientFactory = options.clientFactory ?? ((root, server) => new LspClient(root, server));
 		this.now = options.now ?? (() => Date.now());
@@ -211,7 +214,7 @@ export class LspManager {
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
-		const initPromise = startAndInitializeClient(client);
+		const initPromise = startAndInitializeClient(client, this.startTimeoutMs);
 
 		const newManaged: ManagedClient = {
 			client,
@@ -275,7 +278,7 @@ export class LspManager {
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
-		const initPromise = startAndInitializeClient(client);
+		const initPromise = startAndInitializeClient(client, this.startTimeoutMs);
 
 		const managed: ManagedClient = {
 			client,
