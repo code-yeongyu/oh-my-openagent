@@ -66,4 +66,20 @@ describe("buildTaskToolDescription", () => {
     expect(TASK_PROMPT_SNIPPET.length).toBeGreaterThan(0)
     expect(TASK_PROMPT_GUIDELINES.length).toBeGreaterThan(0)
   })
+
+  test("#given task prompt surfaces #when responsibilities are inspected #then target selection belongs to the tool description only", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents })
+    const duplicatedTargetRule = TASK_PROMPT_GUIDELINES.some(
+      (guideline) => /category.*subagent_type|subagent_type.*category/i.test(guideline),
+    )
+
+    // then
+    expect(description).toMatch(/\bprompt\b/)
+    expect(description).toMatch(/\btasks\b/)
+    expect(duplicatedTargetRule).toBe(false)
+  })
 })

@@ -22,4 +22,11 @@ describe("task usage guidance", () => {
     expect(guidance).toContain("end your turn")
     expect(guidance).not.toContain("read progress")
   })
+
+  test("#given the hidden usage hint #when responsibilities are inspected #then invocation syntax stays on the tool surface", () => {
+    // then
+    expect(TASK_USAGE_GUIDANCE).not.toContain("task({")
+    expect(TASK_USAGE_GUIDANCE).toContain("task_output")
+    expect(TASK_USAGE_GUIDANCE).toContain("task_send")
+  })
 })
