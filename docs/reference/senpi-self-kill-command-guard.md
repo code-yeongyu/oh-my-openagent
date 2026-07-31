@@ -123,6 +123,13 @@ Note: this also blocks targeted `taskkill /PID <pid>` (patterns are first-token 
 targeted kill, run it yourself or temporarily remove the rule. Once this PR ships, targeted kills stay
 allowed while image-wide kills are blocked.
 
+**Known limitation:** the permission system matches on the command's first token only
+(`BashArity.prefix`), so the settings rules do NOT cover `cmd //c "taskkill /F /IM node.exe /T"`
+(first token `cmd`) or `for pid in $(tasklist ...); do taskkill //F //PID ...; done` (first token
+`for`) — the two shapes that actually killed the host in the incident. The code guard in this PR
+detects those shapes regardless of position; until it ships, the new-session safety rules in section 6
+are the primary defense.
+
 ## 6. New-session safety guidance
 
 Paste this as the first message of any new session:
