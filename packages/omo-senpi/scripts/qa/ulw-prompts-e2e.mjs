@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
+import { createSandbox, credentialDigest, digestDirectory, seedSandbox } from "./drive.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -94,11 +94,26 @@ function findOnPath(bin) {
   return null
 }
 
+function protectedAgentDigest(agentDir) {
+  return credentialDigest(agentDir)
+}
+
+function sandboxHome(sandbox) {
+  return join(sandbox.root, "home")
+}
+
 function stagedSkillChecks() {
   const researchPath = join(pluginRoot, "skills", "ulw-research", "SKILL.md")
+  const mutationPath = join(pluginRoot, "skills", "ulw-mutation-test", "SKILL.md")
+  const loopWorkflowPath = join(pluginRoot, "skills", "ulw-loop", "references", "full-workflow.md")
   const ultraworkPath = join(pluginRoot, "skills", "ultrawork", "SKILL.md")
   const research = existsSync(researchPath) ? readFileSync(researchPath, "utf8") : ""
+  const mutation = existsSync(mutationPath) ? readFileSync(mutationPath, "utf8") : ""
+  const loopWorkflow = existsSync(loopWorkflowPath) ? readFileSync(loopWorkflowPath, "utf8") : ""
   const ultrawork = existsSync(ultraworkPath) ? readFileSync(ultraworkPath, "utf8") : ""
+  const mutationGate = loopWorkflow.indexOf("### Mutation-Test Gate")
+  const gitCheckpoint = loopWorkflow.indexOf("#### GIT CHECKPOINT")
+  const mutationHeadings = new Set([...mutation.matchAll(/^## ([^\n]+)$/gm)].map((match) => match[1]))
   return {
     ulwResearchExists: research.length > 0,
     ulwResearchNative:
@@ -106,6 +121,17 @@ function stagedSkillChecks() {
       !research.includes("## Senpi Harness Tool Compatibility") &&
       research.includes("team_create") &&
       research.includes("ULW-RESEARCH MODE ENABLED!"),
+    ulwMutationExists: mutation.length > 0,
+    ulwMutationNative:
+      /^name: ulw-mutation-test$/m.test(mutation) &&
+      !mutation.includes("## Senpi Harness Tool Compatibility") &&
+      ["Predict Before Results", "Classify the Outcome", "Repair Surviving Mutations", "Restore and Verify"].every((heading) =>
+        mutationHeadings.has(heading),
+      ),
+    ulwLoopMutationIntegrated:
+      mutationGate >= 0 &&
+      gitCheckpoint > mutationGate &&
+      loopWorkflow.slice(mutationGate, gitCheckpoint).includes("`ulw-mutation-test`"),
     ultraworkDescriptionOk: (ultrawork.match(/^description: (.*)$/m)?.[1] ?? "").includes("injects the full directive as a hidden custom message"),
   }
 }
@@ -114,10 +140,31 @@ function runSelfTest() {
   const sandbox = createSandbox()
   try {
     seedSandbox(sandbox)
+    const isolatedHome = sandboxHome(sandbox)
+    if (resolve(isolatedHome) === resolve(process.env.HOME ?? "")) {
+      throw new Error("QA HOME must not reuse the real user home")
+    }
+    const protectedBefore = protectedAgentDigest(sandbox.agentDir)
+    const volatileDir = join(sandbox.agentDir, "sessions", "live")
+    mkdirSync(volatileDir, { recursive: true })
+    writeFileSync(join(volatileDir, "ambient.jsonl"), `${JSON.stringify({ type: "ambient-session-write" })}\n`)
+    if (protectedAgentDigest(sandbox.agentDir) !== protectedBefore) {
+      throw new Error("volatile session writes must not invalidate the protected real-agent digest")
+    }
+    const settingsPath = join(sandbox.agentDir, "settings.json")
+    const originalSettings = readFileSync(settingsPath)
+    writeFileSync(settingsPath, `${JSON.stringify({ changed: true })}\n`)
+    if (protectedAgentDigest(sandbox.agentDir) === protectedBefore) {
+      throw new Error("protected settings changes must invalidate the real-agent digest")
+    }
+    writeFileSync(settingsPath, originalSettings)
     if (REQUIRED_DIRECTIVE_MARKERS.some((marker) => marker.length === 0)) throw new Error("empty required marker")
     if (digestDirectory(join(sandbox.root, "missing")) !== "absent") throw new Error("missing directory digest should be absent")
     const staged = stagedSkillChecks()
     if (!staged.ulwResearchExists) throw new Error("staged ulw-research skill missing; run sync-skills.mjs first")
+    if (!staged.ulwMutationExists) throw new Error("staged ulw-mutation-test skill missing; run sync-skills.mjs first")
+    if (!staged.ulwMutationNative) throw new Error("staged ulw-mutation-test contract is incomplete")
+    if (!staged.ulwLoopMutationIntegrated) throw new Error("staged ulw-loop mutation gate is missing")
 
     const empty = inspectSession(join(sandbox.root, "missing"))
     if (empty.userTexts.length !== 0 || empty.hiddenDirectives.length !== 0) {
@@ -144,8 +191,10 @@ function runSelfTest() {
 }
 
 function main() {
-  const beforeDigest = digestDirectory(join(process.env.HOME ?? "", ".senpi", "agent"))
+  const beforeDigest = protectedAgentDigest(join(process.env.HOME ?? "", ".senpi", "agent"))
   const sandbox = createSandbox()
+  const isolatedHome = sandboxHome(sandbox)
+  const homeIsolated = resolve(isolatedHome) !== resolve(process.env.HOME ?? "")
   let result = "FAIL"
   let reason
   let transcript = ""
@@ -156,17 +205,24 @@ function main() {
     if (resolvedSenpi === null) {
       result = "SKIP"
       reason = "senpi-binary-unavailable"
-      return printResult({ result, reason, beforeDigest, sandbox })
+      return printResult({ result, reason, beforeDigest, sandbox, homeIsolated })
     }
 
     seedSandbox(sandbox)
+    mkdirSync(isolatedHome, { recursive: true })
     writeFileSync(
       join(sandbox.cwd, "mock-script.json"),
       `${JSON.stringify({ steps: [{ type: "text", text: "ulw prompts e2e complete" }] }, null, 2)}\n`,
     )
     const run = spawnSync(resolvedSenpi, ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "ulw please respond"], {
       cwd: sandbox.cwd,
-      env: { ...process.env, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+        XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+        OMO_SENPI_QA: "1",
+      },
       encoding: "utf8",
       timeout: 60_000,
     })
@@ -183,7 +239,14 @@ function main() {
       session.visibleDirectives.length === 0 &&
       REQUIRED_DIRECTIVE_MARKERS.every((marker) => session.hiddenDirectives[0].content.includes(marker))
     result =
-      ultraworkInjected && staged.ulwResearchNative && staged.ultraworkDescriptionOk && userTextClean && hiddenInjectionOk
+      ultraworkInjected &&
+      staged.ulwResearchNative &&
+      staged.ulwMutationNative &&
+      staged.ulwLoopMutationIntegrated &&
+      staged.ultraworkDescriptionOk &&
+      homeIsolated &&
+      userTextClean &&
+      hiddenInjectionOk
         ? "PASS"
         : "FAIL"
     return printResult({
@@ -200,6 +263,7 @@ function main() {
       userTexts: session.userTexts,
       hiddenDirectiveCount: session.hiddenDirectives.length,
       visibleDirectiveCount: session.visibleDirectives.length,
+      homeIsolated,
     })
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
@@ -220,8 +284,9 @@ function printResult({
   userTexts = [],
   hiddenDirectiveCount = 0,
   visibleDirectiveCount = 0,
+  homeIsolated = false,
 }) {
-  const afterDigest = digestDirectory(join(process.env.HOME ?? "", ".senpi", "agent"))
+  const afterDigest = protectedAgentDigest(join(process.env.HOME ?? "", ".senpi", "agent"))
   console.log(
     JSON.stringify({
       result,
@@ -231,6 +296,7 @@ function printResult({
       hiddenInjectionOk,
       hiddenDirectiveCount,
       visibleDirectiveCount,
+      homeIsolated,
       userTexts,
       missingMarkers,
       forbiddenHits,
