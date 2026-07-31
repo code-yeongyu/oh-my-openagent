@@ -161,20 +161,22 @@ THIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).
 export const OPENAI_CATEGORIES = [
   {
     name: "ultrabrain",
-    config: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
+    config: { model: "openai/gpt-5.6-sol", variant: "max" },
     description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
+    requiresModel: "gpt-5.6-sol",
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.6-terra", variant: "xhigh" },
+    config: { model: "openai/gpt-5.6-sol", variant: "medium" },
     description: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,
+    requiresModel: "gpt-5.6-sol",
   },
   {
     name: "quick",
-    config: { model: "openai/gpt-5.4-mini" },
+    config: { model: "kimi-coding/kimi-for-coding-highspeed" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
   },

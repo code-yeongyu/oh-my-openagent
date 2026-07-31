@@ -39,14 +39,18 @@ export function createPluginInterface(args: {
     "chat.params": async (input: unknown, output: unknown) => {
       const chatParamsInput = input as {
         agent?: string | { name?: string }
+        model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
         message?: { variant?: string }
       }
       const agentName =
         typeof chatParamsInput.agent === "string"
           ? chatParamsInput.agent
           : chatParamsInput.agent?.name
-      if (chatParamsInput.message) {
-        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message)
+      const providerID = chatParamsInput.model?.providerID
+      const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
+      const modelID = typeof rawModelID === "string" ? rawModelID : undefined
+      if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
+        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
       }
       const handler = createChatParamsHandler({
         client: ctx.client,

@@ -28,6 +28,7 @@ export function renderTranscript(entries: readonly TranscriptEntry[], options: R
 
 function renderEntry(entry: TranscriptEntry): readonly string[] {
   if (entry.kind === "assistant") return [`assistant: ${entry.text}`]
+  if (entry.kind === "error") return [`error: ${entry.message}`]
   const marker = entry.is_error ? "tool[error]" : "tool"
   return [`${marker}: ${entry.tool}`]
 }

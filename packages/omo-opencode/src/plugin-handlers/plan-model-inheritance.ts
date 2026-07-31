@@ -1,5 +1,6 @@
 const MODEL_SETTINGS_KEYS = [
   "model",
+  "reasoning",
   "variant",
   "temperature",
   "top_p",

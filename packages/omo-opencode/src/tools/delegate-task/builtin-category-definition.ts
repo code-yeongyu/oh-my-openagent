@@ -6,4 +6,5 @@ export type BuiltinCategoryDefinition = {
   description: string
   promptAppend: string
   resolvePromptAppend?: (model: string | undefined) => string
+  requiresModel?: string
 }

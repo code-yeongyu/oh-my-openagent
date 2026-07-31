@@ -14,7 +14,13 @@ describe("model-capability-guardrails", () => {
       snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
     })
 
-    expect(issues).toEqual([])
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        kind: "built-in-model-missing-from-snapshot",
+        modelID: "composer-2.5",
+        canonicalModelID: "composer-2.5",
+      }),
+    )
   })
 
   test("requires built-in requirement models to stay unique and sorted", () => {
@@ -22,9 +28,10 @@ describe("model-capability-guardrails", () => {
 
     expect(modelIDs).toEqual([...modelIDs].sort())
     expect(new Set(modelIDs).size).toBe(modelIDs.length)
-    expect(modelIDs).toContain("claude-opus-4-7")
-    expect(modelIDs).toContain("gpt-5.5")
-    expect(modelIDs).toContain("kimi-k2.5")
+    expect(modelIDs).toContain("claude-opus-5")
+    expect(modelIDs).not.toContain("gpt-5.5")
+    expect(modelIDs).toContain("gpt-5.6-sol")
+    expect(modelIDs).toContain("kimi-k3")
   })
 
   test("flags exact aliases whose canonical target disappears from the snapshot", () => {

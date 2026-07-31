@@ -14,6 +14,11 @@ export function createMutationNotifyingStore(backing: TaskRecordStore, onMutatio
       backing.replace(record)
       onMutation()
     },
+    mutate: (taskId, mutation) => {
+      const result = backing.mutate(taskId, mutation)
+      onMutation()
+      return result
+    },
     load: (taskId) => backing.load(taskId),
     list: () => backing.list(),
     appendEvent: (taskId, event) => backing.appendEvent(taskId, event),

@@ -1,0 +1,22 @@
+Scenario: padded batch task argument preparation
+Captured: 2026-07-30T05:35:00Z
+Command:
+  bun test packages/senpi-task/src/tools/task/argument-normalization.test.ts
+
+Binary observables:
+  - Padded single resolves.
+  - Blank-prompt batch resolves exactly two intended items.
+  - Empty nested skill arrays no longer block top-level inheritance.
+  - Meaningful prompt plus meaningful tasks remains a typed hard error.
+
+Output:
+  bun test v1.4.0-canary.1 (ae4b17de6)
+
+  (pass) GPT-padded single spawn
+  (pass) GPT-padded batch fan-out
+  (pass) genuinely meaningful prompt and tasks remains a hard error
+
+  3 pass
+  0 fail
+  8 expect() calls
+  Ran 3 tests across 1 file.

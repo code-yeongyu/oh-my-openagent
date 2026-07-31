@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
+import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
@@ -29,10 +30,12 @@ export function settings(overrides: Record<string, unknown> = {}): OmoTaskSettin
 export type FakeHandle = {
   readonly handle: ManagedChildHandle
   settle: (outcome: RunnerOutcome) => void
+  emit: (event: ManagedChildEvent) => void
   readonly steerCalls: string[]
   readonly followUpCalls: string[]
   subscribeCount(): number
   unsubscribeCount(): number
+  waitForSubscription(): Promise<void>
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -44,8 +47,10 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   })
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
+  const listeners = new Set<ManagedChildListener>()
   let subscribeCalls = 0
   let unsubscribeCalls = 0
+  const subscriptionWaiters: Array<() => void> = []
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -57,10 +62,13 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
       followUpCalls.push(text)
     },
     abort: async () => {},
-    subscribe: () => {
+    subscribe: (listener) => {
       subscribeCalls += 1
+      for (const resolve of subscriptionWaiters.splice(0)) resolve()
+      listeners.add(listener)
       return () => {
         unsubscribeCalls += 1
+        listeners.delete(listener)
       }
     },
     waitForOutcome: () => outcome,
@@ -77,10 +85,16 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   return {
     handle,
     settle,
+    emit: (event) => {
+      for (const listener of [...listeners]) listener(event)
+    },
     steerCalls,
     followUpCalls,
     subscribeCount: () => subscribeCalls,
     unsubscribeCount: () => unsubscribeCalls,
+    waitForSubscription: () => subscribeCalls > 0
+      ? Promise.resolve()
+      : new Promise((resolve) => subscriptionWaiters.push(resolve)),
   }
 }
 

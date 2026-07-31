@@ -3,7 +3,7 @@ description: Publish oh-my-opencode to npm via GitHub Actions workflow
 argument-hint: <patch|minor|major>
 ---
 
-<command-instruction>
+
 You are the release manager for oh-my-opencode. Execute the FULL publish workflow from start to finish.
 
 ## CRITICAL: PUBLISH IS SHIP-ONLY — GO STRAIGHT TO THE WORKFLOW
@@ -25,6 +25,32 @@ Publishing is complete only after all release surfaces are verified:
 | `omo codex` | `lazycodex-ai`, Codex plugin metadata, and `code-yeongyu/lazycodex` marketplace release | Codex plugin metadata is stamped with the release version, `lazycodex-ai` publishes, and the LazyCodex repo release is created when the marketplace payload changed. |
 
 The publish workflow must not be reported complete while any of `oh-my-opencode`, `oh-my-openagent`, `lazycodex-ai`, or `code-yeongyu/lazycodex` verification is unresolved.
+
+## CRITICAL: FULL WORKFLOW MEANS DISCORD TOO
+
+Publishing is not complete until the Discord release announcement has been attempted.
+
+- **DO NOT stop after creating the GitHub release.**
+- **DO NOT stop after drafting or applying release notes.**
+- **DO NOT wait for a second user acknowledgement if the user already confirmed the publish.**
+- After the release notes are finalized, immediately run Step 7.5 and post to Discord.
+- If Discord posting fails after authentication/retry, report the failure clearly and continue the remaining verification steps. A skipped Discord step is a workflow failure.
+
+## CRITICAL: NO EARLY TURN-END AFTER TRIGGER (COMPLETION CONTRACT)
+
+Once `gh workflow run publish` succeeds, the publish is NOT done. A prior session forgot this: it triggered the workflow and ended its turn, leaving the release unverified, the enhanced summary unwritten, and the Discord announcement unsent. That mistake is why this section exists.
+
+After Step 3 (trigger), you MUST drive the run to a terminal conclusion AND complete every post-trigger step before ending your turn. You may NOT end the turn, hand off, or stop for the day while ANY of these is unresolved:
+
+1. **Run conclusion** — `gh run view <id> --json conclusion` must return `success` (poll while drafting notes; never sleep idle).
+2. **Release exists** — Step 5: `gh release view v${NEW_VERSION}` resolves.
+3. **Enhanced summary applied** — Step 6 + Step 7: draft (mandatory for patch/minor/major) AND `gh release edit --notes-file` applied. "Patch is optional" is wrong; patch summaries are MANDATORY.
+4. **Discord announced** — Step 7.5: `agent-discordbot message send` attempted; either a message id is recorded OR a clear failure is reported to the user. A skipped Discord step is a workflow failure.
+5. **npm verified** — Step 8: `npm view oh-my-opencode version` (and oh-my-openagent, lazycodex-ai) shows `${NEW_VERSION}`.
+
+Only after all five are green may you end the turn. If the run fails, run `gh run view <id> --log-failed`, report it, and STOP (do not repair the tree mid-publish). If a post-trigger step fails for an external reason (npm propagation, Discord auth), report it clearly and continue the remaining steps — do not let one failure abort the rest.
+
+This contract applies to the slash-command copies (`.agents/command/publish.md`, `.opencode/command/publish.md`) too; they are kept byte-identical to this skill per the `.agents/AGENTS.md` drift rule.
 
 ## CRITICAL: ARGUMENT REQUIREMENT
 
@@ -52,8 +78,9 @@ The publish workflow must not be reported complete while any of `oh-my-opencode`
   { "id": "run-workflow", "content": "Trigger GitHub Actions publish workflow", "status": "pending", "priority": "high" },
   { "id": "wait-workflow", "content": "Wait for workflow completion (poll every 30s)", "status": "pending", "priority": "high" },
   { "id": "verify-and-preview", "content": "Verify release created + preview auto-generated changelog & contributor thanks", "status": "pending", "priority": "high" },
-  { "id": "draft-summary", "content": "Draft enhanced release summary (mandatory for minor/major, optional for patch — ask user)", "status": "pending", "priority": "high" },
-  { "id": "apply-summary", "content": "Prepend enhanced summary to release (if user opted in)", "status": "pending", "priority": "high" },
+  { "id": "draft-summary", "content": "Draft enhanced release summary (mandatory for all release types)", "status": "pending", "priority": "high" },
+  { "id": "apply-summary", "content": "Prepend enhanced summary to release", "status": "pending", "priority": "high" },
+  { "id": "discord-announce", "content": "MANDATORY: post release announcement to Discord channel immediately after release notes are finalized", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "verify-lazycodex", "content": "Verify lazycodex-ai publish, Codex plugin metadata version stamp, and code-yeongyu/lazycodex release/sync", "status": "pending", "priority": "high" },
   { "id": "verify-platform-binaries", "content": "Spot-check platform binary packages on npm", "status": "pending", "priority": "high" },
@@ -163,10 +190,9 @@ After running the preview, present the output to the user and say:
 >
 > You do NOT need to write any of this. It's handled.
 >
-> **For a patch release**, this is usually sufficient on its own. However, if there are notable bug fixes or changes worth highlighting, an enhanced summary can be added.
-> **For a minor/major release**, an enhanced summary is **required** — I'll draft one in the next step.
+> **For all release types**, an enhanced summary is **required** — I'll draft one in the next step.
 
-Wait for the user to acknowledge before proceeding.
+**APPROVAL GATE (single, binary):** The user's initial publish request with a named bump type IS the only approval this workflow requires. Do NOT wait for a separate acknowledgement here. Present the preview, then IMMEDIATELY proceed to Step 6. The only exception: if the user explicitly said "let me review the changelog before you continue" (or equivalent), stop and wait. Otherwise continue without ending the turn.
 </agent-instruction>
 
 ---
@@ -177,7 +203,7 @@ Wait for the user to acknowledge before proceeding.
 
 | Release Type | Action |
 |-------------|--------|
-| **patch** | ASK the user: "Would you like me to draft an enhanced summary highlighting the key bug fixes / changes? Or is the auto-generated changelog sufficient?" If user declines → skip to Step 8. If user accepts → draft a concise bug-fix / change summary below. |
+| **patch** | MANDATORY. Draft a concise bug-fix / change summary. Do NOT proceed without one. |
 | **minor** | MANDATORY. Draft a concise feature summary. Do NOT proceed without one. |
 | **major** | MANDATORY. Draft a full release narrative with migration notes if applicable. Do NOT proceed without one. |
 
@@ -238,17 +264,17 @@ cat /tmp/release-summary-v${NEW_VERSION}.md
 ```
 
 <agent-instruction>
-After drafting, ask the user:
-> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks. Want me to adjust anything before applying?"
+Present the draft to the user:
+> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks."
 
-Do NOT proceed to Step 7 without user confirmation.
+**APPROVAL GATE (same single gate):** The initial publish confirmation covers this step too. Present the draft, then IMMEDIATELY proceed to Step 7 (apply) and Step 7.5 (Discord). Do NOT stop to wait for approval unless the user explicitly requested a release-note review hold before the publish started. The Discord announcement (Step 7.5) is mandatory and must not be blocked by a review hold that was never requested.
 </agent-instruction>
 
 ---
 
 ## STEP 7: APPLY ENHANCED SUMMARY TO RELEASE
 
-**Skip this step ONLY if the user opted out of the enhanced summary in Step 6** — proceed directly to Step 8.
+This step is MANDATORY. The enhanced summary from Step 6 must always be applied.
 
 <architecture>
 The final release note structure:
@@ -294,6 +320,64 @@ gh release edit "v${NEW_VERSION}" --notes-file /tmp/final-release-v${NEW_VERSION
 echo "✅ Release v${NEW_VERSION} updated with enhanced summary."
 gh release view "v${NEW_VERSION}" --json url --jq '.url'
 ```
+
+---
+
+## STEP 7.5: POST RELEASE NOTES TO DISCORD
+
+After the release notes are finalized, post them to the Discord channel. This step is mandatory for every publish run.
+
+<hard-gate>
+The workflow is not complete until this step has either:
+1. Sent a Discord message successfully and recorded the message ID, or
+2. Failed after `agent-discordbot auth status` plus one send retry, with the Jobdori bot-token failure reported to the user.
+
+Never skip this step because the release summary was awaiting approval. If the user already confirmed the publish, continue through Discord before stopping.
+</hard-gate>
+
+<agent-discord-instruction>
+1. Use the Jobdori bot token through `agent-discordbot` for release announcements. This is the required release path; do not use the personal `agent-discord` token unless the bot path is unavailable and the user explicitly approves the fallback. Pin the bot id so release messages go out as the Jobdori bot even if the local `agent-discordbot` current bot changes.
+```bash
+JOBDORI_BOT_ID=1486173823354146917
+agent-discordbot auth status --bot "$JOBDORI_BOT_ID"
+```
+
+2. **Read recent messages** in the channel to match the existing announcement style:
+```bash
+JOBDORI_BOT_ID=1486173823354146917
+agent-discordbot message list 1454708427392680067 --bot "$JOBDORI_BOT_ID" --limit 5
+```
+
+3. If `agent-discordbot` is unavailable or unauthorized, stop and report that the Jobdori token path failed. Only then may a human decide whether to use `agent-discord`.
+
+4. Post the release announcement to channel `1454708427392680067` matching the style of previous announcements. The message should follow this structure:
+```
+@here
+
+🎉 **oh-my-opencode v{VERSION} — {Short Tagline}**
+
+**Feature 1** — one-line description.
+
+**Feature 2** — one-line description.
+
+**Feature 3** — one-line description.
+
+Plus {summary of remaining changes}.
+
+📦 Install / upgrade:
+`bun i -g oh-my-opencode@{VERSION}`  (or `npm`)
+
+📝 Full release notes: {RELEASE_URL}
+```
+
+```bash
+JOBDORI_BOT_ID=1486173823354146917
+RELEASE_URL=$(gh release view "v${NEW_VERSION}" --json url --jq '.url')
+agent-discordbot message send 1454708427392680067 "{your message following the style above}" --bot "$JOBDORI_BOT_ID"
+```
+
+If the message fails to send, warn the user and continue — do NOT block the publish workflow on Discord errors.
+</agent-discord-instruction>
 
 ---
 
@@ -343,20 +427,3 @@ Report success to user with:
 ## LANGUAGE
 
 Respond to user in English.
-
-</command-instruction>
-
-<current-context>
-<published-version>
-!`npm view oh-my-opencode version 2>/dev/null || echo "not published"`
-</published-version>
-<local-version>
-!`node -p "require('./package.json').version" 2>/dev/null || echo "unknown"`
-</local-version>
-<git-status>
-!`git status --porcelain`
-</git-status>
-<recent-commits>
-!`npm view oh-my-opencode version 2>/dev/null | xargs -I{} git log "v{}"..HEAD --oneline 2>/dev/null | head -15 || echo "no commits"`
-</recent-commits>
-</current-context>

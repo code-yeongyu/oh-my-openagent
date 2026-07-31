@@ -108,13 +108,13 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const modalitiesSource: ModelCapabilitiesDiagnostics["modalities"]["source"] =
 		runtimeModalities !== undefined ? "runtime" : snapshotEntry?.modalities !== undefined ? snapshotSource : "none"
 	const resolutionMode: ModelCapabilitiesDiagnostics["resolutionMode"] =
-		snapshotSource !== "none" && canonicalization.source === "canonical"
-			? "snapshot-backed"
-			: snapshotSource !== "none"
-			? "alias-backed"
-			: familySource === "heuristic" || variantsSource === "heuristic" || reasoningEffortsSource === "heuristic"
-			? "heuristic-backed"
-			: "unknown"
+		canonicalization.source === "canonical"
+			? snapshotSource !== "none"
+				? "snapshot-backed"
+				: familySource === "heuristic" || variantsSource === "heuristic" || reasoningEffortsSource === "heuristic"
+					? "heuristic-backed"
+					: "unknown"
+			: "alias-backed"
 
 	return {
 		requestedModelID: canonicalization.requestedModelID,

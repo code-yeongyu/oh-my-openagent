@@ -12,15 +12,15 @@ import type {
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../../logger"
 import { runTmuxCommand } from "../runner"
-import { isInsideTmux } from "./environment"
+import { isInsideTmux, isTmuxPaneCompatible } from "./environment"
 import { isServerRunning } from "./server-health"
 
 export function withPaneSpawnDeps(deps?: Partial<SpawnTmuxPaneDeps>): Partial<SpawnTmuxPaneDeps> {
-  return { log, runTmuxCommand, isInsideTmux, isServerRunning, getTmuxPath, ...deps }
+  return { log, runTmuxCommand, isInsideTmux: isTmuxPaneCompatible, isServerRunning, getTmuxPath, ...deps }
 }
 
 export function withPaneReplaceDeps(deps?: Partial<ReplaceTmuxPaneDeps>): Partial<ReplaceTmuxPaneDeps> {
-  return { log, runTmuxCommand, isInsideTmux, getTmuxPath, ...deps }
+  return { log, runTmuxCommand, isInsideTmux: isTmuxPaneCompatible, getTmuxPath, ...deps }
 }
 
 export function withWindowSpawnDeps(deps?: Partial<SpawnTmuxWindowDeps>): Partial<SpawnTmuxWindowDeps> {
@@ -32,7 +32,7 @@ export function withSessionSpawnDeps(deps?: Partial<SpawnTmuxSessionDeps>): Part
 }
 
 export function paneActivateDeps(): ActivateTmuxPaneDeps {
-  return { log, runTmuxCommand, isInsideTmux, getTmuxPath }
+  return { log, runTmuxCommand, isInsideTmux: isTmuxPaneCompatible, getTmuxPath }
 }
 
 export function paneDimensionsDeps(): GetPaneDimensionsDeps {

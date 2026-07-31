@@ -175,6 +175,12 @@ Triggers: dashboard, settings, mail/inbox, list-detail, command surface, split p
 
 **Action:** Add `layout-skill.md` on top of whatever style skill you selected in Steps 1-2. It carries scroll-ownership doctrine, the two silently-failing CSS contracts (`min-block-size: 0` scroll shells, `minmax(min(…),100%)` grids), the named-primitive vocabulary, container-vs-viewport routing, and the content-stress matrix. It adds no visual direction — the style skill still owns taste. Skip it for pure scroll-the-document marketing pages, where `taste-skill` layout guidance already fits.
 
+### Step 9 — Does the work add or change interaction or motion?
+
+Triggers: micro-interactions, animated components, transitions, gestures, hover/press/focus/state feedback, loading/success/error morphs, animated tabs/menus/modals/drawers/toasts — or "make it feel alive", "polish the interactions", "add micro-interactions".
+
+**Action:** Add `interaction-skill.md` on top of whatever style skill you selected. It anchors interaction design to the beui.dev catalog: find the nearest pattern, read its real source through the file's curl recipe, extract the mechanism (spring config, layout strategy, enter/exit order, reduced-motion path), and adapt the values to `DESIGN.md`. It owns interaction mechanics only — no visual direction — so it stacks cleanly, like `layout-skill.md`.
+
 ## Stacking rules (read this once, internalize it)
 
 1. **At most one Layer A *style* skill at a time.** A layout cannot be both `minimalist-skill` and `brutalist-skill` simultaneously — they encode opposite spacing and typography philosophies. Pick one.
@@ -184,6 +190,7 @@ Triggers: dashboard, settings, mail/inbox, list-detail, command surface, split p
 5. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
 7. **`layout-skill.md` stacks on top of any style skill** for app-shell / dashboard / split-pane work. It owns spatial structure and scroll ownership only — no visual direction — so it never conflicts with the style skill you picked.
+8. **`interaction-skill.md` stacks on top of any style skill** for interaction/motion work. It owns interaction mechanics — springs, layout morphs, enter/exit orchestration, reduced motion — and no visual direction, so it never conflicts with the style skill either.
 
 ## Anti-patterns — do not do these
 
@@ -227,6 +234,7 @@ Once references are loaded, before writing any UI code:
 | "Also output a DESIGN.md doc" | Add `stitch-skill.md` to current stack |
 | "Build a dashboard / settings / inbox / app shell" | one style skill (usually `taste-skill.md`) + `layout-skill.md` |
 | "Panel won't scroll / footer pushed off-screen / mobile overflow" | Add `layout-skill.md` to current stack |
+| "Add micro-interactions / animate this / make it feel alive" | Add `interaction-skill.md` to current stack |
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 

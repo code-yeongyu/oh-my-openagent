@@ -44,8 +44,8 @@ describe("readEventLogTranscript", () => {
 
     // when
     const result = await runTaskOutput(
-      { manager, stateDir, waitConfig: { min_ms: 1, default_ms: 5, max_ms: 10 } },
-      { task_id: record.task_id, mode: "full", block: false },
+      { manager, stateDir },
+      { task_id: record.task_id, mode: "full" },
       record.parent_session_id,
     )
 

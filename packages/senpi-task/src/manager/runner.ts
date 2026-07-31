@@ -12,7 +12,9 @@ export type InProcessSessionContext = {
   readonly agentDir?: string
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
+  readonly modelRuntime?: ChildSpec["modelRuntime"]
   readonly model?: CreateAgentSessionOptions["model"]
+  readonly thinkingLevel?: CreateAgentSessionOptions["thinkingLevel"]
 }
 
 export type InProcessSessionContextProvider = (spec: ManagedStartSpec) => InProcessSessionContext
@@ -48,6 +50,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         // A detached rpc child cannot share the parent's in-memory model registry; thread the resolved
         // provider/modelId so the child resolves the requested model on its own command line.
         ...(spec.model !== undefined ? { model: spec.model } : {}),
+        ...(spec.variant !== undefined ? { variant: spec.variant } : {}),
         ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
       }
@@ -67,7 +70,12 @@ function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): 
     ...(context.agentDir !== undefined ? { agentDir: context.agentDir } : {}),
     ...(context.authStorage !== undefined ? { authStorage: context.authStorage } : {}),
     ...(context.modelRegistry !== undefined ? { modelRegistry: context.modelRegistry } : {}),
+    ...(context.modelRuntime !== undefined ? { modelRuntime: context.modelRuntime } : {}),
     ...(context.model !== undefined ? { model: context.model } : {}),
+    ...(context.thinkingLevel !== undefined ? { thinkingLevel: context.thinkingLevel } : {}),
+    ...(spec.model !== undefined ? { selectedModel: spec.model } : {}),
+    ...(spec.requestedModel !== undefined ? { requestedModel: spec.requestedModel } : {}),
+    ...(spec.fallbackModels !== undefined ? { fallbackModels: spec.fallbackModels } : {}),
     ...(spec.agentType !== undefined ? { agentType: spec.agentType } : {}),
     ...(spec.instructions !== undefined ? { instructions: spec.instructions } : {}),
     ...(spec.toolAllowlist !== undefined ? { toolAllowlist: spec.toolAllowlist } : {}),

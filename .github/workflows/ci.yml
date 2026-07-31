@@ -228,6 +228,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
+      # which are backslash-separated on Windows, so the source digest is platform-dependent and
+      # a committed artifact can never match on every OS. One platform is enough to catch drift.
+      - name: Verify committed Senpi plugin bundle is current
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+
       - name: Run Senpi compatibility tests
         shell: bash
         run: |

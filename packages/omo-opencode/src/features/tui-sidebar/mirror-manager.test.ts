@@ -207,20 +207,27 @@ describe("TuiStateMirror", () => {
   })
 
   it("#given concurrent flush calls #when the first build is in flight #then it does not double-build", async () => {
-    jest.useFakeTimers()
-    // given
+    // given: real timers; the 250ms debounce elapses on its own, and the test
+    // subscribes to the actual build start instead of assuming microtask counts
+    // (the fake-timer + single-tick version of this test deadlocked on CI).
     const projectDir = makeTempDir("concurrent-project")
     let buildCount = 0
-    let releaseBuild: () => void = () => undefined
+    let releaseBuilds: () => void = () => undefined
+    let reportBuildStarted: () => void = () => undefined
+    const buildGate = new Promise<void>((resolvePromise) => {
+      releaseBuilds = resolvePromise
+    })
+    const buildStarted = new Promise<void>((resolvePromise) => {
+      reportBuildStarted = resolvePromise
+    })
     const mirror = createMirror({
       projectDir,
       client: {
         session: {
           status: async () => {
             buildCount += 1
-            await new Promise<void>((resolvePromise) => {
-              releaseBuild = resolvePromise
-            })
+            reportBuildStarted()
+            await buildGate
             return { data: { "ses-main": { type: "busy" } } }
           },
           messages: async () => ({ data: [] }),
@@ -231,9 +238,8 @@ describe("TuiStateMirror", () => {
     // when
     const firstFlush = mirror.flush()
     const secondFlush = mirror.flush()
-    jest.advanceTimersByTime(WRITE_DEBOUNCE_MS)
-    await Promise.resolve()
-    releaseBuild()
+    await buildStarted
+    releaseBuilds()
     await Promise.all([firstFlush, secondFlush])
 
     // then

@@ -1,0 +1,44 @@
+Scenario: real Senpi padded single background spawn
+Captured: 2026-07-30T05:57:00Z
+
+Invocation:
+  HOME="<throwaway-home>" \
+  SENPI_BIN="$(command -v senpi)" \
+  TASK_E2E_OUT_DIR=.omo/evidence/20260730-senpi-task-padding/live-task-e2e-attempt2 \
+  node packages/omo-senpi/scripts/qa/task-e2e.mjs
+
+Concrete input:
+  A real Senpi mock-provider tool call supplied a meaningful top-level prompt,
+  blank optional strings, empty skill arrays, and a synthetic
+  `tasks:[{prompt:"unused",...}]` item. The selected target was the builtin
+  read-only `explore` agent with the local mock model.
+
+Binary observable:
+  PASS iff a background child id is created, the child completes and can be
+  revived/peeked, and no `Provide EITHER prompt OR tasks` text appears.
+
+Observed:
+  result: PASS
+  task id: st_019fb190
+  spawn_background: PASS
+  unconditional_wake: PASS
+  followup_revive: PASS
+  task_output_peek: PASS
+  jsonl_sequence: PASS
+  extension_suppression: PASS
+  XOR error present: false
+  lifecycle signatures:
+    running/resident
+    assistant_message
+    completed/resident
+    revived
+    assistant_message
+    completed/resident
+    completed/disposed
+    destroyed
+
+Raw sanitized artifacts:
+  live-task-e2e-attempt2/verdict.json
+  live-task-e2e-attempt2/main.stdout.json.log
+  live-task-e2e-attempt2/main.stderr.log
+  live-task-e2e-attempt2/main.jsonl.log

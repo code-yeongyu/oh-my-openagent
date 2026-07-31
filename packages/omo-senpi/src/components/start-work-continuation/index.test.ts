@@ -54,7 +54,7 @@ function makeCoordinator(): {
   delivered: string[]
 } {
   const delivered: string[] = []
-  const coordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+  const coordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
   return { coordinator, delivered }
 }
 
@@ -88,9 +88,8 @@ describe("omo-senpi start-work-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await expect(
-      pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")),
-    ).resolves.toBeDefined()
+    const results = await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(results).toBeDefined()
     expect(delivered).toEqual([])
     expect(pi.userMessages).toEqual([])
   })
@@ -225,6 +224,41 @@ describe("omo-senpi start-work-continuation", () => {
     expect(content).toContain("[Status: 2/2")
     expect(content).toContain("Final gate")
     expect(content).toMatch(/final gate|Final Verification/i)
+  })
+
+  it("#given active work #when directive renders #then it instructs honoring the recorded PR delivery mode", async () => {
+    const root = createTempWorkspace()
+    writePlan(root, "t", "## TODOs\n- [ ] 1. Task one\n")
+    writeBoulderJson(root, {
+      schema_version: 2,
+      active_work_id: "w1",
+      works: {
+        w1: {
+          work_id: "w1",
+          active_plan: ".omo/plans/t.md",
+          plan_name: "t",
+          session_ids: ["senpi:qa-s1"],
+          status: "active",
+          started_at: "2026-07-17T00:00:00Z",
+          updated_at: "2026-07-17T01:00:00Z",
+        },
+      },
+    })
+    const pi = new FakeExtensionAPI()
+    const { coordinator, delivered } = makeCoordinator()
+    await createStartWorkContinuationComponent().register(pi, {
+      logger: createLogger(),
+      config: { getFlag: () => false },
+      idleCoordinator: coordinator,
+    })
+
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+
+    expect(delivered).toHaveLength(1)
+    const content = delivered[0] ?? ""
+    expect(content).toContain("--make-pr")
+    expect(content).toContain("--ship")
+    expect(content).toContain("delivery mode")
   })
 
   it("#given paused work #when agent_end fires #then injects continuation directive", async () => {
@@ -399,7 +433,7 @@ describe("omo-senpi start-work-continuation", () => {
 
     const results = await pi.dispatch(
       "input",
-      { type: "input", text: "hello", source: "user" },
+      { type: "input", text: "hello", source: "user", streamingBehavior: "steer" },
       eventCtx(root, "qa-s1"),
     )
 

@@ -44,12 +44,16 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
   join("scripts", "install.mjs")
 ];
+var LEGACY_BUILTIN_SHADOW_PACKAGES = [
+  join("packages", "pi-goal"),
+  join("packages", "pi-webfetch")
+];
 async function runSenpiInstaller(options = {}) {
   const context = resolveInstallContext(options);
   await ensurePluginArtifacts(context);
   const settings = await readSettings(context.settingsPath);
   const before = JSON.stringify(settings);
-  const packages = dedupePackages(readPackages(settings));
+  const packages = removeLegacyBuiltinShadows(dedupePackages(readPackages(settings)), context.repoRoot, context.agentDir);
   if (!packages.includes(context.pluginPath))
     packages.push(context.pluginPath);
   settings.packages = packages;
@@ -151,6 +155,10 @@ function readPackages(settings) {
 }
 function dedupePackages(packages) {
   return [...new Set(packages)];
+}
+function removeLegacyBuiltinShadows(packages, repoRoot, agentDir) {
+  const shadowPaths = new Set(LEGACY_BUILTIN_SHADOW_PACKAGES.map((path) => resolve(repoRoot, path)));
+  return packages.filter((entry) => !shadowPaths.has(resolve(agentDir, entry)));
 }
 async function writeSettingsAtomically(settingsPath, settings) {
   await mkdir(dirname(settingsPath), { recursive: true });

@@ -136,3 +136,63 @@ describe("normalizeSenpiTeamSpec", () => {
     }
   })
 })
+
+describe("normalizeSenpiTeamSpec lenient input", () => {
+  test("#given a JSON-stringified spec #when normalized #then it parses and normalizes like the object form", () => {
+    // given
+    const payload = JSON.stringify({ members: [{ kind: "category", category: "quick", prompt: "work" }] })
+
+    // when
+    const spec = normalizeSenpiTeamSpec(payload, "string-team")
+
+    // then
+    expect(spec.name).toBe("string-team")
+    expect(spec.leadAgentId).toBe(TEAM_LEAD_SENTINEL)
+    expect(spec.members).toHaveLength(1)
+  })
+
+  test("#given a malformed JSON string spec #when normalized #then it rejects with the parse detail and the corrective shape", () => {
+    // given / when
+    let caught: unknown
+    try {
+      normalizeSenpiTeamSpec("{not json", "bad-string")
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.code).toBe("INVALID_SPEC")
+      expect(caught.message).toContain("JSON")
+      expect(caught.message).toContain("object")
+    }
+  })
+
+  test("#given a non-string non-object spec #when normalized #then the error names the received type and the corrective shape", () => {
+    // given / when
+    let caught: unknown
+    try {
+      normalizeSenpiTeamSpec(42, "numeric")
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.code).toBe("INVALID_SPEC")
+      expect(caught.message).toContain("number")
+      expect(caught.message).toContain("object")
+    }
+  })
+
+  test("#given a single member object instead of an array #when normalized #then it is wrapped into a one-member array", () => {
+    // given / when
+    const spec = normalizeSenpiTeamSpec({ members: { kind: "category", category: "quick", prompt: "work" } }, "single-member")
+
+    // then
+    expect(spec.members).toHaveLength(1)
+    expect(spec.members[0]?.kind).toBe("category")
+  })
+})

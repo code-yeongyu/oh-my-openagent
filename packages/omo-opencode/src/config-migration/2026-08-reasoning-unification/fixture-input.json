@@ -1,0 +1,67 @@
+{
+  "categories": {
+    "quick": {
+      "model": "apitopia/kimi-for-coding-highspeed-unlocked",
+      "reasoningEffort": "minimal",
+      "fallback_models": [
+        {
+          "model": "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+          "reasoningEffort": "none"
+        },
+        "quotio-openai/gpt-5.4-mini-fast minimal"
+      ],
+      "maxTokens": 8192
+    },
+    "deep": {
+      "model": "quotio-openai/gpt-5.6-sol-fast",
+      "variant": "medium"
+    },
+    "conflict": {
+      "model": "openai/gpt-5.6-sol(xhigh)",
+      "variant": "high",
+      "reasoningEffort": "xhigh",
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 4096
+      },
+      "textVerbosity": "low"
+    }
+  },
+  "agents": {
+    "metis": {
+      "model": "anthropic/claude-fable-5",
+      "variant": "xhigh",
+      "models": [
+        {
+          "model": "anthropic-api/claude-fable-5",
+          "variant": "xhigh"
+        },
+        "anthropic/claude-opus-5"
+      ]
+    }
+  },
+  "[opencode]": {
+    "agents": {
+      "explore": {
+        "model": "openai/gpt-5.4-mini-fast",
+        "thinking": {
+          "type": "disabled"
+        },
+        "fallback_models": [
+          "openai/gpt-5.4-mini"
+        ]
+      }
+    }
+  },
+  "profiles": {
+    "today": {
+      "[opencode]": {
+        "agents": {
+          "sisyphus": {
+            "variant": "high"
+          }
+        }
+      }
+    }
+  }
+}

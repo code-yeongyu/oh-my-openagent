@@ -99,7 +99,7 @@ describe("TaskManager start failure security", () => {
       reason: GENERIC_START_FAILURE,
     })
     expect(row).toBe(
-      `task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${capturedStart.task_id} reason:${GENERIC_START_FAILURE}`,
+      `task category:ultrabrain model:openai/gpt-5.6-sol:xhigh <i>background</i> error id:${capturedStart.task_id} reason:${GENERIC_START_FAILURE}`,
     )
 
     const persistedRecord = readFileSync(join(store.stateDir, "tasks", `${capturedStart.task_id}.json`), "utf8")
@@ -225,7 +225,7 @@ describe("TaskManager start failure security", () => {
       const resolvedModel: ResolvedModelRecord = { ...RESOLVED_MODEL, source: "explicit" }
       const planner: ChildPlanner = () => ({
         kind: "resolved",
-        plan: { model: "openai/gpt-5.6-sol", resolved_model: resolvedModel, agentType: "oracle" },
+        plan: { model: "openai/gpt-5.6-sol", resolved_model: resolvedModel, agentType: "momus" },
       })
       const runner = new FakeRunner()
       runner.startError = new RunnerError({ kind, message: ADVERSARIAL_ERROR, cause: new Error(ADVERSARIAL_ERROR) })
@@ -236,7 +236,7 @@ describe("TaskManager start failure security", () => {
         prompt: "private prompt payload",
         parent_session_id: "parent-1",
         depth: 1,
-        subagent_type: "oracle",
+        subagent_type: "momus",
         name: "secure-agent",
         run_in_background: false,
       })
@@ -248,7 +248,7 @@ describe("TaskManager start failure security", () => {
         kind: "start_failed",
         task_id: result.task_id,
         name: "secure-agent",
-        subagent_type: "oracle",
+        subagent_type: "momus",
         execution_mode: "in-process",
         model: "openai/gpt-5.6-sol",
         resolved_model: resolvedModel,

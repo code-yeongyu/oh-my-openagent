@@ -1,6 +1,8 @@
 export { listTaskAgents, listTaskCategories } from "./categories"
 export { TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskToolDescription } from "./description"
 export { buildTaskExecute } from "./execute"
+export { resolvePromptCacheSafeWaitSeconds, waitForForegroundTask } from "./foreground-wait"
+export type { ForegroundWaitInput, ForegroundWaitOptions, ForegroundWaitResult, ScheduleDeadline } from "./foreground-wait"
 export { TaskToolParams } from "./params"
 export type { TaskToolParamsStatic } from "./params"
 export {

@@ -45,9 +45,41 @@ type WakeHintPromptInput = {
 }
 
 const temporaryDirectories: string[] = []
+const TEST_EVENT_TIMEOUT_MS = 1_000
+const realSetTimeout = globalThis.setTimeout
+const realClearTimeout = globalThis.clearTimeout
 const immediatePromptGateOptions: Parameters<typeof createTeamIdleWakeHint>[2] = {
   idleSettleMs: 0,
   postDispatchHoldMs: 0,
+}
+
+type Deferred<T> = {
+  promise: Promise<T>
+  resolve(value: T): void
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolvePromise: Deferred<T>["resolve"] | undefined
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  if (!resolvePromise) throw new Error("deferred resolver was not initialized")
+  return { promise, resolve: resolvePromise }
+}
+
+async function waitForEvent<T>(promise: Promise<T>, description: string): Promise<T> {
+  let timeoutID: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), TEST_EVENT_TIMEOUT_MS)
+  })
+
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (timeoutID !== undefined) {
+      realClearTimeout(timeoutID)
+    }
+  }
 }
 
 async function createTemporaryBaseDir(): Promise<string> {
@@ -627,7 +659,14 @@ describe("createTeamIdleWakeHint", () => {
     const messageId = randomUUID()
     await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
     await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+    registerTeamSession("member-session", {
+      teamRunId,
+      memberName: "worker",
+      role: "member",
+    })
     const errorHandler = createTeamMemberErrorHandler(config)
+    const idleHandlerReachedStatus = createDeferred<void>()
+    const continueIdleHandler = createDeferred<void>()
 
     const handler = createTeamIdleWakeHint({
       directory: "/tmp/project",
@@ -635,12 +674,8 @@ describe("createTeamIdleWakeHint", () => {
         session: {
           promptAsync: mock(async (_input: WakeHintPromptInput) => ({})),
           status: async () => {
-            await errorHandler({
-              event: {
-                type: "session.error",
-                properties: { sessionID: "member-session", error: new Error("late prompt failure") },
-              },
-            })
+            idleHandlerReachedStatus.resolve()
+            await continueIdleHandler.promise
             return { data: { "member-session": { type: "idle" } } }
           },
         },
@@ -648,12 +683,24 @@ describe("createTeamIdleWakeHint", () => {
     }, config, { idleSettleMs: 0 })
 
     // when
-    await handler({
+    const idleHandler = handler({
       event: {
         type: "session.idle",
         properties: { sessionID: "member-session" },
       },
     })
+    try {
+      await waitForEvent(idleHandlerReachedStatus.promise, "stale idle handler status check")
+      await errorHandler({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "member-session", error: new Error("late prompt failure") },
+        },
+      })
+    } finally {
+      continueIdleHandler.resolve()
+      await idleHandler
+    }
 
     // then
     const runtimeState = await loadRuntimeState(teamRunId, config)

@@ -42,6 +42,7 @@ export type UpdateOmoConfigOptions = {
   readonly platform?: NodeJS.Platform
   readonly projectDir?: string
   readonly scope: "project" | "user"
+  readonly targetPath?: string
 }
 
 export type UpdateOmoConfigResult = {
@@ -65,7 +66,7 @@ export const DEFAULT_WRITE_FILE_SYSTEM: OmoConfigWriteFileSystem = {
 }
 
 export class OmoConfigWriteError extends Error {
-  readonly name = "OmoConfigWriteError"
+  override readonly name = "OmoConfigWriteError"
 
   constructor(
     readonly path: string,

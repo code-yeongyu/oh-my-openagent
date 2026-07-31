@@ -13,6 +13,10 @@ export function parseZipInfoListedEntry(line: string): ArchiveEntry | null {
 	}
 
 	const [, rawType, rawEntryPath] = match
+	if (rawEntryPath === undefined) {
+		return null
+	}
+
 	return {
 		path: rawEntryPath,
 		type: rawType === "d" ? "directory" : rawType === "l" ? "symlink" : "file",
@@ -65,9 +69,10 @@ export async function listZipEntriesWithZipInfo(
 				return entry
 			}
 
+			const linkPath = await readZipSymlinkTarget(archivePath, entry.path)
 			return {
 				...entry,
-				linkPath: await readZipSymlinkTarget(archivePath, entry.path),
+				...(linkPath === undefined ? {} : { linkPath }),
 			}
 		})
 	)

@@ -16,6 +16,7 @@ import {
   cleanupProjects,
   fakeHandle,
   FakeRegistry,
+  readEvents,
   seedRecord,
   settings,
   tempStore,
@@ -246,6 +247,37 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(result.outcomes[0]?.kind).toBe("lost")
     expect(respawnRunner.startedSpecs).toHaveLength(0)
   })
+  test(" w2reattach #given a live in-process resident visible in the registry snapshot #when reconciled #then it stays running and resident for completion delivery", async () => {
+    // given
+    const store = tempStore()
+    const handle = fakeHandle("st_00000013", "in-process", [])
+    seedRecord(store, { task_id: "st_00000013", status: "running", residency_state: "resident", execution_mode: "in-process" })
+    const registry = new FakeRegistry()
+    registry.add(handle)
+    const pointLookupMissRegistry = {
+      get: () => undefined,
+      entries: () => registry.entries(),
+      forget: (taskId: string) => registry.forget(taskId),
+      hasPendingSends: (taskId: string) => registry.hasPendingSends(taskId),
+    }
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: pointLookupMissRegistry,
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]).toEqual({ task_id: "st_00000013", kind: "resumed", reason: "owned by this process" })
+    expect(store.load("st_00000013")?.status).toBe("running")
+    expect(store.load("st_00000013")?.residency_state).toBe("resident")
+    expect(handle.disposed()).toBe(false)
+  })
+
   test(" w2reattach #given an in-process record marked lost #when reconciled #then its residency claim is released so the slot is reclaimable", async () => {
     // given
     const store = tempStore()
@@ -273,6 +305,26 @@ describe("reconcileOnSessionStart reattach", () => {
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
     expect(store.load("st_00000012")?.residency_state).toBe("disposed")
+  })
+
+  test(" w2reattach #given an orphan whose reattach respawn then fails #when reconciled #then the true terminal reason replaces the first lost reason", async () => {
+    // given a live orphan child with a persisted session but no usable spawn spec, so the first
+    // lost marking (orphan) is followed by a second one (reattach failure) in the same pass
+    const taskId = "st_00000014"
+    const store = tempStore()
+    seedRecord(store, { task_id: taskId, status: "running", residency_state: "resident", execution_mode: "process", pid: 901, updated_at: new Date(now() - 1_000).toISOString() })
+    persistSessions(store, taskId)
+    const respawnRunner = new FakeRespawnRunner()
+    createManager(store, respawnRunner)
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set([901]), []), orphanKillDelayMs: 0 })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then the reattach failure detail replaces the generic orphan reason instead of being swallowed
+    expect(result.outcomes[0]?.kind).toBe("lost")
+    expect(store.load(taskId)?.error_message).toBe("reattach failed: persisted spawn spec unavailable")
+    expect(readEvents(store, taskId)).toContain("reconcile_lost")
   })
 
   test(" w2reattach #given reconcile reattach is disabled #when a durable session exists #then v1 lost behavior runs without respawn", async () => {
@@ -341,11 +393,12 @@ describe("reconcileOnSessionStart reattach", () => {
 
     // then
     expect(respawnRunner.startedSpecs).toHaveLength(2)
-    expect(respawnRunner.controls[1]?.terminated()).toBe(1)
-    expect(respawnRunner.controls[1]?.disposed()).toBe(1)
+    const discardedIndex = respawnRunner.controls.findIndex((control) => control.terminated() === 1)
+    expect(respawnRunner.controls.map((control) => [control.terminated(), control.disposed()]).sort())
+      .toEqual([[0, 0], [1, 1]])
     expect(results.flatMap((result) => result.outcomes.map((outcome) => outcome.kind))).toEqual(["resumed", "resumed"])
     expect(store.load("st_0000000b")?.notification.run_epoch).toBe(1)
-    expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1001)
+    expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1002 - discardedIndex)
   })
 
   test(" w2reattach #given a process runner reports effective launch inputs #when persisted record is reloaded #then only safe spawn facts survive", async () => {
@@ -487,5 +540,185 @@ describe("reconcileOnSessionStart reattach", () => {
     inProcess.handles.get(firstQueued.task_id)?.settle({ status: "completed", finalResponse: "done" })
     await flush()
     expect(store.load(secondQueued.task_id)?.status).toBe("running")
+  })
+})
+
+
+describe("reconcileOnSessionStart cross-process ownership", () => {
+  const foreignPid = 4242
+  const thisPid = 1111
+
+  function crossProcessHarness(options: { readonly host_pid?: number; readonly ownerAlive: boolean }) {
+    const store = tempStore()
+    seedRecord(store, {
+      task_id: "st_00000021",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+      pid: 900,
+      ...(options.host_pid === undefined ? {} : { host_pid: options.host_pid }),
+    })
+    const calls: SignalCall[] = []
+    // The orphan child pid 900 is alive in every scenario here; the owner pid joins it only when alive.
+    const alive = new Set<number>([900])
+    if (options.ownerAlive && options.host_pid !== undefined) alive.add(options.host_pid)
+    return { store, calls, alive }
+  }
+
+  test("#given a running in-process record owned by a LIVE foreign process #when reconciled #then it is skipped and stays running", async () => {
+    // given a sibling senpi process in the same project still owns this in-process child
+    const store = tempStore()
+    seedRecord(store, {
+      task_id: "st_00000022",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "in-process",
+      host_pid: foreignPid,
+    })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set([foreignPid]), []),
+      hostPid: thisPid,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]?.kind).toBe("foreign_live_owner")
+    const record = store.load("st_00000022")
+    expect(record?.status).toBe("running")
+    expect(record?.residency_state).toBe("resident")
+    expect(readEvents(store, "st_00000022")).not.toContain("reconcile_lost")
+  })
+
+  test("#given a running process-mode record owned by a LIVE foreign process #when reconciled #then it is skipped with no signals and no loss", async () => {
+    // given a sibling senpi process in the same project still owns this child
+    const { store, calls, alive } = crossProcessHarness({ host_pid: foreignPid, ownerAlive: true })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ reattach_on_reconcile: false }),
+      now,
+      signaller: fakeSignaller(alive, calls),
+      orphanKillDelayMs: 0,
+      hostPid: thisPid,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then the sibling's live child is never falsely declared lost
+    expect(result.outcomes[0]?.kind).toBe("foreign_live_owner")
+    const record = store.load("st_00000021")
+    expect(record?.status).toBe("running")
+    expect(record?.residency_state).toBe("resident")
+    expect(calls).toHaveLength(0)
+    expect(readEvents(store, "st_00000021")).not.toContain("reconcile_lost")
+  })
+
+  test("#given a running process-mode record whose owner process is DEAD #when reconciled #then it is lost as before", async () => {
+    // given the foreign owner is gone, so the live orphan child is genuinely unreachable
+    const { store, calls, alive } = crossProcessHarness({ host_pid: foreignPid, ownerAlive: false })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ reattach_on_reconcile: false }),
+      now,
+      signaller: fakeSignaller(alive, calls),
+      orphanKillDelayMs: 0,
+      hostPid: thisPid,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]?.kind).toBe("lost_and_terminated")
+    expect(calls).toEqual([{ pid: 900, signal: "SIGTERM" }])
+    expect(store.load("st_00000021")?.status).toBe("lost")
+  })
+
+  test("#given a process-mode record owned by THIS process #when reconciled #then it is not skipped as foreign and reattaches as before", async () => {
+    // given a record this process created whose handle is gone; host_pid === hostPid means the
+    // foreign-owner guard must NOT skip it and the normal orphan kill + respawn reattach runs.
+    const taskId = "st_00000023"
+    const store = tempStore()
+    const seeded = seedProcessRecord(store, taskId)
+    store.replace({ ...seeded, host_pid: thisPid })
+    const sessionPath = persistSessions(store, taskId)
+    const respawnRunner = new FakeRespawnRunner()
+    createManager(store, respawnRunner)
+    const calls: SignalCall[] = []
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set([900]), calls),
+      orphanKillDelayMs: 0,
+      hostPid: thisPid,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(respawnRunner.controls[0]?.switchCalls).toEqual([sessionPath])
+    expect(calls).toEqual([{ pid: 900, signal: "SIGTERM" }])
+    expect(store.load(taskId)?.status).toBe("running")
+  })
+
+  test("#given a legacy running process-mode record with no host_pid #when reconciled #then it is lost as before", async () => {
+    // given a record persisted before owner pids were recorded
+    const { store, calls, alive } = crossProcessHarness({ ownerAlive: false })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ reattach_on_reconcile: false }),
+      now,
+      signaller: fakeSignaller(alive, calls),
+      orphanKillDelayMs: 0,
+      hostPid: thisPid,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]?.kind).toBe("lost_and_terminated")
+    expect(calls).toEqual([{ pid: 900, signal: "SIGTERM" }])
+    expect(store.load("st_00000021")?.status).toBe("lost")
+  })
+
+  test("#given a running in-process record owned by THIS process with no live handle #when reconciled #then it is lost", async () => {
+    // given a record this process created whose handle is gone
+    const store = tempStore()
+    seedRecord(store, {
+      task_id: "st_00000022",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "in-process",
+      host_pid: thisPid,
+    })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set([thisPid]), []),
+      hostPid: thisPid,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then a same-process record without a handle is genuinely unreachable
+    expect(result.outcomes[0]?.kind).toBe("lost")
+    expect(store.load("st_00000022")?.status).toBe("lost")
   })
 })

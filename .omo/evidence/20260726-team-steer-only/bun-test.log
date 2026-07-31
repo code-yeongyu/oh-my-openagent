@@ -1,0 +1,1635 @@
+bun test v1.4.0-canary.1 (ae4b17de6)
+
+packages/omo-senpi/src/package-shape.test.ts:
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [0.94ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.42ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.31ms]
+
+packages/omo-senpi/src/bundle-size.test.ts:
+(pass) omo-senpi bundle size budget > #given the built extension #when its byte size is measured #then it stays within the 700,000-byte plan budget [0.12ms]
+
+packages/omo-senpi/src/runtime-package.test.ts:
+(pass) Senpi LSP daemon runtime staging > #given daemon build outputs #when staged #then manifest pins sorted outputs and verifies [65.69ms]
+(pass) Senpi LSP daemon runtime staging > #given a tampered staged output #when verified #then manifest mismatch is rejected [45.60ms]
+(pass) Senpi LSP daemon runtime staging > #given an existing staged runtime #when replacement fails after backup #then prior bytes are restored [67.42ms]
+
+packages/omo-senpi/src/plugin-manifest.test.ts:
+(pass) OMO Senpi plugin manifest > #given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory [0.33ms]
+(pass) OMO Senpi plugin manifest > #given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent [0.24ms]
+(pass) OMO Senpi plugin manifest > #given package metadata #when loaded #then Pi discoverability and shipped files are pinned [0.09ms]
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.30ms]
+
+packages/omo-senpi/src/skills-sync.test.ts:
+(pass) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 19 roots exist with valid names [0.91ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [4.02ms]
+(pass) OMO Senpi scoped skill sync > #given codex-derived and native skill roots #when scanned #then no Codex or multi-agent harness guidance survives [1.17ms]
+(pass) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization and carry no compatibility banner [0.84ms]
+(pass) OMO Senpi scoped skill sync > #given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example [0.90ms]
+(pass) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.15ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [3.87ms]
+(pass) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.15ms]
+
+packages/omo-senpi/src/runtime-dependency-resolution.test.ts:
+(pass) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [174.66ms]
+
+packages/omo-senpi/src/prompt-surface-consistency.test.ts:
+(pass) prompt surface consistency gate > #given shipped prompt surfaces #when grepped for stale wait idioms #then only migration mentions remain [97.92ms]
+(pass) prompt surface consistency gate > #given swept prompt surfaces #when inspected #then each teaches the injection model [0.43ms]
+(pass) prompt surface consistency gate > #given wait-teaching prompt surfaces #when inspected #then pattern watches route through the monitor tool [3.26ms]
+
+packages/omo-senpi/src/bundle-purity.test.ts:
+(pass) omo-senpi bundle purity > #given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers [0.15ms]
+(pass) omo-senpi bundle purity > #given a built extension #when static imports are inspected #then only senpi peers and node builtins remain external [3.77ms]
+
+packages/senpi-task/src/progress.test.ts:
+(pass) child task progress > #given child events #when progress is composed #then activity carries target, model, turn and tool counts [2.56ms]
+(pass) child task progress > #given a human description #when progress is composed #then the activity leads with what the task is, not its id [0.12ms]
+(pass) child task progress > #given a running tool #when composed #then the activity names the tool and pluralizes tool counts [0.18ms]
+(pass) child task progress > #given no events yet #when composed #then activity has no turn-zero noise beyond the base status [0.16ms]
+(pass) child task progress > #given unknown details #when read #then only the local progress shape is accepted [0.15ms]
+
+packages/senpi-task/src/status-line.test.ts:
+(pass) taskIdentityLabel > #given a description #when labelled #then the human description wins over name and id [0.16ms]
+(pass) taskIdentityLabel > #given no description #when labelled #then the stable name is used [0.07ms]
+(pass) taskIdentityLabel > #given neither description nor name #when labelled #then the id remains as the last-resort handle [0.06ms]
+(pass) taskIdentityLabel > #given blank labels #when labelled #then whitespace-only values are ignored [0.08ms]
+(pass) taskIdentityLabel > #given an overlong description #when labelled #then it is excerpted for one status row [0.17ms]
+(pass) formatStatusTarget > #given a category and resolved model #when formatted #then the model is qualified in parentheses [0.09ms]
+(pass) formatStatusTarget > #given only an agent type #when formatted #then the agent name is the target [0.06ms]
+(pass) formatStatusTarget > #given model metadata with terminal controls #when formatted #then every part is normalized [0.15ms]
+(pass) formatStatusTarget > #given a category but only a raw model #when formatted #then the sanitized raw model qualifies the target [0.08ms]
+(pass) formatStatusTarget > #given no target facts #when formatted #then nothing is emitted [0.08ms]
+(pass) composeStatusLine > #given full live facts #when composed #then tokens follow the canonical identity-first grammar [0.07ms]
+(pass) composeStatusLine > #given a single tool call #when composed #then the tool noun is singular [0.06ms]
+(pass) composeStatusLine > #given no stats #when composed #then only known tokens are emitted [0.05ms]
+
+packages/senpi-task/src/run-stats.test.ts:
+(pass) run stats tracker > #given assistant turns with usage #when snapshotted #then totals and tps derive from generation time [0.88ms]
+(pass) run stats tracker > #given non-assistant messages and missing usage #when snapshotted #then only counted facts appear [0.09ms]
+(pass) run stats tracker > #given snake_case usage fields #when accumulated #then they are read as a fallback [0.09ms]
+(pass) run stats tracker > #given a sub-10 tps run #when snapshotted #then tps keeps one decimal [0.33ms]
+(pass) run stats tracker > #given message_start before message_end #when snapshotted #then the window is the arrival-clock gap [0.09ms]
+(pass) run stats tracker > #given bursty delivery collapsing the generation window #when snapshotted #then tps falls back to runtime [0.08ms]
+(pass) run stats tracker > #given one measured window and one collapsed window #when snapshotted #then tps conservatively uses runtime [0.08ms]
+
+packages/senpi-task/src/senpi-api-tripwire.test.ts:
+(pass) pinned Senpi API surface > #given the senpi-task root import #when curated agent exports are used #then values and result types resolve [1.15ms]
+(pass) pinned Senpi API surface > #given senpi root exports #when type checked #then task adapter can pass session construction seams [0.67ms]
+(pass) pinned Senpi API surface > #given agent dir marker extension #when session boots with minimal loader #then marker factory is not invoked [2741.50ms]
+(pass) pinned Senpi API surface > #given minimal resource loader source #when audited #then fake marker factory option is absent [0.19ms]
+(pass) pinned Senpi API surface > #given pinned artifact #when package metadata and rpc entry are checked #then expected public contract exists [0.39ms]
+
+packages/omo-senpi/src/install/cli-local.test.ts:
+(pass) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip [180.99ms]
+(pass) cli-local > #given invalid positional arg #when invoked #then it exits non-zero with one-line JSON error [99.69ms]
+
+packages/omo-senpi/src/install/install-senpi.test.ts:
+(pass) runSenpiInstaller > #given temp SENPI_CODING_AGENT_DIR #when installing twice #then it writes one absolute plugin package entry and creates backups [46.09ms]
+(pass) runSenpiInstaller > #given existing user settings #when installing #then unrelated values are preserved and package entries are deduped [50.81ms]
+(pass) runSenpiInstaller > #given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written [12.06ms]
+(pass) runSenpiUninstaller > #given mixed package settings #when uninstalling #then only the omo-senpi plugin path is removed [48.78ms]
+
+packages/omo-senpi/src/extension/idle-injection-coordinator.test.ts:
+(pass) IdleInjectionCoordinator > #given a completion and a continuation on one idle edge #when flushed #then exactly one injection is delivered in deterministic order [2.24ms]
+(pass) IdleInjectionCoordinator > #given repeated continuation enqueues #when flushed #then they collapse to one keyed injection [0.14ms]
+(pass) IdleInjectionCoordinator > #given a queued injection #when removed by key #then the flush no-ops and removal reports true only once [0.10ms]
+(pass) IdleInjectionCoordinator > #given an empty queue #when flushed #then nothing is delivered [0.14ms]
+(pass) IdleInjectionCoordinator > #given a deferred scheduleFlush #when the scheduler runs it #then delivery happens on the idle tick, not synchronously [0.34ms]
+(pass) IdleInjectionCoordinator > #given a deferred continuation #when a synchronous wake flushOnIdle drains first #then the deferred pass no-ops [0.21ms]
+(pass) IdleInjectionCoordinator > #given repeated scheduleFlush requests before the deferred pass #when scheduled #then they coalesce to one flush [0.34ms]
+(pass) IdleInjectionCoordinator > #given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns [0.13ms]
+
+packages/omo-senpi/src/extension/index.test.ts:
+config-watch skipped: events capability missing undefined
+(pass) omo-senpi extension entry > #given the real extension entry #when registered with a fake API #then configured components are wired [95.91ms]
+(pass) omo-senpi extension entry > #given config-watch disabled by flag #when composed #then it emits no registration and no warning [0.58ms]
+
+packages/omo-senpi/src/extension/idle-injection-wiring.test.ts:
+(pass) idle-injection wiring: real producers on one idle edge > #given a ulw continuation then a task-completion wake on one idle edge #when both fire #then exactly one injection is delivered [1.50ms]
+
+packages/omo-senpi/src/extension/tool-capture-registry.test.ts:
+(pass) tool capture registry > #given components register tools #when captured #then every injected tool exposes a callable execute [0.26ms]
+(pass) tool capture registry > #given captured tools #when filtered for a child #then lsp tools remain but the task/team family is excluded [0.41ms]
+(pass) tool capture registry > #given a non-tool value #when registered #then it is not captured but still forwarded [0.08ms]
+
+packages/omo-senpi/src/extension/compose.test.ts:
+(pass) composeOmoSenpiExtension > #given enabled components #when composed and an event dispatches #then registers flags components and drives fake handlers [0.50ms]
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+(pass) composeOmoSenpiExtension > #given one component disabled by flag #when composed #then skips exactly that component [0.30ms]
+(pass) composeOmoSenpiExtension > #given a component throws #when composed #then logs the error and registers later components [0.76ms]
+(pass) composeOmoSenpiExtension > #given a component using optional registerMcpServer on an old API #when composed #then skips that component and registers later components [0.53ms]
+(pass) composeOmoSenpiExtension > #given a fake missing sendUserMessage #when composed #then logs one version mismatch and registers nothing [0.28ms]
+
+packages/senpi-task/src/category/resolve-category.test.ts:
+(pass) resolveCategory > #given a builtin category and omo overlay #when resolved #then user config wins and prompt text is appended [1.39ms]
+(pass) resolveCategory > #given a disabled omo category overlay #when resolved #then a disabled result explains the reason [0.11ms]
+(pass) resolveCategory > #given primary model is unavailable and omo fallback exists #when resolved #then delegate-core fallback reaches the registry model [0.38ms]
+(pass) resolveCategory > #given quick primary is unavailable and hardcoded fallback is available #when resolved #then delegate-core fallback chain reaches Anthropic Haiku [0.65ms]
+(pass) resolveCategory > #given writing's Kimi for Coding default is available #when resolved #then its canonical Kimi K3 id is selected [0.16ms]
+(pass) resolveCategory > #given writing's provider default is unavailable and Kimi K3 is available #when resolved #then the K3 fallback is selected [0.25ms]
+(pass) resolveCategory > #given ultrabrain primary is unavailable and hardcoded Google fallback is available #when resolved #then delegate-core fallback chain preserves the high variant [0.22ms]
+(pass) resolveCategory > #given only transformed Vercel GPT-5.6 models #when deep categories resolve #then each keeps xhigh [0.56ms]
+(pass) resolveCategory > #given transformed Vercel and Copilot GPT-5.6 models #when deep categories resolve #then Vercel xhigh wins [0.24ms]
+(pass) resolveCategory > #given only Copilot GPT-5.6 models #when deep categories resolve #then each uses its high rung [0.31ms]
+(pass) resolveCategory > #given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the retired rung is not selected [0.77ms]
+(pass) resolveCategory > #given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default [0.27ms]
+(pass) resolveCategory > #given selected model is absent from registry #when resolved #then unavailable result names attempted and available models [0.18ms]
+(pass) resolveCategory > #given category params in omo overlay #when resolved #then child spec carries generation params and prompt append [0.32ms]
+(pass) resolveCategory > #given a custom category description #when resolved #then the resolved result preserves it [0.14ms]
+(pass) builtin category defaults > #given ported builtin defaults #when snapshotted #then all eight category defaults stay pinned [0.84ms]
+
+packages/senpi-task/src/category/resolve-category-boundary.test.ts:
+(pass) resolveCategory boundary parsing > #given a registry model with legal headers #when resolved #then the header-bearing model is accepted [2.54ms]
+(pass) resolveCategory boundary parsing > #given a malformed registry entry #when resolved #then category resolution returns sanitized model_unavailable instead of throwing [0.25ms]
+(pass) resolveCategory boundary parsing > #given getAvailable returns a throwing-accessor model #when resolved #then category resolution returns sanitized model_unavailable [0.27ms]
+(pass) resolveCategory boundary parsing > #given malformed truthy find results #when resolved #then category resolution returns sanitized model_unavailable [0.23ms]
+(pass) resolveCategory boundary parsing > #given find returns a throwing-accessor model #when resolved #then category resolution returns sanitized model_unavailable [0.14ms]
+(pass) resolveCategory boundary parsing > #given find returns an empty or mismatched identity #when resolved #then category resolution rejects the registry result [0.19ms]
+(pass) resolveCategory boundary parsing > #given inherited model identity fields #when resolved #then category resolution rejects them without leaking prototype data [0.11ms]
+(pass) resolveCategory boundary parsing > #given non-array registry availability #when resolved #then category resolution returns sanitized model_unavailable instead of throwing [0.32ms]
+(pass) resolveCategory boundary parsing > #given prototype-shaped category names #when resolved #then they return not_found instead of inherited object values [0.14ms]
+
+packages/senpi-task/src/category/gpt-5.6-sol-routing.test.ts:
+(pass) GPT-5.6 Sol category routing > #given only OpenCode Sol #when ultrabrain resolves #then it uses the migrated GPT-5.6 rung [0.40ms]
+(pass) GPT-5.6 Sol category routing > #given only OpenCode Sol #when deep resolves #then it uses the migrated GPT-5.6 rung [0.23ms]
+(pass) GPT-5.6 Sol category routing > #given only OpenCode Sol #when unspecified-low resolves #then it uses the migrated GPT-5.6 rung [0.17ms]
+
+packages/senpi-task/src/lifecycle/residency.test.ts:
+(pass) admitResident (residency cap + LRU eviction) > #given residents below the cap #when admitting #then it is admitted with no eviction [2.61ms]
+(pass) admitResident (residency cap + LRU eviction) > #given a full session with terminal residents #when admitting #then the OLDEST idle terminal is evicted [4.10ms]
+(pass) admitResident (residency cap + LRU eviction) > #given the oldest terminal has a pending send #when admitting #then it is skipped and the next terminal is evicted [2.93ms]
+(pass) admitResident (residency cap + LRU eviction) > #given a full session with ALL residents running #when admitting #then it is rejected naming the residents, no eviction [2.37ms]
+(pass) admitResident (residency cap + LRU eviction) > #given other-session residents fill the cap #when admitting for a fresh session #then it is admitted (cap is per parent session) [1.92ms]
+(pass) admitResident (residency cap + LRU eviction) > #given lost residents pin every slot #when admitting #then the oldest lost resident is evicted (residency-leak regression) [2.70ms]
+(pass) admitResident (residency cap + LRU eviction) > #given a cancelled resident at the cap #when admitting #then it is evicted like any other terminal [10.51ms]
+
+packages/senpi-task/src/lifecycle/shutdown.test.ts:
+(pass) teardownOnSessionShutdown > #given mixed resident children #when tearing down #then in-process aborts before dispose and rpc terminates before detach [23.53ms]
+(pass) teardownOnSessionShutdown > #given no resident children #when tearing down #then it reports an empty summary without throwing [0.77ms]
+
+packages/senpi-task/src/lifecycle/single-writer-audit.test.ts:
+(pass) single-writer destruction audit > #given package source #when scanning for destruction invocations #then none live outside the lifecycle port [10.90ms]
+(pass) single-writer destruction audit > #given the allowlist #when auditing the lifecycle port #then it is the only non-definition invoker [0.10ms]
+
+packages/senpi-task/src/lifecycle/destroy.test.ts:
+(pass) destroyResidentTask (the single-writer destruction port) > #given an in-process resident #when cancel-destroyed #then it aborts before dispose and marks disposed [18.00ms]
+(pass) destroyResidentTask (the single-writer destruction port) > #given an in-process resident whose abort rejects #when cancel-destroyed #then dispose still runs and it ends disposed [2.27ms]
+(pass) destroyResidentTask (the single-writer destruction port) > #given an rpc resident #when destroyed #then it terminates (TERM->KILL) then detaches, never dispose-only [2.40ms]
+(pass) destroyResidentTask (the single-writer destruction port) > #given a terminal resident #when evicted #then residency becomes evicted and a JSONL evicted event lands [2.65ms]
+(pass) destroyResidentTask (the single-writer destruction port) > #given no resident handle #when destroyed twice #then it is idempotent and never throws [2.80ms]
+
+packages/senpi-task/src/lifecycle/ttl.test.ts:
+(pass) cleanupExpiredRecords (TTL) > #given an expired terminal record #when cleaning #then its record and log are deleted [4.48ms]
+(pass) cleanupExpiredRecords (TTL) > #given a fresh terminal record #when cleaning #then it is retained [1.48ms]
+(pass) cleanupExpiredRecords (TTL) > #given an old NON-terminal record #when cleaning #then it is retained [1.38ms]
+(pass) cleanupExpiredRecords (TTL) > #given a freshly claimed pending record #when the cutoff is far in the future #then it is retained [1.33ms]
+(pass) cleanupExpiredRecords (TTL) > #given an old lost RPC record with a LIVE pid #when cleaning #then it is retained (no pid-dead proof) [1.66ms]
+(pass) cleanupExpiredRecords (TTL) > #given an old lost RPC record with a DEAD pid #when cleaning #then it is deleted (pid-dead proven) [1.56ms]
+(pass) cleanupExpiredRecords (TTL) > #given an expired terminal record owned by a live resident handle #when cleaning #then it is retained until the handle is forgotten [1.53ms]
+(pass) cleanupExpiredRecords (TTL) cross-process ownership > #given an expired resident record owned by a LIVE foreign process #when cleaning #then it is retained [1.75ms]
+(pass) cleanupExpiredRecords (TTL) cross-process ownership > #given an expired resident record whose foreign owner is DEAD #when cleaning #then it is deleted [1.28ms]
+
+packages/senpi-task/src/lifecycle/reconcile.test.ts:
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a dead process and persisted sessions #when reconciled #then the newest session is respawned running at epoch plus one [39.43ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given injected reattach ports and a registered store fallback #when reconciled #then the injected ports take precedence [4.25ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a dead process without a session #when reconciled #then it remains lost without respawn [4.07ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a live foreign process and persisted session #when reconciled #then it is terminated before respawn reattach [21.54ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given an in-process record #when reconciled #then the previous-process task is lost and never respawned [3.08ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a live in-process resident visible in the registry snapshot #when reconciled #then it stays running and resident for completion delivery [2.02ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given an in-process record marked lost #when reconciled #then its residency claim is released so the slot is reclaimable [2.97ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a leaked {lost, resident} record from an earlier session #when reconciled #then it self-heals to disposed [2.73ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given reconcile reattach is disabled #when a durable session exists #then v1 lost behavior runs without respawn [5.21ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given this process already owns the live handle #when reconciled #then the record is skipped without signalling or respawn [7.58ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal [4.39ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a completed resident daemon with a live foreign pid #when reconciled #then it is terminated before reattach [35.20ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given overlapping reconcile sweeps #when both respawn #then the duplicate child is discarded without replacing the owner [5.26ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a process runner reports effective launch inputs #when persisted record is reloaded #then only safe spawn facts survive [7.67ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given switch_session is cancelled #when reconciled #then the fresh child is torn down and the record stays lost [5.29ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given one trusted launch resolver rejection #when reconciling multiple process tasks #then later tasks still reattach [28.42ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a team member whose current runtime is missing #when reconciling #then it is lost without blocking later records [10.20ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given one concurrency slot and two queued tasks #when a reattached task completes #then only the first queued task starts [11.79ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running in-process record owned by a LIVE foreign process #when reconciled #then it is skipped and stays running [23.09ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running in-process record whose owner process is DEAD #when reconciled #then it is lost as before [10.01ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a legacy running in-process record with no host_pid #when reconciled #then it is lost as before [3.07ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running in-process record owned by THIS process with no live handle #when reconciled #then it is lost [3.28ms]
+
+packages/senpi-task/src/completion/routing.test.ts:
+(pass) routeCompletion > #given idle parent #when routed #then always wakes with no config to consult [1.78ms]
+(pass) routeCompletion > #given streaming parent #when routed #then delivered into the running turn [0.12ms]
+(pass) routeCompletion > #given compacting parent #when routed #then buffered with compacting reason [0.10ms]
+(pass) routeCompletion > #given session_switching parent #when routed #then buffered with switching reason [0.07ms]
+(pass) routeCompletion > #given session_shutdown parent #when routed #then buffered with shutdown reason [0.06ms]
+(pass) shouldNotifyStatus > #given external terminals and completions/errors #when checked #then notifies [0.07ms]
+(pass) shouldNotifyStatus > #given parent-initiated terminals #when checked #then does not notify [0.24ms]
+(pass) shouldNotifyStatus > #given non-terminal statuses #when checked #then does not notify [0.13ms]
+
+packages/senpi-task/src/completion/notifier-retry.test.ts:
+(pass) createCompletionNotifier scheduled retries > #given two immediate failures w2notif #when the first timer fires #then delivery persists exactly once [1.54ms]
+(pass) createCompletionNotifier scheduled retries > #given a failed epoch w2notif #when revive advances the epoch before retry #then stale delivery drops [0.22ms]
+(pass) createCompletionNotifier scheduled retries > #given a pending retry w2notif #when the buffered entry flushes first #then the timer skips notified work [0.24ms]
+(pass) createCompletionNotifier scheduled retries > #given persistent enqueue failures w2notif #when eight timers exhaust #then the cycle caps and the count is cleaned so a later reconcile restarts fresh [0.37ms]
+(pass) createCompletionNotifier scheduled retries > #given failed records from mixed sessions w2notif #when reconciled twice #then only eligible work delivers once [0.17ms]
+(pass) createCompletionNotifier scheduled retries > #given a failed record w2notif #when reconciliation sees compaction #then it buffers normally [0.10ms]
+(pass) createCompletionNotifier scheduled retries > #given retries keep failing w2notif #when timers reschedule #then delays follow the capped ladder [0.21ms]
+(pass) createCompletionNotifier scheduled retries > #given a retry dropped for another session w2notif #when its session reconciles #then backoff restarts at the base delay [0.16ms]
+(pass) createCompletionNotifier scheduled retries > #given session A owns a failed retry w2notif #when session B is current #then retry drops until A reconciles [0.16ms]
+
+packages/senpi-task/src/completion/notifier-buffer-dedupe.test.ts:
+(pass) completion notifier buffered dedupe (W1-V F5) > #given the same (task,epoch) buffered twice #when flushed #then the parent is notified once [2.82ms]
+
+packages/senpi-task/src/completion/notifier.test.ts:
+(pass) createCompletionNotifier - exactly-once epoch contract > #given double terminal replay #when notified twice #then exactly one delivery [0.48ms]
+(pass) createCompletionNotifier - exactly-once epoch contract > #given revived task at epoch 1 #when second completion arrives #then it notifies again [0.29ms]
+(pass) createCompletionNotifier - exactly-once epoch contract > #given persisted notified_epoch #when notified after resume #then no re-notify [0.21ms]
+(pass) createCompletionNotifier - gating > #given synchronous foreground task #when it completes #then never notifies [0.14ms]
+(pass) createCompletionNotifier - gating > #given parent-initiated cancel or interrupt #when terminal #then never notifies [0.10ms]
+(pass) createCompletionNotifier - gating > #given still-running task #when notified #then skipped as non-terminal [0.08ms]
+(pass) createCompletionNotifier - routing table > #given idle parent #when delivered #then triggerTurn payload recorded unconditionally [0.14ms]
+(pass) createCompletionNotifier - routing table > #given streaming parent #when delivered #then triggerTurn payload recorded for the batched steer [0.17ms]
+(pass) createCompletionNotifier - routing table > #given compacting parent #when notified #then buffered without delivery [0.24ms]
+(pass) createCompletionNotifier - routing table > #given session_switching parent #when notified #then buffered without delivery [0.10ms]
+(pass) createCompletionNotifier - buffering, flush, batching > #given two buffered completions on one session #when flushed on idle #then one wake carries both [0.33ms]
+(pass) createCompletionNotifier - buffering, flush, batching > #given buffered completion #when the session was replaced #then it is dropped, not delivered [0.20ms]
+(pass) createCompletionNotifier - buffering, flush, batching > #given no buffered notifications #when flushed #then empty result [0.08ms]
+(pass) createCompletionNotifier - notifier failure contract > #given first enqueue throws but retry succeeds #when delivered #then one retry lands and epoch advances [0.24ms]
+(pass) createCompletionNotifier - notifier failure contract > #given enqueue throws twice #when delivered #then failure recorded and epoch not advanced [0.39ms]
+
+packages/senpi-task/src/completion/notification.test.ts:
+(pass) buildCompletionDetails > #given completed record #when details built #then core facts, full result, and duration are populated [2.20ms]
+(pass) buildCompletionDetails > #given a result longer than the former 700-char cap #when details built #then the full result is included [0.12ms]
+(pass) buildCompletionDetails > #given a result beyond transport capacity #when details built #then its full text is spilled to a local file [7.16ms]
+(pass) buildCompletionDetails > #given resident completed record #when details built #then continuation hint names task_send but never task_output [0.30ms]
+(pass) buildCompletionDetails > #given resident completed record #when details built #then task_send hint uses to and message params [0.15ms]
+(pass) buildCompletionDetails > #given error record #when details built #then error message feeds the full result [0.19ms]
+(pass) buildCompletionDetails > #given tokens provided #when details built #then tokens are attached [0.10ms]
+(pass) buildCompletionMessage > #given a complete result #when notification built #then the body contains it without a follow-up task_output instruction [0.20ms]
+(pass) buildCompletionMessage > #given a spilled result #when notification built #then the body names its local file [1.09ms]
+(pass) buildCompletionMessage > #given two details #when message built #then both completions appear in one content block [0.34ms]
+(pass) completion run stats > #given a record with run stats #when details are built #then run stats and token fallback are attached [0.39ms]
+(pass) completion run stats > #given explicit tokens #when details are built #then the explicit value wins over run stats [0.14ms]
+
+packages/senpi-task/src/completion/unconditional-wake.test.ts:
+(pass) unconditional wake > #given an idle parent #when a background child completes #then it always wakes with triggerTurn [0.24ms]
+(pass) unconditional wake > #given an idle parent #when notified end to end #then a triggerTurn message is enqueued [0.36ms]
+(pass) unconditional wake > #given a streaming parent #when a background child completes #then delivery carries triggerTurn for the batched steer [0.11ms]
+
+packages/senpi-task/src/agents/omo-config-agents.test.ts:
+(pass) mapOmoConfigAgents > #given an omo.json agent with the full field set #when mapped #then snake_case config keys land on the camelCase AgentDefinition with the record key as name [2.59ms]
+(pass) mapOmoConfigAgents > #given the omo.json tools record #when mapped #then each boolean entry becomes a pattern/allow rule [0.28ms]
+(pass) mapOmoConfigAgents > #given an agent with only a name-worth of config #when mapped #then absent optional keys stay absent [0.13ms]
+(pass) mapOmoConfigAgents > #given a config with no agents #when mapped #then the result is an empty record [0.07ms]
+
+packages/senpi-task/src/agents/resolve-agent.test.ts:
+(pass) resolveAgent > #given an agent fallback chain and matching live model #when resolved #then it returns agent metadata and persona [0.81ms]
+(pass) resolveAgent > #given def.model and def.models are both available #when resolved #then def.model wins [0.26ms]
+(pass) resolveAgent > #given an unavailable primary and ordered def.models #when resolved #then the first available model wins [0.13ms]
+(pass) resolveAgent > #given def.models entries the machine has no credentials for #when resolved #then resolution falls through to the first available entry [0.27ms]
+(pass) resolveAgent > #given every configured model is keyless #when resolved #then the builtin fallback chain still resolves an available model [0.13ms]
+(pass) resolveAgent > #given a disabled agent #when resolved #then it is hidden as not_found [0.19ms]
+(pass) resolveAgent > #given an unknown agent name #when resolved #then it returns the active sorted roster [0.21ms]
+(pass) resolveAgent > #given no registry model matches #when resolved #then it returns model_unavailable without throwing [0.16ms]
+(pass) resolveAgent > #given a model override without a registry #when resolved #then it returns persona fields and filters the tool allowlist [0.31ms]
+
+packages/senpi-task/src/agents/tools.test.ts:
+(pass) tools pi-task contract shapes > #given a string-action record #when parsing and normalizing #then allow and deny map to boolean rules [2.58ms]
+(pass) tools pi-task contract shapes > #given a nested command-pattern map #when resolving #then last matching pattern wins [0.13ms]
+(pass) tools pi-task contract shapes > #given a reversed nested map #when resolving #then the trailing broad deny wins over the earlier allow [0.08ms]
+(pass) tools pi-task contract shapes > #given a mixed record of boolean string-action and nested map #when resolving #then every shape evaluates [0.13ms]
+(pass) tools pi-task contract shapes > #given an ask action #when resolving #then it is a non-grant and overrides a broader allow [0.15ms]
+(pass) tools pi-task contract shapes > #given the existing boolean-record shape #when normalizing #then it keeps working unchanged [0.08ms]
+(pass) tools pi-task contract shapes > #given the existing array shape #when normalizing #then bang-prefixed entries deny and plain entries allow [0.33ms]
+
+packages/senpi-task/src/agents/loader.test.ts:
+(pass) loadAgents > #given home and project files #when loading #then later configured locations override earlier names [36.23ms]
+(pass) loadAgents > #given markdown at a configured root #when loading #then only agent subdirectories are scanned [1.81ms]
+(pass) loadAgents > #given file and programmatic definitions #when loading #then registerAgent overrides file values [2.03ms]
+(pass) loadAgents > #given file programmatic and omo config definitions #when loading #then omo agents overlay wins last [3.96ms]
+(pass) loadAgents > #given malformed and valid frontmatter #when loading #then diagnostics are per file and valid agents still load [2.29ms]
+(pass) loadAgents > #given project scan root is a symlink #when loading #then external agents are blocked with a read diagnostic [2.14ms]
+(pass) loadAgents > #given configured location is a symlink #when loading #then later scan children do not escape [2.27ms]
+(pass) loadAgents > #given broken directory symlink and valid sibling #when loading #then read diagnostic is returned and valid agent loads [14.41ms]
+(pass) loadAgents > #given omo json path is a directory #when loading #then read diagnostic is returned and valid agents still load [10.54ms]
+(pass) loadAgents > #given repeated tool allow and deny rules #when resolving a tool #then the last matching rule wins [2.40ms]
+(pass) loadAgents > #given the pi-task documented tools frontmatter shape #when loading #then the agent is kept and rules evaluate [2.15ms]
+(pass) loadAgents > #given a string-action tools record #when loading #then the agent is not dropped with a validation diagnostic [1.69ms]
+(pass) loadAgents > #given snake case omo agent keys #when loading #then fields normalize to camelCase definitions [1.69ms]
+
+packages/senpi-task/src/state/store.test.ts:
+(pass) resolveStateDir > #given no task state override #when resolved #then project omo senpi-task directory is used [2.84ms]
+(pass) resolveStateDir > #given task state override #when resolved #then override directory wins [0.24ms]
+(pass) TaskRecordStore > #given completed task record #when saved and reloaded #then durable task facts are identical [1.48ms]
+(pass) TaskRecordStore > #given a task spawned with a description #when saved and reloaded #then the description survives the round trip [1.24ms]
+(pass) TaskRecordStore > #given sensitive event payload #when event is appended #then jsonl payload is redacted [1.90ms]
+(pass) TaskRecordStore > #given corrupt task json #when records are listed #then typed diagnostic is reported and corrupt record is skipped [1.54ms]
+(pass) TaskRecordStore > #given duplicate generated task id #when a different record is saved #then existing task file is not overwritten [1.06ms]
+(pass) TaskRecordStore > #given completed record #when illegal running transition is persisted #then transition is rejected and completion remains [1.68ms]
+
+packages/senpi-task/src/state/transitions-table.test.ts:
+(pass) transitionTaskRecord exhaustive lifecycle table > #given every status and normal transition #when applied #then allowed and rejected outcomes match the lifecycle table [0.60ms]
+
+packages/senpi-task/src/state/model.test.ts:
+(pass) messageability > #given every status and residency pair #when classified #then the table is exhaustive [0.36ms]
+(pass) transitionTaskRecord > #given a cancelled task #when late failure arrives #then cancelled remains terminal and failure is logged [0.27ms]
+
+packages/senpi-task/src/state/id.test.ts:
+(pass) task id primitives > #given a task id ending in ffff #when bumped #then it carries into the next hexadecimal group [0.18ms]
+(pass) task id primitives > #given a task id #when bumped #then the hexadecimal value increments [0.22ms]
+(pass) task id primitives > #given an isolated module process #when bump-exhaust executes #then it succeeds [34.31ms]
+(pass) task id primitives > #given an isolated module process #when create-exhaust executes #then it succeeds [32.90ms]
+(pass) task id primitives > #given an isolated module process #when floor-raise executes #then it succeeds [33.38ms]
+(pass) task id primitives > #given an isolated module process #when floor-never-lower executes #then it succeeds [31.71ms]
+(pass) task id primitives > #given an isolated module process #when nowms executes #then it succeeds [33.72ms]
+(pass) createTaskId > #given a deterministic clock #when ids are created #then ids are canonical and sortable [0.38ms]
+(pass) createTaskId > #given a same-millisecond burst #when more than one byte of ids are created #then every id is unique [0.48ms]
+(pass) createTaskId > #given an isolated deterministic clock #when ids are created #then the clock seam is repeatable [0.16ms]
+(pass) createTaskId > #given wrap pressure near the id ceiling #when ids are created #then ids never wrap or repeat [0.50ms]
+
+packages/senpi-task/src/state/transitions.test.ts:
+(pass) transitionTaskRecord lifecycle graph > #given pending task #when running-only terminals (complete/fail/interrupt) arrive before start #then they are rejected [2.10ms]
+(pass) transitionTaskRecord lifecycle graph > #given running task #when terminal transitions arrive #then the lifecycle terminal is applied [0.14ms]
+(pass) transitionTaskRecord lifecycle graph > #given a running rpc child killed by signal #when the fail transition carries killed #then the record persists killed:true [0.09ms]
+(pass) transitionTaskRecord lifecycle graph > #given a plain (non-signal) failure #when the fail transition omits killed #then killed stays absent (a record fact) [0.17ms]
+(pass) transitionTaskRecord lifecycle graph > #given pending or running task #when normal lose transition arrives #then lost is rejected [0.14ms]
+(pass) transitionTaskRecord lifecycle graph > #given pending or running task #when reconciliation marks lost #then lost is applied explicitly [0.10ms]
+(pass) transitionTaskRecord lifecycle graph > #given terminal task #when residency-only transition arrives #then status remains and residency changes [0.09ms]
+(pass) transitionTaskRecord lifecycle graph > #given every terminal status #when every residency transition arrives #then only residency changes [0.23ms]
+(pass) transitionTaskRecord lifecycle graph > #given interrupted task #when late completion arrives #then interrupted remains terminal [0.10ms]
+(pass) transitionTaskRecord cancel-from-pending >  w2trans #given pending task #when cancel transition arrives #then it is applied and status becomes cancelled [0.07ms]
+(pass) transitionTaskRecord cancel-from-pending >  w2trans #given pending task #when interrupt transition arrives #then it is rejected as invalid (running-only) [0.07ms]
+(pass) transitionTaskRecord cancel-from-pending >  w2trans #given running task #when cancel transition arrives #then it is still applied (regression) [0.06ms]
+(pass) transitionTaskRecord cancel-from-pending >  w2trans #given terminal task (completed or cancelled) #when cancel arrives #then it is rejected by terminal idempotence [0.08ms]
+(pass) transitionTaskRecord cancel-from-pending >  w2trans #given pending task #when cancel carries error_message #then the reason is stamped onto the cancelled record [0.06ms]
+
+packages/senpi-task/src/state/run-stats-record.test.ts:
+(pass) run stats on task records > #given a complete transition with run stats #when applied #then the terminal record carries them [0.44ms]
+(pass) run stats on task records > #given fail cancel and interrupt transitions #when applied with run stats #then they persist too [0.12ms]
+(pass) run stats on task records > #given a persisted record with run stats #when parsed #then the stats round-trip [0.22ms]
+(pass) run stats on task records > #given malformed run stats #when parsed #then parsing rejects the record [0.19ms]
+
+packages/senpi-task/src/manager/concurrency.test.ts:
+(pass) TaskConcurrency > #given default settings #when nothing acquired #then a fresh model has a free slot [2.30ms]
+(pass) TaskConcurrency > #given limit reached #when checking free slot #then it reports full and exposes queue position [0.22ms]
+(pass) TaskConcurrency > #given a waiter enqueued #when the holder releases #then the waiter callback fires (FIFO handoff) [0.47ms]
+(pass) TaskConcurrency > #given two waiters #when slots free one at a time #then they are granted in FIFO order [0.26ms]
+(pass) TaskConcurrency > #given model and provider overrides #when resolving a key #then model override wins over provider [0.15ms]
+(pass) TaskConcurrency > #given different models #when both acquire under a shared default limit #then each keeps its own count [0.08ms]
+(pass) TaskConcurrency > remove (queued-task dequeue)  w2conc  >  w2conc  #given an enqueued waiter #when removed #then its queuePosition becomes undefined [0.19ms]
+(pass) TaskConcurrency > remove (queued-task dequeue)  w2conc  >  w2conc  #given three queued waiters #when the middle is removed #then survivors renumber (third drops 3 to 2) [0.12ms]
+(pass) TaskConcurrency > remove (queued-task dequeue)  w2conc  >  w2conc  #given head waiter removed #when release fires #then it grants the next survivor not the removed one [0.10ms]
+(pass) TaskConcurrency > remove (queued-task dequeue)  w2conc  >  w2conc  #given no such queued task #when remove called #then it returns false (safe no-op) [0.08ms]
+(pass) TaskConcurrency > remove (queued-task dequeue)  w2conc  >  w2conc  #given an acquired slot #when a queued waiter is removed #then getCount is unchanged [0.10ms]
+(pass) TaskConcurrency > remove (queued-task dequeue)  w2conc  >  w2conc  #given three waiters one removed #when release drains #then both survivors grant in FIFO and removed never grants [0.30ms]
+
+packages/senpi-task/src/manager/manager.test.ts:
+(pass) TaskManager.start > #given a valid spec #when started #then it returns a st_ id and running status with a persisted record [3.42ms]
+(pass) TaskManager.start > #given a child beyond max depth without allowance #when started #then DepthDenied is returned and zero records exist [1.31ms]
+(pass) TaskManager.start > #given a full model slot #when a further same-model task starts #then it queues FIFO and starts when a slot frees [26.00ms]
+(pass) TaskManager.start > #given two categories that resolve to different models #when both start under a shared limit of 1 #then both run [63.39ms]
+(pass) TaskManager.start > #given a runner whose start throws #when a task starts #then the slot is released, the record is error, and a failure event is logged [3.92ms]
+(pass) TaskManager.start > #given a requested name that collides in the same parent #when started #then a -2 suffix and a warning are returned [2.91ms]
+(pass) TaskManager.start > #given execution_mode process on the spec #when started #then the process runner is used [2.99ms]
+(pass) TaskManager.start > #given a resolved model plan #when started #then manager metadata surfaces persist resolved_model without prompt payloads [2.87ms]
+(pass) TaskManager.start > #given a resolved ultrabrain plan whose runner throws #when the real task mapping renders start_failed #then resolved context reaches the error row without the prompt [67.03ms]
+(pass) TaskManager.waitFor > #given a running task with an abortable wait w2waitfor #when the signal aborts #then the wait rejects and its waiter key is removed [26.48ms]
+(pass) TaskManager.waitFor > #given an abortable wait that resolves terminal w2waitfor #when the signal aborts afterwards #then abort is a no-op without an unhandled rejection [15.76ms]
+(pass) TaskManager.waitFor > #given a pre-aborted signal w2waitfor #when waitFor is called #then it rejects immediately without registering a waiter [19.17ms]
+(pass) TaskManager.waitFor > #given two concurrent waiters for one task w2waitfor #when one signal aborts #then the surviving waiter still resolves on settle [14.15ms]
+(pass) TaskManager.waitFor > #given a running task and a signal-less wait w2waitfor #when the task settles #then waitFor resolves as before [3.69ms]
+(pass) TaskManager child subscriptions > #given a pending task #when its concurrency slot is promoted #then the deferred child listener attaches to its managed handle [14.88ms]
+(pass) TaskManager pending cancellation > #given a queued task at the residency cap w2pend #when cancelled #then its wait settles cancelled and a later spawn is admitted [18.51ms]
+(pass) TaskManager pending cancellation > #given a grant whose start transition loses to cancel w2pend #when the slot transfers #then the runner is skipped and the slot is released [8.83ms]
+(pass) TaskManager pending cancellation > #given cancel lands while runner start awaits w2pend #when the handle arrives #then destruction tears it down, settles the wait, and releases the slot [12.14ms]
+(pass) TaskManager pending cancellation > #given a running task with one queued behind it w2pend #when the running task is cancelled #then the queued task receives the released slot [24.11ms]
+
+packages/senpi-task/src/manager/manager-revive-slot.test.ts:
+(pass) TaskManager revive concurrency slot > #given single concurrency #when a revived task completes #then it releases its slot and a queued task starts [15.16ms]
+(pass) TaskManager revive concurrency slot > #given single concurrency #when a task is interrupted #then its slot is released for the next task [5.12ms]
+
+packages/senpi-task/src/manager/manager-claim.test.ts:
+(pass) TaskManager claim characterization > #given no requested name #when started #then the fallback name is the task id [16.73ms]
+(pass) TaskManager claim characterization > #given a duplicate requested name in one parent #when started #then it receives a suffix and warning [4.16ms]
+(pass) TaskManager claim characterization > #given an id-shaped requested name #when an unnamed task claims its fallback #then every saved sibling name is unique [4.71ms]
+(pass) TaskManager claim characterization > #given a background spec #when started #then the manager tracks its task as background [2.94ms]
+(pass) TaskManager claim characterization > #given a runner that fails after persistence #when started and its name is requested again #then the record is terminal and the name remains reserved [9.38ms]
+(pass) TaskManager claim characterization > #given process execution mode #when started #then its record persists a spawn spec [3.51ms]
+(pass) TaskManager claim characterization > #given a blank requested name "" #when started #then it falls back to the task id [2.87ms]
+(pass) TaskManager claim characterization > #given a blank requested name "   " #when started #then it falls back to the task id [2.38ms]
+(pass) TaskManager claim characterization > #given an isolated manager process #when seed seeds from disk #then it succeeds [100.04ms]
+(pass) TaskManager claim characterization > #given an isolated manager process #when warm-cache seeds from disk #then it succeeds [116.34ms]
+(pass) TaskManager claim characterization > #given an isolated manager process #when diagnostics seeds from disk #then it succeeds [130.85ms]
+(pass) TaskManager claim characterization > #given a foreign winner for the first candidate #when started #then it claims the next id [4.39ms]
+(pass) TaskManager claim characterization > #given a requested name and a foreign winner #when started #then only the loser keeps the requested name [11.39ms]
+(pass) TaskManager claim characterization > #given a real manager under collision #when team members spawn #then no member start is rejected [15.42ms]
+(pass) TaskManager claim characterization > #given an allocation failure #when the requested name is retried #then its reservation was released [7.02ms]
+(pass) TaskManager claim characterization > #given bookkeeping fails after a claim #when process mode starts #then it records a terminal failure [3.62ms]
+(pass) TaskManager claim characterization > #given a whitespace requested name #when a collision is claimed #then the fallback follows the final id [3.66ms]
+
+packages/senpi-task/src/manager/manager-hygiene.test.ts:
+(pass) TaskManager release guard growth > #given a task revived multiple times #when each run completes #then the release guard keeps one entry per task, not per epoch [8.09ms]
+(pass) TaskManager release guard growth > #given a completed task #when it is forgotten #then the release guard entry is pruned [26.50ms]
+(pass) TaskManager transcript subscription ownership > #given a running task with a transcript subscription #when it is forgotten #then the subscription is torn down [6.17ms]
+
+packages/senpi-task/src/manager/manager-spawn-facts.test.ts:
+(pass) recordSpawnedPid > #given a running record and a real pid #when folded #then the pid is set on a copy [0.36ms]
+(pass) recordSpawnedPid > #given no pid (in-process child) #when folded #then nothing changes [0.17ms]
+(pass) recordSpawnedPid > #given a record that already went terminal #when folded #then it is left untouched [0.10ms]
+(pass) TaskManager spawn-fact persistence > #given member launch env #when a process task starts #then the generated task id is threaded into the child env [3.53ms]
+(pass) TaskManager spawn-fact persistence > #given a process runner whose child has a pid #when a process task starts #then the persisted record carries that pid [3.98ms]
+(pass) TaskManager spawn-fact persistence > #given an in-process runner with no pid #when a task starts #then the record has no pid [3.07ms]
+
+packages/senpi-task/src/manager/manager-respawn-cleanup.test.ts:
+(pass) TaskManager respawn terminate cleanup > #given cancelled respawn cleanup rejects #when respawn returns #then teardown failure is surfaced [7.85ms]
+(pass) TaskManager respawn dispose cleanup > #given cancelled respawn cleanup rejects #when respawn returns #then teardown failure is surfaced [9.20ms]
+(pass) TaskManager respawn launch trust boundary > #given persisted extension and member env inputs #when respawned #then neither reaches the current runner [1.66ms]
+(pass) TaskManager team-member respawn > #given a team member record #when respawned #then current trusted launch settings replace persisted extension and env [1.53ms]
+(pass) TaskManager respawn variant > #given a record whose resolved model carried a variant #when respawned #then the variant reaches the rpc runner spec [1.82ms]
+
+packages/senpi-task/src/manager/names.test.ts:
+(pass) NameRegistry > #given a fresh name #when registered #then it is used verbatim with no warning [1.90ms]
+(pass) NameRegistry > #given a colliding name in the same parent #when registered #then a -2 suffix and a warning are returned [0.12ms]
+(pass) NameRegistry > #given two prior collisions #when registered again #then the suffix increments to -3 [0.09ms]
+(pass) NameRegistry > #given the same name under a different parent #when registered #then there is no collision [0.08ms]
+(pass) NameRegistry > #given no requested name #when registered #then an auto name is generated and reserved [0.11ms]
+(pass) NameRegistry > #given a registered name #when released and re-registered #then the bare name is available [0.10ms]
+(pass) NameRegistry > #given an unknown name #when released #then registration is unchanged [0.08ms]
+(pass) NameRegistry > #given names in separate parents #when one is released #then the other remains reserved [0.07ms]
+
+packages/senpi-task/src/manager/start-failure-security.test.ts:
+(pass) TaskManager start failure security > #given an unknown runner start error containing secrets #when the task tool reports the failure #then every public and persisted surface receives only the stable classification [4.97ms]
+(pass) TaskManager start failure security > #given a non-Error runner start throw containing secrets #when a team member spawn fails #then the team error contains only the stable classification [4.84ms]
+(pass) TaskManager start failure security > #given a spoofed RunnerError plain object #when the task starts #then it receives the generic unknown-error classification [3.87ms]
+(pass) TaskManager start failure security > #given a spoofed RunnerError ordinary Error #when the task starts #then it receives the generic unknown-error classification [15.14ms]
+(pass) TaskManager start failure security > #given a runner start Error with a hostile name accessor #when the task starts #then classification stays total and returns the generic failure [22.98ms]
+(pass) TaskManager start failure security > #given a runner start throw whose prototype lookup is hostile #when the task starts #then classification stays total and returns the generic failure [4.61ms]
+(pass) TaskManager start failure security > #given a depth-exceeded RunnerError containing secrets #when a named subagent start fails #then its stable classification preserves the resolved context [3.63ms]
+(pass) TaskManager start failure security > #given a session-create-failed RunnerError containing secrets #when a named subagent start fails #then its stable classification preserves the resolved context [4.07ms]
+(pass) TaskManager start failure security > #given a child-prompt-failed RunnerError containing secrets #when a named subagent start fails #then its stable classification preserves the resolved context [22.11ms]
+
+packages/senpi-task/src/manager/manager-status-facts.test.ts:
+(pass) manager status facts > #given a spec carrying a description #when the task starts #then the persisted record keeps it for status views [6.55ms]
+(pass) manager status facts > #given a live child mid-run #when run stats are read #then the manager exposes the in-flight accumulator [3.97ms]
+(pass) manager status facts > #given an unknown task id #when run stats are read #then nothing is reported [1.17ms]
+(pass) manager child subscription cleanup > #given a listener registered before promotion #when its cleanup runs #then the handle unsubscribes exactly once [3.96ms]
+
+packages/senpi-task/src/manager/manager-helpers.test.ts:
+(pass) buildManagedSpec variant > #given a plan carrying a resolved variant #when the managed spec is built #then the variant is threaded [0.29ms]
+(pass) buildManagedSpec variant > #given a plan without a variant #when the managed spec is built #then no variant is threaded [0.15ms]
+
+packages/senpi-task/src/manager/manager-steering-race.test.ts:
+(pass) steering single-writer over the in-process launch-outcome tracker > #given the launch tracker settles on abort #when interrupted #then the record stays interrupted with partial text [5.60ms]
+(pass) steering single-writer over the in-process launch-outcome tracker > #given the launch tracker settles on abort #when cancelled #then the record is cancelled and destruction runs exactly once [19.30ms]
+(pass) steering single-writer over the in-process launch-outcome tracker > #given an already-cancelled task #when cancelled again #then it is a no-op and destruction is not re-run [15.62ms]
+(pass) steering single-writer over the in-process launch-outcome tracker > #given an already-interrupted task #when interrupted again #then it is an idempotent no-op [4.75ms]
+(pass) steering single-writer over the rpc launch-outcome tracker > #given the launch tracker settles on abort #when interrupted #then the record stays interrupted with partial text [4.87ms]
+(pass) steering single-writer over the rpc launch-outcome tracker > #given the launch tracker settles on abort #when cancelled #then the record is cancelled and destruction runs exactly once [4.50ms]
+(pass) steering single-writer over the rpc launch-outcome tracker > #given an already-cancelled task #when cancelled again #then it is a no-op and destruction is not re-run [23.23ms]
+(pass) steering single-writer over the rpc launch-outcome tracker > #given an already-interrupted task #when interrupted again #then it is an idempotent no-op [5.28ms]
+
+packages/senpi-task/src/manager/execution-mode.test.ts:
+(pass) resolveExecutionMode > #given a spec mode #when resolved #then the spec mode wins over every other source [2.53ms]
+(pass) resolveExecutionMode > #given no spec mode but an agent mode #when resolved #then the agent mode wins over config [0.10ms]
+(pass) resolveExecutionMode > #given only a config mode #when resolved #then the config mode is used [0.08ms]
+(pass) resolveExecutionMode > #given no source at all #when resolved #then it falls back to in-process [0.08ms]
+
+packages/senpi-task/src/manager/manager-wiring-seams.test.ts:
+(pass) manager wiring seams (W1-V F3/F7) > #given a launched task #when forget is called #then the live handle is pruned [4.59ms]
+(pass) manager wiring seams (W1-V F3/F7) > #given a background spawn #when queried #then wasBackground reflects the spec [5.28ms]
+(pass) manager wiring seams (W1-V F3/F7) > #given an admit gate that rejects #when starting #then start returns residency_denied and never launches [1.86ms]
+(pass) manager wiring seams (W1-V F3/F7) > #given an admit gate that evicts #when starting #then start proceeds [12.13ms]
+
+packages/senpi-task/src/manager/run-stats-wiring.test.ts:
+(pass) manager run stats wiring > #given a spawned child #when it completes #then the terminal record carries accumulated run stats [37.66ms]
+(pass) manager run stats wiring > #given a spawned child #when it fails #then run stats persist on the error record [19.52ms]
+(pass) manager run stats wiring > #given a spawned child #when it is cancelled #then run stats persist on the cancelled record [9.92ms]
+(pass) manager run stats through steering transitions > #given a running child with usage #when cancelled through cancelTask #then the cancelled record carries run stats [7.86ms]
+(pass) manager run stats through steering transitions > #given a completed run revived then cancelled #when the revived run has no events #then no stale run stats survive [6.06ms]
+
+packages/senpi-task/src/manager/runner.test.ts:
+(pass) createInProcessManagedRunner > #given a managed spec #when started #then it maps to a ChildSpec and injects session context [0.83ms]
+(pass) createRpcManagedRunner > #given a managed spec #when started #then it maps stateDir to state_dir and adapts the handle [0.35ms]
+(pass) createRpcManagedRunner > #given a managed spec with a model #when started #then the model is threaded onto the rpc spec for the detached child [0.20ms]
+(pass) variant threading > #given a managed spec with a variant #when the rpc adapter starts #then the variant reaches the rpc spec [0.30ms]
+(pass) variant threading > #given a managed spec without a variant #when the rpc adapter starts #then no variant is threaded [0.57ms]
+(pass) variant threading > #given a session context with a thinking level #when the in-process adapter starts #then the level reaches the child spec [0.28ms]
+
+packages/senpi-task/src/manager/child-handle.test.ts:
+(pass) adaptInProcessHandle > #given an in-process handle #when adapted #then pid is undefined and the outcome is forwarded [5.40ms]
+(pass) adaptInProcessHandle > #given an in-process handle #when disposed via the seam #then dispose resolves as a promise [0.18ms]
+(pass) adaptRpcHandle > #given an rpc handle that reached idle with no crash #when adapted #then the outcome is completed [0.31ms]
+(pass) adaptRpcHandle > #given an rpc handle that crashed #when adapted #then the outcome is an error carrying the stderr tail [0.36ms]
+
+packages/senpi-task/src/manager/transcript-log.test.ts:
+(pass) logTranscriptEvent > #given an assistant message_end #when logged #then an assistant transcript event is appended with the text [3.58ms]
+(pass) logTranscriptEvent > #given a tool_execution_end #when logged #then a tool transcript event is appended with the tool name and error flag [0.21ms]
+(pass) logTranscriptEvent > #given a non-assistant message_end #when logged #then nothing is appended [0.10ms]
+(pass) logTranscriptEvent > #given an unrelated event type #when logged #then nothing is appended [0.16ms]
+(pass) subscribeTranscriptLog > #given a handle #when subscribed #then transcript events flow into the store and the unsubscribe is returned [0.33ms]
+(pass) logTranscriptEvent child errors > #given an assistant message_end carrying a stopReason error #when logged #then a child_error transcript event is appended with the diagnostic [0.14ms]
+
+packages/senpi-task/src/manager/depth-policy.test.ts:
+(pass) decideDepthPolicy > #given a top-level child within max depth #when decided #then it is allowed [0.43ms]
+(pass) decideDepthPolicy > #given a child beyond max depth with no allowance #when decided #then it is denied [0.14ms]
+(pass) decideDepthPolicy > #given a deeper child whose type is in allowed_subagents #when decided #then it is allowed [0.26ms]
+(pass) decideDepthPolicy > #given a deeper child whose type is NOT in allowed_subagents #when decided #then it is denied [0.27ms]
+
+packages/senpi-task/src/manager/manager-continue.test.ts:
+(pass) TaskManager.continueTask > #given a running resident child #when continued with steer #then the steer is delivered via the handle [17.20ms]
+(pass) TaskManager.continueTask > #given a running resident child #when continued with no deliver_as #then followUp is the default [3.43ms]
+(pass) TaskManager.continueTask > #given a completed but resident child #when continued #then it is revived on the same handle with an incremented epoch [14.30ms]
+(pass) TaskManager.continueTask > #given a cancelled child #when continued #then it is not continuable and suggests task_output [21.10ms]
+(pass) TaskManager.continueTask > #given an unknown task id #when continued #then it is not continuable [2.21ms]
+(pass) TaskManager.list and get > #given tasks across two parents #when listing a parent scope #then only that parent's tasks appear [5.36ms]
+(pass) TaskManager.list and get > #given a queued task #when listing #then its queue position is exposed [4.43ms]
+(pass) TaskManager.list and get > #given a foreground task #when waiting for it #then waitFor resolves with the terminal record [4.58ms]
+
+packages/senpi-task/src/manager/parent-registry-context.test.ts:
+(pass) findModelReference > #given a canonical provider/modelId reference #when resolved #then find is called with the split parts [2.56ms]
+(pass) findModelReference > #given a modelId that itself contains slashes #when resolved #then only the FIRST slash splits provider from modelId [0.26ms]
+(pass) findModelReference > #given a reference without a usable slash boundary #when resolved #then it returns undefined without calling find [0.13ms]
+(pass) createParentRegistrySessionContext > #given no parent registry yet #when the context is built #then it stays empty so senpi keeps its default resolution [0.36ms]
+(pass) createParentRegistrySessionContext > #given a parent registry with a dynamically-registered provider #when a child spec names that model #then the registry, its auth storage, and the resolved Model are threaded [1.89ms]
+(pass) createParentRegistrySessionContext > #given a parent registry but no model on the spec #when the context is built #then registry and auth are threaded with no model override [0.68ms]
+(pass) createParentRegistrySessionContext > #given a spec carrying a valid resolved variant #when the context is built #then it maps to the senpi thinking level [0.53ms]
+(pass) createParentRegistrySessionContext > #given a spec carrying an unknown variant #when the context is built #then no thinking level is threaded [0.70ms]
+(pass) createParentRegistrySessionContext > #given a model reference absent from the parent registry #when the context is built #then registry is still threaded but no Model is set [0.52ms]
+
+packages/senpi-task/src/__adversarial__/chaos-bench.test.ts:
+[chaos] seed=senpi-task-w1-chaos base=2337725802 iterations=200
+(pass) W1-V chaos bench > #given 200 randomized event interleavings #when each is driven to quiescence #then all five invariants hold [5223.28ms]
+
+packages/senpi-task/src/team/runtime-config.test.ts:
+(pass) toTeamCoreConfig > #given omo task.team bounds #when converted #then the team-core config carries the bounds and base dir [0.51ms]
+(pass) toTeamCoreConfig > #given defaults #when converted #then transport fields keep team-core defaults [0.16ms]
+(pass) toTeamCoreSpecSource > #given a project source #when mapped #then it stays project [0.08ms]
+(pass) toTeamCoreSpecSource > #given an omo-json source #when mapped #then it maps to the user slot [0.06ms]
+
+packages/senpi-task/src/team/member-projection.test.ts:
+(pass) projectMemberStatus > #given task status pending #when projected #then member status is pending [0.15ms]
+(pass) projectMemberStatus > #given task status running #when projected #then member status is running [0.05ms]
+(pass) projectMemberStatus > #given task status interrupted #when projected #then member status is idle [0.04ms]
+(pass) projectMemberStatus > #given task status completed #when projected #then member status is completed [0.04ms]
+(pass) projectMemberStatus > #given task status error #when projected #then member status is errored [0.05ms]
+(pass) projectMemberStatus > #given task status cancelled #when projected #then member status is errored [0.04ms]
+(pass) projectMemberStatus > #given task status lost #when projected #then member status is errored [0.04ms]
+(pass) refreshTeamMemberStatuses > #given a member task moved to completed #when refreshed #then the runtime member reflects completed [36.13ms]
+
+packages/senpi-task/src/team/shutdown-helpers.test.ts:
+(pass) shutdown helpers > #given the omo shutdown-helpers parity set #when DELETABLE_MEMBER_STATUSES is read #then it is exactly completed/shutdown_approved/errored [0.15ms]
+(pass) shutdown helpers > #given each member status #when isMemberDeletable is applied #then only terminal-safe statuses are deletable [0.11ms]
+
+packages/senpi-task/src/team/normalize.test.ts:
+(pass) normalizeSenpiTeamSpec > #given a multi-member spec with a category and an agent alias #when normalized #then it parses with the lead sentinel and no spawnable lead member [2.03ms]
+(pass) normalizeSenpiTeamSpec > #given a name-less omo.json team value #when normalized #then it takes the record key as its name [0.12ms]
+(pass) normalizeSenpiTeamSpec > #given a spec that already carries its own name #when normalized #then the explicit name is preserved [0.10ms]
+(pass) normalizeSenpiTeamSpec > #given a raw.lead field on the input #when normalized #then it is rejected with a typed diagnostic and zero members survive [0.18ms]
+(pass) normalizeSenpiTeamSpec > #given a member literally named 'lead' #when normalized #then it is rejected with a typed diagnostic [0.12ms]
+(pass) normalizeSenpiTeamSpec > #given the callerTeamLead option #when normalized #then it is rejected before any member is spawned [0.07ms]
+(pass) normalizeSenpiTeamSpec > #given a member with no resolvable kind fields #when normalized #then the schema rejects it as an invalid spec [0.47ms]
+(pass) normalizeSenpiTeamSpec lenient input > #given a JSON-stringified spec #when normalized #then it parses and normalizes like the object form [0.12ms]
+(pass) normalizeSenpiTeamSpec lenient input > #given a malformed JSON string spec #when normalized #then it rejects with the parse detail and the corrective shape [0.09ms]
+(pass) normalizeSenpiTeamSpec lenient input > #given a non-string non-object spec #when normalized #then the error names the received type and the corrective shape [0.08ms]
+(pass) normalizeSenpiTeamSpec lenient input > #given a single member object instead of an array #when normalized #then it is wrapped into a one-member array [0.09ms]
+
+packages/senpi-task/src/team/member-map.test.ts:
+(pass) member task map sidecar > #given a written map #when read back #then the member -> task mapping round-trips [1.01ms]
+(pass) member task map sidecar > #given no sidecar file #when read #then an empty map is returned [0.35ms]
+(pass) member task map sidecar > #given a malformed sidecar #when read #then an empty map is returned [0.52ms]
+(pass) member task map sidecar > #given a completed write #when the directory is listed #then no temp file remains [0.63ms]
+
+packages/senpi-task/src/team/member-respawn.test.ts:
+(pass) createTeamMemberRespawnLaunchResolver > #given a persisted team member task #when resolved against current team runtime #then trusted extension and identity replace persisted launch inputs [33.83ms]
+(pass) createTeamMemberRespawnLaunchResolver > #given a team member task missing from the current task map #when resolved #then reattach is rejected [12.49ms]
+
+packages/senpi-task/src/team/tasks.test.ts:
+(pass) team tasklist orchestration > #given a task input #when createTeamTask runs #then it persists a pending task with an id [30.82ms]
+(pass) team tasklist orchestration > #given two tasks with a dependency #when the blocked task is claimed before its blocker completes #then it is rejected until the blocker is completed [16.29ms]
+(pass) team tasklist orchestration > #given a claimed task #when a non-owner updates its status #then a typed cross-owner error is raised [6.56ms]
+(pass) team tasklist orchestration > #given a completed task #when a reverse transition is requested #then a typed invalid-transition error is raised [32.26ms]
+(pass) team tasklist orchestration > #given an already-claimed task #when a second member claims it #then a typed already-claimed error is raised [6.87ms]
+(pass) team tasklist orchestration > #given several tasks #when listTeamTasks runs with an owner filter #then only that owner's tasks are returned in id order [29.75ms]
+
+packages/senpi-task/src/team/storage.test.ts:
+(pass) team storage layout > #given a project state dir config #when the base dir is resolved #then it lands under the senpi-task state dir [3.95ms]
+(pass) team storage layout > #given a team run id #when runtime dirs are resolved #then runtime and tasks dirs live under the base dir [7.52ms]
+(pass) team storage layout > #given the discovery-only project spec path #when resolved #then it maps to the omo-compatible .omo/teams path [0.42ms]
+(pass) team storage layout > #given a team run #when runtime dirs are ensured #then the directories are created at the right paths [2.77ms]
+
+packages/senpi-task/src/team/shutdown.test.ts:
+(pass) team shutdown protocol > #given an active member #when requestShutdown runs #then a pending request is recorded and a shutdown_request message is sent to the member [6.44ms]
+(pass) team shutdown protocol > #given a member with a pending request #when requestShutdown runs again #then it is idempotent (no duplicate record or message) [19.88ms]
+(pass) team shutdown protocol > #given an unknown member #when requestShutdown runs #then a typed unknown_member error is raised and nothing is sent [3.21ms]
+(pass) team shutdown protocol > #given a pending request #when approveShutdown runs #then the member becomes shutdown_approved, the task is cancelled, and the request is marked approved [9.34ms]
+(pass) team shutdown protocol > #given no pending request #when approveShutdown runs #then a typed no_pending_request error is raised and no task is cancelled [3.66ms]
+(pass) team shutdown protocol > #given a completed member with a pending request #when approveShutdown runs #then the completed status is preserved (not overwritten) [11.34ms]
+(pass) team shutdown protocol > #given a pending request #when rejectShutdown runs #then the member status is left running and the request records the reason [40.85ms]
+(pass) team shutdown protocol > #given no pending request #when rejectShutdown runs #then a typed no_pending_request error is raised [5.49ms]
+(pass) team shutdown protocol > #given a rejected request #when requestShutdown runs again #then a fresh pending request is allowed [6.43ms]
+
+packages/senpi-task/src/team/import-discipline.test.ts:
+(pass) team layer import discipline > #given the team layer source files #when their imports are scanned #then no forbidden team-core or opencode/tmux specifier is used [3.39ms]
+(pass) team layer import discipline > #given team-core imports #when scanned #then only exported subpaths are used [2.23ms]
+
+packages/senpi-task/src/team/registry.test.ts:
+(pass) loadTeamRegistry > #given an omo.json teams section with a category and agent-alias member #when loaded #then it round-trips into a team-core spec [4.62ms]
+(pass) loadTeamRegistry > #given a directory spec and an omo.json spec sharing a name #when loaded #then the project directory wins [1.71ms]
+(pass) loadTeamRegistry > #given a member with an unresolvable kind #when loaded #then an error is recorded and zero teams spawn [1.02ms]
+(pass) loadTeamRegistry > #given a team declaring a raw lead field #when loaded #then it is rejected and spawns zero members [0.45ms]
+(pass) loadTeamRegistry > #given no team sources #when loaded #then it returns empty teams and errors [0.35ms]
+
+packages/senpi-task/src/team/member-validator.test.ts:
+(pass) validateSenpiTeamMembers vocabulary hints > #given an unknown category with named ports #when validated #then the error lists the available categories [0.28ms]
+(pass) validateSenpiTeamMembers vocabulary hints > #given an unknown subagent_type with named ports #when validated #then the error lists the available agents [0.15ms]
+(pass) validateSenpiTeamMembers > #given resolvable members #when validated #then it passes without throwing [0.12ms]
+(pass) validateSenpiTeamMembers > #given an unresolvable category #when validated #then it throws naming the allowed kinds [0.24ms]
+(pass) validateSenpiTeamMembers > #given an unknown subagent_type #when validated #then it throws a typed diagnostic [0.15ms]
+(pass) validateSenpiTeamMembers > #given a curated read-only agent #when validated #then it is rejected before the known-agent check [0.12ms]
+
+packages/senpi-task/src/team/runtime.test.ts:
+(pass) createTeam > #given a member extension launch config #when a team member starts #then extension and durable identity env reach the manager spec [9.17ms]
+(pass) createTeam > #given a 3-member spec #when created #then the team is active with 3 mapped running members [7.33ms]
+(pass) createTeam > #given roles, prompts, and a resolved model #when created #then member views carry role, model, task id, and prompt excerpt [38.86ms]
+(pass) createTeam > #given member prompts #when members start #then every bootstrap teaches injection-driven work after the role [7.48ms]
+(pass) createTeam > #given the created team #when the sidecar is read #then it maps every member to its st_ id [35.34ms]
+(pass) createTeam > #given a member with a worktreePath #when created #then the cwd is passed and the directory is made [9.48ms]
+(pass) createTeam > #given a spec exceeding max_members #when created #then it is rejected before any spawn [0.86ms]
+(pass) createTeam > #given the 2nd member spawn throws #when created #then the team fails and the 1st member is cancelled [5.62ms]
+(pass) createTeam > #given the member sidecar write throws #when created #then members are cancelled, the team is failed, and it never activates [39.80ms]
+(pass) createTeam > #given a create deadline already passed #when created #then it fails with a deadline error and no spawns [7.76ms]
+(pass) deleteTeam > #given an active team #when deleted #then all member tasks are cancelled and the runtime dir is removed [40.90ms]
+(pass) deleteTeam > #given a team still in creating #when deleted #then an invalid-state error is thrown [5.80ms]
+(pass) deleteTeam > #given an already-deleted team #when deleted again #then it is a no-op [8.16ms]
+
+packages/senpi-task/src/runners/rpc-process.test.ts:
+(pass) RpcProcessRunner > #given a completing child #when started #then the handle reports final text and a clean exit [76.64ms]
+(pass) RpcProcessRunner > #given a busy child #when steered #then the steer is acked while the turn is in flight [52.34ms]
+(pass) RpcProcessRunner > #given a busy child #when followUp is sent #then it is routed as a prompt with followUp streaming behavior [46.70ms]
+(pass) RpcProcessRunner > #given a child killed by signal #when it exits #then the outcome is killed and maps to status error with killed:true [34.46ms]
+(pass) RpcProcessRunner > #given a child that exits nonzero before terminal #when it crashes #then the outcome carries the stderr tail [69.88ms]
+(pass) RpcProcessRunner > #given a resident child #when heartbeats poll #then lastSeen and sessionId are recorded [40.91ms]
+(pass) RpcProcessRunner > #given a spawn #when the descriptor is built #then the child gets an isolated session dir, not the real HOME [11.86ms]
+(pass) RpcProcessRunner > #given an idle resident child #when revived with a follow-up #then waitForIdle re-arms for the new turn instead of the consumed first idle [94.39ms]
+(pass) RpcProcessRunner > #given inheritedExtensions and a spec without its own extensions #when started #then the child spec carries the inherited entries [7.88ms]
+(pass) RpcProcessRunner > #given a spec that already carries extensions #when started #then inheritedExtensions do NOT override them [7.54ms]
+
+packages/senpi-task/src/runners/in-process.test.ts:
+(pass) InProcessRunner > #given a running child #when steered while the prompt is in flight #then the fake session receives it [0.90ms]
+(pass) InProcessRunner > #given a running child #when aborted mid-run #then outcome is cancelled and the session was aborted [0.19ms]
+(pass) InProcessRunner > #given an aborted child #when a follow-up revives it #then the revived turn completes with new final text [0.19ms]
+(pass) InProcessRunner > #given a completing child #when idle #then the last assistant text is extracted [0.13ms]
+(pass) InProcessRunner > #given shared and member-scoped tools #when a child is started #then only member-scoped tools cross the family exclusion [0.20ms]
+(pass) InProcessRunner > #given a tool allowlist and shared lsp tools #when a child is started #then options.tools equals the allowlist while customTools still carries the lsp tool [0.14ms]
+(pass) InProcessRunner > #given a curated child with bash allowed #when the session is constructed #then a restricted bash override replaces the builtin [0.16ms]
+(pass) InProcessRunner > #given a non-curated child #when the session is constructed #then no bash override is injected [0.12ms]
+(pass) InProcessRunner > #given a started child #when the session is constructed #then an in-memory session manager is used [0.11ms]
+(pass) InProcessRunner > #given a completed child #when the runner finishes #then it never disposes and dispose stays idempotent [0.13ms]
+(pass) InProcessRunner > #given a depth over policy #when start is called #then it refuses to construct the session [0.15ms]
+(pass) InProcessRunner > #given a session that fails to construct #when start is called #then a typed session-create failure is thrown with cause [0.18ms]
+(pass) InProcessRunner > #given a prompt that throws #when the child runs #then a typed failure is recorded, the child stays resident, and no rejection escapes [11.30ms]
+(pass) InProcessRunner > #given a subscribed listener #when the child emits lifecycle events #then it observes agent_start before agent_end [0.46ms]
+(pass) InProcessRunner thinking level > #given a spec carrying a thinking level #when the child session is created #then the level reaches the senpi session options [0.17ms]
+(pass) InProcessRunner thinking level > #given a spec without a thinking level #when the child session is created #then no level is forced so senpi keeps its default [0.22ms]
+
+packages/senpi-task/src/steering/engine.test.ts:
+(pass) steering engine over the in-process runner fake > #given a running resident child #when sent a steer #then the steer lands mid-run on the live handle [13.51ms]
+(pass) steering engine over the in-process runner fake > #given a completed resident child #when sent a message #then it revives on the SAME instance with an incremented epoch [2.48ms]
+(pass) steering engine over the in-process runner fake > #given a running resident child #when interrupted then sent #then interrupt keeps partial text and the later send revives [3.14ms]
+(pass) steering engine over the in-process runner fake > #given a running resident child #when cancelled then sent #then destruction runs once and the send is not continuable [2.45ms]
+(pass) steering engine over the in-process runner fake > #given a running child whose abort rejects #when cancelled #then destruction still runs exactly once and the cancel resolves [2.01ms]
+(pass) steering engine over the in-process runner fake > #given a cancelled child #when cancelled again #then it is an idempotent no-op and destruction is not re-run [2.43ms]
+(pass) steering engine over the in-process runner fake > #given a pending child #when two messages are sent #then they queue and deliver in order right after start [1.40ms]
+(pass) steering engine over the rpc runner fake > #given a running resident child #when sent a steer #then the steer lands mid-run on the live handle [1.50ms]
+(pass) steering engine over the rpc runner fake > #given a completed resident child #when sent a message #then it revives on the SAME instance with an incremented epoch [1.82ms]
+(pass) steering engine over the rpc runner fake > #given a running resident child #when interrupted then sent #then interrupt keeps partial text and the later send revives [2.94ms]
+(pass) steering engine over the rpc runner fake > #given a running resident child #when cancelled then sent #then destruction runs once and the send is not continuable [2.06ms]
+(pass) steering engine over the rpc runner fake > #given a running child whose abort rejects #when cancelled #then destruction still runs exactly once and the cancel resolves [1.97ms]
+(pass) steering engine over the rpc runner fake > #given a cancelled child #when cancelled again #then it is an idempotent no-op and destruction is not re-run [1.55ms]
+(pass) steering engine over the rpc runner fake > #given a pending child #when two messages are sent #then they queue and deliver in order right after start [1.17ms]
+(pass) steering engine scope + resolution guards > #given a task owned by another session #when sent without all_scope #then it is scope-denied naming the owning session [33.77ms]
+(pass) steering engine scope + resolution guards > #given a cross-session task #when sent with all_scope #then delivery is allowed [2.52ms]
+(pass) steering engine scope + resolution guards > #given an unknown selector #when sent #then it reports not_found [1.25ms]
+(pass) steering engine scope + resolution guards > #given a task resolved by name #when sent a steer #then the name resolves to the record [1.68ms]
+(pass) steering pending cancellation > #given a pending child with queued sends w2pend #when cancelled then notified started #then the queue is dropped without delivery [1.58ms]
+(pass) steering pending cancellation > #given a pending child w2pend #when interrupted #then it remains pending with a noop outcome [0.84ms]
+(pass) steering pending cancellation > #given a pending child with queued sends w2pend #when dropPending then notified started #then buffered messages are discarded [1.16ms]
+
+packages/senpi-task/src/senpi/thinking-level.test.ts:
+(pass) asSenpiThinkingLevel > #given every senpi thinking level #when validated #then it passes through verbatim [1.81ms]
+(pass) asSenpiThinkingLevel > #given the omo.json reasoningEffort none #when validated #then it maps to senpi off [0.06ms]
+(pass) asSenpiThinkingLevel > #given an unknown variant string #when validated #then it is rejected so the child keeps the harness default [0.06ms]
+(pass) asSenpiThinkingLevel > #given undefined #when validated #then it stays undefined [0.06ms]
+
+packages/senpi-task/src/store/security.test.ts:
+(pass) TaskRecordStore task id boundary > #given hostile task ids #when public path entry points are called #then ids are rejected before writing [13.22ms]
+(pass) parseTaskRecord persisted boundary > #given an old persisted record without resolved model metadata #when listed #then the record remains valid [17.97ms]
+(pass) parseTaskRecord persisted boundary > #given persisted resolved model metadata #when listed #then structured metadata survives the parse round-trip [1.10ms]
+(pass) parseTaskRecord persisted boundary > #given persisted resolved model metadata with a future field #when listed #then known metadata is parsed and the future field is ignored [0.89ms]
+(pass) parseTaskRecord persisted boundary > #given malformed resolved model metadata #when listed #then diagnostic is typed and record is skipped [0.86ms]
+(pass) parseTaskRecord persisted boundary > #given malformed known resolved model fields #when listed #then diagnostic is typed and record is skipped [4.53ms]
+(pass) parseTaskRecord persisted boundary > #given persisted spawn extensions and member env #when listed #then untrusted launch inputs are discarded [0.96ms]
+(pass) parseTaskRecord persisted boundary > #given a persisted killed:true error record #when listed #then the killed FACT survives the parse round-trip [0.92ms]
+(pass) parseTaskRecord persisted boundary > #given a persisted non-boolean killed #when listed #then a typed diagnostic is reported [0.83ms]
+(pass) parseTaskRecord persisted boundary > #given malformed optional pid #when records are listed #then diagnostic is typed and record is skipped [1.20ms]
+(pass) parseTaskRecord persisted boundary > #given malformed optional tool allow #when records are listed #then diagnostic is typed and record is skipped [1.16ms]
+(pass) parseTaskRecord persisted boundary > #given invalid enum sentinel #when diagnostic is reported #then raw rejected value is redacted [1.24ms]
+(pass) createTaskRecord privacy boundary > #given runtime task input with prompt-shaped extras #when created and saved #then extras are not copied into the record or store [1.00ms]
+
+packages/senpi-task/src/store/record-store.test.ts:
+(pass) createTaskRecordStore caching > #given an agent-resolved record #when a fresh store reads it #then source agent round-trips without diagnostics [8.51ms]
+(pass) createTaskRecordStore caching > #given unchanged records #when list() is called repeatedly #then results stay consistent [25.22ms]
+(pass) createTaskRecordStore caching > #given an externally mutated record #when list() runs #then the change is reflected [1.66ms]
+(pass) createTaskRecordStore caching > #given a record removed by another process #when list() runs #then it disappears from results [1.07ms]
+(pass) createTaskRecordStore caching > #given a record replaced through the store #when list() runs #then the cache reflects the new value [1.46ms]
+(pass) createTaskRecordStore event append > #given a removed task #when appendEvent is called again #then the log file is recreated [2.24ms]
+(pass) createTaskRecordStore event append > #given a record save #when the file is read back #then it is compact JSON without pretty-print indentation [1.43ms]
+
+packages/senpi-task/src/store/claim-race.test.ts:
+(pass) claimTaskRecord cross-process race > #given two processes in one frozen id bucket #when they claim task records concurrently #then every record is unique and collisions retry [105.51ms]
+
+packages/senpi-task/src/store/claim.test.ts:
+(pass) claimTaskRecord > #given consecutive persisted records #when a colliding draft is claimed #then it saves the next available record [24.88ms]
+(pass) claimTaskRecord > #given more collisions than the attempt limit #when a draft is claimed #then the final collision propagates [1.51ms]
+(pass) claimTaskRecord > #given a name derived from its id #when the draft is bumped with nameFollowsId #then its name follows the claimed id [0.99ms]
+(pass) claimTaskRecord > #given an unavailable id-derived name #when a draft is claimed #then it skips to the next available id and name [0.87ms]
+(pass) claimTaskRecord > #given unavailable id-derived names exhaust the attempt budget #when a draft is claimed #then it throws task-id space exhaustion [0.40ms]
+(pass) claimTaskRecord > #given a task-id-shaped requested name #when the draft is bumped without nameFollowsId #then its name is preserved verbatim [1.29ms]
+(pass) claimTaskRecord > #given a store that raises a non-collision error #when a draft is claimed #then the error propagates unwrapped [0.36ms]
+(pass) claimTaskRecord > #given a claimed record in an isolated process #when a new id is created #then the id floor follows the claim [47.61ms]
+
+packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts:
+(pass) omo-senpi ultrawork component > #given trigger words #when user input dispatches #then arms via one hidden custom message [0.63ms]
+(pass) omo-senpi ultrawork component > #given a trigger word #when the user text is dispatched #then the typed text is never rewritten [0.13ms]
+(pass) omo-senpi ultrawork component > #given an idle session #when a trigger arms #then the injection carries no delivery override [0.10ms]
+(pass) omo-senpi ultrawork component > #given a steer-queued prompt #when a trigger arms #then the directive stays atomic with the prompt [0.15ms]
+(pass) omo-senpi ultrawork component > #given a followUp-queued prompt #when a trigger arms #then the directive stays atomic with the prompt [0.10ms]
+(pass) omo-senpi ultrawork component > #given a queued /skill: command #when a trigger arms #then the directive is appended so expansion survives [0.11ms]
+(pass) omo-senpi ultrawork component > #given any queued prompt #when a trigger arms #then no hidden message is emitted for it [0.11ms]
+(pass) omo-senpi ultrawork component > #given non-trigger input #when user input dispatches #then injects nothing [0.10ms]
+(pass) omo-senpi ultrawork component > #given recursion guard source extension #when trigger input dispatches #then injects nothing [0.09ms]
+(pass) omo-senpi ultrawork component > #given ultrawork disabled flag #when trigger input dispatches #then suppresses injection [0.08ms]
+(pass) omo-senpi ultrawork component > #given malformed input #when input dispatches #then no-ops safely [0.15ms]
+(pass) omo-senpi ultrawork component > #given ulw-prefixed skill names #when user input dispatches #then injects nothing [0.13ms]
+(pass) omo-senpi ultrawork component > #given input already carrying an ultrawork block #when trigger word dispatches #then does not reinject [0.08ms]
+(pass) omo-senpi ultrawork component > #given /skill: command with a trigger word in args #when dispatched #then arms without touching the command text [0.08ms]
+(pass) omo-senpi ultrawork component > #given a lone open-tag mention without a closing tag #when trigger word dispatches #then still injects [0.07ms]
+(pass) omo-senpi ultrawork component > #given the /skill:ultrawork command itself #when dispatched #then passes through untouched [0.11ms]
+(pass) omo-senpi ultrawork component > #given /skill: command whose trigger appears only in the skill name #when dispatched #then injects nothing [0.07ms]
+(pass) omo-senpi ultrawork component > #given every arming route #when dispatched #then none of them rewrites the user text [0.11ms]
+(pass) omo-senpi ultrawork component > #given synced senpi skill artifact #when description is read #then documents hidden injection instead of inviting a re-read [0.17ms]
+(pass) omo-senpi ultrawork component > #given embedded directive #when inspected #then contains zero forbidden non-senpi tokens [0.55ms]
+(pass) omo-senpi ultrawork component > #given embedded directive #when inspected #then keeps required ultrawork anchors [0.09ms]
+(pass) omo-senpi ultrawork component > #given embedded directive #when inspected #then keeps the senpi-native tool contract [0.10ms]
+(pass) omo-senpi ultrawork component > #given generated directive #when embed script runs check #then passes without drift [46.73ms]
+(pass) omo-senpi ultrawork component > #given generated directive drift #when embed script runs check #then fails [49.06ms]
+
+packages/omo-senpi/src/components/ulw-loop/omo-command.test.ts:
+(pass) omo-senpi ulw-loop omo-command spawn target > #given a .cmd bin on win32 #when building the spawn target #then it wraps with cmd.exe /d /s /c [0.25ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given an uppercase .BAT bin on win32 #when building the spawn target #then it still wraps [0.07ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given an .exe bin on win32 #when building the spawn target #then it spawns directly without cmd.exe [0.06ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given a plain bin on darwin #when building the spawn target #then it is unchanged [0.05ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given a .cmd-looking path on non-win32 #when building the spawn target #then it is NOT wrapped (win32-only guard) [0.05ms]
+
+packages/omo-senpi/src/components/ulw-loop/index.test.ts:
+(pass) omo-senpi ulw-loop continuation > #given no omo binary #when input and agent_end fire #then the component stays inert for the session [0.28ms]
+(pass) omo-senpi ulw-loop continuation > #given active incomplete ulw-loop status #when user input arrives #then steering reminder is injected [0.37ms]
+(pass) omo-senpi ulw-loop continuation > #given incomplete goals #when continuation agent_end fires #then sends exactly one followUp user message [0.13ms]
+(pass) omo-senpi ulw-loop continuation > #given incomplete goals #when continuation repeats #then cap stops the 9th consecutive continuation [0.20ms]
+(pass) omo-senpi ulw-loop continuation > #given continuation cap was reached #when user input resets it #then continuation can resume [0.14ms]
+(pass) omo-senpi ulw-loop continuation > #given stale status snapshot #when user input arrives #then the next identical active status can continue [0.14ms]
+(pass) omo-senpi ulw-loop continuation > #given byte-identical status twice #when continuation repeats #then stale status stops continuation [0.09ms]
+(pass) omo-senpi ulw-loop continuation > #given malformed JSON #when input checks status #then it degrades to no-op with a warning [0.12ms]
+(pass) omo-senpi ulw-loop continuation > #given extension input #when it contains text #then it does not reset or inject [0.12ms]
+(pass) omo-senpi ulw-loop continuation > #given status reports all complete #when continuation fires #then no followUp is sent [0.09ms]
+
+packages/omo-senpi/src/components/ulw-loop/coordinator-routing.test.ts:
+(pass) omo-senpi ulw-loop continuation routing through the idle coordinator > #given a coordinator in ctx #when a continuation fires #then it routes through the coordinator, not a direct user message [0.35ms]
+(pass) omo-senpi ulw-loop continuation routing through the idle coordinator > #given a task completion already queued #when the continuation fires on the same idle edge #then both collapse into one injection [0.18ms]
+(pass) omo-senpi ulw-loop continuation routing through the idle coordinator > #given active boulder start-work continuation #when ulw-loop agent_end fires #then it enqueues nothing [1.68ms]
+
+packages/omo-senpi/src/components/ulw-loop/run-command-containment.test.ts:
+(pass) omo-senpi ulw-loop run-command failure containment > #given runCommand rejects synchronously with EINVAL #when input dispatches #then the handler resolves continue and never rejects [0.26ms]
+(pass) omo-senpi ulw-loop run-command failure containment > #given runCommand resolves non-zero #when agent_end dispatches #then no continuation is sent and the handler resolves [0.13ms]
+(pass) omo-senpi ulw-loop run-command failure containment > #given runCommand rejects but status would otherwise be active #when input dispatches #then no steering reminder is injected [0.14ms]
+
+packages/omo-senpi/src/components/ulw-loop/runtime.test.ts:
+(pass) omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored [0.16ms]
+(pass) omo-senpi ulw-loop runtime > #given omo exists only in a controlled PATH #when resolving the default binary #then it scans PATH without shelling out to Bun [42.18ms]
+(pass) omo-senpi ulw-loop runtime > #given a temp omo binary #when default runOmoCommand executes status #then it captures stdout and cwd via Node-compatible spawning [439.47ms]
+(pass) omo-senpi ulw-loop runtime > #given env and PATH are controlled #when the component registers with defaults #then no Bun global is required for active status handling [359.96ms]
+(pass) omo-senpi ulw-loop runtime > #given built Senpi runs under Node #when inspecting runtime source #then the ulw-loop component has no Bun global dependency [0.20ms]
+
+packages/omo-senpi/src/components/lsp/lsp-architecture.test.ts:
+(pass) omo-senpi lsp architecture boundary > #given the daemon-backed adapter #when source shape is audited #then no vendored LSP engine remains [0.98ms]
+
+packages/omo-senpi/src/components/lsp/lsp-security.test.ts:
+(pass) omo-senpi lsp project config trust > #given untrusted project-local LSP config #when shared server config merges #then arbitrary project commands are not launched [1.05ms]
+(pass) omo-senpi lsp project config trust > #given untrusted project config overrides a builtin #when servers merge #then the builtin command remains selected [0.62ms]
+(pass) omo-senpi lsp project config trust > #given project-local custom commands #when servers merge #then project-local commands remain ignored [0.92ms]
+(pass) omo-senpi lsp project config trust > #given project config customizes safe builtin fields #when servers merge #then command and env still come from the builtin [4.78ms]
+(pass) omo-senpi lsp project config trust > #given user LSP config has a custom command and env #when servers merge #then the user custom server is preserved [3.83ms]
+(pass) omo-senpi lsp project config trust > #given project configs contain multiple unsafe commands #when the component registers #then exactly one migration warning is emitted [8.36ms]
+
+packages/omo-senpi/src/components/lsp/index.test.ts:
+(pass) omo-senpi lsp component > #given the legacy Senpi LSP descriptors #when the daemon-backed component registers #then all non-executor descriptor fields are preserved [1.80ms]
+(pass) omo-senpi lsp component > #given an installed language server #when the component registers #then the exact six LSP tools are exposed [0.12ms]
+(pass) omo-senpi lsp component > #given renamed omo-senpi lsp flags #when diagnostics are disabled #then no LSP tools register [0.09ms]
+(pass) omo-senpi lsp component > #given no language server is resolvable for any file type #when the lsp component registers #then the six tools remain exposed [0.08ms]
+
+packages/omo-senpi/src/components/lsp/daemon-runtime.test.ts:
+(pass) Senpi packaged daemon runtime resolver > #given a shipped extension path #when resolving daemon runtime #then CLI and version are paired from plugin-local runtime [6.72ms]
+(pass) Senpi packaged daemon runtime resolver > #given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .pi context are forwarded [2.49ms]
+(pass) Senpi packaged daemon runtime resolver > #given all six Senpi LSP names #when executing through the packaged client #then canonical Core tool names are used [2.72ms]
+
+packages/omo-senpi/src/components/lsp/lsp-renderers.test.ts:
+(pass) omo-senpi lsp TUI renderers > #given registered LSP tools #when the TUI renders tool activity #then every tool exposes custom call and result renderers [1.19ms]
+
+packages/omo-senpi/src/components/lsp/post-edit-diagnostics.test.ts:
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit diagnostics with errors #when a write tool result arrives #then model-visible diagnostics are injected [0.69ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given many mutated files #when post-edit diagnostics run #then shared orchestration dedupes, bounds concurrency, preserves order, and isolates failures [0.24ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit sessions #when session events fire #then only that session cache resets or deletes [0.30ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given a context with updateToolHookStatus #when post-edit diagnostics run #then the live status label is reported [0.08ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given a non-mutation tool result #when the post-edit handler runs #then no live status is reported [0.06ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit diagnostics are clean #when a write tool result arrives #then no diagnostics are injected [0.06ms]
+
+packages/omo-senpi/src/components/start-work-continuation/index.test.ts:
+(pass) omo-senpi start-work-continuation > #given no boulder state #when agent_end fires #then stays quiet [0.65ms]
+(pass) omo-senpi start-work-continuation > #given malformed boulder JSON #when agent_end fires #then no injection and no throw [0.59ms]
+(pass) omo-senpi start-work-continuation > #given completed work #when agent_end fires #then no injection [0.55ms]
+(pass) omo-senpi start-work-continuation > #given work owned by another harness #when agent_end fires #then no injection [0.47ms]
+(pass) omo-senpi start-work-continuation > #given active work with remaining tasks #when agent_end fires #then injects continuation directive [0.60ms]
+(pass) omo-senpi start-work-continuation > #given zero remaining tasks but total > 0 #when agent_end fires #then still injects final-gate directive [0.55ms]
+(pass) omo-senpi start-work-continuation > #given active work #when directive renders #then it instructs honoring the recorded PR delivery mode [0.56ms]
+(pass) omo-senpi start-work-continuation > #given paused work #when agent_end fires #then injects continuation directive [0.83ms]
+(pass) omo-senpi start-work-continuation > #given identical boulder signature twice #when agent_end repeats #then second is suppressed [0.72ms]
+(pass) omo-senpi start-work-continuation > #given 9 consecutive agent_end events with changing signature #when cap is 8 #then only 8 injections are delivered [1.59ms]
+(pass) omo-senpi start-work-continuation > #given cap reached #when user input arrives #then resets and continuation resumes [53.89ms]
+(pass) omo-senpi start-work-continuation > #given eligible boulder work #when user input arrives #then appends start-work steering reminder [8.33ms]
+(pass) omo-senpi start-work-continuation > #given extension-sourced input #when eligible boulder work exists #then no transform [8.34ms]
+(pass) omo-senpi start-work-continuation > #given missing session manager #when agent_end fires #then skips silently [8.26ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.feedback.test.ts:
+(pass) omo-senpi comment-checker feedback > #given checker violation #when edit completes #then feedback includes the header and offending file [0.96ms]
+(pass) omo-senpi comment-checker feedback > #given checker finds a clean file #when edit completes #then injects nothing [0.27ms]
+(pass) omo-senpi comment-checker feedback > #given unresolvable binary #when eligible results repeat #then component is inert with one notice [0.28ms]
+(pass) omo-senpi comment-checker feedback > #given same file reported twice #when still in one turn #then stale_state debounce emits one report until turn_start [0.29ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.resolver.test.ts:
+(pass) omo-senpi comment-checker binary resolver > #given OMO_COMMENT_CHECKER_BIN and other candidates #when resolving binary #then env var wins first [0.29ms]
+(pass) omo-senpi comment-checker binary resolver > #given package api exports getBinaryPath #when env is unset #then package api resolves before PATH [0.17ms]
+(pass) omo-senpi comment-checker binary resolver > #given env and package resolution fail #when PATH has comment-checker #then PATH fallback resolves last [0.17ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.test.ts:
+(pass) omo-senpi comment-checker component > #given built Senpi runs under Node #when inspecting runtime sources #then comment-checker has no Bun global dependency [0.20ms]
+(pass) omo-senpi comment-checker component > #given every binary resolution path is missing #when eligible results repeat #then inert notice logs once and runner is not called [0.32ms]
+(pass) omo-senpi comment-checker component > #given a context with updateToolHookStatus #when the check runs #then the live status label is reported once [0.19ms]
+(pass) omo-senpi comment-checker component > #given a non-mutation tool result #when tool_result dispatches #then no live status is reported [0.18ms]
+(pass) omo-senpi comment-checker component > #given successful edit result #when tool_result dispatches #then runner receives the right absolute path [0.15ms]
+(pass) omo-senpi comment-checker component > #given bound Senpi session manager #when tool_result dispatches #then runner receives session metadata [0.20ms]
+(pass) omo-senpi comment-checker component > #given successful write result #when tool_result dispatches #then runner receives the written file [0.20ms]
+(pass) omo-senpi comment-checker component > #given read and bash results #when tool_result dispatches #then silent non-edit tools do not trigger [0.15ms]
+(pass) omo-senpi comment-checker component > #given failed edit and write results #when tool_result dispatches #then silent failures do not trigger [0.15ms]
+(pass) omo-senpi comment-checker component > #given missing path and bad payload #when tool_result dispatches #then malformed_input no-ops safely [0.16ms]
+
+packages/omo-senpi/src/components/config-watch/index.test.ts:
+(pass) createConfigWatchComponent > emits one wire-valid omo registration immediately [0.39ms]
+(pass) createConfigWatchComponent > skips without the optional events capability [0.07ms]
+(pass) createConfigWatchComponent > warns that creating user config later requires a reload when its directory and parent are absent [0.08ms]
+(pass) createConfigWatchComponent > logs omo reload and rejection outcomes with paths and errors [0.18ms]
+(pass) createConfigWatchComponent > refreshes targets after rejection without replacing the sticky validator, deferring the re-registration [1.23ms]
+(pass) createConfigWatchComponent > caps deferred re-registration retries when the host rejects deterministically [4.85ms]
+(pass) createConfigWatchComponent > resets the rejection retry budget when the registration payload changes [4.84ms]
+(pass) createConfigWatchComponent > releases event subscriptions on shutdown and replaces subscriptions on repeated register [0.20ms]
+(pass) createConfigWatchComponent > keeps one active registration when ready is emitted repeatedly [0.08ms]
+
+packages/omo-senpi/src/components/config-watch/validate.test.ts:
+(pass) createOmoConfigValidator > #given invalid JSONC in a changed config file #when validating #then rejects with the parse diagnostic [15.35ms]
+(pass) createOmoConfigValidator > #given a schema violation in a changed config file #when validating #then rejects with the validation diagnostic [4.45ms]
+(pass) createOmoConfigValidator > #given a valid changed config #when validating #then accepts and advances the baseline [0.80ms]
+(pass) createOmoConfigValidator > #given a missing optional user config #when validating its path #then accepts [0.37ms]
+(pass) createOmoConfigValidator > #given a pre-existing invalid ancestor layer #when a different valid layer changes #then accepts [0.97ms]
+(pass) createOmoConfigValidator > #given individually valid team layers that newly fail after merge #when the changed layer validates #then rejects the merged diagnostic [1.94ms]
+(pass) createOmoConfigValidator > #given a pre-existing merged-config diagnostic #when an unrelated valid layer changes #then accepts [1.45ms]
+(pass) createOmoConfigValidator > #given an accepted change with a non-attributable pre-existing diagnostic #when another valid change follows #then the updated baseline does not block it [1.56ms]
+(pass) createOmoConfigValidator > #given a rejected change #when an unrelated valid change follows before it is fixed #then rejection remains sticky until the bad diagnostic is gone [17.27ms]
+(pass) createOmoConfigValidator > #given a newly created ancestor .omo directory with invalid JSONC #when validating the directory change #then rejects its descendant diagnostic [4.54ms]
+(pass) createOmoConfigValidator > #given deleting omo.jsonc exposes an invalid sibling omo.json #when validating the deletion #then rejects by containing config directory [12.55ms]
+(pass) createOmoConfigValidator > #given an unreadable changed config path #when validating #then returns its read diagnostic without throwing [8.82ms]
+
+packages/omo-senpi/src/components/config-watch/paths.test.ts:
+(pass) resolveOmoConfigWatchTargets > #given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd-to-home ancestor [5.67ms]
+(pass) resolveOmoConfigWatchTargets > #given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation [0.46ms]
+(pass) resolveOmoConfigWatchTargets > #given a symlinked project .omo directory #when resolving targets #then ignores the symlinked config directory [0.58ms]
+(pass) resolveOmoConfigWatchTargets > #given an existing project .omo directory without a config file #when resolving targets #then watches it for either omo config filename [0.50ms]
+(pass) resolveOmoConfigWatchTargets > #given a missing user config directory with an existing parent #when resolving targets #then watches that parent for omo directory creation [0.48ms]
+(pass) resolveOmoConfigWatchTargets > #given a missing user config directory and parent #when resolving targets #then reports that user-scope creation needs a later reload [0.36ms]
+(pass) resolveOmoConfigWatchTargets > #given the senpi agent dir defaulting under HOME #when resolving targets #then drops every target covering the protected agent paths [0.41ms]
+(pass) resolveOmoConfigWatchTargets > #given an explicit SENPI_CODING_AGENT_DIR under HOME #when resolving targets #then drops the covering ancestor target [0.40ms]
+
+packages/omo-senpi/src/components/codegraph/index.test.ts:
+(pass) createCodegraphComponent > #given registerMcpServer available and supported binary #when registered #then declares codegraph stdio server [0.26ms]
+(pass) createCodegraphComponent > #given bundled binary #when registered #then enables without node support check [0.14ms]
+(pass) createCodegraphComponent > #given binary missing #when registered #then registers disabled placeholder [0.08ms]
+(pass) createCodegraphComponent > #given PATH binary and unsupported node #when registered #then registers disabled placeholder [0.07ms]
+(pass) createCodegraphComponent > #given old senpi without registerMcpServer #when registered #then skips gracefully [0.12ms]
+(pass) createCodegraphComponent > #given senpi-task child marker #when registered #then skips registration [0.08ms]
+(pass) createCodegraphComponent > #given win32 platform and .cmd binary #when registered #then wraps with cmd.exe [0.10ms]
+(pass) createCodegraphComponent > #given argsPrefix #when registered #then prepends before serve --mcp [0.07ms]
+(pass) createCodegraphComponent > #given omo.json codegraph.daemon=true #when registered #then buildCodegraphEnv enables the daemon [1.01ms]
+(pass) createCodegraphComponent > #given OMO_CODEGRAPH_DAEMON=1 and default env builder #when registered #then omits CODEGRAPH_NO_DAEMON [0.11ms]
+(pass) createCodegraphComponent > #given OMO_CODEGRAPH_DAEMON=true (truthy variant) #when registered #then omits CODEGRAPH_NO_DAEMON [0.06ms]
+(pass) createCodegraphComponent > #given no daemon opt-in and default env builder #when registered #then pins CODEGRAPH_NO_DAEMON=1 [0.06ms]
+(pass) createCodegraphComponent > #given OMO_CODEGRAPH_DAEMON=0 #when registered #then pins CODEGRAPH_NO_DAEMON=1 [0.05ms]
+
+packages/omo-senpi/src/components/task/lead-poller-lifecycle.test.ts:
+(pass) lead poller lifecycle > #given owned and foreign teams #when ticks repeat #then only one owned poller is created and reused [0.61ms]
+(pass) lead poller lifecycle > #given an owned lead without a captured session file #when the lifecycle ticks #then it does not reserve inbox delivery until persistence is possible [0.11ms]
+(pass) lead poller lifecycle > #given a compacting parent #when the lifecycle ticks #then the owned poller is suspended [0.09ms]
+(pass) lead poller lifecycle > #given ownership disappears #when the lifecycle reconciles #then the old poller shuts down and cannot resolve [0.09ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when no run id is resolved #then an explicit id is required [0.16ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when no run id is resolved #then the reason lists the owned runs [0.08ms]
+(pass) lead poller lifecycle > #given one owned team #when resolveDefaultTeamRunId is called #then it resolves [0.09ms]
+(pass) lead poller lifecycle > #given no owned team #when resolveDefaultTeamRunId is called #then it reports none [0.06ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when resolveDefaultTeamRunId is called #then it reports ambiguous with the owned runs [0.07ms]
+(pass) lead poller lifecycle > #given a shared delivery journal #when the lifecycle creates a poller #then the journal reaches the poller deps [0.07ms]
+(pass) lead poller lifecycle > #given coordinator delivery states #when an injection enqueues #then scheduling follows streaming idle and transition rules [0.14ms]
+(pass) lead poller lifecycle > #given the component shuts down #when disposed #then the interval and every poller stop [0.10ms]
+
+packages/omo-senpi/src/components/task/team-service.test.ts:
+(pass) createTeamService curated agent gating > #given a team member spec naming a curated read-only agent #when team_create validates members #then the curated rejection message surfaces [1.84ms]
+(pass) createTeamService lead messaging > #given a mapped recipient task #when the lead sends #then the correlation event is persisted on the recipient task [25.30ms]
+(pass) createTeamService lead messaging > #given an active runtime member without a sidecar entry #when the lead sends #then delivery succeeds without a correlation event [6.26ms]
+(pass) createTeamService lead messaging > #given main and provider extensions #when a team member starts #then member tools load before inherited OMO extensions [12.39ms]
+(pass) createTeamService named-team lookup > #given an unknown team_name with declared teams #when createTeam runs #then the error lists the declared teams [3.95ms]
+(pass) createTeamService ownership guard > #given a team owned by another session #when scoped service methods are called #then they reject with an ownership error [34.87ms]
+(pass) createTeamService ownership guard > #given the owning session #when scoped service methods are called #then they proceed [2.58ms]
+
+packages/omo-senpi/src/components/task/engine-agents.test.ts:
+(pass) task engine builtin agent overlay > #given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas [0.84ms]
+(pass) task engine builtin agent overlay > #given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive [1.20ms]
+(pass) task engine builtin agent overlay > #given an omo.json-only agent #when the engine resolves agents #then it is appended alongside the builtins [0.85ms]
+(pass) task engine builtin agent overlay > #given a process override for a curated agent #when the engine resolves agents #then in-process execution remains pinned [0.90ms]
+(pass) task engine builtin agent overlay > #given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable [1.01ms]
+(pass) task engine builtin agent overlay > #given the default engine agents #when the task tool description renders #then all 5 builtin names are advertised sorted [0.84ms]
+(pass) task engine builtin agent overlay > #given agents.oracle.disable in omo.json #when the description renders #then oracle is hidden and the other four stay listed [1.37ms]
+
+packages/omo-senpi/src/components/task/member-liveness.test.ts:
+(pass) team member liveness notifier > #given a SIGKILL member exit while the lead streams #when the terminal record is observed #then one liveness injection reaches the lead with the member and last state [0.37ms]
+(pass) team member liveness notifier > #given a process member killed by SIGKILL #when the manager observes its terminal outcome #then the wired lead notifier injects liveness [22.91ms]
+(pass) team member liveness notifier > #given a normal member completion #when its terminal record is observed #then no liveness event is injected [0.11ms]
+
+packages/omo-senpi/src/components/task/residency-registry.test.ts:
+(pass) createManagerResidencyRegistry rpc teardown bridge > #given an rpc resident #when lifecycle terminates it #then process termination runs without aborting the turn [0.26ms]
+(pass) createManagerResidencyRegistry rpc teardown bridge > #given an rpc resident without a terminate port #when lifecycle terminates it #then teardown rejects instead of leaking silently [0.08ms]
+
+packages/omo-senpi/src/components/task/index.test.ts:
+(pass) omo-senpi task component wiring > #given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired [1.23ms]
+(pass) omo-senpi task component wiring > #given a fake ExtensionAPI boot #when the task component registers #then only injection-driven lead team tools are wired [0.89ms]
+(pass) omo-senpi task component wiring > #given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance [0.97ms]
+(pass) omo-senpi task component wiring > #given the omo-task flag is false #when the component registers #then only the unconditional hygiene sweep handler is wired [0.12ms]
+(pass) omo-senpi task component wiring > #given a malformed omo.json #when the component registers #then it boots with defaults, warns once, and still wires the tools [1.21ms]
+(pass) omo-senpi task component wiring > #given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start [1.21ms]
+(pass) omo-senpi task component wiring > #given a session start #when reconciliation runs #then reattach, cleanup, mailbox reclaim, notification retry, and lead polling stay ordered [0.69ms]
+(pass) omo-senpi task component wiring > #given a captured ui #when session_before_switch fires #then the ui bridge is cleared [0.69ms]
+(pass) omo-senpi task component wiring > #given a captured ui #when session_shutdown fires #then the ui bridge is cleared [0.68ms]
+(pass) omo-senpi task component wiring > #given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes [0.09ms]
+
+packages/omo-senpi/src/components/task/commands.test.ts:
+(pass) registerTaskCommands > #given the component registers commands #when inspecting the api #then /tasks and /task-kill exist [0.14ms]
+(pass) registerTaskCommands > #given tasks in two sessions #when /tasks runs #then only the current session's rows print [0.37ms]
+(pass) registerTaskCommands > #given tasks in two sessions #when /tasks --all runs #then every session's rows print [0.10ms]
+(pass) registerTaskCommands > #given a cancellable task #when /task-kill selects it and confirms #then cancelTask runs for that id [0.32ms]
+(pass) registerTaskCommands > #given a task with a description #when /task-kill lists options #then the human label leads and the id trails [0.12ms]
+(pass) registerTaskCommands > #given a multi-word description #when /task-kill selects and confirms #then cancelTask runs for the task id, not a word of the label [0.09ms]
+(pass) registerTaskCommands > #given the selector is dismissed #when /task-kill runs #then nothing is cancelled [0.07ms]
+(pass) registerTaskCommands > #given no cancellable tasks #when /task-kill runs #then it notifies and never opens the selector [0.10ms]
+
+packages/omo-senpi/src/components/task/planner.test.ts:
+(pass) createTaskChildPlanner > #given a category with model metadata #when planned #then resolved_model preserves display, variant, and reasoning effort [1.17ms]
+(pass) createTaskChildPlanner > #given ultrabrain falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata [0.15ms]
+(pass) createTaskChildPlanner > #given an explicit provider model #when planned #then explicit metadata does not invent variant or reasoning effort [0.06ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model [0.21ms]
+(pass) createTaskChildPlanner > #given an explicit model with subagent_type and no registry #when planned #then the agent persona is kept and the model stays explicit [0.07ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent with no registry #when planned #then it fails closed with the registry-unavailable error [0.06ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a category rather than an agent #when planned #then category resolution still applies [0.10ms]
+(pass) createTaskChildPlanner > #given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available [0.07ms]
+(pass) createTaskChildPlanner > #given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement [0.06ms]
+(pass) createTaskChildPlanner > #given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories [0.06ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent whose chain no registry model satisfies #when planned #then it reports model_unavailable with the agent list [0.09ms]
+(pass) createTaskChildPlanner plan variant > #given a category with an explicit reasoning effort and a variant #when planned #then the applied variant is the reasoning effort [0.07ms]
+(pass) createTaskChildPlanner plan variant > #given a category resolving a variant-bearing fallback without reasoning effort #when planned #then the applied variant is the resolved variant [0.07ms]
+(pass) createTaskChildPlanner plan variant > #given an explicit provider model #when planned #then no variant is applied [0.04ms]
+(pass) createTaskChildPlanner plan variant > #given momus resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model [0.08ms]
+
+packages/omo-senpi/src/components/task/usage-guidance.test.ts:
+(pass) task usage guidance > #given the once-per-session task hint #when rendered #then it teaches steer-only team delivery without a blocking wait [0.10ms]
+
+packages/omo-senpi/src/components/task/planner-model-name-boundary.test.ts:
+(pass) task planner model-name boundary > #given an own safe model name #when category planning resolves #then the friendly name is preserved [0.24ms]
+(pass) task planner model-name boundary > #given an inherited model name #when category planning resolves #then the inherited value is ignored [0.07ms]
+(pass) task planner model-name boundary > #given a throwing model name accessor #when category planning resolves #then the accessor is never invoked [0.06ms]
+(pass) task planner model-name boundary > #given terminal controls or an oversized model name #when category planning resolves #then unsafe names are ignored [0.07ms]
+
+packages/omo-senpi/src/components/task/process-sweep.test.ts:
+(pass) wireSessionStartProcessSweep() > #given a wired sweep #when session_start fires #then the family sweep runs [0.24ms]
+(pass) wireSessionStartProcessSweep() > #given the RPC child marker is set #when session_start fires #then the sweep is skipped [0.22ms]
+(pass) wireSessionStartProcessSweep() > #given a never-resolving sweep #when session_start fires #then the handler returns without blocking [0.13ms]
+(pass) wireSessionStartProcessSweep() > #given a failing sweep #when session_start fires #then the failure is logged and cannot propagate [0.13ms]
+(pass) wireSessionStartProcessSweep() > #given a synchronously throwing sweep #when session_start fires #then the failure is logged and cannot propagate [0.08ms]
+
+packages/omo-senpi/src/components/task/parent-notifier.test.ts:
+(pass) createParentNotifier batched injection delivery > #given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer [0.17ms]
+(pass) createParentNotifier batched injection delivery > #given two near-simultaneous completions #when the batch window closes #then BOTH arrive in ONE steer injection [0.08ms]
+(pass) createParentNotifier batched injection delivery > #given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry [0.07ms]
+(pass) createParentNotifier batched injection delivery > #given an IDLE parent #when two completions land in the same tick #then one microtask followUp carries both [0.11ms]
+(pass) createParentNotifier batched injection delivery > #given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel [0.06ms]
+
+packages/omo-senpi/src/components/task/runtime-context.test.ts:
+(pass) TaskRuntimeContext session facts > #given a live session manager with its file #when captured #then the exact file path is retained [0.12ms]
+
+packages/omo-senpi/src/components/task/engine-runner-routing.test.ts:
+(pass) task engine runner routing > #given an invalid event task id #when the adapter appends an audit event #then store rejection is contained [11.64ms]
+(pass) task engine runner routing > #given a process-mode spawn #when the manager launches #then the process runner receives the spec and the in-process runner does not [16.80ms]
+(pass) task engine runner routing > #given an in-process spawn #when the manager launches #then the in-process runner receives the spec and the process runner does not [3.53ms]
+
+packages/omo-senpi/src/components/task/session-transition-bridge.test.ts:
+(pass) createSessionTransitionBridge transition marking > #given a session about to switch #when onBeforeSwitch fires #then the runtime enters the switching transition [1.41ms]
+(pass) createSessionTransitionBridge transition marking > #given a session about to compact #when onBeforeCompact fires #then the runtime enters the compacting transition [0.06ms]
+(pass) createSessionTransitionBridge transition marking > #given a session shutting down #when onShutdown fires #then the runtime enters the shutdown transition [0.04ms]
+(pass) createSessionTransitionBridge transition marking > #given no pending transition #when a fresh session starts #then no flush is attempted [0.05ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered during compaction #when the same session compacts through #then the buffered completion is flushed and delivered [0.20ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered before a switch #when a different session replaces it #then the completion is dropped, not delivered [0.09ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered before a switch #when the same session resumes #then the buffered completion is delivered [0.06ms]
+
+packages/omo-senpi/src/components/task/message-renderers.test.ts:
+(pass) task-family custom message renderers > #given terminal control injection #when rendering task completion #then structured CJK details are sanitized [0.83ms]
+(pass) task-family custom message renderers > #given structured completion details #when rendering #then user-facing task facts replace protocol tags [0.13ms]
+(pass) task-family custom message renderers > #given a liveness event #when rendering #then member state and a sanitized crash reason are visible [0.11ms]
+(pass) task-family custom message renderers > #given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries [0.15ms]
+
+packages/omo-senpi/src/components/task/team-service-support.test.ts:
+(pass) makeShutdownMessenger > #given a mapped running member #when a shutdown notice is sent #then the notice steers into the running turn [3.99ms]
+
+packages/omo-senpi/src/components/task/status-ui.test.ts:
+(pass) formatFooterStatus > #given two running tasks #when formatting the footer #then compact active counts and a task tail render [0.30ms]
+(pass) formatFooterStatus > #given no tasks #when formatting the footer #then it is undefined so the status clears [0.06ms]
+(pass) formatFooterStatus > #given errored and completed terminals #when formatting #then done and err counts are distinct [0.07ms]
+(pass) formatFooterStatus > #given a 137-column active task #when formatting the footer #then it remains one physical line at 72 and 120 columns [0.11ms]
+(pass) buildWidgetRows > #given more than five active tasks #when building rows #then it caps at five and adds a +N more row [0.16ms]
+(pass) buildWidgetRows > #given only terminal tasks #when building rows #then no rows render (widget clears) [0.04ms]
+(pass) buildWidgetRows > #given an active task #when building a row #then it retains useful id, target, model, mode, and status context [0.06ms]
+(pass) buildWidgetRows > #given a 137-column active task #when building its widget row #then it remains one physical line at 72 and 120 columns [0.07ms]
+(pass) formatTaskRow > #given a category task with resolved model metadata #when formatting #then category, display model, reasoning, variant, mode, and status render in one order [0.06ms]
+(pass) formatTaskRow > #given a task with a description #when formatting #then the human label leads and name and id trail [0.05ms]
+(pass) formatTaskRow > #given a legacy task without resolved model metadata #when formatting #then raw model is preserved as the model label [0.05ms]
+(pass) formatTaskRow > #given empty resolved model detail labels #when formatting #then empty reasoning and variant labels are omitted [0.05ms]
+(pass) formatTaskRow > #given matching reasoning and variant values #when formatting #then the duplicate variant label is omitted [0.04ms]
+(pass) formatTaskRow > #given a stale malformed running record with final_response #when formatting defensively #then the progress excerpt is terminal-width safe and concise [0.14ms]
+(pass) createTaskStatusUi.syncNow > #given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session [0.43ms]
+(pass) createTaskStatusUi.syncNow > #given controls across a stale malformed running record with final_response #when syncing defensively #then the row widget and footer are sanitized without damaging CJK text [0.29ms]
+(pass) createTaskStatusUi.syncNow > #given no captured ui context #when syncing #then it is a no-op [0.12ms]
+(pass) createTaskStatusUi.syncNow > #given a non-tui mode #when syncing #then UI is skipped [0.07ms]
+(pass) createTaskStatusUi.syncNow > #given all tasks terminal #when syncing #then the widget is cleared [0.07ms]
+(pass) createTaskStatusUi.background progress > #given two background children #when their latest task events arrive within one debounce window #then footer and widget show truncated descriptions, activity, elapsed time, and spinner frames [0.76ms]
+(pass) createTaskStatusUi.scheduleSync > #given a just-started background child #when the store mutation schedules a render #then it subscribes before the debounce fires [0.17ms]
+(pass) createTaskStatusUi.scheduleSync > #given several rapid schedule calls #when the debounce fires #then syncNow runs once (250ms debounce) [0.31ms]
+(pass) createTaskStatusUi.scheduleSync > #given a pending debounce #when dispose is called #then the timer is cleared and syncNow never runs [0.20ms]
+
+packages/omo-senpi/src/components/telemetry/telemetry.test.ts:
+(pass) omo-senpi telemetry daily activity > #given no daily stamp #when session_start fires #then first session emits daily-active telemetry [17.89ms]
+(pass) omo-senpi telemetry daily activity > #given a same-day stamp #when session_start fires again #then second same-day session does not emit [1.05ms]
+(pass) omo-senpi telemetry daily activity > #given product disable opt-out #when session_start fires #then opt-out suppresses emission and stamp writes [0.32ms]
+(pass) omo-senpi telemetry daily activity > #given product anonymous telemetry opt-out #when session_start fires #then opt-out suppresses emission and stamp writes [0.18ms]
+(pass) omo-senpi telemetry daily activity > #given global opt-out #when session_start fires #then opt-out suppresses emission and stamp writes [0.16ms]
+(pass) omo-senpi telemetry daily activity > #given SENPI_CODING_AGENT_DIR #when telemetry records #then stamp file location respects the isolated senpi agent dir [0.97ms]
+
+packages/omo-senpi/src/components/telemetry/telemetry.payload.test.ts:
+(pass) omo-senpi telemetry payloads > #given telemetry component and telemetry-core builder #when session_start captures through injected transport #then payload equivalence holds [3.65ms]
+(pass) omo-senpi telemetry payloads > #given missing env and empty session payload #when session_start fires #then defaults are safe and no exception escapes [0.94ms]
+(pass) omo-senpi telemetry payloads > #given a hanging transport #when session_start fires #then send failure does not block the session_start path [1.00ms]
+
+packages/senpi-task/src/tools/output/renderers.test.ts:
+(pass) task_output renderers > #given task_output arguments #when rendering calls #then rows show target mode peek and only relevant tail lines [0.18ms]
+(pass) task_output renderers > #given a long multiline Korean and English target #when rendering with ANSI at width 72 #then target is normalized truncated and column-safe [0.24ms]
+(pass) task_output renderers > #given a width smaller than the fixed call tokens #when rendering task_output #then the complete ANSI row is clamped [0.07ms]
+(pass) task_output renderers > #given every result detail kind #when rendering compact rows #then rows are exhaustive and transcripts are not echoed [0.24ms]
+(pass) task_output renderers > #given a described task #when the status row renders #then the human label leads and the id trails [0.07ms]
+(pass) task_output renderers > #given long multiline Korean and English known tasks #when rendering not_found at width 96 #then known list is normalized truncated and column-safe [0.12ms]
+(pass) task_output renderers > #given resolved model details #when the status row renders #then the canonical target token is used [0.09ms]
+(pass) task_output renderers > #given injected controls in task_output model metadata #when the status row renders #then it is plain and sanitized [0.07ms]
+(pass) task_output renderers > #given injected controls in a task_output result #when rendered #then dynamic controls are removed before trusted theme styling [0.08ms]
+(pass) task_output run stats rendering > #given a terminal snapshot with run stats #when the status row renders #then runtime and tps are shown [0.09ms]
+(pass) task_output run stats rendering > #given a snapshot without run stats #when the status row renders #then no runtime tokens appear [0.06ms]
+
+packages/senpi-task/src/tools/output/output-block.test.ts:
+(pass) runTaskOutput non-blocking peek > #given a running child #when task_output reads its status #then it returns its running snapshot without waiting [0.35ms]
+(pass) runTaskOutput non-blocking peek > #given a legacy block true param #when task_output runs #then it redirects to notification-driven peeks [0.09ms]
+(pass) runTaskOutput non-blocking peek > #given a legacy block false param #when task_output runs #then it redirects to notification-driven peeks [0.04ms]
+(pass) runTaskOutput non-blocking peek > #given a legacy blocking timeout param #when task_output runs #then it redirects to notification-driven peeks [0.04ms]
+
+packages/senpi-task/src/tools/output/output.test.ts:
+(pass) runTaskOutput > #given a completed task in tail mode #when read #then the last assistant text is present [0.27ms]
+(pass) runTaskOutput > #given default mode #when read #then a status snapshot with final_response is returned [0.09ms]
+(pass) runTaskOutput > #given a task with a resolved model #when read #then status uses display plus reasoning details [0.10ms]
+(pass) runTaskOutput > #given a task without a resolved model #when read #then status keeps raw model fallback [0.07ms]
+(pass) runTaskOutput > #given a lost task #when read #then a status view with a lost explanation and pid/session-dir breadcrumbs is returned without throwing [0.16ms]
+(pass) runTaskOutput > #given a task owned by another session #when read #then it is not found (fail-closed scope) [0.07ms]
+(pass) runTaskOutput > #given no caller session #when read #then it fails closed as not found [0.05ms]
+(pass) runTaskOutput > #given neither task_id nor name #when read #then invalid arguments are reported [0.05ms]
+(pass) runTaskOutput > #given a name instead of an id #when read #then the task is resolved by name [0.07ms]
+
+packages/senpi-task/src/tools/output/integration.test.ts:
+(pass) readEventLogTranscript > #given a committed team_message_waited event #when task_output reads the event log #then the recovered body is visible [12.06ms]
+(pass) readEventLogTranscript > #given a store event log with transcript events #when read #then assistant and tool entries are reconstructed in order [3.60ms]
+(pass) readEventLogTranscript > #given no log file #when read #then an empty list is returned without throwing [7.72ms]
+(pass) readSessionDirTranscript > #given a child session jsonl on disk #when read #then assistant text entries are extracted [7.84ms]
+(pass) defaultTranscriptReader > #given both sources present #when read #then the event log wins and the source is reported [0.99ms]
+(pass) defaultTranscriptReader > #given only a session dir #when read #then the session jsonl source is used [4.33ms]
+(pass) defaultTranscriptReader > #given neither source #when read #then the source is none [0.25ms]
+
+packages/senpi-task/src/tools/output/render.test.ts:
+(pass) renderTranscript > #given entries #when full mode #then every entry is rendered and not truncated [1.05ms]
+(pass) renderTranscript > #given a transcript with more lines than tailLines #when tail mode #then only the last tailLines lines remain [0.09ms]
+(pass) renderTranscript > #given a transcript longer than the cap #when rendered #then it is elided with a head/tail marker under the cap [0.08ms]
+(pass) renderTranscript > #given no entries #when rendered #then an empty-transcript notice is returned and not truncated [0.04ms]
+(pass) renderTranscript error entries > #given an error transcript entry #when rendered #then it is shown as an error line [0.04ms]
+
+packages/senpi-task/src/tools/output/factory.test.ts:
+(pass) output tool factories > #given the output factory #when built #then name, label, and TypeBox params are wired [0.09ms]
+
+packages/senpi-task/src/tools/team/messaging.test.ts:
+(pass) team messaging route > #given a message to the lead #when it is enqueued #then it reports the lead inbox result [0.28ms]
+(pass) team messaging route > #given a member-direction message #when enqueued #then it reports the recipient list [0.08ms]
+(pass) team messaging route > #given a recipient backpressure error #when send runs #then it surfaces recipient_backpressure [0.13ms]
+(pass) team messaging route > #given a non-lead broadcast #when send runs #then it surfaces broadcast_denied [0.07ms]
+(pass) member-routed team messaging > #given a member targeting a non-member #when send runs #then it surfaces invalid_recipient [0.07ms]
+
+packages/senpi-task/src/tools/team/lifecycle-collision.test.ts:
+(pass) team_create collision handling > #given a first-save collision #when the real team_create tool creates a team #then the team activates without a member rejection or raw collision [21.13ms]
+
+packages/senpi-task/src/tools/team/tasks.test.ts:
+(pass) task_create tool > #given a new task #when create runs #then it reports the created task [0.31ms]
+(pass) task_create tool > #given a blocked task #when create runs #then the text names the blockers [0.10ms]
+(pass) task_create tool > #given a subject with embedded newlines #when create runs #then the text collapses them onto one line [0.09ms]
+(pass) task_create tool > #given a subject with embedded newlines #when create runs #then the text collapses them onto one line [0.09ms]
+(pass) task_create tool > #given adversarial owner and blocked_by values #when list and get run #then the echoed fields are collapsed and bounded [0.29ms]
+(pass) task_create tool > #given the factory #when built #then it names the tool task_create [0.05ms]
+(pass) task_list tool > #given tasks #when list runs #then it reports them, forwarding the filter [0.12ms]
+(pass) task_list tool > #given the factory #when built #then it names the tool task_list [0.04ms]
+(pass) task_get tool > #given an existing task #when get runs #then it reports the task [0.08ms]
+(pass) task_get tool > #given a missing task #when get runs #then it reports not_found [0.11ms]
+(pass) task_get tool > #given the factory #when built #then it names the tool task_get [0.04ms]
+(pass) task_update tool > #given a status update #when update runs #then it reports the updated task [0.17ms]
+(pass) task_update tool > #given an already-claimed task #when claim runs #then it reports already_claimed [0.09ms]
+(pass) task_update tool > #given a blocked task #when claim runs #then it reports blocked_by [0.07ms]
+(pass) task_update tool > #given an illegal transition #when update runs #then it reports invalid_transition [0.06ms]
+(pass) task_update tool > #given a cross-owner update #when update runs #then it reports cross_owner [0.06ms]
+(pass) task_update tool > #given the factory #when built #then it names the tool task_update [0.04ms]
+
+packages/senpi-task/src/tools/team/shutdown.test.ts:
+(pass) shutdown request route > #given a member #when request runs #then it reports requested [0.29ms]
+(pass) shutdown request route > #given an unknown member #when request runs #then it reports unknown_member [0.12ms]
+(pass) shutdown approve route > #given a pending request #when approve runs #then it reports approved [0.12ms]
+(pass) shutdown approve route > #given no pending request #when approve runs #then it reports no_pending_request [0.08ms]
+(pass) shutdown reject route > #given a pending request #when reject runs #then it reports rejected with the reason [0.14ms]
+(pass) shutdown reject route > #given no pending request #when reject runs #then it reports no_pending_request [0.07ms]
+
+packages/senpi-task/src/tools/team/allowlist.test.ts:
+(pass) member child team-tool allowlist > #given the lead team tools w2lead #when built #then the injection-only surface has no blocking wait [0.09ms]
+(pass) member child team-tool allowlist > #given the lead team tools as shared parent tools #when filtered for a child #then all are excluded [0.06ms]
+(pass) member child team-tool allowlist > #given a member with the pre-scoped send #when child tools merge #then ONLY task_send survives [0.09ms]
+
+packages/senpi-task/src/tools/team/lifecycle.test.ts:
+(pass) team_create tool > #given the team_create schema #when inspected #then it exposes no model-supplied lead_session_id override [0.12ms]
+(pass) team_create tool > #given an inline spec #when team_create runs #then it reports the created run and members [0.22ms]
+(pass) team_create tool > #given members with roles, models, and prompts #when team_create runs #then the text lists every member informatively and keeps the first line stable [0.18ms]
+(pass) team_create tool > #given both team_name and inline_spec #when team_create runs #then it rejects with invalid_arguments [0.07ms]
+(pass) team_create tool > #given neither team_name nor inline_spec #when team_create runs #then it rejects with invalid_arguments [0.06ms]
+(pass) team_create tool > #given a spec error #when team_create runs #then it surfaces spec_error with the code [0.11ms]
+(pass) team_create tool > #given a bounds runtime error #when team_create runs #then it surfaces runtime_error with the code [0.08ms]
+(pass) team_create tool > #given the factory #when built #then it names the tool team_create [0.04ms]
+(pass) team_delete tool > #given an active run #when team_delete runs #then it reports the deleted run + cancelled tasks [0.16ms]
+(pass) team_delete tool > #given cancelled member tasks #when team_delete runs #then the text names the cancelled task ids [0.07ms]
+(pass) team_delete tool > #given force #when team_delete runs #then it forwards force=true [0.06ms]
+(pass) team_delete tool > #given an illegal delete state #when team_delete runs #then it surfaces invalid_state [0.08ms]
+(pass) team_delete tool > #given the factory #when built #then it names the tool team_delete [0.04ms]
+(pass) team_create inline_spec schema shape > #given the team_create schema #when inline_spec is inspected #then it exposes an object shape with members (no bare Unknown) [0.05ms]
+(pass) team_create inline_spec schema shape > #given a JSON-stringified inline spec #when team_create runs #then the parsed object reaches the service [0.10ms]
+(pass) team_create inline_spec schema shape > #given the team_create schema #when a single-member-object inline spec is validated #then it passes [0.98ms]
+(pass) team_create inline_spec schema shape > #given an inline spec whose members is a single object #when team_create runs #then the service receives it [0.13ms]
+(pass) team_create inline_spec schema shape > #given a malformed JSON string inline spec #when team_create runs #then it rejects without calling the service [0.09ms]
+
+packages/senpi-task/src/tools/task/description.test.ts:
+(pass) buildTaskToolDescription > #given a custom omo.json category #when the description is built #then it lists that category dynamically [0.14ms]
+(pass) buildTaskToolDescription > #given the description #when built #then it enforces the category XOR subagent_type contract [0.06ms]
+(pass) buildTaskToolDescription > #given the description #when built #then it describes spawn-only task and task_send continuation [0.05ms]
+(pass) buildTaskToolDescription > #given loaded agents #when built #then it lists available agent types [0.04ms]
+(pass) buildTaskToolDescription > #given the prompt surfaces #when read #then snippet and guidelines are present [0.04ms]
+
+packages/senpi-task/src/tools/task/skills.test.ts:
+(pass) buildSkillPrepend > #given resolved skills #when prepended #then each SKILL.md is wrapped before the prompt [1.21ms]
+(pass) buildSkillPrepend > #given no skills #when prepended #then the prompt is returned unchanged [0.05ms]
+(pass) createFsSkillLoader > #given a project skill dir #when a skill is loaded #then its SKILL.md content is resolved and prepended [0.91ms]
+(pass) createFsSkillLoader > #given a missing skill #when loaded #then it is reported missing and prepend is empty [0.49ms]
+(pass) createFsSkillLoader > #given extra search dirs #when a skill lives there #then it resolves from the extra dir [0.84ms]
+
+packages/senpi-task/src/tools/task/execute-batch.test.ts:
+(pass) buildTaskExecute batch fanout >  w2batch #given three sync items #when all complete #then details preserve input order with aggregate completed [0.68ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given one runner error #when the sync batch settles #then both successes remain and aggregate status is error [0.17ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given an oversized batch #when executed #then it rejects before starting any item [0.11ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given a thrown middle start #when later items can start #then every item outcome is preserved [0.18ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given background capacity one #when three items start #then all ids and queue positions return as running [0.20ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given a parent abort during three waits #when the batch settles #then every non-terminal child is cancelled [0.22ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given one tasks item #when compared with a legacy prompt #then the single-spawn result is identical [0.27ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given one denied item #when other sync items complete #then denial has an empty id and aggregate error [0.17ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given every background start fails #when results are aggregated #then status is error instead of running [0.12ms]
+(pass) buildTaskExecute batch fanout >  w2batch #given a model_unavailable start failure #when executed #then the error names valid category names with an override hint [0.09ms]
+
+packages/senpi-task/src/tools/task/tool.test.ts:
+(pass) createTaskTool > #given deps #when the tool is created #then it exposes the senpi ToolDefinition surface [1.21ms]
+(pass) createTaskTool > #given a custom omo.json category #when the description is read #then it lists that category (dynamic snapshot) [0.07ms]
+(pass) createTaskTool > #given the assembled tool #when parameters are read #then the shared TypeBox schema leaves prompt/tasks optional (XOR enforced in validateBatchShape) [0.05ms]
+(pass) createTaskTool > #given the real task call renderer #when rendered at 72 columns #then actual prompt and italic background mode are visible [0.35ms]
+(pass) createTaskTool > #given a category task call #when rendered #then the call row is prompt-only without category or model [0.12ms]
+(pass) createTaskTool > #given an agent task call #when rendered #then the call row is prompt-only without the agent target [0.08ms]
+(pass) createTaskTool > #given a partial child progress result #when rendered #then only the last-line row renders (status lives in senpi's progress line) [0.11ms]
+(pass) createTaskTool > #given a partial result with empty content #when rendered #then no extra rows render below the call line [0.05ms]
+(pass) createTaskTool > #given the real task result renderer #when a category result is rendered #then resolved context and italic foreground mode are visible [0.27ms]
+(pass) createTaskTool > #given an ultrabrain background result #when rendered at 72 columns #then every required context token remains complete [0.17ms]
+
+packages/senpi-task/src/tools/task/execute-spawn.test.ts:
+(pass) buildTaskExecute spawn > #given run_in_background true #when executed #then it returns immediately WITHOUT awaiting child completion [0.25ms]
+(pass) buildTaskExecute spawn > #given the caller session #when spawning #then callerSessionId is injected as parent_session_id [0.12ms]
+(pass) buildTaskExecute spawn > #given a resolved background start #when executed #then resolved metadata and background mode reach result details without prompt persistence [0.10ms]
+(pass) buildTaskExecute spawn > #given config default execution mode #when spawning without an agent overlay #then config mode reaches the start spec [0.10ms]
+(pass) buildTaskExecute spawn > #given load_skills #when spawning #then resolved SKILL.md content is prepended to the child prompt [0.17ms]
+(pass) buildTaskExecute spawn > #given run_in_background falsy #when executed #then it composes start + waitFor and returns the final response inline [0.23ms]
+(pass) buildTaskExecute spawn > #given a resolved foreground record #when execution completes #then resolved metadata, raw model fallback, and foreground mode reach details [0.13ms]
+(pass) buildTaskExecute spawn > #given both category and subagent_type #when executed #then it returns the XOR error result without spawning [0.09ms]
+(pass) buildTaskExecute spawn > #given an unknown category #when executed #then it returns the category-listing plan error [0.09ms]
+(pass) buildTaskExecute spawn > #given an injected ancestry #when spawning #then child depth and root derive from it [0.10ms]
+
+packages/senpi-task/src/tools/task/renderers.test.ts:
+(pass) statusThemeColor > #given terminal statuses #when mapped #then success/error/warning colors are chosen [0.10ms]
+(pass) taskCallLines > #given current spawn arguments #when rendered #then the plain row includes task, target, actual prompt, and mode [0.09ms]
+(pass) taskCallLines > #given a category spawn call #when rendered #then its current target prompt and mode stay stable through extraction [0.05ms]
+(pass) taskCallLines > #given a spawn call #when rendered #then target and mode are summarized [0.04ms]
+(pass) taskCallLines > #given a spawn call without a target #when rendered #then it falls back to a generic task label [0.04ms]
+(pass) taskCallLines > #given a long multiline Korean and English prompt #when rendered #then the actual prompt is normalized and width-safe [0.13ms]
+(pass) taskCallLines > #given a long Korean prompt #when excerpted #then truncation backs up to a word boundary [0.11ms]
+(pass) taskResultLines >  w2batch #given aggregate item details #when rendered #then each item receives its own ordered result line [0.12ms]
+(pass) taskResultLines > #given a result detail #when rendered #then task_id and status appear [0.06ms]
+(pass) taskResultLines > #given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear [0.08ms]
+(pass) taskResultLines > #given a legacy explicit model result #when rendered #then raw model fallback is useful without empty labels [0.05ms]
+(pass) taskResultLines > #given a persisted display already prefixed by the provider #when full and compact rows render #then the provider is not duplicated [0.17ms]
+(pass) taskResultLines > #given resolved category context #when the real result component renders at width 72 #then provider, friendly model, and reasoning stay visible within bounds [0.12ms]
+(pass) renderer grammar > #given long multiline Korean and English text #when excerpted at width 72 #then whitespace is normalized and terminal width is bounded [0.08ms]
+(pass) renderer grammar > #given adversarial terminal sequences and Korean whitespace #when normalized #then controls are removed without damaging ordinary text [0.09ms]
+(pass) renderer grammar > #given injected ANSI in task call and result fields #when themed #then injected controls are removed while trusted theme ANSI remains [0.09ms]
+(pass) linesComponent > #given lines #when a component is built #then render returns those lines and invalidate is callable [0.05ms]
+(pass) linesComponent > #given long Korean and English lines #when rendered at width 72 #then every row is truncated by visible width [0.07ms]
+(pass) taskResultLines run stats > #given terminal details with run stats #when rendered #then runtime and tps tokens are appended [0.17ms]
+(pass) taskResultLines run stats > #given details without run stats #when rendered #then no runtime tokens appear [0.13ms]
+
+packages/senpi-task/src/tools/task/categories.test.ts:
+(pass) listTaskCategories > #given empty omo config #when listed #then builtin categories carry their descriptions [0.16ms]
+(pass) listTaskCategories > #given a custom omo.json category #when listed #then it appears with its description [0.07ms]
+(pass) listTaskCategories > #given a disabled category #when listed #then it is omitted [0.06ms]
+(pass) listTaskAgents > #given loaded agent definitions #when listed #then names and descriptions surface, disabled excluded [0.06ms]
+
+packages/senpi-task/src/tools/task/execute-progress.test.ts:
+(pass) task description wiring > #given a spawn with a description #when the manager starts the child #then the spec carries the human label [0.30ms]
+(pass) task description wiring > #given a background spawn with a description #when the start is acknowledged #then the text leads with the human label [0.17ms]
+(pass) foreground task progress > #given a live child #when it emits task events #then partial updates reflect child state and unsubscribe at completion [0.41ms]
+(pass) foreground task progress > #given a queued child #when it is promoted #then it emits queued progress then attaches at promotion [0.23ms]
+
+packages/senpi-task/src/tools/task/params.test.ts:
+(pass) TaskToolParams > #given the schema #when inspected #then it is a TypeBox object with the task tool fields [0.13ms]
+(pass) TaskToolParams > #given the schema #when properties are inspected #then removed task params are absent [0.08ms]
+(pass) TaskToolParams > #given the schema #when required fields are read #then neither prompt nor tasks is schema-required (the prompt-XOR-tasks rule is enforced by validateBatchShape) [0.05ms]
+(pass) TaskToolParams > #given batch task parameters #when schema is inspected #then a finite maximum is enforced [0.05ms]
+
+packages/senpi-task/src/tools/task/execute-continuation.test.ts:
+(pass) buildTaskExecute spawn-only > #given the task tool #when executed #then it always starts a new child task [1.25ms]
+
+packages/senpi-task/src/tools/task/execute-collision.test.ts:
+(pass) buildTaskExecute collision handling > #given a first-save collision #when one background task executes #then it reports a normal started result without the raw collision [16.16ms]
+(pass) buildTaskExecute collision handling > #given a first-save collision #when a two-item background batch executes #then both tasks start without the raw collision [2.31ms]
+
+packages/senpi-task/src/tools/task/integration.test.ts:
+(pass) task tool over the real TaskManager > #given a background spawn #when driven end to end #then the engine start API persists a running record and returns its st_ id [1.49ms]
+(pass) task tool over the real TaskManager > #given both targets #when driven #then the engine start API is never reached [0.55ms]
+(pass) task tool over the real TaskManager > #given an unknown category #when the planner rejects it #then the tool reports the available categories [1.27ms]
+
+packages/senpi-task/src/tools/task/execute-continuation-scope.test.ts:
+(pass) task tool spawn-only manager seam > #given a real manager #when the task tool executes in two sessions #then both calls spawn children [3.60ms]
+
+packages/senpi-task/src/tools/task/execute-plan-error.test.ts:
+(pass) buildTaskExecute plan errors > #given an unknown target with active agents and categories #when executed #then both roster suffixes are rendered [1.64ms]
+(pass) buildTaskExecute plan errors > #given a model_unavailable plan error #when executed #then the suffix says valid category names with an override hint [0.11ms]
+
+packages/senpi-task/src/tools/task/validation.test.ts:
+(pass) validateTaskTarget > #given only category #when validated #then resolves to a category selection [0.09ms]
+(pass) validateTaskTarget > #given only subagent_type #when validated #then resolves to a subagent selection [0.04ms]
+(pass) validateTaskTarget > #given both category and subagent_type #when validated #then returns a typed both_targets error [0.16ms]
+(pass) validateTaskTarget > #given neither category nor subagent_type #when validated #then returns a typed no_target error [0.10ms]
+(pass) validateTaskTarget > #given empty-string category #when validated #then treated as absent (no_target) [0.06ms]
+(pass) validateBatchShape > #given prompt without tasks w2val #when shape-validated #then resolves to single [0.06ms]
+(pass) validateBatchShape > #given tasks without prompt w2val #when shape-validated #then resolves to batch [0.06ms]
+(pass) validateBatchShape > #given both prompt and tasks w2val #when shape-validated #then names both fields in a typed error [0.05ms]
+(pass) validateBatchShape > #given neither prompt nor tasks w2val #when shape-validated #then returns a no_prompt_or_tasks error [0.04ms]
+(pass) validateBatchShape > #given an empty tasks array w2val #when shape-validated #then returns an empty_tasks error [0.04ms]
+(pass) resolveSpawnItems > #given legacy single-prompt params w2val #when resolved #then yields exactly one ResolvedSpawnItem (regression) [0.07ms]
+(pass) resolveSpawnItems > #given a 3-item batch w2val #when resolved #then inherits top-level model/category and item overrides win [0.08ms]
+(pass) resolveSpawnItems > #given an item subagent_type w2val #when resolved #then it suppresses the inherited top-level category [0.07ms]
+(pass) resolveSpawnItems > #given both prompt and tasks w2val #when resolved #then returns a typed error naming both fields [0.07ms]
+(pass) resolveSpawnItems > #given neither prompt nor tasks w2val #when resolved #then returns a typed error [0.04ms]
+(pass) resolveSpawnItems > #given an empty tasks array w2val #when resolved #then returns a typed error [0.04ms]
+(pass) resolveSpawnItems > #given an item with both category and subagent_type w2val #when resolved #then returns an item_target error naming the index [0.05ms]
+(pass) batch spawn types > #given the new batch types w2val #when imported #then ResolvedSpawnItem and TaskToolItemDetail are exported with the documented shape [0.04ms]
+(pass) batch spawn types > #given TaskToolDetails w2val #when constructed with items #then the additive items field is accepted [0.04ms]
+
+packages/senpi-task/src/tools/task/execute-abort.test.ts:
+(pass) buildTaskExecute abort handling >  w2sig #given a pre-aborted signal #when spawn executes #then it returns cancelled without starting a child [0.27ms]
+(pass) buildTaskExecute abort handling >  w2sig #given a sync child waiting #when the parent aborts #then it cancels once and reports the task id [0.32ms]
+(pass) buildTaskExecute abort handling >  w2sig #given a child becomes terminal during parent abort #when cancellation is a noop #then execute still returns cancelled cleanly [0.17ms]
+(pass) buildTaskExecute abort handling >  w2sig #given a background child has started #when the parent aborts #then the child survives without cancellation [0.09ms]
+(pass) buildTaskExecute abort handling >  w2sig #given a sync spawn without a signal #when the child completes #then foreground behavior is unchanged [0.12ms]
+
+packages/senpi-task/src/tools/control/send-schema.test.ts:
+(pass) TaskSendParams > #given the task_send schema #when inspected #then it exposes to and hides old recipient keys [1.25ms]
+
+packages/senpi-task/src/tools/control/renderers.test.ts:
+(pass) control tool renderers > #given a plain task_send message #when rendering the call #then it shows concise target delivery and a width-safe excerpt [0.23ms]
+(pass) control tool renderers > #given long multiline Korean and English text #when rendering with ANSI at width 72 #then text is normalized truncated and column-safe [0.11ms]
+(pass) control tool renderers > #given a long Korean continuation #when rendering task_send #then the excerpt ends at a word boundary [0.09ms]
+(pass) control tool renderers > #given structured shutdown task_send messages #when rendering calls #then summaries name request approve reject and reason without object stringification [0.12ms]
+(pass) control tool renderers > #given a structured shutdown request with a meaningful reason #when rendering at normal width #then the real reason remains visible [0.06ms]
+(pass) control tool renderers > #given a structured shutdown request with no room for a meaningful reason #when rendering at the Senpi edge width #then the optional reason field is omitted [0.15ms]
+(pass) control tool renderers > #given pure interrupt task_send #when rendering the call #then it is meaningful without an empty message label [0.06ms]
+(pass) control tool renderers > #given whitespace-only control text #when rendering calls #then empty message and reason labels are omitted [0.10ms]
+(pass) control tool renderers > #given the steered task_send result mapping #when rendering #then the exact themed row is stable [0.10ms]
+(pass) control tool renderers > #given the revived task_send result mapping #when rendering #then the exact themed row is stable [0.04ms]
+(pass) control tool renderers > #given the queued task_send result mapping #when rendering #then the exact themed row is stable [0.03ms]
+(pass) control tool renderers > #given the not_continuable task_send result mapping #when rendering #then the exact themed row is stable [0.03ms]
+(pass) control tool renderers > #given the scope_denied task_send result mapping #when rendering #then the exact themed row is stable [0.03ms]
+(pass) control tool renderers > #given the not_found task_send result mapping #when rendering #then the exact themed row is stable [0.04ms]
+(pass) control tool renderers > #given the invalid_arguments task_send result mapping #when rendering #then the exact themed row is stable [0.03ms]
+(pass) control tool renderers > #given the interrupted task_send result mapping #when rendering #then the exact themed row is stable [0.04ms]
+(pass) control tool renderers > #given the noop task_send result mapping #when rendering #then the exact themed row is stable [0.04ms]
+(pass) control tool renderers > #given the team_message task_send result mapping #when rendering #then the exact themed row is stable [0.05ms]
+(pass) control tool renderers > #given the shutdown_requested task_send result mapping #when rendering #then the exact themed row is stable [0.04ms]
+(pass) control tool renderers > #given the shutdown_responded task_send result mapping #when rendering #then the exact themed row is stable [0.03ms]
+(pass) control tool renderers > #given the shutdown_failed task_send result mapping #when rendering #then the exact themed row is stable [0.04ms]
+(pass) control tool renderers > #given a structured shutdown failure #when rendering the result #then it shows concise safe context with the error theme [0.05ms]
+(pass) control tool renderers > #given task_cancel arguments and result variants #when rendering #then identifier reason and status rows are concise [0.11ms]
+(pass) control tool renderers > #given injected controls in task_send and task_cancel results #when rendered #then dynamic controls are removed before trusted theme styling [0.13ms]
+
+packages/senpi-task/src/tools/control/clamp.test.ts:
+(pass) clampWaitTimeout > #given below-min timeout #when clamped #then rises to min [0.09ms]
+(pass) clampWaitTimeout > #given exactly min timeout #when clamped #then unchanged [0.04ms]
+(pass) clampWaitTimeout > #given above-max timeout #when clamped #then falls to max [0.04ms]
+(pass) clampWaitTimeout > #given exactly max timeout #when clamped #then unchanged [0.03ms]
+(pass) clampWaitTimeout > #given an in-range timeout #when clamped #then passes through [0.03ms]
+(pass) clampWaitTimeout > #given no timeout #when clamped #then uses the configured default [0.03ms]
+
+packages/senpi-task/src/tools/control/send.test.ts:
+(pass) runTaskSend > #given task_send tool factories #when tools are created #then both expose custom call and result renderers [0.11ms]
+(pass) runTaskSend > #given a running child #when a message is sent #then it is delivered as followUp by default [3.87ms]
+(pass) runTaskSend > #given a caller session id #when sending #then callerSessionId is injected into the steering call [0.12ms]
+(pass) runTaskSend > #given all_scope true #when sending #then allScope is forwarded to the engine [0.07ms]
+(pass) runTaskSend > #given interrupt park mode #when sent without a message #then it calls interrupt before child send [0.16ms]
+(pass) runTaskSend > #given a child owned by another session #when interrupt parks without all_scope #then scope is denied before interrupt [1.34ms]
+(pass) runTaskSend > #given interrupt park mode with a string message #when sent #then it is rejected before routing [0.12ms]
+(pass) runTaskSend > #given structured messages with deliver_as #when sent #then deliver_as is rejected as plain-text-only [0.08ms]
+(pass) runTaskSend > #given plain-text send without a message #when sent #then it is rejected before routing [0.09ms]
+(pass) runTaskSend > #given a child owned by another session #when sent without all_scope #then scope is denied naming the owner [1.06ms]
+(pass) runTaskSend > #given an unknown name #when sending #then not_found lists this session's task names [1.31ms]
+(pass) runTaskSend > #given a string recipient that is not a child and no team routing #when sent #then the child not_found result is preserved [0.09ms]
+(pass) runTaskSend > #given a cancelled child #when task_send targets it #then it is not continuable [1.38ms]
+
+packages/senpi-task/src/tools/control/send-shutdown.test.ts:
+(pass) runTaskSend shutdown routing > #given a lead shutdown_request #when routed through task_send #then requestShutdown is called [0.49ms]
+(pass) runTaskSend shutdown routing > #given a lead shutdown_response approve #when routed through task_send #then approveShutdown is called [0.17ms]
+(pass) runTaskSend shutdown routing > #given a shutdown_response reject without a reason #when routed through task_send #then it fails before rejectShutdown [0.12ms]
+(pass) runTaskSend shutdown routing > #given a lead shutdown_response reject with a reason #when routed through task_send #then rejectShutdown is called [0.10ms]
+(pass) runTaskSend shutdown routing > #given shutdown_request hits missing team state #when routed through task_send #then it returns a sanitized structured failure [0.21ms]
+(pass) runTaskSend shutdown routing > #given shutdown_response approve hits missing team state #when routed through task_send #then it returns a sanitized structured failure [0.10ms]
+(pass) runTaskSend shutdown routing > #given shutdown_response reject hits missing team state #when routed through task_send #then it returns a sanitized structured failure [0.08ms]
+(pass) runTaskSend shutdown routing > #given a shutdown domain failure #when routed through task_send #then it returns stable safe failure details [0.09ms]
+(pass) runTaskSend shutdown routing > #given an unexpected shutdown service error #when routed through task_send #then the original exception propagates [0.10ms]
+(pass) runTaskSend shutdown routing > #given structured message with no team routing #when sent #then it reports not in a team [0.07ms]
+(pass) runTaskSend shutdown routing > #given member-scoped task_send #when it sends a structured shutdown message #then shutdown is lead-only [0.07ms]
+
+packages/senpi-task/src/tools/control/member-scoped-renderer.test.ts:
+(pass) member-scoped task_send renderer > #given a member-scoped team message #when its tool call renders #then it displays steer rather than followUp [0.13ms]
+
+packages/senpi-task/src/tools/control/send-unify-integration.test.ts:
+(pass) task_send unified park and revive integration > #given a running child #when task_send parks then follows up #then the revived turn completes [2.23ms]
+
+packages/senpi-task/src/tools/control/send-team.test.ts:
+(pass) runTaskSend team routing > #given a string recipient that is not a child but is a team member #when team routing is present #then it sends a team message [0.23ms]
+(pass) runTaskSend team routing > #given a team route without a run id #when child lookup misses #then it fails before service calls [0.10ms]
+(pass) runTaskSend team routing > #given no team_run_id and a default resolver with one owned team #when child lookup misses #then the send uses the resolved team [0.09ms]
+(pass) runTaskSend team routing > #given no team_run_id and an ambiguous default resolver #when child lookup misses #then it reports the owned runs without service calls [0.08ms]
+(pass) runTaskSend team routing > #given no team_run_id and a default resolver reporting no owned team #when child lookup misses #then it falls back to the known-tasks not-found [0.07ms]
+(pass) runTaskSend team routing > #given a shutdown_request without team_run_id and a resolver with one owned team #when routed #then requestShutdown uses the resolved team [0.09ms]
+(pass) runTaskSend team routing > #given the member-scoped factory #when created #then it exposes the shared task_send surface [0.06ms]
+(pass) runTaskSend team routing > #given member routing with a bound run id #when params include another run id #then the bound run id wins [0.07ms]
+(pass) runTaskSend team routing > #given a member-scoped peer send requesting followUp #when the recipient is running #then the steering engine delivers as steer [1.25ms]
+(pass) runTaskSend team routing > #given a lead send with team_run_id requesting followUp #when the recipient is running #then the steering engine delivers as steer [1.07ms]
+(pass) runTaskSend team routing > #given a team shutdown message requesting followUp #when lead routing sends it #then the delivery option is ignored [0.09ms]
+
+packages/senpi-task/src/tools/control/cancel.test.ts:
+(pass) runTaskCancel > #given the task_cancel tool #when created #then it exposes custom call and result renderers [2.11ms]
+(pass) runTaskCancel > #given a running child #when cancelled with a reason #then the exact post-state is reported [1.75ms]
+(pass) runTaskCancel > #given a cancelled child #when task_send follows up #then the child is not continuable [2.38ms]
+(pass) runTaskCancel > #given an already-cancelled child #when cancelled again #then it is a no-op with the cancelled status [1.63ms]
+(pass) runTaskCancel > #given an unknown id #when cancelled #then not_found is returned [2.21ms]
+(pass) runTaskCancel > #given no identifier #when cancelled #then invalid_arguments is returned [8.67ms]
+(pass) runTaskCancel > #given the task_cancel tool #when reading its description #then it names the terminal contract without stale revive wording [5.14ms]
+
+packages/senpi-task/src/tools/control/factory.test.ts:
+(pass) control tool factories > #given the control factories #when built #then names, labels, and TypeBox params are wired [1.39ms]
+(pass) control tool factories > #given the default resolver #when a session carrier is passed #then the current session id is read [0.06ms]
+
+packages/senpi-task/src/agents/builtin/builtin-agents.test.ts:
+(pass) builtin curated agents > #given the builtin defaults #when listing names sorted #then exactly the 5 curated agents are present [0.10ms]
+(pass) builtin curated agents > #given the builtin record #when listing keys sorted #then exactly the 5 curated agents are present and map to their definitions [0.09ms]
+(pass) builtin curated agents > #given the curated name set #when checking membership #then it contains exactly the 5 curated names [0.06ms]
+(pass) builtin curated agents > #given every builtin definition #when inspecting shape #then mode is subagent and executionMode is pinned in-process [0.04ms]
+(pass) builtin curated agents > #given every builtin definition #when inspecting prompts #then each is non-empty and names only available capabilities [0.86ms]
+(pass) builtin curated agents > #given every builtin definition #when inspecting tool rules #then exactly the 9 literal allow-true rules are present [0.12ms]
+(pass) builtin curated agents > #given every builtin definition #when inspecting descriptions #then each is non-empty with the brand tag stripped [0.05ms]
+
+packages/senpi-task/src/agents/builtin/fallback-chains.test.ts:
+(pass) AGENT_FALLBACK_CHAINS > #given the builtin chains #when listing keys #then exactly the 5 curated agent names are present [1.36ms]
+(pass) AGENT_FALLBACK_CHAINS > #given the builtin chains #when inspecting entries #then every entry has a non-empty providers list and model [0.07ms]
+(pass) AGENT_FALLBACK_CHAINS > #given the builtin chains #when counting entries #then chain lengths match the source transcription [0.07ms]
+(pass) AGENT_FALLBACK_CHAINS > #given the oracle chain #when reading the head entry #then it is the literal transcribed gpt-5.6-sol xhigh rung [0.05ms]
+(pass) AGENT_FALLBACK_CHAINS > #given the mirrored fallback table #when compared with the independent transcription #then every provider model variant and order is pinned [0.07ms]
+
+packages/senpi-task/src/team/member-extension/residency.test.ts:
+(pass) member injection residency > #given a member whose initial turn ended without a wait #when lead mail is injected #then its resident RPC session revives into a working turn [45.53ms]
+
+packages/senpi-task/src/team/member-extension/qa-inject-hold.test.ts:
+(pass) member QA after-inject hold > #given a hold path outside QA #when resolved #then the test hook stays disabled [0.15ms]
+(pass) member QA after-inject hold > #given a QA release file #when an injected message enters the hook #then a marker is written before release [0.85ms]
+
+packages/senpi-task/src/team/member-extension/index.test.ts:
+(pass) member extension lifecycle > #given unread mail during extension loading #when session_start fires #then inbound team mail steers at the lifecycle edge [3.40ms]
+
+packages/senpi-task/src/team/member-extension/self-poller.test.ts:
+(pass) member self-poller > #given an after-inject hold w2mem #when delivery reaches the crash window #then reservation stays uncommitted until released [8.75ms]
+(pass) member self-poller > #given an unread message w2mem #when its envelope reaches the session JSONL #then commit happens only after persistence [3.11ms]
+(pass) member self-poller > #given an inject with no acknowledgement yet w2mem #when ack checks repeat #then the reservation is held and never double-injected [4.18ms]
+(pass) member self-poller > #given a crash after envelope persistence w2mem #when a new poller recovers #then it commits without reinjecting [33.35ms]
+(pass) member self-poller > #given a consumed-ledger stray w2mem #when the poller sees the duplicate unread file #then it acks without injecting [4.01ms]
+
+packages/senpi-task/src/team/member-extension/tools.test.ts:
+(pass) member extension tools > #given member and lead recipients #when task_send runs #then each durable inbox receives its unchanged message [3.07ms]
+(pass) member extension tools > #given an unknown recipient #when task_send runs #then it rejects without writing mail [0.39ms]
+(pass) member extension tools > #given an unknown recipient #when task_send runs #then the error lists the valid recipients [0.34ms]
+(pass) member extension tools > #given malformed member identity env #when parsed #then typed configuration errors reject malformed values [0.19ms]
+
+packages/senpi-task/src/team/messaging/reclaim.test.ts:
+(pass) reclaimStaleTeamReservations > #given a stale reservation older than the ttl #when reclaimed #then it is restored to unread [5.26ms]
+(pass) reclaimStaleTeamReservations > #given a fresh reservation within the ttl #when reclaimed #then nothing is restored [2.18ms]
+(pass) reclaimStaleTeamReservations > #given multiple members #when reclaimed #then each member's stale reservations are reported per name [19.93ms]
+
+packages/senpi-task/src/team/messaging/delivery-journal.test.ts:
+(pass) lead delivery journal > #given recorded messages #when drained #then it returns the oldest unreported first and reports atomically [0.19ms]
+(pass) lead delivery journal > #given mixed senders #when drained with a from filter #then only matching messages are taken and the rest stay unreported [0.07ms]
+(pass) lead delivery journal > #given two teams #when drained #then deliveries stay isolated per team [0.05ms]
+(pass) lead delivery journal > #given a reported message that is re-recorded #when drained #then it is unreported again [0.06ms]
+(pass) lead delivery journal > #given a dropped team #when drained #then nothing remains [0.04ms]
+(pass) lead delivery journal > #given more deliveries than the cap #when drained #then the oldest are evicted and order is preserved [0.08ms]
+
+packages/senpi-task/src/team/messaging/message.test.ts:
+(pass) buildTeamMessage > #given from/to/body #when built #then a well-formed message-kind Message is produced [1.23ms]
+(pass) buildTeamMessage > #given a summary #when built #then the summary is carried and a broadcast target is preserved [0.07ms]
+(pass) buildPeerMessageEnvelope > #given a message with markup-bearing fields #when the envelope is built #then attributes are escaped in team-core's order [0.06ms]
+(pass) buildPeerMessageEnvelope > #given a summary #when the envelope is built #then the summary attribute is appended [0.05ms]
+
+packages/senpi-task/src/team/messaging/session-start-reconcile.test.ts:
+(pass) reconcileTeamMailboxOnSessionStart > #given an active team with a stale reservation #when reconciled #then the reservation is restored to unread [11.43ms]
+(pass) reconcileTeamMailboxOnSessionStart > #given a fresh reservation within the ttl #when reconciled #then it is left reserved [4.30ms]
+(pass) reconcileTeamMailboxOnSessionStart > #given an owned team with a stale lead reservation #when reconciled #then the lead inbox is restored [5.50ms]
+(pass) reconcileTeamMailboxOnSessionStart > #given a foreign team with a stale lead reservation #when reconciled #then its lead inbox is untouched [34.57ms]
+(pass) reconcileTeamMailboxOnSessionStart > #given no active teams #when reconciled #then it is a no-op that does not throw [5.23ms]
+
+packages/senpi-task/src/team/messaging/send.test.ts:
+(pass) sendTeamMessage recipient guidance > #given an unknown recipient #when the lead sends #then the error names the team members and valid forms [1.95ms]
+(pass) sendTeamMessage recipient guidance > #given an unknown recipient #when the lead sends #then the stable InvalidRecipientError name survives for the tool-layer mapping [1.43ms]
+(pass) sendTeamMessage pull-only delivery > #given a member recipient w2send #when a member sends #then one unread file is written and the send returns enqueued [2.47ms]
+(pass) sendTeamMessage pull-only delivery > #given the lead sentinel w2send #when a member sends #then the lead inbox receives an unread file [2.87ms]
+(pass) sendTeamMessage pull-only delivery > #given three active members w2send #when the lead broadcasts #then every recipient inbox stays unread [7.30ms]
+(pass) sendTeamMessage pull-only delivery > #given a member task mapping w2send #when the member sends #then team_message_sent is anchored to the sender record [22.78ms]
+(pass) sendTeamMessage pull-only delivery > #given no appendEvent dependency w2send #when the lead sends #then enqueue still succeeds [3.11ms]
+(pass) sendTeamMessage pull-only delivery > #given a full recipient inbox w2send #when a member sends #then RecipientBackpressureError still surfaces [3.80ms]
+
+packages/senpi-task/src/team/messaging/lead-poller.test.ts:
+(pass) lead poller injection delivery > #given member mail #when the lead polls #then it injects the peer envelope without a blocking tool [4.60ms]
+(pass) lead poller injection delivery > #given a crash before the lead injection flushes #when a fresh poller resumes #then the durable mailbox redelivers [3.92ms]
+(pass) lead poller injection delivery > #given a crash after lead transcript persistence #when a fresh poller resumes #then it commits without reinjecting [5.52ms]
+(pass) lead poller injection delivery > #given no captured lead transcript #when mail flushes #then the reservation holds until persistence becomes observable [35.95ms]
+
+packages/senpi-task/src/team/messaging/session-marker-index.test.ts:
+(pass) createSessionMarkerIndex > #given a session file with an envelope #when contains is queried #then it finds the messageId [0.77ms]
+(pass) createSessionMarkerIndex > #given repeated queries on an unchanged file #when contains runs again #then no bytes are re-read [0.57ms]
+(pass) createSessionMarkerIndex > #given an appended envelope #when contains runs #then only the appended bytes are read [0.71ms]
+(pass) createSessionMarkerIndex > #given a missing session file #when contains runs #then it returns false [0.92ms]
+(pass) createSessionMarkerIndex > #given a truncated/rotated file #when contains runs #then the index resets and rescans [0.76ms]
+
+packages/senpi-task/src/runners/in-process/curated-readonly-bash.test.ts:
+(pass) planCuratedReadonlyCommand > #given read-only curl and GitHub requests #when planned #then direct executables are returned without a shell [0.24ms]
+(pass) planCuratedReadonlyCommand > #given mutation-capable flags or commands #when planned #then every request is rejected [0.12ms]
+
+packages/senpi-task/src/runners/in-process/shared-tool-filter.test.ts:
+(pass) shared parent tool family filter > #given task and team family names #when classified #then only family names match [0.10ms]
+(pass) shared parent tool family filter > #given shared tools with family and ui-only entries #when filtered #then family and ui-only removed [0.09ms]
+(pass) shared parent tool family filter > #given family tool in shared and in member-scoped #when merged #then only member-scoped family crosses the exclusion [0.07ms]
+(pass) shared parent tool family filter > #given no member-scoped tools #when merged #then result is only the filtered shared set [0.05ms]
+
+packages/senpi-task/src/runners/in-process/marker-suppression.test.ts:
+(pass) in-process child extension suppression > #given an agent dir with a marker extension #when a child boots through the runner #then the factory never runs and parent tools survive [27.85ms]
+
+packages/senpi-task/src/runners/in-process/child-handle-outcome.test.ts:
+(pass) createChildHandle turn outcomes > #given a turn ending with a stopReason error message #when the prompt resolves #then the outcome is an error carrying the provider message [2.32ms]
+(pass) createChildHandle turn outcomes > #given a turn that produces no assistant output at all #when the prompt resolves #then the outcome is an error, never completed with empty text [0.09ms]
+(pass) createChildHandle turn outcomes > #given a revived child whose new turn produces nothing #when the revive turn resolves #then the stale previous response is NOT reused as a fresh completion [0.10ms]
+(pass) createChildHandle turn outcomes > #given a healthy turn with assistant text #when the prompt resolves #then the outcome completes with this turn's text [0.06ms]
+
+packages/senpi-task/src/runners/in-process/child-handle-revive.test.ts:
+(pass) createChildHandle revive > #given a running child #when followed up mid-turn #then it queues via followUp without starting a new turn [0.27ms]
+(pass) createChildHandle revive > #given a completed resident child #when revived with a follow-up #then a fresh turn is tracked and waitForIdle reflects the new outcome [0.09ms]
+
+packages/senpi-task/src/runners/rpc/protocol-client.test.ts:
+(pass) RpcProtocolClient >  w2reattach #given session RPC commands #when switching and reading entries #then typed command data is preserved [38.86ms]
+(pass) RpcProtocolClient >  w2reattach #given a resume session path #when an RPC process starts #then it switches without replaying the prompt [32.76ms]
+(pass) RpcProtocolClient >  w2reattach #given inherited RPC extensions #when the process runner starts #then its effective spawn facts expose them for persistence [1.35ms]
+(pass) RpcProtocolClient > #given two in-flight requests answered out of order #when correlating #then each promise resolves by id [100.91ms]
+(pass) RpcProtocolClient > #given a completing turn #when subscribing #then agent lifecycle events fan out to every subscriber [25.34ms]
+(pass) RpcProtocolClient > #given an extension_ui_request #when auto-answering #then the child receives a deny and never blocks [24.96ms]
+(pass) RpcProtocolClient > #given a malformed line #when parsing #then it is reported and the connection survives [21.37ms]
+(pass) RpcProtocolClient > #given a disposed client #when sending #then it rejects because the process is gone [1.14ms]
+(pass) RpcProtocolClient > #given a verbose child stderr #when chunks accumulate #then the internal buffer is capped and tail reflects recent bytes [37.91ms]
+
+packages/senpi-task/src/runners/rpc/ui-auto-answer.test.ts:
+(pass) buildAutoUiResponse > #given a confirm request #when auto-answering #then it denies (confirmed:false) [0.12ms]
+(pass) buildAutoUiResponse > #given select/input/editor requests #when auto-answering #then each cancels [0.13ms]
+(pass) buildAutoUiResponse > #given a display-only request #when auto-answering #then no response is emitted [0.06ms]
+
+packages/senpi-task/src/runners/rpc/exit-mapping.test.ts:
+(pass) classifyChildExit > #given a spawn error #when classifying #then it is a spawn_error outcome [1.40ms]
+(pass) classifyChildExit > #given an exit by signal #when classifying #then it is killed with the signal recorded [0.05ms]
+(pass) classifyChildExit > #given a zero exit code #when classifying #then it is clean [0.04ms]
+(pass) classifyChildExit > #given a nonzero exit code #when classifying #then it is crashed and stderr tail is capped at 4KB [0.06ms]
+(pass) tailStderr > #given text longer than the cap #when tailing #then it keeps the last cap characters [0.05ms]
+(pass) mapExitOutcomeToError > #given a killed child that has NOT reached terminal #when mapping #then status error with killed:true and exit facts [0.06ms]
+(pass) mapExitOutcomeToError > #given a nonzero exit before terminal #when mapping #then status error carries the stderr tail, not killed [0.05ms]
+(pass) mapExitOutcomeToError > #given an exit AFTER a terminal state #when mapping #then it is resident teardown with no status change [0.04ms]
+
+packages/senpi-task/src/runners/rpc/terminate.test.ts:
+(pass) terminateRpcChild > #given a cooperating child #when terminating #then SIGTERM ends it without escalation [1.26ms]
+(pass) terminateRpcChild > #given a TERM-ignoring child #when terminating #then it escalates to SIGKILL within the budget [170.17ms]
+(pass) terminateRpcChild > #given an already-exited child #when terminating #then it resolves without throwing [1.06ms]
+
+packages/senpi-task/src/runners/rpc/parent-extensions.test.ts:
+(pass) parseExtensionEntries > #given an argv with -e and --extension pairs #when parsing #then every entry value is collected in order [0.12ms]
+(pass) parseExtensionEntries > #given an argv with no extension flags #when parsing #then the result is empty [0.05ms]
+(pass) parseExtensionEntries > #given a dangling -e with no value #when parsing #then it is ignored rather than pushing undefined [0.04ms]
+
+packages/senpi-task/src/runners/rpc/spawn.test.ts:
+(pass) detectBunBinary > #given a bun virtual-fs url #when detecting #then it reports a bun binary [0.09ms]
+(pass) detectBunBinary > #given a plain file url #when detecting #then it is not a bun binary [0.04ms]
+(pass) resolveChildSessionDir > #given a state dir and task id #when resolving #then the session dir nests under sessions/<id>/ [0.05ms]
+(pass) resolveSenpiExecutable > #given SENPI_BIN pointing at an existing absolute path #when resolving #then it is used verbatim [0.05ms]
+(pass) resolveSenpiExecutable > #given SENPI_BIN pointing at a missing absolute path #when resolving #then it is null (no silent PATH fallthrough) [0.05ms]
+(pass) resolveSenpiExecutable > #given no SENPI_BIN and an empty PATH #when resolving a node runtime #then no executable is found [0.04ms]
+(pass) resolveSenpiExecutable > #given a bun runtime #when resolving #then the sibling binary next to the bun exec is chosen [0.04ms]
+(pass) buildChildArgs > #given a spec with model and extensions #when building child args #then no-extensions leads, each -e follows, then --model [0.05ms]
+(pass) buildChildArgs > #given a spec with neither model nor extensions #when building child args #then only no-extensions is present [0.04ms]
+(pass) buildChildArgs > #given a spec with a valid variant #when building child args #then --thinking follows --model [0.05ms]
+(pass) buildChildArgs > #given the omo.json reasoningEffort none as variant #when building child args #then it maps to senpi off [0.04ms]
+(pass) buildChildArgs > #given an unknown variant #when building child args #then no --thinking flag is emitted [0.04ms]
+(pass) buildRpcSpawn spawn strategy > #given a resolvable senpi executable #when building #then it spawns the EXECUTABLE in rpc mode (not the loader-hijacked rpc-entry) [0.09ms]
+(pass) buildRpcSpawn spawn strategy > #given a bun runtime with a resolvable sibling executable #when building #then the sibling binary runs rpc mode with threaded args [0.06ms]
+(pass) buildRpcSpawn spawn strategy > #given NO resolvable executable #when building #then it falls back to execPath + rpc-entry, still threading child args [0.06ms]
+(pass) buildRpcSpawn spawn strategy > #given a parent env #when building #then the child gets an isolated session dir and inherits parent vars untouched [0.07ms]
+(pass) buildRpcSpawn spawn strategy > #given member extension env w2mem #when building #then identity config and task id reach the child without overriding isolation [0.05ms]
+
+packages/senpi-task/src/tools/output/transcript/session-jsonl.test.ts:
+(pass) parseSessionTranscript > #given a v1 linear session #when parsed #then only assistant text entries are extracted in order [0.31ms]
+(pass) parseSessionTranscript > #given a v2 tree session with a model_change and toolResult #when parsed #then user/tool/non-message entries are skipped [0.21ms]
+(pass) parseSessionTranscript > #given a v3 session with custom, custom_message, and an unknown future entry #when parsed #then unknown types are tolerated and only assistant text survives [0.14ms]
+(pass) parseSessionTranscript > #given malformed lines mixed with valid ones #when parsed #then broken lines are skipped without throwing [0.08ms]
+(pass) parseSessionTranscript > #given an assistant message with multiple text blocks #when parsed #then the blocks are concatenated [0.04ms]
+
+packages/senpi-task/src/tools/output/transcript/event-log.test.ts:
+(pass) readEventLogTranscript > #given a log with assistant, tool, and child_error events #when read #then all three are lifted in order [1.64ms]
+
+ 1240 pass
+ 0 fail
+ 1 snapshots, 4010 expect() calls
+Ran 1240 tests across 192 files. [16.36s]

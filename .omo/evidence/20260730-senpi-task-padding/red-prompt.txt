@@ -1,0 +1,36 @@
+Scenario: task prompt responsibility separation
+Captured: 2026-07-30T05:37:00Z
+
+Commands:
+  bun test packages/senpi-task/src/tools/task/description.test.ts
+  bun test packages/omo-senpi/src/components/task/usage-guidance.test.ts
+
+Binary observables:
+  - FAIL when target-selection semantics are duplicated in prompt guidelines.
+  - FAIL when hidden once-per-session guidance repeats task invocation syntax.
+
+Description test output:
+  Expected duplicatedTargetRule: false
+  Received: true
+  5 pass
+  1 fail
+
+Usage-guidance test output:
+  Expected TASK_USAGE_GUIDANCE not to contain structural invocation token:
+    task({
+  Received the duplicated single and batch invocation syntax.
+  2 pass
+  1 fail
+
+Machine-consumed prompt baseline:
+  descriptionChars: 2894
+  snippetChars: 85
+  guidelineCount: 4
+  guidelineChars: 348
+  usageChars: 793
+  totalChars: 4120
+
+Why this is the right RED:
+  The assertions target responsibility boundaries and stable tool syntax,
+  not an exact sentence or snapshot. Dynamic category/agent coverage and
+  runtime task_send/task_output delivery facts remain independently tested.

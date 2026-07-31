@@ -21,7 +21,20 @@ const mockGetDuplicateOmoPluginWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRunOpenCodeStartupMigration = mock(() => ({
+  journalResumed: false,
+  migratedFrom: [],
+  reloadRequired: false,
+  results: [],
+  skippedConflictCount: 0,
+}))
 const mockLoadPluginConfig = mock(() => ({}))
+const mockLoadConfigChain = mock((directory: string) => ({
+  config: mockLoadPluginConfig(directory, {}),
+  messages: [],
+  path: null,
+  valid: true,
+}))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,
 )
@@ -70,7 +83,7 @@ const mockCreateFirstMessageVariantGate = mock(() => ({
   clear: () => {},
 }))
 
-function createTestPluginModule(): ReturnType<typeof createPluginModule> {
+function createTestPluginModule(overrides: Parameters<typeof createPluginModule>[0] = {}): ReturnType<typeof createPluginModule> {
   return createPluginModule({
     initConfigContext: mockInitConfigContext,
     detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
@@ -80,6 +93,8 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
+    loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
@@ -95,6 +110,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     log: mockLog,
     createModelCacheState: mockCreateModelCacheState as never,
     createFirstMessageVariantGate: mockCreateFirstMessageVariantGate as never,
+    ...overrides,
   })
 }
 
@@ -104,12 +120,21 @@ describe("createPluginModule()", () => {
     mockGetDuplicateOmoPluginWarning.mockClear()
     mockInjectServerAuthIntoClient.mockClear()
     mockLoadPluginConfig.mockClear()
+    mockLoadConfigChain.mockClear()
+    mockRunOpenCodeStartupMigration.mockClear()
     mockCreateManagers.mockClear()
     mockRuntimeSkillSourceStop.mockClear()
     mockCreateRuntimeSkillSourceServer.mockClear()
     mockCreateTools.mockClear()
     mockCreateHooks.mockClear()
     mockCreatePluginInterface.mockClear()
+    mockRunOpenCodeStartupMigration.mockReturnValue({
+      journalResumed: false,
+      migratedFrom: [],
+      reloadRequired: false,
+      results: [],
+      skippedConflictCount: 0,
+    })
     mockDetectDuplicateOmoPlugin.mockReturnValue({
       detected: false,
       pluginName: null,
@@ -331,6 +356,156 @@ describe("createPluginModule()", () => {
       } finally {
         console.warn = originalWarn
       }
+    })
+  })
+
+  describe("#given startup migration consumes legacy configuration", () => {
+    it("#then startup reloads the config and emits one migration summary toast", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        migratedFrom: ["/home/alice/.config/opencode/omo.json"],
+        reloadRequired: true,
+        results: [],
+        skippedConflictCount: 2,
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(runOpenCodeStartupMigration).toHaveBeenCalledWith({ cwd: "/tmp/project" })
+      expect(showToast).toHaveBeenCalledTimes(1)
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: {
+          title: "Configuration migrated",
+          message: expect.stringContaining("1 legacy source"),
+          variant: "success",
+        },
+      })
+      expect(mockLoadPluginConfig).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("#given serverPlugin is initialized twice in one process", () => {
+    it("#then startup migration predicates run only once", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        migratedFrom: [],
+        reloadRequired: false,
+        results: [],
+        skippedConflictCount: 0,
+      }))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      const input = { directory: "/tmp/project", client: {} } as Parameters<typeof pluginModule.server>[0]
+
+      // when
+      await pluginModule.server(input)
+      await pluginModule.server(input)
+
+      // then
+      expect(runOpenCodeStartupMigration).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("#given startup migration fails", () => {
+    it("#then startup keeps defaults and reports one loud error toast", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        error: "Migration validation failed for ~/.omo/omo.jsonc",
+        journalResumed: false,
+        migratedFrom: [],
+        reloadRequired: false,
+        results: [],
+        skippedConflictCount: 0,
+      }))
+      const loadConfigChain = mock(() => ({ config: {}, messages: ["invalid config"], path: null, valid: false }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ loadConfigChain, runOpenCodeStartupMigration })
+
+      // when
+      const hooks = await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(hooks).toBeDefined()
+      expect(showToast).toHaveBeenCalledTimes(1)
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: { title: "Configuration migration failed", variant: "error" },
+      })
+      expect(mockCreateManagers.mock.calls.at(-1)?.[0]?.pluginConfig).toEqual({})
+    })
+  })
+
+  describe("#given the omo process sweep during plugin init", () => {
+    it("#when the sweep never resolves #then startup still completes fire-and-forget", async () => {
+      // given a sweep promise that never settles
+      const startOmoProcessSweep = mock(() => new Promise<void>(() => {}))
+      const pluginModule = createTestPluginModule({ startOmoProcessSweep })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      const hooks = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then startup completed without awaiting the sweep
+      expect(startOmoProcessSweep).toHaveBeenCalledTimes(1)
+      expect(hooks).toBeDefined()
+      expect(mockCreatePluginInterface).toHaveBeenCalled()
+    })
+
+    it("#when the sweep rejects #then the failure is logged and cannot propagate into startup", async () => {
+      // given a sweep that fails immediately
+      const startOmoProcessSweep = mock(() => Promise.reject(new Error("sweep boom")))
+      const pluginModule = createTestPluginModule({ startOmoProcessSweep })
+      mockLoadPluginConfig.mockReturnValue({})
+      mockLog.mockClear()
+
+      // when
+      const hooks = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+      // let the fire-and-forget rejection handler run
+      await Promise.resolve()
+      await Promise.resolve()
+
+      // then startup completed and the failure only reached the log
+      expect(hooks).toBeDefined()
+      const sweepLogs = mockLog.mock.calls.filter(
+        (call) => typeof call[0] === "string" && call[0].includes("omo process sweep failed"),
+      )
+      expect(sweepLogs).toHaveLength(1)
+    })
+
+    it("#when the sweep throws synchronously #then startup still completes", async () => {
+      // given a sweep that throws before returning a promise
+      const startOmoProcessSweep = mock(() => {
+        throw new Error("sync sweep boom")
+      })
+      const pluginModule = createTestPluginModule({ startOmoProcessSweep })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      const hooks = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(hooks).toBeDefined()
+      expect(mockCreatePluginInterface).toHaveBeenCalled()
     })
   })
 })

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-const QUICK_PROMPT = "You are team member 'quick'. MOCKROLE=quick. Report to the lead, then finish."
+const QUICK_PROMPT = "You are team member 'quick'. MOCKROLE=quick. Report to the lead when injected work arrives, then end your turn."
 const FIXTURE_PROMPT = "You are team member 'fixture'. MOCKROLE=fixture. Acknowledge, then finish."
-const DURA_PROMPT = "You are team member 'dura'. MOCKROLE=dura. Seed your backlog, then finish."
+const DURA_PROMPT = "You are team member 'dura'. MOCKROLE=dura. Seed your backlog, then end your turn."
 const RCL_PROMPT = "You are team member 'rcl'. MOCKROLE=quick. Acknowledge, then finish."
 
 function toolCall(name, args) {
@@ -23,25 +23,13 @@ export const LEAD_SCRIPT = {
         ],
       },
     }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "LEAD2QUICK handshake: send QUICK2LEAD only after this wait resolves" }),
-    toolCall("team_wait", { team_run_id: "__TEAM_RUN_ID__", from: "quick", timeout_ms: 20000 }),
-    toolCall("task_create", { team_run_id: "__TEAM_RUN_ID__", subject: "e2e task", description: "drive the claim and complete flow" }),
-    toolCall("task_update", { team_run_id: "__TEAM_RUN_ID__", task_id: "__TASK_ID__", status: "claimed" }),
-    toolCall("task_update", { team_run_id: "__TEAM_RUN_ID__", task_id: "__TASK_ID__", status: "in_progress" }),
-    toolCall("task_update", { team_run_id: "__TEAM_RUN_ID__", task_id: "__TASK_ID__", status: "completed" }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: { type: "shutdown_request", reason: "quick finished the e2e work" } }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: { type: "shutdown_response", request_id: "ignored-by-senpi", approve: true } }),
-    toolCall("task_output", { name: "team:__TEAM_RUN_ID__:quick", mode: "status", block: false }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_request", reason: "fixture shutdown probe" } }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_response", request_id: "ignored-by-senpi", approve: false, reason: "keep working on the e2e task" } }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_request", reason: "fixture cleanup after rejection proof" } }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "fixture", message: { type: "shutdown_response", request_id: "ignored-by-senpi", approve: true } }),
-    text("lead e2e lifecycle drive complete"),
+    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "LEAD2QUICK injected handshake: report QUICK2LEAD after this arrives" }),
+    { type: "hang" },
+    text("lead observed the injected member report"),
   ],
   quick: [
-    toolCall("team_wait", { from: "lead", timeout_ms: 20000 }),
-    toolCall("task_send", { to: "lead", message: "QUICK2LEAD member report to the lead" }),
-    text("quick member work complete"),
+    text("quick initial turn ended; waiting for an injected lead message"),
+    toolCall("task_send", { to: "lead", message: "QUICK2LEAD member report delivered by injection" }),
     { type: "hang" },
   ],
   fixture: [text("fixture member acknowledged")],
@@ -52,13 +40,11 @@ export const DURA_REVIVE_SCRIPT = {
     toolCall("team_create", {
       inline_spec: { name: "durateam", members: [{ name: "dura", kind: "category", category: "dura", prompt: DURA_PROMPT }] },
     }),
-    toolCall("task_output", { name: "team:__TEAM_RUN_ID__:dura", mode: "status", block: true, timeout_ms: 20000 }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "dura", message: "DURA-DRAIN durability payload one" }),
-    toolCall("task_output", { name: "team:__TEAM_RUN_ID__:dura", mode: "status", block: true, timeout_ms: 20000 }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "dura", message: "DURA-DRAIN durability payload two" }),
     { type: "hang" },
   ],
-  dura: [text("dura member seeded and complete")],
+  dura: [text("dura member seeded and initial turn ended")],
 }
 
 export const DURA_SEED_SCRIPT = {
@@ -75,15 +61,34 @@ export const NOOP_SCRIPT = {
   lead: [text("fresh boot for session_start reclaim")],
 }
 
+// Print mode exits the moment its scripted turns settle, while the member mailbox poller only ticks
+// on 1s intervals and the ack scanner commits only after the injected envelope reaches the session
+// JSONL at a tool boundary. Two tool-held waits keep the turn (and therefore the process) alive
+// across exactly those boundaries: reservation first, durable processed commit second.
+export function crashReplacementScript(unreadPath, processedPath) {
+  return {
+    quick: [
+      toolCall("bash", { command: waitForPathCommand(unreadPath, "absent") }),
+      toolCall("bash", { command: waitForPathCommand(processedPath, "present") }),
+      text("replacement crash message recovered"),
+    ],
+  }
+}
+
+function waitForPathCommand(path, mode) {
+  const hit = mode === "present" ? "fs.existsSync(p)" : "!fs.existsSync(p)"
+  const script = `const fs=require('fs');const p=process.argv[1];const until=Date.now()+25000;(function poll(){if(${hit})process.exit(0);if(Date.now()>until){console.error('timed out waiting for '+p);process.exit(1)}setTimeout(poll,100)})()`
+  return `node -e "${script}" ${JSON.stringify(path)}`
+}
+
 export const CRASH_SEED_SCRIPT = {
   lead: [
     toolCall("team_create", {
       inline_spec: {
         name: "crashteam",
-        members: [{ name: "crash", kind: "category", category: "quick", prompt: "You are team member 'crash'. MOCKROLE=quick. Become idle, then accept one crash-window message." }],
+        members: [{ name: "crash", kind: "category", category: "quick", prompt: "You are team member 'crash'. MOCKROLE=quick. End your turn, then accept one crash-window injection." }],
       },
     }),
-    toolCall("task_output", { name: "team:__TEAM_RUN_ID__:crash", mode: "status", block: true, timeout_ms: 20000 }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "crash", message: "CRASH-ONCE inject exactly once" }),
     { type: "hang" },
   ],

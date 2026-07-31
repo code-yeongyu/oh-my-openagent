@@ -1,4 +1,5 @@
 import { runTmuxCommand } from "../runner"
+import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
 import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand } from "./pane-command"
 
@@ -26,6 +27,12 @@ export async function activateTmuxPane(
     return false
   }
 
+  const authEnvArgs = buildPaneAuthEnvironmentArgs()
+  if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+    deps.log("[activateTmuxPane] SKIP: authenticated cmux panes are unsupported", { paneId, sessionId })
+    return false
+  }
+
   const tmux = await deps.getTmuxPath()
   if (!tmux) {
     deps.log("[activateTmuxPane] SKIP: tmux not found", { paneId, sessionId })
@@ -36,7 +43,7 @@ export async function activateTmuxPane(
   const result = await deps.runTmuxCommand(tmux, [
     "respawn-pane",
     "-k",
-    ...buildPaneAuthEnvironmentArgs(),
+    ...authEnvArgs,
     "-t",
     paneId,
     opencodeCmd,

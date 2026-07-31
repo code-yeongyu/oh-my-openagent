@@ -1,17 +1,21 @@
 #!/usr/bin/env bun
+import { createOmoJsonSchema } from "./build-omo-schema-document"
 import { createOhMyOpenCodeJsonSchema } from "./build-schema-document"
 
-const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
+const OMO_SCHEMA_OUTPUT_PATH = "assets/omo.schema.json"
+const LEGACY_SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
 const DIST_SCHEMA_OUTPUT_PATH = "dist/oh-my-opencode.schema.json"
 
 async function main() {
-  console.log("Generating JSON Schema...")
+  console.log("Generating JSON Schemas...")
 
-  const finalSchema = createOhMyOpenCodeJsonSchema()
-  await Bun.write(SCHEMA_OUTPUT_PATH, JSON.stringify(finalSchema, null, 2))
-  await Bun.write(DIST_SCHEMA_OUTPUT_PATH, JSON.stringify(finalSchema, null, 2))
+  await Bun.write(OMO_SCHEMA_OUTPUT_PATH, JSON.stringify(createOmoJsonSchema(), null, 2))
 
-  console.log(`✓ JSON Schema generated: ${SCHEMA_OUTPUT_PATH}`)
+  const legacySchema = createOhMyOpenCodeJsonSchema()
+  await Bun.write(LEGACY_SCHEMA_OUTPUT_PATH, JSON.stringify(legacySchema, null, 2))
+  await Bun.write(DIST_SCHEMA_OUTPUT_PATH, JSON.stringify(legacySchema, null, 2))
+
+  console.log(`✓ JSON Schemas generated: ${OMO_SCHEMA_OUTPUT_PATH}, ${LEGACY_SCHEMA_OUTPUT_PATH}`)
 }
 
 main()

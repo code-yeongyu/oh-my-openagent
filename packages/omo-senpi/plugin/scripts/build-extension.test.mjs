@@ -3,7 +3,7 @@ import { appendFile, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/pr
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { buildExtension, checkExtensionCurrent } from "./build-extension.mjs"
+import { buildExtension, checkExtensionCurrent, toPortableBuildPath } from "./build-extension.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(scriptDir, "..", "..", "..", "..")
@@ -23,6 +23,13 @@ async function builtOutputs() {
 }
 
 describe("checkExtensionCurrent", () => {
+  test("#given platform-specific source paths #when normalized #then build markers use portable separators", () => {
+    expect(toPortableBuildPath("packages\\omo-senpi\\src\\extension\\index.ts"))
+      .toBe("packages/omo-senpi/src/extension/index.ts")
+    expect(toPortableBuildPath("packages/omo-senpi/src/extension/index.ts"))
+      .toBe("packages/omo-senpi/src/extension/index.ts")
+  })
+
   test("#given current generated outputs with old mtimes #when checked #then freshness passes", async () => {
     // given
     const outputs = await builtOutputs()

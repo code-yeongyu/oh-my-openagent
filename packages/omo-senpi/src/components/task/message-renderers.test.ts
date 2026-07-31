@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { Theme, type MessageRenderer } from "@code-yeongyu/senpi"
 import { normalizeRendererText, rendererVisibleWidth } from "@oh-my-opencode/senpi-task"
 
-import { renderTaskCompletion } from "./renderers"
+import { renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
 
 const TEST_FG_COLORS = {
   accent: "#000000",
@@ -39,6 +39,7 @@ const TEST_FG_COLORS = {
   text: "#000000",
   thinkingHigh: "#000000",
   thinkingLow: "#000000",
+  thinkingMax: "#000000",
   thinkingMedium: "#000000",
   thinkingMinimal: "#000000",
   thinkingOff: "#000000",
@@ -79,7 +80,7 @@ function renderContentLines<T>(
 ): readonly string[] {
   const component = renderer(
     { role: "custom", customType, content, display: true, details, timestamp: 0 },
-    { expanded: false },
+    { expanded: false, outputPad: 0 },
     TEST_THEME,
   )
   return component?.render(width) ?? []
@@ -99,8 +100,9 @@ describe("task-family custom message renderers", () => {
       task_id: "st_1",
       name: "작업자",
       status: "completed" as const,
+      model: "quotio-openai/gpt-5.4-mini-fast",
       duration_ms: 10,
-      final_response_head: ADVERSARIAL_CONTENT,
+      final_response: ADVERSARIAL_CONTENT,
       continuation_hint: "task_send로 계속",
     }]
 
@@ -119,9 +121,17 @@ describe("task-family custom message renderers", () => {
       task_id: "st_done",
       name: "worker",
       status: "completed" as const,
+      category: "quick",
+      model: "requested/model",
+      resolved_model: {
+        source: "category" as const,
+        provider: "quotio-openai",
+        model_id: "gpt-5.4-mini-fast",
+        display: "quotio-openai/gpt-5.4-mini-fast",
+      },
       duration_ms: 1250,
       tokens: 321,
-      final_response_head: "검증 작업을 완료했습니다.",
+      final_response: "검증 작업을 완료했습니다.",
       continuation_hint: 'Use task_send({ to: "st_done", message: "..." }) to continue.',
     }]
 
@@ -138,6 +148,8 @@ describe("task-family custom message renderers", () => {
     expect(text).toContain("task completion")
     expect(text).toContain("name:worker")
     expect(text).toContain("id:st_done")
+    expect(text).toContain("category:quick")
+    expect(text).toContain("model:quotio-openai/gpt-5.4-mini-fast")
     expect(text).toContain("status:completed")
     expect(text).toContain("duration:1.25s")
     expect(text).toContain("tokens:321")
@@ -147,15 +159,40 @@ describe("task-family custom message renderers", () => {
     expect(text).not.toContain("<head>")
   })
 
+  test("#given a liveness event #when rendering #then member state and a sanitized crash reason are visible", () => {
+    // given
+    const details = {
+      memberName: "alpha",
+      lastKnownState: "error" as const,
+      reason: ADVERSARIAL_CONTENT,
+    }
+
+    // when
+    const lines = renderContentLines(
+      renderTeamMemberLiveness,
+      "senpi-task.team-member-liveness",
+      "raw liveness protocol",
+      details,
+    )
+
+    // then
+    expectSanitizedLines(lines)
+    const text = lines.join("\n")
+    expect(text).toContain("team member liveness")
+    expect(text).toContain("member:alpha")
+    expect(text).toContain("last state:error")
+  })
+
   test("#given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries", () => {
     // given
     const details = [{
       task_id: "st_done",
       name: "worker",
       status: "completed" as const,
+      model: "quotio-openai/gpt-5.4-mini-fast",
       duration_ms: 1250,
-      final_response_head: "검증 작업을 완료했습니다.",
-      continuation_hint: 'Use task_output({ task_id: "st_done" }) to read the full result after inspecting the complete transcript and all attached evidence.',
+      final_response: "검증 작업을 완료했습니다.",
+      continuation_hint: 'Use task_send({ to: "st_done", message: "continue with the remaining evidence and report the result" }) to continue.',
     }]
 
     // when

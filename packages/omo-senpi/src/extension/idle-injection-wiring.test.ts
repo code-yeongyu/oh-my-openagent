@@ -6,7 +6,7 @@ import { activeStatus, createLogger } from "../components/ulw-loop/ulw-loop.test
 import { createParentNotifier } from "../components/task/parent-notifier"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
-// The Oracle arbitration blocker: a background task-completion wake and a ulw-loop continuation that
+// The arbitration blocker: a background task-completion wake and a ulw-loop continuation that
 // land on the SAME idle edge must collapse into exactly ONE injection. This drives the two REAL
 // producers (createUlwLoopComponent + createParentNotifier) through one shared coordinator, exactly as
 // composeOmoSenpiExtension wires them, instead of hand-enqueuing state the producers never actually
@@ -16,7 +16,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
     // given a shared coordinator whose deferred flush is captured (manual scheduler = deterministic)
     const delivered: string[] = []
     const scheduled: Array<() => void> = []
-    const coordinator = new IdleInjectionCoordinator((content) => delivered.push(content), {
+    const coordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content), {
       scheduleFlush: (flush) => scheduled.push(flush),
     })
 
@@ -43,8 +43,9 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
           task_id: "st_done",
           name: "bg",
           status: "completed",
+          model: "quotio-openai/gpt-5.4-mini-fast",
           duration_ms: 1,
-          final_response_head: "",
+          final_response: "",
           continuation_hint: "",
         },
       ],

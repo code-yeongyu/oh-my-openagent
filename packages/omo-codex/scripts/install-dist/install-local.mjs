@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.18.2",
+    version: "4.19.3",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6429,7 +6429,7 @@ function whereCommand(command) {
   }
 }
 // packages/omo-codex/src/install/codex-process.ts
-var WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"]);
+var WINDOWS_CMD_SHIM_COMMANDS = new Set(["codex", "npm", "npx"]);
 function resolveRunCommandInvocation(command, args, platform = process.platform) {
   if (platform !== "win32" || !WINDOWS_CMD_SHIM_COMMANDS.has(command.toLowerCase())) {
     return { command, args: [...args] };
@@ -7068,6 +7068,7 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
   const packageJsonPaths = [];
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths);
   const packageLock = await readPackageLock(pluginRoot);
+  let rewroteAnyPackageJson = false;
   for (const packageJsonPath of packageJsonPaths) {
     const raw = await readFile5(packageJsonPath, "utf8");
     const parsed = JSON.parse(raw);
@@ -7103,13 +7104,16 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
         changed = true;
       }
     }
-    if (changed)
+    if (changed) {
       await writeFile2(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}
 `);
+      rewroteAnyPackageJson = true;
+    }
   }
   if (packageLock.changed)
     await writeFile2(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}
 `);
+  return rewroteAnyPackageJson;
 }
 async function readPackageLock(pluginRoot) {
   const path = join8(pluginRoot, "package-lock.json");
@@ -7530,10 +7534,11 @@ async function installCachedPlugin(input) {
   await rm4(tempPath, { recursive: true, force: true });
   try {
     await copyDirectory(input.sourcePath, tempPath);
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
+    const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
-    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"]);
+    const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
       await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
@@ -8835,6 +8840,24 @@ function stripUnquotedInlineComment3(line) {
 
 // packages/omo-codex/src/install/codex-config-reasoning.ts
 var MANAGED_KEYS = ["model", "model_context_window", "model_reasoning_effort", "plan_mode_reasoning_effort"];
+var CODEX_REASONING_BY_UNIFIED_LEVEL = {
+  off: "none",
+  none: "none",
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: "max"
+};
+function applyReasoningOverride(catalog, reasoning) {
+  if (reasoning === undefined)
+    return catalog;
+  const wireEffort = CODEX_REASONING_BY_UNIFIED_LEVEL[reasoning.trim().toLowerCase()];
+  if (wireEffort === undefined)
+    return catalog;
+  return { ...catalog, current: { ...catalog.current, modelReasoningEffort: wireEffort } };
+}
 function ensureCodexReasoningConfig(config, catalog) {
   const current = readRootReasoningSettings(config);
   if (Object.keys(current).length > 0 && !matchesProfile(current, catalog.current) && !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))) {
@@ -9175,7 +9198,7 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
-  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
+  config = ensureCodexReasoningConfig(config, applyReasoningOverride(await readCodexModelCatalog(input.repoRoot), input.reasoning));
   config = ensureCodexMultiAgentV2Config(config, {
     multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath)
   });
@@ -9392,6 +9415,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.5", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "ultra" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "ultra" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9401,6 +9428,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
       }
     ]
   ],
@@ -9410,6 +9441,37 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
         current: { model: "gpt-5.6-luna", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "max" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-high",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-code-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-clone-fidelity-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9428,6 +9490,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "high" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-sol", effort: "low" }
       }
     ]
   ]

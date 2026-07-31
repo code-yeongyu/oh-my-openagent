@@ -195,6 +195,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false,
+    ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
   })
   await seedAndMigrateOmoSot({ env, log, repoRoot, runCommand })
 

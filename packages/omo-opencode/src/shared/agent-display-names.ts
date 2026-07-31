@@ -45,7 +45,7 @@ export function stripAgentListSortPrefix(agentName: string): string {
  *
  * @param overrides - Optional per-agent overrides map. If the agent has a `displayName`
  *   field set, it takes precedence over the hardcoded AGENT_DISPLAY_NAMES entry.
- *   This enables i18n: `agents.sisyphus.displayName = "总指挥"` in oh-my-openagent.json.
+ *   This enables i18n: `agents.sisyphus.displayName = "总指挥"` in .omo/omo.jsonc.
  */
 export function getAgentDisplayName(
   configKey: string,

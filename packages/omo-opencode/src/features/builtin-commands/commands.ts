@@ -72,7 +72,7 @@ Timestamp: $TIMESTAMP
 <user-request>
 $ARGUMENTS
 </user-request>`,
-      argumentHint: "[plan-name]",
+      argumentHint: "[plan-name] [--worktree <path>] [--make-pr] [--ship]",
     },
     "stop-continuation": {
       description: "(builtin) Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session",

@@ -14,6 +14,7 @@ export type LifecycleContext = {
   readonly now: () => number
   readonly signaller: ProcessSignaller
   readonly orphanKillDelayMs: number
+  readonly hostPid: number
   readonly reattachPorts: LifecycleReattachPorts | undefined
 }
 
@@ -46,6 +47,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     now: deps.now ?? Date.now,
     signaller: deps.signaller ?? defaultSignaller,
     orphanKillDelayMs: deps.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS,
+    hostPid: deps.hostPid ?? process.pid,
     reattachPorts: injectedLifecycleReattachPorts(deps),
   }
 }

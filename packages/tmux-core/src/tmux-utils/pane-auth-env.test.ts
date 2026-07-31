@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 
 import type { TmuxCommandResult } from "../runner"
 import type { TmuxConfig } from "../types"
@@ -7,6 +7,9 @@ import { replaceTmuxPane } from "./pane-replace"
 import { spawnTmuxPane } from "./pane-spawn"
 import { spawnTmuxSession } from "./session-spawn"
 import { spawnTmuxWindow } from "./window-spawn"
+
+const originalTmux = process.env.TMUX
+const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -90,8 +93,17 @@ function expectNoAuthEnvArgs(args: readonly string[]): void {
 }
 
 describe("tmux pane auth environment propagation", () => {
+	beforeEach(() => {
+		process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
+		delete process.env.CMUX_SOCKET_PATH
+	})
+
 	afterEach(() => {
 		setAuthEnv()
+		if (originalTmux === undefined) delete process.env.TMUX
+		else process.env.TMUX = originalTmux
+		if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
+		else process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
 	})
 
 	it("#given auth env vars with spaces #when activateTmuxPane respawns attach #then tmux receives env args and quoted attach values", async () => {

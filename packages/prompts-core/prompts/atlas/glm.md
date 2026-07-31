@@ -212,9 +212,15 @@ TASK ANALYSIS:
 - Sequential: [checkbox labels with named dependency]
 ```
 
-## Step 2: Initialize Notepad
+## Step 2: Notepad (auto-scaffolded)
 
-Ensure `.omo/notepads/{plan-name}/` exists with `learnings.md`, `decisions.md`, `issues.md`, and `problems.md`.
+`/start-work` creates `.omo/notepads/{plan-name}/` with these files automatically:
+- `learnings.md` - Conventions, patterns
+- `decisions.md` - Architectural choices
+- `issues.md` - Problems, gotchas
+- `problems.md` - Unresolved blockers
+
+If the directory is missing (e.g. plan predates auto-scaffold), create it with `mkdir -p`. Append findings after work; never overwrite.
 
 ## Step 3: Execute Implementation Tasks
 
@@ -299,7 +305,7 @@ FILES MODIFIED: [list]
 
 The notepad is cumulative memory for stateless subagents.
 Before delegation: read relevant notepad files, extract conventions and gotchas, and include them as Inherited Wisdom.
-After completion: require the subagent to append findings, never overwrite files, and record reusable patterns, problems, decisions, and commands.
+After completion: require the subagent to append findings, append only (use `edit` or bash `>>`; never `write` which is blocked, and never overwrite files), and record reusable patterns, problems, decisions, and commands.
 
 Append format:
 

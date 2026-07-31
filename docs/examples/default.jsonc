@@ -7,8 +7,8 @@
   "agents": {
     // Main orchestrator: handles delegation and drives tasks to completion
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-7",
-      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
+      "model": "anthropic/claude-opus-5",
+      "ultrawork": { "model": "anthropic/claude-opus-5", "variant": "max" },
     },
 
     // Deep autonomous worker: end-to-end implementation
@@ -23,10 +23,10 @@
     },
 
     // Architecture consultant: complex design and debugging
-    "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
+    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high" },
 
     // Documentation and code search
-    "librarian": { "model": "google/gemini-3-flash" },
+    "librarian": { "model": "google/gemini-3.6-flash" },
 
     // Fast codebase exploration
     "explore": { "model": "github-copilot/grok-code-fast-1" },
@@ -50,10 +50,10 @@
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
-    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
-    "writing": { "model": "kimi-for-coding/k2p5" },
-    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
-    "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
+    "unspecified-high": { "model": "anthropic/claude-opus-5", "variant": "max" },
+    "writing": { "model": "kimi-for-coding/kimi-k3", "variant": "low" },
+    "visual-engineering": { "model": "anthropic/claude-opus-5", "variant": "max" },
+    "deep": { "model": "openai/gpt-5.6-sol", "variant": "medium" },
     "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
   },
 

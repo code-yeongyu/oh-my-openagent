@@ -6,7 +6,13 @@ import type { TaskRecordStore } from "../store"
 
 // Why a task is being torn down. Cancel (todo 10), LRU eviction, TTL cleanup, session shutdown, and
 // session_start reconciliation ALL route their destruction through the single-writer port.
-export type DestroyCause = "cancel" | "evict" | "ttl" | "shutdown" | "reconcile_lost"
+export type DestroyCause =
+  | "cancel"
+  | "evict"
+  | "ttl"
+  | "shutdown"
+  | "reconcile_lost"
+  | "fallback_handoff"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
@@ -79,6 +85,9 @@ export type LifecycleDeps = {
   readonly reattach?: ReattachPort
   // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
   readonly orphanKillDelayMs?: number
+  // Pid of THIS host process. Defaults to process.pid; injectable so reconciliation tests can
+  // simulate cross-process ownership deterministically.
+  readonly hostPid?: number
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {

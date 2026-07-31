@@ -37,3 +37,12 @@ export const CATEGORY_PROMPT_APPEND_RESOLVERS: Record<string, (model: string | u
     .filter((definition) => definition.resolvePromptAppend !== undefined)
     .map((definition) => [definition.name, definition.resolvePromptAppend!]),
 )
+
+// Gate models mirrored from senpi-task's builtins.ts requiresModel plumbing: CATEGORY_MODEL_REQUIREMENTS
+// (model-core) wins when it carries its own requiresModel; this record covers builtin categories whose
+// gate is declared only on the definition (deep).
+export const BUILTIN_CATEGORY_REQUIRES_MODEL: Record<string, string> = Object.fromEntries(
+  BUILTIN_CATEGORIES
+    .filter((definition) => definition.requiresModel !== undefined)
+    .map((definition) => [definition.name, definition.requiresModel!]),
+)

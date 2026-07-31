@@ -11,6 +11,8 @@ import { SenpiTeamSpecError } from "./errors"
 export type SenpiTeamMemberPorts = {
   readonly isCategoryResolvable: (category: string) => boolean
   readonly isKnownAgent: (subagentType: string) => boolean
+  readonly categoryNames?: readonly string[]
+  readonly agentNames?: readonly string[]
 }
 
 const ALLOWED_KINDS_HINT =
@@ -24,8 +26,11 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
   for (const member of spec.members) {
     if (member.kind === "category") {
       if (!ports.isCategoryResolvable(member.category)) {
+        const available = ports.categoryNames !== undefined && ports.categoryNames.length > 0
+          ? ` Available categories: ${[...ports.categoryNames].sort().join(", ")}.`
+          : ""
         throw new SenpiTeamSpecError(
-          `Team '${spec.name}' member '${member.name}' references unknown category '${member.category}'. ${ALLOWED_KINDS_HINT}.`,
+          `Team '${spec.name}' member '${member.name}' references unknown category '${member.category}'.${available} ${ALLOWED_KINDS_HINT}.`,
           "UNRESOLVABLE_CATEGORY",
           spec.name,
         )
@@ -42,8 +47,11 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
     }
 
     if (!ports.isKnownAgent(member.subagent_type)) {
+      const available = ports.agentNames !== undefined && ports.agentNames.length > 0
+        ? ` Available agents: ${[...ports.agentNames].sort().join(", ")}.`
+        : ""
       throw new SenpiTeamSpecError(
-        `Team '${spec.name}' member '${member.name}' references unknown subagent_type '${member.subagent_type}'. ${ALLOWED_KINDS_HINT}.`,
+        `Team '${spec.name}' member '${member.name}' references unknown subagent_type '${member.subagent_type}'.${available} ${ALLOWED_KINDS_HINT}.`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )

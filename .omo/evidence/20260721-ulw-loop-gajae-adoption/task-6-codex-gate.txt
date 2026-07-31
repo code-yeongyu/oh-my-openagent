@@ -1,0 +1,29 @@
+Command: cd /Users/yeongyu/local-workspaces/omo-wt/ulw-loop-batch-efficiency-v2 && bun run test:codex
+Observed: exit 0.
+
+Final output summary:
+- tests 510
+- pass 510
+- fail 0
+- cancelled 0
+- skipped 0
+- todo 0
+- duration_ms 28080.658917
+
+Notable command-chain surfaces exercised by the gate:
+- build:codex-install
+- build:git-bash-mcp
+- build:lsp-tools-mcp
+- build:lsp-daemon
+- npm --prefix packages/lsp-tools-mcp test
+- npm --prefix packages/omo-codex/plugin ci
+- npm --prefix packages/omo-codex/plugin/components/ulw-loop test
+- bun run --cwd packages/omo-codex/plugin build
+- codegraph typecheck/test
+- third-party notice check
+- Codex installer/config/plugin suites via bun test and node --test
+
+Side effect note: bun run test:codex rebuilds packages/omo-codex/plugin/components/codegraph/dist/cli.js with alternate source-comment prefixes. That tracked out-of-scope build artifact was restored by running the codegraph component build from its package cwd; final status confirmed no codegraph diff.
+
+Why enough: this is the canonical root Codex compatibility gate required by the plan.
+Omitted: full 1483-line stdout is summarized to avoid a noisy artifact; the final machine-readable test summary above is exact from the passing run.

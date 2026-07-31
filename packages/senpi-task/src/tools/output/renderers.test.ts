@@ -4,12 +4,7 @@ import type { ThemeColor } from "@code-yeongyu/senpi"
 
 import { rendererVisibleWidth } from "../task/renderers"
 import { toolResult } from "../control"
-import {
-  renderTaskOutputCall,
-  renderTaskOutputResult,
-  taskOutputModelText,
-  type OutputRenderTheme,
-} from "./renderers"
+import { renderTaskOutputCall, renderTaskOutputResult, type OutputRenderTheme } from "./renderers"
 import type { TaskOutputDetails, TaskSnapshot } from "./types"
 
 const TEST_THEME: OutputRenderTheme = {
@@ -45,14 +40,14 @@ function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
 }
 
 describe("task_output renderers", () => {
-  test("#given task_output arguments #when rendering calls #then rows show target mode wait and only relevant tail lines", () => {
+  test("#given task_output arguments #when rendering calls #then rows show target mode peek and only relevant tail lines", () => {
     // given / when
     const tailLine = firstLine(
-      renderTaskOutputCall({ name: "long-running-explorer", mode: "tail", block: false, tail_lines: 20 }, TEST_THEME),
+      renderTaskOutputCall({ name: "long-running-explorer", mode: "tail", tail_lines: 20 }, TEST_THEME),
       96,
     )
     const statusLine = firstLine(
-      renderTaskOutputCall({ task_id: "st_1", mode: "status", block: true, tail_lines: 20 }, TEST_THEME),
+      renderTaskOutputCall({ task_id: "st_1", mode: "status", tail_lines: 20 }, TEST_THEME),
       96,
     )
 
@@ -62,7 +57,7 @@ describe("task_output renderers", () => {
     expect(tailLine).toContain("mode:tail")
     expect(tailLine).toContain("peek")
     expect(tailLine).toContain("tail_lines:20")
-    expect(statusLine).toContain("block")
+    expect(statusLine).toContain("peek")
     expect(statusLine).not.toContain("tail_lines")
   })
 
@@ -73,7 +68,6 @@ describe("task_output renderers", () => {
         {
           name: "한국어 작업 이름이 아주 길게 이어집니다.\nEnglish task name also continues long enough to require truncation.",
           mode: "tail",
-          block: false,
           tail_lines: 7,
         },
         ANSI_THEME,
@@ -91,7 +85,7 @@ describe("task_output renderers", () => {
   test("#given a width smaller than the fixed call tokens #when rendering task_output #then the complete ANSI row is clamped", () => {
     // given / when
     const line = firstLine(
-      renderTaskOutputCall({ name: "abcdef", mode: "status", block: true }, ANSI_THEME),
+      renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME),
       20,
     )
 
@@ -112,7 +106,6 @@ describe("task_output renderers", () => {
         truncated: true,
         snapshot: snapshot(),
       },
-      { kind: "timed_out", task_id: "st_wait", waited_ms: 5000 },
       { kind: "not_found", reason: "No task 'missing' in this session.", known_tasks: ["alpha"] },
       { kind: "invalid_arguments", reason: "Provide task_id or name." },
     ]
@@ -122,15 +115,29 @@ describe("task_output renderers", () => {
 
     // then
     expect(lines).toHaveLength(details.length)
-    expect(lines.join("\n")).toContain("task_output status")
+    expect(lines.join("\n")).toContain("task_output st_done running")
     expect(lines.join("\n")).toContain("task_output transcript st_done")
     expect(lines.join("\n")).toContain("source:event-log")
     expect(lines.join("\n")).toContain("truncated")
-    expect(lines.join("\n")).toContain("task_output timed out st_wait after 5000ms")
     expect(lines.join("\n")).toContain("task_output not found")
     expect(lines.join("\n")).toContain("known:alpha")
     expect(lines.join("\n")).toContain("task_output invalid")
     expect(lines.join("\n")).not.toContain("secret transcript body")
+  })
+
+  test("#given a described task #when the status row renders #then the human label leads and the id trails", () => {
+    // given / when
+    const line = firstLine(
+      renderTaskOutputResult(
+        toolResult("ignored", { kind: "status", snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }) }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
+      200,
+    )
+
+    // then
+    expect(line).toStartWith("[success]task_output Audit the waiting line (st_done) completed")
   })
 
   test("#given long multiline Korean and English known tasks #when rendering not_found at width 96 #then known list is normalized truncated and column-safe", () => {
@@ -153,49 +160,68 @@ describe("task_output renderers", () => {
     expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(96)
   })
 
-  test("#given resolved model details #when formatting model text #then display is preferred and empty labels are omitted", () => {
+  test("#given resolved model details #when the status row renders #then the canonical target token is used", () => {
     // given / when
-    const withResolved = taskOutputModelText(
-      snapshot({
-        model: "openai/gpt-5.6-sol",
+    const withResolved = firstLine(
+      renderTaskOutputResult(
+        toolResult("ignored", {
+          kind: "status",
+          snapshot: snapshot({
+            category: "quick",
+            resolved_model: {
+              provider: "openai",
+              model_id: "gpt-5.6-sol",
+              display: "GPT-5.6 Sol",
+              reasoning_effort: " ",
+              variant: "xhigh",
+              source: "category",
+            },
+          }),
+        }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
+      200,
+    )
+    const raw = firstLine(
+      renderTaskOutputResult(
+        toolResult("ignored", { kind: "status", snapshot: snapshot({ model: "anthropic/claude-sonnet-4-5" }) }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
+      200,
+    )
+
+    // then blank effort falls back to the variant, and an unresolved model keeps a model token
+    expect(withResolved).toContain("category:quick(openai/gpt-5.6-sol:xhigh)")
+    expect(withResolved).not.toContain("reasoning")
+    expect(raw).toContain("model:anthropic/claude-sonnet-4-5")
+  })
+
+  test("#given injected controls in task_output model metadata #when the status row renders #then it is plain and sanitized", () => {
+    // given
+    const detail: TaskOutputDetails = {
+      kind: "status",
+      snapshot: snapshot({
+        category: "quick",
+        model: "raw\u001b[31m-model\u001b[0m",
         resolved_model: {
           provider: "openai",
           model_id: "gpt-5.6-sol",
-          display: "GPT-5.6 Sol",
-          reasoning_effort: " ",
-          variant: "xhigh",
+          display: "GPT\u001b]0;hidden\u0007-5.6 Sol",
+          reasoning_effort: "xhigh\u0007",
+          variant: "sol\u007f",
           source: "category",
         },
       }),
-    )
-    const raw = taskOutputModelText(snapshot({ model: "anthropic/claude-sonnet-4-5" }))
-
-    // then
-    expect(withResolved).toBe("model GPT-5.6 Sol (variant xhigh)")
-    expect(withResolved).not.toContain("reasoning ")
-    expect(raw).toBe("model anthropic/claude-sonnet-4-5")
-  })
-
-  test("#given injected controls in task_output model metadata #when formatted #then model text is plain and sanitized", () => {
-    // given
-    const task = snapshot({
-      model: "raw\u001b[31m-model\u001b[0m",
-      resolved_model: {
-        provider: "openai",
-        model_id: "gpt-5.6-sol",
-        display: "GPT\u001b]0;hidden\u0007-5.6 Sol",
-        reasoning_effort: "xhigh\u0007",
-        variant: "sol\u007f",
-        source: "category",
-      },
-    })
+    }
 
     // when
-    const text = taskOutputModelText(task)
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
 
     // then
-    expect(text).toBe("model GPT-5.6 Sol (reasoning xhigh, variant sol)")
-    expectNoTerminalControls(text)
+    expect(line).toContain("category:quick(openai/gpt-5.6-sol:xhigh)")
+    expectNoTerminalControls(line)
   })
 
   test("#given injected controls in a task_output result #when rendered #then dynamic controls are removed before trusted theme styling", () => {
@@ -214,5 +240,45 @@ describe("task_output renderers", () => {
     expect(themed).not.toContain("\u001b[31m")
     expect(themed).not.toContain("https://example.com")
     expectNoTerminalControls(plain)
+  })
+})
+
+describe("task_output run stats rendering", () => {
+  test("#given a terminal snapshot with run stats #when the status row renders #then runtime and tps are shown", () => {
+    // given
+    const detail: TaskOutputDetails = {
+      kind: "status",
+      snapshot: snapshot({
+        run_stats: {
+          runtime_ms: 134_000,
+          turns: 3,
+          tool_calls: 5,
+          output_tokens: 900,
+          total_tokens: 4_200,
+          generation_ms: 7_600,
+          tokens_per_second: 118,
+        },
+      }),
+    }
+
+    // when
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    // then
+    expect(line).toContain("task_output st_done completed")
+    expect(line).toContain("· ran 2m 14s")
+    expect(line).toContain("· 118 tok/s")
+  })
+
+  test("#given a snapshot without run stats #when the status row renders #then no runtime tokens appear", () => {
+    // when
+    const line = firstLine(
+      renderTaskOutputResult(toolResult("ignored", { kind: "status", snapshot: snapshot() }), RESULT_OPTIONS, TEST_THEME),
+      200,
+    )
+
+    // then
+    expect(line).not.toContain("ran ")
+    expect(line).not.toContain("tok/s")
   })
 })

@@ -36,8 +36,6 @@ const SEND_RESULT_RENDER_CASES = [
   ["scope_denied", { kind: "scope_denied", task_id: "st_1", owning_session_id: "owner", reason: "Denied." }, "[error]task_send denied st_1 owner:owner[/error]"],
   ["not_found", { kind: "not_found", reason: "No task.", known_tasks: ["alpha"] }, "[error]task_send not found: No task. known:alpha[/error]"],
   ["invalid_arguments", { kind: "invalid_arguments", reason: "message is required" }, "[error]task_send invalid: message is required[/error]"],
-  ["interrupted", { kind: "interrupted", task_id: "st_1", previous_status: "running" }, "[warning]task_send interrupted st_1 (was running)[/warning]"],
-  ["noop", { kind: "noop", task_id: "st_1", previous_status: "interrupted", reason: "Already interrupted." }, "[warning]task_send no change st_1 (interrupted): Already interrupted.[/warning]"],
   ["team_message", { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1" } }, "[success]task_send team message msg-1 enqueued to lead[/success]"],
   ["shutdown_requested", { kind: "shutdown_requested", team_run_id: "team-1", member: "atlas" }, "[warning]task_send shutdown requested team-1 member:atlas[/warning]"],
   ["shutdown_responded", { kind: "shutdown_responded", team_run_id: "team-1", member: "atlas", approved: false }, "[warning]task_send shutdown rejected team-1 member:atlas[/warning]"],
@@ -53,12 +51,11 @@ function expectNoTerminalControls(value: string): void {
 }
 
 describe("control tool renderers", () => {
-  test("#given a plain task_send message #when rendering the call #then it shows concise target delivery and a width-safe excerpt", () => {
+  test("#given a plain task_send message #when rendering the call #then it shows a concise target and width-safe excerpt", () => {
     const line = firstLine(
       renderTaskSendCall(
         {
           to: "st_00000001",
-          deliver_as: "steer",
           message: "Please inspect the database migration and report only the risky steps. tail-marker",
         },
         ANSI_THEME,
@@ -66,7 +63,8 @@ describe("control tool renderers", () => {
       96,
     )
 
-    expect(line).toContain("task_send to:st_00000001 deliver:steer")
+    expect(line).toContain("task_send to:st_00000001")
+    expect(line).not.toContain("deliver:")
     expect(line).not.toContain("operation:")
     expect(line).not.toContain("target:")
     expect(line).not.toContain("delivery:")
@@ -79,7 +77,6 @@ describe("control tool renderers", () => {
       renderTaskSendCall(
         {
           to: "atlas",
-          deliver_as: "followUp",
           message: "한국어 안내가 아주 길게 이어집니다.\nEnglish guidance also continues long enough to require truncation safely.",
         },
         ANSI_THEME,
@@ -99,7 +96,6 @@ describe("control tool renderers", () => {
       renderTaskSendCall(
         {
           to: "st_1",
-          deliver_as: "followUp",
           message: "한국어로 긴 후속 작업 지시를 작성하고 동일한 세션의 맥락을 검증하세요.",
         },
         ANSI_THEME,
@@ -108,7 +104,7 @@ describe("control tool renderers", () => {
     )
 
     // then
-    expect(line).toContain('"한국어로 긴 후속 작업..."')
+    expect(line).toContain('"한국어로 긴 후속 작업 지시를 작성하고..."')
     expect(line).not.toContain("지...")
     expect(visibleWidth(line)).toBeLessThanOrEqual(72)
   })
@@ -193,10 +189,11 @@ describe("control tool renderers", () => {
     expect(visibleWidth(line)).toBeLessThanOrEqual(73)
   })
 
-  test("#given pure interrupt task_send #when rendering the call #then it is meaningful without an empty message label", () => {
-    const line = firstLine(renderTaskSendCall({ to: "atlas", deliver_as: "interrupt" }, TEST_THEME), 80)
+  test("#given task_send without a message #when rendering the call #then it is meaningful without an empty message label", () => {
+    const line = firstLine(renderTaskSendCall({ to: "atlas" }, TEST_THEME), 80)
 
-    expect(line).toContain("task_send to:atlas deliver:interrupt")
+    expect(line).toContain("task_send to:atlas")
+    expect(line).not.toContain("deliver:")
     expect(line).not.toContain("message:")
   })
 

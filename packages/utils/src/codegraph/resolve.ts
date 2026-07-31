@@ -5,6 +5,7 @@ import { basename, dirname, join } from "node:path"
 import { createRequire } from "node:module"
 
 import { bunWhich } from "../runtime/which"
+import { resolvePinnedCodegraphBin } from "./managed-runtime"
 import { CODEGRAPH_NODE_BIN_ENV, evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "./node-support"
 
 export type CodegraphCommandSource = "bundled" | "env" | "path" | "provisioned"
@@ -156,12 +157,7 @@ export function resolveCodegraphNodeSupport(
 }
 
 function defaultProvisionedBin(homeDir: string, fileExists: (filePath: string) => boolean): string | null {
-  const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph"
-  const candidates = [
-    join(homeDir, ".omo", "codegraph", "bin", binaryName),
-    join(homeDir, ".omo", "codegraph", "node-servers", "node_modules", ".bin", binaryName),
-  ]
-  return candidates.find((candidate) => fileExists(candidate)) ?? null
+  return resolvePinnedCodegraphBin(join(homeDir, ".omo", "codegraph"), { fileExists })
 }
 
 function resolveBundledShim(

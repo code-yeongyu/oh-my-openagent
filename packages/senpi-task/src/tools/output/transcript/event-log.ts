@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT } from "../../../manager/transcript-log"
+import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_ERROR_EVENT, TRANSCRIPT_TOOL_EVENT } from "../../../manager/transcript-log"
 import type { TranscriptEntry } from "../types"
 
 // Re-exported from the writer (manager/transcript-log.ts) so reader and writer share ONE contract for
 // the event-type names and can never drift.
-export { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT }
+export { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_ERROR_EVENT, TRANSCRIPT_TOOL_EVENT }
 
 // Reconstruct a child's transcript from OUR event log (logs/<taskId>.jsonl). Only the two transcript
 // event types are lifted; lifecycle/audit events on the same log are ignored. A missing log is an
@@ -51,6 +51,9 @@ function transcriptEntryOf(entry: unknown): TranscriptEntry | undefined {
   }
   if (entry.type === TRANSCRIPT_TOOL_EVENT && typeof payload.tool === "string") {
     return { kind: "tool", tool: payload.tool, is_error: payload.is_error === true }
+  }
+  if (entry.type === TRANSCRIPT_ERROR_EVENT && typeof payload.message === "string") {
+    return { kind: "error", message: payload.message }
   }
   if (entry.type === "team_message_waited" && typeof payload.from === "string" && typeof payload.body === "string") {
     return { kind: "assistant", text: `[team message from ${payload.from}] ${payload.body}` }

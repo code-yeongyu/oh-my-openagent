@@ -1,16 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { BUILTIN_AGENTS } from "@oh-my-opencode/senpi-task"
+import { BUILTIN_AGENTS, type SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import { createTaskChildPlanner, type TaskModelRegistry } from "./planner"
 
-type FakeModel = {
-  readonly provider: string
-  readonly id: string
-}
+type FakeModel = SenpiModelPort & { readonly name?: string }
 
-function model(provider: string, id: string): FakeModel {
-  return { provider, id }
+function model(provider: string, id: string, name?: string): FakeModel {
+  return { provider, id, ...(name === undefined ? {} : { name }) }
 }
 
 function registry(models: readonly FakeModel[]): TaskModelRegistry {
@@ -42,7 +39,7 @@ describe("createTaskChildPlanner", () => {
         },
       },
       {},
-      () => registry([model("google", "gemini-3.1-pro")]),
+      () => registry([model("google", "gemini-3.1-pro", "Gemini 3.1 Pro")]),
     )
 
     // when
@@ -60,18 +57,18 @@ describe("createTaskChildPlanner", () => {
       source: "category",
       provider: "google",
       model_id: "gemini-3.1-pro",
-      display: "google/gemini-3.1-pro",
+      display: "Gemini 3.1 Pro",
       variant: "high",
       reasoning_effort: "xhigh",
     })
   })
 
-  test("#given ultrabrain falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata", () => {
+  test("#given visual-engineering falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata", () => {
     // given
     const planner = createTaskChildPlanner(
       {},
       {},
-      () => registry([model("google", "gemini-3.1-pro")]),
+      () => registry([model("zai-coding-plan", "glm-5.2")]),
     )
 
     // when
@@ -79,17 +76,17 @@ describe("createTaskChildPlanner", () => {
       prompt: "Think hard.",
       parent_session_id: "parent-1",
       depth: 0,
-      category: "ultrabrain",
+      category: "visual-engineering",
     })
 
     // then
     const resolved = expectResolved(result)
     expect(resolved.plan.resolved_model).toMatchObject({
       source: "category",
-      provider: "google",
-      model_id: "gemini-3.1-pro",
-      display: "google/gemini-3.1-pro",
-      variant: "high",
+      provider: "zai-coding-plan",
+      model_id: "glm-5.2",
+      display: "zai-coding-plan/glm-5.2",
+      variant: "max",
     })
   })
 
@@ -180,7 +177,7 @@ describe("createTaskChildPlanner", () => {
       prompt: "Review this design.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "oracle",
+      subagent_type: "momus",
       model: "openai/gpt-5.5",
     })
 
@@ -193,7 +190,7 @@ describe("createTaskChildPlanner", () => {
       model_id: "gpt-5.5",
       display: "openai/gpt-5.5",
     })
-    expect(resolved.plan.agentType).toBe("oracle")
+    expect(resolved.plan.agentType).toBe("momus")
     expect(resolved.plan.instructions).toBeDefined()
     expect(resolved.plan.toolAllowlist).toHaveLength(9)
     expect(resolved.plan.agentExecutionMode).toBe("in-process")
@@ -226,7 +223,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("google", "gemini-3.1-pro")]),
+      () => registry([model("zai-coding-plan", "glm-5.2")]),
     )
 
     // when
@@ -234,13 +231,13 @@ describe("createTaskChildPlanner", () => {
       prompt: "Think hard.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "ultrabrain",
+      subagent_type: "visual-engineering",
     })
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "google" })
-    expect(resolved.plan.category).toBe("ultrabrain")
+    expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "zai-coding-plan" })
+    expect(resolved.plan.category).toBe("visual-engineering")
   })
 
   test("#given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available", () => {
@@ -269,7 +266,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement", () => {
     // given
-    const agents = { ...BUILTIN_AGENTS, oracle: { name: "oracle", disable: true } }
+    const agents = { ...BUILTIN_AGENTS, momus: { name: "momus", disable: true } }
     const planner = createTaskChildPlanner({}, agents, () => undefined)
 
     // when
@@ -277,14 +274,14 @@ describe("createTaskChildPlanner", () => {
       prompt: "Review this design.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "oracle",
+      subagent_type: "momus",
       model: "openai/gpt-5.5",
     })
 
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis"])
   })
 
   test("#given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories", () => {
@@ -306,8 +303,11 @@ describe("createTaskChildPlanner", () => {
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
-    expect(result.error.availableCategories).toContain("ultrabrain")
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+    // writing survives on a gemini-only registry (its gemini-3.1-pro rung resolves); ultrabrain's
+    // sol-only chain is dead, so the dead-chain gate excludes it.
+    expect(result.error.availableCategories).toContain("writing")
+    expect(result.error.availableCategories).not.toContain("ultrabrain")
   })
 
   test("#given subagent_type naming a builtin agent whose chain no registry model satisfies #when planned #then it reports model_unavailable with the agent list", () => {
@@ -330,6 +330,154 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.message).toContain('No available model for agent "explore"')
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+  })
+})
+
+describe("createTaskChildPlanner plan variant", () => {
+  test("#given a category with an explicit reasoning effort and a variant #when planned #then the applied variant is the reasoning effort", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {
+        categories: {
+          ultrabrain: {
+            model: "google/gemini-3.1-pro",
+            variant: "high",
+            reasoningEffort: "xhigh",
+          },
+        },
+      },
+      {},
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Find the hard bug.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      category: "ultrabrain",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.variant).toBe("xhigh")
+    expect(resolved.plan.resolved_model).toMatchObject({ reasoning_effort: "xhigh", variant: "high" })
+  })
+
+  test("#given a category with reasoning effort only #when planned #then the public plan carries that effort", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {
+        categories: {
+          ultrabrain: {
+            model: "google/gemini-3.1-pro",
+            reasoningEffort: "xhigh",
+          },
+        },
+      },
+      {},
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Find the hard bug.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      category: "ultrabrain",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBe("xhigh")
+  })
+
+  test("#given a category with variant only #when planned #then the public plan carries that variant", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {
+        categories: {
+          ultrabrain: {
+            model: "google/gemini-3.1-pro",
+            variant: "high",
+          },
+        },
+      },
+      {},
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Find the hard bug.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      category: "ultrabrain",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBe("high")
+  })
+
+  test("#given a category resolving a variant-bearing fallback without reasoning effort #when planned #then the applied variant is the resolved variant", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      {},
+      () => registry([model("zai-coding-plan", "glm-5.2")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Think hard.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      category: "visual-engineering",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBe("max")
+  })
+
+  test("#given an explicit provider model #when planned #then no variant is applied", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      {},
+      () => registry([model("openai", "gpt-5.5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Use this model directly.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openai/gpt-5.5",
+    })
+
+    // then
+    expect(expectResolved(result).plan.variant).toBeUndefined()
+  })
+
+  test("#given momus resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("openai", "gpt-5.6-sol")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Review the plan.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "momus",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("openai/gpt-5.6-sol")
+    expect(resolved.plan.variant).toBe("xhigh")
   })
 })

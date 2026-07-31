@@ -3,6 +3,26 @@ import type { CodexModelCatalog, CodexReasoningProfileMatch } from "./codex-mode
 
 const MANAGED_KEYS = ["model", "model_context_window", "model_reasoning_effort", "plan_mode_reasoning_effort"] as const
 
+/** Unified omo reasoning levels the Codex wire accepts, with `off` spelled `none` (kept dependency-free for the bundled installer). */
+const CODEX_REASONING_BY_UNIFIED_LEVEL: Readonly<Record<string, string>> = {
+  off: "none",
+  none: "none",
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: "max",
+}
+
+/** Applies a unified-config `reasoning` level over the catalog default; unknown tokens keep the catalog value. */
+export function applyReasoningOverride(catalog: CodexModelCatalog, reasoning: string | undefined): CodexModelCatalog {
+  if (reasoning === undefined) return catalog
+  const wireEffort = CODEX_REASONING_BY_UNIFIED_LEVEL[reasoning.trim().toLowerCase()]
+  if (wireEffort === undefined) return catalog
+  return { ...catalog, current: { ...catalog.current, modelReasoningEffort: wireEffort } }
+}
+
 export function ensureCodexReasoningConfig(config: string, catalog: CodexModelCatalog): string {
   const current = readRootReasoningSettings(config)
   if (Object.keys(current).length > 0 && !matchesProfile(current, catalog.current) && !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))) {

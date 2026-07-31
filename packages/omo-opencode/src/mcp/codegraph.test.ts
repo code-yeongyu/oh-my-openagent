@@ -1,8 +1,10 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
+import { tmpdir } from "node:os"
+import { CODEGRAPH_NO_DAEMON_ENV, CODEGRAPH_PINNED_VERSION, CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
 import { createCodegraphMcpConfig } from "./codegraph"
 import type { RuntimeExecutable } from "./runtime-executable"
 
@@ -157,31 +159,112 @@ describe("createCodegraphMcpConfig", () => {
 
   it("uses configured install_dir for provisioned lookup and MCP environment", () => {
     // given
-    const installDir = "/custom/codegraph"
+    const installDir = mkdtempSync(join(tmpdir(), "omo-codegraph-custom-install-"))
     const provisionedPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
+    const markerPath = join(installDir, ".provisioned", `codegraph-${CODEGRAPH_PINNED_VERSION}.json`)
     const nodePath = "/opt/node22/bin/node"
+    mkdirSync(join(installDir, "bin"), { recursive: true })
+    mkdirSync(join(installDir, ".provisioned"), { recursive: true })
+    writeFileSync(provisionedPath, "")
+    writeFileSync(markerPath, `${JSON.stringify({ binPath: provisionedPath, version: CODEGRAPH_PINNED_VERSION })}\n`)
+
+    try {
+      // when
+      const config = createCodegraphMcpConfig({
+        cwd: "/workspace/project",
+        config: { enabled: true, install_dir: installDir },
+        env: {},
+        homeDir: "/tmp/omo-codegraph-test-home",
+        nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "22.14.0" : "26.3.0"),
+        requireResolve: () => {
+          throw new Error("bundled package absent")
+        },
+        resolveExecutable: createResolver({ node: nodePath }),
+      })
+
+      // then
+      expect(config).toMatchObject({
+        type: "local",
+        command: [provisionedPath, "serve", "--mcp"],
+        enabled: true,
+      })
+      expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
+    } finally {
+      rmSync(installDir, { force: true, recursive: true })
+    }
+  })
+
+  it("omits CODEGRAPH_NO_DAEMON from the MCP environment by default", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
 
     // when
     const config = createCodegraphMcpConfig({
       cwd: "/workspace/project",
-      config: { enabled: true, install_dir: installDir },
-      env: {},
-      fileExists: (filePath) => filePath === provisionedPath,
+      config: { enabled: true },
+      env: { OMO_CODEGRAPH_BIN: codegraphPath },
+      fileExists: (filePath) => filePath === codegraphPath,
       homeDir: "/tmp/omo-codegraph-test-home",
-      nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "22.14.0" : "26.3.0"),
-      requireResolve: () => {
-        throw new Error("bundled package absent")
-      },
-      resolveExecutable: createResolver({ node: nodePath }),
+      resolveExecutable: createResolver({}),
     })
 
     // then
-    expect(config).toMatchObject({
-      type: "local",
-      command: [provisionedPath, "serve", "--mcp"],
-      enabled: true,
+    expect(config.enabled).toBe(true)
+    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBeUndefined()
+  })
+
+  it("pins CODEGRAPH_NO_DAEMON=1 in the MCP environment when daemon=false", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { daemon: false, enabled: true },
+      env: { OMO_CODEGRAPH_BIN: codegraphPath },
+      fileExists: (filePath) => filePath === codegraphPath,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({}),
     })
-    expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.environment?.[CODEGRAPH_NO_DAEMON_ENV]).toBe("1")
+  })
+
+  it("keeps the registration disabled when the project is under a configured excluded root", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/excluded/project",
+      config: { enabled: true, excluded_roots: ["/excluded"] },
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({ codegraph: codegraphPath }),
+    })
+
+    // then
+    expect(config.command).toEqual([codegraphPath, "serve", "--mcp"])
+    expect(config.enabled).toBe(false)
+  })
+
+  it("keeps the registration disabled when the project lives under the OS tmpdir by default", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: join(tmpdir(), "omo-codegraph-mcp-excluded-probe"),
+      config: { enabled: true },
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable: createResolver({ codegraph: codegraphPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(false)
   })
 })
 

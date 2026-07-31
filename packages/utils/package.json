@@ -73,9 +73,17 @@
       "types": "./src/migration/*.ts",
       "import": "./src/migration/*.ts"
     },
+    "./process-sweep": {
+      "types": "./src/process-sweep/index.ts",
+      "import": "./src/process-sweep/index.ts"
+    },
     "./process-stream-reader": {
       "types": "./src/process-stream-reader.ts",
       "import": "./src/process-stream-reader.ts"
+    },
+    "./process-tree": {
+      "types": "./src/process-tree.ts",
+      "import": "./src/process-tree.ts"
     },
     "./prompt-async-gate": {
       "types": "./src/prompt-async-gate.ts",
@@ -108,6 +116,7 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/omo-config-core": "workspace:*",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1"
   },

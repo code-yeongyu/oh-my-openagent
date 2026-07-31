@@ -14,7 +14,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     const delivered: string[] = []
-    const idleCoordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+    const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
       resolveOmoBin: () => "/tmp/omo",
@@ -35,7 +35,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     const delivered: string[] = []
-    const idleCoordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+    const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
     idleCoordinator.enqueue({ key: "st_done", source: "task-completion", content: "task st_done completed" })
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
@@ -79,7 +79,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
       const pi = new FakeExtensionAPI()
       const logger = createLogger()
       const delivered: string[] = []
-      const idleCoordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+      const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
       await createUlwLoopComponent({
         resolveOmoBin: () => "/tmp/omo",
         runCommand: async () => ({ code: 0, stdout: activeStatus() }),

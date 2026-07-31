@@ -1,0 +1,25 @@
+Reviewer assignment:
+
+Review the completed senpi-task always-steer diff and evidence against:
+
+1. Public schema/runtime/renderer RED→GREEN.
+2. Optionless running-child steer and same-session resident revival.
+3. Final test/typecheck/build/cleanup evidence with the LSP gap disclosed.
+
+Final synchronous reviewer result:
+
+```text
+No blockers.
+
+VERDICT: APPROVE
+```
+
+Reviewer task: `st_019fa2f9`
+
+Two earlier reviewer lanes are not counted as approval:
+
+- Momus first rejected because it required a canonical `.omo/plans/*.md` path.
+- After receiving the plan path, Momus entered an unbounded read loop and was cancelled as inconclusive.
+- A bounded background reviewer also stopped producing progress and was cancelled as inconclusive.
+
+Only the completed synchronous criterion reviewer above satisfies the approval gate.

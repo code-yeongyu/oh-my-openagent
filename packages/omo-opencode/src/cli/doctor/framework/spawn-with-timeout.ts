@@ -19,7 +19,7 @@ async function readSpawnStream(stream: ReadableStream<Uint8Array> | undefined): 
   try {
     return await new Response(stream).text()
   } catch (error) {
-    if (error instanceof Error && error.message.includes("already been used")) {
+    if (error instanceof Error && (error.message.includes("already been used") || error.message.includes("disturbed or locked"))) {
       return ""
     }
     throw error

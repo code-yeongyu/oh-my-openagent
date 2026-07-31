@@ -97,7 +97,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "Active work tracked in boulder.json. Power outage? System crash? Doesn't matter. Pick up exactly where you stopped.",
-      "model": "Claude Opus 4.7 Max"
+      "model": "Claude Opus 5 High"
     },
     "prometheusAtlas": {
       "badge": "Orchestration Workflow",
@@ -106,7 +106,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.7 Max",
+        "model": "Claude Fable 5 XHigh",
         "description": "The architect. Interviews you, explores your codebase, and creates detailed battle plans. Never writes code. Uses Metis and Momus as quality gates.",
         "features": [
           "Intelligent interview mode",

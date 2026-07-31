@@ -1,12 +1,15 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoCategoryConfig } from "@oh-my-opencode/omo-config-core"
 
+import type { ResolvedModelRecord } from "../state"
+
 export type BuiltinCategoryDefinition = {
   readonly name: string
   readonly config: OmoCategoryConfig
   readonly description: string
   readonly promptAppend: string
   readonly resolvePromptAppend?: (model: string | undefined) => string
+  readonly requiresModel?: string
 }
 
 export type SenpiModelPort = {
@@ -23,7 +26,11 @@ export type ResolvedChildSpec<TModel extends SenpiModelPort> = {
   readonly model: TModel
   readonly provider: string
   readonly modelId: string
+  readonly requested_model?: ResolvedModelRecord
+  readonly fallback_models?: readonly ResolvedModelRecord[]
+  readonly displayName?: string
   readonly variant?: string
+  readonly reasoning?: string
   readonly temperature?: number
   readonly top_p?: number
   readonly maxTokens?: number
@@ -73,4 +80,7 @@ export type CategoryResolutionResult<TModel extends SenpiModelPort> =
       readonly availableCategories: readonly string[]
       readonly nearestFallback?: string
       readonly fallbackEntry?: DelegateFallbackEntry
+      // Dead-chain detail: present when the builtin fallback chain had zero resolvable rungs.
+      readonly attempted_chain?: readonly DelegateFallbackEntry[]
+      readonly missing_providers?: readonly string[]
     }

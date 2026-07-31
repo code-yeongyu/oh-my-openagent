@@ -1,0 +1,26 @@
+{
+  "result": "PASS",
+  "runtime": "@code-yeongyu/senpi 2026.7.5-2",
+  "checks": {
+    "spawn_background": "PASS",
+    "unconditional_wake": "PASS",
+    "followup_revive": "PASS",
+    "task_output_full": "PASS",
+    "task_output_block": "PASS",
+    "jsonl_sequence": "PASS",
+    "extension_suppression": "PASS",
+    "batch_fanout_two_children": "PASS",
+    "sync_inline_no_notification": "PASS",
+    "negative_category_error": "PASS",
+    "real_senpi_untouched": "PASS",
+    "no_leaked_pids": "PASS"
+  },
+  "leakedPids": 0,
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [],
+  "realSenpiDigestUnchanged": true,
+  "providedAgentDir": "unset",
+  "sandboxCount": 4,
+  "mainExit": 0
+}

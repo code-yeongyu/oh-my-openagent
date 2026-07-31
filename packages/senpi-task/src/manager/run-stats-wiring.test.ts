@@ -1,0 +1,137 @@
+import { afterEach, describe, expect, test } from "bun:test"
+
+import { baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
+
+afterEach(() => {
+  cleanupProjects()
+})
+
+describe("manager run stats wiring", () => {
+  test("#given a spawned child #when it completes #then the terminal record carries accumulated run stats", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+
+    // when
+    fake.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "working" }],
+        usage: { output: 120, totalTokens: 300 },
+      },
+    })
+    fake.emit({ type: "tool_execution_start", toolName: "read", args: { path: "a.ts" } })
+    fake.settle({ status: "completed", finalResponse: "done" })
+    const final = await manager.waitFor(started.task_id)
+
+    // then
+    expect(final.status).toBe("completed")
+    const record = store.load(started.task_id)
+    expect(record?.run_stats?.turns).toBe(1)
+    expect(record?.run_stats?.tool_calls).toBe(1)
+    expect(record?.run_stats?.output_tokens).toBe(120)
+    expect(record?.run_stats?.total_tokens).toBe(300)
+    expect(record?.run_stats?.runtime_ms).toBeGreaterThanOrEqual(0)
+  })
+
+  test("#given a spawned child #when it fails #then run stats persist on the error record", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+
+    // when
+    fake.emit({ type: "tool_execution_start", toolName: "bash", args: { command: "ls" } })
+    fake.settle({ status: "error", failure: { kind: "child-turn-failed", message: "boom" } })
+    const final = await manager.waitFor(started.task_id)
+
+    // then
+    expect(final.status).toBe("error")
+    expect(store.load(started.task_id)?.run_stats?.tool_calls).toBe(1)
+  })
+
+  test("#given a spawned child #when it is cancelled #then run stats persist on the cancelled record", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+
+    // when
+    fake.emit({
+      type: "message_end",
+      message: { role: "assistant", content: [{ type: "text", text: "partial" }], usage: { output: 10, totalTokens: 20 } },
+    })
+    fake.settle({ status: "cancelled" })
+    const final = await manager.waitFor(started.task_id)
+
+    // then
+    expect(final.status).toBe("cancelled")
+    expect(store.load(started.task_id)?.run_stats?.turns).toBe(1)
+  })
+})
+
+describe("manager run stats through steering transitions", () => {
+  test("#given a running child with usage #when cancelled through cancelTask #then the cancelled record carries run stats", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+    fake.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "working" }],
+        usage: { output: 77, totalTokens: 300 },
+      },
+    })
+    fake.emit({ type: "tool_execution_start", toolName: "read", args: {} })
+
+    // when
+    const outcome = await manager.cancelTask(started.task_id, "user cancelled")
+
+    // then
+    expect(outcome.kind).toBe("cancelled")
+    const record = store.load(started.task_id)
+    expect(record?.status).toBe("cancelled")
+    expect(record?.run_stats?.turns).toBe(1)
+    expect(record?.run_stats?.tool_calls).toBe(1)
+    expect(record?.run_stats?.output_tokens).toBe(77)
+  })
+
+  test("#given a completed run revived then cancelled #when the revived run has no events #then no stale run stats survive", async () => {
+    // given: a first run that completes WITH stats
+    const { manager, store, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+    fake.emit({
+      type: "message_end",
+      message: { role: "assistant", content: [{ type: "text", text: "one" }], usage: { output: 50, totalTokens: 100 } },
+    })
+    fake.settle({ status: "completed", finalResponse: "done" })
+    await manager.waitFor(started.task_id)
+    expect(store.load(started.task_id)?.run_stats?.output_tokens).toBe(50)
+
+    // when: a follow-up revives the resident child and the revived run is cancelled with no events
+    const send = await manager.sendToTask({ idOrName: started.task_id, message: "keep going" })
+    if (send.kind !== "revived") throw new Error(`unexpected send result: ${send.kind}`)
+    const outcome = await manager.cancelTask(started.task_id, "stop the revived run")
+
+    // then: the revived run's cancel must not report the previous run's stats
+    expect(outcome.kind).toBe("cancelled")
+    const record = store.load(started.task_id)
+    expect(record?.run_stats?.output_tokens).toBeUndefined()
+    expect(record?.run_stats?.turns).toBe(0)
+  })
+})

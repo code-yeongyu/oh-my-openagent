@@ -17,18 +17,18 @@ describe("validateTaskTarget", () => {
 
   test("#given only subagent_type #when validated #then resolves to a subagent selection", () => {
     // given
-    const params = { prompt: "do it", subagent_type: "oracle" }
+    const params = { prompt: "do it", subagent_type: "momus" }
 
     // when
     const result = validateTaskTarget(params)
 
     // then
-    expect(result).toEqual({ kind: "subagent_type", subagentType: "oracle" })
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "momus" })
   })
 
   test("#given both category and subagent_type #when validated #then returns a typed both_targets error", () => {
     // given
-    const params = { prompt: "do it", category: "quick", subagent_type: "oracle" }
+    const params = { prompt: "do it", category: "quick", subagent_type: "momus" }
 
     // when
     const result = validateTaskTarget(params)
@@ -142,7 +142,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       prompt: "do it",
-      category: "quick",
+      subagent_type: "momus",
       model: "anthropic/claude-opus-4",
       load_skills: ["a"],
     }
@@ -156,18 +156,18 @@ describe("resolveSpawnItems", () => {
     expect(result.items).toHaveLength(1)
     const item = result.items[0]
     if (item === undefined) throw new Error("expected item")
-    expect(item.kind).toBe("category")
-    if (item.kind !== "category") throw new Error("expected category")
-    expect(item.category).toBe("quick")
+    expect(item.kind).toBe("subagent_type")
+    if (item.kind !== "subagent_type") throw new Error("expected subagent_type")
+    expect(item.subagentType).toBe("momus")
     expect(item.prompt).toBe("do it")
     expect(item.model).toBe("anthropic/claude-opus-4")
     expect(item.load_skills).toEqual(["a"])
   })
 
-  test("#given a 3-item batch w2val #when resolved #then inherits top-level model/category and item overrides win", () => {
+  test("#given a 3-item batch w2val #when resolved #then inherits top-level model/subagent and item overrides win", () => {
     // given
     const params = {
-      category: "quick",
+      subagent_type: "momus",
       model: "anthropic/claude-opus-4",
       load_skills: ["shared"],
       tasks: [
@@ -186,15 +186,15 @@ describe("resolveSpawnItems", () => {
     expect(result.items).toHaveLength(3)
     const [first, second, third] = result.items
     if (first === undefined || second === undefined || third === undefined) throw new Error("expected 3 items")
-    expect(first.kind).toBe("category")
-    expect(second.kind).toBe("category")
-    expect(third.kind).toBe("category")
-    if (first.kind !== "category" || second.kind !== "category" || third.kind !== "category") {
-      throw new Error("expected category")
+    expect(first.kind).toBe("subagent_type")
+    expect(second.kind).toBe("subagent_type")
+    expect(third.kind).toBe("subagent_type")
+    if (first.kind !== "subagent_type" || second.kind !== "subagent_type" || third.kind !== "subagent_type") {
+      throw new Error("expected subagent_type")
     }
-    expect(first.category).toBe("quick")
-    expect(second.category).toBe("quick")
-    expect(third.category).toBe("quick")
+    expect(first.subagentType).toBe("momus")
+    expect(second.subagentType).toBe("momus")
+    expect(third.subagentType).toBe("momus")
     expect(first.model).toBe("anthropic/claude-opus-4")
     expect(second.model).toBe("anthropic/claude-haiku")
     expect(third.model).toBe("anthropic/claude-opus-4")
@@ -207,7 +207,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       category: "quick",
-      tasks: [{ prompt: "one" }, { prompt: "two", subagent_type: "oracle" }],
+      tasks: [{ prompt: "one" }, { prompt: "two", subagent_type: "momus" }],
     }
 
     // when
@@ -223,7 +223,7 @@ describe("resolveSpawnItems", () => {
     expect(inherited.category).toBe("quick")
     expect(suppressed.kind).toBe("subagent_type")
     if (suppressed.kind !== "subagent_type") throw new Error("expected subagent_type")
-    expect(suppressed.subagentType).toBe("oracle")
+    expect(suppressed.subagentType).toBe("momus")
     expect("category" in suppressed).toBe(false)
   })
 
@@ -271,7 +271,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       category: "quick",
-      tasks: [{ prompt: "ok" }, { prompt: "bad", category: "deep", subagent_type: "oracle" }],
+      tasks: [{ prompt: "ok" }, { prompt: "bad", category: "deep", subagent_type: "momus" }],
     }
 
     // when
@@ -294,7 +294,7 @@ describe("batch spawn types", () => {
       prompt: "p",
       load_skills: [],
       kind: "subagent_type",
-      subagentType: "oracle",
+      subagentType: "momus",
     }
     const detail: TaskToolItemDetail = { task_id: "t1", status: "completed" }
 
@@ -315,5 +315,77 @@ describe("batch spawn types", () => {
     // then
     expect(withItems.items).toHaveLength(1)
     expect(withItems.items?.[0]?.task_id).toBe("c1")
+  })
+})
+
+describe("validateTaskTarget category+model exclusivity", () => {
+  test("#given category with model #when validated #then returns a typed category_with_model error", () => {
+    // given
+    const params = { prompt: "p", category: "architect", model: "quotio-openai/gpt-5.4-mini-fast" }
+
+    // when
+    const result = validateTaskTarget(params)
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") throw new Error("expected error")
+    expect(result.error.code).toBe("category_with_model")
+    expect(result.error.message).toContain("omo.json")
+  })
+
+  test("#given subagent_type with model #when validated #then resolves to a subagent selection", () => {
+    // given
+    const params = { prompt: "p", subagent_type: "momus", model: "openai/gpt-5.6-sol" }
+
+    // when
+    const result = validateTaskTarget(params)
+
+    // then
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "momus" })
+  })
+})
+
+describe("resolveSpawnItems category+model exclusivity", () => {
+  test("#given single-form category with a model override #then returns an item_target error", () => {
+    // given / when
+    const result = resolveSpawnItems({ prompt: "p", category: "quick", model: "openai/gpt-5.4-mini" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") throw new Error("expected error")
+    expect(result.error.code).toBe("item_target")
+    expect(result.error.message).toContain("omo.json")
+  })
+
+  test("#given a top-level model inherited by a category item #then returns an item_target error", () => {
+    // given / when
+    const result = resolveSpawnItems({ model: "openai/gpt-5.4-mini", tasks: [{ prompt: "one", category: "quick" }] })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") throw new Error("expected error")
+    expect(result.error.code).toBe("item_target")
+    expect(result.error.message).toContain("Task item 0")
+  })
+
+  test("#given a top-level category and an item model #then returns an item_target error", () => {
+    // given / when
+    const result = resolveSpawnItems({ category: "quick", tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.4-mini" }] })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") throw new Error("expected error")
+    expect(result.error.code).toBe("item_target")
+    expect(result.error.message).toContain("Task item 1")
+  })
+
+  test("#given subagent items inheriting a top-level model #then resolves ok with the model attached", () => {
+    // given / when
+    const result = resolveSpawnItems({ subagent_type: "momus", model: "openai/gpt-5.6-sol", tasks: [{ prompt: "one" }] })
+
+    // then
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") throw new Error("expected ok")
+    expect(result.items[0]?.model).toBe("openai/gpt-5.6-sol")
   })
 })

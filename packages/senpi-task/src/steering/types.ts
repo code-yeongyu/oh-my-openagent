@@ -1,8 +1,8 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
-import type { TaskRecord, TaskStatus } from "../state"
+import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 
-export type DestructionCause = "cancel"
+export type DestructionCause = "cancel" | "fallback_handoff"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -20,6 +20,10 @@ export type SteeringPort = {
   // tracking under the NEW run_epoch so the later release is not swallowed by the release guard.
   reacquireForRevive(taskId: string): void
   readonly destruction: DestructionPort
+  // Snapshot of the manager-owned run-stats accumulator for a live task, attached to the cancel
+  // transition steering performs (the manager's later outcome transition is late-transition
+  // ignored by terminal idempotence, so this is the only chance cancel has).
+  runStatsSnapshot(taskId: string): TaskRunStats | undefined
   now(): number
 }
 

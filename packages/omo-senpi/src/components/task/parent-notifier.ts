@@ -23,7 +23,14 @@ export function createParentNotifier(
   return {
     enqueue(message: ParentNotifierMessage): void {
       if (coordinator !== undefined) {
-        coordinator.enqueue({ key: injectionKey(message), source: "task-completion", content: message.content })
+        coordinator.enqueue({
+          key: injectionKey(message),
+          source: "task-completion",
+          customType: message.customType,
+          content: message.content,
+          display: message.display,
+          details: message.details,
+        })
         // Mid-turn: collect in the batch window (the agent_end drain backstops a turn that ends first).
         // Idle: flush on the next microtask so same-tick completions batch but delivery is immediate.
         if (isStreaming?.() === true) coordinator.scheduleFlush()

@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 
 import {
+	createParentWatchdog,
 	errorResponse,
 	isPlainRecord,
 	jsonRpcId,
@@ -35,6 +36,8 @@ const CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION =
 const CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE =
 	"Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call codegraph_node in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
 
+const SIGKILL_ESCALATION_MS = 2_000;
+
 export async function runBridgedCodegraphProcess(
 	command: string,
 	args: readonly string[],
@@ -63,22 +66,45 @@ export async function runBridgedCodegraphProcess(
 			resolveExit(signal === null ? 0 : 1);
 		});
 	});
-	const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
-		defaultResponseMode = mode;
-	});
-	const responseForwardingDone = forwardCodegraphToClient(
-		childOutput,
-		options.output,
-		pendingResponses,
-		() => defaultResponseMode,
-	);
-	const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
-	const childAndResponsesDone = Promise.all([childExit, responseForwardingDone]).then(([exitCode]) => exitCode);
 	const destroyChildPipes = (): void => {
 		childInput.destroy();
 		childOutput.destroy();
 	};
 	void childExit.then(destroyChildPipes, destroyChildPipes);
+	// Parent-liveness watchdog: when the parent dies while holding our stdio
+	// open, the client stream never sees EOF, so the only settle path is to
+	// drop the client input, close the child pipes, and terminate the child.
+	// The bridge then resolves through the normal child-exit path, and the
+	// destroyed input releases its read handle so the process can actually
+	// exit (same teardown pattern as runJsonRpcStdioServer's own watchdog).
+	// In daemon mode the child is the upstream lightweight proxy, so killing
+	// it on parent death is correct; the detached daemon is a separate process
+	// and is never touched.
+	let parentWatchdogFired = false;
+	const parentWatchdog = createParentWatchdog(options.parentWatchdog, () => {
+		parentWatchdogFired = true;
+		options.input.destroy();
+		destroyChildPipes();
+		terminateCodegraphChild(child);
+	});
+	const clientForwardingDone = forwardClientToCodegraph(
+		options.input,
+		childInput,
+		pendingResponses,
+		(mode) => {
+			defaultResponseMode = mode;
+		},
+		() => parentWatchdogFired,
+	);
+	const responseForwardingDone = forwardCodegraphToClient(
+		childOutput,
+		options.output,
+		pendingResponses,
+		() => defaultResponseMode,
+		() => parentWatchdogFired,
+	);
+	const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
+	const childAndResponsesDone = Promise.all([childExit, responseForwardingDone]).then(([exitCode]) => exitCode);
 	try {
 		return await Promise.race([childAndResponsesDone, bridgeDone.then(() => childExit)]);
 	} catch (error) {
@@ -86,7 +112,30 @@ export async function runBridgedCodegraphProcess(
 		if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
 		await childExit.catch(() => undefined);
 		throw error;
+	} finally {
+		parentWatchdog.clear();
 	}
+}
+
+function terminateCodegraphChild(child: ChildProcess): void {
+	if (child.exitCode !== null || child.signalCode !== null) return;
+	child.kill("SIGTERM");
+	const escalation = setTimeout(() => {
+		if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+	}, SIGKILL_ESCALATION_MS);
+	escalation.unref();
+}
+
+// Stream errors raised by the watchdog's own teardown (input destroy, child
+// pipe destroy) while a forwarder is parked on that stream.
+function isWatchdogTeardownError(error: unknown): boolean {
+	if (!(error instanceof Error) || !("code" in error)) return false;
+	return (
+		error.code === "ERR_STREAM_PREMATURE_CLOSE" ||
+		error.code === "ERR_STREAM_DESTROYED" ||
+		error.code === "ERR_STREAM_WRITE_AFTER_END" ||
+		error.code === "EPIPE"
+	);
 }
 
 async function forwardClientToCodegraph(
@@ -94,24 +143,33 @@ async function forwardClientToCodegraph(
 	childInput: Writable,
 	pendingResponses: Map<string, PendingClientResponse>,
 	setDefaultResponseMode: (mode: StdioJsonRpcResponseMode) => void,
+	tolerateWatchdogClose: () => boolean,
 ): Promise<void> {
-	for await (const message of readStdioJsonRpcMessages(input)) {
-		if (message.kind === "parse_error") {
-			continue;
+	try {
+		for await (const message of readStdioJsonRpcMessages(input)) {
+			if (message.kind === "parse_error") {
+				continue;
+			}
+			const responseMode = message.responseMode;
+			setDefaultResponseMode(responseMode);
+			const key = responseModeKey(message.payload);
+			if (key !== null) {
+				pendingResponses.set(key, {
+					method: jsonRpcMethod(message.payload),
+					responseMode,
+					toolName: jsonRpcToolName(message.payload),
+				});
+			}
+			await writeLine(childInput, JSON.stringify(message.payload));
 		}
-		const responseMode = message.responseMode;
-		setDefaultResponseMode(responseMode);
-		const key = responseModeKey(message.payload);
-		if (key !== null) {
-			pendingResponses.set(key, {
-				method: jsonRpcMethod(message.payload),
-				responseMode,
-				toolName: jsonRpcToolName(message.payload),
-			});
-		}
-		await writeLine(childInput, JSON.stringify(message.payload));
+		childInput.end();
+	} catch (error) {
+		// The parent watchdog destroys the client input and child pipes while
+		// this forwarder is parked on a read or write; that teardown is
+		// self-inflicted, so settle quietly and let the child-exit path report
+		// the outcome.
+		if (!(tolerateWatchdogClose() && isWatchdogTeardownError(error))) throw error;
 	}
-	childInput.end();
 }
 
 async function forwardCodegraphToClient(
@@ -119,17 +177,25 @@ async function forwardCodegraphToClient(
 	output: Writable,
 	pendingResponses: Map<string, PendingClientResponse>,
 	defaultResponseMode: () => StdioJsonRpcResponseMode,
+	tolerateWatchdogClose: () => boolean,
 ): Promise<void> {
-	for await (const message of readStdioJsonRpcMessages(childOutput)) {
-		if (message.kind === "parse_error") {
-			await writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
-			continue;
+	try {
+		for await (const message of readStdioJsonRpcMessages(childOutput)) {
+			if (message.kind === "parse_error") {
+				await writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
+				continue;
+			}
+			const key = responseModeKey(message.payload);
+			const pendingResponse = key === null ? undefined : pendingResponses.get(key);
+			const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
+			if (key !== null) pendingResponses.delete(key);
+			await writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
 		}
-		const key = responseModeKey(message.payload);
-		const pendingResponse = key === null ? undefined : pendingResponses.get(key);
-		const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
-		if (key !== null) pendingResponses.delete(key);
-		await writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
+	} catch (error) {
+		// The parent watchdog destroys the child pipes while this forwarder is
+		// parked on a read; that close is self-inflicted, so settle quietly and
+		// let the child-exit path report the outcome.
+		if (!(tolerateWatchdogClose() && isWatchdogTeardownError(error))) throw error;
 	}
 }
 

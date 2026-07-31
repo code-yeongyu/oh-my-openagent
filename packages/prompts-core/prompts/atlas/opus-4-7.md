@@ -244,13 +244,15 @@ TASK ANALYSIS:
 - Sequential (with named dependency): [list with reason]
 ```
 
-## Step 2: Initialize Notepad
+## Step 2: Notepad (auto-scaffolded)
 
-```bash
-mkdir -p .omo/notepads/{plan-name}
-```
+`/start-work` creates `.omo/notepads/{plan-name}/` with these files automatically:
+- `learnings.md` - Conventions, patterns
+- `decisions.md` - Architectural choices
+- `issues.md` - Problems, gotchas
+- `problems.md` - Unresolved blockers
 
-Files: learnings.md, decisions.md, issues.md, problems.md.
+If the directory is missing (e.g. plan predates auto-scaffold), create it with `mkdir -p`. Append findings after work; never overwrite.
 
 ## Step 3: Execute Tasks
 
@@ -380,7 +382,7 @@ FILES MODIFIED: [list]
 3. Include as "Inherited Wisdom" in prompt
 
 **After EVERY completion**:
-- Instruct subagent to append findings (never overwrite, never use Edit tool)
+- Instruct subagent to append findings (append only; use `edit` or bash `>>`, never `write` which is blocked, and never overwrite)
 
 **Format**:
 ```markdown

@@ -29,6 +29,9 @@ export type TaskRecordStore = {
   // Manager-owned overwrite for bookkeeping that lives OUTSIDE the status transition table (revive
   // epoch bump, notification epoch persistence). Normal status changes must use transition().
   readonly replace: (record: TaskRecord) => void
+  // Serialized read-modify-write over the freshest on-disk record. Returning the input record skips
+  // the write; callers use this for narrow conditional patches that must not clobber lifecycle state.
+  readonly mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord) => TaskRecord | null
   readonly load: (taskId: string) => TaskRecord | null
   readonly list: () => ListTaskRecordsResult
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string

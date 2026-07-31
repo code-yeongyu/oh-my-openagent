@@ -20,9 +20,13 @@ const fakeTool = tool({
 })
 
 const tempDirs: string[] = []
+let homeDirectory: string | undefined
 
 afterEach(() => {
   delete process.env.OPENCODE_CONFIG_DIR
+  if (homeDirectory === undefined) delete process.env.HOME
+  else process.env.HOME = homeDirectory
+  homeDirectory = undefined
 
   for (const tempDir of tempDirs.splice(0)) {
     rmSync(tempDir, { recursive: true, force: true })
@@ -51,16 +55,17 @@ describe("team-mode tool registry wiring", () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-team-mode-fresh-install-"))
     tempDirs.push(rootDir)
-    const userConfigDir = join(rootDir, "home", ".config", "opencode")
+    const userHomeDir = join(rootDir, "home")
     const projectDir = join(rootDir, "project")
 
-    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(userHomeDir, ".omo"), { recursive: true })
     mkdirSync(projectDir, { recursive: true })
     writeFileSync(
-      join(userConfigDir, "oh-my-openagent.json"),
-      JSON.stringify({ team_mode: { enabled: true } }),
+      join(userHomeDir, ".omo", "omo.jsonc"),
+      JSON.stringify({ "[opencode]": { team_mode: { enabled: true } } }),
     )
-    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    homeDirectory = process.env.HOME
+    process.env.HOME = userHomeDir
 
     const { loadPluginConfig } = await importFreshPluginConfigModule()
     const pluginConfig = loadPluginConfig(projectDir, {})

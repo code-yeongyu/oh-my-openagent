@@ -1,3 +1,4 @@
+import { loadSenpiOmoConfig } from "../config-resolution"
 import {
 	buildCodegraphEnv,
 	resolveCodegraphCommand,
@@ -13,20 +14,42 @@ import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../
 export interface CodegraphComponentOptions {
 	readonly resolveCommand?: (options: ResolveCodegraphCommandOptions) => CodegraphCommandResolution
 	readonly resolveNodeSupport?: (options: ResolveCodegraphNodeSupportOptions) => CodegraphNodeSupport
-	readonly buildEnv?: () => Record<string, string>
+	readonly buildCodegraphEnv?: (options: { readonly daemon: boolean }) => Record<string, string>
+	readonly loadConfig?: typeof loadSenpiOmoConfig
+	readonly resolveCwd?: () => string
 	readonly platform?: NodeJS.Platform
 	readonly env?: Record<string, string | undefined>
 }
 
 const CODEGRAPH_COMPONENT_NAME = "codegraph"
 const CHILD_SESSION_MARKER_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
+const DAEMON_OVERRIDE_ENV = "OMO_CODEGRAPH_DAEMON"
+const TRUTHY_ENV_VALUES = new Set(["1", "true", "yes"])
+const FALSY_ENV_VALUES = new Set(["0", "false", "no"])
+
+function resolveDaemonEnvironmentOverride(env: Record<string, string | undefined>): boolean | undefined {
+	const value = env[DAEMON_OVERRIDE_ENV]?.trim().toLowerCase()
+	if (value === undefined || value.length === 0) return undefined
+	if (TRUTHY_ENV_VALUES.has(value)) return true
+	if (FALSY_ENV_VALUES.has(value)) return false
+	return undefined
+}
+
+function resolveDaemon(
+	env: Record<string, string | undefined>,
+	configuredDaemon: boolean | undefined,
+): boolean {
+	return resolveDaemonEnvironmentOverride(env) ?? configuredDaemon ?? true
+}
 
 export function createCodegraphComponent(options: CodegraphComponentOptions = {}): OmoSenpiComponent {
 	const resolveCommand = options.resolveCommand ?? resolveCodegraphCommand
 	const resolveNodeSupport = options.resolveNodeSupport ?? resolveCodegraphNodeSupport
-	const buildEnv = options.buildEnv ?? (() => buildCodegraphEnv())
-	const platform = options.platform ?? process.platform
+	const buildEnv = options.buildCodegraphEnv ?? buildCodegraphEnv
+	const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
+	const resolveCwd = options.resolveCwd ?? (() => process.cwd())
 	const env = options.env ?? process.env
+	const platform = options.platform ?? process.platform
 
 	return {
 		name: CODEGRAPH_COMPONENT_NAME,
@@ -44,6 +67,9 @@ export function createCodegraphComponent(options: CodegraphComponentOptions = {}
 				})
 				return
 			}
+
+			const loaded = loadConfig({ cwd: resolveCwd(), env })
+			const daemon = resolveDaemon(env, loaded.config.codegraph?.daemon)
 
 			const resolved = resolveCommand({ env })
 			const nodeSupport = resolveNodeSupport({ env })
@@ -63,8 +89,9 @@ export function createCodegraphComponent(options: CodegraphComponentOptions = {}
 				type: "stdio",
 				command: finalCommand,
 				args: finalArgs,
-				env: buildEnv(),
+				env: buildEnv({ daemon }),
 				enabled,
+				lifecycle: "eager",
 			})
 		},
 	}

@@ -215,7 +215,7 @@ describe("parseJsoncSafe", () => {
 
 describe("readJsoncFile", () => {
   const testDir = join(__dirname, ".test-jsonc")
-  const testFile = join(testDir, "config.jsonc")
+  const testFile = join(testDir, "fixture.jsonc")
 
   beforeEach(() => {
     rmSync(testDir, { recursive: true, force: true })

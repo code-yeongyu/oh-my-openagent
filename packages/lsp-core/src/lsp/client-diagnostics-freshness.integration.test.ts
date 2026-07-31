@@ -51,21 +51,23 @@ describe("LspClient diagnostics freshness", () => {
 					{
 						trigger: "didChange",
 						diagnostics: [diagnostic("post-generation-versionless")],
+						awaitClientDelivery: true,
 					},
 				],
 			},
 			{ diagnosticsFreshnessTimeoutMs: 80, versionlessPublishQuiescenceMs: 20 },
 		);
 		await context.client.openFile(context.source);
-		await waitForEventCount(
+		const versionlessDelivery = waitForEventCount(
 			context.events,
-			(event) => event.type === "serverNotification" && event.method === "textDocument/publishDiagnostics",
+			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
 			1,
 		);
+		const startedAt = Date.now();
 		writeFileSync(context.source, "const after = 1;\n", "utf-8");
 		await context.client.openFile(context.source);
+		expect(await versionlessDelivery).toHaveLength(1);
 
-		const startedAt = Date.now();
 		const result = await context.client.diagnostics(context.source);
 		const elapsedMs = Date.now() - startedAt;
 
@@ -104,14 +106,21 @@ describe("LspClient diagnostics freshness", () => {
 						trigger: "didChange",
 						version: 1,
 						diagnostics: [diagnostic("stale")],
+						awaitClientDelivery: true,
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 30, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5 },
 		);
 		await stale.client.openFile(stale.source);
+		const staleDelivery = waitForEventCount(
+			stale.events,
+			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+			1,
+		);
 		writeFileSync(stale.source, "const stale = 1;\n", "utf-8");
 		await stale.client.openFile(stale.source);
+		expect(await staleDelivery).toHaveLength(1);
 
 		const staleResult = await stale.client.diagnostics(stale.source);
 
@@ -127,14 +136,21 @@ describe("LspClient diagnostics freshness", () => {
 						trigger: "didChange",
 						version: 3,
 						diagnostics: [diagnostic("future")],
+						awaitClientDelivery: true,
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 30, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5 },
 		);
 		await future.client.openFile(future.source);
+		const futureDelivery = waitForEventCount(
+			future.events,
+			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+			1,
+		);
 		writeFileSync(future.source, "const future = 1;\n", "utf-8");
 		await future.client.openFile(future.source);
+		expect(await futureDelivery).toHaveLength(1);
 
 		const futureResult = await future.client.diagnostics(future.source);
 
@@ -284,7 +300,7 @@ describe("LspClient diagnostics freshness", () => {
 					{ error: { code: -32601, message: "Method not found" } },
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
 		);
 
 		const first = await context.client.diagnostics(context.source);
@@ -307,7 +323,7 @@ describe("LspClient diagnostics freshness", () => {
 					{ error: { code: -32601, message: "Method not found" } },
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
 		);
 
 		const first = await context.client.diagnostics(context.source);

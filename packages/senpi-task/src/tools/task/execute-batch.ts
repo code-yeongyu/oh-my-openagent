@@ -1,9 +1,12 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
 
-import type { StartResult, TaskManager } from "../../manager"
+import type { PlanResolutionError, StartResult, TaskManager } from "../../manager"
 import type { TaskRecord } from "../../state"
+import type { ForegroundWaitOptions, ForegroundWaitResult } from "./foreground-wait"
+import { waitForForegroundTask } from "./foreground-wait"
 import { MAX_TASK_BATCH_ITEMS } from "./params"
-import type { ResolvedSpawnItem, TaskToolDetails, TaskToolItemDetail } from "./types"
+import { backgroundConversionText } from "./start-presentation"
+import type { ResolvedSpawnItem, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
 
 type StartedResult = Extract<StartResult, { kind: "started" }>
 type FailedStartResult = Exclude<StartResult, StartedResult>
@@ -18,10 +21,11 @@ type BatchItemOutput = {
   readonly continuation: boolean
 }
 
-export type ExecuteBatchInput = {
+export type ExecuteBatchInput = ForegroundWaitOptions & {
   readonly manager: TaskManager
   readonly items: readonly ResolvedSpawnItem[]
   readonly signal: AbortSignal | undefined
+  readonly ctx: TaskToolContext
   readonly runInBackground: boolean
   readonly startItem: (item: ResolvedSpawnItem) => Promise<StartResult>
 }
@@ -37,9 +41,7 @@ function continuationFooter(taskId: string): string {
 function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult): TaskToolItemDetail {
   switch (start.kind) {
     case "plan_unresolved": {
-      const available = start.error.availableCategories
-      const suffix = available !== undefined && available.length > 0 ? ` Available categories: ${available.join(", ")}.` : ""
-      return itemError(item, "", start.error.message + suffix)
+      return itemError(item, "", start.error.message + categoryListSuffix(start.error))
     }
     case "depth_denied":
       return itemError(item, "", start.reason)
@@ -59,10 +61,13 @@ function itemError(item: ResolvedSpawnItem, taskId: string, message: string): Ta
   }
 }
 
-function startedDetail(start: StartedResult): TaskToolItemDetail {
+function startedDetail(item: ResolvedSpawnItem, start: StartedResult): TaskToolItemDetail {
   return {
     task_id: start.task_id,
     name: start.name,
+    ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
+    ...(item.model === undefined ? {} : { model: item.model }),
+    ...(start.resolved_model === undefined ? {} : { resolved_model: start.resolved_model }),
     status: start.status,
     ...(start.queue_position !== undefined && { queue_position: start.queue_position }),
   }
@@ -86,6 +91,18 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
   return starts
 }
 
+function categoryListSuffix(error: PlanResolutionError): string {
+  const available = error.availableCategories
+  if (available === undefined || available.length === 0) return ""
+  // A model_unavailable failure means the category name IS valid; listing it under "Available
+  // categories" told models to retry the same broken binding. Name the vocabulary honestly and
+  // point at the omo.json config escape hatch.
+  if (error.code === "model_unavailable") {
+    return ` Valid category names: ${available.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+  }
+  return ` Available categories: ${available.join(", ")}.`
+}
+
 function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {
   const reason = `tasks supports at most ${MAX_TASK_BATCH_ITEMS} items.`
   return result(reason, { task_id: "", status: "invalid_arguments", mode: "spawn", reason })
@@ -106,7 +123,7 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
   const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
-  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.result) : start.detail)
+  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result) : start.detail)
   return result(backgroundText(starts, status), {
     task_id: taskId,
     status,
@@ -129,6 +146,17 @@ function recordOutput(record: TaskRecord, start: StartedResult): BatchItemOutput
   }
 }
 
+function promotedOutput(start: Extract<BatchStart, { kind: "started" }>, budgetSeconds: number): BatchItemOutput {
+  return {
+    detail: {
+      ...startedDetail(start.item, start.result),
+      run_in_background: true,
+    },
+    body: backgroundConversionText(start.result, start.item.description, budgetSeconds),
+    continuation: false,
+  }
+}
+
 function rejectionMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
 }
@@ -142,13 +170,14 @@ function rejectedOutput(start: StartedResult, aborted: boolean, reason: unknown)
   }
 }
 
-function aggregateStatus(items: readonly TaskToolItemDetail[], aborted: boolean): "error" | "cancelled" | "completed" {
+function aggregateStatus(items: readonly TaskToolItemDetail[], aborted: boolean): "running" | "error" | "cancelled" | "completed" {
+  if (items.some((item) => item.status === "running" || item.status === "pending")) return "running"
   if (items.some((item) => item.status === "error" || item.status === "lost")) return "error"
   if (aborted || items.some((item) => item.status === "cancelled" || item.status === "interrupted")) return "cancelled"
   return "completed"
 }
 
-function syncText(status: "error" | "cancelled" | "completed", outputs: readonly BatchItemOutput[]): string {
+function syncText(status: "running" | "error" | "cancelled" | "completed", outputs: readonly BatchItemOutput[]): string {
   const lines = outputs.map((output, index) => {
     const label = output.detail.name ?? (output.detail.task_id || "task")
     const footer = output.continuation ? continuationFooter(output.detail.task_id) : ""
@@ -159,7 +188,14 @@ function syncText(status: "error" | "cancelled" | "completed", outputs: readonly
 
 async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[]): Promise<AgentToolResult<TaskToolDetails>> {
   const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
-  const settled = await Promise.allSettled(live.map((start) => input.manager.waitFor(start.result.task_id, { signal: input.signal })))
+  const settled = await Promise.allSettled(live.map((start) => waitForForegroundTask({
+    manager: input.manager,
+    taskId: start.result.task_id,
+    signal: input.signal,
+    ctx: input.ctx,
+    ...(input.env !== undefined && { env: input.env }),
+    ...(input.scheduleDeadline !== undefined && { scheduleDeadline: input.scheduleDeadline }),
+  })))
   const batchAborted = settled.some(
     (entry) => entry.status === "rejected" && input.signal?.aborted === true && entry.reason === input.signal.reason,
   )
@@ -179,18 +215,24 @@ async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[
     const entry = settled[liveIndex]
     liveIndex += 1
     if (entry === undefined) return rejectedOutput(start.result, false, "missing wait result")
-    if (entry.status === "fulfilled") return recordOutput(entry.value, start.result)
+    if (entry.status === "fulfilled") {
+      const waited: ForegroundWaitResult = entry.value
+      return waited.kind === "completed"
+        ? recordOutput(waited.record, start.result)
+        : promotedOutput(start, waited.budgetSeconds)
+    }
     const aborted = input.signal?.aborted === true && entry.reason === input.signal.reason
     return rejectedOutput(start.result, aborted, entry.reason)
   })
   const items = outputs.map((output) => output.detail)
   const status = aggregateStatus(items, batchAborted)
   const taskId = live[0]?.result.task_id ?? ""
+  const runInBackground = items.some((item) => item.run_in_background === true)
   return result(syncText(status, outputs), {
     task_id: taskId,
     status,
     mode: "spawn",
-    run_in_background: false,
+    run_in_background: runInBackground,
     items,
   })
 }

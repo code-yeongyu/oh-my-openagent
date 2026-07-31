@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import type { Message } from "@oh-my-opencode/team-core/types"
-import { WaitRegistry, toTeamCoreConfig, type LeadInjection } from "@oh-my-opencode/senpi-task"
+import { createLeadDeliveryJournal, toTeamCoreConfig, type LeadInjection } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjection } from "../../extension/idle-injection-coordinator"
 import { createLeadPollerLifecycle, type LeadPollerFactoryInput, type LeadPollerPort } from "./lead-poller-lifecycle"
@@ -10,7 +10,7 @@ import type { TaskRuntimeContext } from "./runtime-context"
 
 type FakePoller = LeadPollerPort & { readonly teamRunId: string; polls: number; shutdowns: number }
 
-function harness() {
+function harness(options: { readonly withCoordinator?: boolean } = {}) {
   let sessionId: string | undefined = "session-a"
   let state: ReturnType<TaskRuntimeContext["parentState"]> = { kind: "idle" }
   let sessionFile: string | undefined = "/tmp/lead.jsonl"
@@ -23,6 +23,8 @@ function harness() {
   let scheduled = 0
   let soon = 0
   const userMessages: string[] = []
+  const sentMessages: Array<{ message: unknown; options: unknown }> = []
+  const journal = createLeadDeliveryJournal()
 
   const lifecycle = createLeadPollerLifecycle({
     listTeams: async () => teams,
@@ -33,15 +35,22 @@ function harness() {
     },
     config: toTeamCoreConfig(OmoTaskSettingsSchema.parse({}), "/tmp/teams"),
     runtimeDir: (teamRunId) => `/tmp/runtime/${teamRunId}`,
-    waitRegistry: new WaitRegistry<Message>(),
+    deliveryJournal: journal,
     appendTaskEvent: () => undefined,
-    pi: { sendUserMessage: (content) => userMessages.push(String(content)) },
+    pi: {
+      sendMessage: (message: unknown, deliveryOptions: unknown) => {
+        sentMessages.push({ message, options: deliveryOptions })
+      },
+      sendUserMessage: (content: unknown) => userMessages.push(String(content)),
+    } as never,
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
-    coordinator: {
-      enqueue: (injection) => injected.push(injection),
-      scheduleFlush: () => { scheduled += 1 },
-      flushSoon: () => { soon += 1 },
-    },
+    coordinator: options.withCoordinator === false
+      ? undefined
+      : {
+          enqueue: (injection) => injected.push(injection),
+          scheduleFlush: () => { scheduled += 1 },
+          flushSoon: () => { soon += 1 },
+        },
     createPoller: (input) => {
       const poller: FakePoller = {
         teamRunId: input.teamRunId,
@@ -69,7 +78,9 @@ function harness() {
     mapReads,
     intervals,
     injected,
+    journal,
     userMessages,
+    sentMessages,
     get scheduled() { return scheduled },
     get soon() { return soon },
     get intervalDisposals() { return intervalDisposals },
@@ -85,6 +96,29 @@ function ownedTeam(teamRunId: string, leadSessionId = "session-a") {
 }
 
 describe("lead poller lifecycle", () => {
+  test("#given no shared coordinator #when team mail injects #then fallback is hidden custom steer", async () => {
+    const h = harness({ withCoordinator: false })
+    await h.lifecycle.tick()
+
+    h.created[0]?.input.coordinator.enqueue({
+      key: "team-message:m1",
+      source: "team-message",
+      content: '<peer_message from="worker" to="lead" messageId="m1">ready</peer_message>',
+    } as LeadInjection)
+
+    expect(h.userMessages).toEqual([])
+    expect(h.sentMessages).toEqual([
+      {
+        message: {
+          customType: "senpi-task:team-message",
+          content: '<peer_message from="worker" to="lead" messageId="m1">ready</peer_message>',
+          display: false,
+        },
+        options: { triggerTurn: true, deliverAs: "steer" },
+      },
+    ])
+  })
+
   test("#given owned and foreign teams #when ticks repeat #then only one owned poller is created and reused", async () => {
     // given
     const h = harness()
@@ -117,21 +151,6 @@ describe("lead poller lifecycle", () => {
 
     // then
     expect(h.created[0]?.poller.polls).toBe(1)
-  })
-
-  test("#given a lead without a captured session file #when team_wait resolves its owned run #then no poller is available to reserve delivery", async () => {
-    // given
-    const h = harness()
-    h.setSessionFile(undefined)
-
-    // when
-    const resolved = await h.lifecycle.resolveTeamRunId()
-    const poller = h.lifecycle.resolveLeadPoller("run-owned")
-
-    // then
-    expect(resolved).toEqual({ ok: true, teamRunId: "run-owned" })
-    expect(h.created).toHaveLength(0)
-    expect(poller).toBeUndefined()
   })
 
   test("#given a compacting parent #when the lifecycle ticks #then the owned poller is suspended", async () => {
@@ -173,6 +192,71 @@ describe("lead poller lifecycle", () => {
     // then
     expect(missing).toMatchObject({ ok: false })
     expect(explicit).toEqual({ ok: true, teamRunId: "run-b" })
+  })
+
+  test("#given multiple owned teams #when no run id is resolved #then the reason lists the owned runs", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-a"), ownedTeam("run-b")])
+
+    // when
+    const missing = await h.lifecycle.resolveTeamRunId()
+
+    // then
+    expect(missing.ok).toBe(false)
+    if (missing.ok) throw new Error("expected resolution failure")
+    expect(missing.reason).toContain("run-a")
+    expect(missing.reason).toContain("run-b")
+  })
+
+  test("#given one owned team #when resolveDefaultTeamRunId is called #then it resolves", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-solo")])
+
+    // when
+    const resolved = await h.lifecycle.resolveDefaultTeamRunId()
+
+    // then
+    expect(resolved).toEqual({ kind: "resolved", teamRunId: "run-solo" })
+  })
+
+  test("#given no owned team #when resolveDefaultTeamRunId is called #then it reports none", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-foreign", "session-b")])
+
+    // when
+    const resolved = await h.lifecycle.resolveDefaultTeamRunId()
+
+    // then
+    expect(resolved).toEqual({ kind: "none" })
+  })
+
+  test("#given multiple owned teams #when resolveDefaultTeamRunId is called #then it reports ambiguous with the owned runs", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-a"), ownedTeam("run-b")])
+
+    // when
+    const resolved = await h.lifecycle.resolveDefaultTeamRunId()
+
+    // then
+    expect(resolved.kind).toBe("ambiguous")
+    if (resolved.kind !== "ambiguous") throw new Error("expected ambiguous")
+    expect(resolved.reason).toContain("run-a")
+    expect(resolved.reason).toContain("run-b")
+  })
+
+  test("#given a shared delivery journal #when the lifecycle creates a poller #then the journal reaches the poller deps", async () => {
+    // given
+    const h = harness()
+
+    // when
+    await h.lifecycle.tick()
+
+    // then
+    expect(h.created[0]?.input.deliveryJournal).toBe(h.journal)
   })
 
   test("#given coordinator delivery states #when an injection enqueues #then scheduling follows streaming idle and transition rules", async () => {

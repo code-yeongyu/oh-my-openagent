@@ -1,0 +1,11 @@
+# _INDEX.md operating-references section (discoverability fix)
+
+RED: `rg -c 'interaction-skill' _INDEX.md` on origin/dev = 0 hits — the canonical directory (loaded by the greenfield shortlist lane and by "read the index before loading anything") never mentioned interaction-skill.md, so agents shortlisting via _INDEX could never discover it.
+GREEN: same rg = 1 hit (operating-references row); Layer A (12) and 83-file library counts unchanged (2 count lines preserved, verified by rg).
+Battery unchanged (edit is a committed designOriginal markdown file; no machine consumer reads its prose):
+
+ 72 pass
+ 0 fail
+ 613 expect() calls
+Ran 72 tests across 14 files. [1265.00ms]
+

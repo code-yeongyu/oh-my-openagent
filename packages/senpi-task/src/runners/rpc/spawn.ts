@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { delimiter, dirname, isAbsolute, join, sep } from "node:path"
 
 import type { RpcRunnerSpec } from "../types"
+import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 
 const require = createRequire(import.meta.url)
 
@@ -19,6 +20,11 @@ export type RpcSpawnDescriptor = {
   readonly args: readonly string[]
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
+}
+
+type SenpiLauncher = {
+  readonly command: string
+  readonly prefixArgs: readonly string[]
 }
 
 export type RpcSpawnRuntime = {
@@ -79,9 +85,39 @@ export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null 
     return scanPathForExecutable(override, runtime.parentEnv.PATH)
   }
   if (runtime.isBunBinary) {
-    return join(dirname(runtime.execPath), binaryName)
+    const sibling = join(dirname(runtime.execPath), binaryName)
+    return existsSync(sibling) ? sibling : null
   }
   return scanPathForExecutable(binaryName, runtime.parentEnv.PATH)
+}
+
+function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): SenpiLauncher | null {
+  if (runtime.platform !== "win32" || executable.toLowerCase().endsWith(".exe")) {
+    return { command: executable, prefixArgs: [] }
+  }
+  const shimDir = dirname(executable)
+  const cliCandidates = [
+    join(shimDir, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
+    join(shimDir, "..", "@code-yeongyu", "senpi", "dist", "cli.js"),
+  ]
+  const cliPath = cliCandidates.find((candidate) => existsSync(candidate))
+  return cliPath === undefined ? null : { command: runtime.execPath, prefixArgs: [cliPath] }
+}
+
+function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
+  const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
+  if (executable !== null) {
+    const normalized = normalizeSenpiLauncher(executable, runtime)
+    if (normalized !== null) return normalized
+  }
+  if (runtime.platform !== "win32") return null
+  for (const name of ["senpi.cmd", "senpi"]) {
+    const npmShim = scanPathForExecutable(name, runtime.parentEnv.PATH)
+    if (npmShim === null) continue
+    const normalized = normalizeSenpiLauncher(npmShim, runtime)
+    if (normalized !== null) return normalized
+  }
+  return null
 }
 
 /**
@@ -96,6 +132,10 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   }
   if (spec.model !== undefined && spec.model.length > 0) {
     args.push("--model", spec.model)
+  }
+  const thinkingLevel = asSenpiThinkingLevel(spec.reasoning ?? spec.variant)
+  if (thinkingLevel !== undefined) {
+    args.push("--thinking", thinkingLevel)
   }
   return args
 }
@@ -132,9 +172,14 @@ export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRunt
     [SESSION_DIR_ENV]: resolveChildSessionDir(spec.state_dir, spec.task_id),
   }
   const childArgs = buildChildArgs(spec)
-  const executable = (resolved.resolveSenpiExecutable ?? resolveSenpiExecutable)(resolved)
-  if (executable !== null) {
-    return { command: executable, args: ["--mode", "rpc", ...childArgs], cwd: spec.cwd, env }
+  const launcher = resolveSenpiLauncher(resolved)
+  if (launcher !== null) {
+    return {
+      command: launcher.command,
+      args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs],
+      cwd: spec.cwd,
+      env,
+    }
   }
   return { command: resolved.execPath, args: [resolved.resolveRpcEntry(), ...childArgs], cwd: spec.cwd, env }
 }

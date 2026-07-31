@@ -2,36 +2,38 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import { log } from "@oh-my-opencode/utils"
 import {
-  BUILTIN_AGENTS,
-  CURATED_READONLY_AGENT_NAMES,
-  InProcessRunner,
-  RpcProcessRunner,
   createCompletionNotifier,
-  createInProcessManagedRunner,
-  createParentRegistrySessionContext,
-  createRpcManagedRunner,
   createTaskLifecycle,
   parseExtensionEntries,
   createTaskManager,
   createTeamMemberRespawnLaunchResolver,
   createTaskRecordStore,
-  mapOmoConfigAgents,
   resolveMemberExtensionEntryPath,
   type AgentDefinition,
+  type ChildPlanner,
   type CompletionNotifier,
-  type ManagedRunner,
   type PersistedTaskEvent,
   type SpawnAdmission,
   type TaskLifecycle,
   type TaskManager,
+  type TaskRecord,
   type TaskRecordStore,
 } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { createCategoryUnavailableWarningPlanner } from "./category-unavailable-warning"
 import { createCompletionObservingStore } from "./completion-bridge"
+import {
+  DEFAULT_RUNNER_FACTORIES,
+  resolveTaskAgents,
+  type RunnerBuildContext,
+  type TaskRunnerFactories,
+} from "./engine-runners"
+import { createOwnedMemberLivenessNotifier } from "./owned-member-liveness"
 import { createParentNotifier } from "./parent-notifier"
 import { createTaskChildPlanner } from "./planner"
+import { createTeamMemberLivenessNotifier, type TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { createMutationNotifyingStore } from "./store-mutation-observer"
@@ -41,10 +43,13 @@ export interface TaskEngine {
   readonly lifecycle: TaskLifecycle
   readonly notifier: CompletionNotifier
   readonly runtime: TaskRuntimeContext
+  readonly planner: ChildPlanner
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
   readonly stateDir: string
+  readonly memberLiveness: TeamMemberLivenessNotifier
+  readonly notifyOwnedMemberLiveness: (record: TaskRecord) => Promise<void>
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
   // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
   // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
@@ -62,21 +67,7 @@ export interface ComposeTaskEngineDeps {
   readonly runnerFactories?: TaskRunnerFactories
 }
 
-export interface RunnerBuildContext {
-  readonly runtime: TaskRuntimeContext
-  readonly sharedParentTools: () => readonly ToolDefinition[]
-  readonly settings: OmoTaskSettings
-}
-
-export interface TaskRunnerFactories {
-  readonly inProcess: (context: RunnerBuildContext) => ManagedRunner
-  readonly process: (context: RunnerBuildContext) => ManagedRunner
-}
-
-const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
-  inProcess: buildInProcessRunner,
-  process: buildProcessRunner,
-}
+export type { RunnerBuildContext, TaskRunnerFactories } from "./engine-runners"
 
 /**
  * Assemble the full senpi-task engine graph and wire the W1-V contracts:
@@ -89,17 +80,70 @@ const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
   const runtime = new TaskRuntimeContext(deps.cwd)
-  const agents = resolveAgents(deps.omoConfig)
-
-  const baseStore = createTaskRecordStore({
+  const stateDir = {
     project_dir: deps.cwd,
     ...(settings.state_dir !== undefined && { task: { state_dir: settings.state_dir } }),
+  }
+  const baseStore = createTaskRecordStore(stateDir)
+  const memberLiveness = createTeamMemberLivenessNotifier({
+    pi: deps.pi,
+    ...(deps.coordinator === undefined ? {} : { coordinator: deps.coordinator }),
+    isStreaming: () => runtime.parentState().kind === "streaming",
+    wasDelivered: (record) => {
+      try {
+        const fresh = baseStore.load(record.task_id) ?? record
+        return (fresh.notification.liveness_notified_epoch ?? -1) >= record.notification.run_epoch
+      } catch (error) {
+        log("omo-senpi team liveness marker read failed", {
+          taskId: record.task_id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return false
+      }
+    },
+    markDelivered: (record) => {
+      try {
+        const capturedEpoch = record.notification.run_epoch
+        baseStore.mutate(record.task_id, (fresh) => {
+          if (fresh.status !== record.status || fresh.notification.run_epoch !== capturedEpoch) return fresh
+          if ((fresh.notification.liveness_notified_epoch ?? -1) >= capturedEpoch) return fresh
+          return {
+            ...fresh,
+            notification: { ...fresh.notification, liveness_notified_epoch: capturedEpoch },
+          }
+        })
+      } catch (error) {
+        log("omo-senpi team liveness marker write failed", {
+          taskId: record.task_id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    onError: (error) => {
+      log("omo-senpi team liveness delivery failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    },
   })
+  const notifyOwnedMemberLiveness = createOwnedMemberLivenessNotifier({
+    stateDir,
+    settings,
+    runtime,
+    notifier: memberLiveness,
+    onError: (error, record) => {
+      log("omo-senpi team liveness ownership check failed", {
+        taskId: record.task_id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    },
+  })
+  const agents = resolveTaskAgents(deps.omoConfig)
 
   const parentNotifier = createParentNotifier(deps.pi, deps.coordinator, () => runtime.parentState().kind === "streaming")
   const notifier = createCompletionNotifier({
     notifier: parentNotifier,
     store: baseStore,
+    stateDir: baseStore.stateDir,
     getParentState: () => runtime.parentState(),
     getCurrentSessionId: () => runtime.sessionId(),
   })
@@ -126,6 +170,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     notifier,
     parentState: () => runtime.parentState(),
     wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
+    onTerminal: (record) => void notifyOwnedMemberLiveness(record),
   })
 
   const mutationListeners = new Set<() => void>()
@@ -138,19 +183,27 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
+  const basePlanner = createTaskChildPlanner(deps.omoConfig, agents, () => runtime.modelRegistry())
+  const planner = createCategoryUnavailableWarningPlanner({
+    planner: basePlanner,
+    pi: deps.pi,
+    runtime,
+    omoConfig: deps.omoConfig,
+    settings,
+  })
   const manager = createTaskManager({
     store: notifyingStore,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
-    planner: createTaskChildPlanner(deps.omoConfig, agents, () => runtime.modelRegistry()),
+    planner,
     config: settings,
     cwd: deps.cwd,
-    destruction: { destroyResidentTask: (taskId) => lifecycle.destroyResidentTask(taskId, "cancel") },
+    destruction: {
+      destroyResidentTask: (taskId, cause) =>
+        lifecycle.destroyResidentTask(taskId, cause),
+    },
     admit: (parentSessionId) => admitAdapter(lifecycle, parentSessionId),
     trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({
-      stateDir: {
-        project_dir: deps.cwd,
-        ...(settings.state_dir === undefined ? {} : { task: { state_dir: settings.state_dir } }),
-      },
+      stateDir,
       taskSettings: settings,
       memberExtension: {
         entryPath: resolveMemberExtensionEntryPath(),
@@ -165,10 +218,13 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     lifecycle,
     notifier,
     runtime,
+    planner,
     agents,
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
+    memberLiveness,
+    notifyOwnedMemberLiveness,
     appendTaskEvent,
     onStoreMutation: (listener) => {
       mutationListeners.add(listener)
@@ -182,50 +238,4 @@ async function admitAdapter(lifecycle: TaskLifecycle, parentSessionId: string): 
   if (admission.kind === "admitted") return { kind: "admitted" }
   if (admission.kind === "evicted") return { kind: "evicted", evicted_task_id: admission.evicted_task_id }
   return { kind: "rejected", message: admission.error.message }
-}
-
-function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
-  const inProcess = new InProcessRunner({
-    // The live capture-registry array; the runner filters the task/team family at spawn time.
-    get sharedParentTools(): readonly ToolDefinition[] {
-      return build.sharedParentTools()
-    },
-    depthPolicy: { maxDepth: Math.max(build.settings.max_depth + 1, 1) },
-  })
-  // Thread the PARENT session's captured model registry (and its bound auth storage) into every child,
-  // resolving the plan's provider/modelId against that same registry. Without this a child spawns
-  // against senpi's default agent-dir resolution and never sees a provider registered on the live
-  // parent session (the -e mock provider, extension providers) - the W2-V "No API key found" gap.
-  const context = createParentRegistrySessionContext(() => build.runtime.modelRegistry())
-  return createInProcessManagedRunner(inProcess, context)
-}
-
-// The process (multi-process) slot: a real senpi rpc child. It runs in a SEPARATE OS process, so the
-// parent's in-memory model registry object cannot be handed across the boundary; instead the child
-// inherits the parent env (SENPI_CODING_AGENT_DIR and friends via buildRpcSpawn) and resolves the same
-// agent dir's auth/models. Wiring this slot is what makes `execution_mode:"process"` spawn an rpc child
-// instead of silently falling back to the in-process runner.
-function buildProcessRunner(_build: RunnerBuildContext): ManagedRunner {
-  // Forward the parent's own `-e` extensions to every detached child. A separate OS process cannot
-  // inherit the parent's in-memory extension registry, so the child is spawned with `--no-extensions`
-  // plus these entries reproduced explicitly (a local provider in QA, or a production `-e` extension).
-  const inheritedExtensions = parseExtensionEntries(process.argv)
-  return createRpcManagedRunner(new RpcProcessRunner({ inheritedExtensions }))
-}
-
-// The child-agent registry the task tool advertises and `subagent_type` / team-member spawns resolve
-// against: the builtin curated agents first, with the user's omo.json `agents` overlaid field-level
-// per name (the loader's overlayAgent semantics) so omo.json wins individual fields - and can disable
-// a builtin - while user-only names are appended. Curated execution mode is the one exception: their
-// persona and tool boundary require the in-process runner, so a process override is ignored.
-function resolveAgents(config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
-  const merged: Record<string, AgentDefinition> = { ...BUILTIN_AGENTS }
-  for (const [name, definition] of Object.entries(mapOmoConfigAgents(config))) {
-    merged[name] = { ...merged[name], ...definition }
-  }
-  for (const name of CURATED_READONLY_AGENT_NAMES) {
-    const definition = merged[name]
-    if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
-  }
-  return merged
 }

@@ -109,6 +109,37 @@ describe("buildTmuxAttachCommand", () => {
       }
     },
   )
+  it("places serverUrl before --session and --dir in output", () => {
+    const serverUrl = "http://127.0.0.1:4242"
+    const sessionId = "ses_abc123"
+    const dir = "/tmp/test-project"
+    const cmd = buildTmuxAttachCommand(serverUrl, sessionId, dir)
+    // serverUrl must appear after "opencode attach" and before --session
+    const attachIdx = cmd.indexOf("opencode attach")
+    const urlIdx = cmd.indexOf(serverUrl)
+    const sessionIdx = cmd.indexOf("--session")
+    const dirIdx = cmd.indexOf("--dir")
+    expect(attachIdx).toBeGreaterThanOrEqual(0)
+    expect(urlIdx).toBeGreaterThan(attachIdx)
+    expect(sessionIdx).toBeGreaterThan(urlIdx)
+    expect(dirIdx).toBeGreaterThan(sessionIdx)
+  })
+
+  it("places sessionId after --session flag", () => {
+    const cmd = buildTmuxAttachCommand("http://127.0.0.1:3000", "ses_target123", "/tmp/proj")
+    const sessionFlagIdx = cmd.indexOf("--session")
+    const sessionIdIdx = cmd.indexOf("ses_target123")
+    expect(sessionFlagIdx).toBeGreaterThanOrEqual(0)
+    expect(sessionIdIdx).toBeGreaterThan(sessionFlagIdx)
+  })
+
+  it("falls back to process.cwd() when directory argument is omitted", () => {
+    const cwd = process.cwd()
+    const cmd = buildTmuxAttachCommand("http://127.0.0.1:3000", "ses_abc123")
+    // Nested /bin/sh quoting doubles Windows path separators.
+    expect(cmd).toContain(cwd.replaceAll("\\", "\\\\"))
+    expect(cmd).toContain("--dir")
+  })
 })
 
 describe("buildTmuxPlaceholderCommand", () => {

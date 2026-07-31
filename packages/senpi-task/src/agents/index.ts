@@ -12,6 +12,7 @@ export type {
   ResolveAgentOptions,
   ResolvedAgentResult,
 } from "./resolve-agent"
+export type { AgentModelCandidate, AgentModelEntry } from "./agent-model-entry"
 export type {
   AgentDefinition,
   AgentDefinitionInput,

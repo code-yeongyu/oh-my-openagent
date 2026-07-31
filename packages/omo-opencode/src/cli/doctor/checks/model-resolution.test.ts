@@ -65,7 +65,7 @@ describe("model-resolution check", () => {
         info.agents.find((a) => a.name === "sisyphus"),
         "sisyphus agent resolution",
       )
-      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-7")
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
       expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
@@ -79,13 +79,13 @@ describe("model-resolution check", () => {
         info.categories.find((c) => c.name === "visual-engineering"),
         "visual-engineering category resolution",
       )
-      expect(visual.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
-      expect(visual.requirement.fallbackChain[0]?.providers).toContain("google")
+      expect(visual.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
+      expect(visual.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
   })
 
   describe("getModelResolutionInfoWithOverrides", () => {
-    // given: User has overrides in oh-my-opencode.json
+    // given: User has overrides in omo.json
     // when: Getting resolution info with config
     // then: Shows user override in Step 1 position
 

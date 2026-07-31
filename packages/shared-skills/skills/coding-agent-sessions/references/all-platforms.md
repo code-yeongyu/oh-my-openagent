@@ -4,13 +4,15 @@
 
 Search these first, then add user-supplied roots with `--root`:
 
-Registered platform keys: `codex`, `claude`, `senpi`, `opencode`, `openclaw`, `droid`, `amp`, `gemini`, `kimi`, `qwen`, `codebuff`, `roo-code`, `kilo-code`, `cline`, `kodu`, `cursor-cli`, `aider`, `kilo-cli`, `hermes`, `goose`, `crush`, `zed`, `kiro`.
+Registered platform keys: `codex`, `claude`, `senpi`, `oh-my-pi`, `gajae-code`, `opencode`, `openclaw`, `droid`, `amp`, `gemini`, `kimi`, `qwen`, `codebuff`, `roo-code`, `kilo-code`, `cline`, `kodu`, `cursor-cli`, `aider`, `kilo-cli`, `hermes`, `goose`, `crush`, `zed`, `kiro`, `aside`.
 
 | Platform | Unix/macOS | Windows |
 |---|---|---|
 | Codex | `$CODEX_HOME`, `~/.codex` | `%CODEX_HOME%`, `%USERPROFILE%\.codex` |
 | Claude | `~/.claude` | `%USERPROFILE%\.claude`, `%APPDATA%\Claude` |
 | Senpi / pi | `~/.senpi/agent`, `~/.pi/agent` | `%USERPROFILE%\.senpi\agent`, `%USERPROFILE%\.pi\agent` |
+| oh-my-pi (`omp`) | `~/.omp/agent`, `~/.omp/profiles/*/agent`, `$XDG_DATA_HOME/omp` | `%USERPROFILE%\.omp\agent` |
+| gajae-code (`gjc`) | `~/.gjc/agent`, `~/.gjc/profiles/*/agent`, `$XDG_DATA_HOME/gjc` | `%USERPROFILE%\.gjc\agent` |
 | OpenCode | `$OPENCODE_HOME`, `~/.opencode`, `~/.local/share/opencode` | `%OPENCODE_HOME%`, `%APPDATA%\opencode`, `%USERPROFILE%\.opencode` |
 | OpenClaw | `~/.openclaw/agents/*/sessions`, `~/.openclaw/session-backups` | pass `--root` |
 | Factory Droid | `~/.factory/sessions/*/*.jsonl` | pass `--root` |
@@ -23,6 +25,7 @@ Registered platform keys: `codex`, `claude`, `senpi`, `opencode`, `openclaw`, `d
 | Aider | bounded project roots containing `.aider.chat.history.md`; use `--root` for other repos | pass `--root` |
 | Kilo CLI (`kilo-cli`) / Hermes / Goose / Crush / Zed | Known SQLite roots are probed cheaply; unsupported schemas return empty | pass `--root` |
 | Kiro | `~/.kiro/sessions/cli/*.json` plus paired `*.jsonl` prompt events | pass `--root` |
+| Aside (browser agent) | `~/.aside/u/*/sessions/<date>_<id>/messages.jsonl`, joined with the per-user `state.db` `sessions` table (title, parent_id, cwd, model, timestamps). `~/.aside/u/*/agents/*/sessions/` is a hardlink mirror of `sessions/` and is intentionally not scanned | pass `--root` |
 
 ## Excluded usage-only sources
 
@@ -50,6 +53,7 @@ Do not add these as default transcript platforms without a separate prompt-recon
 | Claude | `projects/<proj>/<sid>/subagents/**/agent-<agentId>.jsonl` | directory `<sid>` | `agent-*.meta.json` `agentType` |
 | Codex | thread row + own rollout JSONL | `thread_spawn_edges` / `source.subagent.thread_spawn.parent_thread_id` | `agent_nickname (agent_role)` |
 | OpenCode | `session` table row / `storage/session/**.json` | `parent_id` column / `parentID` field | `agent` column |
+| Aside | own `sessions/<date>_<id>/messages.jsonl` transcript | `parent_id` column in `state.db` `sessions` | child session's `title` column (task description) |
 
 ## Parallelism
 

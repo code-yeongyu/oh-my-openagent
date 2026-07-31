@@ -37,14 +37,21 @@ const entryPath = join(packageRoot, "src", "extension", "index.ts")
 const outputPath = join(pluginRoot, "extensions", "omo.js")
 const memberEntryPath = join(repoRoot, "packages", "senpi-task", "src", "team", "member-extension", "index.ts")
 const memberOutputPath = join(pluginRoot, "extensions", "omo-member.js")
-const builtinModuleNames = builtinModules.filter((moduleName) => !moduleName.startsWith("_"))
+const builtinModuleNames = builtinModules
+  .filter((moduleName) => !moduleName.startsWith("_"))
+  .sort()
 const externalSpecifiers = [
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
 ]
 const BUILD_MARKER_PREFIX = "// omo-senpi-build:"
-const BUILD_SETTINGS = JSON.stringify({ target: "node", format: "esm", minify: true, externalSpecifiers })
+const BUILD_SETTINGS = JSON.stringify({
+  target: "node",
+  format: "esm",
+  minify: true,
+  loaderAliases: SENPI_LOADER_ALIASES,
+})
 
 export async function buildExtension(options = {}) {
   const output = options.outputPath ?? outputPath
@@ -137,13 +144,17 @@ async function attachBuildMarker(output, entry, metafile) {
 async function digestBuildSources(metadata, entry) {
   const inputs = metadata !== null && typeof metadata === "object" && metadata.inputs !== null
     && typeof metadata.inputs === "object" ? Object.keys(metadata.inputs).sort() : []
-  const hash = createHash("sha256").update(BUILD_SETTINGS).update(relative(repoRoot, entry))
+  const hash = createHash("sha256").update(BUILD_SETTINGS).update(toPortableBuildPath(relative(repoRoot, entry)))
   for (const input of inputs) {
     const inputPath = resolve(repoRoot, input)
-    hash.update(relative(repoRoot, inputPath)).update(await readFile(inputPath))
+    hash.update(toPortableBuildPath(relative(repoRoot, inputPath))).update(await readFile(inputPath))
   }
   hash.update(await readFile(fileURLToPath(import.meta.url)))
   return hash.digest("hex")
+}
+
+export function toPortableBuildPath(path) {
+  return path.replaceAll("\\", "/")
 }
 
 function artifactsMatch(currentText, expectedText) {

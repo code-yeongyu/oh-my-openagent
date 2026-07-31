@@ -33,7 +33,6 @@ function expectMissingStateFailure(
 function spyManager(outcome: SendOutcome): SendManager {
   return {
     sendToTask: () => Promise.resolve(outcome),
-    interruptTask: () => Promise.resolve({ kind: "not_found", reason: "unused" }),
     list: () => [],
   }
 }
@@ -52,6 +51,9 @@ describe("runTaskSend shutdown routing", () => {
 
     expect(result.details).toEqual({ kind: "shutdown_requested", team_run_id: "run-1", member: "alpha" })
     expect(service.calls[0]).toMatchObject({ method: "requestShutdown", args: ["run-1", "alpha"] })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("alpha")
+    expect(text).toContain("run-1")
   })
 
   test("#given a lead shutdown_response approve #when routed through task_send #then approveShutdown is called", async () => {
@@ -67,6 +69,9 @@ describe("runTaskSend shutdown routing", () => {
 
     expect(result.details).toEqual({ kind: "shutdown_responded", team_run_id: "run-1", member: "alpha", approved: true })
     expect(service.calls[0]).toMatchObject({ method: "approveShutdown", args: ["run-1", "alpha"] })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("alpha")
+    expect(text).toContain("run-1")
   })
 
   test("#given a shutdown_response reject without a reason #when routed through task_send #then it fails before rejectShutdown", async () => {
@@ -110,6 +115,9 @@ describe("runTaskSend shutdown routing", () => {
 
     expect(result.details).toEqual({ kind: "shutdown_responded", team_run_id: "run-1", member: "alpha", approved: false })
     expect(service.calls[0]).toMatchObject({ method: "rejectShutdown", args: ["run-1", "alpha", "still needed"] })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("alpha")
+    expect(text).toContain("run-1")
   })
 
   test("#given shutdown_request hits missing team state #when routed through task_send #then it returns a sanitized structured failure", async () => {

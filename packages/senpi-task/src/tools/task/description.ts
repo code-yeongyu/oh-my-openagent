@@ -4,13 +4,13 @@ import type { AgentDefinition } from "../../agents"
 import { listTaskAgents, listTaskCategories } from "./categories"
 import type { TaskAgentInfo, TaskCategoryInfo } from "./types"
 
-export const TASK_PROMPT_SNIPPET = "Delegate foreground or background work to a child agent (category XOR subagent_type)."
+export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
 
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
-  "Provide EITHER category OR subagent_type - never both, never neither.",
   "Use run_in_background=true only for parallel independent work; the default waits and returns the result.",
+  "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
   "Continue an existing child with task_send(to=\"st_...\", message=\"...\"); task always spawns.",
-  "Read progress with task_output, steer with task_send, and cancel with task_cancel.",
+  "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
 ]
 
 type DescriptionInput = {
@@ -27,29 +27,24 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
   const categories = listTaskCategories(input.omoConfig)
   const agents = listTaskAgents(input.agents)
   const agentNames = agents.map((agent) => agent.name).join(", ") || "none loaded"
-  return `Spawn a child task with category-based or direct agent selection.
+  return `Spawn one child task or fan out a batch.
 
-  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Providing BOTH will FAIL.
+Choose exactly one input form:
+- Single: prompt
+- Batch: tasks (1-16 items); top-level target, model, and skills are inherited when an item omits them. An inherited model is rejected when the item's effective target is a category.
 
-  CORRECT - using a category:
-    task(category="quick", description="Fix type error", prompt="...")
-  CORRECT - direct agent with background parallelism:
-    task(subagent_type="oracle", description="Review design", prompt="...", run_in_background=true)
+Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO NOT provide both.
 
-  REQUIRED: provide exactly ONE of:
-  - category: routes through Sisyphus-Junior with the category-optimized model. Available categories:
+- category routes through Sisyphus-Junior. Available categories:
 ${renderList(categories)}
-  - subagent_type: invoke a specific agent directly. Available agents: ${agentNames}
+- subagent_type invokes a loaded agent directly. Available agents: ${agentNames}
 
-  DO NOT provide both.
-
-  - load_skills: optional string[]; defaults to []. Each named skill's SKILL.md is prepended to the child prompt.
-  - run_in_background: optional; defaults to false (waits and returns the final response inline). Set true to return a task_id immediately for parallel work; the system notifies you on completion and you inspect it with task_output / task_send.
-  - model / name: optional overrides.
-
-  WHEN TO CONTINUE:
-  - A task needs a follow-up -> task_send(to="st_...", message="Also: [question]")
-  - A task was parked/interrupted -> task_send(to="st_...", message="Continue with: [specific issue]")
-
-  Prompts MUST be in English.`
+Blank provider padding is normalized automatically; do not add filler values.
+load_skills prepends named skills. run_in_background=true returns task ids for parallel work; false waits for results.
+name is an optional stable handle. model is an explicit override for subagent_type spawns ONLY.
+NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
+  CORRECT: task(subagent_type="momus", model="openai/gpt-5.6-sol", prompt="...")
+  INCORRECT: task(category="architect", model="quotio-openai/gpt-5.4-mini-fast", prompt="...")
+task_send continues an existing child; task always spawns.
+Prompts MUST be in English.`
 }

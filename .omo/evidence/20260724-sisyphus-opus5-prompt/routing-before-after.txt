@@ -1,0 +1,5 @@
+BEFORE (dev tip 346a054bc):
+anthropic/claude-opus-5 -> fallback
+AFTER (worktree):
+anthropic/claude-opus-5 -> claude-opus-5
+anthropic/claude-opus-4-8 -> claude-opus-4-8

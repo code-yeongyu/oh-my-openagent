@@ -502,3 +502,116 @@ describe("TmuxPollingManager overlap", () => {
     expect(closedSessionIds).toEqual(["ses-1"])
   })
 })
+
+describe("TmuxPollingManager cmux eager-activated sessions", () => {
+  test("skips activateSessionPane for sessions pre-marked as attachActivated=true", async () => {
+    //#given — session is cmux-eager: attachActivated at creation, paneId matches an active pane
+    const now = new Date()
+    const sessions = new Map<string, TrackedSession>()
+    sessions.set("ses-cmux-eager", {
+      sessionId: "ses-cmux-eager",
+      paneId: "%9",
+      description: "cmux eager session",
+      attachActivated: true,       // ← set at creation for cmux
+      attachActivatedAt: now,
+      createdAt: now,
+      lastSeenAt: now,
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+      stableIdlePolls: 0,
+      observedIdleActivityVersion: 0,
+    })
+
+    let activateSessionPaneCalls = 0
+    const activateSessionPaneMock = async (_tracked: TrackedSession): Promise<boolean> => {
+      activateSessionPaneCalls += 1
+      return true
+    }
+
+    const getWindowStateMock = async (): Promise<WindowState> => ({
+      windowWidth: 200,
+      windowHeight: 50,
+      windowActive: true,
+      sessionAttached: true,
+      mainPane: { paneId: "%1", width: 100, height: 50, left: 0, top: 0, title: "main", isActive: false },
+      agentPanes: [{ paneId: "%9", width: 100, height: 50, left: 100, top: 0, title: "agent", isActive: true }],
+    })
+
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-cmux-eager": { type: "running" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async () => {},
+      undefined,
+      getWindowStateMock,
+      activateSessionPaneMock,
+    )
+
+    //#when — trigger a poll cycle
+    await (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
+
+    //#then — activateSessionPane must NOT be called because the pane is already attachActivated
+    expect(activateSessionPaneCalls).toBe(0)
+  })
+
+  test("calls activateSessionPane for sessions with attachActivated=false (regression guard)", async () => {
+    //#given — normal non-cmux session: attachActivated false, pane is active (focus-defer path)
+    const now = new Date()
+    const sessions = new Map<string, TrackedSession>()
+    sessions.set("ses-normal", {
+      sessionId: "ses-normal",
+      paneId: "%8",
+      description: "normal session",
+      attachActivated: false,      // ← not yet activated
+      createdAt: now,
+      lastSeenAt: now,
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    })
+
+    let activateSessionPaneCalls = 0
+    const activateSessionPaneMock = async (_tracked: TrackedSession): Promise<boolean> => {
+      activateSessionPaneCalls += 1
+      return true
+    }
+
+    const getWindowStateMock = async (): Promise<WindowState> => ({
+      windowWidth: 200,
+      windowHeight: 50,
+      windowActive: true,
+      sessionAttached: true,
+      mainPane: { paneId: "%1", width: 100, height: 50, left: 0, top: 0, title: "main", isActive: false },
+      agentPanes: [{ paneId: "%8", width: 100, height: 50, left: 100, top: 0, title: "agent", isActive: true }],
+    })
+
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-normal": { type: "running" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async () => {},
+      undefined,
+      getWindowStateMock,
+      activateSessionPaneMock,
+    )
+
+    //#when
+    await (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
+
+    //#then — focus-defer path: activateSessionPane MUST be called because pane is focused but not activated yet
+    expect(activateSessionPaneCalls).toBe(1)
+  })
+})

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runners/in-process/child-handle"
 import type { ChildSpec } from "../runners/in-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
@@ -56,13 +57,19 @@ describe("createInProcessManagedRunner", () => {
   test("#given a managed spec #when started #then it maps to a ChildSpec and injects session context", async () => {
     // given
     let captured: ChildSpec | undefined
+    const modelRuntime = { kind: "native-provider-runtime" } as unknown as NonNullable<
+      CreateAgentSessionOptions["modelRuntime"]
+    >
     const runner: InProcessRunnerLike = {
       start: (spec) => {
         captured = spec
         return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
       },
     }
-    const managed = createInProcessManagedRunner(runner, () => ({ agentDir: "/home/user/.senpi/agent" }))
+    const managed = createInProcessManagedRunner(runner, () => ({
+      agentDir: "/home/user/.senpi/agent",
+      modelRuntime,
+    }))
 
     // when
     const handle = await managed.start(managedSpec())
@@ -71,8 +78,48 @@ describe("createInProcessManagedRunner", () => {
     // then
     expect(captured?.taskId).toBe("st_00000001")
     expect(captured?.agentDir).toBe("/home/user/.senpi/agent")
+    expect(captured?.modelRuntime).toBe(modelRuntime)
     expect(captured?.parentSessionId).toBe("parent-1")
     expect(outcome).toEqual({ status: "completed", finalResponse: "ok" })
+  })
+
+  test("#given a managed spec with a runtime fallback chain #when started #then the ordered chain reaches the child runner", async () => {
+    // given
+    let captured: ChildSpec | undefined
+    const requestedModel = {
+      source: "category",
+      provider: "kimi-coding",
+      model_id: "kimi-for-coding-highspeed-unlocked",
+      display: "kimi-coding/kimi-for-coding-highspeed-unlocked",
+      reasoning_effort: "minimal",
+    } as const
+    const fallbackModels = [
+      {
+        source: "category",
+        provider: "quotio-openai",
+        model_id: "gpt-5.4-mini-fast",
+        display: "quotio-openai/gpt-5.4-mini-fast",
+        reasoning_effort: "minimal",
+      },
+    ] as const
+    const runner: InProcessRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
+      },
+    }
+    const managed = createInProcessManagedRunner(runner)
+    const spec = {
+      ...managedSpec(),
+      requestedModel,
+      fallbackModels,
+    }
+
+    // when
+    await managed.start(spec)
+
+    // then
+    expect(captured).toMatchObject({ requestedModel, fallbackModels })
   })
 })
 
@@ -113,5 +160,61 @@ describe("createRpcManagedRunner", () => {
 
     // then: a separate OS process cannot share the parent's registry, so the model rides the spec
     expect(captured?.model).toBe("anthropic/claude")
+  })
+})
+
+describe("variant threading", () => {
+  test("#given a managed spec with a variant #when the rpc adapter starts #then the variant reaches the rpc spec", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start({ ...managedSpec(), variant: "max" })
+
+    // then
+    expect(captured?.variant).toBe("max")
+  })
+
+  test("#given a managed spec without a variant #when the rpc adapter starts #then no variant is threaded", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start(managedSpec())
+
+    // then
+    expect(captured?.variant).toBeUndefined()
+  })
+
+  test("#given a session context with a thinking level #when the in-process adapter starts #then the level reaches the child spec", async () => {
+    // given
+    let captured: ChildSpec | undefined
+    const runner: InProcessRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
+      },
+    }
+    const managed = createInProcessManagedRunner(runner, () => ({ thinkingLevel: "high" }))
+
+    // when
+    await managed.start(managedSpec())
+
+    // then
+    expect(captured?.thinkingLevel).toBe("high")
   })
 })

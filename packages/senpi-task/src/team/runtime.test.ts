@@ -68,7 +68,6 @@ describe("createTeam", () => {
       stateDir: join(stateDir.project_dir, ".omo", "senpi-task"),
       base_dir: join(stateDir.project_dir, ".omo", "senpi-task", "teams"),
       members: ["alpha"],
-      wait: settings.wait,
     })
     expect(started?.memberScopedTools).toBeUndefined()
   })
@@ -105,6 +104,92 @@ describe("createTeam", () => {
       expect(spec.depth).toBe(1)
       expect(spec.name).toMatch(/^team:[0-9a-f-]+:(alpha|beta|gamma)$/)
     }
+  })
+
+  test("#given roles, prompts, and a resolved model #when created #then member views carry role, model, task id, and prompt excerpt", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const manager = new FakeTeamManager({
+      behaviors: [
+        {
+          kind: "ok",
+          resolvedModel: {
+            provider: "anthropic",
+            model_id: "claude-opus-4-7",
+            display: "Claude Opus 4.7",
+            reasoning_effort: "high",
+            source: "category",
+          },
+        },
+        { kind: "ok" },
+        { kind: "ok" },
+      ],
+    })
+
+    // when
+    const created = await createTeam(threeMemberSpec(), "project", {
+      manager,
+      stateDir,
+      taskSettings: taskSettings(),
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+    })
+
+    // then
+    const [alpha, beta, gamma] = created.members
+    expect(created.members).toHaveLength(3)
+    expect(alpha).toMatchObject({
+      name: "alpha",
+      status: "running",
+      role: { kind: "category", category: "quick" },
+      promptExcerpt: "task alpha",
+    })
+    expect(alpha?.taskId).toMatch(/^st_/)
+    expect(alpha?.model).toMatchObject({ provider: "anthropic", display: "Claude Opus 4.7", reasoning_effort: "high" })
+    expect(beta?.model).toBeUndefined()
+    expect(gamma).toMatchObject({
+      name: "gamma",
+      role: { kind: "subagent_type", subagentType: "sisyphus" },
+      promptExcerpt: "task gamma",
+    })
+  })
+
+  test("#given member prompts #when members start #then every bootstrap teaches injection-driven work after the role", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const manager = new FakeTeamManager()
+    const spec = normalizeSenpiTeamSpec(
+      {
+        members: [
+          { name: "alpha", kind: "category", category: "quick", prompt: "task alpha" },
+          { name: "beta", kind: "subagent_type", subagent_type: "sisyphus" },
+        ],
+      },
+      "squad",
+    )
+
+    // when
+    await createTeam(spec, "project", {
+      manager,
+      stateDir,
+      taskSettings: taskSettings(),
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+    })
+
+    // then
+    const [alphaStart, betaStart] = manager.started
+    for (const start of [alphaStart, betaStart]) {
+      expect(start?.prompt).toContain("injected messages")
+      expect(start?.prompt).not.toContain("team_wait")
+      expect(start?.prompt).toContain("task_send")
+    }
+    expect(alphaStart?.prompt).toContain("'alpha'")
+    expect(alphaStart?.prompt).toContain("'squad'")
+    expect(alphaStart?.prompt).toContain("task alpha")
+    expect(alphaStart?.prompt.indexOf("end your turn")).toBeLessThan(alphaStart?.prompt.indexOf("task alpha"))
+    expect(betaStart?.prompt).toContain("'beta'")
+    expect(betaStart?.prompt).toContain("'squad'")
   })
 
   test("#given the created team #when the sidecar is read #then it maps every member to its st_ id", async () => {

@@ -152,6 +152,7 @@ function senpiEnv(sandbox, binDir, sessionDir) {
     ...process.env,
     PATH: `${binDir}:${process.env.PATH ?? ""}`,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
     OMO_SENPI_QA: "1",
   }

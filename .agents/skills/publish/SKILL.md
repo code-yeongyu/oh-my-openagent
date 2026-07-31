@@ -35,6 +35,22 @@ Publishing is not complete until the Discord release announcement has been attem
 - After the release notes are finalized, immediately run Step 7.5 and post to Discord.
 - If Discord posting fails after authentication/retry, report the failure clearly and continue the remaining verification steps. A skipped Discord step is a workflow failure.
 
+## CRITICAL: NO EARLY TURN-END AFTER TRIGGER (COMPLETION CONTRACT)
+
+Once `gh workflow run publish` succeeds, the publish is NOT done. A prior session forgot this: it triggered the workflow and ended its turn, leaving the release unverified, the enhanced summary unwritten, and the Discord announcement unsent. That mistake is why this section exists.
+
+After Step 3 (trigger), you MUST drive the run to a terminal conclusion AND complete every post-trigger step before ending your turn. You may NOT end the turn, hand off, or stop for the day while ANY of these is unresolved:
+
+1. **Run conclusion** — `gh run view <id> --json conclusion` must return `success` (poll while drafting notes; never sleep idle).
+2. **Release exists** — Step 5: `gh release view v${NEW_VERSION}` resolves.
+3. **Enhanced summary applied** — Step 6 + Step 7: draft (mandatory for patch/minor/major) AND `gh release edit --notes-file` applied. "Patch is optional" is wrong; patch summaries are MANDATORY.
+4. **Discord announced** — Step 7.5: `agent-discordbot message send` attempted; either a message id is recorded OR a clear failure is reported to the user. A skipped Discord step is a workflow failure.
+5. **npm verified** — Step 8: `npm view oh-my-opencode version` (and oh-my-openagent, lazycodex-ai) shows `${NEW_VERSION}`.
+
+Only after all five are green may you end the turn. If the run fails, run `gh run view <id> --log-failed`, report it, and STOP (do not repair the tree mid-publish). If a post-trigger step fails for an external reason (npm propagation, Discord auth), report it clearly and continue the remaining steps — do not let one failure abort the rest.
+
+This contract applies to the slash-command copies (`.agents/command/publish.md`, `.opencode/command/publish.md`) too; they are kept byte-identical to this skill per the `.agents/AGENTS.md` drift rule.
+
 ## CRITICAL: ARGUMENT REQUIREMENT
 
 **You MUST receive a version bump type from the user.** Valid options:
@@ -175,9 +191,7 @@ After running the preview, present the output to the user and say:
 >
 > **For all release types**, an enhanced summary is **required** — I'll draft one in the next step.
 
-Wait for the user to acknowledge before proceeding.
-
-If the user already confirmed the publish workflow and did not explicitly ask to review the generated changelog before release-note editing, treat the publish confirmation as sufficient acknowledgement and continue. Do not end the assistant turn here.
+**APPROVAL GATE (single, binary):** The user's initial publish request with a named bump type IS the only approval this workflow requires. Do NOT wait for a separate acknowledgement here. Present the preview, then IMMEDIATELY proceed to Step 6. The only exception: if the user explicitly said "let me review the changelog before you continue" (or equivalent), stop and wait. Otherwise continue without ending the turn.
 </agent-instruction>
 
 ---
@@ -249,10 +263,10 @@ cat /tmp/release-summary-v${NEW_VERSION}.md
 ```
 
 <agent-instruction>
-After drafting, ask the user:
-> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks. Want me to adjust anything before applying?"
+Present the draft to the user:
+> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks."
 
-If the user already confirmed the publish workflow and did not explicitly request a release-note review hold, proceed to Step 7 after presenting the draft. Do not stop before Step 7.5, because the Discord announcement is mandatory.
+**APPROVAL GATE (same single gate):** The initial publish confirmation covers this step too. Present the draft, then IMMEDIATELY proceed to Step 7 (apply) and Step 7.5 (Discord). Do NOT stop to wait for approval unless the user explicitly requested a release-note review hold before the publish started. The Discord announcement (Step 7.5) is mandatory and must not be blocked by a review hold that was never requested.
 </agent-instruction>
 
 ---
