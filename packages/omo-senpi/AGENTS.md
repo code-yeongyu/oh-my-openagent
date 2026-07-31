@@ -13,7 +13,7 @@ This package is adapter-only. It may depend on harness-neutral core packages plu
 | `src/components/` | Eleven live components: `config-startup`, `ultrawork`, `start-work-continuation`, `ulw-loop`, `fallback-architect`, `comment-checker`, `telemetry`, `lsp`, `codegraph`, `task`, and `config-watch`, plus the `config-resolution` loader helper. |
 | `src/install/` | Local Senpi installer and uninstaller helpers. They add or remove the absolute plugin path in `SENPI_CODING_AGENT_DIR` or `~/.senpi/agent` settings. |
 | `scripts/qa/` | Live Senpi QA drivers, continuation probe, and mock provider used by task 13 validation. |
-| `skills/` | Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool); currently `hyperplan`, `ultrawork`, `ulw-loop`, and `ulw-research`. `sync-skills.mjs` ships them verbatim. |
+| `skills/` | Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool); currently `hyperplan`, `ultrawork`, `ulw-loop`, `ulw-mutation-test`, and `ulw-research`. `sync-skills.mjs` ships them verbatim. |
 | `plugin/` | The single Pi package `@code-yeongyu/omo-senpi`. It contains generated `extensions/omo.js`, generated skills, package metadata, and plugin-local build scripts. |
 
 The v1 install surface is local-path only. Install the built Pi package from `packages/omo-senpi/plugin`; do not document npm, git, or marketplace distribution for this adapter until that exists in code.
