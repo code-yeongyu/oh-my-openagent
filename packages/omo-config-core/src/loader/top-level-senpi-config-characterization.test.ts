@@ -17,7 +17,7 @@ const CURRENT_USER_CONFIG = `{
       "model": "kimi-coding/kimi-for-coding-highspeed-unlocked",
       "reasoningEffort": "minimal",
       "fallback_models": [
-        { "model": "quotio-openai/gpt-5.4-mini-fast", "reasoningEffort": "minimal" },
+        { "model": "quotio-openai/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
         { "model": "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", "reasoningEffort": "none" }
       ],
       "prompt_append": ${JSON.stringify(QUICK_PROMPT_APPEND)}
@@ -31,9 +31,9 @@ const CURRENT_USER_CONFIG = `{
     "explore": {
       "model": "kimi-coding/kimi-for-coding-highspeed",
       "models": [
-        { "model": "quotio-openai/gpt-5.4-mini-fast", "reasoningEffort": "minimal" },
+        { "model": "quotio-openai/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
         "example-gateway/z-ai/glm-5.2-ultrafast-unlocked",
-        { "model": "quotio-openai/gpt-5.4-mini", "reasoningEffort": "minimal" }
+        { "model": "quotio-openai/gpt-5.6-luna-fast", "reasoningEffort": "minimal" }
       ]
     },
     "oracle": {
@@ -48,9 +48,9 @@ const EXPECTED_CONFIG = {
     explore: {
       model: "kimi-coding/kimi-for-coding-highspeed",
       models: [
-        { model: "quotio-openai/gpt-5.4-mini-fast", reasoning: "minimal" },
+        { model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "minimal" },
         "example-gateway/z-ai/glm-5.2-ultrafast-unlocked",
-        { model: "quotio-openai/gpt-5.4-mini", reasoning: "minimal" },
+        { model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "minimal" },
       ],
     },
     oracle: {
@@ -61,7 +61,7 @@ const EXPECTED_CONFIG = {
   categories: {
     quick: {
       fallback_models: [
-        { model: "quotio-openai/gpt-5.4-mini-fast", reasoning: "minimal" },
+        { model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "minimal" },
         { model: "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", reasoning: "off" },
       ],
       model: "kimi-coding/kimi-for-coding-highspeed-unlocked",

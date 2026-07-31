@@ -8,7 +8,7 @@
           "model": "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
           "reasoningEffort": "none"
         },
-        "quotio-openai/gpt-5.4-mini-fast minimal"
+        "quotio-openai/gpt-5.6-luna-fast minimal"
       ],
       "maxTokens": 8192
     },
@@ -43,12 +43,12 @@
   "[opencode]": {
     "agents": {
       "explore": {
-        "model": "openai/gpt-5.4-mini-fast",
+        "model": "openai/gpt-5.6-luna-fast",
         "thinking": {
           "type": "disabled"
         },
         "fallback_models": [
-          "openai/gpt-5.4-mini"
+          "openai/gpt-5.6-luna-fast"
         ]
       }
     }

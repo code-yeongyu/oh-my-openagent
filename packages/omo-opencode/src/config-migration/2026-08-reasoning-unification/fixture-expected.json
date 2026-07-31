@@ -10,7 +10,7 @@
           "model": "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
           "reasoning": "off"
         },
-        "quotio-openai/gpt-5.4-mini-fast:minimal"
+        "quotio-openai/gpt-5.6-luna-fast:minimal"
       ],
       "max_tokens": 8192
     },
@@ -50,10 +50,10 @@
       "explore": {
         "models": [
           {
-            "model": "openai/gpt-5.4-mini-fast",
+            "model": "openai/gpt-5.6-luna-fast",
             "reasoning": "off"
           },
-          "openai/gpt-5.4-mini"
+          "openai/gpt-5.6-luna-fast"
         ]
       }
     }

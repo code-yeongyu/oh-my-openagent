@@ -537,10 +537,11 @@ describe("createCallOmoAgent", () => {
       throw new Error("Expected launch to be called")
     }
     const [launchArgs] = firstLaunchCall
-    // explore's first fallbackChain entry is openai/gpt-5.4-mini-fast
+    // explore's first fallbackChain entry is openai/gpt-5.6-luna-fast at low reasoning
     expect(launchArgs.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4-mini-fast",
+      modelID: "gpt-5.6-luna-fast",
+      variant: "low",
     })
   })
 

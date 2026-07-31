@@ -17,12 +17,12 @@ describe("resolveManagedAgentReasoning", () => {
 		expect(effort).toBe("low")
 	})
 
-	test("#given a preserved gpt-5.4-mini/low default #when resolving #then the chained upgrade still lands on the new effort", () => {
+	test("#given a preserved gpt-5.6-luna-fast/low default #when resolving #then the chained upgrade still lands on the new effort", () => {
 		// when
 		const effort = resolveManagedAgentReasoning({
 			agentName: "librarian",
 			...bundled,
-			preserved: { model: "gpt-5.4-mini", effort: "low" },
+			preserved: { model: "gpt-5.6-luna-fast", effort: "low" },
 		})
 		// then
 		expect(effort).toBe("low")

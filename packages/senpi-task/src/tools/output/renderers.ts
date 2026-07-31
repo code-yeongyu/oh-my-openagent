@@ -113,7 +113,12 @@ function nonEmpty(value: string | undefined): string | undefined {
 }
 
 function snapshotIdentity(snapshot: TaskSnapshot): string {
-  return taskIdentityLabel({ taskId: snapshot.task_id, name: snapshot.name, description: snapshot.description })
+  return taskIdentityLabel({
+    taskId: snapshot.task_id,
+    name: snapshot.name,
+    description: snapshot.description,
+    taskSummary: snapshot.task_summary,
+  })
 }
 
 function assertNever(value: never): never {

@@ -44,6 +44,7 @@ export type ManagedRunner = {
 
 export type ManagerStartSpec = {
   readonly prompt: string
+  readonly task_summary?: string
   readonly parent_session_id: string
   readonly root_session_id?: string
   readonly depth: number

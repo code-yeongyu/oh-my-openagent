@@ -52,18 +52,20 @@ describe("resolveAgent", () => {
       prompt: "Inspect the codebase",
       executionMode: "in-process",
     })
-    const models = registry([model("openai", "gpt-5.4-mini-fast")])
+    const models = registry([model("openai", "gpt-5.6-luna-fast")])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.4-mini-fast")
+    expect(result.model).toBe("openai/gpt-5.6-luna-fast")
     expect(result.resolved_model).toEqual({
       source: "agent",
       provider: "openai",
-      model_id: "gpt-5.4-mini-fast",
-      display: "openai/gpt-5.4-mini-fast",
+      model_id: "gpt-5.6-luna-fast",
+      display: "openai/gpt-5.6-luna-fast",
+      variant: "low",
+      reasoning: "low",
     })
     expect(result.agentType).toBe("explore")
     expect(result.instructions).toBe("Inspect the codebase")
@@ -160,15 +162,15 @@ describe("resolveAgent", () => {
     // given
     const agents = roster({ name: "explore", models: ["anthropic/claude-haiku-4-5"] })
     const models = catalogRegistry(
-      [model("openai", "gpt-5.4-mini-fast")],
-      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-5.4-mini-fast")],
+      [model("openai", "gpt-5.6-luna-fast")],
+      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-5.6-luna-fast")],
     )
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.4-mini-fast")
+    expect(result.model).toBe("openai/gpt-5.6-luna-fast")
   })
 
   test("#given a disabled agent #when resolved #then it is hidden as not_found", () => {

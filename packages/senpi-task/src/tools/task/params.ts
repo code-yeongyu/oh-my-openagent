@@ -1,10 +1,18 @@
 import { Type, type Static } from "typebox"
 
+import { TASK_SUMMARY_MAX_LENGTH } from "../../task-summary"
+
 export const MAX_TASK_BATCH_ITEMS = 16
 
 export const TaskToolParams = Type.Object({
   prompt: Type.Optional(
     Type.String({ description: "The instruction for the child task. MUST be written in English. Mutually exclusive with tasks; provide exactly one of prompt or tasks." }),
+  ),
+  task_summary: Type.Optional(
+    Type.String({
+      maxLength: TASK_SUMMARY_MAX_LENGTH,
+      description: "One-line summary of the delegated work, shown to the user in the task footer/widget UI instead of the raw prompt. Keep it within 80 chars; longer values are force-truncated.",
+    }),
   ),
   description: Type.Optional(
     Type.String({ description: "Short human label for this task, shown in status views." }),
@@ -29,6 +37,12 @@ export const TaskToolParams = Type.Object({
     Type.Array(
       Type.Object({
         prompt: Type.String({ description: "The instruction for this child task. MUST be written in English." }),
+        task_summary: Type.Optional(
+          Type.String({
+            maxLength: TASK_SUMMARY_MAX_LENGTH,
+            description: "One-line summary of this task's delegated work, shown in the task footer/widget UI. Longer values are force-truncated to 80 chars.",
+          }),
+        ),
         description: Type.Optional(Type.String({ description: "Short human label for this task." })),
         category: Type.Optional(Type.String({ description: "Category name for this task." })),
         subagent_type: Type.Optional(Type.String({ description: "Direct agent name for this task." })),

@@ -8,6 +8,7 @@ const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
 const expectedSkillNames = [
   "ast-grep",
   "coding-agent-sessions",
+  "data-scientist",
   "debugging",
   "frontend",
   "git-master",
@@ -118,7 +119,7 @@ describe("OMO Senpi scoped skill sync", () => {
       const name = extractFrontmatterField(frontmatter, "name")
       expect(name, `${relative(repoRoot, skillFile)} frontmatter name must equal ${skillName}`).toBe(skillName)
 
-      const descriptionLine = frontmatter.match(/^description:\\s*(.*)$/m)?.[0] ?? ""
+      const descriptionLine = frontmatter.match(/^description:\s*(.*)$/m)?.[0] ?? ""
       expect(
         descriptionLine.length,
         `${relative(repoRoot, skillFile)} description line must be <= 1024 chars`,

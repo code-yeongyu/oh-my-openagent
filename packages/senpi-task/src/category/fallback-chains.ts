@@ -21,13 +21,18 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "glm-5.2",
       variant: "max",
     },
+    {
+      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    },
   ],
   architect: [
     { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"], model: "claude-fable-5", variant: "xhigh" },
   ],
   ultrabrain: [
     { providers: ["openai", "quotio-openai", "vercel"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
+    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
     { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "max" },
   ],
   deep: [
@@ -56,26 +61,32 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ],
   quick: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-    { providers: ["quotio-openai"], model: "gpt-5.4-mini-fast", variant: "minimal" },
-    { providers: ["openai"], model: "gpt-5.4-mini", variant: "minimal" },
+    { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+    { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "off" },
+    {
+      providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go", "vercel"],
+      model: "qwen3.6-flash",
+      variant: "low",
+    },
+    { providers: ["opencode-go", "vercel"], model: "minimax-m3", variant: "max" },
+    { providers: ["opencode-go", "vercel"], model: "minimax-m2.7", variant: "max" },
     { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
-    { providers: ["xiaomi"], model: "mimo-v2.5-pro-ultraspeed" },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "vercel"],
+      model: "claude-haiku-4-5",
+      variant: "off",
+    },
   ],
   "unspecified-low": [
     {
-      providers: ["openai", "quotio-openai", "vercel"],
-      model: "gpt-5.6-luna",
-      variant: "xhigh",
-    },
-    {
-      providers: ["github-copilot"],
-      model: "gpt-5.6-luna",
+      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-terra",
       variant: "high",
     },
     {
       providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
       model: "claude-sonnet-5",
-      variant: "medium",
+      variant: "low",
     },
     {
       providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
@@ -92,7 +103,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "mimo-v2.5-pro",
       variant: "max",
     },
-    { providers: ["cursor"], model: "composer-2.5" },
   ],
   "unspecified-high": [
     {

@@ -546,7 +546,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **GPT-5.6 Terra** | openai, vercel                   | GPT-5.6 mid-tier. Default for Momus (high) and an optional balanced override elsewhere.                    |
 | **GPT-5.6 Luna**  | openai, vercel                   | GPT-5.6 light tier. Default for the `unspecified-low` category (xhigh).                                    |
 | **GPT-5.6 Sol override paths** | openai, github-copilot, opencode, vercel | Default for Oracle and the first GPT-5.6 Sol-family fallback for Hephaestus, Momus, `deep`, and `ultrabrain`. |
-| **GPT-5.4 Mini**  | openai, github-copilot, opencode, vercel | Fast + strong reasoning. Utility fallback after the Kimi high-speed quick default.                  |
+| **GPT 5.6 Luna Fast**  | openai, github-copilot, opencode, vercel | Fast + strong reasoning. Utility fallback after the Kimi high-speed quick default.                  |
 | **GPT-5-Nano**    | opencode, vercel                 | Ultra-cheap, fast. Good for simple utility tasks.                                                           |
 
 **Different-behavior Models**:
@@ -558,7 +558,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **MiniMax M3**             | opencode-go, vercel              | Latest MiniMax flagship. Primary utility fallback, ahead of M2.7.   |
 | **MiniMax M2.7**           | opencode-go, opencode, vercel    | Fast and smart. Utility fallback for various chains.        |
 | **MiniMax M2.7 Highspeed** | vercel, opencode                 | Faster utility variant used in Explore and retrieval chains.|
-| **Qwen 3.7 Plus**          | opencode-go                      | 1M context, high-speed reasoning. Default for Explore and Librarian when GPT-5.4 Mini Fast is unavailable. |
+| **Qwen 3.7 Plus**          | opencode-go                      | 1M context, high-speed reasoning. Default for Explore and Librarian when GPT 5.6 Luna Fast is unavailable. |
 
 **Speed-Focused Models**:
 
@@ -599,7 +599,7 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent                 | Role               | Default Chain                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go\|bailian-coding-plan/qwen3.7-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m3 → minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3 → opencode-go\|vercel/minimax-m2.7 → anthropic\|github-copilot\|vercel/claude-haiku-4-5 → openai\|vercel/gpt-5.4-nano |
+| **Explore**           | Fast codebase grep | openai/gpt-5.6-luna-fast → deepseek/deepseek-v4-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m3 → minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3 → opencode-go\|vercel/minimax-m2.7 → anthropic\|github-copilot\|vercel/claude-haiku-4-5 → openai\|vercel/gpt-5.4-nano |
 | **Librarian**         | Docs/code search   | (same chain as Explore)                                                |
 | **Multimodal Looker** | Vision/screenshots | openai\|opencode\|vercel/gpt-5.6-sol (low) → opencode-go\|vercel/kimi-k3 → zai-coding-plan\|vercel/glm-4.6v → openai\|github-copilot\|opencode\|vercel/gpt-5-nano |
 

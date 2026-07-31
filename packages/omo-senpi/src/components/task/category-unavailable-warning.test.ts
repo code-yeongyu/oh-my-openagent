@@ -24,7 +24,7 @@ type CapturedNotify = {
 
 const QUICK_CHAIN: readonly DelegateFallbackEntry[] = [
   { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-  { providers: ["openai"], model: "gpt-5.4-mini", variant: "minimal" },
+  { providers: ["openai"], model: "gpt-5.6-luna-fast", variant: "minimal" },
 ]
 
 function deadChainError(category: string): PlanResolutionError {
@@ -231,6 +231,6 @@ describe("createCategoryUnavailableWarningPlanner", () => {
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.category).toBe("quick")
     expect(result.error.attempted_chain).toBeDefined()
-    expect(result.error.missing_providers).toContain("openai")
+    expect(result.error.missing_providers).toContain("quotio-openai")
   })
 })

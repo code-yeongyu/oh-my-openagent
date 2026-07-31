@@ -20,6 +20,7 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     age_ms: ageMs(record, now),
     ...(record.name !== undefined ? { name: record.name } : {}),
     ...(record.description !== undefined ? { description: record.description } : {}),
+    ...(record.task_summary !== undefined ? { task_summary: record.task_summary } : {}),
     ...(record.agent_type !== undefined ? { agent_type: record.agent_type } : {}),
     ...(record.category !== undefined ? { category: record.category } : {}),
     ...(record.pid !== undefined ? { pid: record.pid } : {}),

@@ -35,7 +35,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-haiku-4-5",
   "google/gemini-3.1-pro",
   "google/gemini-3-flash",
-  "openai/gpt-5.4-mini",
+  "openai/gpt-5.6-luna-fast",
   "openai/gpt-5.6-sol",
   "kimi-for-coding/kimi-for-coding-highspeed",
   "openai/gpt-5.5",
@@ -142,7 +142,7 @@ describe("sisyphus-task", () => {
       models: {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3", "kimi-for-coding-highspeed"],
-        openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
+        openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-5.6-luna-fast", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai", "kimi-for-coding"],
       updatedAt: "2026-01-01T00:00:00.000Z",

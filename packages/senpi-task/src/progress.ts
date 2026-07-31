@@ -25,6 +25,7 @@ export type ChildProgressTarget = {
   readonly model?: string
   readonly name?: string
   readonly description?: string
+  readonly taskSummary?: string
 }
 
 type ChildProgress = {
@@ -52,7 +53,7 @@ export function createChildProgress(
 
   const activity = (stats: ReturnType<typeof tracker.snapshot>): string =>
     composeStatusLine({
-      identity: taskIdentityLabel({ taskId, name: target.name, description: target.description }),
+      identity: taskIdentityLabel({ taskId, name: target.name, description: target.description, taskSummary: target.taskSummary }),
       target: formatStatusTarget({
         category: target.category,
         agentType: target.agentType,

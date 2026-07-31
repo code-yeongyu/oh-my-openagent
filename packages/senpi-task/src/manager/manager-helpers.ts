@@ -24,6 +24,7 @@ export function buildRecordInput(input: {
     depth: spec.depth,
     execution_mode: executionMode,
     model: plan.model,
+    ...(spec.task_summary !== undefined ? { task_summary: spec.task_summary } : {}),
     ...(spec.description !== undefined ? { description: spec.description } : {}),
     ...(plan.requested_model !== undefined
       ? { requested_model: plan.requested_model }

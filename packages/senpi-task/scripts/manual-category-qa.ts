@@ -21,7 +21,7 @@ function throwingProviderAccessorModel(message: string): object {
     },
     id: {
       enumerable: true,
-      value: "gpt-5.4-mini",
+      value: "gpt-5.6-luna-fast",
     },
   })
 }
@@ -147,13 +147,13 @@ requireCondition(
   "unavailable available models missing registry model",
 )
 
-const hardcodedFallback = resolveCategory("quick", {}, registry([model("openai", "gpt-5.4-mini")]))
+const hardcodedFallback = resolveCategory("quick", {}, registry([model("openai", "gpt-5.6-luna-fast")]))
 requireCondition(hardcodedFallback.kind === "resolved", "hardcoded fallback scenario did not resolve")
 if (hardcodedFallback.kind !== "resolved") {
   throw new Error("hardcoded fallback scenario did not resolve")
 }
 requireCondition(hardcodedFallback.spec.provider === "openai", "hardcoded fallback provider mismatch")
-requireCondition(hardcodedFallback.spec.modelId === "gpt-5.4-mini", "hardcoded fallback model mismatch")
+requireCondition(hardcodedFallback.spec.modelId === "gpt-5.6-luna-fast", "hardcoded fallback model mismatch")
 requireCondition(hardcodedFallback.spec.variant === "minimal", "hardcoded fallback variant is not minimal")
 requireCondition(hardcodedFallback.modelSelection.matchedFallback, "hardcoded fallback was not marked as fallback")
 
@@ -172,7 +172,7 @@ requireCondition(systemDefault.spec.modelId === "system-default", "system defaul
 
 const headerModel = {
   provider: "quotio-openai",
-  id: "gpt-5.4-mini-fast",
+  id: "gpt-5.6-luna-fast",
   name: "header model",
   headers: { "User-Agent": "test" },
 }
@@ -214,15 +214,15 @@ requireCondition(throwingAvailable.availableModels.length === 0, "throwing avail
 requireCondition(!JSON.stringify(throwingAvailable).includes(throwingAvailableMarker), "throwing available accessor marker leaked")
 
 const secretFindResults = [
-  { provider: "openai", id: "gpt-5.4-mini", password: "hidden" },
-  { provider: "openai", id: "gpt-5.4-mini", accessToken: "hidden" },
-  { provider: "openai", id: "gpt-5.4-mini", privateToken: "hidden" },
+  { provider: "openai", id: "gpt-5.6-luna-fast", password: "hidden" },
+  { provider: "openai", id: "gpt-5.6-luna-fast", accessToken: "hidden" },
+  { provider: "openai", id: "gpt-5.6-luna-fast", privateToken: "hidden" },
 ]
 const secretFind = secretFindResults.map((findResult) => resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
     find: () => findResult,
   },
 ))
@@ -240,7 +240,7 @@ const identityFind = identityFindResults.map((findResult) => resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
     find: () => findResult,
   },
 ))
@@ -249,7 +249,7 @@ for (const result of identityFind) {
   if (result.kind !== "model_unavailable") {
     throw new Error("identity find result did not return model_unavailable")
   }
-  requireCondition(result.attemptedModel === "openai/gpt-5.4-mini", "identity find attempted model changed")
+  requireCondition(result.attemptedModel === "openai/gpt-5.6-luna-fast", "identity find attempted model changed")
   requireCondition(!JSON.stringify(result).includes("evil"), "identity find result leaked mismatched provider")
 }
 
@@ -258,7 +258,7 @@ const throwingFind = resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
     find: () => throwingProviderAccessorModel(throwingFindMarker),
   },
 )
@@ -267,21 +267,21 @@ if (throwingFind.kind !== "model_unavailable") {
   throw new Error("throwing find accessor did not return model_unavailable")
 }
 requireCondition(
-  throwingFind.availableModels.includes("openai/gpt-5.4-mini"),
+  throwingFind.availableModels.includes("openai/gpt-5.6-luna-fast"),
   "throwing find accessor lost valid available model",
 )
 requireCondition(!JSON.stringify(throwingFind).includes(throwingFindMarker), "throwing find accessor marker leaked")
 
 const inheritedIdentityModel: object = Object.create({
   provider: "openai",
-  id: "gpt-5.4-mini",
+  id: "gpt-5.6-luna-fast",
   privateToken: "hidden",
 })
 const inheritedIdentity = resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
     find: () => inheritedIdentityModel,
   },
 )
@@ -292,8 +292,8 @@ const nonArrayAvailable = resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => ({ 0: model("openai", "gpt-5.4-mini"), length: 1 }),
-    find: () => model("openai", "gpt-5.4-mini"),
+    getAvailable: () => ({ 0: model("openai", "gpt-5.6-luna-fast"), length: 1 }),
+    find: () => model("openai", "gpt-5.6-luna-fast"),
   },
 )
 requireCondition(nonArrayAvailable.kind === "model_unavailable", "non-array getAvailable did not return model_unavailable")
@@ -302,7 +302,7 @@ if (nonArrayAvailable.kind !== "model_unavailable") {
 }
 requireCondition(nonArrayAvailable.availableModels.length === 0, "non-array getAvailable leaked available models")
 
-const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-5.4-mini")]))
+const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-5.6-luna-fast")]))
 requireCondition(prototypeName.kind === "not_found", "prototype-shaped category did not return not_found")
 
 console.log(JSON.stringify({

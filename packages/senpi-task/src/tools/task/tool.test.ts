@@ -230,8 +230,7 @@ describe("createTaskTool", () => {
     const [row = ""] = renderedLines(component, 72)
 
     // then
-    expect(row).toContain("category:quick")
-    expect(row).toContain("model:openai/gpt-5.6-sol:xhigh")
+    expect(row).toContain("category:quick(openai/gpt-5.6-sol:xhigh)")
     expect(row).toContain(`${ANSI_ITALIC}foreground${ANSI_ITALIC_END}`)
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
   })

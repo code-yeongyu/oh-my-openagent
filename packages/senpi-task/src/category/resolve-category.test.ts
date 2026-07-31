@@ -37,8 +37,8 @@ const gpt56CategoryCases = [
     modelId: "gpt-5.6-sol",
     nativeVariant: "max",
     mixedWinner: { provider: "vercel", modelId: "openai/gpt-5.6-sol", variant: "max" },
-    copilotVariant: "high",
-    copilotFallbackEntry: { providers: ["github-copilot"] as string[], model: "gpt-5.6-sol", variant: "high" },
+    copilotVariant: "max",
+    copilotFallbackEntry: { providers: ["github-copilot"] as string[], model: "gpt-5.6-sol", variant: "max" },
   },
   {
     category: "deep",
@@ -54,11 +54,15 @@ const gpt56CategoryCases = [
   },
   {
     category: "unspecified-low",
-    modelId: "gpt-5.6-luna",
-    nativeVariant: "xhigh",
-    mixedWinner: { provider: "vercel", modelId: "openai/gpt-5.6-luna", variant: "xhigh" },
+    modelId: "gpt-5.6-terra",
+    nativeVariant: "high",
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-terra", variant: "high" },
     copilotVariant: "high",
-    copilotFallbackEntry: { providers: ["github-copilot"] as string[], model: "gpt-5.6-luna", variant: "high" },
+    copilotFallbackEntry: {
+      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"] as string[],
+      model: "gpt-5.6-terra",
+      variant: "high",
+    },
   },
 ] as const
 
@@ -247,9 +251,9 @@ describe("resolveCategory", () => {
     expect(resolved.spec.reasoningEffort).toBe("medium")
   })
 
-  test("#given quick primary is unavailable and the quotio rung is available #when resolved #then delegate-core fallback chain reaches gpt-5.4-mini-fast", () => {
+  test("#given quick primary is unavailable and the quotio rung is available #when resolved #then delegate-core fallback chain reaches gpt-5.6-luna-fast", () => {
     // given
-    const models = registry([model("quotio-openai", "gpt-5.4-mini-fast")])
+    const models = registry([model("quotio-openai", "gpt-5.6-luna-fast")])
 
     // when
     const result = resolveCategory("quick", {}, models)
@@ -257,13 +261,13 @@ describe("resolveCategory", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.spec.provider).toBe("quotio-openai")
-    expect(resolved.spec.modelId).toBe("gpt-5.4-mini-fast")
-    expect(resolved.spec.variant).toBe("minimal")
+    expect(resolved.spec.modelId).toBe("gpt-5.6-luna-fast")
+    expect(resolved.spec.variant).toBe("low")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
       providers: ["quotio-openai"],
-      model: "gpt-5.4-mini-fast",
-      variant: "minimal",
+      model: "gpt-5.6-luna-fast",
+      variant: "low",
     })
   })
 

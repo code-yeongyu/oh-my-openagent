@@ -28,19 +28,19 @@ describe("agent plans carrying configured effort", () => {
     const config = {
       agents: {
         explore: {
-          models: [{ model: "quotio-openai/gpt-5.4-mini-fast", reasoningEffort: "minimal" as const }],
+          models: [{ model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" as const }],
         },
       },
     } satisfies OmoConfig
     const agents = mapOmoConfigAgents(config)
-    const models = registry([{ provider: "quotio-openai", id: "gpt-5.4-mini-fast" }])
+    const models = registry([{ provider: "quotio-openai", id: "gpt-5.6-luna-fast" }])
     const planner = createTaskChildPlanner(config, agents, () => models)
 
     // when
     const plan = resolvedPlan(planner({ subagent_type: "explore", prompt: "go", parent_session_id: "p", depth: 1 }))
 
     // then
-    expect(plan.model).toBe("quotio-openai/gpt-5.4-mini-fast")
+    expect(plan.model).toBe("quotio-openai/gpt-5.6-luna-fast")
     expect(plan.variant).toBe("minimal")
     expect(plan.resolved_model?.reasoning_effort).toBe("minimal")
   })
@@ -71,12 +71,12 @@ describe("agent plans carrying configured effort", () => {
       agents: {
         explore: {
           variant: "high",
-          models: [{ model: "quotio-openai/gpt-5.4-mini-fast", reasoningEffort: "minimal" as const }],
+          models: [{ model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" as const }],
         },
       },
     } satisfies OmoConfig
     const agents = mapOmoConfigAgents(config)
-    const models = registry([{ provider: "quotio-openai", id: "gpt-5.4-mini-fast" }])
+    const models = registry([{ provider: "quotio-openai", id: "gpt-5.6-luna-fast" }])
     const planner = createTaskChildPlanner(config, agents, () => models)
 
     // when

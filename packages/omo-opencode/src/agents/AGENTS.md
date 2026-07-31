@@ -22,8 +22,8 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 | **Sisyphus** | claude-opus-5 max | (model default) | primary | kimi-k3 → gpt-5.6-sol medium → glm-5.2 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
 | **Hephaestus** | gpt-5.6-sol medium | (model default) | primary | GPT-5.6 Sol only (`requiresProvider`: openai \| github-copilot \| opencode \| vercel) | Autonomous deep worker |
 | **Oracle** | gpt-5.6-sol xhigh (high on Copilot) | 0.1 | subagent | gemini-3.1-pro high → claude-opus-5 max → glm-5.2 | Read-only consultation |
-| **Librarian** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.7-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
-| **Explore** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.7-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
+| **Librarian** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
+| **Explore** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
 | **Multimodal-Looker** | gpt-5.6-sol low | 0.1 | subagent | kimi-k3 → glm-4.6v → gpt-5-nano | PDF/image analysis |
 | **Metis** | claude-opus-5 high | **0.3** | subagent | kimi-k3 low | Pre-planning consultant |
 | **Momus** | gpt-5.6-terra high | 0.1 | subagent | gpt-5.6-sol xhigh (high on Copilot) → claude-opus-5 max → gemini-3.1-pro high → glm-5.2 | Plan reviewer |

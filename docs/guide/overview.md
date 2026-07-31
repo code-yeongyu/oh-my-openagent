@@ -230,7 +230,7 @@ You can override specific agents or categories in your config:
 - GPT-5.6 Terra — balanced mid-tier; preferred for Momus (high) and available as an explicit override elsewhere
 - GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
 - GPT-5.6 Sol override paths — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
-- GPT-5.4 Mini — fast and cheap utility fallback after the Kimi high-speed quick default
+- GPT 5.6 Luna Fast — fast and cheap utility fallback after the Kimi high-speed quick default
 
 **Different-behavior models**:
 

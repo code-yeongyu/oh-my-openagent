@@ -9,8 +9,8 @@ test("#given a record with fallback attempts #when result details are built #the
     { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed", display: "kimi-for-coding-highspeed", source: "category" as const },
     {
       provider: "quotio-openai",
-      model_id: "gpt-5.4-mini-fast",
-      display: "gpt-5.4-mini-fast",
+      model_id: "gpt-5.6-luna-fast",
+      display: "gpt-5.6-luna-fast",
       reasoning_effort: "high",
       source: "category" as const,
     },
@@ -20,7 +20,7 @@ test("#given a record with fallback attempts #when result details are built #the
     root_session_id: "session-root",
     depth: 0,
     execution_mode: "in-process",
-    model: "quotio-openai/gpt-5.4-mini-fast",
+    model: "quotio-openai/gpt-5.6-luna-fast",
     fallback_attempts: fallbackAttempts,
   }, 1)
 
@@ -29,4 +29,22 @@ test("#given a record with fallback attempts #when result details are built #the
 
   // then
   expect(details.fallback_attempts).toEqual(fallbackAttempts)
+})
+
+test("#given a record with a task_summary #when result details are built #then the summary reaches the renderer details", () => {
+  // given
+  const record = createTaskRecord({
+    task_summary: "Audit the boundary",
+    parent_session_id: "session-parent",
+    root_session_id: "session-root",
+    depth: 0,
+    execution_mode: "in-process",
+    model: "quotio-openai/gpt-5.6-luna-fast",
+  }, 1)
+
+  // when
+  const details = recordDetails(record, "spawn")
+
+  // then
+  expect(details.task_summary).toBe("Audit the boundary")
 })

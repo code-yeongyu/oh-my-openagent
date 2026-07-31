@@ -107,7 +107,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   })
 
   // Builtin chain fixture providers for the "quick" category: rung 1 (kimi-coding/
-  // kimi-for-coding-highspeed) always dies on the child; rung 2 (quotio-openai/gpt-5.4-mini-fast)
+  // kimi-for-coding-highspeed) always dies on the child; rung 2 (quotio-openai/gpt-5.6-luna-fast)
   // answers unless the scenario exhausts the chain. quotio-openai needs reasoning so the runtime
   // accepts the rung variant (":minimal") in its fallback selector.
   pi.registerProvider("kimi-coding", {
@@ -125,7 +125,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://omo-runtime-fallback-mock",
     apiKey: "mock",
     api: "openai-completions",
-    models: [{ ...mockModel("gpt-5.4-mini-fast", "Chain rung two"), reasoning: true }],
+    models: [{ ...mockModel("gpt-5.6-luna-fast", "Chain rung two"), reasoning: true }],
     streamSimple(model, context) {
       return streamMessage(childReply(model.id))
     },
@@ -142,7 +142,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
         quotio: ids.filter((id) => id.includes("quotio")),
         kimi: ids.filter((id) => id.includes("kimi")),
         mock: ids.filter((id) => id.includes("omo-fallback-mock")),
-        findQuotio: registry?.find("quotio-openai", "gpt-5.4-mini-fast") !== undefined,
+        findQuotio: registry?.find("quotio-openai", "gpt-5.6-luna-fast") !== undefined,
       }, null, 2))
     }
     dump("t0")
@@ -155,7 +155,7 @@ function childReply(modelId: string): AssistantMessage {
   if (modelId === "healthy-fallback") {
     return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
   }
-  if (modelId === "gpt-5.4-mini-fast" && SCENARIO !== "chain-exhausted") {
+  if (modelId === "gpt-5.6-luna-fast" && SCENARIO !== "chain-exhausted") {
     return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
   }
   return assistant(modelId, "error", [], QUOTA_ERROR)

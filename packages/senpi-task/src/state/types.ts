@@ -67,8 +67,10 @@ export type TaskSpawnSpec = {
 
 export type TaskRecordInput = {
   readonly name?: string
-  // Human label supplied by the task tool's `description` param. Status surfaces lead with this,
-  // falling back to name and only then to the opaque task id.
+  // One-line delegated-work summary from the task tool's `task_summary` param. Status surfaces
+  // lead with this, then description, then name, and only then the opaque task id.
+  readonly task_summary?: string
+  // Human label supplied by the task tool's `description` param.
   readonly description?: string
   readonly parent_session_id: string
   readonly root_session_id: string

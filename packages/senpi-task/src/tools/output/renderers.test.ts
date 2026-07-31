@@ -125,6 +125,24 @@ describe("task_output renderers", () => {
     expect(lines.join("\n")).not.toContain("secret transcript body")
   })
 
+  test("#given a task_summary snapshot #when the status row renders #then the summary leads over the description", () => {
+    // given / when
+    const line = firstLine(
+      renderTaskOutputResult(
+        toolResult("ignored", {
+          kind: "status",
+          snapshot: snapshot({ name: "task-1", description: "quick label", task_summary: "Audit the waiting line" }),
+        }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
+      200,
+    )
+
+    // then
+    expect(line).toStartWith("[success]task_output Audit the waiting line (st_done) completed")
+  })
+
   test("#given a described task #when the status row renders #then the human label leads and the id trails", () => {
     // given / when
     const line = firstLine(

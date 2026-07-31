@@ -4,10 +4,10 @@ import { truncateToWidth } from "@earendil-works/pi-tui"
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
 import {
   formatTaskMode,
-  formatTaskTarget,
   renderTaskCallLines,
   taskCallLines,
 } from "./call-renderer"
+import { formatTargetWithModel } from "../../status-line"
 import {
   ELLIPSIS,
   excerptRendererText,
@@ -28,7 +28,6 @@ type LinesComponent = {
 type WidthAwareLines = (width: number) => readonly string[]
 
 type RendererTheme = Pick<Theme, "fg" | "italic">
-type ModelIdentity = Pick<TaskToolDetails, "model" | "resolved_model">
 
 const STATUS_COLORS: Readonly<Record<string, ThemeColor>> = {
   completed: "success",
@@ -47,11 +46,6 @@ export function statusThemeColor(status: string): ThemeColor {
 
 export function formatTaskStatus(status: string): string {
   return normalizeRendererText(status)
-}
-
-export function formatResolvedModel(model: string | undefined): string | undefined {
-  const normalized = optionalRendererText(model)
-  return normalized === undefined ? undefined : `model:${normalized}`
 }
 
 export function taskResultLines(details: TaskToolDetails): readonly string[] {
@@ -94,20 +88,18 @@ export function linesComponent(lines: readonly string[] | WidthAwareLines): Line
   }
 }
 
-function taskTargetToken(args: Pick<TaskToolDetails, "category" | "subagent_type">): string | undefined {
-  const target = formatTaskTarget(args)
+type TargetIdentity = Pick<TaskToolDetails, "category" | "subagent_type" | "model" | "resolved_model">
+
+// One target token per row, in the shared status-line grammar: `category:<n>(<model>:<effort>)` |
+// `agent:<n>(<model>:<effort>)` | `model:<m>`. No site composes its own agent/category branch.
+function taskTargetToken(details: TargetIdentity): string | undefined {
+  const target = formatTargetWithModel({
+    category: details.category,
+    agentType: details.subagent_type,
+    resolvedModel: details.resolved_model,
+    model: details.model,
+  })
   return target === "task" ? undefined : target
-}
-
-function resolvedModelToken(details: ModelIdentity): string | undefined {
-  const resolved = details.resolved_model
-  if (resolved === undefined) return formatResolvedModel(details.model)
-
-  const provider = optionalRendererText(resolved.provider)
-  const modelId = optionalRendererText(resolved.model_id)
-  if (provider === undefined || modelId === undefined) return formatResolvedModel(details.model)
-  const reasoning = optionalRendererText(resolved.reasoning) ?? optionalRendererText(resolved.reasoning_effort) ?? optionalRendererText(resolved.variant)
-  return `model:${provider}/${modelId}${reasoning === undefined ? "" : `:${reasoning}`}`
 }
 
 function fallbackCountToken(details: Pick<TaskToolDetails, "fallback_attempts">): string | undefined {
@@ -121,7 +113,6 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
   return joinRendererTokens([
     "task",
     taskTargetToken(details),
-    resolvedModelToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
@@ -140,7 +131,6 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
     "item",
     name === undefined ? undefined : `name:${name}`,
     taskTargetToken(item),
-    resolvedModelToken(item),
     formatTaskStatus(item.status),
     taskId === undefined ? undefined : `id:${taskId}`,
     item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
@@ -149,22 +139,20 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
 }
 
 function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefined, width: number): string {
-  const requiredWithoutModel = [
+  const requiredWithoutTarget = [
     "task",
-    taskTargetToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
   ].filter((token): token is string => token !== undefined)
-  const requiredSpaces = requiredWithoutModel.length
-  const modelWidth = Math.max(
+  const requiredSpaces = requiredWithoutTarget.length + 1
+  const targetWidth = Math.max(
     0,
-    width - requiredWithoutModel.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
+    width - requiredWithoutTarget.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
   )
   const required = [
     "task",
-    taskTargetToken(details),
-    compactResolvedModelToken(details, modelWidth),
+    compactTargetToken(details, targetWidth),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
@@ -179,8 +167,8 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
   return line
 }
 
-function compactResolvedModelToken(details: ModelIdentity, maxWidth: number): string | undefined {
-  const token = resolvedModelToken(details)
+function compactTargetToken(details: TargetIdentity, maxWidth: number): string | undefined {
+  const token = taskTargetToken(details)
   if (token === undefined || rendererVisibleWidth(token) <= maxWidth) return token
   return excerptRendererText(token, maxWidth)
 }

@@ -17,6 +17,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     fallback_attempts,
     resolved_model,
     root_session_id,
+    task_summary,
     tool_allow,
     tool_deny,
   } = input
@@ -36,6 +37,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
       notified_epoch: -1,
     },
     ...(name === undefined ? {} : { name }),
+    ...(task_summary === undefined ? {} : { task_summary }),
     ...(description === undefined ? {} : { description }),
     ...(agent_type === undefined ? {} : { agent_type }),
     ...(category === undefined ? {} : { category }),

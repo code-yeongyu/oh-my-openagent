@@ -12,6 +12,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
   const name = readOptionalString(value, "name")
+  const taskSummary = readOptionalString(value, "task_summary")
   const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
   const category = readOptionalString(value, "category")
@@ -43,6 +44,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     updated_at: readString(value, "updated_at"),
     notification: readNotification(value),
     ...(name === undefined ? {} : { name }),
+    ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),

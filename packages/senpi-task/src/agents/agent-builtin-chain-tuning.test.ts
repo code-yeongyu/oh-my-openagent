@@ -24,7 +24,7 @@ describe("agent tuning on the builtin fallback chain", () => {
   test("#given an agent with only top level effort #when the builtin chain resolves #then the effort still reaches the record", () => {
     // given
     const agents = roster({ name: "explore", reasoningEffort: "minimal" })
-    const models = registry([{ provider: "openai", id: "gpt-5.4-mini-fast" }])
+    const models = registry([{ provider: "openai", id: "gpt-5.6-luna-fast" }])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))

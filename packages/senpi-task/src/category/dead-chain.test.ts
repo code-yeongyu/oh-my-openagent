@@ -38,9 +38,15 @@ describe("dead-chain category disabling", () => {
         "kimi-coding",
         "kimi-for-coding",
         "quotio-openai",
-        "openai",
+        "deepseek",
+        "qwen-token-plan",
+        "alibaba-token-plan",
+        "bailian-coding-plan",
+        "opencode-go",
+        "vercel",
         "xai",
-        "xiaomi",
+        "anthropic-api",
+        "github-copilot",
       ])
     })
 

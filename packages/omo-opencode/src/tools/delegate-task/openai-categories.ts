@@ -89,7 +89,7 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.4-mini).
+THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.6-luna-fast).
 
 The model executing this task is optimized for speed over depth. Your prompt MUST be:
 

@@ -99,7 +99,7 @@ describe("TaskManager start failure security", () => {
       reason: GENERIC_START_FAILURE,
     })
     expect(row).toBe(
-      `task category:ultrabrain model:openai/gpt-5.6-sol:xhigh <i>background</i> error id:${capturedStart.task_id} reason:${GENERIC_START_FAILURE}`,
+      `task category:ultrabrain(openai/gpt-5.6-sol:xhigh) <i>background</i> error id:${capturedStart.task_id} reason:${GENERIC_START_FAILURE}`,
     )
 
     const persistedRecord = readFileSync(join(store.stateDir, "tasks", `${capturedStart.task_id}.json`), "utf8")

@@ -21,9 +21,9 @@ describe("provider model id transform", () => {
     const provider = "kimi-for-coding"
 
     // when
-    const transformed = transformModelForProvider(provider, "gpt-5.4-mini")
+    const transformed = transformModelForProvider(provider, "gpt-5.6-luna-fast")
 
     // then
-    expect(transformed).toBe("gpt-5.4-mini")
+    expect(transformed).toBe("gpt-5.6-luna-fast")
   })
 })

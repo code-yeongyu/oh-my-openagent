@@ -41,6 +41,7 @@ const TASK_EVENTS = [
   "before_agent_start",
   "agent_end",
 ]
+const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
 const TASK_COMMANDS = ["task-kill", "tasks"]
 
 interface RecordedLog {
@@ -178,9 +179,12 @@ describe("omo-senpi task component wiring", () => {
       "senpi-task.team-member-liveness",
       "senpi-task.category-unavailable",
     ])
-    // exactly the task event handlers (session lifecycle + transition-buffer edges) plus the
+    // exactly the task event handlers (session lifecycle + transition-buffer edges), the
+    // skill-invocation tracker subscriptions feeding the plan-gated agent gate, plus the
     // unconditional T16 hygiene sweep handler, which registers its own session_start listener
-    expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS, "session_start"].sort())
+    expect(pi.handlers.map((handler) => handler.event).sort()).toEqual(
+      [...TASK_EVENTS, ...SKILL_INVOCATION_TRACKER_EVENTS, "session_start"].sort(),
+    )
   })
 
   it("#given a fake ExtensionAPI boot #when the task component registers #then only injection-driven lead team tools are wired", () => {

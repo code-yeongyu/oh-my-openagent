@@ -35,7 +35,7 @@ describe("loadSenpiOmoConfig", () => {
         deep: { fallback_models: ["quotio-openai/gpt-5.6-terra"] },
       },
       agents: {
-        explore: { model: "kimi-coding/kimi-for-coding-highspeed", models: ["quotio-openai/gpt-5.4-mini-fast"] },
+        explore: { model: "kimi-coding/kimi-for-coding-highspeed", models: ["quotio-openai/gpt-5.6-luna-fast"] },
         oracle: { model: "quotio-openai/gpt-5.6-sol", reasoningEffort: "max" },
       },
     })
@@ -50,7 +50,7 @@ describe("loadSenpiOmoConfig", () => {
       deep: { fallback_models: ["quotio-openai/gpt-5.6-terra"] },
     })
     expect(result.config.agents).toEqual({
-      explore: { model: "kimi-coding/kimi-for-coding-highspeed", models: ["quotio-openai/gpt-5.4-mini-fast"] },
+      explore: { model: "kimi-coding/kimi-for-coding-highspeed", models: ["quotio-openai/gpt-5.6-luna-fast"] },
       oracle: { model: "quotio-openai/gpt-5.6-sol", reasoning: "max" },
     })
   })

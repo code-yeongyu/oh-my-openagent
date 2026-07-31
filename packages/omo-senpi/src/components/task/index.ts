@@ -27,6 +27,7 @@ import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { createSkillInvocationTracker, type SkillInvocationTracker } from "./skill-invocation-tracker"
 import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
@@ -79,7 +80,8 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       pi.registerMessageRenderer?.(TEAM_MEMBER_LIVENESS_MESSAGE_TYPE, renderTeamMemberLiveness)
       pi.registerMessageRenderer?.(CATEGORY_UNAVAILABLE_MESSAGE_TYPE, renderCategoryUnavailable)
       const teamTools = createTeamToolContext(pi, ctx, engine)
-      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId)
+      const skillInvocations = createSkillInvocationTracker(pi)
+      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations)
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
@@ -124,6 +126,7 @@ function registerTaskTools(
   engine: TaskEngine,
   teamService: TeamToolsService,
   resolveDefaultTeamRunId: TaskSendTeamRouting["resolveDefaultTeamRunId"],
+  skillInvocations: SkillInvocationTracker,
 ): void {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
@@ -132,6 +135,7 @@ function registerTaskTools(
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
+      resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })
   pi.registerTool({
@@ -152,6 +156,7 @@ function createTeamToolContext(
 ): TeamToolContext {
   const serviceDeps = {
     manager: engine.manager,
+    destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig: engine.omoConfig,
