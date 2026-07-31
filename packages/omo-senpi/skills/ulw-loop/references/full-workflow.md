@@ -156,6 +156,23 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 4. If retrying failed work, run `omo ulw-loop complete-goals --retry-failed --json`.
 5. Never create a second omo-senpi goal for the same aggregate objective.
 
+### Mutation-Test Gate
+
+Run this gate after the focused implementation tests are green and before any git checkpoint whenever a work unit adds or changes a test assertion, test case, fixture expectation, prompt-behavior rule, or test-quality claim.
+
+1. Invoke `ulw-mutation-test` and follow its complete workflow. Write each mutation's observable change and exact predicted test failure to the criterion artifact before applying it.
+2. Exercise 3-5 distinct, realistic failure surfaces when the behavior supports them. Every counted mutation must compile, be reached by the selected test, and change an observable contract.
+3. Apply one mutation at a time. Restore it before classification, prove affected hashes and the scoped diff match the baseline, then continue.
+4. A meaningful survivor inside the test's promise is a blocking test defect: strengthen the test, prove the original code stays green, reapply the same mutation, require the predicted failure, and restore again.
+5. Invalid, unreached, equivalent, misattributed, or inconclusive attempts do not count as defended behavior. Replace them or leave the criterion blocked with evidence.
+6. Capture the mutation report and final restoration receipt at the criterion's `expectedEvidence` path. Tests, coverage, or a mutation score without this observable artifact do not pass the gate.
+
+If the work unit changes no assertion, test case, fixture expectation, prompt-behavior rule, or test-quality claim, record `not_applicable` with the scoped diff evidence. Do not invent harmless mutations merely to produce a score.
+
+#### GIT CHECKPOINT
+
+Checkpointing is allowed only after the required mutation report is clean and bound to the current tree. When commits are not explicitly authorized or no git-tracked files changed, record the no-commit reason as usual.
+
 ### Per-Criterion Cycle
 1. PLAN: read `criterion.scenario`, `criterion.expectedEvidence`, prior ledger entries, and safety bounds. Identify which tasks in the current wave are independent.
 2. Register atomic todos via `update_plan` — one ultra-granular step per action, `path: <action> for <criterion> - verify by <check>`. Call `update_plan` on every transition (start → `in_progress`, finish → `completed`); exactly one `in_progress`, mark completed immediately, never batch, never let the rendered plan lag behind reality.
@@ -173,6 +190,8 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 11. After 5 cycles on one goal without required criteria passing, checkpoint failed.
 12. Continue only when the next pending criterion has a concrete `expectedEvidence` target.
 
+Before checkpointing a work unit that changed assertions, test cases, fixture expectations, prompt-behavior rules, or test-quality claims, invoke `ulw-mutation-test` after focused tests are green and require its report before checkpointing. Meaningful survivors and uncertain restoration are blocking.
+
 ### Goal Completion
 1. Non-final aggregate goal: confirm every `essential` criterion is `pass`; non-essential criteria may remain pending. Final aggregate goal: confirm every criterion across the whole plan is `pass`.
 2. Call `get_goal` for a fresh snapshot.
@@ -183,7 +202,11 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ## Final Quality Gate
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
-2. FREEZE first — no more edits or rebases. At the frozen HEAD, re-run Manual-QA for any PASS criterion whose stamped tree differs from `git rev-parse --short "HEAD^{tree}"`, so every criterion is proven on the frozen tree; each artifact exists and is non-empty.
+1a. For every work unit that changed an assertion, test case, fixture expectation, prompt-behavior rule, or test-quality claim, verify its mutation report is present, current-tree stamped, free of unresolved meaningful survivors, and paired with an exact restoration receipt.
+2. Run the final build, type check, and generated-output freshness gate so every generated artifact is current.
+2a. FREEZE immediately after that gate — no more edits, rebases, builds, or generated writes. Capture the frozen HEAD, tree, worktree digest, and generated hashes.
+2b. At the frozen state, re-run Manual-QA for any PASS criterion whose stamped tree differs from `git rev-parse --short "HEAD^{tree}"`, so every criterion is proven on the exact built tree; each artifact exists and is non-empty.
+2c. After Manual-QA, capture final hashes, status, and residue/process receipts again; require the frozen worktree digest and generated hashes to match step 2a before any reviewer starts.
 3a. Spawn the configured omo-senpi code reviewer and QA executor in one background `task({ tasks: [...] })` batch with brief, goals, desired outcome, diff, and evidence; consume BOTH injected completions and confirm their report artifacts exist on disk.
 3b. Only then spawn omo-senpi-gate-reviewer with those artifact paths.
 3c. The gate's approval binds to the frozen tree and full commit SHA and covers its three lanes — code quality, hands-on QA, and goal verification. Immediately append one durable `.omo/ulw-loop/ledger.jsonl` record per passing lane with the lane name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the ledger and require the exact lane/SHA pair; memory or an unstamped report is not coverage. A later rebase or amend that keeps the tree identical still has a new SHA and needs fresh lane stamps; changed content needs fresh review of the delta.
