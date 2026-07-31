@@ -1,0 +1,32 @@
+PR #6228 review hardening - 2026-07-31
+
+WHAT WAS TESTED
+
+1. Focused behavior suite:
+   bun test packages/lsp-core/src/lsp/workspace-document-state.test.ts
+2. Package typecheck:
+   bunx tsgo --noEmit -p packages/lsp-core
+3. Direct library driver:
+   bun -e <normalizeDocumentUri driver>
+
+WHAT WAS OBSERVED
+
+- The focused suite passed: 5 pass, 0 fail.
+- The package typecheck exited 0 with no diagnostics.
+- The direct driver printed:
+  {"linux":["file:///c:/x.ts","file:///C:/x.ts"],"windows":"file:///C:/x.ts"}
+- Linux now preserves two case-distinct POSIX URI keys.
+- Windows still folds a lowercase drive letter to uppercase, retaining the
+  issue #6167 fix.
+
+WHY IT IS ENOUGH
+
+The new regression exercises the reviewer's POSIX counterexample directly,
+while the existing Windows integration test still drives the document-state
+publish/lookup path. The direct driver confirms both platform branches through
+the exported normalization seam.
+
+WHAT WAS OMITTED
+
+No credentials, tokens, auth headers, private configuration, or raw
+environment dumps were captured.

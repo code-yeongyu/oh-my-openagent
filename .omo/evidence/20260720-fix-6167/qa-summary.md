@@ -52,6 +52,10 @@ store and lookup (rather than only the server-fed read) keeps the two sides cons
   configured to publish under a lowercase-drive URI (PSES behaviour). BEFORE fix: `items = []`
   (dropped). AFTER fix: `items = [<diagnostic>]`, `transientError = null`. Isolated in a `mktemp`
   workspace; the workspace is removed by the driver on exit.
+- **Review hardening** `review-20260731.txt`: drive-letter folding is now gated to Windows.
+  Explicit platform cases preserve `file:///c:/...` and `file:///C:/...` as distinct keys on
+  Linux while retaining lowercase-to-uppercase folding on Windows. The focused suite passed
+  5/5, package typecheck exited 0, and a direct library driver observed both branches.
 
 ## Why this is enough
 

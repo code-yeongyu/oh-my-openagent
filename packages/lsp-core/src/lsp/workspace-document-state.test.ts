@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Diagnostic } from "./types.js";
-import { WorkspaceDocumentState } from "./workspace-document-state.js";
+import { normalizeDocumentUri, WorkspaceDocumentState } from "./workspace-document-state.js";
 import type { WorkspaceMutation } from "./workspace-edit.js";
 
 describe("WorkspaceDocumentState watched-file bounds", () => {
@@ -59,6 +59,15 @@ describe("WorkspaceDocumentState watched-file bounds", () => {
 });
 
 describe("WorkspaceDocumentState drive-letter case (issue #6167)", () => {
+	it("#given drive-like POSIX file URIs #when normalized #then preserves their distinct case-sensitive keys", () => {
+		expect(normalizeDocumentUri("file:///c:/project/x.ts", "linux")).toBe("file:///c:/project/x.ts");
+		expect(normalizeDocumentUri("file:///C:/project/x.ts", "linux")).toBe("file:///C:/project/x.ts");
+	});
+
+	it("#given a lowercase Windows drive URI #when normalized #then folds the drive to uppercase", () => {
+		expect(normalizeDocumentUri("file:///c:/project/x.ts", "win32")).toBe("file:///C:/project/x.ts");
+	});
+
 	it.skipIf(process.platform !== "win32")(
 		"#given a server publishes under a lowercase Windows drive URI #when the open document is resolved #then the diagnostics are recorded, not dropped",
 		async () => {

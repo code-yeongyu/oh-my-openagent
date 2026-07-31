@@ -81,11 +81,11 @@ export interface WorkspaceDocumentStateOptions {
 
 const FILE_URI_DRIVE_LETTER = /^(file:\/\/\/)([a-zA-Z]):/;
 
-// pathToFileURL keys openByUri with the realpath drive-letter case (file:///C:/... on
-// Windows), but language servers publish their own case (PowerShell Editor Services sends
-// file:///c:/..., issue #6167). Canonicalize the drive letter on both store and lookup so
-// server-sourced URIs collapse onto the same openByUri key regardless of case.
-function normalizeDocumentUri(uri: string): string {
+// On Windows, pathToFileURL keys openByUri with the realpath drive-letter case
+// (file:///C:/...), but language servers may publish their own case
+// (PowerShell Editor Services sends file:///c:/..., issue #6167).
+export function normalizeDocumentUri(uri: string, platform: NodeJS.Platform = process.platform): string {
+	if (platform !== "win32") return uri;
 	return uri.replace(FILE_URI_DRIVE_LETTER, (_match, scheme: string, drive: string) => `${scheme}${drive.toUpperCase()}:`);
 }
 
