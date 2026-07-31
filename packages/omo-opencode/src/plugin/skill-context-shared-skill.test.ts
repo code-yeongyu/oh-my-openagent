@@ -2,9 +2,10 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { parseFrontmatter } from "@oh-my-opencode/utils"
 import type { ToolContext, ToolResult } from "@opencode-ai/plugin/tool"
 
 import { OhMyOpenCodeConfigSchema } from "../config"
@@ -19,6 +20,7 @@ const BLOCKED_MIXED_CASE_SKILL_BODY = "BLOCKED_MIXED_CASE_SKILL_BODY"
 const BLOCKED_MIXED_CASE_SKILL_DESCRIPTION = "BLOCKED_MIXED_CASE_SKILL_DESCRIPTION"
 const BLOCKED_NATIVE_SKILL_BODY = "BLOCKED_NATIVE_SKILL_BODY"
 const BLOCKED_NATIVE_SKILL_DESCRIPTION = "BLOCKED_NATIVE_SKILL_DESCRIPTION"
+const SHARED_ULW_PLAN_SKILL_PATH = join(import.meta.dir, "../../../shared-skills/skills/ulw-plan/SKILL.md")
 
 function createToolContext(directory: string): ToolContext {
   return {
@@ -206,6 +208,20 @@ describe("plugin-wired shared skills", () => {
     // then
     expect(plainOutput).toContain("## Skill: ulw-plan")
     expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
+  })
+
+  test("#given no local ulw-plan collision #when OpenCode loads and executes bare ulw-plan #then it delivers the actual shared source body", async () => {
+    // given
+    rmSync(join(testDirectory, ".opencode", "skills", "ulw-plan"), { recursive: true, force: true })
+    const expectedSharedBody = parseFrontmatter(readFileSync(SHARED_ULW_PLAN_SKILL_PATH, "utf8")).body
+    const skillTool = await createPluginWiredSkillTool({ directory: testDirectory })
+    const toolContext = createToolContext(testDirectory)
+
+    // when
+    const plainOutput = toolResultToText(await skillTool.execute({ name: "ulw-plan" }, toolContext))
+
+    // then
+    expect(plainOutput).toContain(expectedSharedBody.trim())
   })
 
   test("#given the shared skill is loaded #when skill context is built #then it appears under its bare name", async () => {

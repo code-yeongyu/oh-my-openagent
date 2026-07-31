@@ -26,9 +26,9 @@ Fold a contrarian self-grill into the Metis spawn: challenge the single highest-
 </default_selection>
 
 <high_accuracy_auto>
-Because the human did not steer, adversarial review SUBSTITUTES for the interview you skipped - this is what catches a bad default. Metis runs during plan generation as always; after Metis findings are folded and the plan file is complete, run the dual high-accuracy review defined in `full-workflow.md` AUTOMATICALLY - no "do you want a review?" question - and resubmit fresh until BOTH passes APPROVE, fixing every cited issue.
+Because the human did not steer, adversarial review SUBSTITUTES for the interview you skipped - this is what catches a bad default. Metis runs during plan generation as always; after Metis findings are folded and the plan file is complete, run the bounded high-accuracy protocol defined in `full-workflow.md` AUTOMATICALLY - no "do you want a review?" question. It always consumes exactly two full rounds and only the correction, final-repair, and closure allowances that protocol permits; no resubmit-until-approval loop exists.
 
-TRIVIAL-TIER GUARD: if Classify sized the work Trivial, the auto-Momus loop is SUPPRESSED (Metis still runs once) - a vague-but-tiny request ("clean this up") must not trigger the full adversarial loop. UNCLEAR raises the research-plus-default posture; it does not override the Trivial cost guard for Momus.
+TRIVIAL-TIER GUARD: if Classify sized the work Trivial, the automatic bounded protocol is SUPPRESSED (Metis still runs once) - a vague-but-tiny request ("clean this up") must not trigger full adversarial review. UNCLEAR raises the research-plus-default posture; it does not override the Trivial cost guard for Momus.
 </high_accuracy_auto>
 
 <approval_gate>
@@ -40,5 +40,5 @@ Request: "make auth better".
 1. Research waves -> current auth at `src/auth/*` and evidence for the requested improvement; best-practice baselines via librarian.
 2. Topology lock as an ANNOUNCEMENT, not a question: components refine the evidenced auth intent in full, such as session hardening, brute-force protection, and password policy when the repository supports them. MFA is an adjacent capability and stays in Scope OUT unless the user asks for it or evidence establishes it as part of the requested outcome.
 3. Adopted-defaults table (assumption | default | rationale | reversible?): bcrypt rounds 8 -> 12 (reversible), add 5/min-per-IP login limit (reversible), rotate session id on privilege change (reversible).
-4. Metis folded -> auto dual review (fix cited gaps until both approve) -> brief LEADING with the approach and the defaults, surfaced in the human TL;DR for veto.
+4. Metis folded -> auto bounded review -> brief LEADING with the approach and the defaults, surfaced in the human TL;DR for veto.
 </worked_example>
