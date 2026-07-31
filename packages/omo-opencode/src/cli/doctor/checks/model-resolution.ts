@@ -1,5 +1,7 @@
+import { join } from "node:path"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../../shared/model-requirements"
 import { getModelCapabilities } from "../../../shared/model-capabilities"
+import { getOpenCodeCacheDir } from "../../../shared"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
@@ -123,10 +125,11 @@ export async function checkModels(): Promise<CheckResult> {
   const issues: DoctorIssue[] = []
 
   if (!available.cacheExists) {
+    const cacheFile = join(getOpenCodeCacheDir(), "models.json")
     issues.push({
       title: "Model cache not found",
-      description: "OpenCode model cache is missing, so model availability cannot be validated.",
-      fix: "Run: opencode models --refresh",
+      description: `OpenCode model cache is missing at ${cacheFile}, so model availability cannot be validated.`,
+      fix: `Run: opencode models --refresh, then verify ${cacheFile}. If it is still missing, update or report OpenCode because OpenCode core writes this cache.`,
       severity: "warning",
       affects: ["model resolution"],
     })
