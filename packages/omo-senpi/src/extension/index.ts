@@ -11,6 +11,7 @@ import { createStartWorkContinuationComponent } from "../components/start-work-c
 import { createUltraworkComponent } from "../components/ultrawork"
 import { createUlwLoopComponent } from "../components/ulw-loop"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
+import { createSelfKillGuardComponent } from "../components/self-kill-guard"
 
 const components: OmoSenpiComponent[] = [
   createConfigStartupComponent(),
@@ -18,6 +19,7 @@ const components: OmoSenpiComponent[] = [
   createStartWorkContinuationComponent(),
   createUlwLoopComponent(),
   createFallbackArchitectComponent(),
+  createSelfKillGuardComponent(),
   createCommentCheckerComponent(),
   createSenpiTelemetryComponent(),
   createLspComponent(),

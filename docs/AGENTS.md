@@ -30,6 +30,7 @@
 | Rules-injector cross-module comparison | [docs/reference/rules-injection-cross-module-comparison.md](reference/rules-injection-cross-module-comparison.md) |
 | Codex telemetry internals | [docs/reference/codex-telemetry.md](reference/codex-telemetry.md) |
 | Monitor tool reference | [docs/reference/monitor.md](reference/monitor.md) |
+| Self-kill command guard (incident + PR) | [docs/reference/senpi-self-kill-command-guard.md](reference/senpi-self-kill-command-guard.md) |
 | Web-terminal visual QA helper | [docs/reference/web-terminal-visual-qa.md](reference/web-terminal-visual-qa.md) |
 | Sample configs | [docs/examples/](examples) (default, coding-focused, planning-focused) |
 | Privacy & ToS | [docs/legal/](legal) |
