@@ -192,21 +192,59 @@ describe("runtime fallback error classifier", () => {
   })
 
   test("classifies terminal_quota_exhausted detail as abort (non-retryable)", () => {
-    const error = {
-      detail: {
+    const cases = [
+      {
+        label: "structured terminal_quota_exhausted detail with standard message",
         error: {
-          type: "terminal_quota_exhausted",
-          message: "Terminal quota or billing limit reached for the requested LiteLLM model handle.",
-          model: "big-pickle",
-          upstream_error: "insufficient balance on z.ai account",
+          detail: {
+            error: {
+              type: "terminal_quota_exhausted",
+              message: "Terminal quota or billing limit reached for the requested LiteLLM model handle.",
+              model: "big-pickle",
+              upstream_error: "insufficient balance on z.ai account",
+            },
+          },
         },
+        expectedType: "abort",
+        expectedRetryable: false,
       },
+      {
+        label: "structured terminal_quota_exhausted detail with arbitrary message (e.g. Account locked)",
+        error: {
+          detail: {
+            error: {
+              type: "terminal_quota_exhausted",
+              message: "Account locked",
+            },
+          },
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "message-based terminal quota without structured detail type",
+        error: {
+          message: "Terminal quota reached for provider model",
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "softer quota_exceeded message without terminal marker (legacy retryable fallback)",
+        error: {
+          message: "Usage limit exceeded for this billing cycle",
+        },
+        expectedType: "quota_exceeded",
+        expectedRetryable: true,
+      },
+    ] as const
+
+    for (const c of cases) {
+      const type = classifyRuntimeFallbackError(c.error)
+      const retryable = isRuntimeFallbackRetryableError(c.error, [429, 500, 502, 503, 504])
+
+      expect(type, c.label).toBe(c.expectedType)
+      expect(retryable, c.label).toBe(c.expectedRetryable)
     }
-
-    const type = classifyRuntimeFallbackError(error)
-    const retryable = isRuntimeFallbackRetryableError(error, [429, 500, 502, 503, 504])
-
-    expect(type).toBe("abort")
-    expect(retryable).toBe(false)
   })
 })
