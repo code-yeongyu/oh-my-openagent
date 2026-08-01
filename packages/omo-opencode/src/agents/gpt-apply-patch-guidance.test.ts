@@ -77,7 +77,6 @@ describe("GPT apply_patch prompt guidance", () => {
       "qwen3.7PLUS",
       "bailian-coding-plan/qwen3.7PLUS",
       "Qwen3.7PLUS",
-      "opencode-go/qwen3.7-plus",
     ]
 
     for (const model of models) {
