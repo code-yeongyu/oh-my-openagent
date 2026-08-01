@@ -54,7 +54,11 @@ function getUnknownProperty(value: unknown, key: string): unknown {
   if (!isUnknownRecord(value)) return undefined
   try {
     return value[key]
-  } catch {
+  } catch (cause) {
+    // Unknown inputs may use hostile Proxy traps, so property-read failures cannot escape this boundary.
+    if (!(cause instanceof Error)) {
+      void cause
+    }
     return undefined
   }
 }
