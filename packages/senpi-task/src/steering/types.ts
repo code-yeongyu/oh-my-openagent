@@ -2,7 +2,7 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 
-export type DestructionCause = "cancel"
+export type DestructionCause = "cancel" | "fallback_handoff"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.

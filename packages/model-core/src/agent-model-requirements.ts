@@ -24,7 +24,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "kimi-k3",
       },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
-      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5.2" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
@@ -67,8 +67,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   librarian: {
     fallbackChain: [
-      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
-      { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.5-plus" },
+      { providers: ["openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
+      { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -79,8 +80,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   explore: {
     fallbackChain: [
-      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
-      { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.5-plus" },
+      { providers: ["openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
+      { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -154,7 +156,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
+      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-5" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
@@ -168,7 +170,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "sisyphus-junior": {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
+      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-5" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],

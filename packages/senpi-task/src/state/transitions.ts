@@ -150,9 +150,22 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
 
 export function markRecordLostForReconciliation(
   record: TaskRecord,
-  input: { readonly timestamp: string; readonly error_message: string },
+  input: { readonly timestamp: string; readonly error_message: string; readonly updateReason?: boolean },
 ): TaskTransitionResult {
-  if (terminalStatuses.has(record.status)) {
+  const shouldUpdateReason = input.updateReason === true
+  if (terminalStatuses.has(record.status) && record.status !== "lost") {
+    return {
+      applied: false,
+      record,
+      audit: {
+        type: "late_transition_ignored",
+        attempted_status: "lost",
+        current_status: record.status,
+      },
+    }
+  }
+
+  if (record.status === "lost" && !shouldUpdateReason) {
     return {
       applied: false,
       record,

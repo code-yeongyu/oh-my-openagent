@@ -17,6 +17,7 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 			...closedMcpStdio(),
 			config: { codegraph: { auto_provision: false, enabled: true }, sources: [], warnings: [] },
 			env: { PATH: "/bin" },
+			nodeVersion: "22.14.0",
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
 			runProcess: (command: string) => {
@@ -96,8 +97,8 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 		try {
 			mkdirSync(join(homeDir, ".omo"), { recursive: true });
 			mkdirSync(join(workspace, ".omo"), { recursive: true });
-			writeFileSync(join(homeDir, ".omo", "config.jsonc"), '{ "codegraph": { "enabled": true } }\n');
-			writeFileSync(join(workspace, ".omo", "config.jsonc"), '{ "[codex]": { "codegraph": { "enabled": false } } }\n');
+			writeFileSync(join(homeDir, ".omo", "omo.jsonc"), '{ "codegraph": { "enabled": true } }\n');
+			writeFileSync(join(workspace, ".omo", "omo.jsonc"), '{ "[codex]": { "codegraph": { "enabled": false } } }\n');
 
 			// when
 			const exitCode = await runCodegraphServe({

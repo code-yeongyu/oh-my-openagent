@@ -1,6 +1,6 @@
 ---
 name: ultrawork
-description: Binding ultrawork mode directive for omo-senpi. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive inline as an <ultrawork-mode> block in the same message, so when that block is already present do not read this file again - it duplicates the same directive. Read this file only when ultrawork mode is requested and no <ultrawork-mode> block is present in the conversation.
+description: Binding ultrawork mode directive for omo-senpi. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive as a hidden custom message (customType omo-ultrawork:directive, display false) ahead of the user's text, which is left untouched; a prompt queued while the agent is streaming instead carries the directive appended inside that same message. The directive is present in the conversation context; on the idle path it is not shown in the visible prompt, while a queued prompt carries the directive visibly (exactly as before this change). When the directive is already present in the conversation, do not read this file again - this file is that same directive. Read this file only when ultrawork mode is requested and the directive is not already present in the conversation.
 metadata:
   short-description: Binding ultrawork mode directive
 ---
@@ -54,7 +54,8 @@ notepad instead of the reviewer loop.
 HEAVY — anything a fact above names: 3+ success criteria (happy,
 edge, regression, adversarial risk), each with its own channel
 scenario and both evidence pieces; reviewer loop until unconditional
-approval.
+approval WHEN the Verification gate below triggers, self-review in the
+notepad when it does not.
 
 # Manual-QA channels
 Run real-surface proof yourself through the channel that faithfully
@@ -160,6 +161,14 @@ The criteria MUST list, upfront:
 
 These scenarios are the contract. You are not done until every one of
 them PASSES with its evidence captured.
+Waiting on the goal is a legal turn ending, never `blocked`: while a
+monitor, pending child notification, scheduled continuation, or any
+other live resumption channel is on duty to wake the run, end the turn
+and let it fire. `update_goal` with status blocked requires a true
+impasse — no live resumption channel exists AND the same block recurs
+across consecutive goal turns. Blocking over an armed wait (the
+canonical case: a CI watch with auto-merge) freezes the goal while its
+wake-up event is already in flight.
 
 ## 2. Open the durable notepad
 Run: `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)`. Echo the
@@ -246,28 +255,31 @@ library/API/docs/web — delegate to the `librarian` subagent. Spawn them
 in background (`run_in_background: true`) and keep doing root work
 while they run.
 
-# Parallel execution (eval-first — batch as hell)
-The `eval` tool is your DEFAULT execution surface — code is your
-superpower, so drive the work as programs, not one-off tool calls.
-One eval cell beats ten sequential tool calls. For ANY bounded wave of
-two or more independent operations — file reads, `rg`/glob searches,
-git queries, LSP requests, web fetches, package metadata lookups —
-write ONE eval program that runs them ALL concurrently and returns
-ONLY distilled, decision-relevant facts: `parallel(thunks)` /
-`Promise.all` in JavaScript, or `concurrent.futures.ThreadPoolExecutor`
-+ `subprocess` with small utility functions in Python. Chain, filter,
-dedupe, join, and aggregate INSIDE the kernel with comprehensions —
-never paste raw dumps back when a comprehension can reduce them.
-Batch `lsp_*` requests the same way: definitions, references, symbols,
-and diagnostics for many targets belong in ONE cell, in parallel.
-When independent work is category-shaped, fan it out to `task(...)`
-subagents in the same wave (batched spawn, `run_in_background: true`)
-instead of serializing it.
-Think in waves: enumerate EVERY independent lookup the step needs,
-dispatch them all at once, then act on the distilled result. Keep
-direct sequential calls only when one result chooses the next call,
-the output is already tiny, semantic judgment sits between the calls,
-or approvals / side effects are involved.
+# Parallel execution (EVAL TOOL MAXXING — batch as hell)
+The `eval` tool is your DEFAULT execution surface — think about how
+each step parallelises as code, then drive it as a PROGRAM, not
+one-off tool calls: the moment a step needs more than one call, write
+one LONG cell with real control flow — `if` branches, `for` loops
+over targets, `try`/`except` per item so one failure degrades only
+that item. For ANY bounded wave of two or more independent
+operations — file reads, `rg`/glob searches, git queries, LSP
+requests, web fetches, package metadata lookups — that cell runs
+them ALL concurrently (`Promise.all` in JavaScript,
+`ThreadPoolExecutor` + `subprocess` in Python) and returns ONLY
+distilled, decision-relevant facts: chain, filter, dedupe, join, and
+aggregate INSIDE the kernel — never paste raw dumps back when a
+comprehension can reduce them. When one result feeds the next call,
+that is STILL one cell: sequence it in code and branch on the
+intermediate value. Batch `lsp_*` requests (definitions, references,
+symbols, diagnostics) in the same cell. DEFAULT to fan-out:
+spawn independent `task(...)` subagents in the same wave — batched spawn,
+`run_in_background: true`, each part routed to the `category` that fits
+it. Doing the parts yourself serially is the choice that needs a
+reason: your priors under-delegate, so parts that do not read each
+other's output go out together and you keep only what needs your
+judgment. Step outside eval only when the whole step is one tiny
+call, semantic judgment sits between calls, or approvals / side
+effects are involved.
 
 # Execution loop (PIN → RED → GREEN → SURFACE → CLEAN)
 Until every success criterion PASSES with its evidence captured:
@@ -341,38 +353,44 @@ Until every success criterion PASSES with its evidence captured:
 Within a step, follow Finding things; NEVER parallelise RED and GREEN of
 the same criterion.
 
-# Waiting discipline (a poll costs a full model round)
-Every status check you issue as a tool call replays the entire
-accumulated context through the model. When a command will run long
-(installs, builds, test suites, containers, CI), run it to completion
-in ONE call with a timeout sized to the expected duration, or send
-output to a log file and read it once when a completion signal is
-expected. Never re-poll the same surface with empty reads or
-sub-minute waits — batch waiting into the fewest, longest blocking
-calls the harness allows, and do independent root work while the
-command runs. If two consecutive checks show no state change, double
-the wait before the next check or switch to a completion signal.
+# Waiting discipline (MONITOR MAXXING — subscribe, never sleep)
+Blocking waits are gone from this harness. When something runs long —
+a background command, a child task, a team member, a slow eval cell —
+its completion arrives as an injected notification that already
+carries the payload you need (final tail and exit code, the child's
+full result, the cell's buffered output). Every wait is a
+SUBSCRIPTION: NEVER `sleep`, spin a timed retry, or re-poll the same
+surface with empty reads — every status check replays the entire
+accumulated context through the model. Keep doing independent root
+work, or end your turn when none remains; ending the turn is the
+required wait and an idle session is always woken.
+- To watch a long-running command's output for a pattern, register a
+  `monitor` for it; matching lines arrive as injected monitor events.
+- Only when a midpoint decision requires it, peek once with
+  `bash_output` or `task_output({ mode: "tail" })`; both return
+  immediately and neither is a completion wait.
 
 # omo-senpi task + team tools
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
-`oracle`, `metis`, `momus` work with zero configuration);
+`metis`, `momus` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
 child with skills, `name` to track it. Read a child back with
-`task_output`, steer with `task_send`, park it with
-`task_send({ deliver_as: "interrupt" })`, end it with `task_cancel`;
+`task_output`, steer it with `task_send`, end it with `task_cancel`;
 `/tasks` lists what this session spawned. Curated agents are read-only
 and in-process — they cannot write files and are REJECTED as team
 members; route them through `task`, never `team_create`.
 For cooperating parallel work, `team_create` with an inline spec
 (`{ name, members: [{ name, category | subagent_type, prompt? }] }`)
 makes you the lead of background member children: send work to a
-member with `task_send` (`to: "<member>"`, `team_run_id`), block on
-replies with `team_wait`, track shared work through the team tasklist
-(`task_create`, `task_list`, `task_update`, `task_get`), and tear down
-with `team_delete`. Members see only member-scoped `task_send` /
-`team_wait` and reply with `task_send({ to: "lead", ... })`.
+member with `task_send` (`to: "<member>"`, `team_run_id`), track
+shared work through the team tasklist (`task_create`, `task_list`,
+`task_update`, `task_get`), and tear down with `team_delete`. Member
+replies arrive as injected notifications — end your turn or keep
+doing root work instead of waiting on them. Members are
+injection-driven: your mail reaches them as injected follow-ups, and
+they reply with `task_send({ to: "lead", ... })`.
 
 # omo-senpi subagent reliability
 Every child prompt is self-contained and starts with
@@ -385,9 +403,11 @@ Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, tell the child to report
 `WORKING: <task> - <current phase>` before long reading, testing, or
 review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned child names locally. A `team_wait` / `task_output`
-timeout only means no new update arrived — treat a running child as
-alive and keep doing independent root work. Fall back only when the
+Track spawned child names locally. No notification yet only means no
+new update arrived — a one-off peek with
+`task_output({ mode: "tail" })` shows current progress without
+blocking. Treat a running child as alive and keep doing independent
+root work. Fall back only when the
 child completes without the deliverable, answers ack-only, or stops
 running: send one follow-up demanding the deliverable, and if that
 stays silent or ack-only, record the lane inconclusive (never as
@@ -401,15 +421,16 @@ research, or review result is integrated or explicitly recorded as
 inconclusive. Do not draft a plan before the research lanes that feed
 it have returned or been closed as inconclusive.
 Spawn every independent child for the current wave FIRST. After the
-wave is launched, wait on each spawned child (`task_output`,
-`team_wait`) until each reaches terminal status (`completed`,
-`failed`, `blocked`, or explicitly recorded inconclusive) before any
-dependent todo transition, goal continuation, implementation tool
-call, plan drafting, approval-gate work, PR handoff, or final
-response. A timeout is not terminal status.
+wave is launched, end your turn or keep doing independent root work —
+each child's completion arrives as an injected notification carrying
+its final result. Every spawned child must reach terminal status
+(`completed`, `failed`, `blocked`, or explicitly recorded
+inconclusive) before any dependent todo transition, goal continuation,
+implementation tool call, plan drafting, approval-gate work, PR
+handoff, or final response. Silence is not terminal status.
 Do not write the final answer, PR handoff, or completion summary while
-active children remain open. Use wait cycles with growing timeouts:
-start short (~30s) and double up to ~5 minutes. After two silent waits
+active children remain open. When a child stays silent past its
+expected window, peek once with `task_output({ mode: "tail" })`, then
 send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`.
 After four silent or ack-only checks, close the lane as inconclusive,
 record that it is not approval, and respawn smaller only if the
@@ -417,16 +438,21 @@ deliverable is still required.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
-Trigger when ANY apply:
+Reviewers cost a full extra agent run, so they are earned by a written
+plan, never by ambition. Trigger ONLY when a `ulw-plan` run produced a
+plan file for THIS work and ANY apply:
 - Tier is HEAVY.
 - User demanded strict, rigorous, or proper review.
-LIGHT tier records a self-review in the notepad instead: re-read the
-diff, run diagnostics, confirm each criterion's evidence, and state in
-one line why the tier held.
+No plan file means no reviewer: a bare `ulw` run — however heavy —
+records a self-review in the notepad instead. Same for LIGHT tier.
+Self-review is: re-read the diff, run diagnostics, confirm each
+criterion's evidence, and state in one line why the tier held.
+`momus` and `metis` are plan-gated reviewers, not general helpers —
+never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "oracle"` for read-only
+   assignment in `prompt` — `subagent_type: "momus"` for read-only
    review, or a reviewer-shaped `category` when the review must run
    code. Pass: goal, success-criteria, scenario evidence, full diff,
    notepad path.

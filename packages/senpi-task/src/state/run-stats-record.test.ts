@@ -12,6 +12,8 @@ const RUN_STATS: TaskRunStats = {
   total_tokens: 4_200,
   generation_ms: 7_600,
   tokens_per_second: 118,
+  cost_usd: 0.4213,
+  cache_hit_rate: 0.8712,
 }
 
 function runningRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
@@ -85,6 +87,32 @@ describe("run stats on task records", () => {
   test("#given malformed run stats #when parsed #then parsing rejects the record", () => {
     // given
     const record = { ...runningRecord(), run_stats: { runtime_ms: "12" } }
+
+    // then
+    expect(() => parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")).toThrow()
+  })
+
+  test("#given a record with cost and cache hit rate #when parsed #then both fields round-trip", () => {
+    // given
+    const record = {
+      ...runningRecord({ status: "completed" }),
+      run_stats: { runtime_ms: 10, turns: 1, tool_calls: 0, cost_usd: 0.4213, cache_hit_rate: 0 },
+    }
+
+    // when
+    const parsed = parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")
+
+    // then
+    expect(parsed.run_stats?.cost_usd).toBe(0.4213)
+    expect(parsed.run_stats?.cache_hit_rate).toBe(0)
+  })
+
+  test("#given a non-numeric cost_usd #when parsed #then parsing rejects the record", () => {
+    // given
+    const record = {
+      ...runningRecord(),
+      run_stats: { runtime_ms: 10, turns: 1, tool_calls: 0, cost_usd: "0.42" },
+    }
 
     // then
     expect(() => parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")).toThrow()

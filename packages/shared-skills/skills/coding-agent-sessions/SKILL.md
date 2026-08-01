@@ -1,6 +1,6 @@
 ---
 name: coding-agent-sessions
-description: "MUST USE when asked to find, read, list, search, inspect, fetch, export, or reconstruct coding-agent sessions across Codex, Claude Code/Desktop, OpenCode, Senpi/pi, OpenClaw, Factory Droid, Amp, Gemini/Kimi/Qwen CLIs, Codebuff, Roo/Kilo/Cline, Kodu, Cursor CLI, Aider, or unknown local agent logs. Covers transcripts, session IDs, rollout JSONL, state SQLite, Claude projects/pre-compact histories, OpenCode messages/parts, child/subagent linkage, cwd/model/time/token filters, archives, and cost clues. Expands fuzzy recall into parallel query lanes and first probes known stores so absent platforms are skipped cheaply. Triggers: coding agent sessions, Codex/Claude/OpenCode/Senpi/pi/OpenClaw/Droid/Amp/Kodu/Cursor/Aider sessions, transcript search, session history, session ID, read transcript, token usage, subagent sessions, what did I do yesterday, did we already do this."
+description: "MUST USE when asked to find, read, list, search, inspect, fetch, export, or reconstruct coding-agent sessions across Codex, Claude Code/Desktop, OpenCode, Senpi/pi, oh-my-pi (omp), gajae-code (gjc), OpenClaw, Factory Droid, Amp, Gemini/Kimi/Qwen CLIs, Codebuff, Roo/Kilo/Cline, Kodu, Cursor CLI, Aider, Aside browser-agent sessions, or unknown local agent logs. Covers transcripts, session IDs, rollout JSONL, state SQLite, Claude projects/pre-compact histories, OpenCode messages/parts, child/subagent linkage, cwd/model/time/token filters, archives, and cost clues. Expands fuzzy recall into parallel query lanes and first probes known stores so absent platforms are skipped cheaply. Triggers: coding agent sessions, Codex/Claude/OpenCode/Senpi/pi/oh-my-pi/omp/gajae-code/gjc/OpenClaw/Droid/Amp/Kodu/Cursor/Aider/Aside sessions, transcript search, session history, session ID, read transcript, token usage, subagent sessions, what did I do yesterday, did we already do this."
 ---
 
 # Coding Agent Sessions
@@ -16,8 +16,9 @@ Find local coding-agent sessions across agent products before answering from mem
    | Codex / OpenAI Codex CLI | `references/codex.md` |
    | Claude Code / Claude Desktop histories | `references/claude.md` |
    | Senpi / pi coding-agent logs | `references/senpi.md` |
+   | oh-my-pi (`omp`, `~/.omp`) and gajae-code (`gjc`, `~/.gjc`) logs | `references/senpi.md` |
    | OpenCode / oh-my-openagent (formerly oh-my-opencode) storage | `references/opencode.md` |
-   | OpenClaw, Droid, Amp, Gemini, Kimi, Qwen, Codebuff, Roo/Kilo/Cline, Kodu, Cursor CLI, Aider, Kiro, Goose, Hermes, Crush, Zed | `references/all-platforms.md` |
+   | OpenClaw, Droid, Amp, Gemini, Kimi, Qwen, Codebuff, Roo/Kilo/Cline, Kodu, Cursor CLI, Aider, Kiro, Goose, Hermes, Crush, Zed, Aside | `references/all-platforms.md` |
    | Unknown / "any session" / cross-agent search | `references/all-platforms.md` |
 
 2. **Run the broad finder first unless the user gave an exact file path. For fuzzy recall, expand the query first.**
@@ -28,6 +29,7 @@ When the user remembers a task vaguely ("that OpenCode bug", "the dashboard PR",
 python3 scripts/find-agent-sessions.py list --limit 20
 python3 scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
 python3 scripts/find-agent-sessions.py find "proxy" --platform openclaw --platform droid --platform amp
+python3 scripts/find-agent-sessions.py find "refactor" --platform oh-my-pi --platform gajae-code
 python3 scripts/find-agent-sessions.py find --query "deploy" --query "token usage" --workers 64
 python3 scripts/find-agent-sessions.py find --query "opencode bug" --query "fix opencode" --query "OpenCode parent session" --include-subagents --workers 64
 python3 scripts/find-agent-sessions.py read <session-id>
@@ -49,7 +51,7 @@ The finder prints JSON for stdout and `jq`. Every result includes:
 
 | Field | Meaning |
 |---|---|
-| `platform` | Registered platform key such as `codex`, `claude`, `opencode`, `openclaw`, `droid`, `amp`, `kodu`, `cursor-cli`, `aider`, `roo-code`, `kilo-code`, `kilo-cli`, or `kiro` |
+| `platform` | Registered platform key such as `codex`, `claude`, `senpi`, `oh-my-pi`, `gajae-code`, `opencode`, `openclaw`, `droid`, `amp`, `kodu`, `cursor-cli`, `aider`, `roo-code`, `kilo-code`, `kilo-cli`, `kiro`, or `aside` |
 | `id` | Session ID or stable file-derived ID |
 | `path` | Raw transcript/index file |
 | `cwd` | Working directory when recoverable |
@@ -117,8 +119,10 @@ Use `references/codex.md` for Codex storage details.
 | Problem | Fix |
 |---|---|
 | Missing Codex sessions | Set `CODEX_HOME` or pass `--root /path/to/.codex`. |
+| Missing oh-my-pi / gajae-code sessions | Those stores live in `~/.omp/agent/sessions` and `~/.gjc/agent/sessions`. For a custom `PI_CONFIG_DIR` / `PI_CODING_AGENT_DIR`, pass that agent dir with `--root`. |
 | Missing OpenCode sessions | Pass the data dir that contains `messages/` and `parts/`, often `~/.opencode` or `~/.local/share/opencode`. |
 | Missing Claude sessions | Search `~/.claude/projects`, `~/.claude/transcripts`, and `~/.claude/pre-compact-session-histories`; use `--root` for nonstandard config dirs. |
+| Missing Aside sessions | The Aside browser agent stores per-user data under `~/.aside/u/<n>/` (`sessions/<date>_<id>/messages.jsonl` transcripts + a `state.db` index; `agents/*/sessions/` is just a hardlink mirror). Pass `--root` for a nonstandard `.aside` dir or an exported user dir. |
 | Missing optional platform sessions | Check `references/all-platforms.md` for the exact local store. For project-local tools such as Aider, pass `--root /path/to/workspace` if the repo is outside the bounded default roots. |
 | Date filter misses local sessions | Timestamps are compared as UTC instants when parseable; otherwise file mtime is used. |
 | Search is slow | Narrow with repeated `--platform` flags or date/cwd filters. Optional stores are probed before parsing; avoid passing your whole home as `--root` unless you really want every bounded project-local scan. |

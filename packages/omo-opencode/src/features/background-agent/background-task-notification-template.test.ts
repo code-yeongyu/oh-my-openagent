@@ -245,7 +245,7 @@ All sibling background tasks are complete. Your next action should be to call \`
               attemptNumber: 1,
               sessionId: "ses-primary",
               providerId: "genai-proxy-openai",
-              modelId: "gpt-5.4-mini",
+              modelId: "gpt-5.6-luna-fast",
               status: "error",
               error: "Forbidden: Selected provider is forbidden",
             },
@@ -274,7 +274,7 @@ All sibling background tasks are complete. Your next action should be to call \`
                 attemptNumber: 1,
                 sessionId: "ses-primary",
                 providerId: "genai-proxy-openai",
-                modelId: "gpt-5.4-mini",
+                modelId: "gpt-5.6-luna-fast",
                 status: "error",
                 error: "Forbidden: Selected provider is forbidden",
               },
@@ -295,7 +295,7 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
       expect(notification).toContain("- `task-3`: Fallback task")
       expect(notification).toContain("Background task attempts:")
-      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.4-mini — ses-primary")
+      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.6-luna-fast — ses-primary")
       expect(notification).toContain("    Error: Forbidden: Selected provider is forbidden")
       expect(notification).toContain("  - Attempt 2 — COMPLETED — anthropic/claude-haiku-4.5 — ses-fallback")
     })

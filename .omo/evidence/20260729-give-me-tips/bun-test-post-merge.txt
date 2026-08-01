@@ -1,0 +1,561 @@
+bun test v1.4.0-canary.1 (ae4b17de6)
+
+packages/omo-senpi/src/package-shape.test.ts:
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [5.44ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.29ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.20ms]
+
+packages/omo-senpi/src/bundle-size.test.ts:
+(pass) omo-senpi bundle size budget > #given the built extension #when its byte size is measured #then it stays within the 700,000-byte plan budget [0.28ms]
+
+packages/omo-senpi/src/runtime-package.test.ts:
+(pass) Senpi LSP daemon runtime staging > #given daemon build outputs #when staged #then manifest pins sorted outputs and verifies [21.91ms]
+(pass) Senpi LSP daemon runtime staging > #given a tampered staged output #when verified #then manifest mismatch is rejected [52.54ms]
+(pass) Senpi LSP daemon runtime staging > #given an existing staged runtime #when replacement fails after backup #then prior bytes are restored [50.79ms]
+
+packages/omo-senpi/src/plugin-manifest.test.ts:
+(pass) OMO Senpi plugin manifest > #given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory [0.66ms]
+(pass) OMO Senpi plugin manifest > #given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent [0.08ms]
+(pass) OMO Senpi plugin manifest > #given package metadata #when loaded #then Pi discoverability and shipped files are pinned [0.07ms]
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.18ms]
+
+packages/omo-senpi/src/skills-sync.test.ts:
+(pass) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 20 roots exist with valid names [0.85ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [5.62ms]
+(pass) OMO Senpi scoped skill sync > #given codex-derived and native skill roots #when scanned #then no Codex or multi-agent harness guidance survives [1.20ms]
+(pass) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization and carry no compatibility banner [1.26ms]
+(pass) OMO Senpi scoped skill sync > #given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example [0.75ms]
+(pass) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.49ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [3.98ms]
+(pass) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.25ms]
+
+packages/omo-senpi/src/runtime-dependency-resolution.test.ts:
+(pass) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [224.47ms]
+
+packages/omo-senpi/src/bundle-purity.test.ts:
+(pass) omo-senpi bundle purity > #given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers [0.11ms]
+(pass) omo-senpi bundle purity > #given a built extension #when static imports are inspected #then only senpi peers and node builtins remain external [1.82ms]
+
+packages/omo-senpi/src/install/cli-local.test.ts:
+(pass) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip [120.82ms]
+(pass) cli-local > #given invalid positional arg #when invoked #then it exits non-zero with one-line JSON error [87.26ms]
+
+packages/omo-senpi/src/install/install-senpi.test.ts:
+(pass) runSenpiInstaller > #given temp SENPI_CODING_AGENT_DIR #when installing twice #then it writes one absolute plugin package entry and creates backups [41.47ms]
+(pass) runSenpiInstaller > #given existing user settings #when installing #then unrelated values are preserved and package entries are deduped [13.81ms]
+(pass) runSenpiInstaller > #given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written [11.51ms]
+(pass) runSenpiUninstaller > #given mixed package settings #when uninstalling #then only the omo-senpi plugin path is removed [16.44ms]
+
+packages/omo-senpi/src/extension/idle-injection-coordinator.test.ts:
+(pass) IdleInjectionCoordinator > #given hidden metadata #when flushed #then one merged custom message preserves it [1.46ms]
+(pass) IdleInjectionCoordinator > #given a completion and a continuation on one idle edge #when flushed #then exactly one injection is delivered in deterministic order [0.34ms]
+(pass) IdleInjectionCoordinator > #given one task completion on an idle edge #when flushed #then it steers immediately [0.23ms]
+(pass) IdleInjectionCoordinator > #given two task completions on one idle edge #when flushed #then one steer carries both [0.16ms]
+(pass) IdleInjectionCoordinator > #given repeated continuation enqueues #when flushed #then they collapse to one keyed injection [0.07ms]
+(pass) IdleInjectionCoordinator > #given a queued injection #when removed by key #then the flush no-ops and removal reports true only once [0.18ms]
+(pass) IdleInjectionCoordinator > #given an empty queue #when flushed #then nothing is delivered [0.18ms]
+(pass) IdleInjectionCoordinator > #given a deferred scheduleFlush #when the scheduler runs it #then delivery happens on the idle tick, not synchronously [0.42ms]
+(pass) IdleInjectionCoordinator > #given a deferred continuation #when a synchronous wake flushOnIdle drains first #then the deferred pass no-ops [0.11ms]
+(pass) IdleInjectionCoordinator > #given repeated scheduleFlush requests before the deferred pass #when scheduled #then they coalesce to one flush [0.10ms]
+(pass) IdleInjectionCoordinator > #given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns [0.07ms]
+
+packages/omo-senpi/src/extension/index.test.ts:
+config-watch skipped: events capability missing undefined
+(pass) omo-senpi extension entry > #given the real extension entry #when registered with a fake API #then configured components are wired [79.16ms]
+config-watch skipped: events capability missing undefined
+(pass) omo-senpi extension entry > #given open todo state #when ordinary input arrives #then the extension does not inject continuity guidance [59.78ms]
+(pass) omo-senpi extension entry > #given config-watch disabled by flag #when composed #then it emits no registration and no warning [0.22ms]
+
+packages/omo-senpi/src/extension/idle-injection-wiring.test.ts:
+(pass) idle-injection wiring: real producers on one idle edge > #given a ulw continuation then a task-completion wake on one idle edge #when both fire #then exactly one injection is delivered [0.69ms]
+
+packages/omo-senpi/src/extension/tool-capture-registry.test.ts:
+(pass) tool capture registry > #given components register tools #when captured #then every injected tool exposes a callable execute [0.27ms]
+(pass) tool capture registry > #given captured tools #when filtered for a child #then lsp tools remain but the task/team family is excluded [0.45ms]
+(pass) tool capture registry > #given a non-tool value #when registered #then it is not captured but still forwarded [0.27ms]
+
+packages/omo-senpi/src/extension/compose.test.ts:
+(pass) composeOmoSenpiExtension > #given enabled components #when composed and an event dispatches #then registers flags components and drives fake handlers [0.65ms]
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+(pass) composeOmoSenpiExtension > #given one component disabled by flag #when composed #then skips exactly that component [0.24ms]
+(pass) composeOmoSenpiExtension > #given a component throws #when composed #then logs the error and registers later components [0.40ms]
+(pass) composeOmoSenpiExtension > #given a component using optional registerMcpServer on an old API #when composed #then skips that component and registers later components [0.58ms]
+(pass) composeOmoSenpiExtension > #given a fake missing sendMessage #when composed #then logs one version mismatch and registers nothing [0.44ms]
+
+packages/omo-senpi/src/components/config-startup/index.test.ts:
+(pass) runSenpiStartupMigration > #given both legacy source groups without an OpenCode boot #when Senpi starts #then the core migration engine migrates both into the unified config [6.12ms]
+(pass) runSenpiStartupMigration > #given OpenCode and Senpi race on the first legacy migration #when Senpi holds the injected core lock #then exactly one caller migrates [1.02ms]
+(pass) createConfigStartupComponent > #given migration results and config diagnostics #when session_start captures a UI #then it reports both once through that UI [0.38ms]
+(pass) createConfigStartupComponent > #given a migration target with a conflicting legacy value #when session_start captures a UI #then it reports the skipped-conflict diagnostic once [0.93ms]
+(pass) createConfigStartupComponent > #given config diagnostics without a UI #when session_start fires #then it logs a single fallback warning [0.17ms]
+
+packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts:
+(pass) omo-senpi ultrawork component > #given trigger words #when user input dispatches #then arms via one hidden custom message [0.59ms]
+(pass) omo-senpi ultrawork component > #given a trigger word #when the user text is dispatched #then the typed text is never rewritten [0.30ms]
+(pass) omo-senpi ultrawork component > #given an idle session #when a trigger arms #then the injection carries no delivery override [0.28ms]
+(pass) omo-senpi ultrawork component > #given a steer-queued prompt #when a trigger arms #then the directive stays atomic with the prompt [0.41ms]
+(pass) omo-senpi ultrawork component > #given a followUp-queued prompt #when a trigger arms #then the directive stays atomic with the prompt [0.14ms]
+(pass) omo-senpi ultrawork component > #given a queued /skill: command #when a trigger arms #then the directive is appended so expansion survives [0.22ms]
+(pass) omo-senpi ultrawork component > #given any queued prompt #when a trigger arms #then no hidden message is emitted for it [0.10ms]
+(pass) omo-senpi ultrawork component > #given non-trigger input #when user input dispatches #then injects nothing [0.09ms]
+(pass) omo-senpi ultrawork component > #given recursion guard source extension #when trigger input dispatches #then injects nothing [0.06ms]
+(pass) omo-senpi ultrawork component > #given ultrawork disabled flag #when trigger input dispatches #then suppresses injection [0.07ms]
+(pass) omo-senpi ultrawork component > #given malformed input #when input dispatches #then no-ops safely [0.20ms]
+(pass) omo-senpi ultrawork component > #given ulw-prefixed skill names #when user input dispatches #then injects nothing [0.28ms]
+(pass) omo-senpi ultrawork component > #given input already carrying an ultrawork block #when trigger word dispatches #then does not reinject [0.34ms]
+(pass) omo-senpi ultrawork component > #given /skill: command with a trigger word in args #when dispatched #then arms without touching the command text [0.57ms]
+(pass) omo-senpi ultrawork component > #given a lone open-tag mention without a closing tag #when trigger word dispatches #then still injects [0.12ms]
+(pass) omo-senpi ultrawork component > #given the /skill:ultrawork command itself #when dispatched #then passes through untouched [0.16ms]
+(pass) omo-senpi ultrawork component > #given /skill: command whose trigger appears only in the skill name #when dispatched #then injects nothing [0.12ms]
+(pass) omo-senpi ultrawork component > #given every arming route #when dispatched #then none of them rewrites the user text [0.20ms]
+(pass) omo-senpi ultrawork component > #given synced senpi skill artifact #when description is read #then documents hidden injection instead of inviting a re-read [0.18ms]
+(pass) omo-senpi ultrawork component > #given embedded directive #when inspected #then contains zero forbidden non-senpi tokens [0.57ms]
+(pass) omo-senpi ultrawork component > #given embedded directive #when inspected #then keeps required ultrawork anchors [0.26ms]
+(pass) omo-senpi ultrawork component > #given embedded directive #when inspected #then keeps the senpi-native tool contract [0.08ms]
+(pass) omo-senpi ultrawork component > #given generated directive #when embed script runs check #then passes without drift [33.76ms]
+(pass) omo-senpi ultrawork component > #given generated directive drift #when embed script runs check #then fails [42.35ms]
+
+packages/omo-senpi/src/components/ulw-loop/omo-command.test.ts:
+(pass) omo-senpi ulw-loop omo-command spawn target > #given a .cmd bin on win32 #when building the spawn target #then it wraps with cmd.exe /d /s /c [1.30ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given an uppercase .BAT bin on win32 #when building the spawn target #then it still wraps [0.06ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given an .exe bin on win32 #when building the spawn target #then it spawns directly without cmd.exe [0.04ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given a plain bin on darwin #when building the spawn target #then it is unchanged [0.05ms]
+(pass) omo-senpi ulw-loop omo-command spawn target > #given a .cmd-looking path on non-win32 #when building the spawn target #then it is NOT wrapped (win32-only guard) [0.04ms]
+
+packages/omo-senpi/src/components/ulw-loop/index.test.ts:
+(pass) omo-senpi ulw-loop continuation > #given no omo binary #when input and agent_end fire #then the component stays inert for the session [0.28ms]
+(pass) omo-senpi ulw-loop continuation > #given active incomplete ulw-loop status #when queued user input arrives #then steering reminder is injected [0.50ms]
+(pass) omo-senpi ulw-loop continuation > #given active incomplete ulw-loop status #when idle user input arrives #then typed text is unchanged [0.10ms]
+(pass) omo-senpi ulw-loop continuation > #given incomplete goals #when continuation agent_end fires #then sends exactly one hidden followUp [0.20ms]
+(pass) omo-senpi ulw-loop continuation > #given incomplete goals #when continuation repeats #then cap stops the 9th consecutive continuation [0.23ms]
+(pass) omo-senpi ulw-loop continuation > #given continuation cap was reached #when user input resets it #then continuation can resume [0.18ms]
+(pass) omo-senpi ulw-loop continuation > #given stale status snapshot #when user input arrives #then the next identical active status can continue [0.23ms]
+(pass) omo-senpi ulw-loop continuation > #given byte-identical status twice #when continuation repeats #then stale status stops continuation [0.17ms]
+(pass) omo-senpi ulw-loop continuation > #given malformed JSON #when input checks status #then it degrades to no-op with a warning [0.19ms]
+(pass) omo-senpi ulw-loop continuation > #given extension input #when it contains text #then it does not reset or inject [0.16ms]
+(pass) omo-senpi ulw-loop continuation > #given status reports all complete #when continuation fires #then no followUp is sent [0.10ms]
+
+packages/omo-senpi/src/components/ulw-loop/coordinator-routing.test.ts:
+(pass) omo-senpi ulw-loop continuation routing through the idle coordinator > #given a coordinator in ctx #when a continuation fires #then it routes through the coordinator, not a direct user message [0.29ms]
+(pass) omo-senpi ulw-loop continuation routing through the idle coordinator > #given a task completion already queued #when the continuation fires on the same idle edge #then both collapse into one injection [0.34ms]
+(pass) omo-senpi ulw-loop continuation routing through the idle coordinator > #given active boulder start-work continuation #when ulw-loop agent_end fires #then it enqueues nothing [8.23ms]
+
+packages/omo-senpi/src/components/ulw-loop/run-command-containment.test.ts:
+(pass) omo-senpi ulw-loop run-command failure containment > #given runCommand rejects synchronously with EINVAL #when input dispatches #then the handler resolves continue and never rejects [0.31ms]
+(pass) omo-senpi ulw-loop run-command failure containment > #given runCommand resolves non-zero #when agent_end dispatches #then no continuation is sent and the handler resolves [0.13ms]
+(pass) omo-senpi ulw-loop run-command failure containment > #given runCommand rejects but status would otherwise be active #when input dispatches #then no steering reminder is injected [0.12ms]
+
+packages/omo-senpi/src/components/ulw-loop/runtime.test.ts:
+(pass) omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored [0.20ms]
+(pass) omo-senpi ulw-loop runtime > #given omo exists only in a controlled PATH #when resolving the default binary #then it scans PATH without shelling out to Bun [45.81ms]
+(pass) omo-senpi ulw-loop runtime > #given a temp omo binary #when default runOmoCommand executes status #then it captures stdout and cwd via Node-compatible spawning [401.82ms]
+(pass) omo-senpi ulw-loop runtime > #given env and PATH are controlled #when the component registers with defaults #then no Bun global is required for active status handling [358.95ms]
+(pass) omo-senpi ulw-loop runtime > #given built Senpi runs under Node #when inspecting runtime source #then the ulw-loop component has no Bun global dependency [0.19ms]
+
+packages/omo-senpi/src/components/config-resolution/index.test.ts:
+(pass) loadSenpiOmoConfig > #given the current top-level-only Senpi categories and agents config #when resolved #then it preserves the established configuration exactly [1.43ms]
+(pass) loadSenpiOmoConfig > #given base and activated Senpi profile category settings #when resolved #then the Senpi profile override wins [0.85ms]
+(pass) loadSenpiOmoConfig > #given catalog names in category and agent model chains #when resolved #then concrete model references and inherited attributes reach Senpi [1.47ms]
+
+packages/omo-senpi/src/components/lsp/lsp-architecture.test.ts:
+(pass) omo-senpi lsp architecture boundary > #given the daemon-backed adapter #when source shape is audited #then no vendored LSP engine remains [1.47ms]
+
+packages/omo-senpi/src/components/lsp/lsp-security.test.ts:
+(pass) omo-senpi lsp project config trust > #given untrusted project-local LSP config #when shared server config merges #then arbitrary project commands are not launched [2.12ms]
+(pass) omo-senpi lsp project config trust > #given untrusted project config overrides a builtin #when servers merge #then the builtin command remains selected [0.90ms]
+(pass) omo-senpi lsp project config trust > #given project-local custom commands #when servers merge #then project-local commands remain ignored [0.69ms]
+(pass) omo-senpi lsp project config trust > #given project config customizes safe builtin fields #when servers merge #then command and env still come from the builtin [0.74ms]
+(pass) omo-senpi lsp project config trust > #given user LSP config has a custom command and env #when servers merge #then the user custom server is preserved [0.84ms]
+(pass) omo-senpi lsp project config trust > #given project configs contain multiple unsafe commands #when the component registers #then exactly one migration warning is emitted [0.69ms]
+
+packages/omo-senpi/src/components/lsp/index.test.ts:
+(pass) omo-senpi lsp component > #given the legacy Senpi LSP descriptors #when the daemon-backed component registers #then all non-executor descriptor fields are preserved [0.21ms]
+(pass) omo-senpi lsp component > #given an installed language server #when the component registers #then the exact six LSP tools are exposed [0.14ms]
+(pass) omo-senpi lsp component > #given renamed omo-senpi lsp flags #when diagnostics are disabled #then no LSP tools register [0.12ms]
+(pass) omo-senpi lsp component > #given no language server is resolvable for any file type #when the lsp component registers #then the six tools remain exposed [0.17ms]
+
+packages/omo-senpi/src/components/lsp/daemon-runtime.test.ts:
+(pass) Senpi packaged daemon runtime resolver > #given a shipped extension path #when resolving daemon runtime #then CLI and version are paired from plugin-local runtime [22.57ms]
+(pass) Senpi packaged daemon runtime resolver > #given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .pi context are forwarded [242.70ms]
+(pass) Senpi packaged daemon runtime resolver > #given all six Senpi LSP names #when executing through the packaged client #then canonical Core tool names are used [1.78ms]
+
+packages/omo-senpi/src/components/lsp/lsp-renderers.test.ts:
+(pass) omo-senpi lsp TUI renderers > #given registered LSP tools #when the TUI renders tool activity #then every tool exposes custom call and result renderers [0.18ms]
+
+packages/omo-senpi/src/components/lsp/post-edit-diagnostics.test.ts:
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit diagnostics with errors #when a write tool result arrives #then model-visible diagnostics are injected [0.73ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given many mutated files #when post-edit diagnostics run #then shared orchestration dedupes, bounds concurrency, preserves order, and isolates failures [0.26ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit sessions #when session events fire #then only that session cache resets or deletes [0.31ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given a context with updateToolHookStatus #when post-edit diagnostics run #then the live status label is reported [0.17ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given a non-mutation tool result #when the post-edit handler runs #then no live status is reported [0.12ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit diagnostics are clean #when a write tool result arrives #then no diagnostics are injected [0.07ms]
+
+packages/omo-senpi/src/components/start-work-continuation/hidden-delivery.test.ts:
+(pass) start-work continuation hidden delivery > #given active work #when idle agent_end fires #then continuation is a hidden followUp [1.93ms]
+(pass) start-work continuation hidden delivery > #given active work #when input is idle versus queued #then only queued text is transformed [4.60ms]
+
+packages/omo-senpi/src/components/start-work-continuation/index.test.ts:
+(pass) omo-senpi start-work-continuation > #given no boulder state #when agent_end fires #then stays quiet [3.41ms]
+(pass) omo-senpi start-work-continuation > #given malformed boulder JSON #when agent_end fires #then no injection and no throw [0.44ms]
+(pass) omo-senpi start-work-continuation > #given completed work #when agent_end fires #then no injection [0.49ms]
+(pass) omo-senpi start-work-continuation > #given work owned by another harness #when agent_end fires #then no injection [0.50ms]
+(pass) omo-senpi start-work-continuation > #given active work with remaining tasks #when agent_end fires #then injects continuation directive [0.56ms]
+(pass) omo-senpi start-work-continuation > #given zero remaining tasks but total > 0 #when agent_end fires #then still injects final-gate directive [0.52ms]
+(pass) omo-senpi start-work-continuation > #given active work #when directive renders #then it instructs honoring the recorded PR delivery mode [0.52ms]
+(pass) omo-senpi start-work-continuation > #given paused work #when agent_end fires #then injects continuation directive [0.48ms]
+(pass) omo-senpi start-work-continuation > #given identical boulder signature twice #when agent_end repeats #then second is suppressed [0.61ms]
+(pass) omo-senpi start-work-continuation > #given 9 consecutive agent_end events with changing signature #when cap is 8 #then only 8 injections are delivered [1.07ms]
+(pass) omo-senpi start-work-continuation > #given cap reached #when user input arrives #then resets and continuation resumes [0.93ms]
+(pass) omo-senpi start-work-continuation > #given eligible boulder work #when user input arrives #then appends start-work steering reminder [0.42ms]
+(pass) omo-senpi start-work-continuation > #given extension-sourced input #when eligible boulder work exists #then no transform [0.33ms]
+(pass) omo-senpi start-work-continuation > #given missing session manager #when agent_end fires #then skips silently [0.21ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.feedback.test.ts:
+(pass) omo-senpi comment-checker feedback > #given checker violation #when edit completes #then feedback includes the header and offending file [3.86ms]
+(pass) omo-senpi comment-checker feedback > #given checker finds a clean file #when edit completes #then injects nothing [0.23ms]
+(pass) omo-senpi comment-checker feedback > #given unresolvable binary #when eligible results repeat #then component is inert with one notice [5.05ms]
+(pass) omo-senpi comment-checker feedback > #given same file reported twice #when still in one turn #then stale_state debounce emits one report until turn_start [0.50ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.resolver.test.ts:
+(pass) omo-senpi comment-checker binary resolver > #given OMO_COMMENT_CHECKER_BIN and other candidates #when resolving binary #then env var wins first [1.92ms]
+(pass) omo-senpi comment-checker binary resolver > #given package api exports getBinaryPath #when env is unset #then package api resolves before PATH [0.41ms]
+(pass) omo-senpi comment-checker binary resolver > #given env and package resolution fail #when PATH has comment-checker #then PATH fallback resolves last [0.20ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.test.ts:
+(pass) omo-senpi comment-checker component > #given built Senpi runs under Node #when inspecting runtime sources #then comment-checker has no Bun global dependency [0.19ms]
+(pass) omo-senpi comment-checker component > #given every binary resolution path is missing #when eligible results repeat #then inert notice logs once and runner is not called [0.34ms]
+(pass) omo-senpi comment-checker component > #given a context with updateToolHookStatus #when the check runs #then the live status label is reported once [0.16ms]
+(pass) omo-senpi comment-checker component > #given a non-mutation tool result #when tool_result dispatches #then no live status is reported [0.15ms]
+(pass) omo-senpi comment-checker component > #given successful edit result #when tool_result dispatches #then runner receives the right absolute path [0.19ms]
+(pass) omo-senpi comment-checker component > #given bound Senpi session manager #when tool_result dispatches #then runner receives session metadata [0.21ms]
+(pass) omo-senpi comment-checker component > #given successful write result #when tool_result dispatches #then runner receives the written file [0.20ms]
+(pass) omo-senpi comment-checker component > #given read and bash results #when tool_result dispatches #then silent non-edit tools do not trigger [0.17ms]
+(pass) omo-senpi comment-checker component > #given failed edit and write results #when tool_result dispatches #then silent failures do not trigger [0.13ms]
+(pass) omo-senpi comment-checker component > #given missing path and bad payload #when tool_result dispatches #then malformed_input no-ops safely [0.40ms]
+
+packages/omo-senpi/src/components/config-watch/index.test.ts:
+(pass) createConfigWatchComponent > emits one wire-valid omo registration immediately [0.43ms]
+(pass) createConfigWatchComponent > skips without the optional events capability [0.09ms]
+(pass) createConfigWatchComponent > warns that creating user config later requires a reload when its directory and parent are absent [0.08ms]
+(pass) createConfigWatchComponent > logs omo reload and rejection outcomes with paths and errors [0.16ms]
+(pass) createConfigWatchComponent > refreshes targets after rejection without replacing the sticky validator, deferring the re-registration [1.36ms]
+(pass) createConfigWatchComponent > caps deferred re-registration retries when the host rejects deterministically [3.54ms]
+(pass) createConfigWatchComponent > resets the rejection retry budget when the registration payload changes [6.26ms]
+(pass) createConfigWatchComponent > releases event subscriptions on shutdown and replaces subscriptions on repeated register [0.23ms]
+(pass) createConfigWatchComponent > keeps one active registration when ready is emitted repeatedly [0.07ms]
+
+packages/omo-senpi/src/components/config-watch/validate.test.ts:
+(pass) createOmoConfigValidator > #given invalid JSONC in a changed config file #when validating #then rejects with the parse diagnostic [1.67ms]
+(pass) createOmoConfigValidator > #given a schema violation in a changed config file #when validating #then rejects with the validation diagnostic [1.64ms]
+(pass) createOmoConfigValidator > #given a valid changed config #when validating #then accepts and advances the baseline [1.00ms]
+(pass) createOmoConfigValidator > #given a missing optional user config #when validating its path #then accepts [0.58ms]
+(pass) createOmoConfigValidator > #given a pre-existing invalid ancestor layer #when a different valid layer changes #then accepts [1.28ms]
+(pass) createOmoConfigValidator > #given individually valid team layers that newly fail after merge #when the changed layer validates #then rejects the merged diagnostic [2.96ms]
+(pass) createOmoConfigValidator > #given a pre-existing merged-config diagnostic #when an unrelated valid layer changes #then accepts [5.36ms]
+(pass) createOmoConfigValidator > #given an accepted change with a non-attributable pre-existing diagnostic #when another valid change follows #then the updated baseline does not block it [1.79ms]
+(pass) createOmoConfigValidator > #given a rejected change #when an unrelated valid change follows before it is fixed #then rejection remains sticky until the bad diagnostic is gone [1.70ms]
+(pass) createOmoConfigValidator > #given a newly created ancestor .omo directory with invalid JSONC #when validating the directory change #then rejects its descendant diagnostic [0.82ms]
+(pass) createOmoConfigValidator > #given deleting omo.jsonc exposes an invalid sibling omo.json #when validating the deletion #then rejects by containing config directory [0.79ms]
+(pass) createOmoConfigValidator > #given a changed Senpi model catalog cycle #when validating #then rejects the resolved Senpi view diagnostic [0.86ms]
+(pass) createOmoConfigValidator > #given an unreadable changed config path #when validating #then returns its read diagnostic without throwing [0.72ms]
+
+packages/omo-senpi/src/components/config-watch/paths.test.ts:
+(pass) resolveOmoConfigWatchTargets > #given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd-to-home ancestor [3.05ms]
+(pass) resolveOmoConfigWatchTargets > #given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation [1.78ms]
+(pass) resolveOmoConfigWatchTargets > #given a symlinked project .omo directory #when resolving targets #then ignores the symlinked config directory [4.15ms]
+(pass) resolveOmoConfigWatchTargets > #given an existing project .omo directory without a config file #when resolving targets #then watches it for either omo config filename [0.84ms]
+(pass) resolveOmoConfigWatchTargets > #given an existing ~/.omo user config directory #when resolving targets #then it is watched for both config filenames [0.67ms]
+(pass) resolveOmoConfigWatchTargets > #given a missing ~/.omo user config directory #when resolving targets #then no bare-HOME creation target is emitted and discovery needs a later reload [0.47ms]
+(pass) resolveOmoConfigWatchTargets > #given the senpi agent dir defaulting under HOME #when resolving targets #then drops every target covering the protected agent paths [0.51ms]
+(pass) resolveOmoConfigWatchTargets > #given an explicit SENPI_CODING_AGENT_DIR under HOME #when resolving targets #then drops the covering ancestor target [0.47ms]
+(pass) resolveOmoConfigWatchTargets > #given ancestor creation targets #when resolving targets #then every creation glob is root-anchored [0.50ms]
+(pass) resolveOmoConfigWatchTargets > #given the user config parent creation target #when resolving targets #then its glob is root-anchored [0.50ms]
+(pass) resolveOmoConfigWatchTargets > #given an existing .omo directory holding runtime state #when resolving targets #then its config globs are root-anchored so the subtree is not scanned [0.75ms]
+
+packages/omo-senpi/src/components/codegraph/index.test.ts:
+(pass) createCodegraphComponent > #given registerMcpServer available and supported binary #when registered #then declares codegraph stdio server [0.32ms]
+(pass) createCodegraphComponent > #given bundled binary #when registered #then enables without node support check [0.10ms]
+(pass) createCodegraphComponent > #given binary missing #when registered #then registers disabled placeholder [0.08ms]
+(pass) createCodegraphComponent > #given PATH binary and unsupported node #when registered #then registers disabled placeholder [0.09ms]
+(pass) createCodegraphComponent > #given old senpi without registerMcpServer #when registered #then skips gracefully [0.09ms]
+(pass) createCodegraphComponent > #given senpi-task child marker #when registered #then skips registration [0.05ms]
+(pass) createCodegraphComponent > #given win32 platform and .cmd binary #when registered #then wraps with cmd.exe [0.06ms]
+(pass) createCodegraphComponent > #given argsPrefix #when registered #then prepends before serve --mcp [0.07ms]
+(pass) createCodegraphComponent > #given a Senpi harness codegraph override #when registered #then the resolved Senpi view configures the daemon [2.68ms]
+(pass) createCodegraphComponent > #given omo.json codegraph.daemon=true #when registered #then buildCodegraphEnv enables the daemon [0.74ms]
+(pass) createCodegraphComponent > #given OMO_CODEGRAPH_DAEMON=1 and default env builder #when registered #then omits CODEGRAPH_NO_DAEMON [0.09ms]
+(pass) createCodegraphComponent > #given OMO_CODEGRAPH_DAEMON=true (truthy variant) #when registered #then omits CODEGRAPH_NO_DAEMON [0.06ms]
+(pass) createCodegraphComponent > #given no daemon override and default config #when registered #then omits CODEGRAPH_NO_DAEMON [0.06ms]
+(pass) createCodegraphComponent > #given codegraph.daemon=false #when registered #then pins CODEGRAPH_NO_DAEMON=1 [0.06ms]
+(pass) createCodegraphComponent > #given OMO_CODEGRAPH_DAEMON=0 #when registered #then pins CODEGRAPH_NO_DAEMON=1 [0.06ms]
+
+packages/omo-senpi/src/components/task/lead-poller-lifecycle.test.ts:
+(pass) lead poller lifecycle > #given no shared coordinator #when team mail injects #then fallback is hidden custom steer [0.56ms]
+(pass) lead poller lifecycle > #given owned and foreign teams #when ticks repeat #then only one owned poller is created and reused [0.35ms]
+(pass) lead poller lifecycle > #given an owned lead without a captured session file #when the lifecycle ticks #then it does not reserve inbox delivery until persistence is possible [0.11ms]
+(pass) lead poller lifecycle > #given a compacting parent #when the lifecycle ticks #then the owned poller is suspended [0.34ms]
+(pass) lead poller lifecycle > #given ownership disappears #when the lifecycle reconciles #then the old poller shuts down and cannot resolve [0.20ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when no run id is resolved #then an explicit id is required [0.34ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when no run id is resolved #then the reason lists the owned runs [0.18ms]
+(pass) lead poller lifecycle > #given one owned team #when resolveDefaultTeamRunId is called #then it resolves [0.11ms]
+(pass) lead poller lifecycle > #given no owned team #when resolveDefaultTeamRunId is called #then it reports none [0.07ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when resolveDefaultTeamRunId is called #then it reports ambiguous with the owned runs [0.08ms]
+(pass) lead poller lifecycle > #given a shared delivery journal #when the lifecycle creates a poller #then the journal reaches the poller deps [0.06ms]
+(pass) lead poller lifecycle > #given coordinator delivery states #when an injection enqueues #then scheduling follows streaming idle and transition rules [0.12ms]
+(pass) lead poller lifecycle > #given the component shuts down #when disposed #then the interval and every poller stop [0.10ms]
+
+packages/omo-senpi/src/components/task/team-service.test.ts:
+(pass) createTeamService curated agent gating > #given a team member spec naming a curated read-only agent #when team_create validates members #then the curated rejection message surfaces [2.16ms]
+(pass) createTeamService lead messaging > #given a mapped recipient task #when the lead sends #then the correlation event is persisted on the recipient task [9.74ms]
+(pass) createTeamService lead messaging > #given an active runtime member without a sidecar entry #when the lead sends #then delivery succeeds without a correlation event [3.05ms]
+(pass) createTeamService lead messaging > #given main and provider extensions #when a team member starts #then member tools load before inherited OMO extensions [29.33ms]
+(pass) createTeamService named-team lookup > #given an unknown team_name with declared teams #when createTeam runs #then the error lists the declared teams [1.52ms]
+(pass) createTeamService ownership guard > #given a team owned by another session #when scoped service methods are called #then they reject with an ownership error [14.30ms]
+(pass) createTeamService ownership guard > #given the owning session #when scoped service methods are called #then they proceed [3.06ms]
+
+packages/omo-senpi/src/components/task/engine-agents.test.ts:
+(pass) task engine builtin agent overlay > #given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas [2.39ms]
+(pass) task engine builtin agent overlay > #given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive [0.94ms]
+(pass) task engine builtin agent overlay > #given an omo.json-only agent #when the engine resolves agents #then it is appended alongside the builtins [1.19ms]
+(pass) task engine builtin agent overlay > #given a process override for a curated agent #when the engine resolves agents #then in-process execution remains pinned [16.42ms]
+(pass) task engine builtin agent overlay > #given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable [13.26ms]
+(pass) task engine builtin agent overlay > #given the default engine agents #when the task tool description renders #then all 4 builtin names are advertised sorted [0.86ms]
+(pass) task engine builtin agent overlay > #given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed [0.79ms]
+
+packages/omo-senpi/src/components/task/member-liveness.test.ts:
+(pass) team member liveness notifier > #given a SIGKILL member exit while the lead streams #when the terminal record is observed #then one liveness injection reaches the lead with the member and last state [0.37ms]
+(pass) team member liveness notifier > #given a process member killed by SIGKILL #when the manager observes its terminal outcome #then the wired lead notifier injects liveness [14.33ms]
+(pass) team member liveness notifier > #given a normal member completion #when its terminal record is observed #then no liveness event is injected [0.21ms]
+
+packages/omo-senpi/src/components/task/residency-registry.test.ts:
+(pass) createManagerResidencyRegistry rpc teardown bridge > #given an rpc resident #when lifecycle terminates it #then process termination runs without aborting the turn [0.24ms]
+(pass) createManagerResidencyRegistry rpc teardown bridge > #given an rpc resident without a terminate port #when lifecycle terminates it #then teardown rejects instead of leaking silently [0.14ms]
+
+packages/omo-senpi/src/components/task/index.test.ts:
+(pass) omo-senpi task component wiring > #given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired [3.08ms]
+(pass) omo-senpi task component wiring > #given a fake ExtensionAPI boot #when the task component registers #then only injection-driven lead team tools are wired [1.00ms]
+(pass) omo-senpi task component wiring > #given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance [0.83ms]
+(pass) omo-senpi task component wiring > #given the omo-task flag is false #when the component registers #then only the unconditional hygiene sweep handler is wired [0.09ms]
+(pass) omo-senpi task component wiring > #given a malformed omo.json #when the component registers #then it boots with defaults and still wires the tools [1.04ms]
+(pass) omo-senpi task component wiring > #given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start [1.22ms]
+(pass) omo-senpi task component wiring > #given a session start #when reconciliation runs #then reattach, cleanup, mailbox reclaim, notification retry, and lead polling stay ordered [0.62ms]
+(pass) omo-senpi task component wiring > #given a captured ui #when session_before_switch fires #then the ui bridge is cleared [0.74ms]
+(pass) omo-senpi task component wiring > #given a captured ui #when session_shutdown fires #then the ui bridge is cleared [0.88ms]
+(pass) omo-senpi task component wiring > #given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes [0.11ms]
+
+packages/omo-senpi/src/components/task/status-row-format.test.ts:
+(pass) buildWidgetRows > #given more than five active tasks #when building rows #then it caps at five and adds a +N more row [1.75ms]
+(pass) buildWidgetRows > #given only terminal tasks #when building rows #then no rows render [0.07ms]
+(pass) buildWidgetRows > #given an active task #when building a row #then useful identity and execution context remain [0.09ms]
+(pass) buildWidgetRows > #given a 137-column active task #when building its widget row #then it remains one physical line [0.09ms]
+(pass) formatTaskRow > #given resolved category metadata #when formatting #then target, model, reasoning, variant, mode, and status render [0.09ms]
+(pass) formatTaskRow > #given a description #when formatting #then the human label leads [0.06ms]
+(pass) formatTaskRow > #given no resolved model #when formatting #then raw model remains [0.04ms]
+(pass) formatTaskRow > #given empty resolved detail labels #when formatting #then they are omitted [0.05ms]
+(pass) formatTaskRow > #given matching reasoning and variant #when formatting #then duplicate variant is omitted [0.06ms]
+(pass) formatTaskRow > #given malformed running progress #when formatting #then the excerpt is width-safe [0.55ms]
+
+packages/omo-senpi/src/components/task/commands.test.ts:
+(pass) registerTaskCommands > #given the component registers commands #when inspecting the api #then /tasks and /task-kill exist [0.12ms]
+(pass) registerTaskCommands > #given tasks in two sessions #when /tasks runs #then only the current session's rows print [0.24ms]
+(pass) registerTaskCommands > #given tasks in two sessions #when /tasks --all runs #then every session's rows print [0.10ms]
+(pass) registerTaskCommands > #given a cancellable task #when /task-kill selects it and confirms #then cancelTask runs for that id [0.19ms]
+(pass) registerTaskCommands > #given a task with a description #when /task-kill lists options #then the human label leads and the id trails [0.09ms]
+(pass) registerTaskCommands > #given a multi-word description #when /task-kill selects and confirms #then cancelTask runs for the task id, not a word of the label [0.10ms]
+(pass) registerTaskCommands > #given the selector is dismissed #when /task-kill runs #then nothing is cancelled [0.11ms]
+(pass) registerTaskCommands > #given no cancellable tasks #when /task-kill runs #then it notifies and never opens the selector [0.12ms]
+
+packages/omo-senpi/src/components/task/reload-guard.test.ts:
+(pass) reload guard > #given a running resident child #when the veto is evaluated #then reload is cancelled with an actionable reason [0.18ms]
+(pass) reload guard > #given running children #when labelled #then description wins over name over task id [0.12ms]
+(pass) reload guard > #given only terminal residents #when the veto is evaluated #then reload is not blocked [0.05ms]
+(pass) reload guard > #given no resident children #when the veto is evaluated #then reload is not blocked [0.04ms]
+(pass) reload guard > #given a wired guard #when senpi emits session_before_reload #then the handler returns the cancel result [0.12ms]
+(pass) reload guard > #given a running child #when the veto is consulted twice (senpi pre-check + internal check) #then both consultations return the identical result [0.07ms]
+(pass) reload guard > #given a wired guard with no running children #when senpi emits session_before_reload #then reload proceeds [0.06ms]
+
+packages/omo-senpi/src/components/task/status-ui-background.test.ts:
+(pass) createTaskStatusUi.background progress > #given only terminal background tasks #when syncing #then no refresh timer remains active [0.32ms]
+(pass) createTaskStatusUi.background progress > #given an idle parent with a running background task #when time advances quietly #then live status refreshes [0.47ms]
+(pass) createTaskStatusUi.background progress > #given a live refresh timer #when the final background task completes #then the timer stops [0.17ms]
+(pass) createTaskStatusUi.background progress > #given two background children #when latest events arrive #then rows show identity, model, stats, activity, and elapsed time [0.40ms]
+
+packages/omo-senpi/src/components/task/planner.test.ts:
+(pass) createTaskChildPlanner > #given a category with model metadata #when planned #then resolved_model preserves display, variant, and reasoning effort [1.10ms]
+(pass) createTaskChildPlanner > #given visual-engineering falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata [0.68ms]
+(pass) createTaskChildPlanner > #given an explicit provider model #when planned #then explicit metadata does not invent variant or reasoning effort [0.15ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model [0.45ms]
+(pass) createTaskChildPlanner > #given an explicit model with subagent_type and no registry #when planned #then the agent persona is kept and the model stays explicit [0.07ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent with no registry #when planned #then it fails closed with the registry-unavailable error [0.07ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a category rather than an agent #when planned #then category resolution still applies [0.14ms]
+(pass) createTaskChildPlanner > #given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available [0.14ms]
+(pass) createTaskChildPlanner > #given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement [0.08ms]
+(pass) createTaskChildPlanner > #given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories [0.07ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent whose chain no registry model satisfies #when planned #then it reports model_unavailable with the agent list [0.13ms]
+(pass) createTaskChildPlanner plan variant > #given a category with an explicit reasoning effort and a variant #when planned #then the applied variant is the reasoning effort [0.07ms]
+(pass) createTaskChildPlanner plan variant > #given a category resolving a variant-bearing fallback without reasoning effort #when planned #then the applied variant is the resolved variant [0.09ms]
+(pass) createTaskChildPlanner plan variant > #given an explicit provider model #when planned #then no variant is applied [0.04ms]
+(pass) createTaskChildPlanner plan variant > #given momus resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model [0.08ms]
+
+packages/omo-senpi/src/components/task/usage-guidance.test.ts:
+(pass) task usage guidance > #given the once-per-session task hint #when rendered #then it teaches steer-only team delivery without a blocking wait [0.08ms]
+(pass) task usage guidance > #given background task guidance #when rendered #then it makes idle wake unconditional and limits midpoint inspection [0.05ms]
+
+packages/omo-senpi/src/components/task/planner-model-name-boundary.test.ts:
+(pass) task planner model-name boundary > #given an own safe model name #when category planning resolves #then the friendly name is preserved [0.19ms]
+(pass) task planner model-name boundary > #given an inherited model name #when category planning resolves #then the inherited value is ignored [0.07ms]
+(pass) task planner model-name boundary > #given a throwing model name accessor #when category planning resolves #then the accessor is never invoked [0.07ms]
+(pass) task planner model-name boundary > #given terminal controls or an oversized model name #when category planning resolves #then unsafe names are ignored [0.08ms]
+
+packages/omo-senpi/src/components/task/process-sweep.test.ts:
+(pass) wireSessionStartProcessSweep() > #given a wired sweep #when session_start fires #then the family sweep runs [0.22ms]
+(pass) wireSessionStartProcessSweep() > #given the RPC child marker is set #when session_start fires #then the sweep is skipped [0.32ms]
+(pass) wireSessionStartProcessSweep() > #given a never-resolving sweep #when session_start fires #then the handler returns without blocking [0.27ms]
+(pass) wireSessionStartProcessSweep() > #given a failing sweep #when session_start fires #then the failure is logged and cannot propagate [0.21ms]
+(pass) wireSessionStartProcessSweep() > #given a synchronously throwing sweep #when session_start fires #then the failure is logged and cannot propagate [0.16ms]
+
+packages/omo-senpi/src/components/task/parent-notifier.test.ts:
+(pass) createParentNotifier batched injection delivery > #given a completion #when enqueued through the coordinator #then hidden metadata is preserved [0.12ms]
+(pass) createParentNotifier batched injection delivery > #given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer [0.28ms]
+(pass) createParentNotifier batched injection delivery > #given two near-simultaneous completions #when the batch window closes #then BOTH arrive in ONE steer injection [0.10ms]
+(pass) createParentNotifier batched injection delivery > #given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry [0.07ms]
+(pass) createParentNotifier batched injection delivery > #given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both [0.13ms]
+(pass) createParentNotifier batched injection delivery > #given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel [0.05ms]
+
+packages/omo-senpi/src/components/task/completion-bridge.test.ts:
+(pass) completion bridge live background promotion > #given a foreground start promoted before terminal #when completion applies #then the live manager flag delivers a notification [1.98ms]
+(pass) completion bridge live background promotion > #given a genuinely foreground start #when completion applies without promotion #then sync-task notification suppression remains intact [1.44ms]
+
+packages/omo-senpi/src/components/task/runtime-context.test.ts:
+(pass) TaskRuntimeContext session facts > #given a live session manager with its file #when captured #then the exact file path is retained [0.10ms]
+
+packages/omo-senpi/src/components/task/engine-runner-routing.test.ts:
+(pass) task engine runner routing > #given an invalid event task id #when the adapter appends an audit event #then store rejection is contained [1.19ms]
+(pass) task engine runner routing > #given a process-mode spawn #when the manager launches #then the process runner receives the spec and the in-process runner does not [1.97ms]
+(pass) task engine runner routing > #given an in-process spawn #when the manager launches #then the in-process runner receives the spec and the process runner does not [5.68ms]
+
+packages/omo-senpi/src/components/task/session-transition-bridge.test.ts:
+(pass) createSessionTransitionBridge transition marking > #given a session about to switch #when onBeforeSwitch fires #then the runtime enters the switching transition [1.45ms]
+(pass) createSessionTransitionBridge transition marking > #given a session about to compact #when onBeforeCompact fires #then the runtime enters the compacting transition [0.06ms]
+(pass) createSessionTransitionBridge transition marking > #given a session shutting down #when onShutdown fires #then the runtime enters the shutdown transition [0.04ms]
+(pass) createSessionTransitionBridge transition marking > #given no pending transition #when a fresh session starts #then no flush is attempted [0.05ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered during compaction #when the same session compacts through #then the buffered completion is flushed and delivered [0.27ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered before a switch #when a different session replaces it #then the completion is dropped, not delivered [0.09ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered before a switch #when the same session resumes #then the buffered completion is delivered [0.07ms]
+
+packages/omo-senpi/src/components/task/message-renderers.test.ts:
+(pass) task-family custom message renderers > #given terminal control injection #when rendering task completion #then structured CJK details are sanitized [0.31ms]
+(pass) task-family custom message renderers > #given structured completion details #when rendering #then user-facing task facts replace protocol tags [0.16ms]
+(pass) task-family custom message renderers > #given a liveness event #when rendering #then member state and a sanitized crash reason are visible [0.09ms]
+(pass) task-family custom message renderers > #given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries [0.17ms]
+
+packages/omo-senpi/src/components/task/planner-runtime-fallback.test.ts:
+(pass) createTaskChildPlanner runtime fallback > #given a category with configured runtime fallbacks #when planned #then requested and ordered fallback metadata are preserved [0.35ms]
+
+packages/omo-senpi/src/components/task/team-service-support.test.ts:
+(pass) makeShutdownMessenger > #given a mapped running member #when a shutdown notice is sent #then the notice steers into the running turn [9.62ms]
+
+packages/omo-senpi/src/components/task/planner-agent-effort.test.ts:
+(pass) agent plans carrying configured effort > #given an agent model entry with effort #when planned #then the effort becomes the child variant [0.26ms]
+(pass) agent plans carrying configured effort > #given an agent carrying both variant and effort #when planned #then effort wins exactly as it does for a category [0.09ms]
+(pass) agent plans carrying configured effort > #given an agent level variant and a per entry effort #when planned #then the per entry effort still reaches the child [0.07ms]
+(pass) agent plans carrying configured effort > #given an agent with plain string models #when planned #then no variant is invented [0.06ms]
+
+packages/omo-senpi/src/components/task/task-component.test.ts:
+(pass) OMO Senpi task component fallback completion > #given duplicate terminal delivery #when the task component notifies the lead #then it reports model fallback once at terminal completion [0.24ms]
+
+packages/omo-senpi/src/components/task/status-ui.test.ts:
+(pass) createTaskStatusUi.syncNow > #given a list-only manager #when a static running row renders #then no animation timer starts [0.23ms]
+(pass) createTaskStatusUi.syncNow > #given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session [0.17ms]
+(pass) createTaskStatusUi.syncNow > #given controls across a stale malformed running record #when syncing #then rows sanitize controls without damaging CJK [0.16ms]
+(pass) createTaskStatusUi.syncNow > #given no captured ui context #when syncing #then it is a no-op [0.04ms]
+(pass) createTaskStatusUi.syncNow > #given a non-tui mode #when syncing #then UI is skipped [0.07ms]
+(pass) createTaskStatusUi.syncNow > #given all tasks terminal #when syncing #then the widget is cleared [0.05ms]
+(pass) createTaskStatusUi.scheduleSync > #given a just-started background child #when scheduling #then it subscribes before debounce fires [0.08ms]
+(pass) createTaskStatusUi.scheduleSync > #given several rapid schedule calls #when debounce fires #then syncNow runs once [0.14ms]
+(pass) createTaskStatusUi.scheduleSync > #given a pending debounce #when disposed #then the timer clears without rendering [0.26ms]
+
+packages/omo-senpi/src/components/telemetry/telemetry.test.ts:
+(pass) omo-senpi telemetry daily activity > #given no daily stamp #when session_start fires #then first session emits daily-active telemetry [2.83ms]
+(pass) omo-senpi telemetry daily activity > #given a same-day stamp #when session_start fires again #then second same-day session does not emit [0.96ms]
+(pass) omo-senpi telemetry daily activity > #given product disable opt-out #when session_start fires #then opt-out suppresses emission and stamp writes [0.30ms]
+(pass) omo-senpi telemetry daily activity > #given product anonymous telemetry opt-out #when session_start fires #then opt-out suppresses emission and stamp writes [0.21ms]
+(pass) omo-senpi telemetry daily activity > #given global opt-out #when session_start fires #then opt-out suppresses emission and stamp writes [0.25ms]
+(pass) omo-senpi telemetry daily activity > #given SENPI_CODING_AGENT_DIR #when telemetry records #then stamp file location respects the isolated senpi agent dir [0.88ms]
+
+packages/omo-senpi/src/components/telemetry/telemetry.payload.test.ts:
+(pass) omo-senpi telemetry payloads > #given telemetry component and telemetry-core builder #when session_start captures through injected transport #then payload equivalence holds [0.93ms]
+(pass) omo-senpi telemetry payloads > #given missing env and empty session payload #when session_start fires #then defaults are safe and no exception escapes [0.55ms]
+(pass) omo-senpi telemetry payloads > #given a hanging transport #when session_start fires #then send failure does not block the session_start path [0.97ms]
+
+packages/omo-senpi/src/components/fallback-architect/detection.test.ts:
+(pass) fallback-architect detection > #given an assistant message that the classifier stopped > #when stopDetails marks a refusal > #then reports the message as refusal-like [0.10ms]
+(pass) fallback-architect detection > #given an assistant message that the classifier stopped > #when stopDetails marks sensitive content > #then reports the message as refusal-like [0.08ms]
+(pass) fallback-architect detection > #given a provider policy rejection carried only in errorMessage > #when the error text matches the Anthropic usage policy wording > #then reports the message as refusal-like for an error stop [0.07ms]
+(pass) fallback-architect detection > #given a provider policy rejection carried only in errorMessage > #when the error text matches the Anthropic usage policy wording > #then reports the message as refusal-like for a toolUse stop [0.05ms]
+(pass) fallback-architect detection > #given messages that are not refusals > #when the stop is an ordinary transient failure > #then reports the message as not refusal-like [0.04ms]
+(pass) fallback-architect detection > #given messages that are not refusals > #when the message completed normally > #then reports the message as not refusal-like [0.04ms]
+(pass) fallback-architect detection > #given messages that are not refusals > #when the message is not from the assistant > #then reports the message as not refusal-like [0.04ms]
+(pass) fallback-architect detection > #given messages that are not refusals > #when an aborted message still carries stale refusal details > #then the stop reason wins and the message is not refusal-like [0.04ms]
+(pass) fallback-architect detection > #given messages that are not refusals > #when the payload is malformed > #then returns false instead of throwing [0.04ms]
+(pass) fallback-architect detection > #given a model descriptor > #when the id is claude-fable-5 > #then matches regardless of provider [0.04ms]
+(pass) fallback-architect detection > #given a model descriptor > #when the id is another model > #then does not match [0.04ms]
+(pass) fallback-architect detection > #given raw extension payloads > #when the payload is a well formed model_select event > #then the guard accepts it [0.05ms]
+(pass) fallback-architect detection > #given raw extension payloads > #when the payload is missing required fields > #then the guard rejects it without throwing [0.05ms]
+(pass) fallback-architect detection > #given raw extension payloads > #when the payload is a well formed message_end event > #then the guard accepts it and rejects junk [0.04ms]
+
+packages/omo-senpi/src/components/fallback-architect/fallback-architect.test.ts:
+(pass) fallback-architect component > #given a classifier refusal on claude-fable-5 > #when the session falls back to a weaker model > #then it injects exactly one hidden directive naming both models [0.54ms]
+(pass) fallback-architect component > #given a classifier refusal on claude-fable-5 > #when the session falls back to a weaker model > #then it also shows exactly one visible tip naming the fallback model and pointing at give-me-tips [0.31ms]
+(pass) fallback-architect component > #given a classifier refusal on claude-fable-5 > #when the session falls back to a weaker model > #then it registers a renderer for the visible tip message [0.12ms]
+(pass) fallback-architect component > #given a provider policy rejection with no stopDetails > #when the session falls back > #then it still injects the directive [0.13ms]
+(pass) fallback-architect component > #given a fallback that no refusal preceded > #when a transient failure moves the session off fable 5 > #then nothing is injected [0.18ms]
+(pass) fallback-architect component > #given a fallback that no refusal preceded > #when a successful answer precedes the fallback > #then the stale refusal flag does not survive [0.11ms]
+(pass) fallback-architect component > #given a refusal on a model that is not fable 5 > #when the session falls back > #then nothing is injected [0.14ms]
+(pass) fallback-architect component > #given the architect category is unavailable > #when a refusal fallback happens > #then nothing is injected [0.30ms]
+(pass) fallback-architect component > #given the component is disabled by flag > #when a refusal fallback happens and the user prompts again > #then neither the directive nor a reminder is injected [0.17ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when the user sends further prompts > #then each prompt carries exactly one reminder and the input is never rewritten [0.26ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when the prompt was queued while the agent was streaming > #then the reminder rides inside that same prompt instead of burning its own turn [0.50ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when a refusal fallback follows an aborted message carrying stale refusal details > #then nothing is injected [0.17ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when the input came from an extension rather than the user > #then no reminder is injected [0.24ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when the chain falls back a second time from the weaker model > #then no second directive is injected and the state stays active [0.18ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when fable 5 becomes the active model again > #then the reminder stops [0.22ms]
+(pass) fallback-architect component > #given an active refusal fallback > #when the fallback is reverted by senpi > #then the reminder stops [0.17ms]
+(pass) fallback-architect component > #given malformed host payloads > #when they reach the handlers > #then the component ignores them without throwing [0.16ms]
+
+packages/omo-senpi/src/components/fallback-architect/directive.test.ts:
+(pass) fallback-architect directive > #given the custom message types > #when a consumer reads them > #then they are the wire values senpi persists [0.15ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it names both models [0.12ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it routes the model to the architect category [0.11ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it is wrapped in the matched marker pair [0.07ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it identifies the architect consultant as the same Fable 5 model [0.05ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it names the content Fable 5 is sensitive about [0.05ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it demands queries composed to read as legitimate engineering work [0.05ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it prescribes the refusal recovery instead of resending the query [0.10ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the full directive is built > #then it tells the model the user was shown a visible tip about the refusal [0.05ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the compact reminder is built > #then it names the refused model and the architect route [0.04ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the compact reminder is built > #then it carries the compact Fable 5 refusal-avoidance guidance [0.04ms]
+(pass) fallback-architect directive > #given a refusal driven fallback between two models > #when the compact reminder is built > #then it stays shorter than the full directive [0.04ms]
+
+packages/omo-senpi/src/components/fallback-architect/tip-message.test.ts:
+(pass) fallback-architect tip message > #given the custom message type > #when a consumer reads it > #then it is the wire value senpi persists [0.14ms]
+(pass) fallback-architect tip message > #given a refusal fallback from fable 5 to a weaker model > #when the tip text is built > #then it names the actual fallback model [0.06ms]
+(pass) fallback-architect tip message > #given a refusal fallback from fable 5 to a weaker model > #when the tip text is built > #then it says the refusal should not wear the user down because the essence is still reasoned through [0.05ms]
+(pass) fallback-architect tip message > #given a refusal fallback from fable 5 to a weaker model > #when the tip text is built > #then it points at the architect category for fable-5-grade depth [0.05ms]
+(pass) fallback-architect tip message > #given a refusal fallback from fable 5 to a weaker model > #when the tip text is built > #then it ends with a pointer line containing give-me-tips [0.08ms]
+(pass) fallback-architect tip message > #given a persisted tip message > #when the renderer draws it > #then the first line carries the Tip: label [0.06ms]
+(pass) fallback-architect tip message > #given a persisted tip message > #when the renderer draws it > #then every line is dimmed through the theme [0.12ms]
+(pass) fallback-architect tip message > #given a persisted tip message > #when the renderer draws it > #then the tip content survives rendering [0.07ms]
+
+packages/omo-senpi/src/components/fallback-architect/architect-gate.test.ts:
+(pass) architect gate > #given a project config that declares the architect category > #when the gate is evaluated > #then the category counts as active [2.05ms]
+(pass) architect gate > #given a project config that disables the architect category > #when the gate is evaluated > #then the category does not count as active [1.42ms]
+(pass) architect gate > #given a project config without an architect category > #when the gate is evaluated > #then the category does not count as active [0.94ms]
+(pass) architect gate > #given no omo config at all > #when the gate is evaluated > #then it returns false instead of throwing [0.71ms]
+
+ 412 pass
+ 0 fail
+ 1204 expect() calls
+Ran 412 tests across 69 files. [5.21s]

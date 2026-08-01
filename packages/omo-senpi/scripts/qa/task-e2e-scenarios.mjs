@@ -8,11 +8,10 @@ export const MAIN_SCRIPT = {
   parentSteps: [
     { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do the first unit", run_in_background: true, name: "e2echild" } },
     { type: "text", text: "parent turn one done, going idle" },
-    { type: "tool_call", name: "task_send", arguments: { to: "e2echild", deliver_as: "interrupt" } },
     { type: "tool_call", name: "task_send", arguments: { to: "e2echild", message: "do the second unit" } },
     { type: "text", text: "parent turn two done, going idle" },
-    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "full", block: true } },
-    { type: "text", text: "parent read the transcript, all done" },
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "tail" } },
+    { type: "text", text: "parent peeked the child tail, all done" }
   ],
 }
 

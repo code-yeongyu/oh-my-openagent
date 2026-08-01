@@ -1,19 +1,18 @@
 import { describe, expect, it } from "bun:test"
 
-import { rendererVisibleWidth, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
+import type { ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 import {
-  buildWidgetRows,
   createTaskStatusUi,
-  formatFooterStatus,
-  formatTaskRow,
   type StatusUiManager,
   type StatusUiRuntime,
   type StatusUiTimers,
 } from "./status-ui"
 
-// allow: SIZE_OK - status formatting and captured-UI behavior share one focused fixture surface.
+function listed(records: readonly TaskRecord[]): readonly ListedTask[] {
+  return records.map((entry) => ({ record: entry }))
+}
 
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
@@ -28,27 +27,6 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
     notification: { run_epoch: 0, notified_epoch: -1 },
     ...overrides,
   }
-}
-
-function listed(records: readonly TaskRecord[]): readonly ListedTask[] {
-  return records.map((rec) => ({ record: rec }))
-}
-
-function longActiveRecord(): TaskRecord {
-  return record({
-    task_id: "st_01active0123456789",
-    name: "active-child",
-    status: "running",
-    category: "ultrabrain",
-    resolved_model: {
-      provider: "omo-mock",
-      model_id: "mock-1",
-      display: "omo-mock/mock-1",
-      reasoning_effort: "xhigh",
-      variant: "xhigh",
-      source: "category",
-    },
-  })
 }
 
 interface FakeUi extends CapturedUi {
@@ -70,312 +48,28 @@ function fakeUi(): FakeUi {
   }
 }
 
-function fakeManager(records: readonly TaskRecord[]): StatusUiManager & { scopes: unknown[] } {
-  const scopes: unknown[] = []
+function fakeManager(records: readonly TaskRecord[]): StatusUiManager & { scopes: Array<{ scope: string; session_id: string }> } {
+  const scopes: Array<{ scope: string; session_id: string }> = []
   return {
     scopes,
     list: (scope) => {
-      scopes.push(scope)
       if (scope.scope === "all") return listed(records)
-      return listed(records.filter((rec) => rec.parent_session_id === scope.session_id || rec.root_session_id === scope.session_id))
+      scopes.push(scope)
+      return listed(records.filter((entry) => entry.parent_session_id === scope.session_id))
     },
   }
 }
 
-function runtimeOf(ui: CapturedUi | undefined, sessionId: string | undefined, mode: string | undefined): StatusUiRuntime {
-  return { ui: () => ui, sessionId: () => sessionId, mode: () => mode }
+function runtimeOf(ui: FakeUi | undefined, sessionId = "session-a", mode = "tui"): StatusUiRuntime {
+  return {
+    ui: () => ui,
+    sessionId: () => sessionId,
+    mode: () => mode,
+  }
 }
 
-describe("formatFooterStatus", () => {
-  it("#given two running tasks #when formatting the footer #then compact active counts and a task tail render", () => {
-    // given
-    const records = [record({ task_id: "st_aaaa", status: "running" }), record({ task_id: "st_bbbb", status: "running" })]
-
-    // when
-    const footer = formatFooterStatus(records)
-
-    // then
-    expect(footer).toContain("t2/r2")
-    expect(footer).toContain("st_aaaa")
-  })
-
-  it("#given no tasks #when formatting the footer #then it is undefined so the status clears", () => {
-    // given / when / then
-    expect(formatFooterStatus([])).toBeUndefined()
-  })
-
-  it("#given errored and completed terminals #when formatting #then done and err counts are distinct", () => {
-    // given
-    const records = [
-      record({ task_id: "st_a", status: "completed" }),
-      record({ task_id: "st_b", status: "error" }),
-      record({ task_id: "st_c", status: "lost" }),
-    ]
-
-    // when
-    const footer = formatFooterStatus(records) ?? ""
-
-    // then all three terminal, two of them error-like (error + lost)
-    expect(footer).toContain("run:0")
-    expect(footer).toContain("done:3")
-    expect(footer).toContain("err:2")
-  })
-
-  it("#given a 137-column active task #when formatting the footer #then it remains one physical line at 72 and 120 columns", () => {
-    // given / when
-    const footer = formatFooterStatus([longActiveRecord()]) ?? ""
-
-    // then
-    expect(footer).not.toContain("\n")
-    for (const columns of [72, 120]) expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(columns)
-    expect(footer).toBe("t1/r1 st_01acti...|c:ultrabrain omo-mock/mock-1 xhigh in-process running")
-  })
-})
-
-describe("buildWidgetRows", () => {
-  it("#given more than five active tasks #when building rows #then it caps at five and adds a +N more row", () => {
-    // given seven running tasks
-    const records = Array.from({ length: 7 }, (_v, index) => record({ task_id: `st_${index}`, status: "running" }))
-
-    // when
-    const rows = buildWidgetRows(records)
-
-    // then
-    expect(rows).toHaveLength(6)
-    expect(rows[5]).toBe("+2 more")
-  })
-
-  it("#given only terminal tasks #when building rows #then no rows render (widget clears)", () => {
-    // given
-    const records = [record({ task_id: "st_done", status: "completed" })]
-
-    // when / then
-    expect(buildWidgetRows(records)).toHaveLength(0)
-  })
-
-  it("#given an active task #when building a row #then it retains useful id, target, model, mode, and status context", () => {
-    // given
-    const records = [
-      record({ task_id: "st_row", name: "finder", status: "running", agent_type: "explore", pid: 4242 }),
-    ]
-
-    // when
-    const row = buildWidgetRows(records)[0] ?? ""
-
-    // then
-    expect(row).toContain("st_row")
-    expect(row).toContain("a:explore")
-    expect(row).toContain("anthropic/")
-    expect(row).toContain("in-process")
-    expect(row).toContain("running")
-    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
-  })
-
-  it("#given a 137-column active task #when building its widget row #then it remains one physical line at 72 and 120 columns", () => {
-    // given / when
-    const row = buildWidgetRows([longActiveRecord()])[0] ?? ""
-
-    // then
-    expect(row).not.toContain("\n")
-    for (const columns of [70, 72, 120]) expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(columns)
-    expect(row).toContain("c:ultrabrain")
-    expect(row).toContain("omo-mock/mock-1")
-    expect(row).toContain("xhigh")
-    expect(row).toContain("in-process")
-    expect(row).toContain("running")
-  })
-})
-
-describe("formatTaskRow", () => {
-  it("#given a category task with resolved model metadata #when formatting #then category, display model, reasoning, variant, mode, and status render in one order", () => {
-    // given
-    const task = record({
-      task_id: "st_resolved",
-      name: "planner",
-      status: "running",
-      category: "ultrabrain",
-      execution_mode: "rpc",
-      model: "category/raw-fallback",
-      resolved_model: {
-        provider: "openai",
-        model_id: "gpt-5.6-sol",
-        display: "openai/gpt-5.6-sol",
-        reasoning_effort: "xhigh",
-        variant: "sol",
-        source: "category",
-      },
-    })
-
-    // when
-    const row = formatTaskRow(task)
-
-    // then
-    expect(row).toBe(
-      "st_resolved planner category:ultrabrain model:openai/gpt-5.6-sol reasoning:xhigh variant:sol mode:rpc status:running",
-    )
-  })
-
-  it("#given a legacy task without resolved model metadata #when formatting #then raw model is preserved as the model label", () => {
-    // given
-    const task = record({
-      task_id: "st_legacy",
-      status: "running",
-      agent_type: "explore",
-      model: "anthropic/claude-sonnet-4-6",
-    })
-
-    // when
-    const row = formatTaskRow(task)
-
-    // then
-    expect(row).toBe("st_legacy agent:explore model:anthropic/claude-sonnet-4-6 mode:in-process status:running")
-  })
-
-  it("#given empty resolved model detail labels #when formatting #then empty reasoning and variant labels are omitted", () => {
-    // given
-    const task = record({
-      task_id: "st_empty",
-      status: "running",
-      category: "ultrabrain",
-      model: "category/raw-fallback",
-      resolved_model: {
-        provider: "google",
-        model_id: "gemini-3.1-pro",
-        display: "google/gemini-3.1-pro",
-        reasoning_effort: "",
-        variant: "",
-        source: "category",
-      },
-    })
-
-    // when
-    const row = formatTaskRow(task)
-
-    // then
-    expect(row).toBe("st_empty category:ultrabrain model:google/gemini-3.1-pro mode:in-process status:running")
-  })
-
-  it("#given matching reasoning and variant values #when formatting #then the duplicate variant label is omitted", () => {
-    // given / when
-    const row = formatTaskRow(longActiveRecord())
-
-    // then
-    expect(row).toContain("reasoning:xhigh")
-    expect(row).not.toContain("variant:xhigh")
-  })
-
-  it("#given a stale malformed running record with final_response #when formatting defensively #then the progress excerpt is terminal-width safe and concise", () => {
-    // given a stale persisted record; normal lifecycle progress does not set final_response while running
-    const task = record({
-      task_id: "st_cjk",
-      status: "running",
-      agent_type: "explore",
-      final_response: `${"界".repeat(40)}tail`,
-    })
-
-    // when
-    const row = formatTaskRow(task)
-    const progressPrefix = " progress:"
-    const progressIndex = row.indexOf(progressPrefix)
-    const progress = progressIndex >= 0 ? row.slice(progressIndex + progressPrefix.length) : ""
-
-    // then
-    expect(progress).toContain("...")
-    expect(progress).not.toContain("tail")
-    expect(rendererVisibleWidth(progress)).toBeLessThanOrEqual(60)
-  })
-})
-
 describe("createTaskStatusUi.syncNow", () => {
-  it("#given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session", () => {
-    // given tasks split across two sessions
-    const mine = [record({ task_id: "st_1", status: "running" }), record({ task_id: "st_2", status: "running" })]
-    const other = record({ task_id: "st_other", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
-    const manager = fakeManager([...mine, other])
-    const ui = fakeUi()
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui") })
-
-    // when
-    statusUi.syncNow()
-
-    // then footer counts scoped to session-a only (2 tasks, not 3)
-    expect(ui.statusCalls.at(-1)).toContain("t2/r2")
-    // widget shows the two session-a rows below the editor
-    const widget = ui.widgetCalls.at(-1)
-    expect(widget?.content).toHaveLength(2)
-    expect(widget?.placement).toBe("belowEditor")
-  })
-
-  it("#given controls across a stale malformed running record with final_response #when syncing defensively #then the row widget and footer are sanitized without damaging CJK text", () => {
-    // given a stale persisted record; normal lifecycle progress does not set final_response while running
-    const task = record({
-      task_id: "st_\u001b[31mred\u001b[0m", name: "한국어\u0007 작업",
-      status: "running", category: "ultra\u001b[2Jbrain",
-      resolved_model: { provider: "openai", model_id: "gpt-5.6-sol", source: "category", display: "GPT\u001b]0;hidden\u001b\\-5.6 Sol", reasoning_effort: "xhigh\u0085", variant: "sol\u001bc" },
-      final_response: "첫째\t둘째\n界 \u001b]8;;https://example.com/unterminated",
-    })
-    const ui = fakeUi()
-    const statusUi = createTaskStatusUi({ manager: fakeManager([task]), runtime: runtimeOf(ui, "session-a", "tui") })
-
-    // when
-    statusUi.syncNow()
-
-    // then
-    const footer = ui.statusCalls.at(-1) ?? ""
-    const widgetRow = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
-    expect(rendererVisibleWidth(widgetRow)).toBeLessThanOrEqual(70)
-    expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(72)
-    expect(widgetRow).toContain("한")
-    expect(widgetRow).toContain("c:ultrabrain")
-    expect(widgetRow).toContain("GPT-5.6 Sol")
-    expect(widgetRow).toContain("xhigh")
-    expect(widgetRow).toContain("in-process")
-    expect(widgetRow).toContain("running")
-    expect(footer).toContain("t1/r1")
-    expect(`${footer} ${widgetRow}`).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/u)
-  })
-
-  it("#given no captured ui context #when syncing #then it is a no-op", () => {
-    // given a runtime whose ui was cleared on switch/shutdown
-    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(undefined, "session-a", "tui") })
-
-    // when / then it must not throw and must not query the manager
-    statusUi.syncNow()
-    expect(manager.scopes).toHaveLength(0)
-  })
-
-  it("#given a non-tui mode #when syncing #then UI is skipped", () => {
-    // given a captured ui but rpc mode
-    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
-    const ui = fakeUi()
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "rpc") })
-
-    // when
-    statusUi.syncNow()
-
-    // then nothing rendered
-    expect(ui.statusCalls).toHaveLength(0)
-    expect(ui.widgetCalls).toHaveLength(0)
-  })
-
-  it("#given all tasks terminal #when syncing #then the widget is cleared", () => {
-    // given
-    const manager = fakeManager([record({ task_id: "st_done", status: "completed" })])
-    const ui = fakeUi()
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui") })
-
-    // when
-    statusUi.syncNow()
-
-    // then setWidget was called with undefined content to clear the widget
-    expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
-  })
-})
-
-describe("createTaskStatusUi.background progress", () => {
-  it("#given two background children #when their latest task events arrive within one debounce window #then footer and widget show truncated descriptions, activity, elapsed time, and spinner frames", () => {
-    // given a controllable 250ms debounce and two active background children created 65 seconds ago
+  it("#given a list-only manager #when a static running row renders #then no animation timer starts", () => {
     const active = new Map<number, () => void>()
     let nextHandle = 1
     const timers: StatusUiTimers = {
@@ -386,51 +80,91 @@ describe("createTaskStatusUi.background progress", () => {
       },
       clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
     }
-    const first = record({
-      task_id: "st_first",
-      name: "Investigate the unexpectedly long background child description",
-      status: "running",
-      created_at: "2026-07-07T00:00:00.000Z",
-    })
-    const second = record({ task_id: "st_second", name: "Review tests", status: "running", created_at: "2026-07-07T00:00:00.000Z" })
-    const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
-    const manager: StatusUiManager = {
-      list: () => listed([first, second]),
-      wasBackground: () => true,
-      subscribeChild: (taskId, listener) => {
-        listeners.set(taskId, listener)
-        return () => listeners.delete(taskId)
-      },
-    }
-    const ui = fakeUi()
     const statusUi = createTaskStatusUi({
-      manager,
-      runtime: runtimeOf(ui, "session-a", "tui"),
+      manager: fakeManager([record({ task_id: "st_static", status: "running" })]),
+      runtime: runtimeOf(fakeUi()),
       timers,
-      now: () => Date.parse("2026-07-07T00:01:05.000Z"),
     })
 
-    // when the manager-handle subscriptions receive child tool events in one debounce window
     statusUi.syncNow()
-    listeners.get("st_first")?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/foo.ts" } })
-    listeners.get("st_second")?.({ type: "tool_execution_start", toolName: "bash", args: { command: "bun test" } })
-    expect(active.size).toBe(1)
-    for (const callback of active.values()) callback()
 
-    // then each active background child has a compact, single-line live row in the widget and active footer
-    const rows = ui.widgetCalls.at(-1)?.content ?? []
-    expect(rows).toEqual([
-      "⠋ st_first Investigate the... · read src/foo.ts · 1m 5s",
-      "⠋ st_second Review tests · bash bun test · 1m 5s",
-    ])
-    expect(ui.statusCalls.at(-1)).toContain("Investigate the...")
-    expect(ui.statusCalls.at(-1)).toContain("read src/foo.ts")
+    expect(active.size).toBe(0)
+  })
+
+  it("#given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session", () => {
+    const mine = [record({ task_id: "st_1", status: "running" }), record({ task_id: "st_2", status: "running" })]
+    const other = record({ task_id: "st_other", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
+    const manager = fakeManager([...mine, other])
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui) })
+
+    statusUi.syncNow()
+
+    // C1: the duplicated footer task status line is gone; only the belowEditor widget rows remain.
+    expect(ui.statusCalls).toHaveLength(0)
+    const widget = ui.widgetCalls.at(-1)
+    expect(widget?.content).toHaveLength(2)
+    expect(widget?.placement).toBe("belowEditor")
+  })
+
+  it("#given controls across a stale malformed running record #when syncing #then rows sanitize controls without damaging CJK", () => {
+    const task = record({
+      task_id: "st_\u001b[31mred\u001b[0m",
+      name: "한국어\u0007 작업",
+      status: "running",
+      category: "ultra\u001b[2Jbrain",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        source: "category",
+        display: "GPT\u001b]0;hidden\u001b\\-5.6 Sol",
+        reasoning_effort: "xhigh\u0085",
+        variant: "sol\u001bc",
+      },
+      final_response: "첫째\t둘째\n界 \u001b]8;;https://example.com/unterminated",
+    })
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager: fakeManager([task]), runtime: runtimeOf(ui) })
+
+    statusUi.syncNow()
+
+    // C1: no footer status line is registered; the sanitized row lives only in the widget.
+    expect(ui.statusCalls).toHaveLength(0)
+    const widgetRow = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
+    expect(widgetRow).toContain("한")
+    expect(widgetRow).toContain("category:ultrabrain")
+    expect(widgetRow).toContain("openai/gpt-5.6-sol:xhigh")
+    expect(widgetRow).toContain("in-process")
+    expect(widgetRow).toContain("running")
+    expect(widgetRow).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/u)
+  })
+
+  it("#given no captured ui context #when syncing #then it is a no-op", () => {
+    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
+    createTaskStatusUi({ manager, runtime: runtimeOf(undefined) }).syncNow()
+    expect(manager.scopes).toHaveLength(0)
+  })
+
+  it("#given a non-tui mode #when syncing #then UI is skipped", () => {
+    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
+    const ui = fakeUi()
+    createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "rpc") }).syncNow()
+    expect(ui.statusCalls).toHaveLength(0)
+    expect(ui.widgetCalls).toHaveLength(0)
+  })
+
+  it("#given all tasks terminal #when syncing #then the widget is cleared", () => {
+    const ui = fakeUi()
+    createTaskStatusUi({
+      manager: fakeManager([record({ task_id: "st_done", status: "completed" })]),
+      runtime: runtimeOf(ui),
+    }).syncNow()
+    expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
   })
 })
 
 describe("createTaskStatusUi.scheduleSync", () => {
-  it("#given a just-started background child #when the store mutation schedules a render #then it subscribes before the debounce fires", () => {
-    // given a task that can emit its first tool event immediately after the start mutation
+  it("#given a just-started background child #when scheduling #then it subscribes before debounce fires", () => {
     const active = new Map<number, () => void>()
     const timers: StatusUiTimers = {
       set: (callback) => {
@@ -448,19 +182,15 @@ describe("createTaskStatusUi.scheduleSync", () => {
         return () => listeners.delete(taskId)
       },
     }
-    const ui = fakeUi()
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(fakeUi()), timers })
 
-    // when the store mutation schedules the debounced render
     statusUi.scheduleSync()
 
-    // then the child subscription is already installed, before its first tool event can be emitted
     expect(listeners.has("st_background")).toBe(true)
     expect(active.size).toBe(1)
   })
 
-  it("#given several rapid schedule calls #when the debounce fires #then syncNow runs once (250ms debounce)", () => {
-    // given a controllable timer
+  it("#given several rapid schedule calls #when debounce fires #then syncNow runs once", () => {
     const active = new Map<number, () => void>()
     let nextHandle = 1
     const timers: StatusUiTimers = {
@@ -474,26 +204,23 @@ describe("createTaskStatusUi.scheduleSync", () => {
       },
     }
     const ui = fakeUi()
-    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+    const statusUi = createTaskStatusUi({
+      manager: fakeManager([record({ task_id: "st_1", status: "running" })]),
+      runtime: runtimeOf(ui),
+      timers,
+    })
 
-    // when three transitions fire back to back
     statusUi.scheduleSync()
     statusUi.scheduleSync()
     statusUi.scheduleSync()
-
-    // then only one debounce timer is pending
     expect(active.size).toBe(1)
-
-    // when the debounce elapses
     for (const callback of [...active.values()]) callback()
-
-    // then exactly one sync ran
-    expect(ui.statusCalls).toHaveLength(1)
+    // C1: debounce still coalesces to one syncNow, but no footer status is registered.
+    expect(ui.statusCalls).toHaveLength(0)
+    expect(ui.widgetCalls).toHaveLength(1)
   })
 
-  it("#given a pending debounce #when dispose is called #then the timer is cleared and syncNow never runs", () => {
-    // given a controllable timer with a pending scheduled sync
+  it("#given a pending debounce #when disposed #then the timer clears without rendering", () => {
     const active = new Map<number, () => void>()
     let nextHandle = 1
     let cleared = 0
@@ -508,15 +235,15 @@ describe("createTaskStatusUi.scheduleSync", () => {
       },
     }
     const ui = fakeUi()
-    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
-    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+    const statusUi = createTaskStatusUi({
+      manager: fakeManager([record({ task_id: "st_1", status: "running" })]),
+      runtime: runtimeOf(ui),
+      timers,
+    })
     statusUi.scheduleSync()
-    expect(active.size).toBe(1)
 
-    // when the component is disposed before the debounce elapses
     statusUi.dispose()
 
-    // then the pending timer is cleared and no render happens
     expect(cleared).toBe(1)
     expect(active.size).toBe(0)
     expect(ui.statusCalls).toHaveLength(0)

@@ -17,26 +17,26 @@ describe("migrations sidecar", () => {
 
   describe("getSidecarPath", () => {
     test("appends .migrations.json to the config path", () => {
-      expect(getSidecarPath("/home/user/.config/opencode/oh-my-openagent.json")).toBe(
-        "/home/user/.config/opencode/oh-my-openagent.json.migrations.json",
+      expect(getSidecarPath("/home/user/.config/opencode/omo.json")).toBe(
+        "/home/user/.config/opencode/omo.json.migrations.json",
       )
     })
 
     test("works for jsonc configs too", () => {
-      expect(getSidecarPath("/home/user/oh-my-openagent.jsonc")).toBe(
-        "/home/user/oh-my-openagent.jsonc.migrations.json",
+      expect(getSidecarPath("/home/user/omo.jsonc")).toBe(
+        "/home/user/omo.jsonc.migrations.json",
       )
     })
   })
 
   describe("readAppliedMigrations", () => {
     test("returns an empty set when no sidecar exists", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       expect(readAppliedMigrations(configPath).size).toBe(0)
     })
 
     test("returns the applied migrations listed in a well-formed sidecar", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       writeFileSync(
         getSidecarPath(configPath),
         JSON.stringify({
@@ -55,21 +55,21 @@ describe("migrations sidecar", () => {
     })
 
     test("returns an empty set on malformed JSON instead of throwing", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       writeFileSync(getSidecarPath(configPath), "{ this is not json")
 
       expect(readAppliedMigrations(configPath).size).toBe(0)
     })
 
     test("returns an empty set when the sidecar payload has the wrong shape", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       writeFileSync(getSidecarPath(configPath), JSON.stringify({ appliedMigrations: "not-an-array" }))
 
       expect(readAppliedMigrations(configPath).size).toBe(0)
     })
 
     test("ignores non-string entries inside appliedMigrations", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       writeFileSync(
         getSidecarPath(configPath),
         JSON.stringify({
@@ -87,7 +87,7 @@ describe("migrations sidecar", () => {
 
   describe("writeAppliedMigrations", () => {
     test("creates the sidecar with the given migration keys", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       const migrations = new Set([
         "model-version:openai/gpt-5.4->openai/gpt-5.5",
       ])
@@ -102,7 +102,7 @@ describe("migrations sidecar", () => {
     })
 
     test("writes entries in sorted order for stable diffs", () => {
-      const configPath = join(workdir, "oh-my-openagent.json")
+      const configPath = join(workdir, "omo.json")
       const migrations = new Set([
         "model-version:z->y",
         "model-version:a->b",
@@ -121,7 +121,7 @@ describe("migrations sidecar", () => {
 
     test("creates parent directories if they do not exist yet", () => {
       const nested = join(workdir, "nested", "dir", "that", "does", "not", "exist")
-      const configPath = join(nested, "oh-my-openagent.json")
+      const configPath = join(nested, "omo.json")
       // Parent chain intentionally not created.
 
       const ok = writeAppliedMigrations(configPath, new Set(["model-version:a->b"]))
@@ -131,7 +131,7 @@ describe("migrations sidecar", () => {
     })
 
     test("round-trips via readAppliedMigrations", () => {
-      const configPath = join(workdir, "oh-my-openagent.jsonc")
+      const configPath = join(workdir, "omo.jsonc")
       const original = new Set([
         "model-version:openai/gpt-5.4->openai/gpt-5.5",
         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",

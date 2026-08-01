@@ -1,5 +1,6 @@
 import { findContinuableBoulderWork } from "../start-work-continuation/boulder-eligibility"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
 import { resolveOmoBin, runOmoCommand } from "./omo-command"
 
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
@@ -19,12 +20,14 @@ const CONTINUATION_PROMPT = [
 export interface UlwLoopComponentOptions {
   resolveOmoBin?: () => string | null
   runCommand?: (bin: string, args: readonly string[], options: { cwd: string }) => Promise<{ code: number; stdout: string }>
+  footerStatus?: UlwLoopFooterStatusOptions
 }
 
 interface InputEventLike {
   text: string
   source?: unknown
   images?: unknown
+  streamingBehavior?: unknown
 }
 
 interface ActiveStatus {
@@ -47,10 +50,16 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       }
 
       const runCommand = options.runCommand ?? runOmoCommand
+      const footerStatus = createUlwLoopFooterStatus(options.footerStatus)
       const state = {
         consecutiveContinuations: 0,
         previousStatusRaw: undefined as string | undefined,
       }
+
+      pi.on("session_start", async (_payload, eventCtx) => {
+        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
+      })
 
       pi.on("input", async (payload, eventCtx) => {
         if (!isInputEvent(payload)) return { action: "continue" }
@@ -58,7 +67,9 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
         state.consecutiveContinuations = 0
         state.previousStatusRaw = undefined
+        if (payload.streamingBehavior === undefined) return { action: "continue" }
         const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null || !status.active) return { action: "continue" }
         return {
           action: "transform",
@@ -84,6 +95,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         }
 
         const status = await readActiveStatus(omoBin, runCommand, cwd, ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null) {
           return
         }
@@ -101,6 +113,15 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         state.consecutiveContinuations += 1
         deliverContinuation(pi, ctx)
       })
+
+      pi.on("tool_result", async (payload, eventCtx) => {
+        if (!shouldRefreshFooterAfterToolResult(payload)) return
+        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
+      })
+
+      pi.on("session_before_switch", () => footerStatus.dispose())
+      pi.on("session_shutdown", () => footerStatus.dispose())
     },
   }
 }
@@ -117,12 +138,21 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void
     ctx.idleCoordinator.enqueue({
       key: ULW_CONTINUATION_INJECTION_KEY,
       source: "ulw-continuation",
+      customType: "omo-senpi:ulw-continuation",
       content: CONTINUATION_PROMPT,
+      display: false,
     })
     ctx.idleCoordinator.scheduleFlush()
     return
   }
-  pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })
+  pi.sendMessage(
+    {
+      customType: "omo-senpi:ulw-continuation",
+      content: CONTINUATION_PROMPT,
+      display: false,
+    },
+    { triggerTurn: true, deliverAs: "followUp" },
+  )
 }
 
 async function readActiveStatus(
@@ -181,6 +211,15 @@ function isInputEvent(value: unknown): value is InputEventLike {
 
 function isUserSourcedInput(value: InputEventLike): boolean {
   return value.source !== "extension"
+}
+
+function shouldRefreshFooterAfterToolResult(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  const toolName = value["toolName"]
+  return toolName === "create_goal"
+    || toolName === "update_goal"
+    || toolName === "bash"
+    || toolName === "interactive_bash"
 }
 
 function extractSessionId(eventCtx: unknown): string | undefined {

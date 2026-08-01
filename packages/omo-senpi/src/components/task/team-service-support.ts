@@ -25,6 +25,8 @@ export function buildMemberPorts(omoConfig: OmoConfig, agentNames: ReadonlySet<s
   return {
     isCategoryResolvable: (category) => categoryNames.has(category),
     isKnownAgent: (subagentType) => agentNames.has(subagentType),
+    categoryNames: [...categoryNames],
+    agentNames: [...agentNames],
   }
 }
 
@@ -63,8 +65,18 @@ export async function resolveTeamSpec(
   if (entry !== undefined) return { spec: entry.spec, source: entry.source }
 
   const failure = registry.errors.find((error) => error.name === teamName)
-  const message = failure !== undefined ? failure.message : `team '${teamName}' not found in project .omo/teams or omo.json`
-  throw new SenpiTeamSpecError(message, "INVALID_SPEC", teamName)
+  if (failure !== undefined) throw new SenpiTeamSpecError(failure.message, "INVALID_SPEC", teamName)
+
+  const declared = registry.teams.map((candidate) => candidate.name)
+  const declaredSuffix = declared.length > 0 ? ` Declared teams: ${declared.sort().join(", ")}.` : ""
+  const brokenSuffix = registry.errors.length > 0
+    ? ` (${registry.errors.length} team spec(s) failed to load: ${registry.errors.map((error) => error.name).sort().join(", ")}.)`
+    : ""
+  throw new SenpiTeamSpecError(
+    `team '${teamName}' not found in project .omo/teams or omo.json.${declaredSuffix}${brokenSuffix}`,
+    "INVALID_SPEC",
+    teamName,
+  )
 }
 
 async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberName: string): Promise<string | undefined> {
@@ -73,13 +85,13 @@ async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberN
   return map[memberName]
 }
 
-// Delivers a shutdown-protocol notice to the target member's background child as a follow-up, resolving
+// Delivers a shutdown-protocol notice to the target member's background child as a steer, resolving
 // the member->task mapping from the run sidecar. A member with no live task is a silent no-op.
 export function makeShutdownMessenger(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): ShutdownMessenger {
   return async (message) => {
     const taskId = await memberTaskId(stateDir, teamRunId, message.to)
     if (taskId === undefined) return
-    await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "followUp" })
+    await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "steer" })
   }
 }
 

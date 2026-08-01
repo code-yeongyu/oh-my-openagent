@@ -1185,7 +1185,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model is applied
-    expect(agent.model).toBe("google/gemini-3.1-pro")
+    expect(agent.model).toBe("anthropic/claude-opus-5")
   })
 
   test("agent with category and existing model keeps existing model", () => {

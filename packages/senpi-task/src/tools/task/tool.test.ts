@@ -39,13 +39,15 @@ function fakeManager(overrides: Partial<TaskManager>): TaskManager {
     getResidentHandle: () => undefined,
     subscribeChild: () => () => {},
     residentTaskIds: () => [],
+    promoteToBackground: () => true,
     wasBackground: () => false,
+    runStatsSnapshot: () => undefined,
     ...overrides,
   }
 }
 
 function deps(manager: TaskManager): TaskToolDeps {
-  return { manager, omoConfig: OMO_CONFIG, agents: { oracle: { name: "oracle", description: "Deep reasoning" } } }
+  return { manager, omoConfig: OMO_CONFIG, agents: { momus: { name: "momus", description: "Deep reasoning" } } }
 }
 
 function renderedLines(component: unknown, width: number): string[] {
@@ -85,7 +87,7 @@ describe("createTaskTool", () => {
     // then
     expect(tool.description).toContain("release-crew")
     expect(tool.description).toContain("Ships the release train")
-    expect(tool.description).toContain("oracle")
+    expect(tool.description).toContain("momus")
   })
 
   test("#given the assembled tool #when parameters are read #then the shared TypeBox schema leaves prompt/tasks optional (XOR enforced in validateBatchShape)", () => {
@@ -228,9 +230,7 @@ describe("createTaskTool", () => {
     const [row = ""] = renderedLines(component, 72)
 
     // then
-    expect(row).toContain("category:quick")
-    expect(row).toContain("GPT-5.6 Sol")
-    expect(row).toContain("xhigh")
+    expect(row).toContain("category:quick(openai/gpt-5.6-sol:xhigh)")
     expect(row).toContain(`${ANSI_ITALIC}foreground${ANSI_ITALIC_END}`)
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
   })

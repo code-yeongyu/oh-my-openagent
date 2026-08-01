@@ -41,7 +41,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude for orchestration. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Opus 5 for orchestration and visual work. GPT-5.6 Sol for deep reasoning. Kimi K3 and GLM 5.2 as visual fallbacks. Kimi high-speed for quick tasks. All working together, automatically.
 
 ---
 
@@ -84,10 +84,10 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 
 - **Claude Opus 5** / **Opus 5** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Kimi K3** — Strongest Kimi for Sisyphus. Recommended when you can accept its thinking-token cost; the K3 prompt is calibrated to stop overthinking and keep work moving.
-- **Kimi K3** / **K3** — Great Claude-like alternatives. K3 is the current default fallback in the primary Sisyphus chain after K3; many users run K3 or the K3/K3 combo exclusively.
-- **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus uses a GLM-5.2-calibrated prompt for model IDs recognized as GLM, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
+- **Kimi K2.7** — Restrained, outcome-first Kimi fallback for Claude-like orchestration paths.
+- **GLM 5.2** — Solid option, especially via OpenCode Go. Sisyphus uses a GLM-5.2-calibrated prompt and the automatic chain includes `glm-5.2` explicitly, but current evidence is still lighter than Claude/Kimi maintainer validation.
 
-Sisyphus works best on Claude Opus 5, Kimi K3 (or K3), and GLM 5. GPT-5.4 has its own prompt, while GPT-5.5 and GPT-5.6 Sol share a model-aware GPT-native prompt family. Hephaestus remains the recommended GPT-5.6 agent because [issue #6074](https://github.com/code-yeongyu/oh-my-openagent/issues/6074) tracks Sisyphus over-orchestration on bounded work.
+Sisyphus works best on Claude Opus 5, Kimi K3/K2.7, and GLM 5.2. GPT-5.4 has its own prompt, while GPT-5.5 and GPT-5.6 Sol share a model-aware GPT-native prompt family. Hephaestus remains the recommended GPT-5.6 agent because [issue #6074](https://github.com/code-yeongyu/oh-my-openagent/issues/6074) tracks Sisyphus over-orchestration on bounded work.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -99,9 +99,9 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 **Why this beats vanilla Codex CLI:**
 
-- **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
+- **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. Opus 5 for orchestration and visual work. GPT-5.6 Sol for deep reasoning. Kimi high-speed for quick tasks. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol xhigh through OpenAI or Vercel. `deep` prefers GPT-5.6 Terra xhigh through OpenAI or Vercel. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` prefers GPT-5.6 Luna xhigh. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` starts with Claude Opus 5 max, then Kimi K3 and GLM 5.2. `ultrabrain` prefers GPT-5.6 Sol xhigh, while `deep` uses GPT-5.6 Sol medium. `artistry` starts with Claude Fable 5, `quick` with Kimi high-speed, `unspecified-low` with GPT-5.6 Luna, and both `unspecified-high` and `writing` with Kimi K3. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -178,7 +178,7 @@ You can override specific agents or categories in your config:
     },
 
     // Research agents: cheaper models are fine
-    "librarian": { "model": "google/gemini-3-flash" },
+    "librarian": { "model": "google/gemini-3.6-flash" },
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
     // Architecture consultation: GPT or Claude Opus
@@ -186,32 +186,32 @@ You can override specific agents or categories in your config:
   },
 
   "categories": {
-    // Frontend/UI work: Gemini dominates visual tasks
+    // Frontend/UI work: Opus 5, then Kimi K3 and GLM 5.2
     "visual-engineering": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-5",
+      "variant": "max",
     },
 
     // Hard logic and architecture: GPT-5.6 Sol xhigh
     "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
 
     // Autonomous research and execution
-    "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
+    "deep": { "model": "openai/gpt-5.6-sol", "variant": "medium" },
 
     // Creative and design work
-    "artistry": { "model": "google/gemini-3.1-pro", "variant": "high" },
+    "artistry": { "model": "anthropic/claude-fable-5", "variant": "xhigh" },
 
     // Quick tasks: fast and cheap
-    "quick": { "model": "openai/gpt-5.4-mini" },
+    "quick": { "model": "kimi-for-coding/kimi-for-coding-highspeed" },
 
-    // Low-effort fallback: cheapest available
-    "unspecified-low": { "model": "openai/gpt-5.4-mini" },
+    // Low-effort fallback: GPT-5.6 Luna
+    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
-    // High-effort fallback: best available
-    "unspecified-high": { "model": "anthropic/claude-opus-5", "variant": "max" },
+    // High-effort fallback: Kimi K3, then Opus 5
+    "unspecified-high": { "model": "kimi-for-coding/kimi-k3", "variant": "max" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-opus-5", "variant": "high" },
+    "writing": { "model": "kimi-for-coding/kimi-k3", "variant": "low" },
   },
 }
 ```
@@ -222,19 +222,19 @@ You can override specific agents or categories in your config:
 
 - Claude Opus 5, Claude Haiku 4.5
 - Kimi K3 — behaves very similarly to Claude
-- GLM 5 — Claude-like behavior, good for broad tasks
+- GLM 5.2 — Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
-- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
+- GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain`; the `deep` category uses it at medium effort
+- GPT-5.6 Terra — balanced mid-tier; preferred for Momus (high) and available as an explicit override elsewhere
 - GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
-- GPT-5.6 Sol — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
-- GPT-5.4 Mini — fast and cheap utility tasks
+- GPT-5.6 Sol override paths — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
+- GPT 5.6 Luna Fast — fast and cheap utility fallback after the Kimi high-speed quick default
 
 **Different-behavior models**:
 
-- Gemini 3.1 Pro — excels at visual/frontend tasks
+- Gemini 3.1 Pro — visual-capable explicit override for providers that expose it; not the built-in `visual-engineering` default
 - MiniMax M3 / M2.7 / M2.7-highspeed — fast and smart for utility tasks
 - Grok Code Fast 1 — optimized for code grep/search
 

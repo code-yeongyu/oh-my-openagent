@@ -1,0 +1,6 @@
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project genuinely lacks typescript #then it fails with a clear error and exit 2 [34.46ms]
+
+ 153 pass
+ 0 fail
+ 980 expect() calls
+Ran 153 tests across 25 files. [1324.00ms]

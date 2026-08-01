@@ -12,21 +12,14 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe("team e2e session evidence", () => {
-  it("#given a delivered member wait in child JSONL #when main evidence is analyzed #then delivery is proven without a mock observation file", async () => {
+describe("team e2e injection evidence", () => {
+  it("#given injected member and lead envelopes #when main evidence is analyzed #then injection delivery and a drained lead inbox are proven", () => {
     // given
     const fixture = createFixture()
-    seedWaitEvidence(fixture)
-    writeSessionLine(fixture, {
-      type: "message",
-      message: {
-        role: "toolResult",
-        details: { message_id: fixture.leadMessageId, body: "LEAD2QUICK handshake" },
-      },
-    })
+    seedInjectionEvidence(fixture)
 
     // when
-    const checks = await analyzeMain(
+    const checks = analyzeMain(
       { events: fixture.events, status: 0 },
       { cwd: fixture.project },
       fixture.obsDir,
@@ -34,23 +27,27 @@ describe("team e2e session evidence", () => {
 
     // then
     expect(checks.memberEnvelopeEchoed).toBe(true)
+    expect(checks.memberToLeadInjected).toBe(true)
+    expect(checks.leadInboxDrained).toBe(true)
+    expect(checks.noBlockingTeamWaitCalls).toBe(true)
   })
 
-  it("#given a missing observation directory #when main evidence is analyzed #then the evidence directory is created", async () => {
+  it("#given a missing observation directory #when main evidence is analyzed #then injection evidence is written", () => {
     // given
     const fixture = createFixture()
-    seedWaitEvidence(fixture)
+    seedInjectionEvidence(fixture)
     rmSync(fixture.obsDir, { recursive: true, force: true })
+    mkdirSync(fixture.obsDir, { recursive: true })
 
     // when
-    await analyzeMain(
+    analyzeMain(
       { events: fixture.events, status: 0 },
       { cwd: fixture.project },
       fixture.obsDir,
     )
 
     // then
-    expect(existsSync(join(fixture.obsDir, "team-wait-evidence.json"))).toBe(true)
+    expect(existsSync(join(fixture.obsDir, "team-injection-evidence.json"))).toBe(true)
   })
 
   it("#given one JSON-escaped peer envelope #when crash evidence counts the message id #then it reports exactly one envelope", () => {
@@ -85,7 +82,6 @@ function createFixture() {
   const runId = "11111111-1111-4111-8111-111111111111"
   const taskId = "st_00000001"
   const leadMessageId = "22222222-2222-4222-8222-222222222222"
-  const waitMessageId = "33333333-3333-4333-8333-333333333333"
   mkdirSync(project, { recursive: true })
   mkdirSync(obsDir, { recursive: true })
   return {
@@ -94,35 +90,32 @@ function createFixture() {
     runId,
     taskId,
     leadMessageId,
-    waitMessageId,
     events: [
-      toolEvent("team_create", { kind: "created", team_run_id: runId, members: [{ name: "quick" }] }),
+      toolEvent("team_create", { kind: "created", team_run_id: runId, members: [{ name: "quick" }, { name: "fixture" }] }),
       toolEvent("task_send", {
         kind: "team_message",
         team: { kind: "to_members", message_id: leadMessageId, recipients: ["quick"] },
-      }),
-      toolEvent("team_wait", {
-        kind: "message",
-        message_id: waitMessageId,
-        from: "quick",
-        body: "QUICK2LEAD member report",
       }),
     ],
   }
 }
 
-function seedWaitEvidence(fixture: Fixture): void {
+function seedInjectionEvidence(fixture: Fixture): void {
   const runtime = join(fixture.project, ".omo", "senpi-task", "teams", "runtime", fixture.runId)
   const processed = join(runtime, "inboxes", "lead", "processed")
-  const logs = join(fixture.project, ".omo", "senpi-task", "logs")
+  const sessions = join(fixture.project, ".omo", "senpi-task", "children", fixture.taskId, "sessions", fixture.taskId)
   mkdirSync(processed, { recursive: true })
-  mkdirSync(logs, { recursive: true })
+  mkdirSync(sessions, { recursive: true })
   writeFileSync(join(runtime, "senpi-task-members.json"), `${JSON.stringify({ quick: fixture.taskId })}\n`)
-  writeFileSync(join(processed, `${fixture.waitMessageId}.json`), "{}\n")
-  writeFileSync(
-    join(logs, `${fixture.taskId}.jsonl`),
-    `${JSON.stringify({ type: "team_message_delivered", payload: { message_id: fixture.waitMessageId } })}\n`,
-  )
+  writeFileSync(join(processed, "member-reply.json"), "{}\n")
+  writeSessionLine(fixture, {
+    type: "message",
+    message: {
+      role: "user",
+      content: [{ type: "text", text: `<peer_message from="lead" messageId="${fixture.leadMessageId}">\nLEAD2QUICK\n</peer_message>` }],
+    },
+  })
+  writeFileSync(join(fixture.obsDir, "lead-received.txt"), "custom-message\nQUICK2LEAD member report delivered by injection\n")
 }
 
 function writeSessionLine(fixture: Fixture, event: object): void {

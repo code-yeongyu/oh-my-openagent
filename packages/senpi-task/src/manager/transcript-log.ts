@@ -1,5 +1,6 @@
 import type { PersistedTaskEvent } from "../store"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
+import { applyRuntimeFallbackEvent, type RuntimeFallbackStore } from "./runtime-fallback-event"
 
 // The transcript event types the runner subscription writes into OUR JSONL event log. The task_output
 // event-log reader (tools/output/transcript/event-log.ts) lifts exactly these back out, so the two
@@ -10,6 +11,8 @@ export const TRANSCRIPT_ERROR_EVENT = "child_error"
 
 export type TranscriptLogStore = {
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
+  readonly load?: RuntimeFallbackStore["load"]
+  readonly replace?: RuntimeFallbackStore["replace"]
 }
 
 // Persist the transcript-relevant slice of a child event: assistant prose from message_end, a tool
@@ -17,6 +20,7 @@ export type TranscriptLogStore = {
 // stopReason "error" diagnostic (otherwise a failed turn leaves NO trace and task_output reads an
 // empty transcript). Every other event is ignored so the log stays a clean transcript.
 export function logTranscriptEvent(store: TranscriptLogStore, taskId: string, event: ManagedChildEvent): void {
+  applyRuntimeFallbackEvent(store, taskId, event)
   const persisted = toPersistedEvent(event)
   if (persisted !== undefined) store.appendEvent(taskId, persisted)
 }
@@ -37,7 +41,32 @@ function toPersistedEvent(event: ManagedChildEvent): PersistedTaskEvent | undefi
   if (event.type === "tool_execution_end" && typeof event.toolName === "string") {
     return { type: TRANSCRIPT_TOOL_EVENT, payload: { tool: event.toolName, is_error: event.isError === true } }
   }
+  if (event.type === "retry_fallback_applied") {
+    return {
+      type: event.type,
+      payload: {
+        from: readEventString(event, "from"),
+        to: readEventString(event, "to"),
+        chain_key: readEventString(event, "chainKey"),
+        reason: readEventString(event, "reason"),
+      },
+    }
+  }
+  if (event.type === "retry_fallback_exhausted") {
+    return {
+      type: event.type,
+      payload: {
+        chain_key: readEventString(event, "chainKey"),
+        last_error: readEventString(event, "lastError"),
+      },
+    }
+  }
   return undefined
+}
+
+function readEventString(event: ManagedChildEvent, key: string): string | undefined {
+  const value = Reflect.get(event, key)
+  return typeof value === "string" ? value : undefined
 }
 
 function assistantFailure(message: unknown): { readonly message: string; readonly stop_reason: string } | undefined {

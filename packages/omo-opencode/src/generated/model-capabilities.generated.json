@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T14:04:01.805Z",
+  "generatedAt": "2026-07-29T03:28:21.339Z",
   "sourceUrl": "https://models.dev/api.json",
   "models": {
     "glm-5": {
@@ -434,6 +434,8 @@
         "input": [
           "text",
           "image",
+          "video",
+          "audio",
           "pdf"
         ],
         "output": [
@@ -441,8 +443,8 @@
         ]
       },
       "limit": {
-        "context": 1000000,
-        "output": 64000
+        "context": 1048576,
+        "output": 65536
       }
     },
     "google/gemini-2.5-flash-lite": {
@@ -1084,25 +1086,6 @@
         "output": 262000
       }
     },
-    "accounts/fireworks/routers/glm-5p1-fast": {
-      "id": "accounts/fireworks/routers/glm-5p1-fast",
-      "family": "glm",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 202800,
-        "output": 131072
-      }
-    },
     "accounts/fireworks/routers/kimi-k2p6-turbo": {
       "id": "accounts/fireworks/routers/kimi-k2p6-turbo",
       "family": "kimi-thinking",
@@ -1141,6 +1124,26 @@
       "limit": {
         "context": 262000,
         "output": 262000
+      }
+    },
+    "accounts/fireworks/routers/kimi-k3-fast": {
+      "id": "accounts/fireworks/routers/kimi-k3-fast",
+      "family": "kimi-k3",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
+        "output": 131072
       }
     },
     "accounts/fireworks/models/qwen3p7-plus": {
@@ -1261,25 +1264,6 @@
         "output": 512000
       }
     },
-    "accounts/fireworks/models/glm-5p1": {
-      "id": "accounts/fireworks/models/glm-5p1",
-      "family": "glm",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 202800,
-        "output": 131072
-      }
-    },
     "accounts/fireworks/models/deepseek-v4-pro": {
       "id": "accounts/fireworks/models/deepseek-v4-pro",
       "family": "deepseek-thinking",
@@ -1354,6 +1338,26 @@
       },
       "limit": {
         "context": 1048575,
+        "output": 131072
+      }
+    },
+    "accounts/fireworks/models/kimi-k3": {
+      "id": "accounts/fireworks/models/kimi-k3",
+      "family": "kimi-k3",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
         "output": 131072
       }
     },
@@ -2504,6 +2508,27 @@
         "output": 128000
       }
     },
+    "anthropic/claude-opus-5": {
+      "id": "anthropic/claude-opus-5",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
     "z-ai/glm-5": {
       "id": "z-ai/glm-5",
       "family": "glm",
@@ -2708,8 +2733,8 @@
         "output": 128000
       }
     },
-    "openai/gpt-5.4-mini": {
-      "id": "openai/gpt-5.4-mini",
+    "openai/gpt-5.6-luna-fast": {
+      "id": "openai/gpt-5.6-luna-fast",
       "family": "gpt-mini",
       "reasoning": true,
       "temperature": false,
@@ -2937,15 +2962,14 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
         ]
       },
       "limit": {
-        "context": 1000000,
+        "context": 200000,
         "output": 128000
       }
     },
@@ -3065,15 +3089,14 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
         ]
       },
       "limit": {
-        "context": 1000000,
+        "context": 200000,
         "output": 128000
       }
     },
@@ -5329,7 +5352,7 @@
       },
       "limit": {
         "context": 400000,
-        "output": 100000,
+        "output": 128000,
         "input": 272000
       }
     },
@@ -5423,8 +5446,8 @@
       "toolCall": false,
       "modalities": {
         "input": [
-          "pdf",
           "image",
+          "pdf",
           "text"
         ],
         "output": [
@@ -5433,8 +5456,7 @@
       },
       "limit": {
         "context": 128000,
-        "output": 16384,
-        "input": 111616
+        "output": 16384
       }
     },
     "openai/gpt-5.3-codex-spark": {
@@ -6473,7 +6495,7 @@
       },
       "limit": {
         "context": 524288,
-        "output": 524288
+        "output": 262144
       }
     },
     "zai-org/glm-4.7": {
@@ -6494,6 +6516,27 @@
         "context": 202752,
         "output": 131072,
         "input": 200000
+      }
+    },
+    "moonshotai/kimi-k3": {
+      "id": "moonshotai/kimi-k3",
+      "family": "kimi-k3",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
+        "output": 131072
       }
     },
     "microsoft/phi-4-multimodal-instruct": {
@@ -6591,6 +6634,46 @@
         "output": 8192
       }
     },
+    "nvidia/cosmos-reason2-8b": {
+      "id": "nvidia/cosmos-reason2-8b",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 131072,
+        "output": 16384
+      }
+    },
+    "nvidia/nemotron-nano-12b-v2-vl": {
+      "id": "nvidia/nemotron-nano-12b-v2-vl",
+      "family": "nemotron",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 131072,
+        "output": 131072
+      }
+    },
     "nvidia/bevformer": {
       "id": "nvidia/bevformer",
       "reasoning": false,
@@ -6629,6 +6712,25 @@
         "input": 256000
       }
     },
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5": {
+      "id": "nvidia/Llama-3.3-Nemotron-Super-49B-v1.5",
+      "family": "nemotron",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 131072,
+        "output": 131072
+      }
+    },
     "nvidia/cosmos-transfer2_5-2b": {
       "id": "nvidia/cosmos-transfer2_5-2b",
       "reasoning": false,
@@ -6647,6 +6749,25 @@
       "limit": {
         "context": 0,
         "output": 4096
+      }
+    },
+    "nvidia/llama-3.1-nemotron-nano-8b-v1": {
+      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "family": "nemotron",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 131072,
+        "output": 16384
       }
     },
     "nvidia/active-speaker-detection": {
@@ -6685,8 +6806,8 @@
         "output": 4096
       }
     },
-    "nvidia/llama-3_1-nemotron-safety-guard-8b-v3": {
-      "id": "nvidia/llama-3_1-nemotron-safety-guard-8b-v3",
+    "nvidia/llama-3.1-nemotron-safety-guard-8b-v3": {
+      "id": "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
       "family": "nemotron",
       "reasoning": false,
       "temperature": false,
@@ -6702,6 +6823,45 @@
       "limit": {
         "context": 128000,
         "output": 4096
+      }
+    },
+    "nvidia/llama-3.3-nemotron-super-49b-v1": {
+      "id": "nvidia/Llama-3.3-Nemotron-Super-49B-v1",
+      "family": "nemotron",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": false,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 128000,
+        "output": 16384,
+        "input": 128000
+      }
+    },
+    "nvidia/llama-3.1-nemotron-70b-instruct": {
+      "id": "nvidia/llama-3.1-nemotron-70b-instruct",
+      "family": "nemotron",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 128000,
+        "output": 8192
       }
     },
     "nvidia/nemotron-3-super-120b-a12b": {
@@ -6761,6 +6921,25 @@
       "limit": {
         "context": 0,
         "output": 4096
+      }
+    },
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1": {
+      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "family": "nemotron",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 128000,
+        "output": 16384
       }
     },
     "nvidia/llama-3_2-nemoretriever-300m-embed-v1": {
@@ -6838,6 +7017,26 @@
       "limit": {
         "context": 128000,
         "output": 4096
+      }
+    },
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1": {
+      "id": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+      "family": "nemotron",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 32768,
+        "output": 16384
       }
     },
     "nvidia/synthetic-video-detector": {
@@ -6934,6 +7133,24 @@
         "context": 128000,
         "output": 16384,
         "input": 128000
+      }
+    },
+    "nvidia/riva-translate-4b-instruct-v1.1": {
+      "id": "nvidia/riva-translate-4b-instruct-v1.1",
+      "reasoning": false,
+      "temperature": false,
+      "toolCall": false,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 128000,
+        "output": 4096
       }
     },
     "nvidia/nemotron-content-safety-reasoning-4b": {
@@ -7069,24 +7286,6 @@
         "output": 4096
       }
     },
-    "nvidia/riva-translate-4b-instruct-v1_1": {
-      "id": "nvidia/riva-translate-4b-instruct-v1_1",
-      "reasoning": false,
-      "temperature": false,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4096
-      }
-    },
     "google/google-paligemma": {
       "id": "google/google-paligemma",
       "reasoning": false,
@@ -7106,6 +7305,26 @@
         "output": 8192
       }
     },
+    "google/gemma-3-4b-it": {
+      "id": "google/gemma-3-4b-it",
+      "family": "gemma",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": false,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 131072,
+        "output": 16384
+      }
+    },
     "google/gemma-2-2b-it": {
       "id": "google/gemma-2-2b-it",
       "reasoning": false,
@@ -7122,6 +7341,26 @@
       "limit": {
         "context": 128000,
         "output": 4096
+      }
+    },
+    "google/gemma-3-12b-it": {
+      "id": "google/gemma-3-12b-it",
+      "family": "gemma",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 131072,
+        "output": 16384
       }
     },
     "google/gemma-3n-e4b-it": {
@@ -7304,8 +7543,8 @@
         "input": 256000
       }
     },
-    "abacusai/dracarys-llama-3_1-70b-instruct": {
-      "id": "abacusai/dracarys-llama-3_1-70b-instruct",
+    "abacusai/dracarys-llama-3.1-70b-instruct": {
+      "id": "abacusai/dracarys-llama-3.1-70b-instruct",
       "reasoning": false,
       "temperature": true,
       "toolCall": true,
@@ -7322,8 +7561,8 @@
         "output": 8192
       }
     },
-    "upstage/solar-10_7b-instruct": {
-      "id": "upstage/solar-10_7b-instruct",
+    "upstage/solar-10.7b-instruct": {
+      "id": "upstage/solar-10.7b-instruct",
       "reasoning": false,
       "temperature": true,
       "toolCall": true,
@@ -7417,6 +7656,26 @@
         "output": 0
       }
     },
+    "mistralai/mistral-medium-3.5-128b": {
+      "id": "mistralai/Mistral-Medium-3.5-128B",
+      "family": "mistral-medium",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "image",
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 262144,
+        "output": 131072
+      }
+    },
     "mistralai/mistral-nemotron": {
       "id": "mistralai/mistral-nemotron",
       "family": "nemotron",
@@ -7498,6 +7757,27 @@
         "input": 262144
       }
     },
+    "mistralai/ministral-14b-instruct-2512": {
+      "id": "mistralai/ministral-14b-instruct-2512",
+      "family": "ministral",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": false,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 262144,
+        "output": 32768,
+        "input": 262144
+      }
+    },
     "mistralai/mixtral-8x22b-instruct": {
       "id": "mistralai/mixtral-8x22b-instruct",
       "reasoning": false,
@@ -7517,24 +7797,6 @@
         "output": 65536
       },
       "family": "mistral"
-    },
-    "mistralai/mistral-7b-instruct-v03": {
-      "id": "mistralai/mistral-7b-instruct-v03",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 65536,
-        "output": 65536
-      }
     },
     "mistralai/magistral-small-2506": {
       "id": "mistralai/Magistral-Small-2506",
@@ -7572,6 +7834,24 @@
       "limit": {
         "context": 32768,
         "output": 16384
+      }
+    },
+    "mistralai/mistral-7b-instruct-v0.3": {
+      "id": "mistralai/Mistral-7B-Instruct-v0.3",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 32768,
+        "output": 32768
       }
     },
     "bytedance/seed-oss-36b-instruct": {
@@ -7802,6 +8082,25 @@
       "limit": {
         "context": 128000,
         "output": 8192
+      }
+    },
+    "poolside/laguna-xs-2.1": {
+      "id": "poolside/laguna-xs-2.1",
+      "family": "laguna",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 262144,
+        "output": 32768
       }
     },
     "stepfun-ai/step-3.5-flash": {
@@ -8305,15 +8604,14 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
         ]
       },
       "limit": {
-        "context": 1050000,
+        "context": 372000,
         "input": 922000,
         "output": 128000
       }
@@ -8350,8 +8648,7 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
@@ -8446,8 +8743,8 @@
         "output": 163840
       }
     },
-    "gpt-5.4-mini": {
-      "id": "gpt-5.4-mini",
+    "gpt-5.6-luna-fast": {
+      "id": "gpt-5.6-luna-fast",
       "family": "gpt-mini",
       "reasoning": true,
       "temperature": false,
@@ -8462,7 +8759,7 @@
         ]
       },
       "limit": {
-        "context": 400000,
+        "context": 272000,
         "input": 272000,
         "output": 128000
       }
@@ -8586,15 +8883,14 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
         ]
       },
       "limit": {
-        "context": 1050000,
+        "context": 372000,
         "input": 922000,
         "output": 128000
       }
@@ -8759,18 +9055,15 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "video",
-          "audio",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
         ]
       },
       "limit": {
-        "context": 1048576,
-        "output": 65536,
+        "context": 1000000,
+        "output": 128000,
         "input": 128000
       }
     },
@@ -9061,13 +9354,12 @@
     "gemma-4-26b-a4b-it": {
       "id": "gemma-4-26b-a4b-it",
       "family": "gemma",
-      "reasoning": true,
+      "reasoning": false,
       "temperature": true,
       "toolCall": true,
       "modalities": {
         "input": [
-          "text",
-          "image"
+          "text"
         ],
         "output": [
           "text"
@@ -9075,7 +9367,7 @@
       },
       "limit": {
         "context": 256000,
-        "output": 16384
+        "output": 25600
       }
     },
     "gemini-embedding-001": {
@@ -11765,8 +12057,8 @@
         "input": 128000,
         "output": 128000
       },
-      "family": "deepseek",
-      "temperature": true
+      "temperature": true,
+      "family": "deepseek"
     },
     "mirothinker-1-7-deepresearch-mini": {
       "id": "mirothinker-1-7-deepresearch-mini",
@@ -14674,26 +14966,6 @@
         "output": 16384
       }
     },
-    "nvidia/llama-3.3-nemotron-super-49b-v1": {
-      "id": "nvidia/Llama-3.3-Nemotron-Super-49B-v1",
-      "family": "nemotron",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "input": 128000,
-        "output": 16384
-      }
-    },
     "nvidia/llama-3_3-nemotron-super-49b-v1_5": {
       "id": "nvidia/Llama-3_3-Nemotron-Super-49B-v1_5",
       "family": "nemotron",
@@ -15719,7 +15991,7 @@
       "limit": {
         "context": 131072,
         "input": 41000,
-        "output": 8192
+        "output": 16384
       },
       "temperature": true,
       "family": "qwen"
@@ -16474,26 +16746,6 @@
         "output": 131072
       },
       "temperature": true
-    },
-    "mistralai/ministral-14b-instruct-2512": {
-      "id": "mistralai/ministral-14b-instruct-2512",
-      "family": "ministral",
-      "reasoning": false,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 262144,
-        "input": 262144,
-        "output": 32768
-      }
     },
     "mistralai/mixtral-8x22b-instruct-v0.1": {
       "id": "mistralai/mixtral-8x22b-instruct-v0.1",
@@ -19261,8 +19513,7 @@
         "context": 128000,
         "input": 128000,
         "output": 16384
-      },
-      "temperature": false
+      }
     },
     "openai/o3-pro-2025-06-10": {
       "id": "openai/o3-pro-2025-06-10",
@@ -19346,7 +19597,7 @@
     },
     "openai/gpt-4o-mini-search-preview": {
       "id": "openai/gpt-4o-mini-search-preview",
-      "family": "o-mini",
+      "family": "gpt-mini",
       "reasoning": false,
       "toolCall": false,
       "modalities": {
@@ -19362,7 +19613,7 @@
         "input": 111616,
         "output": 16384
       },
-      "temperature": false
+      "temperature": true
     },
     "baidu/ernie-4.5-vl-28b-a3b": {
       "id": "baidu/ernie-4.5-vl-28b-a3b",
@@ -19482,7 +19733,7 @@
       "limit": {
         "context": 262144,
         "input": 262144,
-        "output": 80000
+        "output": 262144
       },
       "temperature": true,
       "family": "trinity"
@@ -19867,7 +20118,7 @@
         ]
       },
       "limit": {
-        "context": 131072,
+        "context": 65536,
         "output": 65536
       }
     },
@@ -20411,9 +20662,28 @@
         "output": 32768
       }
     },
+    "abliterated-model-large": {
+      "id": "abliterated-model-large",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "input": 1000000,
+        "output": 999990
+      }
+    },
     "abliterated-model": {
       "id": "abliterated-model",
-      "reasoning": false,
+      "reasoning": true,
       "temperature": true,
       "toolCall": true,
       "modalities": {
@@ -20997,6 +21267,26 @@
       "limit": {
         "context": 256000,
         "output": 8192
+      }
+    },
+    "gpt-4o-mini-transcribe": {
+      "id": "gpt-4o-mini-transcribe",
+      "family": "gpt",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 16000,
+        "output": 16000
       }
     },
     "qwen3-235b-a22b-thinking-2507": {
@@ -22641,6 +22931,26 @@
       "limit": {
         "context": 131072,
         "output": 32768
+      }
+    },
+    "gpt-4o-transcribe": {
+      "id": "gpt-4o-transcribe",
+      "family": "gpt",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 16000,
+        "output": 16000
       }
     },
     "grok-4-20-non-reasoning": {
@@ -25292,8 +25602,8 @@
         "output": 30000
       }
     },
-    "gpt-5.4-mini-2026-03-17": {
-      "id": "gpt-5.4-mini-2026-03-17",
+    "gpt-5.6-luna-fast-2026-03-17": {
+      "id": "gpt-5.6-luna-fast-2026-03-17",
       "family": "gpt-mini",
       "reasoning": true,
       "temperature": false,
@@ -26016,9 +26326,9 @@
     "o1-mini": {
       "id": "o1-mini",
       "family": "o-mini",
-      "reasoning": true,
+      "reasoning": false,
       "temperature": false,
-      "toolCall": true,
+      "toolCall": false,
       "modalities": {
         "input": [
           "text"
@@ -27466,6 +27776,25 @@
         "output": 4096
       }
     },
+    "gemini-embedding": {
+      "id": "gemini-embedding",
+      "family": "gemini",
+      "reasoning": false,
+      "temperature": false,
+      "toolCall": false,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 2048,
+        "output": 1
+      }
+    },
     "anthropic--claude-4-sonnet": {
       "id": "anthropic--claude-4-sonnet",
       "family": "claude-sonnet",
@@ -28302,24 +28631,6 @@
       "limit": {
         "context": 8192,
         "output": 4096
-      }
-    },
-    "mistralai/mistral-7b-instruct-v0.3": {
-      "id": "mistralai/Mistral-7B-Instruct-v0.3",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 32768,
-        "output": 32768
       }
     },
     "pioneer/auto": {
@@ -29446,27 +29757,6 @@
         "output": 262144
       }
     },
-    "moonshotai/kimi-k3": {
-      "id": "moonshotai/kimi-k3",
-      "family": "kimi-k3",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image",
-          "video"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 1048576,
-        "output": 131072
-      }
-    },
     "moonshotai/kimi-k3-free": {
       "id": "moonshotai/kimi-k3-free",
       "family": "kimi-k3",
@@ -29545,7 +29835,7 @@
       },
       "limit": {
         "context": 128000,
-        "output": 16384
+        "output": 32000
       },
       "family": "gpt-codex"
     },
@@ -29783,26 +30073,6 @@
       "limit": {
         "context": 128000,
         "output": 4096
-      }
-    },
-    "mistralai/mistral-medium-3.5-128b": {
-      "id": "mistralai/Mistral-Medium-3.5-128B",
-      "family": "mistral-medium",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "image",
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 262144,
-        "output": 131072
       }
     },
     "mistralai/voxtral-small-24b-2507": {
@@ -30871,45 +31141,6 @@
         "output": 8192
       }
     },
-    "llama-3.2-11b-vision-instruct": {
-      "id": "llama-3.2-11b-vision-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 8192
-      }
-    },
-    "phi-3-medium-128k-instruct": {
-      "id": "phi-3-medium-128k-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4096
-      }
-    },
     "cohere-command-a": {
       "id": "cohere-command-a",
       "family": "command-a",
@@ -30927,44 +31158,6 @@
       "limit": {
         "context": 131072,
         "output": 8192
-      }
-    },
-    "meta-llama-3.1-70b-instruct": {
-      "id": "meta-llama-3.1-70b-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 32768
-      }
-    },
-    "meta-llama-3.1-405b-instruct": {
-      "id": "meta-llama-3.1-405b-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 32768
       }
     },
     "cohere-embed-v3-multilingual": {
@@ -31043,63 +31236,6 @@
         "output": 4096
       }
     },
-    "meta-llama-3-8b-instruct": {
-      "id": "meta-llama-3-8b-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 8192,
-        "output": 2048
-      }
-    },
-    "gpt-3.5-turbo-0301": {
-      "id": "gpt-3.5-turbo-0301",
-      "family": "gpt",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 4096,
-        "output": 4096
-      }
-    },
-    "cohere-command-r-plus-08-2024": {
-      "id": "cohere-command-r-plus-08-2024",
-      "family": "command-r",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4000
-      }
-    },
     "phi-4-mini": {
       "id": "phi-4-mini",
       "family": "phi",
@@ -31119,45 +31255,6 @@
         "output": 4096
       }
     },
-    "meta-llama-3.1-8b-instruct": {
-      "id": "meta-llama-3.1-8b-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 32768
-      }
-    },
-    "llama-3.2-90b-vision-instruct": {
-      "id": "llama-3.2-90b-vision-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 8192
-      }
-    },
     "phi-4-reasoning-plus": {
       "id": "phi-4-reasoning-plus",
       "family": "phi",
@@ -31174,63 +31271,6 @@
       },
       "limit": {
         "context": 32000,
-        "output": 4096
-      }
-    },
-    "phi-3-small-8k-instruct": {
-      "id": "phi-3-small-8k-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 8192,
-        "output": 2048
-      }
-    },
-    "phi-3-small-128k-instruct": {
-      "id": "phi-3-small-128k-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4096
-      }
-    },
-    "phi-3-mini-128k-instruct": {
-      "id": "phi-3-mini-128k-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
         "output": 4096
       }
     },
@@ -31254,44 +31294,6 @@
         "output": 32768
       }
     },
-    "meta-llama-3-70b-instruct": {
-      "id": "meta-llama-3-70b-instruct",
-      "family": "llama",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 8192,
-        "output": 2048
-      }
-    },
-    "gpt-4-32k": {
-      "id": "gpt-4-32k",
-      "family": "gpt",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 32768,
-        "output": 32768
-      }
-    },
     "cohere-embed-v-4-0": {
       "id": "cohere-embed-v-4-0",
       "family": "cohere-embed",
@@ -31310,26 +31312,6 @@
       "limit": {
         "context": 128000,
         "output": 1536
-      }
-    },
-    "gpt-5.2-chat": {
-      "id": "gpt-5.2-chat",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384
       }
     },
     "phi-4-mini-reasoning": {
@@ -31361,86 +31343,6 @@
         "input": [
           "text",
           "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4096
-      }
-    },
-    "deepseek-r1-0528": {
-      "id": "deepseek-r1-0528",
-      "family": "deepseek-thinking",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 164000,
-        "output": 164000
-      }
-    },
-    "phi-3-mini-4k-instruct": {
-      "id": "phi-3-mini-4k-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 4096,
-        "output": 1024
-      }
-    },
-    "gpt-5.1-chat": {
-      "id": "gpt-5.1-chat",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image",
-          "audio"
-        ],
-        "output": [
-          "text",
-          "image",
-          "audio"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384
-      }
-    },
-    "phi-3.5-moe-instruct": {
-      "id": "phi-3.5-moe-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
         ],
         "output": [
           "text"
@@ -31498,26 +31400,6 @@
       "toolCall": true,
       "modalities": {
         "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4096
-      }
-    },
-    "gpt-3.5-turbo-0613": {
-      "id": "gpt-3.5-turbo-0613",
-      "family": "gpt",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
           "text"
         ],
         "output": [
@@ -31525,8 +31407,8 @@
         ]
       },
       "limit": {
-        "context": 16384,
-        "output": 16384
+        "context": 430000,
+        "output": 43000
       }
     },
     "ministral-3b": {
@@ -31546,25 +31428,6 @@
       "limit": {
         "context": 128000,
         "output": 8192
-      }
-    },
-    "cohere-command-r-08-2024": {
-      "id": "cohere-command-r-08-2024",
-      "family": "command-r",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4000
       }
     },
     "model-router": {
@@ -31643,44 +31506,6 @@
         "output": 16384
       }
     },
-    "phi-3-medium-4k-instruct": {
-      "id": "phi-3-medium-4k-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 4096,
-        "output": 1024
-      }
-    },
-    "phi-3.5-mini-instruct": {
-      "id": "phi-3.5-mini-instruct",
-      "family": "phi",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 4096
-      }
-    },
     "text-embedding-ada-002": {
       "id": "text-embedding-ada-002",
       "family": "text-embedding",
@@ -31721,26 +31546,6 @@
         "output": 4096
       }
     },
-    "gpt-5-chat": {
-      "id": "gpt-5-chat",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384
-      }
-    },
     "codex-mini": {
       "id": "codex-mini",
       "family": "gpt-codex-mini",
@@ -31758,25 +31563,6 @@
       "limit": {
         "context": 200000,
         "output": 100000
-      }
-    },
-    "deepseek-v3.1": {
-      "id": "deepseek-v3.1",
-      "family": "deepseek",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 32000
       }
     },
     "glm5.2-fast": {
@@ -32558,6 +32344,27 @@
         "output": 128000
       }
     },
+    "duo-chat-opus-5": {
+      "id": "duo-chat-opus-5",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
     "ling-1t": {
       "id": "Ling-1T",
       "family": "ling",
@@ -32630,25 +32437,6 @@
       "limit": {
         "context": 256000,
         "output": 65536
-      }
-    },
-    "nvidia-nemotron-cascade-2-30b-a3b": {
-      "id": "nvidia-nemotron-cascade-2-30b-a3b",
-      "family": "nemotron",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 256000,
-        "output": 32768
       }
     },
     "openai-gpt-54-pro": {
@@ -34661,8 +34449,8 @@
         "output": 64000
       }
     },
-    "openai-gpt-5.4-mini": {
-      "id": "openai-gpt-5.4-mini",
+    "openai-gpt-5.6-luna-fast": {
+      "id": "openai-gpt-5.6-luna-fast",
       "family": "gpt-mini",
       "reasoning": true,
       "temperature": false,
@@ -35458,26 +35246,6 @@
         "input": 0
       }
     },
-    "gpt-5.3-chat": {
-      "id": "gpt-5.3-chat",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384
-      }
-    },
     "gpt-image-1": {
       "id": "gpt-image-1",
       "family": "gpt-image",
@@ -35497,6 +35265,27 @@
         "context": 0,
         "output": 0,
         "input": 0
+      }
+    },
+    "thinkingmachines/inkling-nvfp4": {
+      "id": "thinkingmachines/Inkling-NVFP4",
+      "family": "ling",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "audio"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
+        "output": 262144
       }
     },
     "mistralai/mistral-small-3.2-24b-instruct-2506": {
@@ -37886,25 +37675,6 @@
         "output": 8192
       }
     },
-    "poolside/laguna-xs-2.1": {
-      "id": "poolside/laguna-xs-2.1",
-      "family": "laguna",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 262144,
-        "output": 32768
-      }
-    },
     "poolside/laguna-s-2.1": {
       "id": "poolside/laguna-s-2.1",
       "family": "laguna-s",
@@ -38292,6 +38062,26 @@
       },
       "limit": {
         "context": 262144,
+        "output": 65536
+      }
+    },
+    "hf:moonshotai/kimi-k3": {
+      "id": "hf:moonshotai/Kimi-K3",
+      "family": "kimi-k3",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 524288,
         "output": 65536
       }
     },
@@ -41097,8 +40887,7 @@
       },
       "limit": {
         "context": 128000,
-        "output": 16384,
-        "input": 111616
+        "output": 16384
       }
     },
     "openai/gpt-5-image": {
@@ -41337,25 +41126,6 @@
       },
       "family": "command-r"
     },
-    "nvidia/llama-3.3-nemotron-super-49b-v1.5": {
-      "id": "nvidia/Llama-3.3-Nemotron-Super-49B-v1.5",
-      "family": "nemotron",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 131072,
-        "output": 131072
-      }
-    },
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
       "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
       "family": "nemotron",
@@ -41478,26 +41248,6 @@
       },
       "family": "lyria"
     },
-    "google/gemma-3-4b-it": {
-      "id": "google/gemma-3-4b-it",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": false,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 131072,
-        "output": 16384
-      },
-      "family": "gemma"
-    },
     "google/gemini-2.5-pro-preview": {
       "id": "google/gemini-2.5-pro-preview",
       "reasoning": true,
@@ -41604,26 +41354,6 @@
         "output": 65535
       },
       "family": "gemini-pro"
-    },
-    "google/gemma-3-12b-it": {
-      "id": "google/gemma-3-12b-it",
-      "reasoning": false,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 131072,
-        "output": 16384
-      },
-      "family": "gemma"
     },
     "google/gemini-2.5-flash-image": {
       "id": "google/gemini-2.5-flash-image",
@@ -42732,7 +42462,7 @@
     "~moonshotai/kimi-latest": {
       "id": "~moonshotai/kimi-latest",
       "reasoning": true,
-      "temperature": false,
+      "temperature": true,
       "toolCall": true,
       "modalities": {
         "input": [
@@ -42745,7 +42475,7 @@
       },
       "limit": {
         "context": 1048576,
-        "output": 262144
+        "output": 1048576
       },
       "family": "kimi"
     },
@@ -44597,6 +44327,44 @@
         "output": 16384
       }
     },
+    "qwen3.6-max": {
+      "id": "qwen3.6-max",
+      "family": "qwen",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 256000,
+        "output": 64000
+      }
+    },
+    "qwen3-coder-480b-a35b-instruct-int4-mixed-ar": {
+      "id": "qwen3-coder-480b-a35b-instruct-int4-mixed-ar",
+      "family": "qwen",
+      "reasoning": false,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 106000,
+        "output": 10600
+      }
+    },
     "qwen-mt-plus": {
       "id": "qwen-mt-plus",
       "family": "qwen",
@@ -45782,26 +45550,6 @@
       "limit": {
         "context": 4096,
         "output": 4096
-      }
-    },
-    "nvidia/nemotron-nano-12b-v2-vl": {
-      "id": "nvidia/nemotron-nano-12b-v2-vl",
-      "family": "nemotron",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 131072,
-        "output": 131072
       }
     },
     "google/imagen-4.0-ultra-generate-001": {
@@ -48725,11 +48473,11 @@
         "output": 128000
       }
     },
-    "anthropic/claude-opus-5": {
-      "id": "anthropic/claude-opus-5",
-      "family": "claude-opus",
+    "moonshotai/kimi-k3-fast": {
+      "id": "moonshotai/kimi-k3-fast",
+      "family": "kimi-k3",
       "reasoning": true,
-      "temperature": true,
+      "temperature": false,
       "toolCall": true,
       "modalities": {
         "input": [
@@ -48743,7 +48491,7 @@
       },
       "limit": {
         "context": 1000000,
-        "output": 128000
+        "output": 131072
       }
     },
     "openai/whisper-1": {
@@ -49297,6 +49045,25 @@
       "limit": {
         "context": 32768,
         "output": 16384
+      }
+    },
+    "deepseek-r1-0528": {
+      "id": "deepseek-r1-0528",
+      "family": "deepseek-thinking",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 164000,
+        "output": 164000
       }
     },
     "moonshot-kimi-k2-instruct": {
@@ -50214,6 +49981,27 @@
       "limit": {
         "context": 262144,
         "output": 32768
+      }
+    },
+    "qwen/qwen3.7-flash": {
+      "id": "qwen/qwen3.7-flash",
+      "family": "qwen",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 65536
       }
     },
     "~x-ai/grok-latest": {
@@ -52379,6 +52167,24 @@
         "output": 4096
       }
     },
+    "deepseek-v3.1": {
+      "id": "deepseek-v3.1",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 128000,
+        "output": 32000
+      }
+    },
     "doubao-1.5-vision-pro": {
       "id": "doubao-1.5-vision-pro",
       "reasoning": false,
@@ -53289,15 +53095,14 @@
       "modalities": {
         "input": [
           "text",
-          "image",
-          "pdf"
+          "image"
         ],
         "output": [
           "text"
         ]
       },
       "limit": {
-        "context": 1050000,
+        "context": 372000,
         "input": 922000,
         "output": 128000
       }

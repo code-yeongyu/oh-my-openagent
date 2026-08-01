@@ -22,6 +22,8 @@ export type RpcRunnerSpec = {
   // The provider/modelId the child must resolve. A separate OS process cannot share the parent's
   // in-memory registry, so the model is threaded onto the child command line (`--model`).
   readonly model?: string
+  // The resolved reasoning the child must apply as its thinking level (`--thinking`).
+  readonly reasoning?: string
   // The resolved variant the child must apply as its thinking level (`--thinking`).
   readonly variant?: string
   // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and

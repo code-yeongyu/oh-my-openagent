@@ -14,7 +14,7 @@ OFF by default. Enable via JSONC config.
 
 ## Enable
 
-Add to user config `~/.config/opencode/oh-my-openagent.jsonc` or project config `.opencode/oh-my-openagent.jsonc`:
+Add to the `[opencode]` block of `~/.omo/omo.jsonc` (user) or `.omo/omo.jsonc` (project):
 
 ```jsonc
 {

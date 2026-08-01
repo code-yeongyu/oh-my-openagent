@@ -2,6 +2,7 @@ import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry"
 import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
 import { isPlainRecord } from "@oh-my-opencode/utils"
 
+import { clampTaskSummary } from "../task-summary"
 import { SenpiTeamSpecError } from "./errors"
 
 /**
@@ -26,6 +27,34 @@ function assertNoCallerTeamLead(options: NormalizeSenpiTeamSpecOptions | undefin
   }
 }
 
+function coerceStringSpec(rawSpec: unknown, teamName: string): unknown {
+  if (typeof rawSpec !== "string") return rawSpec
+  try {
+    return JSON.parse(rawSpec)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new SenpiTeamSpecError(
+      `Team '${teamName}' spec is a string that is not valid JSON (${detail}). Pass the spec as an object like { name?, members: [{ name, category|subagent_type, prompt? }] }, or as a valid JSON string of that object.`,
+      "INVALID_SPEC",
+      teamName,
+    )
+  }
+}
+
+function wrapSingleMember(rawSpec: unknown): unknown {
+  if (isPlainRecord(rawSpec) && isPlainRecord(rawSpec.members)) {
+    return { ...rawSpec, members: [rawSpec.members] }
+  }
+  return rawSpec
+}
+
+function describeReceived(rawSpec: unknown): string {
+  if (rawSpec === null) return "null"
+  if (Array.isArray(rawSpec)) return "an array"
+  if (typeof rawSpec === "object") return "an object"
+  return `a ${typeof rawSpec}`
+}
+
 function assertNoRawLeadField(rawSpec: unknown, teamName: string): void {
   if (isPlainRecord(rawSpec) && rawSpec.lead !== undefined && rawSpec.lead !== null) {
     throw new SenpiTeamSpecError(
@@ -42,6 +71,20 @@ function remapAgentAliasKind(members: readonly unknown[]): unknown[] {
       return { ...member, kind: "subagent_type" }
     }
     return member
+  })
+}
+
+// Harness-side length enforcement mirroring the task tool: an over-limit member task_summary is
+// clamped BEFORE TeamSpecSchema.parse so it truncates instead of rejecting the whole spec.
+function clampMemberTaskSummaries(members: readonly unknown[]): unknown[] {
+  return members.map((member) => {
+    if (!isPlainRecord(member) || typeof member.task_summary !== "string") return member
+    const clamped = clampTaskSummary(member.task_summary)
+    if (clamped === undefined) {
+      const { task_summary: _dropped, ...rest } = member
+      return rest
+    }
+    return { ...member, task_summary: clamped }
   })
 }
 
@@ -73,16 +116,21 @@ export function normalizeSenpiTeamSpec(
   options?: NormalizeSenpiTeamSpecOptions,
 ): TeamSpec {
   assertNoCallerTeamLead(options, teamName)
-  assertNoRawLeadField(rawSpec, teamName)
+  const coerced = wrapSingleMember(coerceStringSpec(rawSpec, teamName))
+  assertNoRawLeadField(coerced, teamName)
 
-  const normalized = normalizeTeamSpecInput(rawSpec)
+  const normalized = normalizeTeamSpecInput(coerced)
   if (!isPlainRecord(normalized)) {
-    throw new SenpiTeamSpecError(`Team '${teamName}' spec is not an object.`, "INVALID_SPEC", teamName)
+    throw new SenpiTeamSpecError(
+      `Team '${teamName}' spec must be an object like { name?, members: [...] }; received ${describeReceived(rawSpec)}. Pass the spec as a nested object, or as a valid JSON string of that object.`,
+      "INVALID_SPEC",
+      teamName,
+    )
   }
 
   const preNormalized: Record<string, unknown> = { ...normalized }
   if (Array.isArray(preNormalized.members)) {
-    const members = remapAgentAliasKind(preNormalized.members)
+    const members = clampMemberTaskSummaries(remapAgentAliasKind(preNormalized.members))
     assertNoReservedMemberName(members, teamName)
     preNormalized.members = members
   }

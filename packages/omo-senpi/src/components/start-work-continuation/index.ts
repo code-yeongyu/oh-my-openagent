@@ -21,15 +21,11 @@ interface InputEventLike {
   text: string
   source?: unknown
   images?: unknown
+  streamingBehavior?: unknown
 }
 
 interface SessionManagerLike {
   getSessionId(): string | undefined
-}
-
-interface AgentEndEventCtx {
-  cwd?: unknown
-  sessionManager?: SessionManagerLike
 }
 
 export function createStartWorkContinuationComponent(
@@ -49,6 +45,7 @@ export function createStartWorkContinuationComponent(
 
         state.consecutiveContinuations = 0
         state.lastSignature = undefined
+        if (payload.streamingBehavior === undefined) return { action: "continue" }
 
         const sessionId = extractSessionId(eventCtx)
         const cwd = extractCwd(eventCtx)
@@ -120,12 +117,21 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext, conte
     ctx.idleCoordinator.enqueue({
       key: START_WORK_CONTINUATION_INJECTION_KEY,
       source: "boulder-continuation",
+      customType: "omo-senpi:start-work-continuation",
       content,
+      display: false,
     })
     ctx.idleCoordinator.scheduleFlush()
     return
   }
-  pi.sendUserMessage(content, { deliverAs: "followUp" })
+  pi.sendMessage(
+    {
+      customType: "omo-senpi:start-work-continuation",
+      content,
+      display: false,
+    },
+    { triggerTurn: true, deliverAs: "followUp" },
+  )
 }
 
 interface DirectiveState {

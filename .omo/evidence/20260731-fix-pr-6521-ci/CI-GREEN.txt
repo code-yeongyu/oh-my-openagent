@@ -1,0 +1,41 @@
+GitHub Actions GREEN
+====================
+
+PR:
+  https://github.com/code-yeongyu/oh-my-openagent/pull/6521
+
+Exact head:
+  d9ef47e90dbb5f0b7698d4fed12c6acce0e40219
+
+Workflow:
+  https://github.com/code-yeongyu/oh-my-openagent/actions/runs/30632258545
+
+Monitor result:
+  CI_EXIT=0
+
+Observed required jobs:
+  test (ubuntu-latest): success
+  test (macos-latest): success
+  test (windows-latest): success
+  typecheck (ubuntu-latest): success
+  typecheck (macos-latest): success
+  typecheck (windows-latest): success
+  codex-compatibility (ubuntu-latest): success
+  codex-compatibility (macos-latest): success
+  codex-compatibility (windows-latest): success
+  senpi-compatibility (ubuntu-latest): success
+  senpi-compatibility (macos-latest): success
+  senpi-compatibility (windows-latest): success
+  lazycodex-published-smoke: success
+  build: success
+  block-master-pr: success
+
+External checks:
+  CLA Assistant: success
+  Package Labels: success
+  GitGuardian Security Checks: success
+  Cubic AI code reviewer: success
+
+Decisive regression:
+  The Windows full-suite job that failed in run 30627980408 completed
+  successfully in run 30632258545.

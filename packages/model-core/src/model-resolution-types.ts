@@ -4,6 +4,7 @@ export interface DelegatedModelConfig {
   providerID: string
   modelID: string
   variant?: string
+  reasoning?: string
   reasoningEffort?: string
   temperature?: number
   top_p?: number

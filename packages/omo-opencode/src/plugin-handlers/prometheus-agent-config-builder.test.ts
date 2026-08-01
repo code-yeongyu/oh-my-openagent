@@ -239,6 +239,24 @@ describe("buildPrometheusAgentConfig", () => {
       });
   });
 
+  describe("#given canonical reasoning configured", () => {
+    test("explicit reasoning wins over category reasoning", async () => {
+      // given
+      resolveCategoryConfigSpy.mockReturnValue({ reasoning: "high" } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { category: "test-category", reasoning: "low" },
+        userCategories: { "test-category": { reasoning: "high" } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.reasoning).toBe("low");
+    });
+  });
+
   describe("#given category fallback_models", () => {
     test("materializes category fallback_models when Prometheus has no explicit fallback_models", async () => {
       // given

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test"
+import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "@oh-my-opencode/model-core"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
+import { RETRYABLE_ERROR_PATTERNS } from "./constants"
 import { createFallbackState } from "./fallback-state"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -35,6 +37,11 @@ function createDeps(): HookDeps {
     },
     options: undefined,
     pluginConfig: {
+      git_master: {
+        commit_footer: true,
+        include_co_authored_by: true,
+        git_env_prefix: "GIT_MASTER_",
+      },
       categories: {
         test: {
           fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
@@ -67,6 +74,52 @@ function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: stri
 }
 
 describe("createSessionStatusHandler", () => {
+  it("#given model-core retryable patterns #when the adapter status fallback patterns are loaded #then they share the canonical pattern set", () => {
+    // given
+    const canonicalPatterns = RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS
+
+    // when
+    const statusFallbackPatterns = RETRYABLE_ERROR_PATTERNS
+
+    // then
+    expect(statusFallbackPatterns).toBe(canonicalPatterns)
+  })
+
+  it("#given a free usage retry status #when the handler receives it #then it dispatches the fallback immediately", async () => {
+    // given
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-free-usage"
+    SessionCategoryRegistry.register(sessionID, "test")
+
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    // when
+    await handler({
+      sessionID,
+      model: "opencode/big-pickle",
+      status: {
+        type: "retry",
+        attempt: 1,
+        message: "Free usage exceeded, subscribe to Go",
+      },
+    })
+
+    // then
+    expect(abortCalls).toEqual([sessionID])
+    expect(retryCalls).toEqual([
+      {
+        sessionID,
+        model: "openai/gpt-5.4",
+        source: "session.status",
+      },
+    ])
+    expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(true)
+    SessionCategoryRegistry.clear()
+  })
+
   it("#given pending fallback prompt may already be accepted #when provider retry status arrives #then it keeps waiting for that accepted prompt", async () => {
     // given
     SessionCategoryRegistry.clear()

@@ -1,0 +1,26 @@
+{
+  "event": "session.status",
+  "message": "Free usage exceeded, subscribe to Go",
+  "abortCount": 1,
+  "promptDispatchCount": 1,
+  "promptCall": {
+    "path": {
+      "id": "qa-runtime-fallback-status-free-usage"
+    },
+    "body": {
+      "model": {
+        "providerID": "openai",
+        "modelID": "gpt-5.4"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "continue"
+        }
+      ]
+    },
+    "query": {
+      "directory": "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/fix-6538-runtime-fallback-status-drift"
+    }
+  }
+}

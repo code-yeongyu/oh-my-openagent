@@ -15,6 +15,7 @@ export type ManagedChildEvent = {
   readonly input?: unknown
   readonly result?: unknown
   readonly isError?: boolean
+  readonly to?: string
 }
 
 export type ManagedChildListener = (event: ManagedChildEvent) => void

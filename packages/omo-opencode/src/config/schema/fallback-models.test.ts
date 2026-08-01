@@ -27,6 +27,7 @@ describe("FallbackModelsSchema", () => {
       {
         model: "openai/gpt-5.4",
         variant: "high",
+        reasoning: "xhigh",
         reasoningEffort: "high",
         temperature: 0.3,
       },
@@ -68,6 +69,27 @@ describe("OhMyOpenCodeConfigSchema fallback_models", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.explore?.fallback_models).toEqual(config.agents.explore.fallback_models)
+    }
+  })
+
+  test("accepts canonical reasoning under categories", () => {
+    // given
+    const config = {
+      categories: {
+        deep: {
+          model: "openai/gpt-5.6-sol",
+          reasoning: "auto",
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.categories?.deep?.reasoning).toBe("auto")
     }
   })
 

@@ -331,6 +331,18 @@ test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sa
 	assert.doesNotMatch(componentWorkflow.content, dangerousBypassPattern, `${componentWorkflow.path} ships unsafe Codex bypass guidance`);
 });
 
+test("#given packaged ulw-research skill #when Codex delivery gates are inspected #then the category-based proofread gate is stripped", async () => {
+	// given
+	const content = await readFile(join(root, "skills", "ulw-research", "SKILL.md"), "utf8");
+
+	// then the writing-category proofread gate never ships to Codex (no category concept there)
+	assert.doesNotMatch(content, /category="writing"/, "codex ulw-research ships the writing-category proofread gate");
+	assert.doesNotMatch(content, /Proofread gate/, "codex ulw-research still references the proofread gate");
+	// and the visual-QA delivery gate survives as the single gate
+	assert.match(content, /### The delivery gate \u2014 visual QA must PASS/u, "codex ulw-research lost the visual-QA delivery gate");
+	assert.match(content, /Visual QA \(always\)/, "codex ulw-research lost the visual-QA gate body");
+});
+
 test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {
 	// given
 	const skillsRoot = join(root, "skills");

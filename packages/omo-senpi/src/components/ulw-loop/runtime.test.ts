@@ -56,7 +56,7 @@ describe("omo-senpi ulw-loop runtime", () => {
 
         const results = await pi.dispatch(
           "input",
-          { type: "input", text: "continue", source: "interactive" },
+          { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
           { cwd: fake.dir },
         )
 

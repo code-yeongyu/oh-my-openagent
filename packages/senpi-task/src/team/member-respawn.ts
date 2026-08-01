@@ -80,7 +80,6 @@ export function createTeamMemberRespawnLaunchResolver(
           ...config,
           stateDir: resolveStateDir(options.stateDir),
           members: runtime.members.map((member) => member.name),
-          wait: options.taskSettings.wait,
         }),
       },
     }

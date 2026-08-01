@@ -5,7 +5,7 @@ All reference files live flat in this directory. Three layers:
 - **Layer A — taste skills** (12 files): how to execute. Discipline, motion, spacing, anti-slop, output completeness.
 - **Layer B — design systems** (70 files): what it should look like. Brand-specific color/type/component tokens.
 
-**Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial tasks load **one Layer A + one Layer B** together. See the routing flow in the sibling `README.md`.
+**Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial tasks load **one Layer A + one Layer B** together. See the routing flow in the sibling `README.md`. Specialized phases (interaction and motion, app-shell layout, URL clones, real-product screen research) load the matching project-original operating reference — see the final section of this index.
 
 ---
 
@@ -49,6 +49,19 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 2. **`output-skill.md` and `stitch-skill.md` stack on top of any style skill.** They add discipline and output format, not visual direction.
 3. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 4. **Imagegen skills are image-only.** Do not load them when the user actually wants code.
+
+---
+
+## Operating references — interaction, layout, and research workflows (project-original)
+
+Beyond the 12-file Layer A library, the design ruleset carries project-original operating references for specialized phases. They stack on the routed Layer A + Layer B pair; they never replace a style skill, and they are not counted in the library totals above.
+
+| File | Purpose | Load when |
+|---|---|---|
+| `interaction-skill.md` | Interaction mechanics anchored to the beui.dev catalog: find the nearest pattern, read its real source through the curl recipe, extract the mechanism (spring config, layout strategy, enter/exit order, reduced-motion path), and adapt it to `DESIGN.md` motion tokens. | Any work adding or changing interaction or motion — micro-interactions, animated components, transitions, gestures, hover/press/state feedback, loading/success/error morphs, "make it feel alive". |
+| `layout-skill.md` | Layout mechanics: scroll ownership, the two silent CSS contracts, named primitives, content-stress matrix. Zero visual direction. | App shells, dashboards, split panes, or a layout that breaks under real content. |
+| `lazyweb.md` | Curl-only real-product screen research for design direction. | Greenfield design research lanes. |
+| `clone-from-url.md` | Runtime extraction workflow (browser + `getComputedStyle`) for cloning a named site. | A live site or URL is the visual reference. |
 
 ---
 

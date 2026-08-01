@@ -36,6 +36,18 @@ This is repeated on purpose, because it is the single most ignored rule in this 
 
 **NO EVIDENCE FILE == NO QA == NO COMMIT == NO PUSH.** ALWAYS. EVERY TIME. NO EXCEPTIONS.
 
+## MANDATORY CHANGE-EXECUTION PROTOCOL. EVERY USER-ORDERED PATCH FOLLOWS THIS. NO EXCEPTIONS.
+
+> **THE MOMENT A TASK REQUIRES PRODUCING A PATCH THAT MODIFIES THIS REPOSITORY, AND THE USER HAS EXPLICITLY INSTRUCTED THAT MODIFICATION, THIS PROTOCOL IS LAW. IT IS NOT A SUGGESTION. IT IS NOT OPTIONAL. THERE IS NO "TOO SMALL TO BOTHER", NO "JUST THIS ONCE", NO "I ALREADY KNOW THE CODEBASE". YOU RUN EVERY STEP, IN ORDER, EVERY SINGLE TIME.**
+
+1. **EXPLORE.** MAP the code you are about to touch BEFORE editing a single line: read the real files, trace the call paths, measure the blast radius. NEVER patch from memory.
+2. **MAKE A PLAN.** Write the full plan down BEFORE the first edit: every file, every change, the verification for each. NO PLAN ON DISK MEANS YOU DO NOT START.
+3. **ADD TODOS IN ULTRA-DETAIL.** Mirror EVERY atomic step of the plan into the todo list: one todo per edit-plus-verification unit. Vague todos like "implement feature" are FORBIDDEN.
+4. **MAKE A NEW WORKTREE.** ALL implementation happens in a fresh, task-owned git worktree. NEVER edit the main checkout in place, NEVER hand-commit to `dev`.
+5. **MAKE A PR AND WORK UNTIL IT GETS MERGED.** Open a reviewer-readable PR and STAY ON IT until it is MERGED: fix CI, answer review, re-run QA, resolve conflicts via `smart-rebase`. AN UNMERGED PR IS UNFINISHED WORK.
+6. **SET A GOAL AND RUN THE ULW LOOP.** Register the goal with binding success criteria and drive the work through the `ulw-loop`: evidence-bound, failing-first, real-surface QA. "IT SHOULD WORK" IS NOT EVIDENCE.
+7. **MANAGE THE TODO LIST OBSESSIVELY.** Mark a step in progress the instant it begins, done the instant it finishes, append new steps the moment they surface. THE TODO LIST NEVER LAGS REALITY. EVER.
+
 ## DEFAULT WORKFLOW — how to take on any task
 
 Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now hotfix, deliver every change through the **`work-with-pr`** skill: it works in an isolated git worktree, implements with evidence-bound manual QA, opens a reviewer-readable English PR (what changed, why, observed behavior, QA/evidence, residual risk), runs the verification loop, and merges. Do NOT hand-commit normal work straight to `dev`.
@@ -205,21 +217,26 @@ oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCo
 
 ## MULTI-LEVEL CONFIG
 
+One unified file configures every omo harness (OpenCode plugin, Senpi, Codex codegraph loader). Legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine.
+
 ```
-Walked configs (closer wins): <pwd up to $HOME>/.opencode/oh-my-openagent.json[c]   (legacy: oh-my-opencode.json[c])
+Project layers (nearest wins): <pwd up to $HOME>/.omo/omo.json[c]   ($HOME itself skipped)
                             ↓ merged onto
-User config:               ~/.config/opencode/oh-my-openagent.json[c]   (Windows: %APPDATA%\opencode\)
-                            ↓ falls back to
-Defaults                   (Zod safeParse fills omitted fields)
+User layer:                  ~/.omo/omo.json[c]   (same on every platform)
+                            ↓ resolved per harness, later wins
+Shared base → [harness] block → profiles.<P> → profiles.<P>.[harness]
+                            ↓ applied once at the end
+Defaults                   (Zod schema defaults)
 ```
 
-- `agents`, `categories`, `claude_code`: deep merged recursively (prototype-pollution safe)
-- `disabled_*` arrays: Set union (concatenated + deduplicated)
-- All other fields: override replaces base value
-- `mcp_env_allowlist`: **user-only** for security; walked configs cannot extend it
-- `migrateConfigFile()` rewrites legacy keys (idempotent via `_migrations` tracking + timestamped backups)
+- Harness blocks: `[opencode]` (freeform plugin config), `[senpi]` / `[codex]` (typed shared keys)
+- Profile activation: `OMO_PROFILE` > `OCX_PROFILE` (`ocx oc -p <name>`) > `OPENCODE_CONFIG_DIR` tail `profiles/<name>` > none; no default profiles ship
+- `models` catalog: a `model` string matching a catalog key resolves to the entry's model id and fills unset tuning; site tuning wins; `[harness]` blocks can override entries
+- Merge: plain objects deep-merge recursively (prototype-pollution safe); scalars and arrays replace
+- `mcp_env_allowlist` + `browser_automation_engine.playwright_mcp_args`: **user-layer only** (incl. the user's own profile block); project layers cannot extend them
+- Runtime migration (lock+journal, no-clobber, markers in `_migrations`): ids `2026-07-opencode-config-unification` (oh-my-* files) and `2026-07-codex-config-jsonc` (`~/.omo/config.jsonc`); backups at `~/.omo/migration-backup-<UTC-ts>-opencode-config/`; triggers at plugin startup (opencode + senpi), codex startup (config.jsonc group only), install, and `oh-my-openagent config migrate` (`--dry-run`/`--json`)
 
-Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"`
+Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"`
 
 ## THREE-TIER MCP SYSTEM
 

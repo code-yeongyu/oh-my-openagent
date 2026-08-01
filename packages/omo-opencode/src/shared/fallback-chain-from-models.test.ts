@@ -98,10 +98,10 @@ describe("parseFallbackModelEntry (extended)", () => {
   })
 
   it("parses model with minimal space variant", () => {
-    const result = parseFallbackModelEntry("openai/gpt-5.4 minimal", undefined)
+    const result = parseFallbackModelEntry("openai/gpt-5.6-luna minimal", undefined)
     expect(result).toEqual({
       providers: ["openai"],
-      model: "gpt-5.4",
+      model: "gpt-5.6-luna",
       variant: "minimal",
     })
   })
@@ -308,8 +308,8 @@ describe("flattenToFallbackModelStrings", () => {
 
   it("explicit variant overrides minimal space-suffix variant", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4 minimal", variant: "low" },
-    ])).toEqual(["openai/gpt-5.4(low)"])
+      { model: "openai/gpt-5.6-luna minimal", variant: "low" },
+    ])).toEqual(["openai/gpt-5.6-luna(low)"])
   })
 
   it("preserves trailing non-variant suffixes when adding explicit variant", () => {

@@ -1,13 +1,13 @@
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig, ProviderAvailability } from "./model-fallback-types"
 
 const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
-  explore: { model: "openai/gpt-5.4-mini-fast" },
-  librarian: { model: "openai/gpt-5.4-mini-fast" },
+  explore: { model: "openai/gpt-5.6-luna-fast", variant: "low" },
+  librarian: { model: "openai/gpt-5.6-luna-fast", variant: "low" },
 }
 
 const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
   artistry: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
-  quick: { model: "openai/gpt-5.4-mini" },
+  quick: { model: "openai/gpt-5.6-luna-fast" },
   "visual-engineering": { model: "openai/gpt-5.6-sol", variant: "high" },
   writing: { model: "openai/gpt-5.6-sol", variant: "medium" },
 }

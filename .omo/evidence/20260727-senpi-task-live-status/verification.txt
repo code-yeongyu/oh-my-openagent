@@ -1,0 +1,45 @@
+VERIFICATION SUMMARY
+
+Changed-file / package checks
+- `bun run --cwd packages/omo-senpi typecheck`
+  Result: exit 0 (`tsgo --noEmit -p tsconfig.json`)
+- `bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts packages/omo-senpi/src/components/task/status-ui.test.ts packages/omo-senpi/src/components/task/status-row-format.test.ts`
+  Result: exit 0
+- `node packages/omo-senpi/plugin/scripts/build-extension.mjs --check`
+  Result: exit 0; generated `packages/omo-senpi/plugin/extensions/omo.js` is current
+- `git diff --check`
+  Result: exit 0, no output
+- TypeScript no-excuse checker
+  Result: checker itself crashed before analyzing files because its TypeScript import exposed no `ScriptTarget`; package and repository typechecks were used as the blocking diagnostics instead.
+- Pure LOC:
+  `status-ui.ts`: 173
+  `status-row-format.ts`: 168
+  `status-ui-background.test.ts`: 212
+
+Repository gates
+- `bun run typecheck`
+  Result: exit 0 across root, script, and package tsconfigs.
+- `bun run build`
+  Result: exit 0; all build steps completed, including the Senpi plugin extension.
+- `bun test`
+  Result: did not complete within the 600-second command deadline. Before the deadline it reported unrelated existing 5-second timeout failures under `packages/omo-opencode/src/tools/delegate-task/skill-resolver.test.ts` and `packages/omo-opencode/src/tools/delegate-task/tools.test.ts`. No Senpi status failure appeared; the scoped Senpi suites pass independently.
+
+POST-REBASE REFRESH
+- Rebased cleanly onto current `origin/dev`; `HEAD..origin/dev` count is 0.
+- `bun test packages/omo-senpi/src`
+  Result: exit 0 on the rebased source.
+- Focused status suites
+  Result: 27 pass, 0 fail after cached-record remediation and the new static-row regression.
+- `bun run --cwd packages/omo-senpi typecheck`
+  Result: exit 0.
+- `bun run typecheck`
+  Result: exit 0.
+- `bun run build`
+  Result: exit 0.
+- `node packages/omo-senpi/plugin/scripts/build-extension.mjs --check`
+  Result: exit 0 after regeneration on the rebased source.
+- Root build regenerated unrelated Codex artifacts; they were isolated in a temporary path-scoped stash and discarded. Final tracked worktree scope contains only five Senpi files.
+- The post-rebase full root `bun test` was not repeated because its earlier 600-second run was blocked by unrelated OpenCode delegate-task timeouts; the complete `packages/omo-senpi/src` suite is green.
+
+LSP note
+- The registered LSP tool rejects paths outside the session cwd, while the user-required isolated worktree is a sibling directory. Calls against the changed worktree returned `LSP file path must be inside request cwd`. Clean package/root tsgo runs provide the executable diagnostics fallback without touching the dirty main checkout.

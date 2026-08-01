@@ -11,7 +11,11 @@ export function applyCategoryParams(
 
   return {
     ...base,
-    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
+    ...(config.reasoning !== undefined
+      ? { reasoning: config.reasoning }
+      : config.reasoningEffort !== undefined
+        ? { reasoningEffort: config.reasoningEffort }
+        : {}),
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),

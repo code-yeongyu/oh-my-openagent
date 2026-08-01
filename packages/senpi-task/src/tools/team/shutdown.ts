@@ -1,30 +1,28 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
-import { Type } from "typebox"
-import type { Static } from "typebox"
 
 import { SenpiShutdownError } from "../../team"
 import { toolResult } from "../control"
 import type { TeamToolsService } from "./types"
 
-export const TeamShutdownRequestParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  member: Type.String({ description: "Member to request shutdown for." }),
-})
+// Shutdown has no standalone tool registration: the model-facing surface is the structured-message
+// union on task_send. These input types describe the runner calls only; the dead TypeBox param
+// schemas that implied standalone team_shutdown_* tools were removed so no future registrar wires
+// a second, inconsistent shutdown UI.
+export type TeamShutdownRequestInput = {
+  readonly team_run_id: string
+  readonly member: string
+}
 
-export const TeamApproveShutdownParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  member: Type.String({ description: "Member whose pending shutdown to approve." }),
-})
+export type TeamApproveShutdownInput = {
+  readonly team_run_id: string
+  readonly member: string
+}
 
-export const TeamRejectShutdownParams = Type.Object({
-  team_run_id: Type.String({ description: "Team run id." }),
-  member: Type.String({ description: "Member whose pending shutdown to reject." }),
-  reason: Type.String({ description: "Why the member should keep working." }),
-})
-
-export type TeamShutdownRequestInput = Static<typeof TeamShutdownRequestParams>
-export type TeamApproveShutdownInput = Static<typeof TeamApproveShutdownParams>
-export type TeamRejectShutdownInput = Static<typeof TeamRejectShutdownParams>
+export type TeamRejectShutdownInput = {
+  readonly team_run_id: string
+  readonly member: string
+  readonly reason: string
+}
 
 export type ShutdownErrorView =
   | { readonly kind: "unknown_member"; readonly member: string; readonly reason: string }

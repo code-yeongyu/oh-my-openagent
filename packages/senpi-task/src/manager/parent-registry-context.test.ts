@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { AuthStorage, ModelRegistry } from "@code-yeongyu/senpi"
+import { ModelRegistry, ModelRuntime } from "@code-yeongyu/senpi"
 
 import { createParentRegistrySessionContext, findModelReference } from "./parent-registry-context"
 import type { ManagedStartSpec } from "./types"
@@ -19,7 +19,7 @@ function baseSpec(overrides: Partial<ManagedStartSpec> = {}): ManagedStartSpec {
 }
 
 function registryWithMockProvider(): ModelRegistry {
-  const registry = ModelRegistry.inMemory(AuthStorage.inMemory())
+  const registry = new ModelRegistry(ModelRuntime.createSync())
   registry.registerProvider("omo-mock", {
     name: "omo mock provider",
     baseUrl: "file://mock-provider",
@@ -109,6 +109,7 @@ describe("createParentRegistrySessionContext", () => {
   test("#given a parent registry with a dynamically-registered provider #when a child spec names that model #then the registry, its auth storage, and the resolved Model are threaded", () => {
     // given
     const registry = registryWithMockProvider()
+    const modelRuntime = registry.modelRuntime
     const provide = createParentRegistrySessionContext(() => registry)
 
     // when
@@ -116,6 +117,7 @@ describe("createParentRegistrySessionContext", () => {
 
     // then
     expect(context.modelRegistry).toBe(registry)
+    expect(context.modelRuntime).toBe(modelRuntime)
     expect(context.authStorage).toBe(registry.authStorage)
     expect(context.model?.provider).toBe("omo-mock")
     expect(context.model?.id).toBe("mock-1")

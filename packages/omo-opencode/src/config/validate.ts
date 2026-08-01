@@ -1,20 +1,12 @@
-import { isPlainRecord } from "@oh-my-opencode/utils"
-import { readFileSync } from "node:fs"
-import { homedir } from "node:os"
-import { dirname, relative } from "node:path"
+import { relative } from "node:path"
 
-import { mergeConfigs } from "../plugin-config/config-merger"
-import { parseConfigPartially } from "../plugin-config/single-config-loader"
-import {
-  containsPath,
-  detectPluginConfigFile,
-  findProjectOpencodePluginConfigFiles,
-  getOpenCodeConfigDirs,
-  parseJsonc,
-} from "../shared"
+import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+
 import { applyDisabledProviders } from "../shared/disabled-providers"
 import { log } from "../shared/logger"
-import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../shared/plugin-identity"
+import { loadOmoOpenCodeConfigChain } from "../plugin-config/omo-config-chain"
+import { mergeConfigs } from "../plugin-config/config-merger"
+import { findUnknownKeyPaths } from "../plugin-config/unknown-key-diagnostics"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./schema"
 
 export type PluginConfigValidation = {
@@ -24,42 +16,10 @@ export type PluginConfigValidation = {
   readonly config: OhMyOpenCodeConfig
 }
 
-type ConfigLayer = {
-  readonly path: string
-  readonly configDir: string
-}
-
-type LoadedConfigLayer = ConfigLayer & {
-  readonly config: Partial<OhMyOpenCodeConfig> | null
+type LoadedConfigView = {
+  readonly config: Partial<OhMyOpenCodeConfig>
   readonly messages: readonly string[]
-}
-
-function resolveHomeDirectory(): string {
-  return process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-}
-
-function discoverConfigInDirectory(configDir: string): string | null {
-  const detected = detectPluginConfigFile(configDir, {
-    basenames: [CONFIG_BASENAME],
-    legacyBasenames: [LEGACY_CONFIG_BASENAME],
-  })
-  return detected.format === "none" ? null : detected.path
-}
-
-function discoverUserLayers(): readonly ConfigLayer[] {
-  return getOpenCodeConfigDirs({ binary: "opencode" }).flatMap((configDir) => {
-    const configPath = discoverConfigInDirectory(configDir)
-    return configPath ? [{ path: configPath, configDir }] : []
-  })
-}
-
-function discoverProjectLayersNearestFirst(directory: string): readonly ConfigLayer[] {
-  const homeDirectory = resolveHomeDirectory()
-  const stopDirectory = containsPath(homeDirectory, directory) ? homeDirectory : directory
-  return findProjectOpencodePluginConfigFiles(directory, stopDirectory).map((configPath) => ({
-    path: configPath,
-    configDir: dirname(configPath),
-  }))
+  readonly path: string
 }
 
 function shortPath(configPath: string): string {
@@ -74,102 +34,76 @@ function formatIssuePath(path: readonly PropertyKey[]): string {
 
 function schemaMessages(configPath: string, rawConfig: Record<string, unknown>): readonly string[] {
   const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
-  if (result.success) return []
-  return result.error.issues.map((issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`)
+  const validationMessages = result.success
+    ? []
+    : result.error.issues.map((issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`)
+  const unknownKeyMessages = findUnknownKeyPaths(OhMyOpenCodeConfigSchema, rawConfig)
+    .map((path) => `${shortPath(configPath)}: Unknown config key: ${formatIssuePath(path)}`)
+  return [...validationMessages, ...unknownKeyMessages]
 }
 
-function parseLayerConfig(configPath: string): LoadedConfigLayer {
-  try {
-    const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<unknown>(content)
-    if (!isPlainRecord(rawConfig)) {
-      return {
-        path: configPath,
-        configDir: dirname(configPath),
-        config: null,
-        messages: [`${shortPath(configPath)}: <root>: Expected object`],
-      }
-    }
+function parseConfig(rawConfig: Record<string, unknown>): Partial<OhMyOpenCodeConfig> {
+  let config: Partial<OhMyOpenCodeConfig> = {}
+  for (const [key, value] of Object.entries(rawConfig)) {
+    const result = OhMyOpenCodeConfigSchema.safeParse({ [key]: value })
+    if (!result.success) continue
+    const section = Object.entries(result.data).find(([parsedKey]) => parsedKey === key)
+    if (section !== undefined) config = Object.assign(config, Object.fromEntries([section]))
+  }
+  return config
+}
 
-    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
-    return {
-      path: configPath,
-      configDir: dirname(configPath),
-      config: result.success ? result.data : parseConfigPartially(rawConfig),
-      messages: schemaMessages(configPath, rawConfig),
-    }
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-    return {
-      path: configPath,
-      configDir: dirname(configPath),
-      config: null,
-      messages: [`${shortPath(configPath)}: ${error.message}`],
-    }
+function parseConfigView(path: string, rawConfig: Record<string, unknown>): LoadedConfigView {
+  return {
+    config: parseConfig(rawConfig),
+    messages: schemaMessages(path, rawConfig),
+    path,
   }
 }
 
-function firstPath(layers: readonly LoadedConfigLayer[]): string | null {
-  const first = layers[0]
-  return first ? first.path : null
-}
-
-function firstFailingPath(layers: readonly LoadedConfigLayer[]): string | null {
-  for (const layer of layers) {
-    if (layer.messages.length > 0) return layer.path
-  }
-  return null
-}
-
-function mergeLoadedConfig(
-  userLayersNearestFirst: readonly LoadedConfigLayer[],
-  projectLayersNearestFirst: readonly LoadedConfigLayer[],
-): OhMyOpenCodeConfig {
+function mergeViews(views: readonly LoadedConfigView[]): OhMyOpenCodeConfig {
   let config = OhMyOpenCodeConfigSchema.parse({})
-
-  for (const layer of [...userLayersNearestFirst].reverse()) {
-    if (layer.config) config = mergeConfigs(config, layer.config)
+  for (const view of views) {
+    config = mergeConfigs(config, view.config)
   }
+  return config
+}
 
-  const userMcpEnvAllowlist = config.mcp_env_allowlist ?? []
-  const userPlaywrightMcpArgs = config.browser_automation_engine?.playwright_mcp_args
-  for (const layer of [...projectLayersNearestFirst].reverse()) {
-    if (layer.config) config = mergeConfigs(config, layer.config)
-  }
+function protectUserFields(
+  config: OhMyOpenCodeConfig,
+  userConfig: Partial<OhMyOpenCodeConfig>,
+): OhMyOpenCodeConfig {
+  const userMcpEnvAllowlist = userConfig?.mcp_env_allowlist ?? []
+  const userPlaywrightMcpArgs = userConfig?.browser_automation_engine?.playwright_mcp_args
+  const browserAutomationEngine = config.browser_automation_engine === undefined
+    ? undefined
+    : (() => {
+      const { playwright_mcp_args: _projectPlaywrightMcpArgs, ...browser } = config.browser_automation_engine
+      return browser
+    })()
 
-  config = { ...config, mcp_env_allowlist: userMcpEnvAllowlist }
-  if (config.browser_automation_engine) {
-    const {
-      playwright_mcp_args: _projectPlaywrightMcpArgs,
-      ...browserAutomationEngine
-    } = config.browser_automation_engine
-    config = {
-      ...config,
-      browser_automation_engine: userPlaywrightMcpArgs !== undefined
-        ? { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs }
-        : browserAutomationEngine,
-    }
+  return {
+    ...config,
+    mcp_env_allowlist: userMcpEnvAllowlist,
+    ...(browserAutomationEngine === undefined
+      ? {}
+      : {
+        browser_automation_engine: userPlaywrightMcpArgs === undefined
+          ? browserAutomationEngine
+          : { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs },
+      }),
   }
-  return applyDisabledProviders(config)
 }
 
 function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
   const legacy = config.ralph_loop
-  if (legacy === undefined) {
-    return config
-  }
+  if (legacy === undefined) return config
 
   const enabled = typeof legacy.enabled === "boolean" ? legacy.enabled : undefined
   const defaultMaxIterations = typeof legacy.default_max_iterations === "number" ? legacy.default_max_iterations : undefined
-
-  if (enabled === undefined && defaultMaxIterations === undefined) {
-    return config
-  }
+  if (enabled === undefined && defaultMaxIterations === undefined) return config
 
   log("[config] ralph_loop is deprecated and will be removed in a future release. Use goal instead.")
-
   const existingGoal = config.goal
   return {
     ...config,
@@ -181,16 +115,23 @@ function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig 
   }
 }
 
-export function validatePluginConfig(directory: string): PluginConfigValidation {
-  const userLayersNearestFirst = discoverUserLayers().map((layer) => parseLayerConfig(layer.path))
-  const projectLayersNearestFirst = discoverProjectLayersNearestFirst(directory).map((layer) => parseLayerConfig(layer.path))
-  const layers = [...userLayersNearestFirst, ...projectLayersNearestFirst]
-  const messages = layers.flatMap((layer) => layer.messages)
+export function validatePluginConfig(
+  directory: string,
+  environment: OmoConfigEnv = process.env,
+): PluginConfigValidation {
+  const chain = loadOmoOpenCodeConfigChain(directory, environment)
+  const views = chain.views.map((view) => parseConfigView(view.path, view.config))
+  const chainMessages = chain.diagnostics.map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
+  const messages = [...chainMessages, ...views.flatMap((view) => view.messages)]
+  const firstFailingView = views.find((view) => view.messages.length > 0)
+  const firstView = views[0]
+  const userConfig = parseConfig(chain.protectedUserView)
+  const config = applyDisabledProviders(protectUserFields(mergeViews(views), userConfig))
 
   return {
     valid: messages.length === 0,
     messages,
-    path: firstFailingPath(layers) ?? firstPath(layers),
-    config: migrateRalphLoopConfig(mergeLoadedConfig(userLayersNearestFirst, projectLayersNearestFirst)),
+    path: chainMessages.length > 0 ? chain.diagnostics[0]?.path ?? null : firstFailingView?.path ?? firstView?.path ?? null,
+    config: migrateRalphLoopConfig(config),
   }
 }

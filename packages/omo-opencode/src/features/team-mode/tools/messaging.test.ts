@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, jest, spyOn, test } from "bun:test"
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
@@ -16,6 +16,7 @@ import {
   getSessionPromptParams,
 } from "../../../shared/session-prompt-params-state"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../../hooks/shared/prompt-async-gate"
+import { DEFAULT_SESSION_IDLE_SETTLE_MS } from "@oh-my-opencode/utils/session-idle-settle"
 import { listUnreadMessages } from "@oh-my-opencode/team-core/team-mailbox/inbox"
 import { pollAndBuildInjection } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { BroadcastNotPermittedError } from "@oh-my-opencode/team-core/team-mailbox/send"
@@ -94,16 +95,56 @@ const TeamSendToolResultSchema = z.object({
 
 type TeamSendToolResult = z.infer<typeof TeamSendToolResultSchema>
 
-afterEach(() => {
+type Deferred<T> = {
+  promise: Promise<T>
+  resolve(value: T): void
+}
+
+const temporaryDirectories: string[] = []
+const TEST_EVENT_TIMEOUT_MS = 1_000
+const realSetTimeout = globalThis.setTimeout
+const realClearTimeout = globalThis.clearTimeout
+
+function createDeferred<T>(): Deferred<T> {
+  let resolvePromise: Deferred<T>["resolve"] | undefined
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  if (!resolvePromise) throw new Error("deferred resolver was not initialized")
+  return { promise, resolve: resolvePromise }
+}
+
+async function waitForEvent<T>(promise: Promise<T>, description: string): Promise<T> {
+  let timeoutID: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), TEST_EVENT_TIMEOUT_MS)
+  })
+
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (timeoutID !== undefined) {
+      realClearTimeout(timeoutID)
+    }
+  }
+}
+
+afterEach(async () => {
+  jest.useRealTimers()
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
   releaseAllPromptAsyncReservationsForTesting()
   _resetForTesting()
+  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
+    await rm(directoryPath, { recursive: true, force: true })
+  }))
 })
 
 async function createFixtureBaseDir(): Promise<string> {
-  return await mkdtemp(path.join(tmpdir(), "team-send-message-"))
+  const baseDir = await mkdtemp(path.join(tmpdir(), "team-send-message-"))
+  temporaryDirectories.push(baseDir)
+  return baseDir
 }
 
 function createConfig(baseDir: string) {
@@ -533,29 +574,48 @@ describe("createTeamSendMessageTool", () => {
   })
 
   test("live delivery uses the registered agent alias when the runtime stores a config-key agent name", async () => {
-    // given
-    registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
-    const fixture = await createTeamFixture()
-    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
-    const state = await loadState(fixture.teamRunId, fixture.config)
-    const memberTwo = state.members.find((member) => member.name === "m2")
-    if (!memberTwo) throw new Error("m2 runtime member missing")
-    memberTwo.subagent_type = "atlas"
-    await saveState(state, fixture.config)
+    jest.useFakeTimers()
+    const settleTimerScheduled = createDeferred<void>()
+    const fakeSetTimeout = globalThis.setTimeout
+    const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation((callback, delay, ...args) => {
+      if (delay === DEFAULT_SESSION_IDLE_SETTLE_MS) {
+        settleTimerScheduled.resolve()
+      }
+      return fakeSetTimeout(callback, delay, ...args)
+    })
 
-    const { client, calls } = createRecordingClient()
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
+    try {
+      // given
+      registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+      const fixture = await createTeamFixture()
+      const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+      const state = await loadState(fixture.teamRunId, fixture.config)
+      const memberTwo = state.members.find((member) => member.name === "m2")
+      if (!memberTwo) throw new Error("m2 runtime member missing")
+      memberTwo.subagent_type = "atlas"
+      await saveState(state, fixture.config)
 
-    // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      const { client, calls } = createRecordingClient()
+      const liveTool = createTeamSendMessageTool(fixture.config, client)
 
-    // then
-    expect(calls).toHaveLength(1)
-    expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+      // when
+      const delivery = liveTool.execute({
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      }, fixture.toolContext(fixture.memberOneSessionId))
+      await waitForEvent(settleTimerScheduled.promise, "live delivery idle-settle timer")
+      jest.advanceTimersByTime(DEFAULT_SESSION_IDLE_SETTLE_MS)
+      await delivery
+
+      // then
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+    } finally {
+      setTimeoutSpy.mockRestore()
+      jest.clearAllTimers()
+      jest.useRealTimers()
+    }
   })
 
   test("live delivery reapplies category routing and advanced model params for category members", async () => {

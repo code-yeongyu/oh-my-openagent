@@ -1,3 +1,4 @@
+import { OmoReasoningSchema } from "@oh-my-opencode/omo-config-core"
 import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
 import { AgentPermissionSchema } from "./internal/permission"
@@ -6,6 +7,8 @@ export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
   fallback_models: FallbackModelsSchema.optional(),
+  reasoning: OmoReasoningSchema.optional(),
+  /** @deprecated Use `reasoning` instead. */
   variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
@@ -36,22 +39,26 @@ export const AgentOverrideConfigSchema = z.object({
       budgetTokens: z.number().optional(),
     })
     .optional(),
-  /** Reasoning effort level (OpenAI). Overrides category and default settings. */
+  /** @deprecated Use `reasoning` instead. */
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   /** Text verbosity level. */
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
-  /** Per-message ultrawork override model/variant when ultrawork keyword is detected. */
+  /** Per-message ultrawork override model/reasoning when ultrawork keyword is detected. */
   ultrawork: z
     .object({
       model: z.string().optional(),
+      reasoning: OmoReasoningSchema.optional(),
+      /** @deprecated Use `reasoning` instead. */
       variant: z.string().optional(),
     })
     .optional(),
   compaction: z
     .object({
       model: z.string().optional(),
+      reasoning: OmoReasoningSchema.optional(),
+      /** @deprecated Use `reasoning` instead. */
       variant: z.string().optional(),
     })
     .optional(),

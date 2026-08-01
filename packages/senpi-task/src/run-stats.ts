@@ -17,6 +17,10 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
   let generationMs = 0
   let collapsedWindows = 0
   let windowStart = startedAt
+  let costUsd = 0
+  let sawCost = false
+  let cacheReadTokens = 0
+  let cacheableTokens = 0
 
   return {
     accept(event) {
@@ -44,16 +48,32 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       if (window === 0 && (usage.output ?? 0) > 0) collapsedWindows += 1
       outputTokens += usage.output ?? 0
       totalTokens += usage.total ?? 0
+      if (usage.cost !== undefined) {
+        costUsd += usage.cost
+        sawCost = true
+      }
+      cacheReadTokens += usage.cacheRead ?? 0
+      cacheableTokens += (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
       return true
     },
     snapshot(nowMs) {
       const runtimeMs = Math.max(0, nowMs - startedAt)
-      // RPC delivery can arrive in a post-hoc burst, collapsing measured generation windows to
-      // zero. Whenever any token-bearing window collapsed (or none was measured at all), fall
-      // back to total runtime so throughput stays a conservative lower bound instead of either
-      // disappearing or being divided by only the windows that happened to measure.
-      const throughputWindowMs = collapsedWindows > 0 || generationMs === 0 ? runtimeMs : generationMs
-      const tps = tokensPerSecond(outputTokens, throughputWindowMs)
+      // Generation throughput contract: `tokens_per_second` is emitted ONLY when every
+      // token-bearing generation window has a non-zero measured duration, so the figure reflects
+      // streaming speed and nothing else. When any token-bearing window collapsed to zero
+      // (post-hoc RPC burst, clock coalescing, etc.), the timing for that portion of the output
+      // is irrecoverably lost — dividing total tokens by only the surviving measured windows
+      // would overstate throughput, and dividing by runtime would conflate streaming speed with
+      // tool/idle time. Either way the number is unverifiable, so `tokens_per_second` is omitted.
+      //
+      // The runtime fallback survives ONLY for the no-measured-window case where no
+      // token-bearing collapsed window exists (i.e. outputTokens is zero or every window was
+      // zero-token): there the runtime is the sole available timing signal and no collapsed
+      // token timing has been lost.
+      const throughputWindowMs =
+        collapsedWindows > 0 ? undefined : generationMs > 0 ? generationMs : runtimeMs
+      const tps = throughputWindowMs === undefined ? undefined : tokensPerSecond(outputTokens, throughputWindowMs)
+      const cacheHitRate = boundedCacheHitRate(cacheReadTokens, cacheableTokens)
       return {
         runtime_ms: runtimeMs,
         turns,
@@ -62,6 +82,8 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
         ...(totalTokens > 0 ? { total_tokens: totalTokens } : {}),
         ...(generationMs > 0 ? { generation_ms: generationMs } : {}),
         ...(tps === undefined ? {} : { tokens_per_second: tps }),
+        ...(sawCost && Number.isFinite(costUsd) ? { cost_usd: costUsd } : {}),
+        ...(cacheHitRate === undefined ? {} : { cache_hit_rate: cacheHitRate }),
       }
     },
   }
@@ -73,25 +95,56 @@ export function tokensPerSecond(outputTokens: number, generationMs: number): num
   return raw >= 10 ? Math.round(raw) : Math.round(raw * 10) / 10
 }
 
+function boundedCacheHitRate(cacheReadTokens: number, cacheableTokens: number): number | undefined {
+  if (!Number.isFinite(cacheReadTokens) || !Number.isFinite(cacheableTokens) || cacheableTokens <= 0) {
+    return undefined
+  }
+  const rate = cacheReadTokens / cacheableTokens
+  return Number.isFinite(rate) ? Math.min(1, Math.max(0, rate)) : undefined
+}
+
 function isAssistantMessage(message: unknown): message is Record<string, unknown> {
   return isRecord(message) && message.role === "assistant"
 }
 
-function readUsage(message: Record<string, unknown>): { readonly output?: number; readonly total?: number } {
+type UsageFacts = {
+  readonly output?: number
+  readonly total?: number
+  readonly cost?: number
+  readonly input?: number
+  readonly cacheRead?: number
+  readonly cacheWrite?: number
+}
+
+function readUsage(message: Record<string, unknown>): UsageFacts {
   const usage = message.usage
   if (!isRecord(usage)) return {}
   return {
-    ...(firstNumber(usage.output, usage.output_tokens) === undefined
-      ? {}
-      : { output: firstNumber(usage.output, usage.output_tokens) }),
-    ...(firstNumber(usage.totalTokens, usage.total_tokens) === undefined
-      ? {}
-      : { total: firstNumber(usage.totalTokens, usage.total_tokens) }),
+    ...optionalNumber("output", firstFiniteNonNegativeNumber(usage.output, usage.output_tokens)),
+    ...optionalNumber("total", firstFiniteNonNegativeNumber(usage.totalTokens, usage.total_tokens)),
+    ...optionalNumber("cost", readCost(usage.cost)),
+    ...optionalNumber("input", firstFiniteNonNegativeNumber(usage.input, usage.input_tokens)),
+    ...optionalNumber("cacheRead", firstFiniteNonNegativeNumber(usage.cacheRead, usage.cache_read_input_tokens)),
+    ...optionalNumber(
+      "cacheWrite",
+      firstFiniteNonNegativeNumber(usage.cacheWrite, usage.cache_creation_input_tokens),
+    ),
   }
 }
 
-function firstNumber(...values: readonly unknown[]): number | undefined {
-  return values.find((value): value is number => typeof value === "number")
+// Senpi reports cost either as a plain number or as a per-bucket breakdown carrying `.total`.
+function readCost(value: unknown): number | undefined {
+  return firstFiniteNonNegativeNumber(isRecord(value) ? value.total : value)
+}
+
+function optionalNumber<K extends string>(key: K, value: number | undefined): Partial<Record<K, number>> {
+  return value === undefined ? {} : ({ [key]: value } as Record<K, number>)
+}
+
+function firstFiniteNonNegativeNumber(...values: readonly unknown[]): number | undefined {
+  return values.find(
+    (value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0,
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

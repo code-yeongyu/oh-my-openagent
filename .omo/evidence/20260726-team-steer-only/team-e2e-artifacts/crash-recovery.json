@@ -1,0 +1,19 @@
+{
+  "target": {
+    "ready": true,
+    "markerPath": "/Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/.omo/evidence/20260726-team-steer-only/team-e2e-artifacts/crash-after-inject.json",
+    "messageId": "f2248f1a-7591-402b-8343-acd2f17c58fd",
+    "runId": "a900bf05-3613-4e2b-9567-dbe5839e2872",
+    "taskId": "st_019f9edc",
+    "pid": 32557
+  },
+  "before": {
+    "processedExists": false,
+    "eventCount": 0
+  },
+  "memberKilled": true,
+  "parentKilled": true,
+  "initialStatus": null,
+  "restartStatus": 0,
+  "livenessInjected": true
+}

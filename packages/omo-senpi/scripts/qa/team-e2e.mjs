@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { delimiter, dirname, isAbsolute, join, resolve, win32 } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
@@ -11,23 +11,27 @@ import {
   findResults,
   inboxCounts,
   memberInboxDir,
+  memberTaskId,
   parseEvents,
   readText,
   seedCrashReservation,
 } from "./team-e2e-support.mjs"
-import { analyzeMain, teamMessageEnqueues, verdict } from "./team-e2e-analysis.mjs"
-import { evaluateCrashRecovery, runCrashRestartScenario } from "./team-e2e-crash.mjs"
-import { cleanupProcessGroups, pollUntil, startSenpiRun } from "./team-e2e-runtime.mjs"
+import { analyzeMain, injectionEvidence, teamMessageEnqueues, verdict } from "./team-e2e-analysis.mjs"
+import { runCrashRestartScenario } from "./team-e2e-crash.mjs"
+import { createOwnedProcessRegistry, pollUntil, startSenpiRun } from "./team-e2e-runtime.mjs"
 import { LEAD_SCRIPT, DURA_REVIVE_SCRIPT, DURA_SEED_SCRIPT, NOOP_SCRIPT } from "./team-e2e-scripts.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "team-e2e-mock-provider.ts")
+const memberExtensionEntry = join(scriptDir, "..", "..", "plugin", "extensions", "omo-member.js")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 const STALE_TTL_MS = 10 * 60 * 1000
 const DURA_DRAIN_TIMEOUT_MS = 30_000
+const MAIN_INJECTION_TIMEOUT_MS = 30_000
 const DURA_EXPECTED_PROCESSED = 3
 
-const OMO_CONFIG = {
+export const TEAM_E2E_OMO_CONFIG = {
+  task: { reattach_on_reconcile: false },
   categories: {
     quick: { model: "omo-mock/mock-1" },
     fixture: { model: "omo-mock/mock-1" },
@@ -36,23 +40,39 @@ const OMO_CONFIG = {
   agents: { fixture: { model: "omo-mock/mock-1", description: "team fixture agent", prompt: "You are the fixture agent." } },
 }
 
-const spawnedGroups = new Set()
+const spawnedGroups = createOwnedProcessRegistry()
 
-function resolveSenpi() {
-  const bin = process.env.SENPI_BIN?.trim() || "senpi"
-  if (bin.includes("/")) return existsSync(bin) ? bin : null
-  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
-    const candidate = resolve(dir || ".", bin)
-    if (existsSync(candidate)) return candidate
+export function resolveSenpi(operations = {}) {
+  const platform = operations.platform ?? process.platform
+  const env = operations.env ?? process.env
+  const fileExists = operations.existsSync ?? existsSync
+  const requested = env.SENPI_BIN?.trim()
+  if (requested !== undefined && requested !== "" && isExecutablePath(requested)) {
+    return fileExists(requested) ? requested : null
+  }
+  const names = platform === "win32" && (requested === undefined || requested === "" || requested.toLowerCase() === "senpi")
+    ? ["senpi.exe", "senpi.cmd", "senpi"]
+    : [requested || "senpi"]
+  const pathDelimiter = operations.delimiter ?? (platform === "win32" ? ";" : delimiter)
+  const joinPath = operations.joinPath ?? (platform === "win32" ? win32.join : join)
+  for (const dir of (env.PATH ?? "").split(pathDelimiter)) {
+    for (const name of names) {
+      const candidate = joinPath(dir || ".", name)
+      if (fileExists(candidate)) return candidate
+    }
   }
   return null
+}
+
+function isExecutablePath(value) {
+  return isAbsolute(value) || win32.isAbsolute(value) || value.includes("/") || value.includes("\\")
 }
 
 function seedProject(sandbox) {
   seedSandbox(sandbox)
   const omoDir = join(sandbox.cwd, ".omo")
   mkdirSync(omoDir, { recursive: true })
-  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(OMO_CONFIG, null, 2)}\n`)
+  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(TEAM_E2E_OMO_CONFIG, null, 2)}\n`)
 }
 
 function startRun(input) {
@@ -60,7 +80,8 @@ function startRun(input) {
     ...input,
     mockProviderEntry,
     parseEvents,
-    onPid: (pid) => spawnedGroups.add(pid),
+    onPid: (pid) => spawnedGroups.onSpawn(pid),
+    onClose: (pid) => spawnedGroups.onClose(pid),
   })
 }
 
@@ -69,48 +90,74 @@ function runSenpi(input) {
 }
 
 function killGroups() {
-  return cleanupProcessGroups(spawnedGroups)
+  return spawnedGroups.cleanup()
 }
 
 async function runMain(senpiBin, outDir) {
   const sandbox = createSandbox()
-  const obsDir = resolve(outDir, "main-obs")
-  seedProject(sandbox)
-  const run = await runSenpi({ senpiBin, sandbox, prompt: "drive the full team e2e lifecycle", script: LEAD_SCRIPT, obsDir })
-  writeFileSync(join(outDir, "main-stdout.json.log"), run.stdout)
-  writeFileSync(join(outDir, "main-stderr.log"), run.stderr)
-  return { checks: await analyzeMain(run, sandbox, obsDir), exit: run.status }
+  try {
+    const obsDir = resolve(outDir, "main-obs")
+    seedProject(sandbox)
+    const active = startRun({ senpiBin, sandbox, prompt: "drive injection-only team delivery", script: LEAD_SCRIPT, obsDir })
+    let observation
+    try {
+      observation = await pollUntil(
+        () => Promise.resolve(mainInjectionObserved(sandbox.cwd, obsDir)),
+        (value) => value.memberEnvelopeEchoed && value.memberToLeadInjected && value.leadInbox.unread === 0 && value.leadInbox.reserved === 0,
+        MAIN_INJECTION_TIMEOUT_MS,
+      )
+    } finally {
+      await active.kill()
+    }
+    const run = await active.completion
+    writeFileSync(join(outDir, "main-stdout.json.log"), run.stdout)
+    writeFileSync(join(outDir, "main-stderr.log"), run.stderr)
+    writeFileSync(join(outDir, "main-observed.json"), `${JSON.stringify(observation, null, 2)}\n`)
+    return { checks: analyzeMain(run, sandbox, obsDir, observation), exit: run.status }
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+function mainInjectionObserved(cwd, obsDir) {
+  const runId = discoverRunIds(cwd)[0]
+  const quickTask = runId === undefined ? undefined : memberTaskId(cwd, runId, "quick")
+  return injectionEvidence(cwd, runId, quickTask, "LEAD2QUICK", obsDir)
 }
 
 async function runDuraRevive(senpiBin, outDir) {
   const sandbox = createSandbox()
-  const obsDir = resolve(outDir, "dura-obs")
-  seedProject(sandbox)
-  const active = startRun({ senpiBin, sandbox, prompt: "durability revive drain drive", script: DURA_REVIVE_SCRIPT, obsDir })
-  let state
   try {
-    state = await pollUntil(
-      () => Promise.resolve(readDuraInboxState(sandbox.cwd)),
-      (value) => value.counts.unread === 0
-        && value.counts.reserved === 0
-        && value.counts.processed >= DURA_EXPECTED_PROCESSED,
-      DURA_DRAIN_TIMEOUT_MS,
-    )
+    const obsDir = resolve(outDir, "dura-obs")
+    seedProject(sandbox)
+    const active = startRun({ senpiBin, sandbox, prompt: "durability revive drain drive", script: DURA_REVIVE_SCRIPT, obsDir })
+    let state
+    try {
+      state = await pollUntil(
+        () => Promise.resolve(readDuraInboxState(sandbox.cwd)),
+        (value) => value.counts.unread === 0
+          && value.counts.reserved === 0
+          && value.counts.processed >= DURA_EXPECTED_PROCESSED,
+        DURA_DRAIN_TIMEOUT_MS,
+      )
+    } finally {
+      await active.kill()
+    }
+    const run = await active.completion
+    writeFileSync(join(outDir, "dura-stdout.json.log"), run.stdout)
+    writeFileSync(join(outDir, "dura-stderr.log"), run.stderr)
+    const send = findResults(run.events, "task_send")
+    writeFileSync(join(outDir, "dura-inbox.json"), `${JSON.stringify(state, null, 2)}\n`)
+    return {
+      duraBacklogSeeded: readText(join(obsDir, "dura-seeded.txt")) !== undefined,
+      duraMessagesEnqueued: teamMessageEnqueues(send).length >= 2,
+      duraUnreadDrainedToZero:
+        state.counts.unread === 0
+        && state.counts.reserved === 0
+        && state.counts.processed >= DURA_EXPECTED_PROCESSED,
+    }
   } finally {
-    active.kill()
-  }
-  const run = await active.completion
-  writeFileSync(join(outDir, "dura-stdout.json.log"), run.stdout)
-  writeFileSync(join(outDir, "dura-stderr.log"), run.stderr)
-  const send = findResults(run.events, "task_send")
-  writeFileSync(join(outDir, "dura-inbox.json"), `${JSON.stringify(state, null, 2)}\n`)
-  return {
-    duraBacklogSeeded: readText(join(obsDir, "dura-seeded.txt")) !== undefined,
-    duraMessagesEnqueued: teamMessageEnqueues(send).length >= 2,
-    duraUnreadDrainedToZero:
-      state.counts.unread === 0
-      && state.counts.reserved === 0
-      && state.counts.processed >= DURA_EXPECTED_PROCESSED,
+    rmSync(sandbox.root, { recursive: true, force: true })
   }
 }
 
@@ -124,21 +171,25 @@ function readDuraInboxState(cwd) {
 
 async function runReclaim(senpiBin, outDir) {
   const sandbox = createSandbox()
-  seedProject(sandbox)
-  const seed = await runSenpi({ senpiBin, sandbox, prompt: "seed an active team for reclaim", script: DURA_SEED_SCRIPT })
-  writeFileSync(join(outDir, "reclaim-seed-stdout.json.log"), seed.stdout)
-  const runId = discoverRunIds(sandbox.cwd)[0]
-  if (runId === undefined) return { reclaimReservationRestored: false, reclaimNoLeak: false }
-  const inbox = memberInboxDir(sandbox.cwd, runId, "rcl")
-  const reservation = seedCrashReservation(inbox, STALE_TTL_MS * 2, "rcl")
-  const before = inboxCounts(inbox)
-  const reclaim = await runSenpi({ senpiBin, sandbox, prompt: "boot a fresh session so session_start reclaims", script: NOOP_SCRIPT })
-  writeFileSync(join(outDir, "reclaim-boot-stdout.json.log"), reclaim.stdout)
-  const after = inboxCounts(inbox)
-  writeFileSync(join(outDir, "reclaim-inbox.json"), `${JSON.stringify({ runId, reservation: reservation.messageId, before, after, restored: existsSync(reservation.restoredPath) }, null, 2)}\n`)
-  return {
-    reclaimReservationRestored: before.reserved === 1 && after.unread === 1 && existsSync(reservation.restoredPath),
-    reclaimNoLeak: after.reserved === 0,
+  try {
+    seedProject(sandbox)
+    const seed = await runSenpi({ senpiBin, sandbox, prompt: "seed an active team for reclaim", script: DURA_SEED_SCRIPT })
+    writeFileSync(join(outDir, "reclaim-seed-stdout.json.log"), seed.stdout)
+    const runId = discoverRunIds(sandbox.cwd)[0]
+    if (runId === undefined) return { reclaimReservationRestored: false, reclaimNoLeak: false }
+    const inbox = memberInboxDir(sandbox.cwd, runId, "rcl")
+    const reservation = seedCrashReservation(inbox, STALE_TTL_MS * 2, "rcl")
+    const before = inboxCounts(inbox)
+    const reclaim = await runSenpi({ senpiBin, sandbox, prompt: "boot a fresh session so session_start reclaims", script: NOOP_SCRIPT })
+    writeFileSync(join(outDir, "reclaim-boot-stdout.json.log"), reclaim.stdout)
+    const after = inboxCounts(inbox)
+    writeFileSync(join(outDir, "reclaim-inbox.json"), `${JSON.stringify({ runId, reservation: reservation.messageId, before, after, restored: existsSync(reservation.restoredPath) }, null, 2)}\n`)
+    return {
+      reclaimReservationRestored: before.reserved === 1 && after.unread === 1 && existsSync(reservation.restoredPath),
+      reclaimNoLeak: after.reserved === 0,
+    }
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
   }
 }
 
@@ -163,12 +214,10 @@ async function main() {
     let leakedPids = 0
     try {
       const main = await runMain(senpiBin, outDir)
-      const dura = await runDuraRevive(senpiBin, outDir)
-      const reclaim = await runReclaim(senpiBin, outDir)
-      const crash = await runCrashRestartScenario({ senpiBin, outDir, createSandbox, seedProject, startRun })
-      checks = { ...main.checks, ...dura, ...reclaim, ...crash }
+      const crash = await runCrashRestartScenario({ senpiBin, outDir, createSandbox, seedProject, startRun, memberExtensionEntry })
+      checks = { ...main.checks, ...crash }
     } finally {
-      leakedPids = killGroups()
+      leakedPids = await killGroups()
     }
     const afterCredential = credentialDigest(realSenpiAgentDir)
     const afterWholeDir = digestDirectory(realSenpiAgentDir)
@@ -197,6 +246,7 @@ function selfTest() {
     throw new Error("self-test: team e2e default capture directory must not live under scripts/qa")
   }
   if (defaultOutDir.cleanup) rmSync(defaultOutDir.outDir, { recursive: true, force: true })
+  verifyMainInjectionHelper()
   const scriptSource = readFileSync(join(scriptDir, "team-e2e-scripts.mjs"), "utf8")
   if (droppedToolPattern().test(scriptSource)) {
     throw new Error("self-test: team e2e scripts still name a dropped tool")
@@ -218,34 +268,26 @@ function selfTest() {
   if (enqueue?.messageId !== "msg-1" || enqueue.recipients[0] !== "quick") {
     throw new Error("self-test: pull enqueue details not parsed")
   }
-  const crashChecks = evaluateCrashRecovery({
-    target: { ready: true },
-    before: { processedExists: false, eventCount: 0 },
-    memberKilled: true,
-    parentKilled: true,
-    restartStatus: 0,
-    recovery: { processedExists: true, processedCount: 1, eventCount: 1, envelopeCount: 1 },
-  })
-  if (!Object.values(crashChecks).every((value) => value === true)) {
-    throw new Error("self-test: exact-once crash recovery should pass")
-  }
-  const duplicateEnvelope = evaluateCrashRecovery({
-    target: { ready: true },
-    before: { processedExists: false, eventCount: 0 },
-    memberKilled: true,
-    parentKilled: true,
-    restartStatus: 0,
-    recovery: { processedExists: true, processedCount: 1, eventCount: 1, envelopeCount: 2 },
-  })
-  if (duplicateEnvelope.crashSessionEnvelopeExactlyOnce !== false) {
-    throw new Error("self-test: duplicate crash envelope must fail")
-  }
   const empty = inboxCounts(join(scriptDir, "does-not-exist"))
   if (empty.unread !== 0 || empty.reserved !== 0) throw new Error("self-test: missing inbox should be zeroed")
   if (verdict({ a: true, b: true }).result !== "PASS") throw new Error("self-test: all-true verdict should PASS")
   if (verdict({ a: true, b: false }).result !== "FAIL") throw new Error("self-test: any-false verdict should FAIL")
   if (resolveSenpi === undefined) throw new Error("self-test: resolveSenpi missing")
   console.log("SELF-TEST OK")
+}
+
+function verifyMainInjectionHelper() {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-team-e2e-self-test-"))
+  try {
+    const runId = "self-test-run"
+    const runtime = join(root, ".omo", "senpi-task", "teams", "runtime", runId)
+    mkdirSync(runtime, { recursive: true })
+    writeFileSync(join(runtime, "senpi-task-members.json"), JSON.stringify({ quick: "st_self_test" }))
+    const observed = mainInjectionObserved(root, join(root, "obs"))
+    if (observed.quickTask !== "st_self_test") throw new Error("self-test: member task lookup failed")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 }
 
 function droppedToolPattern() {

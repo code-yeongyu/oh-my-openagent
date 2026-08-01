@@ -12,6 +12,7 @@ const REQUIRED_CAPABILITIES = [
   "getFlag",
   "registerTool",
   "registerCommand",
+  "sendMessage",
   "sendUserMessage",
 ] as const
 
@@ -83,9 +84,8 @@ export function composeOmoSenpiExtension(
     // continuation) defers its flush through this timer, so everything that becomes ready within the
     // window collapses into ONE steer injection instead of N separate ones.
     const idleCoordinator = new IdleInjectionCoordinator(
-      (content, options) => {
-        pi.sendUserMessage(content, options)
-      },
+      (message, options) =>
+        pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
       { scheduleFlush: (flush) => void setTimeout(flush, 200) },
     )
 

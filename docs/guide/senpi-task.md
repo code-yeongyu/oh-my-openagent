@@ -44,11 +44,11 @@ Team members always use process mode. Their child process loads a small member e
 
 Every control/read tool targets a child by id or by name:
 
-- **`task_send`** delivers a follow-up message or a steer. `to` accepts a child id/name or a team member name. `deliver_as` is `followUp` (queued for the child's next turn), `steer` (interrupt-and-inject), or `interrupt` (park a running resident child without ending it). Structured shutdown messages also route through this tool for lead sessions.
-- **`task_output`** returns a child's snapshot and transcript. `block` defaults to `true`, so a read waits for a running child until it finishes or `timeout_ms` is reached; pass `block:false` for an immediate peek. The timeout is clamped to the configured `wait` bounds (`min_ms` / `default_ms` / `max_ms`). Committed `team_wait` recoveries appear as `[team message from <from>] <body>` lines.
+- **`task_send`** always steers a plain-text message into a running child. `to` accepts a child id/name or a team member name. Sending to a finished resident child revives the same session. Structured shutdown messages also route through this tool for lead sessions.
+- **`task_output`** immediately returns a child snapshot (`mode:"status"`) or a transcript peek (`mode:"tail"` / `mode:"full"`). It never waits for completion; terminal results arrive through task-completion notifications. Committed `team_wait` recoveries appear as `[team message from <from>] <body>` lines.
 - **`task_cancel`** cancels a child terminally and stops its work.
 
-Parent-initiated park and cancel return their result synchronously in the tool response and never fire a completion notification.
+Parent-initiated cancel returns its result synchronously in the tool response and never fires a completion notification.
 
 ## Inspecting children
 
@@ -72,7 +72,7 @@ The component registers two slash commands (`packages/omo-senpi/src/components/t
 - **`/tasks`** lists this session's tasks; `/tasks --all` lists tasks across every session.
 - **`/task-kill`** opens a selector over cancellable tasks (running / pending / interrupted) and cancels the chosen one after a confirm.
 
-A live status footer also tracks the session's tasks as they change.
+A live status widget below the editor tracks the session's tasks as they change; the footer itself stays reserved for the goal indicator.
 
 ## Teams
 
@@ -109,7 +109,7 @@ All defaults live in `omo.json` under `task` and `teams`. A minimal project conf
 }
 ```
 
-Full field reference, defaults, layer precedence, and the `omo.json` vs `oh-my-openagent.json` coexistence rules are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
+Full field reference, defaults, layer precedence, harness blocks, and profile resolution are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this Senpi guide.
 

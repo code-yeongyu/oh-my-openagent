@@ -9,6 +9,56 @@ const allowAll: SenpiTeamMemberPorts = {
   isKnownAgent: () => true,
 }
 
+describe("validateSenpiTeamMembers vocabulary hints", () => {
+  test("#given an unknown category with named ports #when validated #then the error lists the available categories", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "category", category: "quikc", prompt: "work" }] }, "typo-team")
+    const ports: SenpiTeamMemberPorts = {
+      isCategoryResolvable: (category) => category === "quick" || category === "deep",
+      isKnownAgent: () => true,
+      categoryNames: ["deep", "quick"],
+    }
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, ports)
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.message).toContain("Available categories: deep, quick")
+    }
+  })
+
+  test("#given an unknown subagent_type with named ports #when validated #then the error lists the available agents", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "subagent_type", subagent_type: "orakel", prompt: "work" }] }, "typo-team")
+    const ports: SenpiTeamMemberPorts = {
+      isCategoryResolvable: () => true,
+      isKnownAgent: (agent) => agent === "sisyphus",
+      agentNames: ["sisyphus"],
+    }
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, ports)
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.message).toContain("Available agents: sisyphus")
+    }
+  })
+})
+
 describe("validateSenpiTeamMembers", () => {
   test("#given resolvable members #when validated #then it passes without throwing", () => {
     // given
@@ -32,7 +82,7 @@ describe("validateSenpiTeamMembers", () => {
   test("#given an unresolvable category #when validated #then it throws naming the allowed kinds", () => {
     // given
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "oracle-like-unknown", name: "x" }] },
+      { members: [{ kind: "unresolvable-kind", name: "x" }] },
       "bad-category-team",
     )
     const ports: SenpiTeamMemberPorts = {
@@ -87,7 +137,7 @@ describe("validateSenpiTeamMembers", () => {
   test("#given a curated read-only agent #when validated #then it is rejected before the known-agent check", () => {
     // given
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "oracle" }] },
+      { members: [{ kind: "agent", subagent_type: "momus" }] },
       "curated-agent-team",
     )
 
@@ -104,7 +154,7 @@ describe("validateSenpiTeamMembers", () => {
     if (caught instanceof SenpiTeamSpecError) {
       expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
       expect(caught.message).toBe(
-        'curated read-only agent "oracle" cannot be a team member; delegate via the task tool instead',
+        'curated read-only agent "momus" cannot be a team member; delegate via the task tool instead',
       )
     }
   })

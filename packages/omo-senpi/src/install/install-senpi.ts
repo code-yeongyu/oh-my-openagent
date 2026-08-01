@@ -61,12 +61,21 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("scripts", "install.mjs"),
 ] as const
 
+const LEGACY_BUILTIN_SHADOW_PACKAGES = [
+  join("packages", "pi-goal"),
+  join("packages", "pi-webfetch"),
+] as const
+
 export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Promise<SenpiInstallResult> {
   const context = resolveInstallContext(options)
   await ensurePluginArtifacts(context)
   const settings = await readSettings(context.settingsPath)
   const before = JSON.stringify(settings)
-  const packages = dedupePackages(readPackages(settings))
+  const packages = removeLegacyBuiltinShadows(
+    dedupePackages(readPackages(settings)),
+    context.repoRoot,
+    context.agentDir,
+  )
   if (!packages.includes(context.pluginPath)) packages.push(context.pluginPath)
   settings.packages = packages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
@@ -184,6 +193,11 @@ function readPackages(settings: SettingsRecord): string[] {
 
 function dedupePackages(packages: readonly string[]): string[] {
   return [...new Set(packages)]
+}
+
+function removeLegacyBuiltinShadows(packages: readonly string[], repoRoot: string, agentDir: string): string[] {
+  const shadowPaths = new Set(LEGACY_BUILTIN_SHADOW_PACKAGES.map((path) => resolve(repoRoot, path)))
+  return packages.filter((entry) => !shadowPaths.has(resolve(agentDir, entry)))
 }
 
 async function writeSettingsAtomically(settingsPath: string, settings: SettingsRecord): Promise<string> {

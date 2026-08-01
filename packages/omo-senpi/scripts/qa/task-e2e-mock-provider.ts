@@ -5,6 +5,7 @@
 declare const process: {
   argv: string[]
   cwd(): string
+  exit(code: number): never
   getBuiltinModule<T>(id: string): T
 }
 
@@ -33,6 +34,10 @@ interface MockStepUsage {
   input?: number
   output?: number
   totalTokens?: number
+  cacheRead?: number
+  cacheWrite?: number
+  // Senpi reports cost either as a plain number or as a per-bucket breakdown carrying `.total`.
+  cost?: number | { input?: number; output?: number; total: number }
 }
 
 type MockStep =
@@ -42,6 +47,8 @@ type MockStep =
 interface MockScript {
   parentSteps: MockStep[]
   childSteps: MockStep[]
+  models?: readonly string[]
+  failChildModels?: readonly string[]
   customMessages?: ReadonlyArray<{
     readonly customType: string
     readonly content: string
@@ -50,7 +57,7 @@ interface MockScript {
 }
 
 type Api = "openai-completions"
-type StopReason = "stop" | "toolUse" | "aborted"
+type StopReason = "stop" | "toolUse" | "aborted" | "error"
 
 interface Model<TApi extends string = Api> {
   id: string
@@ -80,9 +87,17 @@ interface AssistantMessage {
   content: AssistantContent[]
   api: Api
   provider: "omo-mock"
-  model: "mock-1"
-  usage: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: number }
+  model: string
+  usage: {
+    input: number
+    output: number
+    cacheRead: number
+    cacheWrite: number
+    totalTokens: number
+    cost: number | { input?: number; output?: number; total: number }
+  }
   stopReason: StopReason
+  errorMessage?: string
   timestamp: number
 }
 
@@ -121,23 +136,26 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<unknown> {
   result(): Promise<AssistantMessage>
 }
 
-const model: MockModel = {
-  id: "mock-1",
-  name: "Mock 1",
-  reasoning: false,
-  input: ["text"],
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  contextWindow: 16_000,
-  maxTokens: 4096,
+function mockModel(id: string): MockModel {
+  return {
+    id,
+    name: id,
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 200_000,
+    maxTokens: 4096,
+  }
 }
 
 export default function registerMockProvider(pi: ExtensionAPI): void {
+  const script = loadMockScript(process.cwd())
   pi.registerProvider("omo-mock", {
     name: "omo mock provider",
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions",
-    models: [model],
+    models: (script.models ?? ["mock-1"]).map(mockModel),
     streamSimple(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
       return streamMockResponse(streamModel, context, options)
     },
@@ -176,7 +194,11 @@ export function messagesContainChild(context: Context): boolean {
   return false
 }
 
-export function stepToAssistantMessage(step: MockStep, callCount: number): AssistantMessage {
+export function stepToAssistantMessage(
+  step: MockStep,
+  callCount: number,
+  modelId = "mock-1",
+): AssistantMessage {
   const content: AssistantContent[] =
     step.type === "text"
       ? [{ type: "text", text: step.text }]
@@ -186,7 +208,7 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
     content,
     api: "openai-completions",
     provider: "omo-mock",
-    model: "mock-1",
+    model: modelId,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0, ...step.usage },
     stopReason: step.type === "tool_call" ? "toolUse" : "stop",
     timestamp: Date.now(),
@@ -196,19 +218,40 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
 let parentCallCount = 0
 let childCallCount = 0
 
-function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
+function streamMockResponse(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const stream = createLocalAssistantMessageEventStream()
   const script = loadMockScript(context.cwd ?? process.cwd())
   // RPC children (--mode rpc) never see the in-process subagent identity line in their
   // message context, so argv mode is the structural child signal; the identity line stays the
   // in-process signal.
   const isChild = messagesContainChild(context) || process.argv.includes("rpc")
+  if (isChild && script.failChildModels?.includes(streamModel.id)) {
+    if (process.argv.includes("rpc")) {
+      queueMicrotask(() => process.exit(42))
+      return stream
+    }
+    const failure: AssistantMessage = {
+      ...stepToAssistantMessage(
+        { type: "text", text: "" },
+        1,
+        streamModel.id,
+      ),
+      stopReason: "error",
+      errorMessage: "mock provider capacity exhausted",
+    }
+    queueMicrotask(() => {
+      stream.push({ type: "start", partial: failure })
+      stream.push({ type: "error", reason: "error", error: failure })
+      stream.end(failure)
+    })
+    return stream
+  }
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount
   const step = steps[Math.min(index, steps.length - 1)]
   if (isChild) childCallCount += 1
   else parentCallCount += 1
-  const message = stepToAssistantMessage(step, index + 1)
+  const message = stepToAssistantMessage(step, index + 1, streamModel.id)
 
   queueMicrotask(() => {
     if (options?.signal?.aborted) {

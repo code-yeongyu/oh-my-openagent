@@ -1,7 +1,11 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
+import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import {
@@ -30,17 +34,40 @@ function fakeNodeSupport(overrides: Partial<CodegraphNodeSupport> = {}): Codegra
 	}
 }
 
+function loadedConfig(daemon: boolean = true) {
+	return {
+		config: { codegraph: { auto_provision: true, daemon, enabled: true, telemetry: false } },
+		diagnostics: [],
+		layers: [],
+		sources: [],
+	}
+}
+
+function testCodegraphEnv({ daemon }: { readonly daemon: boolean }): Record<string, string> {
+	return {
+		CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph",
+		...(daemon ? {} : { CODEGRAPH_NO_DAEMON: "1" }),
+		CODEGRAPH_NO_DOWNLOAD: "1",
+		CODEGRAPH_TELEMETRY: "0",
+		DO_NOT_TRACK: "1",
+	}
+}
+
 function createTestComponent(options: CodegraphComponentOptions = {}): OmoSenpiComponent {
 	return createCodegraphComponent({
 		resolveCommand: () => fakeResolution(),
 		resolveNodeSupport: () => fakeNodeSupport(),
-		buildEnv: () => ({
-			CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph",
-			CODEGRAPH_NO_DAEMON: "1",
-			CODEGRAPH_NO_DOWNLOAD: "1",
-			CODEGRAPH_TELEMETRY: "0",
-			DO_NOT_TRACK: "1",
-		}),
+		buildCodegraphEnv: testCodegraphEnv,
+		loadConfig: () => loadedConfig(),
+		...options,
+	})
+}
+
+function createDefaultEnvComponent(options: CodegraphComponentOptions = {}): OmoSenpiComponent {
+	return createCodegraphComponent({
+		resolveCommand: () => fakeResolution(),
+		resolveNodeSupport: () => fakeNodeSupport(),
+		loadConfig: () => loadedConfig(),
 		...options,
 	})
 }
@@ -70,7 +97,6 @@ describe("createCodegraphComponent", () => {
 					lifecycle: "eager",
 					env: {
 						CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph",
-						CODEGRAPH_NO_DAEMON: "1",
 						CODEGRAPH_NO_DOWNLOAD: "1",
 						CODEGRAPH_TELEMETRY: "0",
 						DO_NOT_TRACK: "1",
@@ -176,11 +202,71 @@ describe("createCodegraphComponent", () => {
 		expect(pi.mcpServers[0]?.config.args).toEqual(["--node-runtime", "node22", "serve", "--mcp"])
 	})
 
+	it("#given a Senpi harness codegraph override #when registered #then the resolved Senpi view configures the daemon", async () => {
+		// given
+		const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-codegraph-senpi-view-"))
+		const homeDir = join(cwd, "home")
+		mkdirSync(join(homeDir, ".omo"), { recursive: true })
+		writeFileSync(join(homeDir, ".omo", "omo.json"), JSON.stringify({
+			codegraph: { daemon: true },
+			"[senpi]": { codegraph: { daemon: false } },
+		}), "utf-8")
+
+		try {
+			// when
+			const pi = new FakeExtensionAPI()
+			await createCodegraphComponent({
+				resolveCommand: () => fakeResolution(),
+				resolveCwd: () => cwd,
+				resolveNodeSupport: () => fakeNodeSupport(),
+				env: { HOME: homeDir },
+			}).register(pi, fakeContext())
+
+			// then
+			expect((pi.mcpServers[0]?.config.env as Record<string, string>).CODEGRAPH_NO_DAEMON).toBe("1")
+		} finally {
+			rmSync(cwd, { force: true, recursive: true })
+		}
+	})
+
+	it("#given omo.json codegraph.daemon=true #when registered #then buildCodegraphEnv enables the daemon", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-codegraph-config-"))
+		const homeDir = join(cwd, "home")
+		const buildCodegraphEnvCalls: Array<{ readonly daemon: boolean }> = []
+		mkdirSync(join(cwd, ".omo"), { recursive: true })
+		writeFileSync(join(cwd, ".omo", "omo.json"), JSON.stringify({ codegraph: { daemon: true } }), "utf-8")
+
+		try {
+			const buildCodegraphEnv = (options: { readonly daemon: boolean }) => {
+				buildCodegraphEnvCalls.push(options)
+				return testCodegraphEnv(options)
+			}
+			const createComponent = (env: Record<string, string | undefined>) =>
+				createCodegraphComponent({
+					resolveCommand: () => fakeResolution(),
+					resolveNodeSupport: () => fakeNodeSupport(),
+					buildCodegraphEnv,
+					loadConfig: (options = {}) => loadOmoConfig({ cwd: options.cwd, env: { HOME: homeDir } }),
+					resolveCwd: () => cwd,
+					env,
+				})
+
+			const configuredPi = new FakeExtensionAPI()
+			await createComponent({}).register(configuredPi, fakeContext())
+			const overriddenPi = new FakeExtensionAPI()
+			await createComponent({ OMO_CODEGRAPH_DAEMON: "0" }).register(overriddenPi, fakeContext())
+
+			expect(buildCodegraphEnvCalls).toEqual([{ daemon: true }, { daemon: false }])
+			expect((configuredPi.mcpServers[0]?.config.env as Record<string, string>).CODEGRAPH_NO_DAEMON).toBeUndefined()
+			expect((overriddenPi.mcpServers[0]?.config.env as Record<string, string>).CODEGRAPH_NO_DAEMON).toBe("1")
+		} finally {
+			rmSync(cwd, { force: true, recursive: true })
+		}
+	})
+
 	it("#given OMO_CODEGRAPH_DAEMON=1 and default env builder #when registered #then omits CODEGRAPH_NO_DAEMON", async () => {
 		const pi = new FakeExtensionAPI()
-		const component = createCodegraphComponent({
-			resolveCommand: () => fakeResolution(),
-			resolveNodeSupport: () => fakeNodeSupport(),
+		const component = createDefaultEnvComponent({
 			env: { OMO_CODEGRAPH_DAEMON: "1" },
 		})
 
@@ -194,9 +280,7 @@ describe("createCodegraphComponent", () => {
 
 	it("#given OMO_CODEGRAPH_DAEMON=true (truthy variant) #when registered #then omits CODEGRAPH_NO_DAEMON", async () => {
 		const pi = new FakeExtensionAPI()
-		const component = createCodegraphComponent({
-			resolveCommand: () => fakeResolution(),
-			resolveNodeSupport: () => fakeNodeSupport(),
+		const component = createDefaultEnvComponent({
 			env: { OMO_CODEGRAPH_DAEMON: " True " },
 		})
 
@@ -206,12 +290,23 @@ describe("createCodegraphComponent", () => {
 		expect("CODEGRAPH_NO_DAEMON" in env).toBe(false)
 	})
 
-	it("#given no daemon opt-in and default env builder #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
+	it("#given no daemon override and default config #when registered #then omits CODEGRAPH_NO_DAEMON", async () => {
 		const pi = new FakeExtensionAPI()
-		const component = createCodegraphComponent({
-			resolveCommand: () => fakeResolution(),
-			resolveNodeSupport: () => fakeNodeSupport(),
+		const component = createDefaultEnvComponent({
 			env: {},
+		})
+
+		await component.register(pi, fakeContext())
+
+		const env = (pi.mcpServers[0]?.config.env ?? {}) as Record<string, string>
+		expect(env.CODEGRAPH_NO_DAEMON).toBeUndefined()
+	})
+
+	it("#given codegraph.daemon=false #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
+		const pi = new FakeExtensionAPI()
+		const component = createDefaultEnvComponent({
+			env: {},
+			loadConfig: () => loadedConfig(false),
 		})
 
 		await component.register(pi, fakeContext())
@@ -222,9 +317,7 @@ describe("createCodegraphComponent", () => {
 
 	it("#given OMO_CODEGRAPH_DAEMON=0 #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
 		const pi = new FakeExtensionAPI()
-		const component = createCodegraphComponent({
-			resolveCommand: () => fakeResolution(),
-			resolveNodeSupport: () => fakeNodeSupport(),
+		const component = createDefaultEnvComponent({
 			env: { OMO_CODEGRAPH_DAEMON: "0" },
 		})
 

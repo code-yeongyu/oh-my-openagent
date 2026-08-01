@@ -136,7 +136,8 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Explore includes its remaining fallbacks
-      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4-mini-fast")
+      expect(result.agents?.explore?.model).toBe("openai/gpt-5.6-luna-fast")
+      expect(result.agents?.explore?.variant).toBe("low")
       expect(result.agents?.explore?.fallback_models).toBeDefined()
       expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
     })
@@ -195,7 +196,8 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Librarian includes its remaining fallbacks
-      expect(result.agents?.librarian?.model).toBe("openai/gpt-5.4-mini-fast")
+      expect(result.agents?.librarian?.model).toBe("openai/gpt-5.6-luna-fast")
+      expect(result.agents?.librarian?.variant).toBe("low")
       expect(result.agents?.librarian?.fallback_models).toBeDefined()
       expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)
     })
@@ -267,12 +269,11 @@ describe("generateModelConfig provider routes", () => {
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then utility routes use the global MiniMax provider
+      // then utility agents use the global MiniMax provider
       expect(result.agents?.librarian?.model).toBe("minimax-coding-plan/MiniMax-M3")
       expect(result.agents?.explore?.model).toBe("minimax-coding-plan/MiniMax-M3")
       expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M3")
       expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-coding-plan/MiniMax-M3")
-      expect(result.categories?.writing?.model).toBe("minimax-coding-plan/MiniMax-M3")
     })
 
     test("keeps opencode-go MiniMax M3 ahead of Coding Plan fallback when both are available", () => {
@@ -296,10 +297,11 @@ describe("generateModelConfig provider routes", () => {
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then utility routes use the regional MiniMax provider
+      // then utility agents use the regional MiniMax provider
       expect(result.agents?.librarian?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
       expect(result.agents?.explore?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
-      expect(result.categories?.quick?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      expect(result.agents?.atlas?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
     })
   })
 
@@ -312,7 +314,7 @@ describe("generateModelConfig provider routes", () => {
 
     // then it uses the canonical schema URL
     expect(result.$schema).toBe(
-      "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+      "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
     )
   })
 })

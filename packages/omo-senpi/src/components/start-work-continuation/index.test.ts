@@ -54,7 +54,7 @@ function makeCoordinator(): {
   delivered: string[]
 } {
   const delivered: string[] = []
-  const coordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+  const coordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
   return { coordinator, delivered }
 }
 
@@ -88,9 +88,8 @@ describe("omo-senpi start-work-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await expect(
-      pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")),
-    ).resolves.toBeDefined()
+    const results = await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(results).toBeDefined()
     expect(delivered).toEqual([])
     expect(pi.userMessages).toEqual([])
   })
@@ -434,7 +433,7 @@ describe("omo-senpi start-work-continuation", () => {
 
     const results = await pi.dispatch(
       "input",
-      { type: "input", text: "hello", source: "user" },
+      { type: "input", text: "hello", source: "user", streamingBehavior: "steer" },
       eventCtx(root, "qa-s1"),
     )
 

@@ -24,7 +24,7 @@ import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
-  model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+  model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
   fallbackChain: undefined,
   systemContent: `system:${member.name}`,
 }))
@@ -201,9 +201,9 @@ describe("createTeamRun", () => {
       subagent_type: member.subagent_type,
       model: member.model,
     }))).toEqual([
-      { name: "member-1", subagent_type: "member-1-agent", model: { providerID: "openai", modelID: "gpt-5.4-mini" } },
-      { name: "member-2", subagent_type: "member-2-agent", model: { providerID: "openai", modelID: "gpt-5.4-mini" } },
-      { name: "member-3", subagent_type: "member-3-agent", model: { providerID: "openai", modelID: "gpt-5.4-mini" } },
+      { name: "member-1", subagent_type: "member-1-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
+      { name: "member-2", subagent_type: "member-2-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
+      { name: "member-3", subagent_type: "member-3-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
     ])
   })
 

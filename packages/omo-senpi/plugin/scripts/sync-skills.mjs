@@ -11,7 +11,7 @@ const sharedSkillsRoot = join(repoRoot, "shared-skills", "skills")
 const skillSources = [
   {
     name: "ulw-loop",
-    source: join(repoRoot, "omo-codex", "plugin", "components", "ulw-loop", "skills", "ulw-loop"),
+    source: join(repoRoot, "omo-senpi", "skills", "ulw-loop"),
   },
 ]
 const componentSkillNames = new Set(skillSources.map(({ name }) => name))
@@ -21,6 +21,10 @@ const componentSkillNames = new Set(skillSources.map(({ name }) => name))
 // section stripping, and no Senpi-compatibility banner (they already speak native Senpi tools).
 const nativeSkillsRoot = join(repoRoot, "omo-senpi", "skills")
 const nativeSkillSources = [
+  {
+    name: "give-me-tips",
+    source: join(nativeSkillsRoot, "give-me-tips"),
+  },
   {
     name: "hyperplan",
     source: join(nativeSkillsRoot, "hyperplan"),
@@ -68,7 +72,7 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with category/agent matching \`.omo/omo.json\` (e.g. \`agent: "librarian"\`) |
 | \`task(...)\` | \`task\` tool |
 | \`background_output(task_id="...")\` | \`task_output\` tool with the task id |
-| \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, \`team_wait\`, ...); members poll with \`task_send\` / \`team_wait\` |
+| \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, ...); send with \`task_send\`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
 
 If a code block below conflicts with this section, this section wins.
 
@@ -150,6 +154,48 @@ function applyStartWorkOverlay(content) {
   return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
 }
 
+const ulwPlanReviewOverride = `## Senpi Review Override (authoritative)
+
+In omo-senpi the curated \`oracle\` subagent does not exist. The high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file. Ignore every "dual" review instruction, every "independent" reviewer lane, and every \`independent_reviewer\` state field below; never spawn \`task(subagent_type="oracle")\`. A momus approval whose remaining items are notes counts as approval.
+
+Only a plan file produced by this skill and recorded with \`review_required\` authorizes a \`momus\` or \`metis\` review. A bare \`ulw\` run without that file uses notepad self-review instead, however large the work feels.
+
+If a section below conflicts with this section, this section wins.
+
+`
+
+const ulwPlanConsultationLanes = `## Senpi Design Consultation Lanes (authoritative)
+
+When the task tool's available categories include \`architect\` and/or \`ultrabrain\`, ACTIVELY consult them as background advisory lanes while grounding and drafting the plan:
+
+| Lane | Category | Ask it for |
+| --- | --- | --- |
+| Big-picture design | \`architect\` | module boundaries, decomposition options, trade-offs, blast radius |
+| Detail design | \`ultrabrain\` | algorithms, edge cases, exact interfaces and contracts |
+
+Spawn them with \`task(category: "architect" \\| "ultrabrain", run_in_background: true)\` in the same wave as your research lanes, and integrate their answers before the approval brief. Every such prompt MUST start with TASK / DELIVERABLE / SCOPE / VERIFY / STOP WHEN and MUST declare itself advisory-only: read-only analysis, NO file edits, recommendations returned as text. Treat what comes back as claims to verify, not as decisions already made.
+
+This section is an EXPLICIT EXCEPTION to the later rule "Never dispatch with \`category=\`": it authorizes exactly these two advisory lanes. Every other category dispatch stays forbidden. When neither category is listed as available, skip these lanes silently.
+
+`
+
+function applyUlwPlanOverlay(content) {
+  if (content.includes("# ulw-plan - full workflow")) {
+    return insertAfterFrontmatter(content, ulwPlanReviewOverride)
+  }
+  if (/^#\s+ulw-plan\s*$/m.test(content)) {
+    return insertAfterFrontmatter(content, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
+  }
+  return content
+}
+
+function insertAfterFrontmatter(content, section) {
+  const frontmatterEnd = content.indexOf("\n---\n", content.startsWith("---\n") ? 4 : 0)
+  if (!content.startsWith("---\n") || frontmatterEnd === -1) return `${section}${content}`
+  const insertAt = frontmatterEnd + "\n---\n".length
+  return `${content.slice(0, insertAt)}\n${section}${content.slice(insertAt)}`
+}
+
 function findSenpiCompatibilitySectionEnd(content, searchStart) {
   const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g
   structuralEndPattern.lastIndex = searchStart
@@ -205,6 +251,9 @@ function applySharedTierAdaptation(skillName, content) {
   let adapted = content
   if (skillName === "start-work") {
     adapted = applyStartWorkOverlay(adapted)
+  }
+  if (skillName === "ulw-plan") {
+    adapted = applyUlwPlanOverlay(adapted)
   }
   adapted = stripNamedSections(adapted)
   adapted = insertSenpiCompatibilityGuidance(adapted)
@@ -266,7 +315,7 @@ export async function syncSkills() {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
     await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
-    await adaptSkillTree(destination, applyTier1Adaptation)
+    await adaptSkillTree(destination, normalizeBlankLines)
   }
 
   for (const { name, source } of nativeSkillSources) {

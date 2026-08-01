@@ -34,10 +34,12 @@ export function createParentRegistrySessionContext(
     const registry = resolveRegistry()
     if (registry === undefined) return {}
     const model = spec.model === undefined ? undefined : findModelReference(registry, spec.model)
+    const modelRuntime = registry.modelRuntime
     const thinkingLevel = asSenpiThinkingLevel(spec.variant)
     return {
       modelRegistry: registry,
       authStorage: registry.authStorage,
+      ...(modelRuntime !== undefined && { modelRuntime }),
       ...(model !== undefined && { model }),
       ...(thinkingLevel !== undefined && { thinkingLevel }),
     }

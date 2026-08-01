@@ -1,9 +1,11 @@
 import { createAgentSession, SessionManager, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
 
 import { CURATED_READONLY_AGENT_NAMES } from "../agents/builtin"
+import type { ResolvedModelRecord } from "../state"
 import { createChildResourceLoader } from "./in-process/child-loader"
 import { createChildHandle, type ChildHandle, type ChildSession } from "./in-process/child-handle"
 import { createCuratedReadonlyBashTool } from "./in-process/curated-readonly-bash"
+import { createRuntimeFallbackSettings } from "./in-process/runtime-fallback-settings"
 import { RunnerError } from "./in-process/runner-error"
 import { mergeChildCustomTools } from "./in-process/shared-tool-filter"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -38,8 +40,12 @@ export type ChildSpec = {
   readonly agentDir?: string
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
+  readonly modelRuntime?: CreateAgentSessionOptions["modelRuntime"]
   readonly model?: CreateAgentSessionOptions["model"]
   readonly thinkingLevel?: CreateAgentSessionOptions["thinkingLevel"]
+  readonly selectedModel?: string
+  readonly requestedModel?: ResolvedModelRecord
+  readonly fallbackModels?: readonly ResolvedModelRecord[]
   readonly toolAllowlist?: readonly string[]
   // executable ToolDefinitions merged AFTER the shared-tool family filter - the ONLY sanctioned
   // bypass of the task/team-family exclusion (team layer injects the pre-scoped member tool here).
@@ -92,6 +98,7 @@ export class InProcessRunner {
     const customTools = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
       ? [...mergedCustomTools.filter((tool) => tool.name !== "bash"), createCuratedReadonlyBashTool(spec.cwd)]
       : mergedCustomTools
+    const settingsManager = createRuntimeFallbackSettings(spec.selectedModel, spec.fallbackModels)
     const options: CreateAgentSessionOptions = {
       cwd: spec.cwd,
       sessionManager: SessionManager.inMemory(spec.cwd),
@@ -100,8 +107,10 @@ export class InProcessRunner {
       ...(spec.agentDir !== undefined && { agentDir: spec.agentDir }),
       ...(spec.authStorage !== undefined && { authStorage: spec.authStorage }),
       ...(spec.modelRegistry !== undefined && { modelRegistry: spec.modelRegistry }),
+      ...(spec.modelRuntime !== undefined && { modelRuntime: spec.modelRuntime }),
       ...(spec.model !== undefined && { model: spec.model }),
       ...(spec.thinkingLevel !== undefined && { thinkingLevel: spec.thinkingLevel }),
+      settingsManager,
       ...(spec.toolAllowlist !== undefined && { tools: [...spec.toolAllowlist] }),
     }
 

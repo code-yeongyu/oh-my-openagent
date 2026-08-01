@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "checks": {
+    "createTwoMembersActive": true,
+    "createListsActiveMembers": true,
+    "leadToMemberEnqueued": true,
+    "memberEnvelopeEchoed": true,
+    "memberToLeadInjected": true,
+    "leadInboxDrained": true,
+    "noBlockingTeamWaitCalls": true,
+    "crashHoldReached": true,
+    "crashKilledMemberAtHold": true,
+    "crashReservationUncommittedAtKill": true,
+    "crashRestartExitClean": true,
+    "crashLivenessInjectedToLead": true,
+    "crashLivenessAcknowledged": true
+  },
+  "failed": [],
+  "credentialIsolationClean": true,
+  "wholeDirUnchanged": true,
+  "leakedPids": 0
+}

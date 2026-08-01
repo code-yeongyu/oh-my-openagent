@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, relative, resolve } from "node:path"
 import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
@@ -114,6 +114,32 @@ describe("runSenpiInstaller", () => {
     expect(settings.nested).toEqual({ enabled: true })
     expect(settings.packages).toEqual(["keep-me", pluginPath])
     expect(await backupFiles(agentDir)).toHaveLength(1)
+  })
+
+  test("#given legacy goal and webfetch packages #when installing #then builtin-shadowing entries are removed", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const legacyGoal = join(repoRoot, "packages", "pi-goal")
+    const legacyWebfetch = join(repoRoot, "packages", "pi-webfetch")
+    await writeFile(
+      join(agentDir, "settings.json"),
+      JSON.stringify({
+        packages: [
+          "keep-me",
+          relative(agentDir, legacyGoal),
+          legacyWebfetch,
+          pluginPath,
+        ],
+      }),
+    )
+
+    // when
+    await runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    const settings = await readSettings(agentDir)
+    expect(settings.packages).toEqual(["keep-me", pluginPath])
   })
 
   test("#given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written", async () => {

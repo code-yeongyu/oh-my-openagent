@@ -79,6 +79,7 @@ function childEnv(baseEnv, sandbox, sessionDir, senpiBin) {
     ...env,
     SENPI_BIN: senpiBin,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
     OMO_SENPI_QA: "1",
     OMO_SENPI_DISABLE_POSTHOG: "1",
@@ -144,10 +145,24 @@ async function runScenario(name) {
   if (payload.result !== "PASS") process.exitCode = run.status || 1
 }
 
+// Cost is reported either as a plain number or as a per-bucket breakdown carrying `.total`; both
+// shapes must produce a visible `$cost (CH: rate%)` token, so both count as usable QA usage.
+function costTotal(cost) {
+  if (typeof cost === "number") return cost
+  return typeof cost?.total === "number" ? cost.total : undefined
+}
+
+function hasCostUsage(step) {
+  const usage = step?.usage
+  if (usage === undefined) return false
+  return (costTotal(usage.cost) ?? 0) > 0 && typeof usage.cacheRead === "number" && usage.cacheRead > 0
+}
+
 function runSelfTest() {
   if (parseArgs(["--scenario", "edge"]).scenario !== "edge") throw new Error("self-test: scenario parser failed")
   if (parseArgs(["--scenario", "active"]).scenario !== "active") throw new Error("self-test: active scenario parser failed")
   if (parseArgs(["--scenario", "team"]).scenario !== "team") throw new Error("self-test: team scenario parser failed")
+  if (parseArgs(["--scenario", "team-active"]).scenario !== "team-active") throw new Error("self-test: team-active scenario parser failed")
   try {
     parseArgs(["--scenario", "bogus"])
     throw new Error("self-test: bad scenario accepted")
@@ -159,12 +174,24 @@ function runSelfTest() {
   const command = composeCommand("/tmp/senpi", prepared.sessionDir, "full")
   const activeCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "active")
   const teamCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team")
+  const teamActiveCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team-active")
   const env = childEnv({ ...process.env, SENPI_CODING_AGENT_DIR: "/real/agent", OPENAI_API_KEY: "secret" }, prepared.sandbox, prepared.sessionDir, "/tmp/senpi")
   if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: TUI command must not force print/json mode")
   if (!command.args.includes(mockProviderEntry) || !command.args.includes("omo-mock") || !command.args.includes("mock-1")) throw new Error("self-test: mock provider command is incomplete")
   if (!activeCommand.args.includes(SCENARIOS.active.prompt)) throw new Error("self-test: active command prompt is incomplete")
   if (!teamCommand.args.includes(SCENARIOS.team.prompt)) throw new Error("self-test: team command prompt is incomplete")
+  if (!teamActiveCommand.args.includes(SCENARIOS["team-active"].prompt)) throw new Error("self-test: team-active command prompt is incomplete")
   if (SCENARIOS.team.customMessages?.[0]?.customType !== "senpi-task.team-message") throw new Error("self-test: team custom message is incomplete")
+  // Cost/cache-hit stats only exist once usage rides on the step that is still streaming, so the
+  // live-capture scenarios must attach usage to the step that keeps the row on screen.
+  const activeToolStep = SCENARIOS.active.childSteps.find((step) => step.type === "tool_call")
+  if (!hasCostUsage(activeToolStep)) throw new Error("self-test: active child tool step must carry cost/cache usage")
+  const teamActive = SCENARIOS["team-active"]
+  const teamCreate = teamActive.parentSteps.find((step) => step.type === "tool_call" && step.name === "team_create")
+  if (teamCreate === undefined) throw new Error("self-test: team-active must create a real team")
+  if ((teamCreate.arguments.inline_spec?.members ?? []).length === 0) throw new Error("self-test: team-active team needs a member")
+  const memberToolStep = teamActive.childSteps.find((step) => step.type === "tool_call")
+  if (!hasCostUsage(memberToolStep)) throw new Error("self-test: team-active member step must carry cost/cache usage")
   if (env.SENPI_CODING_AGENT_DIR !== prepared.sandbox.agentDir || env.OPENAI_API_KEY !== undefined) throw new Error("self-test: env isolation failed")
   const oldOutDir = process.env.TASK_TUI_E2E_OUT_DIR
   process.env.TASK_TUI_E2E_OUT_DIR = receiptDir

@@ -13,15 +13,20 @@ const sourcePlugin = new URL("../../index.ts", import.meta.url).href
 
 describe("detectCurrentConfig - single package detection", () => {
   let testConfigDir = ""
+  let homeDirectory = ""
+  let originalHome: string | undefined
   let testConfigPath = ""
   let testOmoConfigPath = ""
 
   beforeEach(() => {
     testConfigDir = join(tmpdir(), `omo-detect-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    homeDirectory = join(testConfigDir, "home")
     testConfigPath = join(testConfigDir, "opencode.json")
-    testOmoConfigPath = join(testConfigDir, "oh-my-opencode.json")
+    testOmoConfigPath = join(homeDirectory, ".omo", "omo.jsonc")
 
-    mkdirSync(testConfigDir, { recursive: true })
+    mkdirSync(join(testOmoConfigPath, ".."), { recursive: true })
+    originalHome = process.env.HOME
+    process.env.HOME = homeDirectory
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
     resetConfigContext()
   })
@@ -30,6 +35,8 @@ describe("detectCurrentConfig - single package detection", () => {
     rmSync(testConfigDir, { recursive: true, force: true })
     resetConfigContext()
     delete process.env.OPENCODE_CONFIG_DIR
+    if (originalHome === undefined) delete process.env.HOME
+    else process.env.HOME = originalHome
   })
 
   it("detects both legacy and canonical plugin entries", () => {
@@ -57,7 +64,9 @@ describe("detectCurrentConfig - single package detection", () => {
   it("detects OpenCode Go from the existing omo config", () => {
     // given
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")
-    writeFileSync(testOmoConfigPath, JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.6" } } }, null, 2) + "\n", "utf-8")
+    writeFileSync(testOmoConfigPath, JSON.stringify({
+      "[opencode]": { agents: { atlas: { model: "opencode-go/kimi-k2.6" } } },
+    }, null, 2) + "\n", "utf-8")
 
     // when
     const result = detectCurrentConfig()
@@ -73,7 +82,7 @@ describe("detectCurrentConfig - single package detection", () => {
     writeFileSync(testOmoConfigPath, "{}\n", "utf-8")
     const originalReadFileSync = fs.readFileSync
     const readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation((filePath, options) => {
-      if (String(filePath).endsWith("oh-my-opencode.json")) {
+      if (String(filePath).replaceAll("\\", "/").endsWith(".omo/omo.jsonc")) {
         throw "read failed"
       }
       return originalReadFileSync(filePath, options)

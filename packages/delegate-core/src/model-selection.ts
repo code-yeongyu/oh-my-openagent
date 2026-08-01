@@ -6,6 +6,8 @@ import {
   transformModelForProvider,
 } from "@oh-my-opencode/model-core"
 
+export { transformModelForProvider } from "@oh-my-opencode/model-core"
+
 export type DelegateFallbackEntry = {
   readonly providers: string[]
   readonly model: string

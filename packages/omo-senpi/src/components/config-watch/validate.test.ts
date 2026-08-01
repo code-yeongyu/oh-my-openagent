@@ -214,6 +214,22 @@ describe("createOmoConfigValidator", () => {
     expect(rejectedErrors(validation).join("\n")).toContain(jsonPath)
   })
 
+  it("#given a changed Senpi model catalog cycle #when validating #then rejects the resolved Senpi view diagnostic", () => {
+    // given
+    const fixture = createFixture()
+    const changedPath = configPath(fixture.projectDir)
+    writeConfig(changedPath, validTaskConfig)
+    const validator = createValidator(fixture)
+    writeConfig(changedPath, '{"models":{"loop":{"model":"loop"}},"[senpi]":{"categories":{"quick":{"model":"loop"}}}}')
+
+    // when
+    const validation = validator.validate([changedPath])
+
+    // then
+    expect(validation.ok).toBe(false)
+    expect(rejectedErrors(validation).join("\n")).toContain('Model catalog entry "loop" references itself')
+  })
+
   it("#given an unreadable changed config path #when validating #then returns its read diagnostic without throwing", () => {
     const fixture = createFixture()
     const changedPath = configPath(fixture.projectDir)

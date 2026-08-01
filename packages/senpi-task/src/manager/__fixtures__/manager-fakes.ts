@@ -35,6 +35,7 @@ export type FakeHandle = {
   readonly followUpCalls: string[]
   subscribeCount(): number
   unsubscribeCount(): number
+  waitForSubscription(): Promise<void>
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -49,6 +50,7 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   const listeners = new Set<ManagedChildListener>()
   let subscribeCalls = 0
   let unsubscribeCalls = 0
+  const subscriptionWaiters: Array<() => void> = []
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -62,6 +64,7 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     abort: async () => {},
     subscribe: (listener) => {
       subscribeCalls += 1
+      for (const resolve of subscriptionWaiters.splice(0)) resolve()
       listeners.add(listener)
       return () => {
         unsubscribeCalls += 1
@@ -89,6 +92,9 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     followUpCalls,
     subscribeCount: () => subscribeCalls,
     unsubscribeCount: () => unsubscribeCalls,
+    waitForSubscription: () => subscribeCalls > 0
+      ? Promise.resolve()
+      : new Promise((resolve) => subscriptionWaiters.push(resolve)),
   }
 }
 

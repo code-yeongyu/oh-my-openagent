@@ -17,11 +17,11 @@ export async function destroyResidentTask(
   const handle = context.registry.get(taskId)
   if (handle !== undefined) {
     await teardownHandle(handle)
-    context.registry.forget(taskId)
+    if (cause !== "fallback_handoff") context.registry.forget(taskId)
   } else if (cause === "reconcile_lost") {
     await terminateOrphan(context, taskId)
   }
-  recordResidency(context, taskId, cause)
+  if (cause !== "fallback_handoff") recordResidency(context, taskId, cause)
 }
 
 async function teardownHandle(handle: ResidentHandle): Promise<void> {

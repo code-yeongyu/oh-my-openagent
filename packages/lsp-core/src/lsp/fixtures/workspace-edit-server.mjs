@@ -51,6 +51,14 @@ function finishRename(context) {
 	}, delay);
 }
 
+function sendPublishDeliveryBarrier() {
+	const id = nextServerRequestId;
+	nextServerRequestId += 1;
+	pendingServerRequests.set(String(id), { kind: "publishDeliveryBarrier", method: "workspace/configuration" });
+	record({ type: "serverRequest", method: "workspace/configuration", id });
+	send({ jsonrpc: "2.0", id, method: "workspace/configuration", params: { items: [] } });
+}
+
 function schedulePublish(step, fallbackUri, fallbackVersion) {
 	const delay = Number(step.delayMs ?? 0);
 	setTimeout(() => {
@@ -61,6 +69,7 @@ function schedulePublish(step, fallbackUri, fallbackVersion) {
 		};
 		record({ type: "serverNotification", method: "textDocument/publishDiagnostics", params });
 		send({ jsonrpc: "2.0", method: "textDocument/publishDiagnostics", params });
+		if (step.awaitClientDelivery === true) sendPublishDeliveryBarrier();
 	}, delay);
 }
 
@@ -79,11 +88,11 @@ function handleClientResponse(message) {
 	pendingServerRequests.delete(String(message.id));
 	record({
 		type: "clientResponse",
-		method: "workspace/applyEdit",
+		method: context.method ?? "workspace/applyEdit",
 		result: message.result ?? null,
 		error: message.error ?? null,
 	});
-	if (context.kind === "unscoped") return;
+	if (context.kind === "publishDeliveryBarrier" || context.kind === "unscoped") return;
 	if (typeof context.pendingApplyResponses === "number") {
 		context.pendingApplyResponses -= 1;
 		if (context.pendingApplyResponses > 0) return;

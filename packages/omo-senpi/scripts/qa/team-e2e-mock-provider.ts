@@ -104,7 +104,7 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<unknown> {
   result(): Promise<AssistantMessage>
 }
 
-const model = { id: "mock-1", name: "Mock 1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 16_000, maxTokens: 4096 }
+const model = { id: "mock-1", name: "Mock 1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200_000, maxTokens: 4096 }
 
 const ROLE_MARKERS: ReadonlyArray<readonly [string, string]> = [
   ["MOCKROLE=quick", "quick"],

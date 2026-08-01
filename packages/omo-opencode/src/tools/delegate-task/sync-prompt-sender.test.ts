@@ -345,6 +345,129 @@ bunDescribe("sendSyncPrompt", () => {
     })
   })
 
+  bunTest("lowers canonical models entry reasoning to the selected model variant in the actual prompt payload", async () => {
+    //#given
+    const { resolveCategoryExecution } = require("./category-resolver")
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+    const category = "canonical-preset"
+    const resolution = await resolveCategoryExecution(
+      {
+        category,
+        description: "test task",
+        prompt: "test prompt",
+        run_in_background: false,
+        load_skills: [],
+      },
+      {
+        client: {},
+        manager: {},
+        directory: "/tmp/test",
+        userCategories: {
+          [category]: {
+            models: [{ model: "openai/gpt-5.4", reasoning: "high", reasoningEffort: "low" }],
+          },
+        },
+      },
+      undefined,
+      undefined,
+    )
+    let promptArgs!: PromptArgs
+    const promptWithModelSuggestionRetry = bunMock(async (_client: unknown, input: PromptArgs) => {
+      promptArgs = input
+    })
+
+    //#when
+    await sendSyncPrompt(
+      { session: { promptAsync: bunMock(async () => ({ data: {} })) } },
+      {
+        sessionID: "test-session",
+        agentToUse: "sisyphus-junior",
+        args: {
+          category,
+          description: "test task",
+          prompt: "test prompt",
+          run_in_background: false,
+          load_skills: [],
+        },
+        systemContent: undefined,
+        categoryModel: resolution.categoryModel,
+        directory: "/tmp/test",
+        toastManager: null,
+        taskId: undefined,
+      },
+      { promptWithModelSuggestionRetry },
+    )
+
+    //#then
+    bunExpect(promptArgs.body.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    bunExpect(promptArgs.body.variant).toBe("high")
+    bunExpect(promptArgs.body.options).toBeUndefined()
+  })
+
+  bunTest("lowers canonical category reasoning to reasoningEffort in the actual prompt payload for a model without presets", async () => {
+    //#given
+    const { resolveCategoryExecution } = require("./category-resolver")
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+    const category = "canonical-effort"
+    const resolution = await resolveCategoryExecution(
+      {
+        category,
+        description: "test task",
+        prompt: "test prompt",
+        run_in_background: false,
+        load_skills: [],
+      },
+      {
+        client: {},
+        manager: {},
+        directory: "/tmp/test",
+        userCategories: {
+          [category]: {
+            models: ["test-provider/plain-model"],
+            reasoning: "high",
+            reasoningEffort: "low",
+          },
+        },
+      },
+      undefined,
+      undefined,
+    )
+    let promptArgs!: PromptArgs
+    const promptWithModelSuggestionRetry = bunMock(async (_client: unknown, input: PromptArgs) => {
+      promptArgs = input
+    })
+
+    //#when
+    await sendSyncPrompt(
+      { session: { promptAsync: bunMock(async () => ({ data: {} })) } },
+      {
+        sessionID: "test-session",
+        agentToUse: "sisyphus-junior",
+        args: {
+          category,
+          description: "test task",
+          prompt: "test prompt",
+          run_in_background: false,
+          load_skills: [],
+        },
+        systemContent: undefined,
+        categoryModel: resolution.categoryModel,
+        directory: "/tmp/test",
+        toastManager: null,
+        taskId: undefined,
+      },
+      { promptWithModelSuggestionRetry },
+    )
+
+    //#then
+    bunExpect(promptArgs.body.model).toEqual({ providerID: "test-provider", modelID: "plain-model" })
+    bunExpect(promptArgs.body.variant).toBeUndefined()
+    bunExpect(promptArgs.body.options).toEqual({ reasoningEffort: "high" })
+    bunExpect(getSessionPromptParams("test-session")).toEqual({
+      options: { reasoningEffort: "high" },
+    })
+  })
+
   bunTest("forwards category temperature through the sync prompt body", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")

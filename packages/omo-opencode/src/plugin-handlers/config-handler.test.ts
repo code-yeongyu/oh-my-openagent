@@ -97,7 +97,7 @@ beforeEach(async () => {
     configJson: "/tmp/.config/opencode/opencode.json",
     configJsonc: "/tmp/.config/opencode/opencode.jsonc",
     packageJson: "/tmp/.config/opencode/package.json",
-    omoConfig: "/tmp/.config/opencode/oh-my-opencode.jsonc",
+    omoConfig: "/tmp/.config/opencode/omo.jsonc",
   })
 
   spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation((config: Record<string, unknown>) => config)
@@ -854,7 +854,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("google/gemini-3.1-pro")
+    expect(config?.model).toBe("anthropic/claude-opus-5")
   })
 
   test("user categories override default categories", () => {

@@ -440,4 +440,39 @@ describe("backward-compatible codegraph process-sweep module", () => {
     expect(typeof legacy.parseDaemonLock).toBe("function")
     expect(typeof legacy.daemonLockCandidates).toBe("function")
   })
+  it("#given daemon identity changes after TERM #when escalation runs #then replacement PID is never killed", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "omo-lsp-pid-reuse-"))
+    const baseDir = join(homeDir, ".omo", "lsp-daemon")
+    writeOwner(join(baseDir, "v1.0.0"), 4242)
+    const signals: string[] = []
+    let attestCalls = 0
+
+    const result = await sweepStaleLspDaemonVersions({
+      attestTarget: async () => {
+        attestCalls += 1
+        return attestCalls < 3
+      },
+      currentVersion: "2.0.0",
+      force: true,
+      graceMs: 0,
+      homeDir,
+      killer: {
+        isAlive: () => true,
+        async kill(pid) {
+          signals.push(`KILL:${pid}`)
+        },
+        async terminate(pid) {
+          signals.push(`TERM:${pid}`)
+        },
+      },
+      isAlive: () => true,
+      platform: "linux",
+    })
+
+    expect(attestCalls).toBe(3)
+    expect(signals).toEqual(["TERM:4242"])
+    expect(result.killed).toEqual([])
+    rmSync(homeDir, { recursive: true, force: true })
+  })
+
 })

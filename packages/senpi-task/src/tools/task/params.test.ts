@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { TASK_SUMMARY_MAX_LENGTH } from "../../task-summary"
 import { MAX_TASK_BATCH_ITEMS, TaskToolParams } from "./params"
 
 describe("TaskToolParams", () => {
@@ -34,5 +35,18 @@ describe("TaskToolParams", () => {
 
   test("#given batch task parameters #when schema is inspected #then a finite maximum is enforced", () => {
     expect(TaskToolParams.properties.tasks).toMatchObject({ maxItems: MAX_TASK_BATCH_ITEMS })
+  })
+
+  test("#given the schema #when task_summary is inspected #then it sits right after prompt with the schema length limit", () => {
+    const keys = Object.keys(TaskToolParams.properties)
+    expect(keys.indexOf("task_summary")).toBe(keys.indexOf("prompt") + 1)
+    expect(TaskToolParams.properties.task_summary).toMatchObject({ maxLength: TASK_SUMMARY_MAX_LENGTH })
+  })
+
+  test("#given a batch item schema #when task_summary is inspected #then it sits right after the item prompt with the schema length limit", () => {
+    const itemSchema = TaskToolParams.properties.tasks.items
+    const keys = Object.keys(itemSchema.properties)
+    expect(keys.indexOf("task_summary")).toBe(keys.indexOf("prompt") + 1)
+    expect(itemSchema.properties.task_summary).toMatchObject({ maxLength: TASK_SUMMARY_MAX_LENGTH })
   })
 })

@@ -28,19 +28,20 @@ async function reconcileRecord(context: LifecycleContext, record: TaskRecord): P
     return reconcileTerminalRecord(context, record)
   }
 
-  if (record.execution_mode !== "process") {
-    // The project store is shared by every senpi process in this project. A record owned by a LIVE
-    // sibling process is not orphaned: marking it lost here would clobber that process's running
-    // child (its completion would then be dropped as a late transition). Only a dead owner - or a
-    // legacy record with no owner pid - is genuinely unreachable from any process.
-    const ownerPid = record.host_pid
-    if (ownerPid !== undefined && ownerPid !== context.hostPid && context.signaller.isAlive(ownerPid)) {
-      return {
-        task_id: record.task_id,
-        kind: "foreign_live_owner",
-        reason: `in-process child owned by live process pid=${ownerPid}`,
-      }
+  // The project store is shared by every senpi process in this project. A record owned by a LIVE
+  // sibling process is not orphaned: marking it lost here would clobber that process's running
+  // child (its completion would then be dropped as a late transition). Only a dead owner - or a
+  // legacy record with no owner pid - is genuinely unreachable from any process.
+  const ownerPid = record.host_pid
+  if (ownerPid !== undefined && ownerPid !== context.hostPid && context.signaller.isAlive(ownerPid)) {
+    return {
+      task_id: record.task_id,
+      kind: "foreign_live_owner",
+      reason: `in-process child owned by live process pid=${ownerPid}`,
     }
+  }
+
+  if (record.execution_mode !== "process") {
     await markLost(context, record, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }
@@ -204,7 +205,11 @@ function heartbeatState(context: LifecycleContext, record: TaskRecord): "fresh" 
 // unreachable, so it must never keep occupying a residency slot the LRU gate cannot reclaim
 // (the reconcile_lost cause also kills a still-alive orphan pid before the claim is dropped).
 async function markLost(context: LifecycleContext, record: TaskRecord, message: string): Promise<void> {
-  const result = markRecordLostForReconciliation(record, { timestamp: nowIso(context), error_message: message })
+  const result = markRecordLostForReconciliation(record, {
+    timestamp: nowIso(context),
+    error_message: message,
+    updateReason: record.status === "lost",
+  })
   if (!result.applied) return
   context.store.replace(result.record)
   context.store.appendEvent(record.task_id, { type: "reconcile_lost", payload: { reason: message } })

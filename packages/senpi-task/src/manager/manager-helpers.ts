@@ -24,6 +24,14 @@ export function buildRecordInput(input: {
     depth: spec.depth,
     execution_mode: executionMode,
     model: plan.model,
+    ...(spec.task_summary !== undefined ? { task_summary: spec.task_summary } : {}),
+    ...(spec.description !== undefined ? { description: spec.description } : {}),
+    ...(plan.requested_model !== undefined
+      ? { requested_model: plan.requested_model }
+      : {}),
+    ...(plan.fallback_models !== undefined
+      ? { fallback_models: plan.fallback_models }
+      : {}),
     ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
@@ -53,6 +61,12 @@ export function buildManagedSpec(input: {
     parentSessionId: spec.parent_session_id,
     rootSessionId: spec.root_session_id ?? spec.parent_session_id,
     ...(plan.model !== undefined ? { model: plan.model } : {}),
+    ...(plan.requested_model !== undefined
+      ? { requestedModel: plan.requested_model }
+      : {}),
+    ...(plan.fallback_models !== undefined
+      ? { fallbackModels: plan.fallback_models }
+      : {}),
     ...(plan.variant !== undefined ? { variant: plan.variant } : {}),
     ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
     ...(instructions !== undefined ? { instructions } : {}),

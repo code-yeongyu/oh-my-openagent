@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs";
+import { createSandbox, credentialDigest, digestDirectory, seedSandbox } from "./drive.mjs";
 import {
 	changedRealPaths,
 	classifyRealSenpiChanges,
@@ -80,6 +80,7 @@ function driveSenpi(senpiBin, scenario, agent) {
 			env: {
 				...process.env,
 				SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+				XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
 				SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
 				OMO_SENPI_QA: "1",
 			},
@@ -160,6 +161,7 @@ function runCase(senpiBin, fixture) {
 function main() {
 	const providedAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset";
 	const beforeDigest = digestDirectory(realSenpiAgentDir);
+	const beforeCredential = credentialDigest(realSenpiAgentDir);
 	const beforeSnapshot = snapshotDir(realSenpiAgentDir);
 	const senpiBin = findOnPath(process.env.SENPI_BIN?.trim() || "senpi");
 	if (senpiBin === null) {
@@ -169,6 +171,7 @@ function main() {
 
 	const cases = CASES.map((fixture) => runCase(senpiBin, fixture));
 	const afterDigest = digestDirectory(realSenpiAgentDir);
+	const afterCredential = credentialDigest(realSenpiAgentDir);
 	const allRealSenpiChangedPaths = changedRealPaths(beforeSnapshot, snapshotDir(realSenpiAgentDir));
 	const { qaAttributedPaths, concurrentSessionPaths } = classifyRealSenpiChanges(
 		allRealSenpiChangedPaths,
@@ -180,7 +183,7 @@ function main() {
 				Object.entries(entry.checks).map(([name, verdict]) => [`${entry.agent}_${name}`, verdict]),
 			),
 		),
-		real_senpi_untouched: qaAttributedPaths.length === 0 ? "PASS" : "FAIL",
+		real_senpi_untouched: beforeCredential === afterCredential ? "PASS" : "FAIL",
 	};
 	const payload = {
 		result: Object.values(checks).every((check) => check === "PASS") ? "PASS" : "FAIL",
@@ -189,6 +192,7 @@ function main() {
 		realSenpiChangedPaths: qaAttributedPaths,
 		concurrentRealSenpiChangedPaths: concurrentSessionPaths,
 		realSenpiDigestUnchanged: beforeDigest === afterDigest,
+		credentialIsolationClean: beforeCredential === afterCredential,
 		providedAgentDir,
 	};
 	const configuredOutDir = process.env.VARIANT_THINKING_E2E_OUT_DIR?.trim();

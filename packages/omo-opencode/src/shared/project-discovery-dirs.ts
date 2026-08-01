@@ -2,9 +2,6 @@ import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { dirname, join, resolve, win32 } from "node:path"
 
-import { detectPluginConfigFile } from "./jsonc-parser"
-import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
-
 const worktreePathCache = new Map<string, string | undefined>()
 
 function normalizePath(path: string): string {
@@ -166,43 +163,4 @@ export function findProjectOpencodeCommandDirs(startDirectory: string, stopDirec
     ],
     stopDirectory ?? detectWorktreePath(startDirectory),
   )
-}
-
-export function findProjectOpencodePluginConfigFiles(
-  startDirectory: string,
-  stopDirectory?: string,
-): string[] {
-  const paths: string[] = []
-  const seen = new Set<string>()
-  let currentDirectory = normalizePath(startDirectory)
-  const resolvedStopDirectory = stopDirectory ? normalizePath(stopDirectory) : undefined
-  const stopDirectoryKey = resolvedStopDirectory ? pathKey(resolvedStopDirectory) : undefined
-
-  while (true) {
-    const opencodeDirectory = join(currentDirectory, ".opencode")
-    if (existsSync(opencodeDirectory)) {
-      const detected = detectPluginConfigFile(opencodeDirectory, {
-        basenames: [CONFIG_BASENAME],
-        legacyBasenames: [LEGACY_CONFIG_BASENAME],
-      })
-      if (detected.format !== "none") {
-        const detectedPathKey = pathKey(detected.path)
-        if (!seen.has(detectedPathKey)) {
-          seen.add(detectedPathKey)
-          paths.push(detected.path)
-        }
-      }
-    }
-
-    if (stopDirectoryKey === pathKey(currentDirectory)) {
-      return paths
-    }
-
-    const parentDirectory = dirname(currentDirectory)
-    if (parentDirectory === currentDirectory) {
-      return paths
-    }
-
-    currentDirectory = normalizePath(parentDirectory)
-  }
 }

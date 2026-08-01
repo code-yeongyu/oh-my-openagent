@@ -12,7 +12,7 @@ export function createSystemTransformHandler(
 ) => Promise<void> {
   return async (input, output): Promise<void> => {
     // The Sisyphus prompt body is model-family-specific and baked at registration
-    // from the *configured* model in oh-my-openagent.jsonc. This per-request hook
+    // from the *configured* model in .omo/omo.jsonc. This per-request hook
     // is the only seam that knows the model actually selected at runtime, so
     // rebuild the whole body for the runtime model family here (issue #5297).
     reconcileSisyphusRuntimePrompt(output.system, input.model?.id)

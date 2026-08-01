@@ -1,0 +1,31 @@
+{
+  "targetReady": true,
+  "before": {
+    "processedExists": false,
+    "eventCount": 0
+  },
+  "memberKilled": true,
+  "parentTermination": {
+    "kind": "terminated",
+    "platform": "win32"
+  },
+  "parentKilled": true,
+  "afterKillRecord": {
+    "status": "error",
+    "residency_state": "resident",
+    "execution_mode": "process",
+    "notification": {
+      "run_epoch": 0,
+      "notified_epoch": 0
+    },
+    "error_message": "RPC child exited with code 1"
+  },
+  "initialStatus": 1,
+  "restartStatus": 0,
+  "livenessInjected": true,
+  "afterRestartNotification": {
+    "run_epoch": 0,
+    "liveness_notified_epoch": 0
+  },
+  "livenessAcknowledged": true
+}

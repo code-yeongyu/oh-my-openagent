@@ -1,5 +1,6 @@
 import { defineTool, type ToolDefinition } from "@code-yeongyu/senpi"
 
+import { normalizeTaskToolArguments } from "./argument-normalization"
 import { buildTaskToolDescription, TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET } from "./description"
 import { buildTaskExecute } from "./execute"
 import { TaskToolParams } from "./params"
@@ -20,6 +21,7 @@ export function createTaskTool(deps: TaskToolDeps): ToolDefinition<typeof TaskTo
     promptSnippet: TASK_PROMPT_SNIPPET,
     promptGuidelines: [...TASK_PROMPT_GUIDELINES],
     parameters: TaskToolParams,
+    prepareArguments: normalizeTaskToolArguments,
     execute: (toolCallId, params, signal, onUpdate, ctx) => execute(toolCallId, params, signal, onUpdate, ctx),
     renderCall: (args, theme) =>
       linesComponent((width) => renderTaskCallLines(args, theme, width).map((line) => theme.fg("toolTitle", line))),

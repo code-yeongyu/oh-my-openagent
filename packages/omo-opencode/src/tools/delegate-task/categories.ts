@@ -1,5 +1,5 @@
 import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, BUILTIN_CATEGORY_REQUIRES_MODEL } from "./constants"
 import { resolveModel } from "../../shared/model-resolver"
 import { isModelAvailable } from "../../shared/model-availability"
 import { normalizeModel } from "../../shared/model-normalization"
@@ -39,9 +39,10 @@ export function resolveCategoryConfig(
   }
 
   const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-  if (categoryReq?.requiresModel && availableModels && !hasExplicitUserConfig) {
-    if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {
-      log(`[resolveCategoryConfig] Category ${categoryName} requires ${categoryReq.requiresModel} but not available`)
+  const requiredModel = categoryReq?.requiresModel ?? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
+  if (requiredModel && availableModels && !hasExplicitUserConfig) {
+    if (!isModelAvailable(requiredModel, availableModels)) {
+      log(`[resolveCategoryConfig] Category ${categoryName} requires ${requiredModel} but not available`)
       return null
     }
   }

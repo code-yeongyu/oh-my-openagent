@@ -41,15 +41,15 @@ flowchart TB
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
+        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
     end
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
+        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-5 / glm-5.2"]
-        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
-        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-5"]
+        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
+        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / claude-fable-5 / gemini-3.1-pro / glm-5.2"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -103,7 +103,7 @@ Three names can appear together in logs or the TUI:
 
 - **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
 - **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
-- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5`
+- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.2`
 
 The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k3`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
 
@@ -295,7 +295,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k3` → `gpt-5.6-sol` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-5` → `kimi-k3` → `gpt-5.6-sol` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
@@ -499,7 +499,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |
@@ -579,7 +579,7 @@ Use Hephaestus when you deliberately want autonomous deep implementation or arch
 
 ## Configuration
 
-You can control related features in `oh-my-openagent.json`:
+You can control related features in the `[opencode]` block of `~/.omo/omo.jsonc`:
 
 ```jsonc
 {

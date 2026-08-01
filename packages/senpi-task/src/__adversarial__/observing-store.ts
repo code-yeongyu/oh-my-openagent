@@ -43,6 +43,7 @@ export function createObservingStore(backing: TaskRecordStore): ObservingStore {
   const store: TaskRecordStore = {
     stateDir: backing.stateDir,
     save: (record) => backing.save(record),
+    mutate: (taskId, mutation) => backing.mutate(taskId, mutation),
     load: (taskId) => backing.load(taskId),
     list: () => backing.list(),
     appendEvent: (taskId, event) => backing.appendEvent(taskId, event),

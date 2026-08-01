@@ -132,6 +132,22 @@ describe("parseTaskRecord persisted boundary", () => {
     expect(result.records[0]?.resolved_model).toEqual(resolvedModel)
   })
 
+  test("#given persisted resolved model metadata containing reasoning effort only #when listed #then the field survives the parse round-trip", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const resolvedModel = { ...RESOLVED_MODEL, reasoning_effort: "high" }
+    const taskId = "st_1d00002b"
+    writePersistedRecord(project, taskId, { resolved_model: resolvedModel })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.resolved_model).toEqual(resolvedModel)
+  })
+
   test("#given persisted resolved model metadata with a future field #when listed #then known metadata is parsed and the future field is ignored", () => {
     // given
     const project = tempProject()

@@ -1,124 +1,186 @@
-import { existsSync, writeFileSync } from "node:fs"
+import { rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
-  deliveredEventCount,
-  discoverRunIds,
-  inboxCounts,
-  memberInboxDir,
-  memberTaskId,
-  processedMessagePath,
-  readJsonIfPresent,
-  sessionEnvelopeCount,
-  taskRecord,
-} from "./team-e2e-support.mjs"
-import { killProcess, killProcessGroup, pollUntil } from "./team-e2e-runtime.mjs"
-import { CRASH_SEED_SCRIPT, NOOP_SCRIPT } from "./team-e2e-scripts.mjs"
+  createCrashOperations,
+  emptyMailboxState,
+  failedParentTermination,
+  replacementMemberEnv,
+  writeRunLogs,
+} from "./team-e2e-crash-state.mjs"
+import { parseEvents, processedMessagePath, unreadMessagePath } from "./team-e2e-support.mjs"
+import { CRASH_SEED_SCRIPT, crashReplacementScript, NOOP_SCRIPT } from "./team-e2e-scripts.mjs"
 
 const HOLD_TIMEOUT_MS = 30_000
-const RECOVERY_TIMEOUT_MS = 30_000
+const TEAM_LIVENESS_TYPE = "senpi-task.team-member-liveness"
+const ABNORMAL_MEMBER_STATES = new Set(["error", "lost"])
+
+export function hasCrashLivenessEvent(stdout) {
+  for (const event of parseEvents(stdout)) {
+    if (event?.type !== "message_start" && event?.type !== "message_end") continue
+    const message = event?.message
+    if (message === undefined || message === null || typeof message !== "object") continue
+    if (message.customType === TEAM_LIVENESS_TYPE && isCrashLivenessDetails(message.details)) return true
+    if (message.customType !== "omo-senpi:wake" || !Array.isArray(message.details)) continue
+    for (const entry of message.details) {
+      if (entry?.customType === TEAM_LIVENESS_TYPE && isCrashLivenessDetails(entry.details)) return true
+    }
+  }
+  return false
+}
+
+function isCrashLivenessDetails(details) {
+  return details !== null
+    && typeof details === "object"
+    && details.memberName === "crash"
+    && ABNORMAL_MEMBER_STATES.has(details.lastKnownState)
+}
 
 export async function runCrashRestartScenario(input) {
   const sandbox = input.createSandbox()
-  input.seedProject(sandbox)
-  const markerPath = join(input.outDir, "crash-after-inject.json")
-  const initial = input.startRun({
-    senpiBin: input.senpiBin,
-    sandbox,
-    prompt: "seed a member delivery and hold after injection",
-    script: CRASH_SEED_SCRIPT,
-    extraEnv: { SENPI_TASK_QA_HOLD_AFTER_INJECT: markerPath },
-  })
-  const target = await pollUntil(
-    () => Promise.resolve(readCrashTarget(sandbox.cwd, markerPath)),
-    (value) => value.ready,
-    HOLD_TIMEOUT_MS,
-  )
-  const before = readRecoveryState(sandbox.cwd, target)
-  const memberKilled = target.pid === undefined ? false : killProcess(target.pid)
-  const parentKilled = initial.pid === undefined ? false : killProcessGroup(initial.pid)
-  const initialResult = await initial.completion
-  writeFileSync(join(input.outDir, "crash-initial-stdout.json.log"), initialResult.stdout)
-  writeFileSync(join(input.outDir, "crash-initial-stderr.log"), initialResult.stderr)
-
-  let restartStatus = null
-  let recovery = readRecoveryState(sandbox.cwd, target)
-  if (target.ready) {
-    const restartResult = await input.startRun({
+  const ops = createCrashOperations(input.operations)
+  try {
+    input.seedProject(sandbox)
+    const markerPath = join(input.outDir, "crash-after-inject.json")
+    const initial = input.startRun({
       senpiBin: input.senpiBin,
       sandbox,
-      prompt: "restart the same sandbox and reconcile the crashed member",
-      script: NOOP_SCRIPT,
-    }).completion
-    restartStatus = restartResult.status
-    writeFileSync(join(input.outDir, "crash-restart-stdout.json.log"), restartResult.stdout)
-    writeFileSync(join(input.outDir, "crash-restart-stderr.log"), restartResult.stderr)
-    recovery = await pollUntil(
-      () => Promise.resolve(readRecoveryState(sandbox.cwd, target)),
-      isRecoveredExactlyOnce,
-      RECOVERY_TIMEOUT_MS,
+      prompt: "seed a member delivery and hold after injection",
+      script: CRASH_SEED_SCRIPT,
+      extraEnv: { SENPI_TASK_QA_HOLD_AFTER_INJECT: markerPath },
+    })
+    const target = await ops.pollUntil(
+      () => Promise.resolve(ops.readCrashTarget(sandbox.cwd, markerPath)),
+      (value) => value.ready,
+      HOLD_TIMEOUT_MS,
     )
-  }
+    const before = ops.readCrashReservationState(sandbox.cwd, target)
+    const parentAliveAtHold = initial.pid !== undefined && ops.isProcessAlive(initial.pid)
+    const memberAliveAtHold = target.pid !== undefined && ops.isProcessAlive(target.pid)
+    const memberKilled = parentAliveAtHold && memberAliveAtHold && target.pid !== undefined
+      ? ops.killProcess(target.pid)
+      : false
+    const memberTerminal = memberKilled
+      ? await ops.pollUntil(
+        () => Promise.resolve(ops.readMemberTerminal(sandbox.cwd, target)),
+        (value) => value.kind !== undefined,
+        HOLD_TIMEOUT_MS,
+      )
+      : { kind: undefined }
+    const parentAliveBeforeTermination = initial.pid !== undefined && ops.isProcessAlive(initial.pid)
+    const parentTermination = parentAliveBeforeTermination && memberTerminal.kind !== undefined && initial.pid !== undefined
+      ? await ops.terminateProcessTree(initial.pid)
+      : failedParentTermination(initial.pid, "parent was not live after the member terminal transition")
+    const reservationAged = target.ready ? ops.ageCrashReservation(sandbox.cwd, target) : false
+    const initialResult = await initial.completion
+    const afterKillRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox.cwd, target.taskId)
+    writeRunLogs(input.outDir, "crash-initial", initialResult)
 
-  const evidence = {
-    target,
-    before,
-    memberKilled,
-    parentKilled,
-    initialStatus: initialResult.status,
-    restartStatus,
-    recovery,
+    let restartStatus = null
+    let livenessInjected = false
+    let afterRestartRecord
+    let afterReclaim = emptyMailboxState(target)
+    let afterReplacement = emptyMailboxState(target)
+    if (target.ready && parentTermination.kind === "terminated") {
+      const restartResult = await input.startRun({
+        senpiBin: input.senpiBin,
+        sandbox,
+        prompt: "restart the same sandbox and reconcile the crashed member",
+        script: NOOP_SCRIPT,
+        sessionId: target.leadSessionId,
+      }).completion
+      restartStatus = restartResult.status
+      writeRunLogs(input.outDir, "crash-restart", restartResult)
+      livenessInjected = hasCrashLivenessEvent(restartResult.stdout)
+      afterRestartRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox.cwd, target.taskId)
+      afterReclaim = ops.readPostCrashMailbox(sandbox.cwd, target)
+      afterReplacement = await runReplacementMember(input, sandbox, target, ops)
+    }
+
+    const evidence = {
+      target,
+      before,
+      parentAliveAtHold,
+      memberAliveAtHold,
+      memberKilled,
+      memberTerminal,
+      parentAliveBeforeTermination,
+      parentTermination,
+      reservationAged,
+      afterKillRecord,
+      afterRestartRecord,
+      afterReclaim,
+      afterReplacement,
+      initialStatus: initialResult.status,
+      restartStatus,
+      livenessInjected,
+    }
+    writeFileSync(join(input.outDir, "crash-recovery.json"), `${JSON.stringify(evidence, null, 2)}\n`)
+    return evaluateCrashRecovery(evidence)
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
   }
-  writeFileSync(join(input.outDir, "crash-recovery.json"), `${JSON.stringify(evidence, null, 2)}\n`)
-  return evaluateCrashRecovery(evidence)
 }
 
 export function evaluateCrashRecovery(evidence) {
+  const runEpoch = evidence.afterRestartRecord?.notification?.run_epoch
+  const livenessNotifiedEpoch = evidence.afterRestartRecord?.notification?.liveness_notified_epoch
   return {
-    crashHoldReached: evidence.target.ready,
-    crashKilledMemberAtHold: evidence.memberKilled && evidence.parentKilled,
+    crashHoldReached: evidence.target.ready && evidence.parentAliveAtHold === true && evidence.memberAliveAtHold === true,
+    crashKilledMemberAtHold:
+      evidence.memberKilled === true
+      && evidence.memberTerminal?.kind !== undefined
+      && evidence.parentAliveBeforeTermination === true
+      && evidence.parentTermination?.kind === "terminated"
+      && evidence.initialStatus !== 0,
     crashReservationUncommittedAtKill:
-      evidence.before.processedExists === false && evidence.before.eventCount === 0,
+      evidence.before.reservedExists === true
+      && evidence.before.processedExists === false
+      && evidence.before.eventCount === 0,
+    crashReservationRestoredUnread:
+      evidence.reservationAged === true
+      && evidence.afterReclaim.reservedExists === false
+      && evidence.afterReclaim.unreadExists === true,
+    crashReservationNoResidue: evidence.afterReplacement.reservedExists === false,
+    crashReservedMessageDeliveredExactlyOnce:
+      evidence.afterReplacement.unreadExists === false
+      && evidence.afterReplacement.processedExists === true
+      && evidence.afterReplacement.eventCount === 1
+      && evidence.afterReplacement.envelopeCount === 1,
     crashRestartExitClean: evidence.restartStatus === 0,
-    crashProcessedLedgerExactlyOnce:
-      evidence.recovery.processedExists && evidence.recovery.processedCount === 1,
-    crashDeliveredEventExactlyOnce: evidence.recovery.eventCount === 1,
-    crashSessionEnvelopeExactlyOnce: evidence.recovery.envelopeCount === 1,
+    crashLivenessInjectedToLead: evidence.livenessInjected === true,
+    crashLivenessAcknowledged:
+      typeof runEpoch === "number"
+      && typeof livenessNotifiedEpoch === "number"
+      && livenessNotifiedEpoch >= runEpoch,
   }
 }
 
-function readCrashTarget(cwd, markerPath) {
-  const marker = readJsonIfPresent(markerPath)
-  const messageId = typeof marker?.messageId === "string" ? marker.messageId : undefined
-  const runId = discoverRunIds(cwd)[0]
-  const taskId = runId === undefined ? undefined : memberTaskId(cwd, runId, "crash")
-  const record = taskId === undefined ? undefined : taskRecord(cwd, taskId)
-  const pid = typeof record?.pid === "number" ? record.pid : undefined
-  return {
-    ready: messageId !== undefined && runId !== undefined && taskId !== undefined && pid !== undefined,
-    markerPath,
-    messageId,
-    runId,
-    taskId,
-    pid,
+async function runReplacementMember(input, sandbox, target, ops) {
+  if (input.memberExtensionEntry === undefined) return emptyMailboxState(target)
+  const memberEnv = replacementMemberEnv(sandbox.cwd, target)
+  const replacement = input.startRun({
+    senpiBin: input.senpiBin,
+    sandbox,
+    prompt: "MOCKROLE=quick recover the exact stranded crash message",
+    script: crashReplacementScript(
+      unreadMessagePath(sandbox.cwd, target.runId, "crash", target.messageId),
+      processedMessagePath(sandbox.cwd, target.runId, "crash", target.messageId),
+    ),
+    noExtensions: true,
+    extensionEntries: [input.memberExtensionEntry],
+    sessionDir: memberEnv.SENPI_CODING_AGENT_SESSION_DIR,
+    extraEnv: memberEnv,
+  })
+  try {
+    return await ops.pollUntil(
+      () => Promise.resolve(ops.readPostCrashMailbox(sandbox.cwd, target)),
+      (value) => value.processedExists && value.eventCount === 1 && value.envelopeCount === 1,
+      HOLD_TIMEOUT_MS,
+    )
+  } finally {
+    await replacement.kill()
+    const result = await replacement.completion
+    writeRunLogs(input.outDir, "crash-replacement", result)
   }
-}
-
-function readRecoveryState(cwd, target) {
-  if (!target.ready) return emptyRecoveryState()
-  const inbox = memberInboxDir(cwd, target.runId, "crash")
-  return {
-    processedExists: existsSync(processedMessagePath(cwd, target.runId, "crash", target.messageId)),
-    processedCount: inboxCounts(inbox).processed,
-    eventCount: deliveredEventCount(cwd, target.taskId, target.messageId),
-    envelopeCount: sessionEnvelopeCount(cwd, target.taskId, target.messageId),
-  }
-}
-
-function emptyRecoveryState() {
-  return { processedExists: false, processedCount: 0, eventCount: 0, envelopeCount: 0 }
-}
-
-function isRecoveredExactlyOnce(value) {
-  return value.processedExists && value.processedCount === 1 && value.eventCount === 1 && value.envelopeCount === 1
 }

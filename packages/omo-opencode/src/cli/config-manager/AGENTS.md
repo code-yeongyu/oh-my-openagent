@@ -20,14 +20,14 @@
 | `detect-current-config.ts` | Read existing OpenCode config, detect installed plugins |
 | `ensure-config-directory-exists.ts` | Create `.opencode/` dir if missing |
 | `format-error-with-suggestion.ts` | Format errors with actionable suggestions |
-| `generate-omo-config.ts` | Generate `oh-my-opencode.jsonc` from install selections |
+| `generate-omo-config.ts` | Generate the `[opencode]` OMO view from install selections |
 | `jsonc-provider-editor.ts` | Read/write JSONC files with comment preservation |
 | `npm-dist-tags.ts` | Fetch latest version from npm registry (dist-tags) |
 | `opencode-binary.ts` | Detect OpenCode binary location, verify it's installed |
 | `opencode-config-format.ts` | OpenCode config format constants and type guards |
 | `parse-opencode-config-file.ts` | Parse opencode.json/opencode.jsonc with fallback |
 | `plugin-name-with-version.ts` | Resolve `oh-my-opencode@X.Y.Z` for installation |
-| `write-omo-config.ts` | Write generated config to `.opencode/oh-my-opencode.jsonc` |
+| `write-omo-config.ts` | Write generated config to `~/.omo/omo.jsonc` |
 
 ## USAGE PATTERN
 

@@ -1,37 +1,86 @@
+import { normalizeReasoning } from "@oh-my-opencode/model-core"
+import type { GetModelCapabilitiesInput } from "@oh-my-opencode/model-core"
 import type { OhMyOpenCodeConfig } from "../config"
 import { stripInvisibleAgentCharacters } from "./agent-display-names"
+import { getModelCapabilities } from "./model-capabilities"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
-export function resolveAgentVariant(
-  config: OhMyOpenCodeConfig,
-  agentName?: string
-): string | undefined {
-  if (!agentName) {
-    return undefined
-  }
+type ReasoningConfig = {
+  reasoning?: string
+  variant?: string
+  category?: string
+}
 
+type ChainEntry = {
+  providers: string[]
+  model: string
+  reasoning?: string
+  variant?: string
+}
+
+type OpenCodeReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
+
+export type LoweredReasoning = {
+  variant?: string
+  reasoningEffort?: OpenCodeReasoningEffort
+}
+
+export function lowerReasoningForModel(
+  reasoning: string | undefined,
+  model: GetModelCapabilitiesInput,
+): LoweredReasoning {
+  if (reasoning === undefined) return {}
+
+  const normalized = normalizeReasoning(reasoning)
+  if (normalized.passthrough) {
+    return { variant: normalized.passthrough }
+  }
+  if (!normalized.level) return {}
+
+  const capabilities = getModelCapabilities(model)
+  if (capabilities.variants?.includes(normalized.level)) {
+    return { variant: normalized.level }
+  }
+  if (normalized.level === "auto") return {}
+
+  return {
+    reasoningEffort: normalized.level === "off" ? "none" : normalized.level,
+  }
+}
+
+function findAgentOverride(
+  config: OhMyOpenCodeConfig,
+  agentName: string,
+): ReasoningConfig | undefined {
   const stripped = stripInvisibleAgentCharacters(agentName)
-  const agentOverrides = config.agents as
-    | Record<string, { variant?: string; category?: string }>
-    | undefined
-  const agentOverride = agentOverrides
+  const agentOverrides = config.agents as Record<string, ReasoningConfig> | undefined
+  return agentOverrides
     ? agentOverrides[stripped]
       ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
     : undefined
-  if (!agentOverride) {
-    return undefined
-  }
+}
 
-  if (agentOverride.variant) {
-    return agentOverride.variant
-  }
+function getCategoryConfig(
+  config: OhMyOpenCodeConfig,
+  categoryName: string | undefined,
+): ReasoningConfig | undefined {
+  return categoryName ? config.categories?.[categoryName] : undefined
+}
 
-  const categoryName = agentOverride.category
-  if (!categoryName) {
-    return undefined
-  }
+export function resolveAgentVariant(
+  config: OhMyOpenCodeConfig,
+  agentName?: string,
+): string | undefined {
+  if (!agentName) return undefined
 
-  return config.categories?.[categoryName]?.variant
+  const agentOverride = findAgentOverride(config, agentName)
+  if (!agentOverride) return undefined
+
+  const categoryConfig = getCategoryConfig(config, agentOverride.category)
+  return agentOverride.reasoning
+    ?? categoryConfig?.reasoning
+    ?? agentOverride.variant
+    ?? categoryConfig?.variant
 }
 
 export function resolveVariantForModel(
@@ -40,62 +89,51 @@ export function resolveVariantForModel(
   currentModel: { providerID: string; modelID: string },
 ): string | undefined {
   const stripped = stripInvisibleAgentCharacters(agentName)
-  const agentOverrides = config.agents as
-    | Record<string, { variant?: string; category?: string }>
-    | undefined
-  const agentOverride = agentOverrides
-    ? agentOverrides[stripped]
-      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
-    : undefined
-  if (agentOverride?.variant) {
-    return agentOverride.variant
-  }
-
-  const agentRequirement = AGENT_MODEL_REQUIREMENTS[stripped]
-  if (agentRequirement) {
-    return findVariantInChain(agentRequirement.fallbackChain, currentModel)
-  }
+  const agentOverride = findAgentOverride(config, agentName)
   const categoryName = agentOverride?.category
-  if (categoryName) {
-    const categoryRequirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-    if (categoryRequirement) {
-      return findVariantInChain(categoryRequirement.fallbackChain, currentModel)
-    }
-  }
+  const categoryConfig = getCategoryConfig(config, categoryName)
+  const agentChain = AGENT_MODEL_REQUIREMENTS[stripped]?.fallbackChain as ChainEntry[] | undefined
+  const categoryChain = categoryName
+    ? CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain as ChainEntry[] | undefined
+    : undefined
+  const agentChainEntry = findEntryInChain(agentChain, currentModel)
+  const categoryChainEntry = findEntryInChain(categoryChain, currentModel)
 
-  return undefined
+  return agentOverride?.reasoning
+    ?? categoryConfig?.reasoning
+    ?? agentChainEntry?.reasoning
+    ?? categoryChainEntry?.reasoning
+    ?? agentOverride?.variant
+    ?? categoryConfig?.variant
+    ?? agentChainEntry?.variant
+    ?? categoryChainEntry?.variant
 }
 
-function findVariantInChain(
-  fallbackChain: { providers: string[]; model: string; variant?: string }[],
+function findEntryInChain(
+  fallbackChain: ChainEntry[] | undefined,
   currentModel: { providerID: string; modelID: string },
-): string | undefined {
-  for (const entry of fallbackChain) {
-    if (
-      entry.providers.includes(currentModel.providerID)
-      && entry.model === currentModel.modelID
-    ) {
-      return entry.variant
-    }
-  }
+): ChainEntry | undefined {
+  if (!fallbackChain) return undefined
+
+  const exactMatch = fallbackChain.find((entry) => (
+    entry.providers.includes(currentModel.providerID)
+    && entry.model === currentModel.modelID
+  ))
+  if (exactMatch) return exactMatch
 
   // Some providers expose identical model IDs (e.g. OpenAI models via different providers).
   // If we didn't find an exact provider+model match, fall back to model-only matching.
-  for (const entry of fallbackChain) {
-    if (entry.model === currentModel.modelID) {
-      return entry.variant
-    }
-  }
-  return undefined
+  return fallbackChain.find((entry) => entry.model === currentModel.modelID)
 }
 
 export function applyAgentVariant(
   config: OhMyOpenCodeConfig,
   agentName: string | undefined,
-  message: { variant?: string }
+  message: { variant?: string },
+  currentModel: { providerID: string; modelID: string },
 ): void {
   const variant = resolveAgentVariant(config, agentName)
-  if (variant !== undefined && message.variant === undefined) {
-    message.variant = variant
-  }
+  if (variant === undefined || message.variant !== undefined) return
+
+  Object.assign(message, lowerReasoningForModel(variant, currentModel))
 }

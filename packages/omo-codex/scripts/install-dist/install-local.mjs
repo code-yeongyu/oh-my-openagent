@@ -2292,31 +2292,31 @@ var init_exception_steps = __esm(() => {
 // node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
 var exports_error_tracking = {};
 __export(exports_error_tracking, {
-  winjsStackLineParser: () => winjsStackLineParser,
-  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
-  reverseAndStripFrames: () => reverseAndStripFrames,
-  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
-  opera11StackLineParser: () => opera11StackLineParser,
-  opera10StackLineParser: () => opera10StackLineParser,
-  nodeStackLineParser: () => nodeStackLineParser,
-  getUtf8ByteLength: () => getUtf8ByteLength,
-  geckoStackLineParser: () => geckoStackLineParser,
-  createStackParser: () => createStackParser,
-  createDefaultStackParser: () => createDefaultStackParser,
-  chromeStackLineParser: () => chromeStackLineParser,
-  StringCoercer: () => StringCoercer,
-  ReduceableCache: () => ReduceableCache,
-  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
-  PrimitiveCoercer: () => PrimitiveCoercer,
-  ObjectCoercer: () => ObjectCoercer,
-  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
-  EventCoercer: () => EventCoercer,
-  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
-  ErrorEventCoercer: () => ErrorEventCoercer,
-  ErrorCoercer: () => ErrorCoercer,
-  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG,
   DOMExceptionCoercer: () => DOMExceptionCoercer,
-  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG
+  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  ErrorCoercer: () => ErrorCoercer,
+  ErrorEventCoercer: () => ErrorEventCoercer,
+  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
+  EventCoercer: () => EventCoercer,
+  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
+  ObjectCoercer: () => ObjectCoercer,
+  PrimitiveCoercer: () => PrimitiveCoercer,
+  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
+  ReduceableCache: () => ReduceableCache,
+  StringCoercer: () => StringCoercer,
+  chromeStackLineParser: () => chromeStackLineParser,
+  createDefaultStackParser: () => createDefaultStackParser,
+  createStackParser: () => createStackParser,
+  geckoStackLineParser: () => geckoStackLineParser,
+  getUtf8ByteLength: () => getUtf8ByteLength,
+  nodeStackLineParser: () => nodeStackLineParser,
+  opera10StackLineParser: () => opera10StackLineParser,
+  opera11StackLineParser: () => opera11StackLineParser,
+  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
+  reverseAndStripFrames: () => reverseAndStripFrames,
+  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
+  winjsStackLineParser: () => winjsStackLineParser
 });
 var init_error_tracking = __esm(() => {
   init_error_properties_builder();
@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.19.0",
+    version: "4.19.3",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6108,14 +6108,14 @@ var init_posthog = __esm(() => {
 // packages/omo-codex/src/telemetry/index.ts
 var exports_telemetry = {};
 __export(exports_telemetry, {
-  getPostHogDistinctId: () => getPostHogDistinctId,
-  createPluginPostHog: () => createPluginPostHog,
-  createInstallPostHog: () => createInstallPostHog,
-  createCliPostHog: () => createCliPostHog,
-  __setOsProviderForTesting: () => __setOsProviderForTesting,
-  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting,
   __resetOsProviderForTesting: () => __resetOsProviderForTesting,
-  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting
+  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __setOsProviderForTesting: () => __setOsProviderForTesting,
+  createCliPostHog: () => createCliPostHog,
+  createInstallPostHog: () => createInstallPostHog,
+  createPluginPostHog: () => createPluginPostHog,
+  getPostHogDistinctId: () => getPostHogDistinctId
 });
 var init_telemetry = __esm(() => {
   init_posthog();
@@ -6429,7 +6429,7 @@ function whereCommand(command) {
   }
 }
 // packages/omo-codex/src/install/codex-process.ts
-var WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"]);
+var WINDOWS_CMD_SHIM_COMMANDS = new Set(["codex", "npm", "npx"]);
 function resolveRunCommandInvocation(command, args, platform = process.platform) {
   if (platform !== "win32" || !WINDOWS_CMD_SHIM_COMMANDS.has(command.toLowerCase())) {
     return { command, args: [...args] };
@@ -7068,6 +7068,7 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
   const packageJsonPaths = [];
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths);
   const packageLock = await readPackageLock(pluginRoot);
+  let rewroteAnyPackageJson = false;
   for (const packageJsonPath of packageJsonPaths) {
     const raw = await readFile5(packageJsonPath, "utf8");
     const parsed = JSON.parse(raw);
@@ -7103,13 +7104,16 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
         changed = true;
       }
     }
-    if (changed)
+    if (changed) {
       await writeFile2(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}
 `);
+      rewroteAnyPackageJson = true;
+    }
   }
   if (packageLock.changed)
     await writeFile2(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}
 `);
+  return rewroteAnyPackageJson;
 }
 async function readPackageLock(pluginRoot) {
   const path = join8(pluginRoot, "package-lock.json");
@@ -7530,10 +7534,11 @@ async function installCachedPlugin(input) {
   await rm4(tempPath, { recursive: true, force: true });
   try {
     await copyDirectory(input.sourcePath, tempPath);
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
+    const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
-    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"]);
+    const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
       await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
@@ -8835,6 +8840,24 @@ function stripUnquotedInlineComment3(line) {
 
 // packages/omo-codex/src/install/codex-config-reasoning.ts
 var MANAGED_KEYS = ["model", "model_context_window", "model_reasoning_effort", "plan_mode_reasoning_effort"];
+var CODEX_REASONING_BY_UNIFIED_LEVEL = {
+  off: "none",
+  none: "none",
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: "max"
+};
+function applyReasoningOverride(catalog, reasoning) {
+  if (reasoning === undefined)
+    return catalog;
+  const wireEffort = CODEX_REASONING_BY_UNIFIED_LEVEL[reasoning.trim().toLowerCase()];
+  if (wireEffort === undefined)
+    return catalog;
+  return { ...catalog, current: { ...catalog.current, modelReasoningEffort: wireEffort } };
+}
 function ensureCodexReasoningConfig(config, catalog) {
   const current = readRootReasoningSettings(config);
   if (Object.keys(current).length > 0 && !matchesProfile(current, catalog.current) && !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))) {
@@ -9175,7 +9198,7 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
-  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
+  config = ensureCodexReasoningConfig(config, applyReasoningOverride(await readCodexModelCatalog(input.repoRoot), input.reasoning));
   config = ensureCodexMultiAgentV2Config(config, {
     multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath)
   });
@@ -9364,7 +9387,7 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
     "explorer",
     [
       {
-        previous: { model: "gpt-5.4-mini", effort: "low" },
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
         current: { model: "gpt-5.6-terra", effort: "medium" }
       },
       {
@@ -9377,7 +9400,7 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
     "librarian",
     [
       {
-        previous: { model: "gpt-5.4-mini", effort: "low" },
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
         current: { model: "gpt-5.6-terra", effort: "medium" }
       },
       {
@@ -11010,7 +11033,8 @@ async function runCodexInstaller(options = {}) {
     gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
-    autonomousPermissions: options.autonomousPermissions !== false
+    autonomousPermissions: options.autonomousPermissions !== false,
+    ...options.reasoning === undefined ? {} : { reasoning: options.reasoning }
   });
   await seedAndMigrateOmoSot({ env: env2, log, repoRoot, runCommand });
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
@@ -11731,23 +11755,23 @@ async function runLazyCodexInstallLocalCli(input) {
   return 0;
 }
 export {
-  updateCodexConfig,
-  stampGitBashMcpEnv,
-  runLazyCodexInstallLocalCli,
-  runDelegatedOmoCommand,
-  resolveDefaultRepoRootForEntrypoint,
-  resolveDefaultRepoRoot,
-  resolveCodexInstallerBinDir,
-  repairNearestProjectLocalCodexArtifacts,
-  readCodexModelCatalog,
-  parseLazyCodexInstallCliArgs,
-  linkRootRuntimeBin,
-  linkCachedPluginBins,
-  installMarketplaceLocally,
-  installCachedPlugin,
-  formatLazyCodexInstallHelp,
-  findMissingHookCommandTargets,
-  buildDelegatedOmoInvocation,
+  PASSTHROUGH_COMMANDS,
   assertHookCommandTargets,
-  PASSTHROUGH_COMMANDS
+  buildDelegatedOmoInvocation,
+  findMissingHookCommandTargets,
+  formatLazyCodexInstallHelp,
+  installCachedPlugin,
+  installMarketplaceLocally,
+  linkCachedPluginBins,
+  linkRootRuntimeBin,
+  parseLazyCodexInstallCliArgs,
+  readCodexModelCatalog,
+  repairNearestProjectLocalCodexArtifacts,
+  resolveCodexInstallerBinDir,
+  resolveDefaultRepoRoot,
+  resolveDefaultRepoRootForEntrypoint,
+  runDelegatedOmoCommand,
+  runLazyCodexInstallLocalCli,
+  stampGitBashMcpEnv,
+  updateCodexConfig
 };

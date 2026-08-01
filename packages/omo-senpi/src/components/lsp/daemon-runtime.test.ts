@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { callPackagedDaemonTool } from "./daemon-tool-client"
-import { resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime"
+import { resolveSenpiDaemonRuntime, resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime"
 
 const tempDirs: string[] = []
 
@@ -122,4 +122,31 @@ describe("Senpi packaged daemon runtime resolver", () => {
     // then
     expect(results.map((result) => result?.content[0]?.text)).toEqual(cases.map(([, coreName]) => coreName))
   })
+  test("#given daemon runtime overrides #when resolved #then the shared daemon contract is enforced", async () => {
+    const fixture = await makePackagedExtensionFixture()
+    const packagedRuntime = { cliPath: fixture.cliPath, version: "0.1.0" }
+    const overrideCli = join(fixture.distPath, "override-cli.js")
+    await writeFile(overrideCli, "export {}\n", "utf8")
+
+    expect(resolveSenpiDaemonRuntime({
+      OMO_LSP_DAEMON_CLI: overrideCli,
+      OMO_LSP_DAEMON_VERSION: "9.8.7",
+    }, packagedRuntime)).toEqual({ cliPath: overrideCli, version: "9.8.7" })
+    expect(() => resolveSenpiDaemonRuntime({
+      OMO_LSP_DAEMON_CLI: overrideCli,
+    }, packagedRuntime)).toThrow("must be set together")
+    expect(() => resolveSenpiDaemonRuntime({
+      OMO_LSP_DAEMON_CLI: "relative-cli.js",
+      OMO_LSP_DAEMON_VERSION: "9.8.7",
+    }, packagedRuntime)).toThrow("absolute path")
+    expect(() => resolveSenpiDaemonRuntime({
+      OMO_LSP_DAEMON_CLI: fixture.distPath,
+      OMO_LSP_DAEMON_VERSION: "9.8.7",
+    }, packagedRuntime)).toThrow("regular file")
+    expect(() => resolveSenpiDaemonRuntime({
+      OMO_LSP_DAEMON_CLI: overrideCli,
+      OMO_LSP_DAEMON_VERSION: "invalid version",
+    }, packagedRuntime)).toThrow("must match")
+  })
+
 })

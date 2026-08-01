@@ -1,0 +1,9 @@
+Command:
+python3 .omo/evidence/20260801-release-guidance-native-cli/validate-release-notes.py \
+  .omo/evidence/20260801-release-guidance-native-cli/initial-github.md \
+  .omo/evidence/20260801-release-guidance-native-cli/initial-discord.md
+
+Observed:
+AssertionError: initial-github.md: missing dedicated Native CLI transition heading
+
+The initial drafts also contained excluded internal adapter references.

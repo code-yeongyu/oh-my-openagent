@@ -12,6 +12,8 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
   const name = readOptionalString(value, "name")
+  const taskSummary = readOptionalString(value, "task_summary")
+  const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
   const category = readOptionalString(value, "category")
   const toolAllow = readOptionalStringArray(value, "tool_allow")
@@ -22,7 +24,10 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
-  const resolvedModel = readOptionalResolvedModel(value)
+  const requestedModel = readOptionalResolvedModel(value, "requested_model")
+  const fallbackModels = readOptionalResolvedModelArray(value, "fallback_models")
+  const fallbackAttempts = readOptionalResolvedModelArray(value, "fallback_attempts")
+  const resolvedModel = readOptionalResolvedModel(value, "resolved_model")
   const spawnSpec = readOptionalSpawnSpec(value)
   const runStats = readOptionalRunStats(value)
 
@@ -39,10 +44,15 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     updated_at: readString(value, "updated_at"),
     notification: readNotification(value),
     ...(name === undefined ? {} : { name }),
+    ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
+    ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
+    ...(requestedModel === undefined ? {} : { requested_model: requestedModel }),
+    ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
+    ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(pid === undefined ? {} : { pid }),
@@ -63,6 +73,8 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
   const totalTokens = readOptionalNumber(value, "total_tokens")
   const generationMs = readOptionalNumber(value, "generation_ms")
   const tokensPerSecond = readOptionalNumber(value, "tokens_per_second")
+  const costUsd = readOptionalNumber(value, "cost_usd")
+  const cacheHitRate = readOptionalNumber(value, "cache_hit_rate")
   return {
     runtime_ms: readNumber(value, "runtime_ms"),
     turns: readNumber(value, "turns"),
@@ -71,6 +83,8 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
     ...(totalTokens === undefined ? {} : { total_tokens: totalTokens }),
     ...(generationMs === undefined ? {} : { generation_ms: generationMs }),
     ...(tokensPerSecond === undefined ? {} : { tokens_per_second: tokensPerSecond }),
+    ...(costUsd === undefined ? {} : { cost_usd: costUsd }),
+    ...(cacheHitRate === undefined ? {} : { cache_hit_rate: cacheHitRate }),
   }
 }
 
@@ -81,19 +95,41 @@ function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spa
   return { cwd: readString(value, "cwd") }
 }
 
-function readOptionalResolvedModel(record: Record<string, unknown>): ResolvedModelRecord | undefined {
-  const value = record["resolved_model"]
+function readOptionalResolvedModel(
+  record: Record<string, unknown>,
+  key: "requested_model" | "resolved_model" = "resolved_model",
+): ResolvedModelRecord | undefined {
+  const value = record[key]
   if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("resolved_model is not an object")
+  if (!isRecord(value)) throw new Error(`${key} is not an object`)
+  return readResolvedModel(value)
+}
+
+function readOptionalResolvedModelArray(
+  record: Record<string, unknown>,
+  key: "fallback_models" | "fallback_attempts",
+): readonly ResolvedModelRecord[] | undefined {
+  const value = record[key]
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new Error(`${key} is not an array`)
+  return value.map((candidate, index) => {
+    if (!isRecord(candidate)) throw new Error(`${key}[${index}] is not an object`)
+    return readResolvedModel(candidate)
+  })
+}
+
+function readResolvedModel(value: Record<string, unknown>): ResolvedModelRecord {
   const variant = readOptionalString(value, "variant")
-  const reasoningEffort = readOptionalString(value, "reasoning_effort")
+  const legacyReasoningEffort = readOptionalString(value, "reasoning_effort")
+  const reasoning = readOptionalString(value, "reasoning")
   return {
     provider: readString(value, "provider"),
     model_id: readString(value, "model_id"),
     display: readString(value, "display"),
     source: readResolvedModelSource(value),
     ...(variant === undefined ? {} : { variant }),
-    ...(reasoningEffort === undefined ? {} : { reasoning_effort: reasoningEffort }),
+    ...(legacyReasoningEffort === undefined ? {} : { reasoning_effort: legacyReasoningEffort }),
+    ...(reasoning === undefined ? {} : { reasoning }),
   }
 }
 
@@ -101,10 +137,12 @@ function readNotification(record: Record<string, unknown>): TaskRecord["notifica
   const notification = record["notification"]
   if (!isRecord(notification)) throw new Error("notification is not an object")
   const failedEpoch = readOptionalNumber(notification, "notification_failed_epoch")
+  const livenessNotifiedEpoch = readOptionalNumber(notification, "liveness_notified_epoch")
   return {
     run_epoch: readNumber(notification, "run_epoch"),
     notified_epoch: readNumber(notification, "notified_epoch"),
     ...(failedEpoch === undefined ? {} : { notification_failed_epoch: failedEpoch }),
+    ...(livenessNotifiedEpoch === undefined ? {} : { liveness_notified_epoch: livenessNotifiedEpoch }),
   }
 }
 

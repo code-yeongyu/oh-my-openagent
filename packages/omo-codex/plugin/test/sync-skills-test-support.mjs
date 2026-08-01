@@ -8,6 +8,7 @@ export const expectedSkills = [
 	"ast-grep",
 	"coding-agent-sessions",
 	"comment-checker",
+	"data-scientist",
 	"debugging",
 	"frontend",
 	"git-master",
@@ -126,7 +127,13 @@ prefixes when identity is needed.
 `;
 const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
+const ulwResearchOriginalDeliveryGates = "### The delivery gates \u2014 every gate must PASS, in order\n\nNothing reaches the user until the gates pass:\n\n1. **Visual QA (always).** Render the produced artifact back to images \u2014 PDF pages to PNG, the HTML in a real browser \u2014 and look at them: missing or broken figures, clipped tables, overflowing CJK text, blank pages, unreadable chart labels, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.\n2. **Proofread gate \u2014 `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass \u2014 this gate runs BEFORE the first delivery, not after the user finds the typo.";
+const ulwResearchCodexDeliveryGate = "### The delivery gate \u2014 visual QA must PASS\n\nNothing reaches the user until the gate passes:\n\n**Visual QA (always).** Render the produced artifact back to images \u2014 PDF pages to PNG, the HTML in a real browser \u2014 and look at them: missing or broken figures, clipped tables, overflowing CJK text, blank pages, unreadable chart labels, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.";
+
 export function removeCodexSkillOverlays(skillName, content) {
+	if (skillName === "ulw-research") {
+		return content.replace(ulwResearchCodexDeliveryGate, ulwResearchOriginalDeliveryGates);
+	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkCodexCompletion, startWorkOriginalCompletion)

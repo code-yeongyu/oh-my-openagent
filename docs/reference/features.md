@@ -6,19 +6,21 @@ Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, 
 
 ### Current Agent Model Chains
 
+The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi rungs. The OpenCode edition uses `kimi-for-coding` for the same Kimi chain positions. The same resolved chain is used at spawn time and again if runtime retry fallback needs to recover.
+
 | Agent | Primary | Full fallback chain |
 | --- | --- | --- |
-| **sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle` |
+| **sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5.2` → `opencode/big-pickle` |
 | **hephaestus** | `gpt-5.6-sol` | `openai\|github-copilot\|vercel\|opencode/gpt-5.6-sol (medium)` |
 | **oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|vercel/glm-5.2` |
-| **librarian** | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **explore** | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **librarian** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **explore** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **multimodal-looker** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (low)` → `opencode-go\|vercel/kimi-k3` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
 | **prometheus** | `claude-fable-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (max)` |
 | **metis** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (high)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (low)` |
 | **momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
-| **atlas** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
-| **sisyphus-junior** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
+| **atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-5` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| **sisyphus-junior** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-5` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
 
 ### Invoking Agents
 
@@ -62,7 +64,7 @@ review gates rather than relying on prose-only instructions.
 Run agents in the background and continue working:
 
 - Have GPT debug while Claude tries different approaches
-- Gemini writes frontend while Claude handles backend
+- Opus 5 handles visual work while GPT-5.6 Sol tackles deep reasoning
 - Fire massive parallel searches, continue implementation, use results when ready
 
 ```
@@ -129,7 +131,7 @@ When running inside tmux:
 
 When running inside cmux, start OMO with `cmux omo`. OMO routes pane commands through cmux's tmux-compatible interface and does not require a native `tmux` binary on `PATH`. Because that interface cannot safely receive tmux `-e` bindings, OMO creates a cmux pane only when the required pane environment is safely omissible; authenticated listener variables therefore fail closed instead of being inherited or exposed.
 
-Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
+Customize agent models, prompts, and permissions in the `[opencode]` block of `~/.omo/omo.jsonc`.
 
 ### Team Mode (experimental, OFF by default)
 
@@ -163,14 +165,14 @@ By combining these two concepts, you can generate optimal agents through `task`.
 
 | Category             | Default Model                   | Use Cases                                                                                                                   |
 | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `visual-engineering` | `google/gemini-3.1-pro` (high)  | Frontend, UI/UX, design, styling, animation                                                                                 |
+| `visual-engineering` | `anthropic/claude-opus-5` (max) | Frontend, UI/UX, design, styling, animation                                                                                |
 | `ultrabrain`         | `openai/gpt-5.6-sol` (xhigh)    | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
-| `deep`               | `openai/gpt-5.6-terra` (xhigh)  | Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
-| `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
-| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
+| `deep`               | `openai/gpt-5.6-sol` (medium)   | Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
+| `artistry`           | `anthropic/claude-fable-5` (xhigh) | Highly creative/artistic tasks, novel ideas                                                                                 |
+| `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks - single file changes, typo fixes, simple modifications                                                  |
 | `unspecified-low`    | `openai/gpt-5.6-luna` (xhigh)   | Tasks that don't fit other categories, low effort required                                                                  |
-| `unspecified-high`   | `anthropic/claude-opus-5` (max) | Tasks that don't fit other categories, high effort required                                                               |
-| `writing`            | `kimi-for-coding/kimi-k3`          | Documentation, prose, technical writing                                                                                     |
+| `unspecified-high`   | `kimi-for-coding/kimi-k3` (max) | Tasks that don't fit other categories, high effort required                                                               |
+| `writing`            | `kimi-for-coding/kimi-k3` (low) | Documentation, prose, technical writing                                                                                     |
 
 ### Usage
 
@@ -185,7 +187,7 @@ task({
 
 ### Custom Categories
 
-You can define custom categories in your plugin config file. During the rename transition, both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` basenames are recognized.
+You can define custom categories in the `[opencode]` block of the unified config file (`~/.omo/omo.jsonc` or a project `.omo/omo.jsonc`). Legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and are no longer read at runtime.
 
 #### Category Configuration Schema
 
@@ -214,7 +216,7 @@ You can define custom categories in your plugin config file. During the rename t
   "categories": {
     // 1. Define new custom category
     "korean-writer": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3.6-flash",
       "temperature": 0.5,
       "prompt_append": "You are a Korean technical writer. Maintain a friendly and clear tone.",
     },
@@ -251,7 +253,7 @@ When you use a Category, a special agent called **Sisyphus-Junior** performs the
 
 ### Rename Compatibility
 
-The published package and binary remain `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files (`oh-my-openagent.json[c]` or legacy `oh-my-opencode.json[c]`) are recognized during the transition. Run `bunx oh-my-openagent doctor` to check for legacy package name warnings.
+The published package and binary remain `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin configuration lives in the unified `omo.jsonc`; legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` config files are imported once by the migration engine and no longer read at runtime. Run `bunx oh-my-openagent doctor` to check for legacy package name warnings.
 
 ### Fallback Models
 
@@ -262,9 +264,9 @@ Configure per-agent fallback chains with arrays that can mix plain model strings
   "agents": {
     "sisyphus": {
       "fallback_models": [
-        "opencode/glm-5",
+        "opencode/glm-5.2",
         { "model": "openai/gpt-5.6-sol", "variant": "high" },
-        { "model": "anthropic/claude-sonnet-4-6", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
+        { "model": "anthropic/claude-sonnet-5", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
       ]
     }
   }

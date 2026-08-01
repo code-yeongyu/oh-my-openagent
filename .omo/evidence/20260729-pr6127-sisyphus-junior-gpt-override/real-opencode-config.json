@@ -1,0 +1,40 @@
+{
+  "override": {
+    "model": "openai/gpt-5.6-sol",
+    "variant": "xhigh",
+    "temperature": 0.1,
+    "description": "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
+    "mode": "subagent",
+    "color": "#20B2AA",
+    "permission": {
+      "task": "deny",
+      "call_omo_agent": "allow",
+      "task_*": "allow",
+      "teammate": "allow"
+    },
+    "maxTokens": 64000,
+    "reasoningEffort": "xhigh",
+    "name": "Sisyphus-Junior"
+  },
+  "control": {
+    "model": "openai/gpt-5.6-sol",
+    "temperature": 0.1,
+    "description": "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
+    "mode": "subagent",
+    "color": "#20B2AA",
+    "permission": {
+      "task": "deny",
+      "call_omo_agent": "allow",
+      "task_*": "allow",
+      "teammate": "allow"
+    },
+    "maxTokens": 64000,
+    "reasoningEffort": "medium",
+    "name": "Sisyphus-Junior"
+  },
+  "agent_endpoint_variant": {
+    "override": "xhigh",
+    "control": null
+  },
+  "prompt_mentions_gpt56_sol": true
+}

@@ -87,6 +87,25 @@ describe("createSessionMarkerIndex", () => {
     expect(await index.contains(file, "id-1")).toBe(true)
   })
 
+  test("#given a hidden custom message with an envelope #when contains is queried #then it finds the messageId", async () => {
+    const file = tempSessionFile()
+    const messageId = "id-hidden-1"
+    const content = `<peer_message from="worker" to="lead" messageId="${messageId}">hello</peer_message>`
+    writeFileSync(
+      file,
+      `${JSON.stringify({
+        type: "custom_message",
+        customType: "senpi-task:team-message",
+        display: false,
+        content,
+      })}\n`,
+      "utf8",
+    )
+
+    const index = createSessionMarkerIndex()
+    expect(await index.contains(file, messageId)).toBe(true)
+  })
+
   test("#given a missing session file #when contains runs #then it returns false", async () => {
     // given
     const index = createSessionMarkerIndex()

@@ -29,15 +29,22 @@ export type ResolvedModelRecord = {
   readonly provider: string
   readonly model_id: string
   readonly display: string
+  /** @deprecated mirrors `reasoning` during the unification deprecation window. */
   readonly variant?: string
+  /** @deprecated legacy persisted spelling; read through `reasoning`. */
   readonly reasoning_effort?: string
+  /** Canonical unified reasoning level (off|minimal|low|medium|high|xhigh|max) or a harness-native preset token. */
+  readonly reasoning?: string
   readonly source: ResolvedModelSource
 }
 
 // Usage/runtime facts accumulated over ONE run of the child (spawn to terminal transition).
 // total_tokens sums usage.totalTokens across assistant turns (billed volume: context re-sent
 // per turn counts every time); output_tokens sums completion tokens only. generation_ms sums
-// assistant streaming windows, so tokens_per_second reflects generation speed, not tool time.
+// assistant streaming windows. tokens_per_second is emitted ONLY when every token-bearing
+// generation window has a non-zero measured duration; when any token-bearing window collapsed
+// to zero (post-hoc RPC burst, clock coalescing), the lost timing makes generation throughput
+// unverifiable and the field is omitted rather than reporting a runtime-derived substitute.
 export type TaskRunStats = {
   readonly runtime_ms: number
   readonly turns: number
@@ -46,12 +53,18 @@ export type TaskRunStats = {
   readonly total_tokens?: number
   readonly generation_ms?: number
   readonly tokens_per_second?: number
+  /** Summed provider-reported spend for the run, in USD. */
+  readonly cost_usd?: number
+  /** cacheRead / (input + cacheRead + cacheWrite) over the run, as a 0..1 fraction. Omitted when
+   * no turn reported a cacheable denominator (never inferred as zero). */
+  readonly cache_hit_rate?: number
 }
 
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
   readonly notification_failed_epoch?: number
+  readonly liveness_notified_epoch?: number
 }
 
 export type TaskSpawnSpec = {
@@ -62,6 +75,11 @@ export type TaskSpawnSpec = {
 
 export type TaskRecordInput = {
   readonly name?: string
+  // One-line delegated-work summary from the task tool's `task_summary` param. Status surfaces
+  // lead with this, then description, then name, and only then the opaque task id.
+  readonly task_summary?: string
+  // Human label supplied by the task tool's `description` param.
+  readonly description?: string
   readonly parent_session_id: string
   readonly root_session_id: string
   readonly depth: number
@@ -69,6 +87,9 @@ export type TaskRecordInput = {
   readonly category?: string
   readonly execution_mode: string
   readonly model: string
+  readonly requested_model?: ResolvedModelRecord
+  readonly fallback_models?: readonly ResolvedModelRecord[]
+  readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]

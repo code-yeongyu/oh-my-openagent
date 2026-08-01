@@ -40,8 +40,8 @@ describe("createTaskRecordStore caching", () => {
     const resolvedModel = {
       source: "agent" as const,
       provider: "openai",
-      model_id: "gpt-5.4-mini-fast",
-      display: "openai/gpt-5.4-mini-fast",
+      model_id: "gpt-5.6-luna-fast",
+      display: "openai/gpt-5.6-luna-fast",
     }
     writer.save({ ...baseRecord("st_00000007"), resolved_model: resolvedModel })
     const reader = createTaskRecordStore({ project_dir: project })
@@ -52,6 +52,24 @@ describe("createTaskRecordStore caching", () => {
     // then
     expect(result.diagnostics).toEqual([])
     expect(result.records[0]?.resolved_model).toEqual(resolvedModel)
+  })
+
+  test("#given a persisted liveness delivery epoch #when a fresh store reads the task #then the epoch round-trips", () => {
+    // given
+    const project = tempProject()
+    const writer = createTaskRecordStore({ project_dir: project })
+    const record = baseRecord("st_00000008")
+    writer.save({
+      ...record,
+      notification: { ...record.notification, liveness_notified_epoch: 0 },
+    })
+    const reader = createTaskRecordStore({ project_dir: project })
+
+    // when
+    const loaded = reader.load(record.task_id)
+
+    // then
+    expect(loaded?.notification.liveness_notified_epoch).toBe(0)
   })
 
   test("#given unchanged records #when list() is called repeatedly #then results stay consistent", () => {
@@ -107,6 +125,31 @@ describe("createTaskRecordStore caching", () => {
 
     // then
     expect(result.records).toHaveLength(0)
+  })
+
+  test("#given a concurrent lifecycle write #when a serialized conditional patch runs #then it re-reads fresh state and preserves every lifecycle field", () => {
+    const project = tempProject()
+    const writer = createTaskRecordStore({ project_dir: project })
+    const patcher = createTaskRecordStore({ project_dir: project })
+    const record = baseRecord("st_00000009")
+    writer.save(record)
+    const advanced = {
+      ...record,
+      status: "running" as const,
+      name: "revived-member",
+      notification: { ...record.notification, run_epoch: 1 },
+    }
+    writer.replace(advanced)
+
+    patcher.mutate(record.task_id, (fresh) => {
+      if (fresh.status !== record.status || fresh.notification.run_epoch !== record.notification.run_epoch) return fresh
+      return {
+        ...fresh,
+        notification: { ...fresh.notification, liveness_notified_epoch: record.notification.run_epoch },
+      }
+    })
+
+    expect(writer.load(record.task_id)).toEqual(advanced)
   })
 
   test("#given a record replaced through the store #when list() runs #then the cache reflects the new value", () => {

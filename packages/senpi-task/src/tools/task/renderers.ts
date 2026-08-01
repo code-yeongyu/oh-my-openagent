@@ -4,10 +4,10 @@ import { truncateToWidth } from "@earendil-works/pi-tui"
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
 import {
   formatTaskMode,
-  formatTaskTarget,
   renderTaskCallLines,
   taskCallLines,
 } from "./call-renderer"
+import { formatTargetWithModel } from "../../status-line"
 import {
   ELLIPSIS,
   excerptRendererText,
@@ -15,9 +15,8 @@ import {
   normalizeRendererText,
   optionalRendererText,
   rendererVisibleWidth,
-} from "./renderer-text"
+} from "../../renderer-text"
 import { runStatsResultTokens } from "../run-stats-format"
-import { qualifyResolvedModelDisplay } from "./resolved-model-display"
 
 const TASK_REASON_EXCERPT_WIDTH = 40
 
@@ -38,6 +37,7 @@ const STATUS_COLORS: Readonly<Record<string, ThemeColor>> = {
   interrupted: "warning",
   running: "accent",
   pending: "muted",
+  invalid_arguments: "error",
 }
 
 export function statusThemeColor(status: string): ThemeColor {
@@ -46,11 +46,6 @@ export function statusThemeColor(status: string): ThemeColor {
 
 export function formatTaskStatus(status: string): string {
   return normalizeRendererText(status)
-}
-
-export function formatResolvedModel(model: string | undefined): string | undefined {
-  const normalized = optionalRendererText(model)
-  return normalized === undefined ? undefined : `model:${normalized}`
 }
 
 export function taskResultLines(details: TaskToolDetails): readonly string[] {
@@ -93,35 +88,23 @@ export function linesComponent(lines: readonly string[] | WidthAwareLines): Line
   }
 }
 
-function taskTargetToken(args: Pick<TaskToolDetails, "category" | "subagent_type">): string | undefined {
-  const target = formatTaskTarget(args)
+type TargetIdentity = Pick<TaskToolDetails, "category" | "subagent_type" | "model" | "resolved_model">
+
+// One target token per row, in the shared status-line grammar: `category:<n>(<model>:<effort>)` |
+// `agent:<n>(<model>:<effort>)` | `model:<m>`. No site composes its own agent/category branch.
+function taskTargetToken(details: TargetIdentity): string | undefined {
+  const target = formatTargetWithModel({
+    category: details.category,
+    agentType: details.subagent_type,
+    resolvedModel: details.resolved_model,
+    model: details.model,
+  })
   return target === "task" ? undefined : target
 }
 
-function resolvedModelToken(details: TaskToolDetails): string | undefined {
-  const resolved = details.resolved_model
-  if (resolved === undefined) return formatResolvedModel(details.model)
-
-  const display = optionalRendererText(resolved.display) ?? formatResolvedModel(details.model)
-  const qualifiedDisplay = qualifyResolvedModelDisplay(optionalRendererText(resolved.provider), display)
-  const reasoning = optionalRendererText(resolved.reasoning_effort)
-  const variant = usefulVariant(optionalRendererText(resolved.variant), reasoning, display)
-  const content = joinRendererTokens([qualifiedDisplay, reasoning === undefined ? undefined : `reasoning:${reasoning}`,
-    variant === undefined ? undefined : `variant:${variant}`,
-  ])
-  return content.length > 0 ? `(${content})` : undefined
-}
-
-function usefulVariant(
-  variant: string | undefined,
-  reasoning: string | undefined,
-  display: string | undefined,
-): string | undefined {
-  if (variant === undefined) return undefined
-  const comparable = variant.toLocaleLowerCase()
-  if (reasoning?.toLocaleLowerCase() === comparable) return undefined
-  if (display?.toLocaleLowerCase().includes(comparable) === true) return undefined
-  return variant
+function fallbackCountToken(details: Pick<TaskToolDetails, "fallback_attempts">): string | undefined {
+  const count = details.fallback_attempts?.length ?? 0
+  return count > 0 ? `fallback:${count}` : undefined
 }
 
 function taskResultLine(details: TaskToolDetails, mode: string | undefined): string {
@@ -130,7 +113,7 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
   return joinRendererTokens([
     "task",
     taskTargetToken(details),
-    resolvedModelToken(details),
+    fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
     taskId === undefined ? undefined : `id:${taskId}`,
@@ -147,6 +130,7 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
   return joinRendererTokens([
     "item",
     name === undefined ? undefined : `name:${name}`,
+    taskTargetToken(item),
     formatTaskStatus(item.status),
     taskId === undefined ? undefined : `id:${taskId}`,
     item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
@@ -155,21 +139,21 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
 }
 
 function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefined, width: number): string {
-  const requiredWithoutModel = [
+  const requiredWithoutTarget = [
     "task",
-    taskTargetToken(details),
+    fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
   ].filter((token): token is string => token !== undefined)
-  const requiredSpaces = requiredWithoutModel.length
-  const modelWidth = Math.max(
+  const requiredSpaces = requiredWithoutTarget.length + 1
+  const targetWidth = Math.max(
     0,
-    width - requiredWithoutModel.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
+    width - requiredWithoutTarget.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
   )
   const required = [
     "task",
-    taskTargetToken(details),
-    compactResolvedModelToken(details, modelWidth),
+    compactTargetToken(details, targetWidth),
+    fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
   ].filter((token): token is string => token !== undefined)
@@ -183,22 +167,10 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
   return line
 }
 
-function compactResolvedModelToken(details: TaskToolDetails, maxWidth: number): string | undefined {
-  const resolved = details.resolved_model
-  if (resolved === undefined) return formatResolvedModel(details.model)
-  const reasoning = optionalRendererText(resolved.reasoning_effort)
-  const display = optionalRendererText(resolved.display)
-  const qualifiedDisplay = qualifyResolvedModelDisplay(optionalRendererText(resolved.provider), display)
-  const candidates = [qualifiedDisplay, `${resolved.provider}/${resolved.model_id}`, resolved.model_id, details.model]
-    .map(optionalRendererText)
-    .filter((candidate): candidate is string => candidate !== undefined)
-  for (const candidate of candidates) {
-    const token = `(${joinRendererTokens([candidate, reasoning])})`
-    if (rendererVisibleWidth(token) <= maxWidth) return token
-  }
-  const shortest = candidates.toSorted((left, right) => rendererVisibleWidth(left) - rendererVisibleWidth(right))[0]
-  if (shortest === undefined) return undefined
-  return `(${excerptRendererText(joinRendererTokens([shortest, reasoning]), Math.max(0, maxWidth - 2))})`
+function compactTargetToken(details: TargetIdentity, maxWidth: number): string | undefined {
+  const token = taskTargetToken(details)
+  if (token === undefined || rendererVisibleWidth(token) <= maxWidth) return token
+  return excerptRendererText(token, maxWidth)
 }
 
 function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
@@ -217,7 +189,7 @@ export {
   joinRendererTokens,
   normalizeRendererText,
   rendererVisibleWidth,
-} from "./renderer-text"
+} from "../../renderer-text"
 export {
   formatTaskMode,
   formatTaskTarget,

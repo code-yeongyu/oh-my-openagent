@@ -40,7 +40,7 @@ Parent `agent.ts` calls `resolveVariant()` from `@oh-my-opencode/prompts-core` a
 - Kimi K2.x family -> `kimi.md`
 - GLM family -> `glm.md`
 - Claude Opus 4.7 -> `opus-4-7.md`
-- Default -> `default.md` (Claude 4.6 family)
+- Default -> `default.md` (Claude Sonnet 5 family)
 
 `atlasPromptVariants` is ordered with `opus-4-7` before `default` so the specific Claude Opus 4.7 route wins before the generic fallback.
 
@@ -59,7 +59,7 @@ The markdown files keep live OpenCode sections as placeholders. `agent.ts` resol
 
 - Mode: `primary` (respects UI model selection)
 - Temperature: 0.1
-- Default model: `claude-sonnet-4-6`
+- Default model: `claude-sonnet-5`
 - Denied tools: `task`, `call_omo_agent` (Atlas delegates; it does not run subagents directly)
 - Checkbox enforcement in prompts (per `prompt-checkbox-enforcement.test.ts`)
 - Auto-continue: never asks user for approval between plan steps

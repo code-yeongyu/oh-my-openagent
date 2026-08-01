@@ -1,0 +1,9 @@
+Publish guidance checks:
+RED missing Native CLI transition guidance
+RED missing human-summary Senpi exclusion
+
+Public artifact checks:
+GitHub release v4.19.4: release not found
+oh-my-opencode@4.19.4: npm E404
+oh-my-openagent@4.19.4: npm E404
+lazycodex-ai@4.19.4: npm E404

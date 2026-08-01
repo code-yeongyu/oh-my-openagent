@@ -1,0 +1,12 @@
+PASS required transition and exclusion policy in six guidance files
+PASS .agents and .opencode command copies are byte-identical
+PASS git diff --check
+
+bun test script/generate-changelog.test.ts
+Result: all contained-surface exclusion tests passed.
+
+bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts
+Result: all markdown link audit tests passed.
+
+bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+Result: dependencies, DB path, SQL escaping, free port, isolated XDG/HOME, and automatic sandbox cleanup passed.

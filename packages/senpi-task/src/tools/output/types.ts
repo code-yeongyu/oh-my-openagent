@@ -1,11 +1,10 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
 
-import type { ToolProgressDetails } from "../../progress"
 import type { TaskManager } from "../../manager"
 import type { ResolvedModelRecord, TaskRunStats, TaskStatus } from "../../state"
-import type { CallerSessionResolver, WaitBounds } from "../control"
+import type { CallerSessionResolver } from "../control"
 
-export type OutputManager = Pick<TaskManager, "get" | "list" | "waitFor">
+export type OutputManager = Pick<TaskManager, "get" | "list">
 
 export type TranscriptEntry =
   | { readonly kind: "assistant"; readonly text: string }
@@ -30,6 +29,8 @@ export type LostBreadcrumbs = {
 export type TaskSnapshot = {
   readonly task_id: string
   readonly name?: string
+  readonly description?: string
+  readonly task_summary?: string
   readonly status: TaskStatus
   readonly execution_mode: string
   readonly model: string
@@ -47,13 +48,6 @@ export type TaskSnapshot = {
   readonly lost?: LostBreadcrumbs
 }
 
-type WaitingProgress = ToolProgressDetails["progress"] & { readonly maxWaitMs: number }
-
-export type TaskOutputWaitingDetails = {
-  readonly kind: "waiting"
-  readonly progress: WaitingProgress
-}
-
 export type TaskOutputDetails =
   | { readonly kind: "status"; readonly snapshot: TaskSnapshot }
   | {
@@ -66,13 +60,10 @@ export type TaskOutputDetails =
     }
   | { readonly kind: "not_found"; readonly reason: string; readonly known_tasks: readonly string[] }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
-  | { readonly kind: "timed_out"; readonly task_id: string; readonly waited_ms: number }
-  | TaskOutputWaitingDetails
 
 export type TaskOutputDeps = {
   readonly manager: OutputManager
   readonly stateDir: string
-  readonly waitConfig: WaitBounds
   readonly transcriptReader?: TranscriptReader
   readonly resolveCallerSessionId?: CallerSessionResolver
   readonly now?: () => number

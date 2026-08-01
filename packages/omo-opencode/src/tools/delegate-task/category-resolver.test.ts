@@ -119,6 +119,53 @@ describe("resolveCategoryExecution", () => {
 		])
 	})
 
+	test("prefers the canonical models chain over legacy model fields and carries entry reasoning", async () => {
+		//#given
+		const args = {
+			category: "canonical-chain",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			"canonical-chain": {
+				model: "legacy/primary",
+				fallback_models: ["legacy/fallback"],
+				reasoning: "medium",
+				reasoningEffort: "low",
+				models: [
+					{ model: "openai/gpt-5.4", reasoning: "high", reasoningEffort: "minimal" },
+					{ model: "test-provider/plain-model", reasoning: "low" },
+				],
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined)
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.categoryModel?.reasoning).toBe("high")
+		expect(result.fallbackChain).toEqual([
+			{
+				providers: ["test-provider"],
+				model: "plain-model",
+				variant: undefined,
+				reasoning: "low",
+				reasoningEffort: undefined,
+				temperature: undefined,
+				top_p: undefined,
+				maxTokens: undefined,
+				thinking: undefined,
+			},
+		])
+	})
+
 	test("promotes object-style fallback model settings to categoryModel when fallback becomes initial model", async () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({

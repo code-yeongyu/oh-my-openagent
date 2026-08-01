@@ -53,14 +53,14 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 
 | Category | Default Model | Source File | Domain |
 |----------|---------------|-------------|--------|
-| `visual-engineering` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Frontend, UI/UX |
+| `visual-engineering` | anthropic/claude-opus-5 (variant: max) | google-categories.ts | Frontend, UI/UX |
 | `ultrabrain` | openai/gpt-5.6-sol (variant: xhigh) | openai-categories.ts | Hard logic / heavy reasoning |
-| `deep` | openai/gpt-5.6-terra (variant: xhigh) | openai-categories.ts | Autonomous multi-step problem-solving |
-| `artistry` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Creative / unconventional approaches |
-| `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
+| `deep` | openai/gpt-5.6-sol (variant: medium) | openai-categories.ts | Autonomous multi-step problem-solving |
+| `artistry` | anthropic/claude-fable-5 (variant: xhigh) | google-categories.ts | Creative / unconventional approaches |
+| `quick` | kimi-for-coding/kimi-for-coding-highspeed | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | openai/gpt-5.6-luna (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
-| `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
-| `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
+| `unspecified-high` | kimi-for-coding/kimi-k3 (variant: max) | anthropic-categories.ts | High effort fallback |
+| `writing` | kimi-for-coding/kimi-k3 (variant: low) | kimi-categories.ts | Documentation, prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 

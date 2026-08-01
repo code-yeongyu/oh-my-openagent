@@ -33,7 +33,6 @@ function expectMissingStateFailure(
 function spyManager(outcome: SendOutcome): SendManager {
   return {
     sendToTask: () => Promise.resolve(outcome),
-    interruptTask: () => Promise.resolve({ kind: "not_found", reason: "unused" }),
     list: () => [],
   }
 }

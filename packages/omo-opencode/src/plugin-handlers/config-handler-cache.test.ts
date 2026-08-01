@@ -83,7 +83,7 @@ beforeEach(async () => {
     configJson: "/tmp/.config/opencode/opencode.json",
     configJsonc: "/tmp/.config/opencode/opencode.jsonc",
     packageJson: "/tmp/.config/opencode/package.json",
-    omoConfig: "/tmp/.config/opencode/oh-my-opencode.jsonc",
+    omoConfig: "/tmp/.config/opencode/omo.jsonc",
   })
   spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation((config: Record<string, unknown>) => config)
 
