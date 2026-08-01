@@ -5,6 +5,11 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import {
+  clearAllProviderFailures,
+  isProviderFailed,
+} from "../../shared/provider-failure-state"
+import { clearSessionModel, setSessionModel } from "../../shared/session-model-state"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -155,6 +160,8 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
 describe("createMessageUpdateHandler runtime fallback dispatch", () => {
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    clearAllProviderFailures()
+    clearSessionModel("session-provider-mismatch")
   })
 
   it("#given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast", async () => {
@@ -185,6 +192,52 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
       "toast",
     ])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  it("#given stored provider differs from message provider #when quota error is handled #then only the stored provider is unreachable", async () => {
+    const sessionID = "session-provider-mismatch"
+    const deps = createRuntimeFallbackDeps([])
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
+    setSessionModel(sessionID, { providerID: "google", modelID: "gemini-3.1-pro" })
+
+    await handler({
+      sessionID,
+      providerID: "untrusted-message-provider",
+      info: {
+        role: "assistant",
+        providerID: "untrusted-info-provider",
+        model: "google/gemini-3.1-pro",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "google")).toBe(true)
+    expect(isProviderFailed(sessionID, "untrusted-message-provider")).toBe(false)
+    expect(isProviderFailed(sessionID, "untrusted-info-provider")).toBe(false)
+  })
+
+  it("#given no stored provider #when message update supplies a provider #then no provider is marked unreachable", async () => {
+    const sessionID = "session-without-stored-provider"
+    const deps = createRuntimeFallbackDeps([])
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
+
+    await handler({
+      sessionID,
+      providerID: "untrusted-message-provider",
+      info: {
+        role: "assistant",
+        model: "google/gemini-3.1-pro",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "untrusted-message-provider")).toBe(false)
   })
 })
 

@@ -264,10 +264,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     // Notify proactive model-fallback that this provider failed,
     // so it can skip same-provider fallbacks on subsequent requests.
-    const eventProviderID = props?.providerID
-    const failedProviderID = typeof eventProviderID === "string"
-      ? eventProviderID
-      : getSessionModel(sessionID)?.providerID
+    const failedProviderID = getSessionModel(sessionID)?.providerID
     if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
       markProviderFailed(sessionID, failedProviderID)
       log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {

@@ -122,7 +122,7 @@ describe("createEventHandler", () => {
     expect(isProviderFailed(sessionID, "google")).toBe(false)
   })
 
-  it("#given a rate-limit failure #when session.error fires #then the provider is unreachable for that session", async () => {
+  it("#given stored provider differs from event provider #when session.error fires #then only the stored provider is unreachable", async () => {
     const sessionID = "session-rate-limit"
     const deps = createDeps()
     const handler = createEventHandler(deps, createHelpers(deps, [], []))
@@ -133,12 +133,33 @@ describe("createEventHandler", () => {
         type: "session.error",
         properties: {
           sessionID,
+          providerID: "untrusted-event-provider",
           error: { message: "rate limit exceeded" },
         },
       },
     })
 
     expect(isProviderFailed(sessionID, "google")).toBe(true)
+    expect(isProviderFailed(sessionID, "untrusted-event-provider")).toBe(false)
+  })
+
+  it("#given no stored provider #when session.error supplies a provider #then no provider is marked unreachable", async () => {
+    const sessionID = "session-without-stored-provider"
+    const deps = createDeps()
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "untrusted-event-provider",
+          error: { message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "untrusted-event-provider")).toBe(false)
   })
 
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {

@@ -1,10 +1,16 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared/runtime-fallback-retry-marker"
 import { createAutoRetryHelpers } from "./auto-retry"
+import { createStaleSessionCleanup } from "./auto-retry-cleanup"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import {
+  clearAllProviderFailures,
+  isProviderFailed,
+  markProviderFailed,
+} from "../../shared/provider-failure-state"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -59,6 +65,10 @@ function createDeps(promptCalls: { count: number }): HookDeps {
 }
 
 describe("createAutoRetryHelpers", () => {
+  afterEach(() => {
+    clearAllProviderFailures()
+  })
+
   test("#given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted", async () => {
     // given
     const promptCalls = { count: 0 }
@@ -249,5 +259,17 @@ describe("createAutoRetryHelpers", () => {
     expect(deps.sessionStates.has(sessionID)).toBe(false)
     expect(deps.sessionLastAccess.has(sessionID)).toBe(false)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given a stale session provider failure #when stale session cleanup runs #then provider failure state is cleared", () => {
+    const deps = createDeps({ count: 0 })
+    const sessionID = "session-stale-provider-failure"
+    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    markProviderFailed(sessionID, "google")
+    const cleanupStaleSessions = createStaleSessionCleanup(deps, () => {})
+
+    cleanupStaleSessions()
+
+    expect(isProviderFailed(sessionID, "google")).toBe(false)
   })
 })
