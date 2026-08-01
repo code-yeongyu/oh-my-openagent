@@ -228,11 +228,14 @@ describe("runtime fallback error classifier", () => {
     expect(retryable).toBe(false)
   })
 
-  test("#given a non-terminal quota message #when classified #then remains retryable", () => {
+  test.each([
+    "non-terminal quota exceeded",
+    "non-terminal billing limit reached",
+  ])("#given %s #when classified #then remains retryable", (message) => {
     // given
     const error = {
       name: "QuotaExceededError",
-      message: "non-terminal quota exceeded",
+      message,
     }
 
     // when
@@ -242,6 +245,21 @@ describe("runtime fallback error classifier", () => {
     // then
     expect(type).toBe("quota_exceeded")
     expect(retryable).toBe(true)
+  })
+
+  test("#given a throwing detail getter #when classified #then property access failure is conservative", () => {
+    // given
+    const error = {
+      message: "Invalid request payload",
+      get detail(): unknown {
+        throw new Error("detail getter failed")
+      },
+    }
+
+    // when / then
+    expect(() => classifyRuntimeFallbackError(error)).not.toThrow()
+    expect(classifyRuntimeFallbackError(error)).toBeUndefined()
+    expect(isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).toBe(false)
   })
 
   test("classifies terminal_quota_exhausted detail as abort (non-retryable)", () => {

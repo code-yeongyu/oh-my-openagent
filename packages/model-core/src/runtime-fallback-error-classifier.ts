@@ -52,7 +52,11 @@ function isUnknownRecord(value: unknown): value is UnknownRecord {
 
 function getUnknownProperty(value: unknown, key: string): unknown {
   if (!isUnknownRecord(value)) return undefined
-  return value[key]
+  try {
+    return value[key]
+  } catch {
+    return undefined
+  }
 }
 
 function getDetailErrorType(error: unknown): string | undefined {
@@ -64,7 +68,12 @@ function getDetailErrorType(error: unknown): string | undefined {
 }
 
 function isTerminalQuotaMessage(message: string): boolean {
-  if (/\bnon[-\s]+terminal\s+quota\b/i.test(message)) return false
+  if (
+    /\bnon[-\s]+terminal\s+quota\b/i.test(message) ||
+    /\bnon[-\s]+terminal\s+billing\s+limit\b/i.test(message)
+  ) {
+    return false
+  }
   return (
     /\bterminal\s+quota\b/i.test(message) ||
     /\bterminal\s+billing\s+limit\b/i.test(message) ||
