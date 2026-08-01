@@ -262,6 +262,24 @@ describe("runtime fallback error classifier", () => {
     expect(isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).toBe(false)
   })
 
+  test("#given a root Proxy with a throwing get trap #when classified #then shared property access is conservative", () => {
+    // given
+    const error = new Proxy(
+      {},
+      {
+        get(): never {
+          throw new Error("root get trap failed")
+        },
+      },
+    )
+
+    // when / then
+    expect(() => classifyRuntimeFallbackError(error)).not.toThrow()
+    expect(() => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).not.toThrow()
+    expect(classifyRuntimeFallbackError(error)).toBeUndefined()
+    expect(isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).toBe(false)
+  })
+
   test("classifies terminal_quota_exhausted detail as abort (non-retryable)", () => {
     const cases = [
       {
