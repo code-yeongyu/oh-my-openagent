@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isProviderFailureCoordinationError, isRetryableError } from "./error-classifier"
 import {
   areRuntimeModelsEquivalent,
   createFallbackState,
@@ -11,7 +11,7 @@ import {
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
-import { markProviderFailed, clearAllProviderFailures } from "../../shared/provider-failure-state"
+import { clearSessionProviderFailures, markProviderFailed } from "../../shared/provider-failure-state"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
@@ -19,6 +19,7 @@ import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { getSessionModel } from "../../shared/session-model-state"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -115,8 +116,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       }
       sessionStates.set(sessionID, state)
       sessionLastAccess.set(sessionID, Date.now())
-      clearAllProviderFailures()
-      log(`[${HOOK_NAME}] Cleared provider failure state for new session`, { sessionID })
     }
   }
 
@@ -134,6 +133,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
+      clearSessionProviderFailures(sessionID)
     }
   }
 
@@ -264,9 +264,12 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     // Notify proactive model-fallback that this provider failed,
     // so it can skip same-provider fallbacks on subsequent requests.
-    const failedProviderID = props?.providerID as string | undefined
-    if (failedProviderID) {
-      markProviderFailed(failedProviderID)
+    const eventProviderID = props?.providerID
+    const failedProviderID = typeof eventProviderID === "string"
+      ? eventProviderID
+      : getSessionModel(sessionID)?.providerID
+    if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
+      markProviderFailed(sessionID, failedProviderID)
       log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {
         sessionID,
         providerID: failedProviderID,

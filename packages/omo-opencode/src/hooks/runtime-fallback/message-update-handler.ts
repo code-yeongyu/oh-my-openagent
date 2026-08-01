@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isProviderFailureCoordinationError, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -12,6 +12,7 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { getSessionModel } from "../../shared/session-model-state"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -149,9 +150,12 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         })
       }
 
-      const failedProviderID = props?.providerID as string | undefined
-      if (failedProviderID) {
-        markProviderFailed(failedProviderID)
+      const eventProviderID = props?.providerID ?? info?.providerID
+      const failedProviderID = typeof eventProviderID === "string"
+        ? eventProviderID
+        : getSessionModel(sessionID)?.providerID
+      if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
+        markProviderFailed(sessionID, failedProviderID)
         log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {
           sessionID,
           providerID: failedProviderID,

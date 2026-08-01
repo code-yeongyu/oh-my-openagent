@@ -1,10 +1,10 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { beforeEach, describe, expect, test } from "bun:test"
 import {
-  markProviderFailed,
-  isProviderFailed,
-  clearProviderFailure,
   clearAllProviderFailures,
+  clearSessionProviderFailures,
   getFailedProviders,
+  isProviderFailed,
+  markProviderFailed,
   setProviderFailureCooldownMs,
 } from "./provider-failure-state"
 
@@ -15,77 +15,51 @@ describe("provider-failure-state", () => {
   })
 
   test("#given no failures #when checking provider #then returns false", () => {
-    expect(isProviderFailed("openai")).toBe(false)
+    expect(isProviderFailed("session-a", "openai")).toBe(false)
   })
 
-  test("#given provider marked failed #when checking immediately #then returns true", () => {
-    markProviderFailed("openai")
-    expect(isProviderFailed("openai")).toBe(true)
-    expect(isProviderFailed("OPENAI")).toBe(true) // case-insensitive
+  test("#given provider marked failed for one session #when another session checks it #then failures do not leak", () => {
+    markProviderFailed("session-a", "openai")
+
+    expect(isProviderFailed("session-a", "OPENAI")).toBe(true)
+    expect(isProviderFailed("session-b", "openai")).toBe(false)
   })
 
-  test("#given provider marked failed #when cooldown expires #then returns false", async () => {
-    setProviderFailureCooldownMs(50)
-    markProviderFailed("openai")
-    expect(isProviderFailed("openai")).toBe(true)
+  test("#given provider marked failed #when cooldown is zero #then returns false without waiting", () => {
+    markProviderFailed("session-a", "openai")
+    setProviderFailureCooldownMs(0)
 
-    await new Promise((resolve) => setTimeout(resolve, 60))
-
-    expect(isProviderFailed("openai")).toBe(false)
+    expect(isProviderFailed("session-a", "openai")).toBe(false)
   })
 
-  test("#given expired entry #when getFailedProviders called #then excludes expired", async () => {
-    setProviderFailureCooldownMs(50)
-    markProviderFailed("openai")
-    markProviderFailed("anthropic")
+  test("#given failures in two sessions #when one session is cleared #then the other session remains failed", () => {
+    markProviderFailed("session-a", "openai")
+    markProviderFailed("session-b", "anthropic")
 
-    await new Promise((resolve) => setTimeout(resolve, 60))
+    clearSessionProviderFailures("session-a")
 
-    // Re-mark anthropic to keep it active
-    markProviderFailed("anthropic")
-
-    expect(getFailedProviders()).toEqual(["anthropic"])
-  })
-
-  test("#given multiple failures #when clearProviderFailure called #then only clears specific provider", () => {
-    markProviderFailed("openai")
-    markProviderFailed("anthropic")
-
-    clearProviderFailure("openai")
-
-    expect(isProviderFailed("openai")).toBe(false)
-    expect(isProviderFailed("anthropic")).toBe(true)
+    expect(isProviderFailed("session-a", "openai")).toBe(false)
+    expect(isProviderFailed("session-b", "anthropic")).toBe(true)
   })
 
   test("#given multiple failures #when clearAllProviderFailures called #then all cleared", () => {
-    markProviderFailed("openai")
-    markProviderFailed("anthropic")
+    markProviderFailed("session-a", "openai")
+    markProviderFailed("session-b", "anthropic")
 
     clearAllProviderFailures()
 
-    expect(isProviderFailed("openai")).toBe(false)
-    expect(isProviderFailed("anthropic")).toBe(false)
-    expect(getFailedProviders()).toEqual([])
+    expect(isProviderFailed("session-a", "openai")).toBe(false)
+    expect(isProviderFailed("session-b", "anthropic")).toBe(false)
   })
 
   test("#given provider failed #when getFailedProviders called #then returns active providers", () => {
-    markProviderFailed("openai")
-    markProviderFailed("anthropic")
+    markProviderFailed("session-a", "openai")
+    markProviderFailed("session-a", "anthropic")
 
-    const failed = getFailedProviders()
+    const failed = getFailedProviders("session-a")
 
     expect(failed).toContain("openai")
     expect(failed).toContain("anthropic")
     expect(failed).toHaveLength(2)
-  })
-
-  test("#given expired entry #when isProviderFailed called #then cleans up expired entry", async () => {
-    setProviderFailureCooldownMs(50)
-    markProviderFailed("openai")
-
-    await new Promise((resolve) => setTimeout(resolve, 60))
-
-    expect(isProviderFailed("openai")).toBe(false)
-    expect(getFailedProviders()).toEqual([])
   })
 })

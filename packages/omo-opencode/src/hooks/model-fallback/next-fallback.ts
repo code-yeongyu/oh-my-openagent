@@ -59,7 +59,7 @@ export function getNextReachableFallback(
     const providerID = selectFallbackProvider(fallback.providers, state.providerID)
     const modelID = transformModelForProvider(providerID, fallback.model)
 
-    if (isProviderFailed(providerID)) {
+    if (isProviderFailed(sessionID, providerID)) {
       log("[model-fallback] Skipping fallback on failed provider for session: " + sessionID + ", attempt: " + attemptCount + ", provider: " + providerID + ", model: " + fallback.model)
       continue
     }

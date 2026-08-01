@@ -43,3 +43,13 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
     },
   })
 }
+
+export function isProviderFailureCoordinationError(
+  error: unknown,
+  retryOnErrors: number[],
+): boolean {
+  const message = getErrorMessage(error)
+  return classifyErrorType(error) === "quota_exceeded"
+    || extractStatusCode(error, retryOnErrors) === 429
+    || /rate.?limit|too.?many.?requests|频率限制|请求过于频繁/i.test(message)
+}
