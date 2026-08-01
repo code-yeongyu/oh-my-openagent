@@ -209,6 +209,20 @@ describe("runtime fallback error classifier", () => {
         expectedRetryable: false,
       },
       {
+        label: "structured terminal_quota_exhausted detail taking precedence over ModelNotFoundError wrapper",
+        error: {
+          name: "ModelNotFoundError",
+          detail: {
+            error: {
+              type: "terminal_quota_exhausted",
+              message: "Model not found due to exhausted account quota",
+            },
+          },
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
         label: "structured terminal_quota_exhausted detail with arbitrary message (e.g. Account locked)",
         error: {
           detail: {
@@ -222,17 +236,19 @@ describe("runtime fallback error classifier", () => {
         expectedRetryable: false,
       },
       {
-        label: "message-based terminal quota without structured detail type",
+        label: "explicit terminal quota message inside quota error payload",
         error: {
+          name: "QuotaExceededError",
           message: "Terminal quota reached for provider model",
         },
         expectedType: "abort",
         expectedRetryable: false,
       },
       {
-        label: "softer quota_exceeded message without terminal marker (legacy retryable fallback)",
+        label: "soft billing limit message without explicit terminal marker (treats as retryable quota_exceeded)",
         error: {
-          message: "Usage limit exceeded for this billing cycle",
+          name: "BillingError",
+          message: "Billing limit reached for this month, resets tomorrow",
         },
         expectedType: "quota_exceeded",
         expectedRetryable: true,

@@ -57,6 +57,11 @@ function getDetailErrorType(error: unknown): string | undefined {
 }
 
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
+  const detailType = getDetailErrorType(error)
+  if (detailType === "terminal_quota_exhausted") {
+    return "abort"
+  }
+
   const message = getRuntimeFallbackErrorMessage(error)
   const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
 
@@ -88,16 +93,6 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     return "model_not_found"
   }
 
-  const detailType = getDetailErrorType(error)
-  if (
-    detailType === "terminal_quota_exhausted" ||
-    (typeof message === "string" &&
-      (/terminal\s+quota/i.test(message) ||
-        /billing\s+limit.*reached/i.test(message)))
-  ) {
-    return "abort"
-  }
-
   if (
     errorName?.includes("quotaexceeded") ||
     errorName?.includes("insufficientquota") ||
@@ -123,6 +118,14 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /已耗尽/.test(message) ||
     isLocalizedQuotaExhaustionMessage(message)
   ) {
+    if (
+      typeof message === "string" &&
+      (/terminal\s+quota/i.test(message) ||
+        /terminal\s+billing\s+limit/i.test(message) ||
+        /hard\s+billing\s+limit/i.test(message))
+    ) {
+      return "abort"
+    }
     return "quota_exceeded"
   }
 

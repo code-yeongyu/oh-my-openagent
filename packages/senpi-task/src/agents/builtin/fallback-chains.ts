@@ -10,8 +10,8 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
-    { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3-plus" },
-    { providers: ["baidu-coding-plan"], model: "ernie-4.5-mini" },
+    { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
     { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
   ],
   librarian: [
