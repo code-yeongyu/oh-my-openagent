@@ -316,6 +316,52 @@ describe("parent watchdog", () => {
   })
 })
 
+describe("idle timeout", () => {
+  test("#given a live parent that abandons stdin without closing it #when the idle timeout elapses #then the server settles instead of parking on the open pipe", async () => {
+    // The parent is alive and still holds the write end, so stdin never emits
+    // 'end' and the parent watchdog never fires. Only the idle timeout can end
+    // this server, and it must tear the read loop down rather than flag it.
+    const input = new PassThrough()
+    const output = new PassThrough()
+    let idleFired = false
+
+    const served = runJsonRpcStdioServer({
+      input,
+      output,
+      handlerOptions: undefined,
+      idleTimeoutMs: 20,
+      handler: async (message) => successResponse(message.id, { acknowledged: true }),
+      onIdleTimeout: () => {
+        idleFired = true
+      },
+    })
+
+    const outcome = await Promise.race([
+      served.then(() => "settled" as const),
+      Bun.sleep(1_000).then(() => "hung" as const),
+    ])
+
+    expect(idleFired).toBe(true)
+    expect(outcome).toBe("settled")
+  })
+
+  test("#given a real child whose parent holds stdin open and never writes #when the idle timeout elapses #then the child process exits", async () => {
+    // The in-process test above only proves the promise settles. A settled loop
+    // still leaves a live process if anything keeps the event loop alive, so
+    // assert the exit itself — the symptom users actually observe.
+    const child = spawnIdleChild(300)
+    try {
+      const outcome = await Promise.race([
+        child.exited.then(() => "exited" as const),
+        Bun.sleep(5_000).then(() => "alive" as const),
+      ])
+      expect(outcome).toBe("exited")
+    } finally {
+      killQuietly(child.pid)
+    }
+  })
+})
+
 describe("isProcessAlive", () => {
   test("#given a running process #when probed #then it reports alive", () => {
     expect(isProcessAlive(process.pid)).toBe(true)
@@ -429,6 +475,31 @@ async function waitForStderrEvent(
     Bun.sleep(5_000).then(() => false),
   ])
   if (!found) throw new Error(`timed out waiting for child event ${event}`)
+}
+
+function spawnIdleChild(idleTimeoutMs: number) {
+  const serverUrl = new URL("./server.ts", import.meta.url).href
+  const responsesUrl = new URL("./responses.ts", import.meta.url).href
+  const script = `
+    import { successResponse } from ${JSON.stringify(responsesUrl)};
+    import { runJsonRpcStdioServer } from ${JSON.stringify(serverUrl)};
+
+    await runJsonRpcStdioServer({
+      input: process.stdin,
+      output: process.stdout,
+      handlerOptions: undefined,
+      idleTimeoutMs: ${idleTimeoutMs},
+      handler: async (input) => successResponse(input.id, { acknowledged: true }),
+    });
+  `
+  // stdin stays piped and is never written to or closed: the test process is a
+  // live parent holding the write end, which is the case no other teardown
+  // path covers.
+  return Bun.spawn([process.execPath, "-e", script], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
 }
 
 function killQuietly(pid: number): void {
