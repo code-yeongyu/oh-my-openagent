@@ -191,6 +191,59 @@ describe("runtime fallback error classifier", () => {
     expect(signal).toEqual({ signal: retryInfo.summary })
   })
 
+  test("#given terminal quota in data detail #when classified #then aborts without retry", () => {
+    // given
+    const error = {
+      data: {
+        detail: {
+          error: {
+            type: "terminal_quota_exhausted",
+          },
+        },
+      },
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("abort")
+    expect(retryable).toBe(false)
+  })
+
+  test("#given a ModelNotFoundError terminal quota wrapper #when classified #then aborts without retry", () => {
+    // given
+    const error = {
+      name: "ModelNotFoundError",
+      message: "Terminal quota exceeded for the requested model",
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("abort")
+    expect(retryable).toBe(false)
+  })
+
+  test("#given a non-terminal quota message #when classified #then remains retryable", () => {
+    // given
+    const error = {
+      name: "QuotaExceededError",
+      message: "non-terminal quota exceeded",
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
   test("classifies terminal_quota_exhausted detail as abort (non-retryable)", () => {
     const cases = [
       {
