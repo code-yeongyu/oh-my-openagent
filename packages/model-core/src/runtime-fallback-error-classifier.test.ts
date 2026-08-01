@@ -190,4 +190,23 @@ describe("runtime fallback error classifier", () => {
     //#then
     expect(signal).toEqual({ signal: retryInfo.summary })
   })
+
+  test("classifies terminal_quota_exhausted detail as abort (non-retryable)", () => {
+    const error = {
+      detail: {
+        error: {
+          type: "terminal_quota_exhausted",
+          message: "Terminal quota or billing limit reached for the requested LiteLLM model handle.",
+          model: "big-pickle",
+          upstream_error: "insufficient balance on z.ai account",
+        },
+      },
+    }
+
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, [429, 500, 502, 503, 504])
+
+    expect(type).toBe("abort")
+    expect(retryable).toBe(false)
+  })
 })

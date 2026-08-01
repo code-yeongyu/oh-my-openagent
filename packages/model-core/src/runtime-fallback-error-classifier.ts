@@ -44,6 +44,18 @@ function isLocalizedQuotaExhaustionMessage(message: string): boolean {
   )
 }
 
+function getDetailErrorType(error: unknown): string | undefined {
+  try {
+    const anyErr = error as any
+    const detail = anyErr?.detail ?? anyErr
+    const err = detail?.error ?? detail
+    const t = err?.type ?? detail?.type
+    return typeof t === "string" ? t.toLowerCase() : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
   const message = getRuntimeFallbackErrorMessage(error)
   const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
@@ -101,6 +113,14 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /已耗尽/.test(message) ||
     isLocalizedQuotaExhaustionMessage(message)
   ) {
+    const detailType = getDetailErrorType(error)
+    if (
+      detailType === "terminal_quota_exhausted" ||
+      /terminal\s+quota/i.test(message) ||
+      /billing\s+limit.*reached/i.test(message)
+    ) {
+      return "abort"
+    }
     return "quota_exceeded"
   }
 
