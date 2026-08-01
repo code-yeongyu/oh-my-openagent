@@ -4,6 +4,7 @@ import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { createStaleSessionCleanup } from "./auto-retry-cleanup"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import {
   clearAllProviderFailures,
@@ -194,7 +195,7 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
   })
 
-  it("#given stored provider differs from message provider #when quota error is handled #then only the stored provider is unreachable", async () => {
+  it("#given stored provider differs from message and no fallbacks #when session is reaped #then only stored failure is cleared", async () => {
     const sessionID = "session-provider-mismatch"
     const deps = createRuntimeFallbackDeps([])
     const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
@@ -217,6 +218,12 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     expect(isProviderFailed(sessionID, "google")).toBe(true)
     expect(isProviderFailed(sessionID, "untrusted-message-provider")).toBe(false)
     expect(isProviderFailed(sessionID, "untrusted-info-provider")).toBe(false)
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+
+    deps.sessionLastAccess.set(sessionID, 0)
+    createStaleSessionCleanup(deps, () => {})()
+
+    expect(isProviderFailed(sessionID, "google")).toBe(false)
   })
 
   it("#given no stored provider #when message update supplies a provider #then no provider is marked unreachable", async () => {

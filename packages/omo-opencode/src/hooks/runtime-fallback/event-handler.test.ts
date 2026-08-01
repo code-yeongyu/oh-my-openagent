@@ -4,6 +4,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { createStaleSessionCleanup } from "./auto-retry-cleanup"
 import {
   clearAllProviderFailures,
   isProviderFailed,
@@ -122,7 +123,7 @@ describe("createEventHandler", () => {
     expect(isProviderFailed(sessionID, "google")).toBe(false)
   })
 
-  it("#given stored provider differs from event provider #when session.error fires #then only the stored provider is unreachable", async () => {
+  it("#given stored provider differs from event and no fallbacks #when session is reaped #then only stored failure is cleared", async () => {
     const sessionID = "session-rate-limit"
     const deps = createDeps()
     const handler = createEventHandler(deps, createHelpers(deps, [], []))
@@ -141,6 +142,12 @@ describe("createEventHandler", () => {
 
     expect(isProviderFailed(sessionID, "google")).toBe(true)
     expect(isProviderFailed(sessionID, "untrusted-event-provider")).toBe(false)
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+
+    deps.sessionLastAccess.set(sessionID, 0)
+    createStaleSessionCleanup(deps, () => {})()
+
+    expect(isProviderFailed(sessionID, "google")).toBe(false)
   })
 
   it("#given no stored provider #when session.error supplies a provider #then no provider is marked unreachable", async () => {

@@ -153,6 +153,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const failedProviderID = getSessionModel(sessionID)?.providerID
       if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
         markProviderFailed(sessionID, failedProviderID)
+        sessionLastAccess.set(sessionID, Date.now())
         log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {
           sessionID,
           providerID: failedProviderID,
