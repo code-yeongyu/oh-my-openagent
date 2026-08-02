@@ -10,9 +10,17 @@ type InboxConsumerLeaseOptions = {
   readonly staleAfterMs: number
 }
 
+type InboxConsumerLeaseObserver = {
+  readonly beforeOwnershipCheck?: () => void
+}
+
 export const DEAD_CONSUMER_LEASE_STALE_MS = 0
 
-const heldInboxLeases = new AsyncLocalStorage<ReadonlySet<string>>()
+type InboxLeaseOwnership = {
+  active: boolean
+}
+
+const heldInboxLeases = new AsyncLocalStorage<ReadonlyMap<string, InboxLeaseOwnership>>()
 
 export async function withInboxConsumerLease<T>(
   teamRunId: string,
@@ -30,18 +38,26 @@ export async function withInboxConsumerLeaseAtPath<T>(
   recipient: string,
   fn: () => Promise<T>,
   options: InboxConsumerLeaseOptions,
+  observer: InboxConsumerLeaseObserver = {},
 ): Promise<T> {
   await mkdir(inboxDir, { recursive: true, mode: 0o700 })
   const leasePath = path.join(inboxDir, ".consumer.lock")
   const currentLeases = heldInboxLeases.getStore()
-  if (currentLeases?.has(leasePath) === true) {
+  observer.beforeOwnershipCheck?.()
+  if (currentLeases?.get(leasePath)?.active === true) {
     return await fn()
   }
 
-  return withLock(leasePath, async () => await heldInboxLeases.run(
-    new Set([...(currentLeases ?? []), leasePath]),
-    fn,
-  ), {
+  return withLock(leasePath, async () => {
+    const ownership: InboxLeaseOwnership = { active: true }
+    const leases = new Map(currentLeases ?? [])
+    leases.set(leasePath, ownership)
+    try {
+      return await heldInboxLeases.run(leases, fn)
+    } finally {
+      ownership.active = false
+    }
+  }, {
     ownerTag: `team-mailbox-consumer:${recipient}`,
     staleAfterMs: options.staleAfterMs,
   })
