@@ -117,6 +117,7 @@ const STOP_MESSAGE_PATTERNS = [
   "fair use policy",
   "recharge and try",
   "使用上限",
+  "用量上限",
   "额度不足",
   "余额不足",
   "已耗尽",

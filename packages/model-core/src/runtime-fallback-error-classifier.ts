@@ -95,6 +95,7 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /credit\s+balance.*too\s+low/i.test(message) ||
     /limit\s+exhausted/i.test(message) ||
     /使用上限/.test(message) ||
+    /用量上限/.test(message) ||
     /达到.*限制/.test(message) ||
     /额度.*不足/.test(message) ||
     /余额.*不足/.test(message) ||
