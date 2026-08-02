@@ -29,6 +29,7 @@ export {
 } from "./exec"
 export {
   attestLspDaemonCliProcess,
+  isValidLspDaemonVersion,
   listLspDaemonVersionDirs,
   OMO_LSP_DAEMON_DIR_ENV,
   OMO_LSP_DAEMON_VERSION_ENV,

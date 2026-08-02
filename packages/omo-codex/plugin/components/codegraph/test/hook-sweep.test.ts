@@ -38,9 +38,17 @@ describe("CodeGraph SessionStart zombie sweep", () => {
 				{ env: { OMO_LSP_DAEMON_VERSION: "9.9.9" }, homeDir: pluginRoot, pluginRoot },
 				sweeps,
 			);
+			writeFileSync(
+				join(daemonDist, "package.json"),
+				JSON.stringify({ name: "@code-yeongyu/lsp-daemon", version: "invalid version" }),
+			);
+			await sweepOmoFamiliesBestEffort(
+				{ env: {}, homeDir: pluginRoot, pluginRoot },
+				sweeps,
+			);
 
 			// then
-			expect(activeVersions).toEqual(["0.1.0", "9.9.9"]);
+			expect(activeVersions).toEqual(["0.1.0", "9.9.9", undefined]);
 		} finally {
 			rmSync(pluginRoot, { force: true, recursive: true });
 		}

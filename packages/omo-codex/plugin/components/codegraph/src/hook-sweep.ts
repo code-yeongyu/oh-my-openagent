@@ -10,6 +10,7 @@ import {
 	sweepOrphanedLspDaemonProxies,
 	sweepOrphanedGitBashProxies,
 	sweepStaleLspDaemonVersions,
+	isValidLspDaemonVersion,
 	OMO_LSP_DAEMON_VERSION_ENV,
 	type SweepOrphanedLspDaemonProxiesOptions,
 	type SweepOrphanedGitBashProxiesOptions,
@@ -90,7 +91,7 @@ function readPackagedLspDaemonVersion(pluginRoot: string): string | undefined {
 			isRecord(parsed) &&
 			parsed["name"] === "@code-yeongyu/lsp-daemon" &&
 			typeof parsed["version"] === "string" &&
-			parsed["version"].trim().length > 0
+			isValidLspDaemonVersion(parsed["version"])
 		) {
 			return parsed["version"];
 		}

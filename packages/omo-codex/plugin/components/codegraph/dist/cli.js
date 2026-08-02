@@ -9003,7 +9003,10 @@ function resolveLspDaemonBaseDir(options = {}) {
   const homeDir = options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir7();
   return join11(homeDir, ".omo", "lsp-daemon");
 }
-var VERSION_ENTRY_PATTERN = /^v([A-Za-z0-9][A-Za-z0-9._+-]{0,127})$/;
+var LSP_DAEMON_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+function isValidLspDaemonVersion(version2) {
+  return LSP_DAEMON_VERSION_PATTERN.test(version2);
+}
 function listLspDaemonVersionDirs(baseDir) {
   let entries;
   try {
@@ -9017,8 +9020,8 @@ function listLspDaemonVersionDirs(baseDir) {
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
-    const version2 = VERSION_ENTRY_PATTERN.exec(entry.name)?.[1];
-    if (version2 === undefined)
+    const version2 = entry.name.startsWith("v") ? entry.name.slice(1) : undefined;
+    if (version2 === undefined || !isValidLspDaemonVersion(version2))
       continue;
     versions2.push({ dir: join11(baseDir, entry.name), version: version2 });
   }
@@ -9047,7 +9050,8 @@ function requireOwnerText(path) {
 async function planStaleLspDaemonVersionSweep(options) {
   const platform = options.platform ?? process.platform;
   const isAlive = options.isAlive ?? defaultIsProcessAlive;
-  const attestTarget = options.attestTarget ?? (options.attest === undefined ? (target) => attestLspDaemonOwner(target) : (target) => options.attest(target.pid, platform));
+  const attest = options.attest;
+  const attestTarget = options.attestTarget ?? (attest === undefined ? (target) => attestLspDaemonOwner(target) : (target) => attest(target.pid, platform));
   const targets = [];
   const spared = [];
   for (const entry of listLspDaemonVersionDirs(options.baseDir)) {
@@ -9688,7 +9692,7 @@ function resolveActiveLspDaemonVersion(env, pluginRoot) {
 function readPackagedLspDaemonVersion(pluginRoot) {
   try {
     const parsed = JSON.parse(readFileSync7(join16(pluginRoot, "components", "lsp-daemon", "dist", "package.json"), "utf8"));
-    if (isRecord9(parsed) && parsed["name"] === "@code-yeongyu/lsp-daemon" && typeof parsed["version"] === "string" && parsed["version"].trim().length > 0) {
+    if (isRecord9(parsed) && parsed["name"] === "@code-yeongyu/lsp-daemon" && typeof parsed["version"] === "string" && isValidLspDaemonVersion(parsed["version"])) {
       return parsed["version"];
     }
   } catch (error) {

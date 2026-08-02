@@ -52,7 +52,11 @@ export interface LspDaemonVersionDir {
   readonly version: string
 }
 
-const VERSION_ENTRY_PATTERN = /^v([A-Za-z0-9][A-Za-z0-9._+-]{0,127})$/
+const LSP_DAEMON_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
+
+export function isValidLspDaemonVersion(version: string): boolean {
+  return LSP_DAEMON_VERSION_PATTERN.test(version)
+}
 
 export function listLspDaemonVersionDirs(baseDir: string): LspDaemonVersionDir[] {
   let entries
@@ -65,8 +69,8 @@ export function listLspDaemonVersionDirs(baseDir: string): LspDaemonVersionDir[]
   const versions: LspDaemonVersionDir[] = []
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const version = VERSION_ENTRY_PATTERN.exec(entry.name)?.[1]
-    if (version === undefined) continue
+    const version = entry.name.startsWith("v") ? entry.name.slice(1) : undefined
+    if (version === undefined || !isValidLspDaemonVersion(version)) continue
     versions.push({ dir: join(baseDir, entry.name), version })
   }
   return versions.sort((left, right) => left.version.localeCompare(right.version))
@@ -167,10 +171,11 @@ export async function planStaleLspDaemonVersionSweep(
 ): Promise<StaleLspDaemonVersionSweepPlan> {
   const platform = options.platform ?? process.platform
   const isAlive = options.isAlive ?? defaultIsProcessAlive
+  const attest = options.attest
   const attestTarget = options.attestTarget
-    ?? (options.attest === undefined
+    ?? (attest === undefined
       ? (target: StaleLspDaemonVersionTarget) => attestLspDaemonOwner(target)
-      : (target: StaleLspDaemonVersionTarget) => options.attest!(target.pid, platform))
+      : (target: StaleLspDaemonVersionTarget) => attest(target.pid, platform))
   const targets: StaleLspDaemonVersionTarget[] = []
   const spared: SparedLspDaemonVersion[] = []
 
