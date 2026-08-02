@@ -1,13 +1,51 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { sweepCodegraphZombies } from "../../../../../utils/src/process-sweep/index.ts";
 import { executeCodegraphSessionStartHook, type WorkerSpawnInvocation } from "../src/hook.ts";
+import { sweepOmoFamiliesBestEffort } from "../src/hook-sweep.ts";
 
 describe("CodeGraph SessionStart zombie sweep", () => {
+	it("#given a normal packaged LSP runtime without an env override #when helper families sweep #then the packaged daemon version is active", async () => {
+		// given
+		const pluginRoot = mkdtempSync(join(tmpdir(), "omo-packaged-lsp-version-"));
+		const daemonDist = join(pluginRoot, "components", "lsp-daemon", "dist");
+		mkdirSync(daemonDist, { recursive: true });
+		writeFileSync(
+			join(daemonDist, "package.json"),
+			JSON.stringify({ name: "@code-yeongyu/lsp-daemon", version: "0.1.0" }),
+		);
+		const activeVersions: (string | undefined)[] = [];
+		const sweeps = {
+			sweepCodegraph: () => undefined,
+			sweepGitBashProxies: () => undefined,
+			sweepLspProxies: () => undefined,
+			sweepStaleLspDaemons: (options: { readonly currentVersion?: string }) => {
+				activeVersions.push(options.currentVersion);
+			},
+		};
+
+		try {
+			// when
+			await sweepOmoFamiliesBestEffort(
+				{ env: {}, homeDir: pluginRoot, pluginRoot },
+				sweeps,
+			);
+			await sweepOmoFamiliesBestEffort(
+				{ env: { OMO_LSP_DAEMON_VERSION: "9.9.9" }, homeDir: pluginRoot, pluginRoot },
+				sweeps,
+			);
+
+			// then
+			expect(activeVersions).toEqual(["0.1.0", "9.9.9"]);
+		} finally {
+			rmSync(pluginRoot, { force: true, recursive: true });
+		}
+	});
+
 	it("#given the zombie sweep fails #when SessionStart fires #then the hook still exits zero", async () => {
 		// given
 		const stdout: string[] = [];
