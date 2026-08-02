@@ -14,7 +14,12 @@ export function shouldQueueGoalContinuationAfterAgentEnd(
 	hasPendingMessages: boolean,
 	messages: readonly unknown[],
 ): goal is Goal {
-	return goal?.status === "active" && !hasPendingMessages && didAgentEndCleanly(messages);
+	return (
+		goal?.status === "active" &&
+		!hasPendingMessages &&
+		didAgentEndCleanly(messages) &&
+		!didCurrentTurnStartBackgroundWork(messages)
+	);
 }
 
 function didAgentEndCleanly(messages: readonly unknown[]): boolean {
@@ -57,4 +62,36 @@ function isAbortedToolResult(message: unknown): boolean {
 			typeof block["text"] === "string" &&
 			/\babort(?:ed)?\b/i.test(block["text"]),
 	);
+}
+
+function didCurrentTurnStartBackgroundWork(messages: readonly unknown[]): boolean {
+	const lastUserIndex = findLastUserMessageIndex(messages);
+	for (let index = lastUserIndex + 1; index < messages.length; index++) {
+		const message = messages[index];
+		if (!isRecord(message) || message["role"] !== "toolResult") continue;
+		const content = message["content"];
+		if (!Array.isArray(content)) continue;
+		if (
+			content.some(
+				(block) =>
+					isRecord(block) &&
+					block["type"] === "text" &&
+					typeof block["text"] === "string" &&
+					/(?:Command running in background with ID:|Monitor started with ID:|Completion is automatically delivered)/i.test(
+						block["text"],
+					),
+			)
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function findLastUserMessageIndex(messages: readonly unknown[]): number {
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (isRecord(message) && message["role"] === "user") return index;
+	}
+	return -1;
 }
