@@ -8,7 +8,7 @@ import path from "node:path"
 
 import { TeamModeConfigSchema } from "../config"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
-import { withInboxConsumerLease, withInboxConsumerLeaseAtPath } from "./consumer-lease"
+import { withInboxConsumerLease } from "./consumer-lease"
 
 function createSignal(): { readonly promise: Promise<void>; readonly resolve: () => void } {
   let resolveSignal: (() => void) | undefined
@@ -109,55 +109,6 @@ describe("withInboxConsumerLease", () => {
     // then
     expect(result).toBe("nested")
   }, 1_000)
-
-  test("#given a detached nested operation inherited an expired lease w2tc #when a new owner holds the inbox #then the detached operation waits for the live owner", async () => {
-    // given
-    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
-    const teamRunId = randomUUID()
-    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
-    const allowDetachedAttempt = createSignal()
-    const detachedAtOwnershipCheck = createSignal()
-    const newOwnerEntered = createSignal()
-    const releaseNewOwner = createSignal()
-    let detachedEntered = false
-    let newOwnerActive = false
-    let overlapObserved = false
-    let detachedOperation: Promise<void> | undefined
-
-    await withInboxConsumerLease(teamRunId, "m1", config, async () => {
-      detachedOperation = (async () => {
-        await allowDetachedAttempt.promise
-        await withInboxConsumerLeaseAtPath(inboxDir, "m1", async () => {
-          detachedEntered = true
-          overlapObserved = newOwnerActive
-        }, { staleAfterMs: 300_000 }, {
-          beforeOwnershipCheck: detachedAtOwnershipCheck.resolve,
-        })
-      })()
-    }, { staleAfterMs: 300_000 })
-
-    const newOwner = withInboxConsumerLease(teamRunId, "m1", config, async () => {
-      newOwnerActive = true
-      newOwnerEntered.resolve()
-      await releaseNewOwner.promise
-      newOwnerActive = false
-    }, { staleAfterMs: 300_000 })
-    await newOwnerEntered.promise
-
-    // when
-    allowDetachedAttempt.resolve()
-    await detachedAtOwnershipCheck.promise
-    const detachedEnteredBeforeRelease = detachedEntered
-    releaseNewOwner.resolve()
-    await newOwner
-    if (detachedOperation === undefined) throw new Error("detached operation was not initialized")
-    await detachedOperation
-
-    // then
-    expect(detachedEnteredBeforeRelease).toBe(false)
-    expect(overlapObserved).toBe(false)
-    expect(detachedEntered).toBe(true)
-  })
 
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when

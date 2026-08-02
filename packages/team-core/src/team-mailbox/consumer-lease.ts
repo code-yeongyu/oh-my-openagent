@@ -5,20 +5,13 @@ import path from "node:path"
 import type { TeamModeConfig } from "../config"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
 import { withLock } from "../team-state-store/locks"
+import { InboxLeaseOwnership } from "./lease-ownership"
 
 type InboxConsumerLeaseOptions = {
   readonly staleAfterMs: number
 }
 
-type InboxConsumerLeaseObserver = {
-  readonly beforeOwnershipCheck?: () => void
-}
-
 export const DEAD_CONSUMER_LEASE_STALE_MS = 0
-
-type InboxLeaseOwnership = {
-  active: boolean
-}
 
 const heldInboxLeases = new AsyncLocalStorage<ReadonlyMap<string, InboxLeaseOwnership>>()
 
@@ -38,24 +31,21 @@ export async function withInboxConsumerLeaseAtPath<T>(
   recipient: string,
   fn: () => Promise<T>,
   options: InboxConsumerLeaseOptions,
-  observer: InboxConsumerLeaseObserver = {},
 ): Promise<T> {
   await mkdir(inboxDir, { recursive: true, mode: 0o700 })
   const leasePath = path.join(inboxDir, ".consumer.lock")
   const currentLeases = heldInboxLeases.getStore()
-  observer.beforeOwnershipCheck?.()
-  if (currentLeases?.get(leasePath)?.active === true) {
-    return await fn()
-  }
+  const nestedRun = currentLeases?.get(leasePath)?.tryRun(fn) ?? null
+  if (nestedRun !== null) return await nestedRun
 
   return withLock(leasePath, async () => {
-    const ownership: InboxLeaseOwnership = { active: true }
+    const ownership = new InboxLeaseOwnership()
     const leases = new Map(currentLeases ?? [])
     leases.set(leasePath, ownership)
     try {
       return await heldInboxLeases.run(leases, fn)
     } finally {
-      ownership.active = false
+      await ownership.closeAndDrain()
     }
   }, {
     ownerTag: `team-mailbox-consumer:${recipient}`,
