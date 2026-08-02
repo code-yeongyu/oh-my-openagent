@@ -15,6 +15,7 @@ export const TASK_STATUSES = ["pending", "claimed", "in_progress", "completed", 
 
 export const RUNTIME_STATUSES = [
   "creating",
+  "create_cleanup_pending",
   "active",
   "shutdown_requested",
   "deleting",

@@ -9,6 +9,8 @@ export {
 } from "./store"
 export {
   CREATING_TIMEOUT_MS,
+  claimCreatingTeamFailure,
+  finalizeClaimedCreatingTeamFailure,
   isCreatingStateStuck,
   markStuckCreatingTeamFailed,
 } from "./creating-resume"

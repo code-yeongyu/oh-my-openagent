@@ -16,10 +16,33 @@ export function isCreatingStateStuck(
 export async function markStuckCreatingTeamFailed(
   runtimeState: RuntimeState,
   config: TeamModeConfig,
+): Promise<boolean> {
+  const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, config)
+  if (claimedState === null) return false
+  await cleanupMemberWorktrees(claimedState)
+  await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, config)
+  return true
+}
+
+export async function claimCreatingTeamFailure(
+  teamRunId: string,
+  config: TeamModeConfig,
+): Promise<RuntimeState | null> {
+  const claimedState = await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
+    currentRuntimeState.status === "creating"
+      ? { ...currentRuntimeState, status: "create_cleanup_pending" }
+      : currentRuntimeState
+  ), config)
+  return claimedState.status === "create_cleanup_pending" ? claimedState : null
+}
+
+export async function finalizeClaimedCreatingTeamFailure(
+  teamRunId: string,
+  config: TeamModeConfig,
 ): Promise<void> {
-  await cleanupMemberWorktrees(runtimeState)
-  await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    status: "failed",
-  }), config)
+  await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
+    currentRuntimeState.status === "create_cleanup_pending"
+      ? { ...currentRuntimeState, status: "failed" }
+      : currentRuntimeState
+  ), config)
 }

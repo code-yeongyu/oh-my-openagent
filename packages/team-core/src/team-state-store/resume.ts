@@ -33,8 +33,12 @@ export async function resumeAllTeams(
       switch (runtimeState.status) {
         case "creating": {
           if (!isCreatingStateStuck(runtimeState, now, CREATING_TIMEOUT_MS)) break
-          await markStuckCreatingTeamFailed(runtimeState, config)
-          report.marked_failed += 1
+          if (await markStuckCreatingTeamFailed(runtimeState, config)) report.marked_failed += 1
+          break
+        }
+
+        case "create_cleanup_pending": {
+          if (await markStuckCreatingTeamFailed(runtimeState, config)) report.marked_failed += 1
           break
         }
 

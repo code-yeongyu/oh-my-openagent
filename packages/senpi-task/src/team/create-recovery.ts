@@ -1,10 +1,11 @@
 import {
   CREATING_TIMEOUT_MS,
+  claimCreatingTeamFailure,
   cleanupMemberWorktrees,
+  finalizeClaimedCreatingTeamFailure,
   isCreatingStateStuck,
   listActiveTeams,
   loadRuntimeState,
-  markStuckCreatingTeamFailed,
 } from "@oh-my-opencode/team-core/team-state-store"
 
 import { parseTeamMemberTaskIdentity } from "./liveness-ownership"
@@ -33,20 +34,33 @@ export async function recoverStaleCreatingTeams(
 
   for (const journal of await listCreateCompensations(deps.stateDir)) {
     try {
-      const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
-      errors.push(...compensation.errors)
-      if (Object.keys(compensation.pending).length > 0) continue
       let runtimeState
       try {
         runtimeState = await loadRuntimeState(journal.teamRunId, config)
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-        await clearCreateCompensation(deps.stateDir, journal.teamRunId)
+        const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
+        errors.push(...compensation.errors)
+        if (Object.keys(compensation.pending).length === 0) {
+          await clearCreateCompensation(deps.stateDir, journal.teamRunId)
+        }
         continue
       }
-      if (runtimeState.status === "creating") {
-        await markStuckCreatingTeamFailed(runtimeState, config)
+      if (runtimeState.status === "creating" || runtimeState.status === "create_cleanup_pending") {
+        const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, config)
+        if (claimedState === null) continue
+        const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
+        errors.push(...compensation.errors)
+        if (Object.keys(compensation.pending).length > 0) continue
+        await cleanupMemberWorktrees(claimedState)
+        await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, config)
         markedFailed += 1
+      } else if (runtimeState.status === "failed") {
+        const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
+        errors.push(...compensation.errors)
+        if (Object.keys(compensation.pending).length > 0) continue
+      } else {
+        continue
       }
       await clearCreateCompensation(deps.stateDir, journal.teamRunId)
     } catch (error) {
@@ -58,16 +72,18 @@ export async function recoverStaleCreatingTeams(
   for (const team of activeTeams) {
     try {
       const runtimeState = await loadRuntimeState(team.teamRunId, config)
-      if (!isCreatingStateStuck(runtimeState, (deps.now ?? Date.now)(), CREATING_TIMEOUT_MS)) continue
-      const members = await discoverCreatingMembers(runtimeState.teamRunId, runtimeState.members.map((member) => member.name), deps)
-      const compensation = await compensateCreateMembers(runtimeState.teamRunId, members, {
-        ...deps,
-        beforeClear: () => cleanupMemberWorktrees(runtimeState),
-      })
+      const shouldRecover = runtimeState.status === "create_cleanup_pending"
+        || isCreatingStateStuck(runtimeState, (deps.now ?? Date.now)(), CREATING_TIMEOUT_MS)
+      if (!shouldRecover) continue
+      const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, config)
+      if (claimedState === null) continue
+      const members = await discoverCreatingMembers(claimedState.teamRunId, claimedState.members.map((member) => member.name), deps)
+      const compensation = await compensateCreateMembers(claimedState.teamRunId, members, deps)
       errors.push(...compensation.errors)
       if (Object.keys(compensation.pending).length > 0) continue
-      await markStuckCreatingTeamFailed(runtimeState, config)
-      await clearCreateCompensation(deps.stateDir, runtimeState.teamRunId)
+      await cleanupMemberWorktrees(claimedState)
+      await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, config)
+      await clearCreateCompensation(deps.stateDir, claimedState.teamRunId)
       markedFailed += 1
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
