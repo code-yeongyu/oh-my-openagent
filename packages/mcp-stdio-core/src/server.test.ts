@@ -330,7 +330,7 @@ describe("idle timeout", () => {
       output,
       handlerOptions: undefined,
       idleTimeoutMs: 20,
-      handler: async (message) => successResponse(message.id, { acknowledged: true }),
+      handler: async () => successResponse("idle", { acknowledged: true }),
       onIdleTimeout: () => {
         idleFired = true
       },
@@ -404,10 +404,14 @@ describe("isProcessAlive", () => {
   })
 })
 
-function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
+// Each teardown-path test needs a child running the real server over its own
+// stdio, and only the config driving that path differs. The boilerplate lives
+// here so the paths cannot drift; a caller supplies just the lines that make
+// its case, kept verbatim so the child's config still reads at the call site.
+function buildServerScript(config: string, trailer = ""): string {
   const serverUrl = new URL("./server.ts", import.meta.url).href
   const responsesUrl = new URL("./responses.ts", import.meta.url).href
-  const script = `
+  return `
     import { successResponse } from ${JSON.stringify(responsesUrl)};
     import { runJsonRpcStdioServer } from ${JSON.stringify(serverUrl)};
 
@@ -415,27 +419,39 @@ function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
       input: process.stdin,
       output: process.stdout,
       handlerOptions: undefined,
-      idleTimeoutMs: 0,
       handler: async (input) => successResponse(input.id, { acknowledged: true }),
+${config}
+    });
+${trailer}
+  `
+}
+
+// Omitting env inherits the parent environment, so passing process.env through
+// unchanged is what the no-env case already did.
+function spawnServerChild(script: string, env?: Record<string, string>) {
+  return Bun.spawn([process.execPath, "-e", script], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: env ? { ...process.env, ...env } : process.env,
+  })
+}
+
+function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
+  const script = buildServerScript(
+    `      idleTimeoutMs: 0,
       log: (event, fields) => {
         process.stderr.write(JSON.stringify({ event, ...(fields ?? {}) }) + "\\n");
       },
       parentWatchdog: {
         parentPid: Number(process.env.WATCHDOG_PARENT_PID),
         pollIntervalMs: Number(process.env.WATCHDOG_POLL_MS),
-      },
-    });
-    process.stderr.write(JSON.stringify({ event: "server_settled" }) + "\\n");
-  `
-  return Bun.spawn([process.execPath, "-e", script], {
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      ...process.env,
-      WATCHDOG_PARENT_PID: String(parentPid),
-      WATCHDOG_POLL_MS: String(pollIntervalMs),
-    },
+      },`,
+    `    process.stderr.write(JSON.stringify({ event: "server_settled" }) + "\\n");`,
+  )
+  return spawnServerChild(script, {
+    WATCHDOG_PARENT_PID: String(parentPid),
+    WATCHDOG_POLL_MS: String(pollIntervalMs),
   })
 }
 
@@ -478,28 +494,10 @@ async function waitForStderrEvent(
 }
 
 function spawnIdleChild(idleTimeoutMs: number) {
-  const serverUrl = new URL("./server.ts", import.meta.url).href
-  const responsesUrl = new URL("./responses.ts", import.meta.url).href
-  const script = `
-    import { successResponse } from ${JSON.stringify(responsesUrl)};
-    import { runJsonRpcStdioServer } from ${JSON.stringify(serverUrl)};
-
-    await runJsonRpcStdioServer({
-      input: process.stdin,
-      output: process.stdout,
-      handlerOptions: undefined,
-      idleTimeoutMs: ${idleTimeoutMs},
-      handler: async (input) => successResponse(input.id, { acknowledged: true }),
-    });
-  `
   // stdin stays piped and is never written to or closed: the test process is a
   // live parent holding the write end, which is the case no other teardown
   // path covers.
-  return Bun.spawn([process.execPath, "-e", script], {
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-  })
+  return spawnServerChild(buildServerScript(`      idleTimeoutMs: ${idleTimeoutMs},`))
 }
 
 function killQuietly(pid: number): void {
