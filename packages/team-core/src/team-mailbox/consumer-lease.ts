@@ -20,18 +20,19 @@ type HeldInboxLease = {
   readonly scope: InboxLeaseScope
 }
 
+type InboxLeaseContext = {
+  readonly leases: ReadonlyMap<string, HeldInboxLease>
+  readonly leafScope: InboxLeaseScope
+}
+
 export const DEAD_CONSUMER_LEASE_STALE_MS = 0
 
-const heldInboxLeases = new AsyncLocalStorage<ReadonlyMap<string, HeldInboxLease>>()
+const heldInboxLeases = new AsyncLocalStorage<InboxLeaseContext>()
 
 function isActiveLeaseContext(
-  leases: ReadonlyMap<string, HeldInboxLease> | undefined,
-): leases is ReadonlyMap<string, HeldInboxLease> {
-  if (leases === undefined) return false
-  for (const { scope } of leases.values()) {
-    if (!scope.active) return false
-  }
-  return true
+  context: InboxLeaseContext | undefined,
+): context is InboxLeaseContext {
+  return context?.leafScope.active === true
 }
 
 export async function withInboxConsumerLease<T>(
@@ -52,23 +53,28 @@ export async function withInboxConsumerLeaseAtPath<T>(
   options: InboxConsumerLeaseOptions,
 ): Promise<T> {
   const leasePath = path.join(inboxDir, ".consumer.lock")
-  const inheritedLeases = heldInboxLeases.getStore()
-  const currentLeases = isActiveLeaseContext(inheritedLeases)
-    ? inheritedLeases
+  const inheritedContext = heldInboxLeases.getStore()
+  const currentContext = isActiveLeaseContext(inheritedContext)
+    ? inheritedContext
     : undefined
-  const currentLease = currentLeases?.get(leasePath)
-  if (currentLease !== undefined) {
+  const currentLease = currentContext?.leases.get(leasePath)
+  let resetInheritedContext = inheritedContext !== undefined && currentContext === undefined
+  if (currentContext !== undefined && currentLease !== undefined) {
     const childScope: InboxLeaseScope = { active: true }
-    const childLeases = new Map(currentLeases)
+    const childLeases = new Map(currentContext.leases)
     childLeases.set(leasePath, { ownership: currentLease.ownership, scope: childScope })
-    const nestedRun = currentLease.ownership.tryRun(currentLease.scope.active, async () => {
-      try {
-        return await heldInboxLeases.run(childLeases, fn)
-      } finally {
-        childScope.active = false
-      }
-    })
+    const nestedRun = currentLease.ownership.tryRun(
+      currentContext.leafScope.active && currentLease.scope.active,
+      async () => {
+        try {
+          return await heldInboxLeases.run({ leases: childLeases, leafScope: childScope }, fn)
+        } finally {
+          childScope.active = false
+        }
+      },
+    )
     if (nestedRun !== null) return await nestedRun
+    resetInheritedContext = true
   }
 
   await mkdir(inboxDir, { recursive: true, mode: 0o700 })
@@ -76,10 +82,13 @@ export async function withInboxConsumerLeaseAtPath<T>(
   return withLock(leasePath, async () => {
     const ownership = new InboxLeaseOwnership()
     const scope: InboxLeaseScope = { active: true }
-    const leases = new Map(isActiveLeaseContext(currentLeases) ? currentLeases : [])
+    const parentContext = !resetInheritedContext && isActiveLeaseContext(currentContext)
+      ? currentContext
+      : undefined
+    const leases = new Map(parentContext?.leases ?? [])
     leases.set(leasePath, { ownership, scope })
     try {
-      return await heldInboxLeases.run(leases, fn)
+      return await heldInboxLeases.run({ leases, leafScope: scope }, fn)
     } finally {
       scope.active = false
       await ownership.closeAndDrain()

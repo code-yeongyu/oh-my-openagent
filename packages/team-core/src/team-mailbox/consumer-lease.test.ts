@@ -286,6 +286,65 @@ describe("withInboxConsumerLease", () => {
     expect(result).toBe("fresh-b")
   }, 1_000)
 
+  test("#given inbox B is active when ancestor A expires w2tc #when B calls itself afterward #then the active leaf remains reentrant", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const nestedBEntered = createSignal()
+    const startDescendantB = createSignal()
+    let nestedB: Promise<string> | undefined
+
+    await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      nestedB = withInboxConsumerLease(teamRunId, "m2", config, async () => {
+        nestedBEntered.resolve()
+        await startDescendantB.promise
+        return await withInboxConsumerLease(teamRunId, "m2", config, async () => "active-b", {
+          staleAfterMs: 300_000,
+        })
+      }, { staleAfterMs: 300_000 })
+      await nestedBEntered.promise
+    }, { staleAfterMs: 300_000 })
+
+    // when
+    startDescendantB.resolve()
+    if (nestedB === undefined) throw new Error("nested B operation was not initialized")
+    const result = await nestedB
+
+    // then
+    expect(result).toBe("active-b")
+  }, 1_000)
+
+  test("#given inbox B stays active after ancestor A expires w2tc #when B calls A #then the inactive A scope is replaced by a real lease", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const inboxADir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
+    const leaseAPath = path.join(inboxADir, ".consumer.lock")
+    const nestedBEntered = createSignal()
+    const startDescendantA = createSignal()
+    let nestedB: Promise<string> | undefined
+
+    await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      nestedB = withInboxConsumerLease(teamRunId, "m2", config, async () => {
+        nestedBEntered.resolve()
+        await startDescendantA.promise
+        return await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+          await readFile(leaseAPath, "utf8")
+          return "reacquired-a"
+        }, { staleAfterMs: 300_000 })
+      }, { staleAfterMs: 300_000 })
+      await nestedBEntered.promise
+    }, { staleAfterMs: 300_000 })
+
+    // when
+    startDescendantA.resolve()
+    if (nestedB === undefined) throw new Error("nested B operation was not initialized")
+    const result = await nestedB
+
+    // then
+    expect(result).toBe("reacquired-a")
+  }, 1_000)
+
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when
     const mailbox = await import("./index")
