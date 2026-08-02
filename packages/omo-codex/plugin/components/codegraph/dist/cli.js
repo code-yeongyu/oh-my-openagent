@@ -9667,8 +9667,12 @@ async function sweepCodegraphZombiesBestEffort(options, sweep = sweepCodegraphZo
 async function sweepOmoFamiliesBestEffort(options, sweeps = defaultFamilySweeps) {
   const { pluginRoot: configuredPluginRoot, ...sharedOptions } = options;
   const pluginRoot = configuredPluginRoot ?? defaultPluginRoot();
-  const currentVersion = resolveActiveLspDaemonVersion(sharedOptions.env, pluginRoot);
-  const staleSweepOptions = currentVersion === undefined ? sharedOptions : { ...sharedOptions, currentVersion };
+  const versionResolution = resolveActiveLspDaemonVersion(sharedOptions.env, pluginRoot);
+  const staleBaseOptions = versionResolution.kind === "invalid-override" ? {
+    ...sharedOptions,
+    env: { ...sharedOptions.env ?? process.env, [OMO_LSP_DAEMON_VERSION_ENV]: undefined }
+  } : sharedOptions;
+  const staleSweepOptions = versionResolution.kind === "resolved" && versionResolution.version !== undefined ? { ...staleBaseOptions, currentVersion: versionResolution.version } : staleBaseOptions;
   await Promise.all([
     sweepCodegraphZombiesBestEffort(sharedOptions, sweeps.sweepCodegraph, pluginRoot),
     sweepFamilyBestEffort("git-bash proxy sweep", sharedOptions, pluginRoot, (sweepOptions) => sweeps.sweepGitBashProxies(sweepOptions)),
@@ -9685,9 +9689,10 @@ async function sweepFamilyBestEffort(familyLabel, options, pluginRoot, sweep) {
 }
 function resolveActiveLspDaemonVersion(env, pluginRoot) {
   const override = (env ?? process.env)[OMO_LSP_DAEMON_VERSION_ENV];
-  if (override !== undefined && override.trim().length > 0)
-    return override;
-  return readPackagedLspDaemonVersion(pluginRoot);
+  if (override !== undefined) {
+    return isValidLspDaemonVersion(override) ? { kind: "resolved", version: override } : { kind: "invalid-override" };
+  }
+  return { kind: "resolved", version: readPackagedLspDaemonVersion(pluginRoot) };
 }
 function readPackagedLspDaemonVersion(pluginRoot) {
   try {

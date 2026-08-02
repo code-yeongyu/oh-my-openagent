@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 
-import { sweepCodegraphZombies } from "../../../../../utils/src/process-sweep/index.ts";
+import {
+	sweepCodegraphZombies,
+	sweepStaleLspDaemonVersions,
+} from "../../../../../utils/src/process-sweep/index.ts";
 import { executeCodegraphSessionStartHook, type WorkerSpawnInvocation } from "../src/hook.ts";
 import { sweepOmoFamiliesBestEffort } from "../src/hook-sweep.ts";
 
@@ -51,6 +54,77 @@ describe("CodeGraph SessionStart zombie sweep", () => {
 			expect(activeVersions).toEqual(["0.1.0", "9.9.9", undefined]);
 		} finally {
 			rmSync(pluginRoot, { force: true, recursive: true });
+		}
+	});
+
+	it("#given an invalid explicit LSP daemon version #when stale helpers sweep #then version resolution fails closed without candidates or signals", async () => {
+		// given
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-invalid-lsp-version-"));
+		const pluginRoot = join(homeDir, "plugin");
+		const daemonDist = join(pluginRoot, "components", "lsp-daemon", "dist");
+		const staleVersionDir = join(homeDir, ".omo", "lsp-daemon", "v9.9.9");
+		mkdirSync(daemonDist, { recursive: true });
+		mkdirSync(staleVersionDir, { recursive: true });
+		writeFileSync(
+			join(daemonDist, "package.json"),
+			JSON.stringify({ name: "@code-yeongyu/lsp-daemon", version: "0.1.0" }),
+		);
+		writeFileSync(
+			join(staleVersionDir, "daemon.owner"),
+			JSON.stringify({
+				endpoint: { kind: "unix", path: join(staleVersionDir, "daemon.sock"), dev: 1, ino: 1 },
+				nonce: "nonce",
+				pid: 901,
+				startedAt: "2026-08-02T00:00:00.000Z",
+			}),
+		);
+		const signals: string[] = [];
+		let alive = true;
+		let result: Awaited<ReturnType<typeof sweepStaleLspDaemonVersions>> | undefined;
+
+		try {
+			// when
+			await sweepOmoFamiliesBestEffort(
+				{
+					env: { HOME: homeDir, OMO_LSP_DAEMON_VERSION: "invalid version" },
+					force: true,
+					graceMs: 0,
+					homeDir,
+					pluginRoot,
+				},
+				{
+					sweepCodegraph: () => undefined,
+					sweepGitBashProxies: () => undefined,
+					sweepLspProxies: () => undefined,
+					sweepStaleLspDaemons: async (options) => {
+						result = await sweepStaleLspDaemonVersions({
+							...options,
+							attest: () => Promise.resolve(true),
+							isAlive: () => alive,
+							killer: {
+								isAlive: () => alive,
+								kill: (pid) => {
+									signals.push(`KILL:${pid}`);
+									alive = false;
+									return Promise.resolve();
+								},
+								terminate: (pid) => {
+									signals.push(`TERM:${pid}`);
+									alive = false;
+									return Promise.resolve();
+								},
+							},
+						});
+					},
+				},
+			);
+
+			// then
+			expect(result?.action).toBe("skipped");
+			expect(result?.candidates).toEqual([]);
+			expect(signals).toEqual([]);
+		} finally {
+			rmSync(homeDir, { force: true, recursive: true });
 		}
 	});
 
