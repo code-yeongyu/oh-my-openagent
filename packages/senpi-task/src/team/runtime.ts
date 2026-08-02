@@ -1,19 +1,15 @@
 import { rm } from "node:fs/promises"
 
-import { log } from "@oh-my-opencode/utils"
 import type { RuntimeState, TeamSpec } from "@oh-my-opencode/team-core/types"
 import {
-  CREATING_TIMEOUT_MS,
   createRuntimeState,
-  isCreatingStateStuck,
-  listActiveTeams,
   loadRuntimeState,
-  markStuckCreatingTeamFailed,
   transitionRuntimeState,
 } from "@oh-my-opencode/team-core/team-state-store"
 
 import { readMemberTaskMap, writeMemberTaskMap } from "./member-map"
 import { resolveStateDir } from "../store"
+import { rollbackFailedCreate } from "./create-rollback"
 import type { TeamSpecSource } from "./registry"
 import { toTeamCoreConfig, toTeamCoreSpecSource, type TeamCoreConfig } from "./runtime-config"
 import {
@@ -24,12 +20,14 @@ import {
   type DeleteTeamDeps,
   type DeleteTeamResult,
 } from "./runtime-types"
-import { memberTaskName, spawnTeamMembers, type SpawnMembersResult, type SpawnedMember } from "./spawn-members"
+import { memberTaskName, spawnTeamMembers, type SpawnedMember } from "./spawn-members"
 import { ensureTeamRuntimeDirs, resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
 
 const MS_PER_MINUTE = 60_000
 
 export { SenpiTeamRuntimeError } from "./runtime-types"
+export { recoverStaleCreatingTeams } from "./create-recovery"
+export type { RecoverStaleCreatingTeamsResult } from "./create-recovery"
 export type {
   CreateTeamDeps,
   CreateTeamResult,
@@ -111,7 +109,7 @@ export async function createTeam(
   })
 
   if (result.failure !== undefined) {
-    await rollbackFailedCreate(teamRunId, result, deps, config)
+    await rollbackFailedCreate(teamRunId, result.spawned, deps, config)
     throw result.failure
   }
 
@@ -170,70 +168,6 @@ async function activateTeam(
     config,
   )
   return transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "active" }), config)
-}
-
-async function rollbackFailedCreate(
-  teamRunId: string,
-  result: SpawnMembersResult,
-  deps: CreateTeamDeps,
-  config: TeamCoreConfig,
-): Promise<void> {
-  for (const member of result.spawned.values()) {
-    try {
-      const outcome = await deps.manager.cancelTask(member.taskId, `team ${teamRunId} create rollback`)
-      if (outcome.kind !== "cancelled") {
-        log("senpi-task team create rollback cancel skipped", { teamRunId, taskId: member.taskId, outcome: outcome.kind })
-      }
-    } catch (error) {
-      log("senpi-task team create rollback cancel failed", {
-        teamRunId,
-        taskId: member.taskId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-  await transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "failed" }), config)
-}
-
-export type RecoverStaleCreatingTeamsResult = {
-  readonly markedFailed: number
-  readonly errors: readonly Error[]
-}
-
-export async function recoverStaleCreatingTeams(
-  deps: Pick<CreateTeamDeps, "manager" | "stateDir" | "taskSettings" | "now">,
-): Promise<RecoverStaleCreatingTeamsResult> {
-  const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
-  const activeTeams = await listActiveTeams(config)
-  const errors: Error[] = []
-  let markedFailed = 0
-
-  for (const team of activeTeams) {
-    try {
-      const runtimeState = await loadRuntimeState(team.teamRunId, config)
-      if (!isCreatingStateStuck(runtimeState, (deps.now ?? Date.now)(), CREATING_TIMEOUT_MS)) continue
-      const runtimeDir = resolveTeamRuntimeDirs(deps.stateDir, team.teamRunId).runtimeDir
-      const memberMap = await readMemberTaskMap(runtimeDir)
-      for (const [memberName, taskId] of Object.entries(memberMap)) {
-        if (deps.manager.get(taskId)?.name !== memberTaskName(team.teamRunId, memberName)) continue
-        try {
-          await deps.manager.cancelTask(taskId, `team ${team.teamRunId} stale create recovery`)
-        } catch (error) {
-          log("senpi-task stale team create cancel failed", {
-            teamRunId: team.teamRunId,
-            taskId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
-      await markStuckCreatingTeamFailed(runtimeState, config)
-      markedFailed += 1
-    } catch (error) {
-      errors.push(error instanceof Error ? error : new Error(String(error)))
-    }
-  }
-
-  return { markedFailed, errors }
 }
 
 /**

@@ -2,11 +2,12 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+import { listActiveTeams, loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
+import { readCreateCompensation } from "./create-compensation"
 import { readMemberTaskMap } from "./member-map"
 import { normalizeSenpiTeamSpec } from "./normalize"
-import { SenpiTeamRuntimeError, createTeam } from "./runtime"
+import { SenpiTeamRuntimeError, createTeam, recoverStaleCreatingTeams } from "./runtime"
 import { toTeamCoreConfig } from "./runtime-config"
 import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
 import {
@@ -99,9 +100,14 @@ describe("createTeam failures", () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())
     const settings = taskSettings({ max_parallel_members: 1 })
+    let rejectCancellation = true
     const manager = new FakeTeamManager({
       behaviors: [{ kind: "ok" }, { kind: "throw", message: "original spawn failure" }],
-      beforeCancelReturn: () => Promise.reject(new Error("rollback cancellation failure")),
+      beforeCancel: () => {
+        if (!rejectCancellation) return Promise.resolve()
+        rejectCancellation = false
+        return Promise.reject(new Error("rollback cancellation failure"))
+      },
     })
     const spec = normalizeSenpiTeamSpec({
       members: [
@@ -124,6 +130,14 @@ describe("createTeam failures", () => {
     const teamRunId = manager.started[0]?.name?.split(":")[1] ?? ""
     const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
     expect((await loadRuntimeState(teamRunId, config)).status).toBe("failed")
+    expect(manager.get("st_000001")?.status).toBe("running")
+    expect(await readCreateCompensation(stateDir, teamRunId)).toEqual({ alpha: "st_000001" })
+
+    await listActiveTeams(config)
+    await recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
+
+    expect(manager.get("st_000001")?.status).toBe("cancelled")
+    expect(await readCreateCompensation(stateDir, teamRunId)).toEqual({})
   })
 
   test("#given the member sidecar write throws #when created #then members are cancelled, the team is failed, and it never activates", async () => {

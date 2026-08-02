@@ -20,8 +20,9 @@ export type {
   TeamRegistryError,
   TeamSpecSource,
 } from "./registry"
-export { createTeam, deleteTeam, recoverStaleCreatingTeams, SenpiTeamRuntimeError } from "./runtime"
-export type { RecoverStaleCreatingTeamsResult } from "./runtime"
+export { createTeam, deleteTeam, SenpiTeamRuntimeError } from "./runtime"
+export { recoverStaleCreatingTeams } from "./create-recovery"
+export type { RecoverStaleCreatingTeamsResult } from "./create-recovery"
 export type {
   CreateTeamDeps,
   CreateTeamResult,

@@ -1,7 +1,7 @@
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
 import type { TaskLifecycle } from "../lifecycle"
-import type { ManagerStartSpec, StartResult } from "../manager"
+import type { ListedTask, ListScope, ManagerStartSpec, StartResult } from "../manager"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering"
 import type { StateDirConfig } from "../store"
@@ -39,6 +39,7 @@ export type TeamRuntimeManagerPort = {
   start(spec: ManagerStartSpec): Promise<StartResult>
   cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
+  list(scope: ListScope): readonly ListedTask[]
   getResidentHandle(taskId: string): { readonly sessionId: string | undefined } | undefined
 }
 

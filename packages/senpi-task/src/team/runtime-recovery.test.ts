@@ -2,11 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
-import { writeMemberTaskMap } from "./member-map"
 import { normalizeSenpiTeamSpec } from "./normalize"
 import { recoverStaleCreatingTeams } from "./runtime"
 import { toTeamCoreConfig } from "./runtime-config"
-import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
+import { teamStorageBaseDir } from "./storage"
 import {
   FakeTeamManager,
   cleanupTeamRuntimeTmp,
@@ -18,7 +17,7 @@ import {
 afterEach(() => cleanupTeamRuntimeTmp())
 
 describe("recoverStaleCreatingTeams", () => {
-  test("#given a stale partial create #when startup recovery repeats #then only mapped members are cancelled and failure is idempotent", async () => {
+  test("#given start committed but its sidecar write never ran #when startup recovery repeats #then the exact owned member is cancelled idempotently", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())
     const settings = taskSettings()
@@ -53,8 +52,6 @@ describe("recoverStaleCreatingTeams", () => {
       name: "background-unrelated",
     })
     if (member.kind !== "started" || unrelated.kind !== "started") throw new Error("fixture failed to start")
-    await writeMemberTaskMap(resolveTeamRuntimeDirs(stateDir, runtime.teamRunId).runtimeDir, { alpha: member.task_id })
-
     // when
     const first = await recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
     const recoveredState = await loadRuntimeState(runtime.teamRunId, config)

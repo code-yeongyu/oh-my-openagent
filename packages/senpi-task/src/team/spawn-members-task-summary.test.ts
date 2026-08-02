@@ -15,6 +15,7 @@ function fakeManager(captured: ManagerStartSpec[]): TeamRuntimeManagerPort {
       throw new Error("fake TeamRuntimeManagerPort.cancelTask not configured")
     },
     get: () => undefined,
+    list: () => [],
     getResidentHandle: () => undefined,
   }
 }
