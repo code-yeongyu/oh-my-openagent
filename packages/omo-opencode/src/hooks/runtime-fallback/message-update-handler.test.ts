@@ -5,6 +5,7 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { createStaleSessionCleanup } from "./auto-retry-cleanup"
+import { createFallbackState } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import {
   clearAllProviderFailures,
@@ -163,6 +164,34 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     SessionCategoryRegistry.clear()
     clearAllProviderFailures()
     clearSessionModel("session-provider-mismatch")
+    clearSessionModel("session-fallback-provider-attribution")
+  })
+
+  it("#given fallback state advanced to a different provider #when that provider fails #then the active provider is marked failed, not the original", async () => {
+    const sessionID = "session-fallback-provider-attribution"
+    const deps = createRuntimeFallbackDeps([])
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
+    setSessionModel(sessionID, { providerID: "provider-a", modelID: "model-x" })
+    const state = createFallbackState("provider-a/model-x")
+    state.currentModel = "provider-b/model-y"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "provider-b/model-y",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "provider-b")).toBe(true)
+    expect(isProviderFailed(sessionID, "provider-a")).toBe(false)
   })
 
   it("#given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast", async () => {

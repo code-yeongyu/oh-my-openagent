@@ -9,10 +9,11 @@ import {
   _resetMemCacheForTesting,
   updateConnectedProvidersCache,
 } from "../../shared/connected-providers-cache"
-import { clearAllProviderFailures } from "../../shared/provider-failure-state"
+import { clearAllProviderFailures, isProviderFailed } from "../../shared/provider-failure-state"
 import { clearSessionModel, setSessionModel } from "../../shared/session-model-state"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createEventHandler } from "./event-handler"
+import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
 function createContext(): RuntimeFallbackPluginInput {
@@ -71,12 +72,14 @@ describe("provider failure coordination", () => {
     clearAllProviderFailures()
     _resetMemCacheForTesting()
     clearSessionModel("session-a")
+    clearSessionModel("session-fallback-provider-attribution")
   })
 
   afterEach(() => {
     clearAllProviderFailures()
     _resetMemCacheForTesting()
     clearSessionModel("session-a")
+    clearSessionModel("session-fallback-provider-attribution")
   })
 
   it("#given Google exhausts quota for session A #when proactive fallback selects for sessions A and B #then only A skips Google", async () => {
@@ -127,5 +130,49 @@ describe("provider failure coordination", () => {
       providerID: "google",
       modelID: "gemini-3.1-pro-preview",
     })
+  })
+
+  it("#given fallback state advanced to a different provider #when that provider fails #then the active provider is marked failed, not the original", async () => {
+    const sessionID = "session-fallback-provider-attribution"
+    const deps = createDeps()
+    const runtimeHandler = createEventHandler(deps, createHelpers(deps))
+    setSessionModel(sessionID, { providerID: "provider-a", modelID: "model-x" })
+    const state = createFallbackState("provider-a/model-x")
+    state.currentModel = "provider-b/model-y"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await runtimeHandler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "QuotaExceededError", message: "subscription quota exceeded" },
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "provider-b")).toBe(true)
+    expect(isProviderFailed(sessionID, "provider-a")).toBe(false)
+  })
+
+  it("#given no fallback state #when the provider fails #then the stored session provider is marked failed", async () => {
+    const sessionID = "session-fallback-provider-attribution"
+    const deps = createDeps()
+    const runtimeHandler = createEventHandler(deps, createHelpers(deps))
+    setSessionModel(sessionID, { providerID: "provider-a", modelID: "model-x" })
+
+    await runtimeHandler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "QuotaExceededError", message: "subscription quota exceeded" },
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "provider-a")).toBe(true)
   })
 })

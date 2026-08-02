@@ -19,7 +19,7 @@ import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
-import { getSessionModel } from "../../shared/session-model-state"
+import { resolveFailedProviderID } from "./resolve-failed-provider"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -264,7 +264,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     // Notify proactive model-fallback that this provider failed,
     // so it can skip same-provider fallbacks on subsequent requests.
-    const failedProviderID = getSessionModel(sessionID)?.providerID
+    let state = sessionStates.get(sessionID)
+    const failedProviderID = resolveFailedProviderID(sessionID, state)
     if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
       markProviderFailed(sessionID, failedProviderID)
       sessionLastAccess.set(sessionID, Date.now())
@@ -274,7 +275,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       })
     }
 
-    let state = sessionStates.get(sessionID)
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
     if (fallbackModels.length === 0) {

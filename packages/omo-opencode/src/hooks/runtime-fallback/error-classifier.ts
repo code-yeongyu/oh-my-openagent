@@ -50,6 +50,6 @@ export function isProviderFailureCoordinationError(
 ): boolean {
   const message = getErrorMessage(error)
   return classifyErrorType(error) === "quota_exceeded"
-    || extractStatusCode(error, retryOnErrors) === 429
+    || extractStatusCode(error) === 429
     || /rate.?limit|too.?many.?requests|频率限制|请求过于频繁/i.test(message)
 }

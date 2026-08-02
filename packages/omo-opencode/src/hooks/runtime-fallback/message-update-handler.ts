@@ -12,7 +12,7 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
-import { getSessionModel } from "../../shared/session-model-state"
+import { resolveFailedProviderID } from "./resolve-failed-provider"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -150,7 +150,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         })
       }
 
-      const failedProviderID = getSessionModel(sessionID)?.providerID
+      const failedProviderID = resolveFailedProviderID(sessionID, state)
       if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
         markProviderFailed(sessionID, failedProviderID)
         sessionLastAccess.set(sessionID, Date.now())
