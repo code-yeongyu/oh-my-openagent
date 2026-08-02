@@ -1,6 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { effectiveExtension } from "./effective-extension.js";
 import { getLanguageId } from "./language-mappings.js";
@@ -81,11 +81,13 @@ export interface WorkspaceDocumentStateOptions {
 
 function canonicalPath(filePath: string): string {
 	const absolute = resolve(filePath);
+	let canonical: string;
 	try {
-		return realpathSync(absolute);
+		canonical = realpathSync(absolute);
 	} catch {
-		return absolute;
+		canonical = absolute;
 	}
+	return process.platform === "win32" ? canonical.replace(/^[A-Z]:/, (drive) => drive.toLowerCase()) : canonical;
 }
 
 function isSameOrDescendant(candidate: string, parent: string): boolean {
@@ -96,6 +98,14 @@ function isSameOrDescendant(candidate: string, parent: string): boolean {
 function movedPath(candidate: string, oldPath: string, newPath: string): string {
 	const suffix = relative(oldPath, candidate);
 	return suffix === "" ? newPath : resolve(newPath, suffix);
+}
+
+function filePathFromUri(uri: string): string | null {
+	try {
+		return fileURLToPath(uri);
+	} catch {
+		return null;
+	}
 }
 
 export class WorkspaceDocumentState {
@@ -183,7 +193,10 @@ export class WorkspaceDocumentState {
 		readonly diagnostics: readonly Diagnostic[];
 		readonly version?: number;
 	}): void {
-		const state = this.openByUri.get(params.uri);
+		const publishedPath = filePathFromUri(params.uri);
+		const state =
+			this.openByUri.get(params.uri) ??
+			(publishedPath === null ? undefined : this.openDocuments.get(canonicalPath(publishedPath)));
 		if (!state) return;
 		state.publishGeneration += 1;
 		state.lastPublish = {

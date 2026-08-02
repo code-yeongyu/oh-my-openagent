@@ -1,5 +1,11 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
 import { describe, expect, it } from "bun:test";
 
+import type { Diagnostic } from "./types.js";
 import { WorkspaceDocumentState } from "./workspace-document-state.js";
 import type { WorkspaceMutation } from "./workspace-edit.js";
 
@@ -51,6 +57,43 @@ describe("WorkspaceDocumentState watched-file bounds", () => {
 		expect(notificationChanges(notifications[1])).toHaveLength(1);
 		expect(notificationTypes(notifications[0])).toEqual(Array.from({ length: 128 }, () => 2));
 		expect(notificationTypes(notifications[1])).toEqual([2]);
+	});
+});
+
+describe("WorkspaceDocumentState published diagnostic URIs", () => {
+	it("#given TypeScript normalizes a Windows drive URI #when diagnostics are published #then the opened document receives them", async () => {
+		if (process.platform !== "win32") return;
+		const workspace = mkdtempSync(join(tmpdir(), "lsp-document-uri-"));
+		const source = join(workspace, "source.ts");
+		writeFileSync(source, "const value: string = 1;\n", "utf-8");
+		const diagnostics: Diagnostic[] = [
+			{
+				range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } },
+				message: "Type 'number' is not assignable to type 'string'.",
+			},
+		];
+		const documents = new WorkspaceDocumentState(
+			async () => {},
+			() => {},
+			{ versionlessPublishQuiescenceMs: 0 },
+		);
+
+		try {
+			await documents.openFile(source);
+			const openedUri = pathToFileURL(source).href;
+			const publishedUri = openedUri.replace(
+				/^file:\/\/\/([A-Z]):/,
+				(_match, drive: string) => `file:///${drive.toLowerCase()}%3A`,
+			);
+			documents.recordPublishedDiagnostics({ uri: publishedUri, diagnostics });
+			const snapshot = documents.captureDiagnosticSnapshot(source);
+
+			expect(snapshot).not.toBeNull();
+			if (snapshot === null) return;
+			expect(documents.resolvePushDiagnostics(snapshot)).toEqual({ status: "ready", diagnostics });
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+		}
 	});
 });
 
