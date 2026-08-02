@@ -69,6 +69,32 @@ describe("InboxLeaseOwnership", () => {
     expect(events).toEqual(["b-drained", "a-child-finished", "a-drained"])
   })
 
+  test("#given an admitted child remains active after close w2tc #when it starts a descendant #then the descendant stays reentrant", async () => {
+    // given
+    const ownership = new InboxLeaseOwnership()
+    const childEntered = createSignal()
+    const startDescendant = createSignal()
+    const events: string[] = []
+    const child = ownership.tryRun(async () => {
+      childEntered.resolve()
+      await startDescendant.promise
+      const descendant = ownership.tryRun(async () => {
+        events.push("descendant-finished")
+      }, true)
+      await descendant
+      events.push("child-finished")
+    })
+    await childEntered.promise
+
+    // when
+    const drained = ownership.closeAndDrain().then(() => events.push("drained"))
+    startDescendant.resolve()
+    await Promise.all([child, drained])
+
+    // then
+    expect(events).toEqual(["descendant-finished", "child-finished", "drained"])
+  })
+
   test("#given an admitted child throws w2tc #when ownership closes #then failure still releases the drain", async () => {
     // given
     const ownership = new InboxLeaseOwnership()

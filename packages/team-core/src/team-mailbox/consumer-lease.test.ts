@@ -110,6 +110,33 @@ describe("withInboxConsumerLease", () => {
     expect(result).toBe("nested")
   }, 1_000)
 
+  test("#given an unawaited nested call starts before its owner returns w2tc #when the child finishes later #then the outer lease drains it before settling", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const childEntered = createSignal()
+    const releaseChild = createSignal()
+    const events: string[] = []
+    let child: Promise<void> | undefined
+
+    // when
+    const outer = withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      child = withInboxConsumerLease(teamRunId, "m1", config, async () => {
+        events.push("child-entered")
+        childEntered.resolve()
+        await releaseChild.promise
+        events.push("child-finished")
+      }, { staleAfterMs: 300_000 })
+      events.push("outer-returned")
+    }, { staleAfterMs: 300_000 }).then(() => events.push("outer-settled"))
+    await childEntered.promise
+    releaseChild.resolve()
+    await Promise.all([outer, child])
+
+    // then
+    expect(events).toEqual(["child-entered", "outer-returned", "child-finished", "outer-settled"])
+  }, 1_000)
+
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when
     const mailbox = await import("./index")

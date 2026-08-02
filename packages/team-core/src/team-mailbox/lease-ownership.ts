@@ -4,8 +4,8 @@ export class InboxLeaseOwnership {
   private drainPromise: Promise<void> | null = null
   private resolveDrain: (() => void) | null = null
 
-  tryRun<T>(fn: () => Promise<T>): Promise<T> | null {
-    if (!this.accepting) return null
+  tryRun<T>(fn: () => Promise<T>, activeAncestor = false): Promise<T> | null {
+    if (!this.accepting && !activeAncestor) return null
 
     this.admittedChildren += 1
     return this.runAdmitted(fn)
