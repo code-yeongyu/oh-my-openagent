@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from "node:fs"
-import { parseJsonc } from "../../shared"
+import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, parseJsonc } from "../../shared"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 
 interface ParseConfigResult {
@@ -8,8 +8,20 @@ interface ParseConfigResult {
 }
 
 export interface OpenCodeConfig {
-  plugin?: string[]
+  plugin?: (string | [string, unknown])[]
   [key: string]: unknown
+}
+
+// Shared package-name predicate for the omo plugin entry. Centralized here so
+// the installer's detect and add-plugin paths cannot drift apart (AGENTS.md
+// flags duplicate utilities for review). Accepts `unknown` because the parsed
+// `plugin` array may contain tuple entries `[name, options]`; the `typeof`
+// guard skips those without throwing.
+export function isPackageOmoPluginEntry(plugin: unknown): plugin is string {
+  return typeof plugin === "string" && (
+    plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
+    plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+  )
 }
 
 function isEmptyOrWhitespace(content: string): boolean {

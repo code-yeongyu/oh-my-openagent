@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs"
-import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared"
+import { parseJsonc } from "../../shared"
 import type { DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
-import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
+import { isPackageOmoPluginEntry, parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 import { extractVersionFromPluginEntry } from "./version-compatibility"
 
 function detectProvidersFromOmoConfig(): {
@@ -99,12 +99,11 @@ function detectProvidersFromOmoConfig(): {
   }
 }
 
-function isOurPlugin(plugin: string): boolean {
-  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
-         plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+function isOurPlugin(plugin: unknown): plugin is string {
+  return isPackageOmoPluginEntry(plugin)
 }
 
-function findOurPluginEntry(plugins: string[]): string | null {
+function findOurPluginEntry(plugins: readonly (string | [string, unknown])[]): string | null {
   return plugins.find(isOurPlugin) ?? null
 }
 

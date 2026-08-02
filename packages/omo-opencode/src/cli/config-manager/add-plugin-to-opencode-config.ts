@@ -1,13 +1,13 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import type { ConfigMergeResult } from "../types"
-import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../shared"
+import { PLUGIN_NAME } from "../../shared"
 import { backupConfigFile } from "./backup-config"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { detectConfigFormat, type ConfigFormat } from "./opencode-config-format"
-import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
+import { isPackageOmoPluginEntry, parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
 import { getPluginNameWithVersion } from "./plugin-name-with-version"
 import { checkVersionCompatibility, extractVersionFromPluginEntry } from "./version-compatibility"
 
@@ -68,23 +68,21 @@ function getConfigTargets(): ConfigTarget[] {
   })
 }
 
-function isSourceOmoPluginEntry(plugin: string): boolean {
+function isSourceOmoPluginEntry(plugin: unknown): plugin is string {
+  if (typeof plugin !== "string") return false
   const normalized = plugin.toLowerCase().replaceAll("\\", "/")
   if (!normalized.startsWith("file://")) return false
 
   return /\/(omo(?:-[^/]*)?|oh-my-opencode|oh-my-openagent)\/(src|dist)\/index\.(ts|js)$/.test(normalized)
 }
 
-function isPackageOmoPluginEntry(plugin: string): boolean {
-  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
-    plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
-}
-
-function isOurPlugin(plugin: string): boolean {
+// `isPackageOmoPluginEntry` is shared from `parse-opencode-config-file.ts`;
+// the add-plugin path additionally matches `file://` source entries.
+function isOurPlugin(plugin: unknown): plugin is string {
   return isPackageOmoPluginEntry(plugin) || isSourceOmoPluginEntry(plugin)
 }
 
-function findOurPluginEntry(plugins: readonly string[]): string | undefined {
+function findOurPluginEntry(plugins: readonly (string | [string, unknown])[]): string | undefined {
   return plugins.find(isOurPlugin)
 }
 
@@ -94,6 +92,99 @@ function findSourcePluginEntryInTarget(target: ConfigTarget): string | null {
   const parseResult = parseOpenCodeConfigFileWithError(target.path)
   const plugins = parseResult.config?.plugin ?? []
   return plugins.find(isSourceOmoPluginEntry) ?? null
+}
+
+// Locate the bounds of the ROOT-level `plugin` array in a jsonc document.
+// The previous non-greedy regex `\[([\s\S]*?)\]` had two defects this fixes:
+//   1. It stopped at the first `]`, truncating the array whenever an entry
+//      was itself a nested array (the documented `[name, options]` tuple
+//      form), yielding a stray `]` and invalid JSON.
+//   2. It matched the first textual `plugin:` regardless of nesting depth,
+//      so a `plugin` key nested inside another object (e.g. an MCP server
+//      config) appearing before the root array would be rewritten instead,
+//      leaving the active root plugin array unchanged and omo unregistered.
+// The scanner balances brackets while respecting strings and jsonc comments,
+// and only accepts a `plugin:` header at object depth 1 (the root object).
+function findPluginArrayBounds(content: string): { readonly start: number; readonly end: number } | null {
+  const headerRegex = /(?:"plugin"|plugin)\s*:\s*(?=\[)/g
+  let headerMatch: RegExpExecArray | null
+  while ((headerMatch = headerRegex.exec(content)) !== null) {
+    if (objectDepthAt(content, headerMatch.index) === 1) {
+      const start = headerMatch.index + headerMatch[0].length
+      const end = balanceArrayBrackets(content, start)
+      if (end !== null) return { start, end }
+    }
+  }
+  return null
+}
+
+// Count `{`/`}` depth over [0, pos), skipping jsonc strings and comments.
+// depth 0 = outside any object; depth 1 = inside the root object; >=2 nested.
+function objectDepthAt(content: string, pos: number): number {
+  let depth = 0
+  let i = 0
+  let inString = false
+  while (i < pos) {
+    const ch = content[i]
+    if (inString) {
+      if (ch === "\\") { i += 2; continue }
+      if (ch === '"') inString = false
+      i += 1
+      continue
+    }
+    if (ch === '"') { inString = true; i += 1; continue }
+    if (ch === "/" && content[i + 1] === "/") {
+      const nl = content.indexOf("\n", i)
+      i = nl === -1 ? pos : Math.min(nl + 1, pos)
+      continue
+    }
+    if (ch === "/" && content[i + 1] === "*") {
+      const close = content.indexOf("*/", i + 2)
+      i = close === -1 ? pos : Math.min(close + 2, pos)
+      continue
+    }
+    if (ch === "{") depth += 1
+    else if (ch === "}") depth -= 1
+    i += 1
+  }
+  return depth
+}
+
+// Given `start` pointing at `[`, return index after the matching `]` (or null
+// if unbalanced), skipping jsonc strings and comments and balancing nested
+// arrays (e.g. tuple entries `[name, {...}]`).
+function balanceArrayBrackets(content: string, start: number): number | null {
+  if (content[start] !== "[") return null
+  let depth = 0
+  let i = start
+  let inString = false
+  while (i < content.length) {
+    const ch = content[i]
+    if (inString) {
+      if (ch === "\\") { i += 2; continue }
+      if (ch === '"') inString = false
+      i += 1
+      continue
+    }
+    if (ch === '"') { inString = true; i += 1; continue }
+    if (ch === "/" && content[i + 1] === "/") {
+      const nl = content.indexOf("\n", i)
+      i = nl === -1 ? content.length : nl + 1
+      continue
+    }
+    if (ch === "/" && content[i + 1] === "*") {
+      const close = content.indexOf("*/", i + 2)
+      i = close === -1 ? content.length : close + 2
+      continue
+    }
+    if (ch === "[") depth += 1
+    else if (ch === "]") {
+      depth -= 1
+      if (depth === 0) return i + 1
+    }
+    i += 1
+  }
+  return null
 }
 
 function choosePluginEntry(params: {
@@ -177,12 +268,11 @@ function writePluginEntryToTarget(params: {
 
     if (target.format === "jsonc") {
       const content = readFileSync(target.path, "utf-8")
-      const pluginArrayRegex = /((?:"plugin"|plugin)\s*:\s*)\[([\s\S]*?)\]/
-      const match = content.match(pluginArrayRegex)
+      const bounds = findPluginArrayBounds(content)
 
-      if (match) {
-        const formattedPlugins = normalizedPlugins.map((p) => `"${p}"`).join(",\n    ")
-        const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
+      if (bounds) {
+        const formattedPlugins = normalizedPlugins.map((p) => JSON.stringify(p)).join(",\n    ")
+        const newContent = content.slice(0, bounds.start) + `[\n    ${formattedPlugins}\n  ]` + content.slice(bounds.end)
         writeFileSync(target.path, newContent)
       } else {
         const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${nextPluginEntry}"],`)
