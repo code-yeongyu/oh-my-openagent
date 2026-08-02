@@ -16,15 +16,16 @@ export type CreateCleanupClaimant = {
 type CreateCleanupClaimDeps = {
   readonly now?: () => number
   readonly isProcessAlive?: (pid: number) => boolean
+  readonly probeProcess?: (pid: number) => void
 }
 
 export function createCleanupClaimant(): CreateCleanupClaimant {
   return { ownerId: randomUUID(), ownerPid: process.pid }
 }
 
-function isProcessAlive(pid: number): boolean {
+function isProcessAlive(pid: number, probeProcess: (pid: number) => void): boolean {
   try {
-    process.kill(pid, 0)
+    probeProcess(pid)
     return true
   } catch (error) {
     if (!(error instanceof Error)) throw error
@@ -66,7 +67,8 @@ export async function claimCreatingTeamFailure(
   deps: CreateCleanupClaimDeps = {},
 ): Promise<RuntimeState | null> {
   const now = (deps.now ?? Date.now)()
-  const processIsAlive = deps.isProcessAlive ?? isProcessAlive
+  const probeProcess = deps.probeProcess ?? ((pid: number) => process.kill(pid, 0))
+  const processIsAlive = deps.isProcessAlive ?? ((pid: number) => isProcessAlive(pid, probeProcess))
   const claimedState = await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
     canClaimCreatingFailure(currentRuntimeState, claimant, now, processIsAlive)
       ? {

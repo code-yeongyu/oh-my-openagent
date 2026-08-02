@@ -127,11 +127,27 @@ describe("stale creating recovery", () => {
       config,
       { ...aliveProcess, now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS },
     )
+    const permissionDeniedClaim = await claimCreatingTeamFailure(
+      created.teamRunId,
+      successor,
+      config,
+      {
+        now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS,
+        probeProcess: () => {
+          throw Object.assign(new Error("operation not permitted"), { code: "EPERM" })
+        },
+      },
+    )
     const takeover = await claimCreatingTeamFailure(
       created.teamRunId,
       successor,
       config,
-      { isProcessAlive: () => false, now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS },
+      {
+        now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS,
+        probeProcess: () => {
+          throw Object.assign(new Error("no such process"), { code: "ESRCH" })
+        },
+      },
     )
 
     // then
@@ -140,6 +156,7 @@ describe("stale creating recovery", () => {
     expect(spoofedClaim).toBeNull()
     expect(deniedClaim).toBeNull()
     expect(expiredLiveOwnerClaim).toBeNull()
+    expect(permissionDeniedClaim).toBeNull()
     expect(takeover?.createCleanupLease?.ownerId).toBe(successor.ownerId)
     expect(await finalizeClaimedCreatingTeamFailure(created.teamRunId, firstOwner, config)).toBe(false)
     if (takeover === null) throw new Error("fixture failed to take over cleanup lease")
