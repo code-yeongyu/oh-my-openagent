@@ -12,6 +12,7 @@ import {
   listTeamTasks,
   reconcileTeamMailboxOnSessionStart,
   parseExtensionEntries,
+  recoverStaleCreatingTeams,
   resolveMemberExtensionEntryPath,
   refreshTeamMemberStatuses,
   requestShutdown,
@@ -245,4 +246,19 @@ export function createTeamMailboxReconciler(deps: TeamServiceDeps): () => Promis
     config,
     currentLeadSessionId: deps.runtime.sessionId(),
   })
+}
+
+export function createStaleTeamCreateReconciler(deps: TeamServiceDeps): () => Promise<void> {
+  const stateDir = stateDirConfig(deps)
+  return async () => {
+    const result = await recoverStaleCreatingTeams({
+      manager: deps.manager,
+      stateDir,
+      taskSettings: deps.settings,
+      ...(deps.now !== undefined ? { now: deps.now } : {}),
+    })
+    for (const error of result.errors) {
+      log("omo-senpi stale team create recovery failed", { error: error.message })
+    }
+  }
 }

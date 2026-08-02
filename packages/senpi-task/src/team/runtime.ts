@@ -3,12 +3,16 @@ import { rm } from "node:fs/promises"
 import { log } from "@oh-my-opencode/utils"
 import type { RuntimeState, TeamSpec } from "@oh-my-opencode/team-core/types"
 import {
+  CREATING_TIMEOUT_MS,
   createRuntimeState,
+  isCreatingStateStuck,
+  listActiveTeams,
   loadRuntimeState,
+  markStuckCreatingTeamFailed,
   transitionRuntimeState,
 } from "@oh-my-opencode/team-core/team-state-store"
 
-import { readMemberTaskMap, writeMemberTaskMap, type MemberTaskMap } from "./member-map"
+import { readMemberTaskMap, writeMemberTaskMap } from "./member-map"
 import { resolveStateDir } from "../store"
 import type { TeamSpecSource } from "./registry"
 import { toTeamCoreConfig, toTeamCoreSpecSource, type TeamCoreConfig } from "./runtime-config"
@@ -40,8 +44,9 @@ export type {
  * Creates a team run over the task manager: enforce the `max_members` bound BEFORE any spawn, seed
  * team-core runtime state (`creating`), spawn members as in-process background children capped by
  * `max_parallel_members` under a wall-clock deadline, then either roll back (cancel spawned members
- * + transition to `failed`) on the first failure or persist the member sidecar and transition to
- * `active`. The current session is always the lead sentinel; no member is ever elected lead.
+ * + transition to `failed`) on the first failure or transition to `active`. Each successful spawn is
+ * durably added to the member sidecar before creation advances, allowing crash recovery to compensate
+ * only the partial team's owned tasks. The current session is always the lead sentinel.
  */
 export async function createTeam(
   spec: TeamSpec,
@@ -63,6 +68,26 @@ export async function createTeam(
   const teamRunId = runtimeState.teamRunId
   await ensureTeamRuntimeDirs(deps.stateDir, teamRunId, spec.members.map((member) => member.name))
 
+  const memberTaskIds: Record<string, string> = {}
+  const writeMemberMap = deps.writeMemberMap ?? writeMemberTaskMap
+  let sidecarWrite = Promise.resolve()
+  const persistSpawnedMember = (memberName: string, member: SpawnedMember): Promise<void> => {
+    memberTaskIds[memberName] = member.taskId
+    const snapshot = { ...memberTaskIds }
+    sidecarWrite = sidecarWrite.then(async () => {
+      try {
+        await writeMemberMap(resolveTeamRuntimeDirs(deps.stateDir, teamRunId).runtimeDir, snapshot)
+      } catch (error) {
+        throw new SenpiTeamRuntimeError(
+          `team '${spec.name}' member sidecar write failed: ${error instanceof Error ? error.message : String(error)}`,
+          "sidecar_write_failed",
+          spec.name,
+        )
+      }
+    })
+    return sidecarWrite
+  }
+
   const result = await spawnTeamMembers({
     spec,
     teamRunId,
@@ -72,6 +97,7 @@ export async function createTeam(
     maxParallel: deps.taskSettings.team.max_parallel_members,
     deadlineAt: now() + deps.taskSettings.team.max_wall_clock_minutes * MS_PER_MINUTE,
     now,
+    onMemberSpawned: persistSpawnedMember,
     ...(deps.memberExtension !== undefined ? {
       memberExtension: {
         ...deps.memberExtension,
@@ -87,22 +113,6 @@ export async function createTeam(
   if (result.failure !== undefined) {
     await rollbackFailedCreate(teamRunId, result, deps, config)
     throw result.failure
-  }
-
-  const memberTaskIds = toMemberTaskMap(result.spawned)
-  const writeMemberMap = deps.writeMemberMap ?? writeMemberTaskMap
-  // Persist the member sidecar AFTER spawn success but BEFORE the ->active transition (W3-V F4): an
-  // active team with no discoverable/cancellable members is a leak, so a write failure rolls the whole
-  // create back (cancel spawned members + ->failed) instead of activating an orphaned run.
-  try {
-    await writeMemberMap(resolveTeamRuntimeDirs(deps.stateDir, teamRunId).runtimeDir, memberTaskIds)
-  } catch (error) {
-    await rollbackFailedCreate(teamRunId, result, deps, config)
-    throw new SenpiTeamRuntimeError(
-      `team '${spec.name}' member sidecar write failed: ${error instanceof Error ? error.message : String(error)}`,
-      "sidecar_write_failed",
-      spec.name,
-    )
   }
 
   const activated = await activateTeam(teamRunId, result.spawned, config)
@@ -169,18 +179,61 @@ async function rollbackFailedCreate(
   config: TeamCoreConfig,
 ): Promise<void> {
   for (const member of result.spawned.values()) {
-    const outcome = await deps.manager.cancelTask(member.taskId, `team ${teamRunId} create rollback`)
-    if (outcome.kind !== "cancelled") {
-      log("senpi-task team create rollback cancel skipped", { teamRunId, taskId: member.taskId, outcome: outcome.kind })
+    try {
+      const outcome = await deps.manager.cancelTask(member.taskId, `team ${teamRunId} create rollback`)
+      if (outcome.kind !== "cancelled") {
+        log("senpi-task team create rollback cancel skipped", { teamRunId, taskId: member.taskId, outcome: outcome.kind })
+      }
+    } catch (error) {
+      log("senpi-task team create rollback cancel failed", {
+        teamRunId,
+        taskId: member.taskId,
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
   await transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "failed" }), config)
 }
 
-function toMemberTaskMap(spawned: ReadonlyMap<string, SpawnedMember>): MemberTaskMap {
-  const map: Record<string, string> = {}
-  for (const [name, member] of spawned) map[name] = member.taskId
-  return map
+export type RecoverStaleCreatingTeamsResult = {
+  readonly markedFailed: number
+  readonly errors: readonly Error[]
+}
+
+export async function recoverStaleCreatingTeams(
+  deps: Pick<CreateTeamDeps, "manager" | "stateDir" | "taskSettings" | "now">,
+): Promise<RecoverStaleCreatingTeamsResult> {
+  const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
+  const activeTeams = await listActiveTeams(config)
+  const errors: Error[] = []
+  let markedFailed = 0
+
+  for (const team of activeTeams) {
+    try {
+      const runtimeState = await loadRuntimeState(team.teamRunId, config)
+      if (!isCreatingStateStuck(runtimeState, (deps.now ?? Date.now)(), CREATING_TIMEOUT_MS)) continue
+      const runtimeDir = resolveTeamRuntimeDirs(deps.stateDir, team.teamRunId).runtimeDir
+      const memberMap = await readMemberTaskMap(runtimeDir)
+      for (const [memberName, taskId] of Object.entries(memberMap)) {
+        if (deps.manager.get(taskId)?.name !== memberTaskName(team.teamRunId, memberName)) continue
+        try {
+          await deps.manager.cancelTask(taskId, `team ${team.teamRunId} stale create recovery`)
+        } catch (error) {
+          log("senpi-task stale team create cancel failed", {
+            teamRunId: team.teamRunId,
+            taskId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      await markStuckCreatingTeamFailed(runtimeState, config)
+      markedFailed += 1
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
+
+  return { markedFailed, errors }
 }
 
 /**

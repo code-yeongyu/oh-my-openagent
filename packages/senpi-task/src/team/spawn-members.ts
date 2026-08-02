@@ -30,6 +30,7 @@ export type SpawnMembersInput = {
   readonly deadlineAt: number
   readonly now: () => number
   readonly memberExtension?: SpawnMemberExtensionConfig
+  readonly onMemberSpawned?: (memberName: string, member: SpawnedMember) => Promise<void>
 }
 
 export type SpawnMembersResult = {
@@ -67,9 +68,11 @@ export async function spawnTeamMembers(input: SpawnMembersInput): Promise<SpawnM
       const member = input.spec.members[nextIndex++]
       if (member === undefined) return
       try {
-        spawned.set(member.name, await spawnOneMember(input, member))
+        const outcome = await spawnOneMember(input, member)
+        spawned.set(member.name, outcome)
+        await input.onMemberSpawned?.(member.name, outcome)
       } catch (error) {
-        failure = toSpawnFailure(input.teamRunId, member.name, error)
+        if (failure === undefined) failure = toSpawnFailure(input.teamRunId, member.name, error)
         return
       }
     }

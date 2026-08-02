@@ -293,6 +293,10 @@ describe("omo-senpi task component wiring", () => {
     }
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
     wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
+      reconcileStaleTeamCreates: () => {
+        order.push("recover-create")
+        return Promise.resolve()
+      },
       reconcileTeamMailbox: () => {
         order.push("reclaim")
         return Promise.resolve()
@@ -314,7 +318,7 @@ describe("omo-senpi task component wiring", () => {
     })
 
     // then
-    expect(order).toEqual(["reattach", "cleanup", "reclaim", "notify", "poll"])
+    expect(order).toEqual(["reattach", "recover-create", "cleanup", "reclaim", "notify", "poll"])
   })
 
   it("#given a terminal member owned by lead A #when lead B reconciles then lead A reconciles #then only the owning lead receives replay", async () => {

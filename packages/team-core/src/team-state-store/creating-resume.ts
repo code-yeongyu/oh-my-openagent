@@ -3,6 +3,8 @@ import type { RuntimeState } from "../types"
 import { cleanupMemberWorktrees } from "./runtime-cleanup"
 import { transitionRuntimeState } from "./store"
 
+export const CREATING_TIMEOUT_MS = 30 * 60 * 1000
+
 export function isCreatingStateStuck(
   runtimeState: RuntimeState,
   now: number,

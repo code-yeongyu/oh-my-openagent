@@ -2,7 +2,7 @@ import type { TeamModeConfig } from "../config"
 import { log } from "../logger"
 import type { TeamSessionContext } from "../session-client"
 import { resumeActiveTeam } from "./active-resume"
-import { isCreatingStateStuck, markStuckCreatingTeamFailed } from "./creating-resume"
+import { CREATING_TIMEOUT_MS, isCreatingStateStuck, markStuckCreatingTeamFailed } from "./creating-resume"
 import { cleanTerminalTeam, finishDeletingTeam } from "./deleting-resume"
 import { toError } from "./error-normalization"
 import type { ResumeReport } from "./resume-report"
@@ -10,7 +10,6 @@ import { listActiveTeams, loadRuntimeState } from "./store"
 
 export type { ResumeReport } from "./resume-report"
 
-const CREATING_TIMEOUT_MS = 30 * 60 * 1000
 const STALE_RESERVATION_TTL_MS = 10 * 60 * 1000
 
 export async function resumeAllTeams(

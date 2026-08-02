@@ -10,6 +10,7 @@ import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
+  readonly reconcileStaleTeamCreates?: () => Promise<void>
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
 }
@@ -38,6 +39,7 @@ export function wireEventBridge(
       // its persisted liveness epoch suppresses records already delivered in an earlier process.
       if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
     }
+    await reconcileStaleTeamCreatesBestEffort(ctx, state)
     const cleanup = engine.lifecycle.cleanupExpiredRecords()
     if (cleanup.deleted.length > 0) {
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
@@ -103,6 +105,17 @@ export function wireEventBridge(
     )
     return undefined
   })
+}
+
+async function reconcileStaleTeamCreatesBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
+  if (state.reconcileStaleTeamCreates === undefined) return
+  try {
+    await state.reconcileStaleTeamCreates()
+  } catch (error) {
+    ctx.logger.warn("omo-senpi task session-start stale team create recovery failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {

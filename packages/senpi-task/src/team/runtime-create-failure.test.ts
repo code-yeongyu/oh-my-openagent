@@ -4,10 +4,11 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
+import { readMemberTaskMap } from "./member-map"
 import { normalizeSenpiTeamSpec } from "./normalize"
 import { SenpiTeamRuntimeError, createTeam } from "./runtime"
 import { toTeamCoreConfig } from "./runtime-config"
-import { teamStorageBaseDir } from "./storage"
+import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
 import {
   FakeTeamManager,
   cleanupTeamRuntimeTmp,
@@ -89,6 +90,40 @@ describe("createTeam failures", () => {
     expect(teamRunId).toBeDefined()
     const reloaded = await loadRuntimeState(teamRunId ?? "", config)
     expect(reloaded.status).toBe("failed")
+    expect(await readMemberTaskMap(resolveTeamRuntimeDirs(stateDir, teamRunId ?? "").runtimeDir)).toEqual({
+      alpha: "st_000001",
+    })
+  })
+
+  test("#given rollback cancellation rejects #when member creation fails #then the original error survives and the team is still failed", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const settings = taskSettings({ max_parallel_members: 1 })
+    const manager = new FakeTeamManager({
+      behaviors: [{ kind: "ok" }, { kind: "throw", message: "original spawn failure" }],
+      beforeCancelReturn: () => Promise.reject(new Error("rollback cancellation failure")),
+    })
+    const spec = normalizeSenpiTeamSpec({
+      members: [
+        { name: "alpha", kind: "category", category: "quick", prompt: "a" },
+        { name: "beta", kind: "category", category: "deep", prompt: "b" },
+      ],
+    }, "squad")
+
+    // when
+    const attempt = createTeam(spec, "project", {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+    })
+
+    // then
+    await expect(attempt).rejects.toThrow("original spawn failure")
+    const teamRunId = manager.started[0]?.name?.split(":")[1] ?? ""
+    const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
+    expect((await loadRuntimeState(teamRunId, config)).status).toBe("failed")
   })
 
   test("#given the member sidecar write throws #when created #then members are cancelled, the team is failed, and it never activates", async () => {
