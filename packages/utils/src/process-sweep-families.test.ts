@@ -100,6 +100,23 @@ describe("process sweep family matrix", () => {
     expect(gitBashProxies.map((processInfo) => processInfo.pid)).toEqual([315])
   })
 
+  it("#given quoted Windows helper paths under a user root with spaces #when classifying proxies #then dead-parent helpers are selected and active helpers are preserved", () => {
+    const root = "C:\\Users\\Jane Doe\\.codex\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4"
+    const table: readonly ProcessInfo[] = [
+      { command: `node.exe "${root}\\components\\lsp-daemon\\dist\\cli.js" mcp`, pid: 401, ppid: 9999 },
+      { command: `node.exe "${root}\\components\\lsp-daemon\\dist\\cli.js" mcp`, pid: 402, ppid: 200 },
+      { command: `node.exe "${root}\\components\\git-bash-mcp\\dist\\cli.js" mcp`, pid: 403, ppid: 9999 },
+      { command: `node.exe "${root}\\components\\git-bash-mcp\\dist\\cli.js" mcp`, pid: 404, ppid: 200 },
+      { command: "codex.exe app-server", pid: 200, ppid: 4 },
+    ]
+
+    const lspProxies = selectOrphanedLspDaemonProxies(table, { ownedRoots: [root], platform: "win32" })
+    const gitBashProxies = selectOrphanedGitBashProxies(table, { ownedRoots: [root], platform: "win32" })
+
+    expect(lspProxies.map(({ pid }) => pid)).toEqual([401])
+    expect(gitBashProxies.map(({ pid }) => pid)).toEqual([403])
+  })
+
   it("#given a proxy-shaped command with a daemon token alongside mcp #when selecting proxies #then the daemon server shape is never matched", () => {
     // given
     const table: readonly ProcessInfo[] = [

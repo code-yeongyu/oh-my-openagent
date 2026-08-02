@@ -41,15 +41,9 @@ export function splitCommandTokens(command: string): string[] {
 }
 
 export function hasExecutableToken(command: string, expectedPath: string): boolean {
-  let searchFrom = 0
-  for (;;) {
-    const pathIndex = command.indexOf(expectedPath, searchFrom)
-    if (pathIndex < 0) return false
-    const tokenStart = findTokenStart(command, pathIndex)
-    const tokenEnd = findTokenEnd(command, pathIndex + expectedPath.length)
-    if (command.slice(tokenStart, tokenEnd) === expectedPath && tokenLooksExecutable(command, tokenStart)) return true
-    searchFrom = pathIndex + expectedPath.length
-  }
+  return splitCommandTokens(command).some(
+    (token, index, tokens) => token === expectedPath && tokenAtIndexLooksExecutable(tokens, index),
+  )
 }
 
 /**
@@ -59,16 +53,21 @@ export function hasExecutableToken(command: string, expectedPath: string): boole
  * `<root>/node_modules/@code-yeongyu/lsp-daemon/dist/cli.js`).
  */
 export function hasExecutableTokenUnderRootWithSuffix(command: string, root: string, suffix: string): boolean {
-  let searchFrom = 0
-  for (;;) {
-    const suffixIndex = command.indexOf(suffix, searchFrom)
-    if (suffixIndex < 0) return false
-    const tokenStart = findTokenStart(command, suffixIndex)
-    const tokenEnd = findTokenEnd(command, suffixIndex + suffix.length)
-    const token = command.slice(tokenStart, tokenEnd)
-    if (token.endsWith(suffix) && token.startsWith(`${root}/`) && tokenLooksExecutable(command, tokenStart)) return true
-    searchFrom = suffixIndex + suffix.length
+  return splitCommandTokens(command).some(
+    (token, index, tokens) =>
+      token.endsWith(suffix) && token.startsWith(`${root}/`) && tokenAtIndexLooksExecutable(tokens, index),
+  )
+}
+
+function tokenAtIndexLooksExecutable(tokens: readonly string[], index: number): boolean {
+  if (index === 0) return true
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const token = tokens[cursor]
+    if (token === undefined || token.startsWith("-")) continue
+    const executableName = token.split("/").at(-1) ?? token
+    return /^node\d*(\.exe)?$/i.test(executableName) || /^bun(\.exe)?$/i.test(executableName)
   }
+  return false
 }
 
 export function tokenLooksExecutable(command: string, tokenStart: number): boolean {
