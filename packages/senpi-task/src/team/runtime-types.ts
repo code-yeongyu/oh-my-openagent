@@ -54,6 +54,7 @@ export type SpawnMemberExtensionConfig = TeamMemberExtensionConfig & {
 
 export type CreateTeamDeps = {
   readonly manager: TeamRuntimeManagerPort
+  readonly destruction?: Pick<TaskLifecycle, "destroyResidentTask">
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
   readonly leadSessionId: string
@@ -63,6 +64,8 @@ export type CreateTeamDeps = {
   // Injectable member-sidecar writer (defaults to the atomic writeMemberTaskMap). Present so tests can
   // force the pre-activation write to fail and exercise the create rollback.
   readonly writeMemberMap?: (runtimeDir: string, map: MemberTaskMap) => Promise<void>
+  readonly writeCreateCompensation?: (stateDir: StateDirConfig, teamRunId: string, map: MemberTaskMap) => Promise<void>
+  readonly transitionCreateFailed?: (teamRunId: string) => Promise<void>
 }
 
 export type CreatedMemberRole =

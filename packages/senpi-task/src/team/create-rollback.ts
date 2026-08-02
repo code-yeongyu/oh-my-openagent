@@ -1,4 +1,4 @@
-import { transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+import { cleanupMemberWorktrees, loadRuntimeState, transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 import { log } from "@oh-my-opencode/utils"
 
 import { compensateCreateMembers } from "./create-compensation"
@@ -13,8 +13,16 @@ export async function rollbackFailedCreate(
   config: TeamCoreConfig,
 ): Promise<void> {
   const members = Object.fromEntries([...spawned].map(([memberName, member]) => [memberName, member.taskId]))
+  let worktreesCleaned = false
+  const cleanupWorktrees = async (): Promise<void> => {
+    if (worktreesCleaned) return
+    const state = await loadRuntimeState(teamRunId, config)
+    await cleanupMemberWorktrees(state)
+    worktreesCleaned = true
+  }
+  let compensation: Awaited<ReturnType<typeof compensateCreateMembers>>
   try {
-    const compensation = await compensateCreateMembers(teamRunId, members, deps)
+    compensation = await compensateCreateMembers(teamRunId, members, { ...deps, beforeClear: cleanupWorktrees })
     for (const error of compensation.errors) {
       log("senpi-task team create compensation deferred", { teamRunId, error: error.message })
     }
@@ -23,6 +31,25 @@ export async function rollbackFailedCreate(
       teamRunId,
       error: error instanceof Error ? error.message : String(error),
     })
+    return
   }
-  await transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "failed" }), config)
+  if (Object.keys(compensation.pending).length > 0) return
+  try {
+    await cleanupWorktrees()
+  } catch (error) {
+    log("senpi-task team create worktree cleanup deferred", {
+      teamRunId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return
+  }
+  try {
+    if (deps.transitionCreateFailed !== undefined) await deps.transitionCreateFailed(teamRunId)
+    else await transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "failed" }), config)
+  } catch (error) {
+    log("senpi-task team create failed-state persistence deferred", {
+      teamRunId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 }

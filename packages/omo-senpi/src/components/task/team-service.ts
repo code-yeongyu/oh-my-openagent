@@ -139,6 +139,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
       const { spec, source } = await resolveTeamSpec(input, ports, deps.cwd, omoTeams)
       return createTeam(spec, source, {
         manager: deps.manager,
+        destruction: deps.destruction,
         stateDir,
         taskSettings: deps.settings,
         leadSessionId,
@@ -253,6 +254,7 @@ export function createStaleTeamCreateReconciler(deps: TeamServiceDeps): () => Pr
   return async () => {
     const result = await recoverStaleCreatingTeams({
       manager: deps.manager,
+      destruction: deps.destruction,
       stateDir,
       taskSettings: deps.settings,
       ...(deps.now !== undefined ? { now: deps.now } : {}),

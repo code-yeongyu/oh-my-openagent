@@ -130,7 +130,12 @@ export class FakeTeamManager {
       }
     }
     await this.#options.beforeCancel?.(idOrName)
-    this.#records.set(idOrName, { ...record, status: "cancelled", updated_at: new Date().toISOString() })
+    this.#records.set(idOrName, {
+      ...record,
+      status: "cancelled",
+      residency_state: "disposed",
+      updated_at: new Date().toISOString(),
+    })
     await this.#options.beforeCancelReturn?.(idOrName)
     return { kind: "cancelled", task_id: idOrName, previous_status: record.status }
   }

@@ -12,3 +12,4 @@ export {
   isCreatingStateStuck,
   markStuckCreatingTeamFailed,
 } from "./creating-resume"
+export { cleanupMemberWorktrees } from "./runtime-cleanup"

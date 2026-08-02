@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto"
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import type { TaskRecord, TaskStatus } from "../state"
+import type { TaskLifecycle } from "../lifecycle"
+import type { TaskStatus } from "../state"
 import type { StateDirConfig } from "../store"
 import type { TeamRuntimeManagerPort } from "./runtime-types"
 import { memberTaskName } from "./spawn-members"
@@ -12,7 +13,10 @@ export type CreateCompensationMap = Readonly<Record<string, string>>
 
 type CreateCompensationDeps = {
   readonly manager: Pick<TeamRuntimeManagerPort, "cancelTask" | "get">
+  readonly destruction?: Pick<TaskLifecycle, "destroyResidentTask">
   readonly stateDir: StateDirConfig
+  readonly writeCreateCompensation?: typeof writeCreateCompensation
+  readonly beforeClear?: () => Promise<void>
 }
 
 export type CreateCompensationResult = {
@@ -61,7 +65,7 @@ export async function listCreateCompensations(
   }
 }
 
-async function writeCreateCompensation(
+export async function writeCreateCompensation(
   stateDir: StateDirConfig,
   teamRunId: string,
   members: CreateCompensationMap,
@@ -86,21 +90,24 @@ export async function compensateCreateMembers(
     ...await readCreateCompensation(deps.stateDir, teamRunId),
     ...discoveredMembers,
   }
-  await writeCreateCompensation(deps.stateDir, teamRunId, pending)
+  const persist = deps.writeCreateCompensation ?? writeCreateCompensation
+  await persist(deps.stateDir, teamRunId, pending)
   const errors: Error[] = []
 
   for (const [memberName, taskId] of Object.entries(pending)) {
     const record = deps.manager.get(taskId)
     if (record === undefined || record.name !== memberTaskName(teamRunId, memberName)) {
+      if (Object.keys(pending).length === 1) await deps.beforeClear?.()
       delete pending[memberName]
-      await writeCreateCompensation(deps.stateDir, teamRunId, pending)
+      await persist(deps.stateDir, teamRunId, pending)
       continue
     }
     try {
       const outcome = await deps.manager.cancelTask(taskId, `team ${teamRunId} create compensation`)
-      if (!isResolvedCancellation(outcome, record)) continue
+      if (!await verifyCompensatedTask(taskId, outcome, deps)) continue
+      if (Object.keys(pending).length === 1) await deps.beforeClear?.()
       delete pending[memberName]
-      await writeCreateCompensation(deps.stateDir, teamRunId, pending)
+      await persist(deps.stateDir, teamRunId, pending)
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
     }
@@ -109,12 +116,19 @@ export async function compensateCreateMembers(
   return { pending, errors }
 }
 
-function isResolvedCancellation(
+async function verifyCompensatedTask(
+  taskId: string,
   outcome: Awaited<ReturnType<TeamRuntimeManagerPort["cancelTask"]>>,
-  record: TaskRecord,
-): boolean {
-  if (outcome.kind === "cancelled" || outcome.kind === "not_found") return true
-  return TERMINAL_TASK_STATUSES.has(outcome.status) || TERMINAL_TASK_STATUSES.has(record.status)
+  deps: CreateCompensationDeps,
+): Promise<boolean> {
+  if (outcome.kind === "not_found") return true
+  if (outcome.kind === "noop" && !TERMINAL_TASK_STATUSES.has(outcome.status)) return false
+  let current = deps.manager.get(taskId)
+  if (current === undefined || current.residency_state !== "resident") return true
+  if (deps.destruction === undefined) return false
+  await deps.destruction.destroyResidentTask(taskId, "cancel")
+  current = deps.manager.get(taskId)
+  return current === undefined || current.residency_state !== "resident"
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {

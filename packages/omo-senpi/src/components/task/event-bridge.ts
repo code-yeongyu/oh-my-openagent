@@ -26,6 +26,7 @@ export function wireEventBridge(
   state: EventBridgeState,
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  let shouldRecoverStaleTeamCreates = true
   wireReloadGuard(pi, engine.manager)
 
   pi.on("session_start", async (_payload, eventCtx) => {
@@ -39,7 +40,10 @@ export function wireEventBridge(
       // its persisted liveness epoch suppresses records already delivered in an earlier process.
       if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
     }
-    await reconcileStaleTeamCreatesBestEffort(ctx, state)
+    if (shouldRecoverStaleTeamCreates) {
+      shouldRecoverStaleTeamCreates = false
+      await reconcileStaleTeamCreatesBestEffort(ctx, state)
+    }
     const cleanup = engine.lifecycle.cleanupExpiredRecords()
     if (cleanup.deleted.length > 0) {
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
