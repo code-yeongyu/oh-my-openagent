@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { mkdir } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
@@ -13,7 +13,7 @@ import {
 import { normalizeSenpiTeamSpec } from "./normalize"
 import { recoverStaleCreatingTeams } from "./runtime"
 import { toTeamCoreConfig } from "./runtime-config"
-import { teamStorageBaseDir } from "./storage"
+import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
 import {
   FakeTeamManager,
   cleanupTeamRuntimeTmp,
@@ -25,6 +25,30 @@ import {
 afterEach(() => cleanupTeamRuntimeTmp())
 
 describe("recoverStaleCreatingTeams", () => {
+  test("#given finalization removes the runtime before recovery unwinds #when cleanup completes #then no release error is reported", async () => {
+    const projectDir = tempProjectDir()
+    const stateDir = stateDirConfig(projectDir)
+    const settings = taskSettings()
+    const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
+    const spec = normalizeSenpiTeamSpec({
+      members: [{ name: "alpha", kind: "category", category: "quick", prompt: "a" }],
+    }, "removed-after-finalize")
+    const runtime = await createRuntimeState(spec, "lead-session", "project", config)
+    await saveRuntimeState({ ...runtime, createdAt: Date.now() - 31 * 60_000 }, config)
+    const manager = new FakeTeamManager()
+
+    const result = await recoverStaleCreatingTeams({
+      manager,
+      stateDir,
+      taskSettings: settings,
+      afterFinalize: async (teamRunId) => {
+        await rm(resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir, { recursive: true, force: true })
+      },
+    })
+
+    expect(result).toEqual({ markedFailed: 1, errors: [] })
+  })
+
   test("#given one recovery owns cleanup #when another recovery observes pending cleanup #then only the owner performs destructive compensation", async () => {
     // given
     const projectDir = tempProjectDir()

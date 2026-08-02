@@ -13,6 +13,7 @@ import {
   claimCreatingTeamFailure,
   finalizeClaimedCreatingTeamFailure,
   markStuckCreatingTeamFailed,
+  releaseClaimedCreatingTeamFailure,
 } from "./creating-resume"
 import { cleanupMemberWorktrees } from "./runtime-cleanup"
 import { createRuntimeState, loadRuntimeState, transitionRuntimeState } from "./store"
@@ -166,5 +167,87 @@ describe("stale creating recovery", () => {
     const finalized = await loadRuntimeState(created.teamRunId, config)
     expect(finalized.status).toBe("failed")
     expect(finalized.createCleanupLease).toBeUndefined()
+  })
+
+  test("#given an expired lease whose pid was reused #when the successor claims #then the replacement process does not pin the stale owner", async () => {
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-cleanup-pid-reuse-"))
+    temporaryDirectories.push(baseDir)
+    const config = TeamModeConfigSchema.parse({ base_dir: baseDir })
+    const spec: TeamSpec = {
+      version: 1,
+      name: "pid-reuse",
+      createdAt: Date.now(),
+      leadAgentId: "lead",
+      members: [{
+        kind: "subagent_type",
+        name: "lead",
+        subagent_type: "sisyphus",
+        backendType: "in-process",
+        isActive: true,
+      }],
+    }
+    const created = await createRuntimeState(spec, "lead-session", "project", config)
+    const firstOwner = { ownerId: "00000000-0000-4000-8000-000000000011", ownerPid: 303 }
+    const successor = { ownerId: "00000000-0000-4000-8000-000000000012", ownerPid: 404 }
+    const firstClaim = await claimCreatingTeamFailure(created.teamRunId, firstOwner, config, {
+      now: () => 10_000,
+      readProcessIdentity: () => Promise.resolve("boot-a:start-a"),
+    })
+
+    const takeover = await claimCreatingTeamFailure(created.teamRunId, successor, config, {
+      now: () => 10_000 + CREATE_CLEANUP_LEASE_TTL_MS,
+      probeProcess: () => undefined,
+      readProcessIdentity: () => Promise.resolve("boot-a:start-b"),
+    })
+
+    expect(firstClaim?.createCleanupLease?.ownerIdentity).toBe("boot-a:start-a")
+    expect(takeover?.createCleanupLease?.ownerId).toBe(successor.ownerId)
+  })
+
+  test("#given a finalized runtime directory was already removed #when its former owner releases #then release is idempotent", async () => {
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-cleanup-missing-runtime-"))
+    temporaryDirectories.push(baseDir)
+    const config = TeamModeConfigSchema.parse({ base_dir: baseDir })
+    const spec: TeamSpec = {
+      version: 1,
+      name: "missing-runtime",
+      createdAt: Date.now(),
+      leadAgentId: "lead",
+      members: [{ kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true }],
+    }
+    const created = await createRuntimeState(spec, "lead-session", "project", config)
+    const claimant = { ownerId: "00000000-0000-4000-8000-000000000021", ownerPid: 505 }
+    await claimCreatingTeamFailure(created.teamRunId, claimant, config)
+    await rm(path.join(baseDir, "runtime", created.teamRunId), { recursive: true, force: true })
+
+    await expect(releaseClaimedCreatingTeamFailure(created.teamRunId, claimant, config)).resolves.toBeUndefined()
+  })
+
+  test("#given cleanup and release both fail #when stale recovery unwinds #then the cleanup error remains primary", async () => {
+    const primaryError = new Error("cleanup failed")
+    const releaseError = new Error("release failed")
+    let releaseAttempted = false
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-cleanup-dual-failure-"))
+    temporaryDirectories.push(baseDir)
+    const config = TeamModeConfigSchema.parse({ base_dir: baseDir })
+    const spec: TeamSpec = {
+      version: 1,
+      name: "dual-failure",
+      createdAt: Date.now(),
+      leadAgentId: "lead",
+      members: [{ kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true }],
+    }
+    const created = await createRuntimeState(spec, "lead-session", "project", config)
+
+    const attempt = markStuckCreatingTeamFailed(created, config, {
+      cleanupMemberWorktrees: () => Promise.reject(primaryError),
+      releaseClaim: () => {
+        releaseAttempted = true
+        return Promise.reject(releaseError)
+      },
+    })
+
+    await expect(attempt).rejects.toBe(primaryError)
+    expect(releaseAttempted).toBe(true)
   })
 })

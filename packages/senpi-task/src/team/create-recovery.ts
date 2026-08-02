@@ -28,7 +28,9 @@ export type RecoverStaleCreatingTeamsResult = {
 }
 
 export async function recoverStaleCreatingTeams(
-  deps: Pick<CreateTeamDeps, "manager" | "destruction" | "stateDir" | "taskSettings" | "now" | "writeCreateCompensation">,
+  deps: Pick<CreateTeamDeps, "manager" | "destruction" | "stateDir" | "taskSettings" | "now" | "writeCreateCompensation"> & {
+    readonly afterFinalize?: (teamRunId: string) => Promise<void>
+  },
 ): Promise<RecoverStaleCreatingTeamsResult> {
   const errors: Error[] = []
   let markedFailed = 0
@@ -38,6 +40,7 @@ export async function recoverStaleCreatingTeams(
 
   for (const journal of await listCreateCompensations(deps.stateDir)) {
     let claimedTeamRunId: string | undefined
+    let claimFinalized = false
     try {
       let runtimeState
       try {
@@ -62,6 +65,8 @@ export async function recoverStaleCreatingTeams(
         if (renewedState === null) continue
         await cleanupMemberWorktrees(renewedState)
         if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant, config))) continue
+        claimFinalized = true
+        await deps.afterFinalize?.(renewedState.teamRunId)
         markedFailed += 1
       } else if (runtimeState.status === "failed") {
         const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
@@ -74,7 +79,7 @@ export async function recoverStaleCreatingTeams(
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
     } finally {
-      if (claimedTeamRunId !== undefined) {
+      if (claimedTeamRunId !== undefined && !claimFinalized) {
         try {
           await releaseClaimedCreatingTeamFailure(claimedTeamRunId, claimant, config)
         } catch (error) {
@@ -87,6 +92,7 @@ export async function recoverStaleCreatingTeams(
   const activeTeams = await listActiveTeams(config)
   for (const team of activeTeams) {
     let claimedTeamRunId: string | undefined
+    let claimFinalized = false
     try {
       const runtimeState = await loadRuntimeState(team.teamRunId, config)
       const shouldRecover = runtimeState.status === "create_cleanup_pending"
@@ -103,12 +109,14 @@ export async function recoverStaleCreatingTeams(
       if (renewedState === null) continue
       await cleanupMemberWorktrees(renewedState)
       if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant, config))) continue
+      claimFinalized = true
+      await deps.afterFinalize?.(renewedState.teamRunId)
       await clearCreateCompensation(deps.stateDir, renewedState.teamRunId)
       markedFailed += 1
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
     } finally {
-      if (claimedTeamRunId !== undefined) {
+      if (claimedTeamRunId !== undefined && !claimFinalized) {
         try {
           await releaseClaimedCreatingTeamFailure(claimedTeamRunId, claimant, config)
         } catch (error) {

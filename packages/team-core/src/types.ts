@@ -177,6 +177,7 @@ const RuntimeStateTmuxLayoutSchema = z.object({
 const CreateCleanupLeaseSchema = z.object({
   ownerId: z.string().uuid(),
   ownerPid: z.number().int().positive(),
+  ownerIdentity: z.string().min(1).optional(),
   claimedAt: z.number().int().positive(),
 }).strict()
 
