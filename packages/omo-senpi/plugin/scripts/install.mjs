@@ -125,6 +125,7 @@ function isErrno(error, code) {
 var execFileAsync = promisify(execFile);
 var REQUIRED_PLUGIN_ARTIFACTS = [
   join2("extensions", "omo.js"),
+  join2("extensions", "reflection-persona.md"),
   join2("skills", "ast-grep", "SKILL.md"),
   join2("skills", "coding-agent-sessions", "SKILL.md"),
   join2("skills", "debugging", "SKILL.md"),
