@@ -90,15 +90,24 @@ function stripLegacyRuntimeStateFields(rawState: unknown): unknown {
     return rawState
   }
 
+  const createCleanupLease = rawState["createCleanupLease"]
+  const normalizedLease = isPlainRecord(createCleanupLease)
+    && (typeof createCleanupLease["ownerIdentity"] !== "string"
+      || createCleanupLease["ownerIdentity"].trim().length === 0)
+    ? stripInvalidOwnerIdentity(createCleanupLease)
+    : createCleanupLease
   const members = rawState["members"]
-  if (!Array.isArray(members)) {
-    return rawState
-  }
 
   return {
     ...rawState,
-    members: members.map(stripLegacyRuntimeStateMemberFields),
+    ...(normalizedLease === undefined ? {} : { createCleanupLease: normalizedLease }),
+    ...(Array.isArray(members) ? { members: members.map(stripLegacyRuntimeStateMemberFields) } : {}),
   }
+}
+
+function stripInvalidOwnerIdentity(lease: Record<string, unknown>): Record<string, unknown> {
+  const { ownerIdentity: _ownerIdentity, ...leaseWithoutInvalidIdentity } = lease
+  return leaseWithoutInvalidIdentity
 }
 
 function validateRuntimeState(rawState: unknown, teamRunId: string): RuntimeState {

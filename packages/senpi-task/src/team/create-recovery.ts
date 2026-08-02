@@ -28,9 +28,7 @@ export type RecoverStaleCreatingTeamsResult = {
 }
 
 export async function recoverStaleCreatingTeams(
-  deps: Pick<CreateTeamDeps, "manager" | "destruction" | "stateDir" | "taskSettings" | "now" | "writeCreateCompensation"> & {
-    readonly afterFinalize?: (teamRunId: string) => Promise<void>
-  },
+  deps: Pick<CreateTeamDeps, "manager" | "destruction" | "stateDir" | "taskSettings" | "now" | "writeCreateCompensation">,
 ): Promise<RecoverStaleCreatingTeamsResult> {
   const errors: Error[] = []
   let markedFailed = 0
@@ -66,7 +64,6 @@ export async function recoverStaleCreatingTeams(
         await cleanupMemberWorktrees(renewedState)
         if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant, config))) continue
         claimFinalized = true
-        await deps.afterFinalize?.(renewedState.teamRunId)
         markedFailed += 1
       } else if (runtimeState.status === "failed") {
         const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
@@ -110,7 +107,6 @@ export async function recoverStaleCreatingTeams(
       await cleanupMemberWorktrees(renewedState)
       if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant, config))) continue
       claimFinalized = true
-      await deps.afterFinalize?.(renewedState.teamRunId)
       await clearCreateCompensation(deps.stateDir, renewedState.teamRunId)
       markedFailed += 1
     } catch (error) {

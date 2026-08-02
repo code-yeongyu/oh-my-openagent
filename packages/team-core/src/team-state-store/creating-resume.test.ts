@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -204,6 +204,35 @@ describe("stale creating recovery", () => {
     expect(takeover?.createCleanupLease?.ownerId).toBe(successor.ownerId)
   })
 
+  test("#given a malformed persisted process identity #when runtime state loads #then the lease degrades to unknown ownership", async () => {
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-cleanup-malformed-identity-"))
+    temporaryDirectories.push(baseDir)
+    const config = TeamModeConfigSchema.parse({ base_dir: baseDir })
+    const spec: TeamSpec = {
+      version: 1,
+      name: "malformed-identity",
+      createdAt: Date.now(),
+      leadAgentId: "lead",
+      members: [{ kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true }],
+    }
+    const created = await createRuntimeState(spec, "lead-session", "project", config)
+    const claimant = { ownerId: "00000000-0000-4000-8000-000000000031", ownerPid: 606 }
+    const claimed = await claimCreatingTeamFailure(created.teamRunId, claimant, config, {
+      readProcessIdentity: () => Promise.resolve("boot-a:start-a"),
+    })
+    if (claimed?.createCleanupLease === undefined) throw new Error("fixture failed to persist cleanup lease")
+    const malformed = {
+      ...claimed,
+      createCleanupLease: { ...claimed.createCleanupLease, ownerIdentity: 42 },
+    }
+    await writeFile(path.join(baseDir, "runtime", created.teamRunId, "state.json"), JSON.stringify(malformed))
+
+    const reloaded = await loadRuntimeState(created.teamRunId, config)
+
+    expect(reloaded.status).toBe("create_cleanup_pending")
+    expect(reloaded.createCleanupLease?.ownerIdentity).toBeUndefined()
+  })
+
   test("#given a finalized runtime directory was already removed #when its former owner releases #then release is idempotent", async () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-cleanup-missing-runtime-"))
     temporaryDirectories.push(baseDir)
@@ -218,6 +247,7 @@ describe("stale creating recovery", () => {
     const created = await createRuntimeState(spec, "lead-session", "project", config)
     const claimant = { ownerId: "00000000-0000-4000-8000-000000000021", ownerPid: 505 }
     await claimCreatingTeamFailure(created.teamRunId, claimant, config)
+    expect(await finalizeClaimedCreatingTeamFailure(created.teamRunId, claimant, config)).toBeTrue()
     await rm(path.join(baseDir, "runtime", created.teamRunId), { recursive: true, force: true })
 
     await expect(releaseClaimedCreatingTeamFailure(created.teamRunId, claimant, config)).resolves.toBeUndefined()
