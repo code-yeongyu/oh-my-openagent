@@ -72,6 +72,10 @@ async function writeDeadConsumerLease(
   return leasePath
 }
 
+function generationPath(messageId: string, inboxPath: string): string {
+  return path.join(path.dirname(inboxPath), `.reservation-${messageId}.generation`)
+}
+
 describe("mailbox consumer atomicity", () => {
   test("#given a dead consumer lease w2tc #when poll claims unread messages #then it recovers the lease and records the delivery", async () => {
     // given
@@ -103,7 +107,11 @@ describe("mailbox consumer atomicity", () => {
     await expect(access(leasePath)).rejects.toThrow()
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
     expect(await readdir(path.join(inboxDir, "processed"))).toContain(`${messageId}.json`)
-    expect((await readdir(inboxDir)).some((entry) => entry === `${messageId}.json` || entry.startsWith(".delivering-"))).toBe(false)
+    expect((await readdir(inboxDir)).some((entry) => (
+      entry === `${messageId}.json`
+      || entry.startsWith(".delivering-")
+      || entry === `.reservation-${messageId}.generation`
+    ))).toBe(false)
   })
 
   test("#given reclaim wins before a delayed commit w2tc #when commit resumes #then the message has exactly one processed terminal state", async () => {
@@ -144,25 +152,54 @@ describe("mailbox consumer atomicity", () => {
     expect(inboxEntries.some((entry) => entry.startsWith(".delivering-"))).toBe(false)
   })
 
-  test("#given ack and stale reclaim race for one reservation w2tc #when both complete #then exactly one processed file remains", async () => {
+  test("#given reclaim and re-reserve replace a reservation w2tc #when the old handle commits #then it cannot commit the new reservation", async () => {
     // given
     const { teamRunId, config } = await createFixture()
     const messageId = await enqueueMessage(teamRunId, config)
-    const reservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
-    if (reservation === null) throw new Error("delivery reservation was not created")
-    await utimes(reservation.reservedPath, 0, 0)
-    await mkdir(reservation.processedDir, { recursive: true })
+    const oldReservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (oldReservation === null) throw new Error("old delivery reservation was not created")
+    await utimes(oldReservation.reservedPath, 0, 0)
+    expect(await reclaimStaleReservations(teamRunId, "m1", config, 0)).toEqual([messageId])
+    const newReservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (newReservation === null) throw new Error("new delivery reservation was not created")
+    expect(newReservation.generation).not.toBe(oldReservation.generation)
 
     // when
-    await Promise.all([
-      ackMessages(teamRunId, "m1", [messageId], config),
-      reclaimStaleReservations(teamRunId, "m1", config, 0),
-    ])
+    const staleCommit = commitDeliveryReservation(oldReservation)
 
     // then
-    const inboxEntries = await readdir(path.dirname(reservation.inboxPath))
-    const processedEntries = await readdir(reservation.processedDir)
-    expect(inboxEntries.filter((entry) => entry === `${messageId}.json` || entry === `.delivering-${messageId}.json`)).toEqual([])
-    expect(processedEntries.filter((entry) => entry === `${messageId}.json`)).toEqual([`${messageId}.json`])
+    await expect(staleCommit).rejects.toThrow("stale delivery reservation")
+    expect((await stat(newReservation.reservedPath)).isFile()).toBe(true)
+    await expect(access(newReservation.inboxPath)).rejects.toThrow()
+    await commitDeliveryReservation(newReservation)
+    expect((await stat(newReservation.processedPath)).isFile()).toBe(true)
+    await expect(access(generationPath(messageId, newReservation.inboxPath))).rejects.toThrow()
+  })
+
+  test("#given reclaim and re-reserve replace a reservation w2tc #when the old handle releases #then it cannot release the new reservation", async () => {
+    // given
+    const { teamRunId, config } = await createFixture()
+    const messageId = await enqueueMessage(teamRunId, config)
+    const oldReservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (oldReservation === null) throw new Error("old delivery reservation was not created")
+    await utimes(oldReservation.reservedPath, 0, 0)
+    expect(await reclaimStaleReservations(teamRunId, "m1", config, 0)).toEqual([messageId])
+    const newReservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (newReservation === null) throw new Error("new delivery reservation was not created")
+    expect(newReservation.generation).not.toBe(oldReservation.generation)
+
+    // when
+    const staleRelease = releaseDeliveryReservation(oldReservation)
+
+    // then
+    await expect(staleRelease).rejects.toThrow("stale delivery reservation")
+    expect((await stat(newReservation.reservedPath)).isFile()).toBe(true)
+    await expect(access(newReservation.inboxPath)).rejects.toThrow()
+    await releaseDeliveryReservation(newReservation)
+    expect((await stat(newReservation.inboxPath)).isFile()).toBe(true)
+    await expect(access(newReservation.reservedPath)).rejects.toThrow()
+    expect((await stat(generationPath(messageId, newReservation.inboxPath))).isFile()).toBe(true)
+    await ackMessages(teamRunId, "m1", [messageId], config)
+    await expect(access(generationPath(messageId, newReservation.inboxPath))).rejects.toThrow()
   })
 })

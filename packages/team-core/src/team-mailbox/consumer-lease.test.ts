@@ -117,5 +117,6 @@ describe("withInboxConsumerLease", () => {
     // then
     expect(typeof mailbox.isMessageConsumed).toBe("function")
     expect(typeof mailbox.withInboxConsumerLease).toBe("function")
+    expect(typeof mailbox.StaleDeliveryReservationError).toBe("function")
   })
 })

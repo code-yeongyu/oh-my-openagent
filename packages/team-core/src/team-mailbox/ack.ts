@@ -1,4 +1,4 @@
-import { mkdir, rename } from "node:fs/promises"
+import { mkdir, rename, rm, stat } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../config"
@@ -47,6 +47,14 @@ async function ackMessagesUnderLease(
 
         throw error
       }
+    }
+
+    try {
+      await stat(targetPath)
+      await rm(path.join(inboxDir, `.reservation-${messageId}.generation`), { force: true })
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException
+      if (err.code !== "ENOENT") throw error
     }
   }
 }

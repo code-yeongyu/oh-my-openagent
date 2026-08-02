@@ -12,6 +12,7 @@ export { pollAndBuildInjection } from "./poll"
 export type { InjectionResult } from "./poll"
 export { ackMessages } from "./ack"
 export {
+  StaleDeliveryReservationError,
   reserveMessageForDelivery,
   commitDeliveryReservation,
   releaseDeliveryReservation,
