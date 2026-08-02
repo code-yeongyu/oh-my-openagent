@@ -24,6 +24,16 @@ export const DEAD_CONSUMER_LEASE_STALE_MS = 0
 
 const heldInboxLeases = new AsyncLocalStorage<ReadonlyMap<string, HeldInboxLease>>()
 
+function isActiveLeaseContext(
+  leases: ReadonlyMap<string, HeldInboxLease> | undefined,
+): leases is ReadonlyMap<string, HeldInboxLease> {
+  if (leases === undefined) return false
+  for (const { scope } of leases.values()) {
+    if (!scope.active) return false
+  }
+  return true
+}
+
 export async function withInboxConsumerLease<T>(
   teamRunId: string,
   recipient: string,
@@ -42,7 +52,10 @@ export async function withInboxConsumerLeaseAtPath<T>(
   options: InboxConsumerLeaseOptions,
 ): Promise<T> {
   const leasePath = path.join(inboxDir, ".consumer.lock")
-  const currentLeases = heldInboxLeases.getStore()
+  const inheritedLeases = heldInboxLeases.getStore()
+  const currentLeases = isActiveLeaseContext(inheritedLeases)
+    ? inheritedLeases
+    : undefined
   const currentLease = currentLeases?.get(leasePath)
   if (currentLease !== undefined) {
     const childScope: InboxLeaseScope = { active: true }
@@ -63,7 +76,7 @@ export async function withInboxConsumerLeaseAtPath<T>(
   return withLock(leasePath, async () => {
     const ownership = new InboxLeaseOwnership()
     const scope: InboxLeaseScope = { active: true }
-    const leases = new Map(currentLeases ?? [])
+    const leases = new Map(isActiveLeaseContext(currentLeases) ? currentLeases : [])
     leases.set(leasePath, { ownership, scope })
     try {
       return await heldInboxLeases.run(leases, fn)

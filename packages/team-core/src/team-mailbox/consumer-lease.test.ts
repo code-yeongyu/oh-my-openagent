@@ -201,6 +201,91 @@ describe("withInboxConsumerLease", () => {
     expect(events).toEqual(["b-finished", "a-child-finished", "a-outer-settled"])
   }, 1_000)
 
+  test("#given a continuation inherits a finished nested inbox B scope w2tc #when it requests active ancestor inbox A #then it reacquires A after the outer releases", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const nestedBFinished = createSignal()
+    const triggerDetached = createSignal()
+    const releaseOuterA = createSignal()
+    const events: string[] = []
+    let detached: Promise<void> | undefined
+
+    const outerA = withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      await withInboxConsumerLease(teamRunId, "m2", config, async () => {
+        detached = (async () => {
+          await triggerDetached.promise
+          await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+            events.push("detached-entered-a")
+          }, { staleAfterMs: 300_000 })
+        })()
+      }, { staleAfterMs: 300_000 })
+      nestedBFinished.resolve()
+      await releaseOuterA.promise
+      events.push("outer-a-finishing")
+    }, { staleAfterMs: 300_000 }).then(() => events.push("outer-a-settled"))
+    await nestedBFinished.promise
+
+    // when
+    triggerDetached.resolve()
+    releaseOuterA.resolve()
+    await outerA
+    if (detached === undefined) throw new Error("detached operation was not initialized")
+    await detached
+
+    // then
+    expect(events).toEqual(["outer-a-finishing", "outer-a-settled", "detached-entered-a"])
+  }, 1_000)
+
+  test("#given nested inbox B remains active under inbox A w2tc #when B calls active ancestor A #then the descendant remains reentrant", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+
+    // when
+    const result = await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      return await withInboxConsumerLease(teamRunId, "m2", config, async () => {
+        return await withInboxConsumerLease(teamRunId, "m1", config, async () => "nested-a", {
+          staleAfterMs: 300_000,
+        })
+      }, { staleAfterMs: 300_000 })
+    }, { staleAfterMs: 300_000 })
+
+    // then
+    expect(result).toBe("nested-a")
+  }, 1_000)
+
+  test("#given inbox B acquisition outlives its ancestor A scope w2tc #when B enters after A expires #then B starts a fresh reentrant context", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const blockerBEntered = createSignal()
+    const releaseBlockerB = createSignal()
+    const blockerB = withInboxConsumerLease(teamRunId, "m2", config, async () => {
+      blockerBEntered.resolve()
+      await releaseBlockerB.promise
+    }, { staleAfterMs: 300_000 })
+    await blockerBEntered.promise
+    let delayedB: Promise<string> | undefined
+
+    await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      delayedB = withInboxConsumerLease(teamRunId, "m2", config, async () => {
+        return await withInboxConsumerLease(teamRunId, "m2", config, async () => "fresh-b", {
+          staleAfterMs: 300_000,
+        })
+      }, { staleAfterMs: 300_000 })
+    }, { staleAfterMs: 300_000 })
+
+    // when
+    releaseBlockerB.resolve()
+    await blockerB
+    if (delayedB === undefined) throw new Error("delayed B acquisition was not initialized")
+    const result = await delayedB
+
+    // then
+    expect(result).toBe("fresh-b")
+  }, 1_000)
+
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when
     const mailbox = await import("./index")
