@@ -65,7 +65,7 @@ When the `team_*` tools are present, create a **debug-squad** team and split inv
     {
       "kind": "category",
       "category": "deep",
-      "prompt": "You are the Reproduction Engineer. Your job: build the smallest reliable repro — a curl command, a vitest/pytest/go test, a tmux script, a Playwright script for browser bugs, a pwntools script for binary targets. It must reproduce on first try and be copy-pasteable by the Lead. Document exact input, expected output, observed output. Save repro artifacts under /tmp/ and tell the Lead to journal them. If the bug is browser-based you MUST use Playwright CLI — do not simulate with curl."
+      "prompt": "You are the Reproduction Engineer. Your job: build the smallest reliable repro — a curl command, a vitest/pytest/go test, a tmux script, a Playwright script for browser bugs, a pwntools script for binary targets. It must reproduce on first try and be copy-pasteable by the Lead. Document exact input, expected output, observed output. Save repro artifacts under /tmp/ and tell the Lead to journal them. For browser bugs in Codex, use browser:control-in-app-browser with tab.playwright first; use standalone Playwright only when the Browser tool is unavailable or insufficient. Do not simulate a browser with curl."
     },
     {
       "kind": "category",
