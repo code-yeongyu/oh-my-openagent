@@ -37,7 +37,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function buildOwnerContent(ownerTag: string): string {
-  return `${ownerTag}\n${process.pid}\n${Date.now()}\n`
+  return `${ownerTag.replace(/[\r\n]/g, " ")}\n${process.pid}\n${Date.now()}\n`
 }
 
 function parseOwnerContent(content: string): { ownerPid: number; acquiredAtEpochMs: number } | null {
