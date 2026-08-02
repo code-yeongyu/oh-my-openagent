@@ -51,6 +51,7 @@ export {
   type ProcessInfo,
 } from "./process-table"
 export {
+  isProcessStartIdentity,
   parseLinuxProcessStartTicks,
   readProcessStartIdentity,
   type ProcessStartIdentityDeps,

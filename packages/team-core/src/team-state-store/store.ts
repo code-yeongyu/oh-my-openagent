@@ -1,4 +1,5 @@
 import { isPlainRecord } from "@oh-my-opencode/utils"
+import { isProcessStartIdentity } from "@oh-my-opencode/utils/process-sweep"
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import path from "node:path"
@@ -92,8 +93,7 @@ function stripLegacyRuntimeStateFields(rawState: unknown): unknown {
 
   const createCleanupLease = rawState["createCleanupLease"]
   const normalizedLease = isPlainRecord(createCleanupLease)
-    && (typeof createCleanupLease["ownerIdentity"] !== "string"
-      || createCleanupLease["ownerIdentity"].trim().length === 0)
+    && !isProcessStartIdentity(createCleanupLease["ownerIdentity"])
     ? stripInvalidOwnerIdentity(createCleanupLease)
     : createCleanupLease
   const members = rawState["members"]

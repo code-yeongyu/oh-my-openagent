@@ -1,8 +1,17 @@
 import { describe, expect, test } from "bun:test"
 
-import { parseLinuxProcessStartTicks, readProcessStartIdentity } from "./process-identity"
+import { isProcessStartIdentity, parseLinuxProcessStartTicks, readProcessStartIdentity } from "./process-identity"
 
 describe("process start identity", () => {
+  test("#given persisted process identities #when validated #then only canonical platform formats pass", () => {
+    expect(isProcessStartIdentity("linux:12345678-1234-1234-1234-123456789abc:987654")).toBeTrue()
+    expect(isProcessStartIdentity("darwin:203145485856")).toBeTrue()
+    expect(isProcessStartIdentity("win32:638923456000000000")).toBeTrue()
+    expect(isProcessStartIdentity("garbage")).toBeFalse()
+    expect(isProcessStartIdentity("darwin:not-a-kernel-time")).toBeFalse()
+    expect(isProcessStartIdentity("darwin:0")).toBeFalse()
+  })
+
   test("#given linux stat with a parenthesized command #when parsed #then field 22 is stable", () => {
     const stat = "42 (worker with ) parens) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 987654 20"
     expect(parseLinuxProcessStartTicks(stat)).toBe("987654")

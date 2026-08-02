@@ -191,16 +191,16 @@ describe("stale creating recovery", () => {
     const successor = { ownerId: "00000000-0000-4000-8000-000000000012", ownerPid: 404 }
     const firstClaim = await claimCreatingTeamFailure(created.teamRunId, firstOwner, config, {
       now: () => 10_000,
-      readProcessIdentity: () => Promise.resolve("boot-a:start-a"),
+      readProcessIdentity: () => Promise.resolve("darwin:100"),
     })
 
     const takeover = await claimCreatingTeamFailure(created.teamRunId, successor, config, {
       now: () => 10_000 + CREATE_CLEANUP_LEASE_TTL_MS,
       probeProcess: () => undefined,
-      readProcessIdentity: () => Promise.resolve("boot-a:start-b"),
+      readProcessIdentity: () => Promise.resolve("darwin:200"),
     })
 
-    expect(firstClaim?.createCleanupLease?.ownerIdentity).toBe("boot-a:start-a")
+    expect(firstClaim?.createCleanupLease?.ownerIdentity).toBe("darwin:100")
     expect(takeover?.createCleanupLease?.ownerId).toBe(successor.ownerId)
   })
 
@@ -218,12 +218,13 @@ describe("stale creating recovery", () => {
     const created = await createRuntimeState(spec, "lead-session", "project", config)
     const claimant = { ownerId: "00000000-0000-4000-8000-000000000031", ownerPid: 606 }
     const claimed = await claimCreatingTeamFailure(created.teamRunId, claimant, config, {
-      readProcessIdentity: () => Promise.resolve("boot-a:start-a"),
+      readProcessIdentity: () => Promise.resolve("darwin:100"),
     })
     if (claimed?.createCleanupLease === undefined) throw new Error("fixture failed to persist cleanup lease")
+    const claimedAt = claimed.createCleanupLease.claimedAt
     const malformed = {
       ...claimed,
-      createCleanupLease: { ...claimed.createCleanupLease, ownerIdentity: 42 },
+      createCleanupLease: { ...claimed.createCleanupLease, ownerIdentity: "not-a-process-identity" },
     }
     await writeFile(path.join(baseDir, "runtime", created.teamRunId, "state.json"), JSON.stringify(malformed))
 
@@ -231,6 +232,15 @@ describe("stale creating recovery", () => {
 
     expect(reloaded.status).toBe("create_cleanup_pending")
     expect(reloaded.createCleanupLease?.ownerIdentity).toBeUndefined()
+    const takeover = await claimCreatingTeamFailure(created.teamRunId, {
+      ownerId: "00000000-0000-4000-8000-000000000032",
+      ownerPid: 707,
+    }, config, {
+      now: () => claimedAt + CREATE_CLEANUP_LEASE_TTL_MS,
+      probeProcess: () => undefined,
+      readProcessIdentity: () => Promise.resolve("darwin:100"),
+    })
+    expect(takeover).toBeNull()
   })
 
   test("#given a finalized runtime directory was already removed #when its former owner releases #then release is idempotent", async () => {
