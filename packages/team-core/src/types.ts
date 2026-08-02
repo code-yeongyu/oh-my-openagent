@@ -174,6 +174,12 @@ const RuntimeStateTmuxLayoutSchema = z.object({
   paneIds: z.array(z.string()).optional(),
 }).strict()
 
+const CreateCleanupLeaseSchema = z.object({
+  ownerId: z.string().uuid(),
+  ownerPid: z.number().int().positive(),
+  claimedAt: z.number().int().positive(),
+}).strict()
+
 export const RuntimeStateSchema = z.object({
   version: z.literal(1),
   teamRunId: z.string().uuid(),
@@ -181,6 +187,7 @@ export const RuntimeStateSchema = z.object({
   specSource: z.enum(["project", "user"]),
   createdAt: z.number().int().positive(),
   status: z.enum(RUNTIME_STATUSES),
+  createCleanupLease: CreateCleanupLeaseSchema.optional(),
   leadSessionId: z.string().optional(),
   tmuxLayout: RuntimeStateTmuxLayoutSchema.optional(),
   members: z.array(RuntimeStateMemberSchema),

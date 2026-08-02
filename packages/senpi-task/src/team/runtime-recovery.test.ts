@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { mkdir } from "node:fs/promises"
+import { join } from "node:path"
 
 import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
@@ -17,6 +20,57 @@ import {
 afterEach(() => cleanupTeamRuntimeTmp())
 
 describe("recoverStaleCreatingTeams", () => {
+  test("#given one recovery owns cleanup #when another recovery observes pending cleanup #then only the owner performs destructive compensation", async () => {
+    // given
+    const projectDir = tempProjectDir()
+    const stateDir = stateDirConfig(projectDir)
+    const settings = taskSettings()
+    const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
+    const worktreePath = join(projectDir, "worktrees", "alpha")
+    await mkdir(worktreePath, { recursive: true })
+    const spec = normalizeSenpiTeamSpec({
+      members: [{ name: "alpha", kind: "category", category: "quick", prompt: "a", worktreePath }],
+    }, "concurrent-recovery")
+    const runtime = await createRuntimeState(spec, "lead-session", "project", config)
+    await saveRuntimeState({ ...runtime, createdAt: Date.now() - 31 * 60_000 }, config)
+    const firstCancellationStarted = Promise.withResolvers<void>()
+    const releaseFirstCancellation = Promise.withResolvers<void>()
+    let cancellationAttempts = 0
+    const manager = new FakeTeamManager({
+      beforeCancel: async () => {
+        cancellationAttempts += 1
+        if (cancellationAttempts !== 1) return
+        firstCancellationStarted.resolve()
+        await releaseFirstCancellation.promise
+      },
+    })
+    const member = await manager.start({
+      prompt: "member",
+      parent_session_id: "lead-session",
+      root_session_id: "lead-session",
+      depth: 1,
+      execution_mode: "process",
+      run_in_background: true,
+      category: "quick",
+      name: `team:${runtime.teamRunId}:alpha`,
+    })
+    if (member.kind !== "started") throw new Error("fixture failed to start")
+
+    // when
+    const firstRecovery = recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
+    await firstCancellationStarted.promise
+    const secondRecovery = await recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
+
+    // then
+    expect(secondRecovery).toEqual({ markedFailed: 0, errors: [] })
+    expect(cancellationAttempts).toBe(1)
+    expect(existsSync(worktreePath)).toBe(true)
+    releaseFirstCancellation.resolve()
+    expect(await firstRecovery).toEqual({ markedFailed: 1, errors: [] })
+    expect(manager.cancelled.map((entry) => entry.taskId)).toEqual([member.task_id])
+    expect(existsSync(worktreePath)).toBe(false)
+  })
+
   test("#given start committed but its sidecar write never ran #when startup recovery repeats #then the exact owned member is cancelled idempotently", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())

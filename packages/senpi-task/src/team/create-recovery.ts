@@ -2,6 +2,7 @@ import {
   CREATING_TIMEOUT_MS,
   claimCreatingTeamFailure,
   cleanupMemberWorktrees,
+  createCleanupClaimant,
   finalizeClaimedCreatingTeamFailure,
   isCreatingStateStuck,
   listActiveTeams,
@@ -31,6 +32,8 @@ export async function recoverStaleCreatingTeams(
   const errors: Error[] = []
   let markedFailed = 0
   const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
+  const claimant = createCleanupClaimant()
+  const claimDeps = { now: deps.now }
 
   for (const journal of await listCreateCompensations(deps.stateDir)) {
     try {
@@ -47,13 +50,15 @@ export async function recoverStaleCreatingTeams(
         continue
       }
       if (runtimeState.status === "creating" || runtimeState.status === "create_cleanup_pending") {
-        const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, config)
+        const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, claimant, config, claimDeps)
         if (claimedState === null) continue
         const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
         errors.push(...compensation.errors)
         if (Object.keys(compensation.pending).length > 0) continue
-        await cleanupMemberWorktrees(claimedState)
-        await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, config)
+        const renewedState = await claimCreatingTeamFailure(claimedState.teamRunId, claimant, config, claimDeps)
+        if (renewedState === null) continue
+        await cleanupMemberWorktrees(renewedState)
+        if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant.ownerId, config))) continue
         markedFailed += 1
       } else if (runtimeState.status === "failed") {
         const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
@@ -75,15 +80,17 @@ export async function recoverStaleCreatingTeams(
       const shouldRecover = runtimeState.status === "create_cleanup_pending"
         || isCreatingStateStuck(runtimeState, (deps.now ?? Date.now)(), CREATING_TIMEOUT_MS)
       if (!shouldRecover) continue
-      const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, config)
+      const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, claimant, config, claimDeps)
       if (claimedState === null) continue
       const members = await discoverCreatingMembers(claimedState.teamRunId, claimedState.members.map((member) => member.name), deps)
       const compensation = await compensateCreateMembers(claimedState.teamRunId, members, deps)
       errors.push(...compensation.errors)
       if (Object.keys(compensation.pending).length > 0) continue
-      await cleanupMemberWorktrees(claimedState)
-      await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, config)
-      await clearCreateCompensation(deps.stateDir, claimedState.teamRunId)
+      const renewedState = await claimCreatingTeamFailure(claimedState.teamRunId, claimant, config, claimDeps)
+      if (renewedState === null) continue
+      await cleanupMemberWorktrees(renewedState)
+      if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant.ownerId, config))) continue
+      await clearCreateCompensation(deps.stateDir, renewedState.teamRunId)
       markedFailed += 1
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
