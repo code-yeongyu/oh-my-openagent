@@ -39,11 +39,18 @@ export async function readCreateCompensation(
   stateDir: StateDirConfig,
   teamRunId: string,
 ): Promise<CreateCompensationMap> {
+  return await readCreateCompensationEntry(stateDir, teamRunId) ?? {}
+}
+
+async function readCreateCompensationEntry(
+  stateDir: StateDirConfig,
+  teamRunId: string,
+): Promise<CreateCompensationMap | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(compensationPath(stateDir, teamRunId), "utf8"))
-    return isStringRecord(parsed) ? parsed : {}
+    return isStringRecord(parsed) ? parsed : undefined
   } catch {
-    return {}
+    return undefined
   }
 }
 
@@ -56,9 +63,10 @@ export async function listCreateCompensations(
       .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
       .map(async (entry) => {
         const teamRunId = entry.name.slice(0, -".json".length)
-        return { teamRunId, members: await readCreateCompensation(stateDir, teamRunId) }
+        const members = await readCreateCompensationEntry(stateDir, teamRunId)
+        return members === undefined ? undefined : { teamRunId, members }
       }))
-    return journals.filter((journal) => Object.keys(journal.members).length > 0)
+    return journals.filter((journal) => journal !== undefined)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return []
     throw error
@@ -71,14 +79,14 @@ export async function writeCreateCompensation(
   members: CreateCompensationMap,
 ): Promise<void> {
   const target = compensationPath(stateDir, teamRunId)
-  if (Object.keys(members).length === 0) {
-    await rm(target, { force: true })
-    return
-  }
   await mkdir(compensationDir(stateDir), { recursive: true, mode: 0o700 })
   const tempPath = `${target}.${process.pid}.${randomUUID()}.tmp`
   await writeFile(tempPath, `${JSON.stringify(members, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
   await rename(tempPath, target)
+}
+
+export async function clearCreateCompensation(stateDir: StateDirConfig, teamRunId: string): Promise<void> {
+  await rm(compensationPath(stateDir, teamRunId), { force: true })
 }
 
 export async function compensateCreateMembers(

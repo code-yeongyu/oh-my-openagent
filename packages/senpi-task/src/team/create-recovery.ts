@@ -13,6 +13,7 @@ import { toTeamCoreConfig } from "./runtime-config"
 import type { CreateTeamDeps } from "./runtime-types"
 import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
 import {
+  clearCreateCompensation,
   compensateCreateMembers,
   listCreateCompensations,
   type CreateCompensationMap,
@@ -28,20 +29,31 @@ export async function recoverStaleCreatingTeams(
 ): Promise<RecoverStaleCreatingTeamsResult> {
   const errors: Error[] = []
   let markedFailed = 0
+  const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
 
   for (const journal of await listCreateCompensations(deps.stateDir)) {
     try {
-      const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, {
-        ...deps,
-        beforeClear: () => cleanupWorktreesIfPresent(journal.teamRunId, deps),
-      })
+      const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
       errors.push(...compensation.errors)
+      if (Object.keys(compensation.pending).length > 0) continue
+      let runtimeState
+      try {
+        runtimeState = await loadRuntimeState(journal.teamRunId, config)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        await clearCreateCompensation(deps.stateDir, journal.teamRunId)
+        continue
+      }
+      if (runtimeState.status === "creating") {
+        await markStuckCreatingTeamFailed(runtimeState, config)
+        markedFailed += 1
+      }
+      await clearCreateCompensation(deps.stateDir, journal.teamRunId)
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
     }
   }
 
-  const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
   const activeTeams = await listActiveTeams(config)
   for (const team of activeTeams) {
     try {
@@ -55,6 +67,7 @@ export async function recoverStaleCreatingTeams(
       errors.push(...compensation.errors)
       if (Object.keys(compensation.pending).length > 0) continue
       await markStuckCreatingTeamFailed(runtimeState, config)
+      await clearCreateCompensation(deps.stateDir, runtimeState.teamRunId)
       markedFailed += 1
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
@@ -62,18 +75,6 @@ export async function recoverStaleCreatingTeams(
   }
 
   return { markedFailed, errors }
-}
-
-async function cleanupWorktreesIfPresent(
-  teamRunId: string,
-  deps: Pick<CreateTeamDeps, "stateDir" | "taskSettings">,
-): Promise<void> {
-  const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
-  try {
-    await cleanupMemberWorktrees(await loadRuntimeState(teamRunId, config))
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-  }
 }
 
 async function discoverCreatingMembers(

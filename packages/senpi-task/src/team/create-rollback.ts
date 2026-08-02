@@ -1,7 +1,7 @@
 import { cleanupMemberWorktrees, loadRuntimeState, transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 import { log } from "@oh-my-opencode/utils"
 
-import { compensateCreateMembers } from "./create-compensation"
+import { clearCreateCompensation, compensateCreateMembers } from "./create-compensation"
 import type { TeamCoreConfig } from "./runtime-config"
 import type { CreateTeamDeps } from "./runtime-types"
 import type { SpawnedMember } from "./spawn-members"
@@ -48,6 +48,15 @@ export async function rollbackFailedCreate(
     else await transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "failed" }), config)
   } catch (error) {
     log("senpi-task team create failed-state persistence deferred", {
+      teamRunId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return
+  }
+  try {
+    await clearCreateCompensation(deps.stateDir, teamRunId)
+  } catch (error) {
+    log("senpi-task team create compensation cleanup deferred", {
       teamRunId,
       error: error instanceof Error ? error.message : String(error),
     })

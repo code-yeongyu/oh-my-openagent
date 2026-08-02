@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { listActiveTeams, loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
-import { readCreateCompensation } from "./create-compensation"
+import { listCreateCompensations, readCreateCompensation } from "./create-compensation"
 import { readMemberTaskMap } from "./member-map"
 import { normalizeSenpiTeamSpec } from "./normalize"
 import { SenpiTeamRuntimeError, createTeam, recoverStaleCreatingTeams } from "./runtime"
@@ -133,7 +133,7 @@ describe("createTeam failures", () => {
     expect(manager.get("st_000001")?.status).toBe("cancelled")
   })
 
-  test("#given failed-state persistence rejects #when create rollback completes #then the initiating error is still returned", async () => {
+  test("#given failed-state persistence rejects #when immediate startup recovery runs #then its retained journal completes finalization", async () => {
     const stateDir = stateDirConfig(tempProjectDir())
     const settings = taskSettings({ max_parallel_members: 1 })
     const manager = new FakeTeamManager({ behaviors: [{ kind: "ok" }, { kind: "throw", message: "initiating failure" }] })
@@ -155,6 +155,13 @@ describe("createTeam failures", () => {
     const teamRunId = manager.started[0]?.name?.split(":")[1] ?? ""
     const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
     expect((await loadRuntimeState(teamRunId, config)).status).toBe("creating")
+    expect(await listCreateCompensations(stateDir)).toEqual([{ teamRunId, members: {} }])
+
+    const recovery = await recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
+
+    expect(recovery).toEqual({ markedFailed: 1, errors: [] })
+    await expect(loadRuntimeState(teamRunId, config)).rejects.toMatchObject({ code: "ENOENT" })
+    expect(await listCreateCompensations(stateDir)).toEqual([])
   })
 
   test("#given a terminal resident member #when create rollback compensates #then lifecycle destruction is verified before its journal clears", async () => {
