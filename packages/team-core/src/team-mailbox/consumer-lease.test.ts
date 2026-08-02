@@ -345,6 +345,36 @@ describe("withInboxConsumerLease", () => {
     expect(result).toBe("reacquired-a")
   }, 1_000)
 
+  test("#given active B reacquires expired ancestor A w2tc #when the new A callback calls B #then the retained active B lease remains reentrant", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const nestedBEntered = createSignal()
+    const startDescendantA = createSignal()
+    let nestedB: Promise<string> | undefined
+
+    await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      nestedB = withInboxConsumerLease(teamRunId, "m2", config, async () => {
+        nestedBEntered.resolve()
+        await startDescendantA.promise
+        return await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+          return await withInboxConsumerLease(teamRunId, "m2", config, async () => "b-a-b", {
+            staleAfterMs: 300_000,
+          })
+        }, { staleAfterMs: 300_000 })
+      }, { staleAfterMs: 300_000 })
+      await nestedBEntered.promise
+    }, { staleAfterMs: 300_000 })
+
+    // when
+    startDescendantA.resolve()
+    if (nestedB === undefined) throw new Error("nested B operation was not initialized")
+    const result = await nestedB
+
+    // then
+    expect(result).toBe("b-a-b")
+  }, 1_000)
+
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when
     const mailbox = await import("./index")
