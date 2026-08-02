@@ -241,6 +241,25 @@ describe("stale creating recovery", () => {
       readProcessIdentity: () => Promise.resolve("darwin:100"),
     })
     expect(takeover).toBeNull()
+
+    await writeFile(path.join(baseDir, "runtime", created.teamRunId, "state.json"), JSON.stringify({
+      ...claimed,
+      createCleanupLease: {
+        ...claimed.createCleanupLease,
+        ownerIdentity: "linux:ABCDEF12-1234-1234-1234-123456789ABC:100",
+      },
+    }))
+    const uppercaseReloaded = await loadRuntimeState(created.teamRunId, config)
+    expect(uppercaseReloaded.createCleanupLease?.ownerIdentity).toBeUndefined()
+    const uppercaseTakeover = await claimCreatingTeamFailure(created.teamRunId, {
+      ownerId: "00000000-0000-4000-8000-000000000033",
+      ownerPid: 808,
+    }, config, {
+      now: () => claimedAt + CREATE_CLEANUP_LEASE_TTL_MS,
+      probeProcess: () => undefined,
+      readProcessIdentity: () => Promise.resolve("linux:abcdef12-1234-1234-1234-123456789abc:100"),
+    })
+    expect(uppercaseTakeover).toBeNull()
   })
 
   test("#given a finalized runtime directory was already removed #when its former owner releases #then release is idempotent", async () => {

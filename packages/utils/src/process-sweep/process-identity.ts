@@ -49,7 +49,7 @@ export async function readProcessStartIdentity(
 
 export function isProcessStartIdentity(value: unknown): value is string {
   if (typeof value !== "string") return false
-  return /^linux:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}:[1-9]\d*$/i.test(value)
+  return /^linux:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}:[1-9]\d*$/.test(value)
     || /^darwin:[1-9]\d*$/.test(value)
     || /^win32:[1-9]\d*$/.test(value)
 }

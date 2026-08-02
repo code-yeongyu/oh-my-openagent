@@ -10,6 +10,7 @@ describe("process start identity", () => {
     expect(isProcessStartIdentity("garbage")).toBeFalse()
     expect(isProcessStartIdentity("darwin:not-a-kernel-time")).toBeFalse()
     expect(isProcessStartIdentity("darwin:0")).toBeFalse()
+    expect(isProcessStartIdentity("linux:ABCDEF12-1234-1234-1234-123456789ABC:987654")).toBeFalse()
   })
 
   test("#given linux stat with a parenthesized command #when parsed #then field 22 is stable", () => {
