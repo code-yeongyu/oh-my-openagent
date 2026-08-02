@@ -17,7 +17,7 @@ export interface CodegraphOwnedRootsOptions {
  * OMO-owned plugin roots trusted for process matching: the provisioned
  * codegraph install dir, the Claude OMO install, the plugin root, and the
  * Codex plugin cache. These roots are plugin-wide; every sweep family
- * (codegraph, lsp-daemon proxy)
+ * (CodeGraph, LSP proxy, and Git Bash proxy)
  * matches its processes against the same set.
  */
 export function discoverCodegraphOwnedRoots(options: CodegraphOwnedRootsOptions = {}): string[] {

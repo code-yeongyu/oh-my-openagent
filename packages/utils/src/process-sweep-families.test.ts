@@ -6,8 +6,10 @@ import { join } from "node:path"
 import {
   attestLspDaemonCliProcess,
   selectOrphanedLspDaemonProxies,
+  selectOrphanedGitBashProxies,
   selectZombieCodegraphProcesses,
   sweepOrphanedLspDaemonProxies,
+  sweepOrphanedGitBashProxies,
   sweepStaleLspDaemonVersions,
   type ProcessInfo,
 } from "./process-sweep"
@@ -83,15 +85,19 @@ describe("process sweep family matrix", () => {
       { command: `node.exe ${winRoot}\\components\\lsp-daemon\\dist\\cli.js mcp`, pid: 312, ppid: 1 },
       { command: `node.exe ${winRoot}\\components\\lsp-daemon\\dist\\cli.js mcp`, pid: 313, ppid: 200 },
       { command: `node.exe ${winRoot}\\components\\lsp-daemon\\dist\\cli.js daemon`, pid: 314, ppid: 1 },
+      { command: `node.exe ${winRoot}\\components\\git-bash-mcp\\dist\\cli.js mcp`, pid: 315, ppid: 9999 },
+      { command: `node.exe ${winRoot}\\components\\git-bash-mcp\\dist\\cli.js mcp`, pid: 316, ppid: 200 },
     ]
 
     // when
     const codegraph = selectZombieCodegraphProcesses(table, { ownedRoots: [winRoot], platform: "win32" })
     const proxies = selectOrphanedLspDaemonProxies(table, { ownedRoots: [winRoot], platform: "win32" })
+    const gitBashProxies = selectOrphanedGitBashProxies(table, { ownedRoots: [winRoot], platform: "win32" })
 
     // then
     expect(codegraph.map((processInfo) => processInfo.pid)).toEqual([311])
     expect(proxies.map((processInfo) => processInfo.pid)).toEqual([312])
+    expect(gitBashProxies.map((processInfo) => processInfo.pid)).toEqual([315])
   })
 
   it("#given a proxy-shaped command with a daemon token alongside mcp #when selecting proxies #then the daemon server shape is never matched", () => {
@@ -120,6 +126,38 @@ describe("process sweep family matrix", () => {
 
     // then
     expect(proxies).toEqual([])
+  })
+})
+
+describe("orphaned git-bash proxy sweep", () => {
+  it("#given orphaned and live-parent Windows proxies #when sweeping #then only the orphaned owned proxy is terminated", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "omo-git-bash-proxy-sweep-"))
+    const root = "C:\\Users\\runner\\.codex\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4"
+    const table: readonly ProcessInfo[] = [
+      { command: `node.exe ${root}\\components\\git-bash-mcp\\dist\\cli.js mcp`, pid: 610, ppid: 9999 },
+      { command: `node.exe ${root}\\components\\git-bash-mcp\\dist\\cli.js mcp`, pid: 611, ppid: 200 },
+      { command: "codex.exe app-server", pid: 200, ppid: 4 },
+    ]
+    const terminated: number[] = []
+    try {
+      const result = await sweepOrphanedGitBashProxies({
+        force: true,
+        graceMs: 0,
+        homeDir,
+        killer: {
+          isAlive: () => false,
+          kill: () => Promise.resolve(),
+          terminate: (pid) => { terminated.push(pid); return Promise.resolve() },
+        },
+        ownedRoots: [root],
+        platform: "win32",
+        processProvider: () => Promise.resolve(table),
+      })
+      expect(result.killed.map(({ pid }) => pid)).toEqual([610])
+      expect(terminated).toEqual([610])
+    } finally {
+      rmSync(homeDir, { force: true, recursive: true })
+    }
   })
 })
 
