@@ -6,6 +6,13 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null
 }
 
+function requiredSchemaRecord(value: unknown, path: string): Readonly<Record<string, unknown>> {
+  if (!isRecord(value)) {
+    throw new TypeError(`Expected generated omo schema ${path} to be an object`)
+  }
+  return value
+}
+
 function collectSchemaIds(value: unknown): readonly string[] {
   if (Array.isArray(value)) return value.flatMap(collectSchemaIds)
   if (!isRecord(value)) return []
@@ -16,6 +23,20 @@ function collectSchemaIds(value: unknown): readonly string[] {
 }
 
 describe("build-omo-schema-document", () => {
+  test("#given a missing schema path #when required #then the assertion fails with the path", () => {
+    // given
+    const missingValue = undefined
+    const missingPath = "properties.profiles"
+
+    // when
+    const readMissingValue = () => requiredSchemaRecord(missingValue, missingPath)
+
+    // then
+    expect(readMissingValue).toThrow(
+      `Expected generated omo schema ${missingPath} to be an object`,
+    )
+  })
+
   test("#given the omo config schema #when generated #then it is a draft-7 document with the config sections", () => {
     // given
     const expectedDraft = "http://json-schema.org/draft-07/schema#"
@@ -27,7 +48,7 @@ describe("build-omo-schema-document", () => {
     expect(schema.$schema).toBe(expectedDraft)
     expect(schema.$id).toBe(OMO_SCHEMA_ID)
     expect(schema.title).toBe("Omo Configuration")
-    const properties = isRecord(schema.properties) ? schema.properties : {}
+    const properties = requiredSchemaRecord(schema.properties, "properties")
     expect(properties.categories).toBeDefined()
     expect(properties.agents).toBeDefined()
     expect(properties.task).toBeDefined()
@@ -39,7 +60,7 @@ describe("build-omo-schema-document", () => {
     const schema = createOmoJsonSchema()
 
     // when
-    const properties = isRecord(schema.properties) ? schema.properties : {}
+    const properties = requiredSchemaRecord(schema.properties, "properties")
 
     // then
     expect(properties.$schema).toBeDefined()
@@ -60,12 +81,24 @@ describe("build-omo-schema-document", () => {
   test("#given omitted default-backed config fields #when validated #then root and profile migration shapes are accepted", () => {
     // given
     const schema = createOmoJsonSchema()
-    const properties = isRecord(schema.properties) ? schema.properties : {}
-    const profiles = isRecord(properties.profiles) ? properties.profiles : {}
-    const profile = isRecord(profiles.additionalProperties) ? profiles.additionalProperties : {}
-    const profileProperties = isRecord(profile.properties) ? profile.properties : {}
-    const rootOpenCode = isRecord(properties["[opencode]"]) ? properties["[opencode]"] : {}
-    const profileOpenCode = isRecord(profileProperties["[opencode]"]) ? profileProperties["[opencode]"] : {}
+    const properties = requiredSchemaRecord(schema.properties, "properties")
+    const profiles = requiredSchemaRecord(properties.profiles, "properties.profiles")
+    const profile = requiredSchemaRecord(
+      profiles.additionalProperties,
+      "properties.profiles.additionalProperties",
+    )
+    const profileProperties = requiredSchemaRecord(
+      profile.properties,
+      "properties.profiles.additionalProperties.properties",
+    )
+    const rootOpenCode = requiredSchemaRecord(
+      properties["[opencode]"],
+      'properties["[opencode]"]',
+    )
+    const profileOpenCode = requiredSchemaRecord(
+      profileProperties["[opencode]"],
+      'properties.profiles.additionalProperties.properties["[opencode]"]',
+    )
     const validator = z.fromJSONSchema(
       schema as Parameters<typeof z.fromJSONSchema>[0],
     )

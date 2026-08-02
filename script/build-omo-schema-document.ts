@@ -9,6 +9,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
+const SCHEMA_MAP_KEYWORDS = [
+  "$defs",
+  "definitions",
+  "dependencies",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+] as const
+
+const SCHEMA_VALUE_KEYWORDS = [
+  "additionalItems",
+  "additionalProperties",
+  "allOf",
+  "anyOf",
+  "contains",
+  "contentSchema",
+  "else",
+  "if",
+  "items",
+  "not",
+  "oneOf",
+  "prefixItems",
+  "propertyNames",
+  "then",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+] as const
+
 function requiredRecord(value: unknown, path: string): Record<string, unknown> {
   if (!isRecord(value)) throw new Error(`Expected generated omo schema ${path} to be an object`)
   return value
@@ -20,7 +48,7 @@ function withoutSchemaIdentity(schema: Record<string, unknown>): Record<string, 
   )
 }
 
-function omitDefaultBackedRequiredProperties(value: unknown): void {
+export function omitDefaultBackedRequiredProperties(value: unknown): void {
   if (Array.isArray(value)) {
     for (const item of value) omitDefaultBackedRequiredProperties(item)
     return
@@ -38,7 +66,15 @@ function omitDefaultBackedRequiredProperties(value: unknown): void {
     else value.required = required
   }
 
-  for (const nested of Object.values(value)) omitDefaultBackedRequiredProperties(nested)
+  for (const keyword of SCHEMA_MAP_KEYWORDS) {
+    const schemas = value[keyword]
+    if (!isRecord(schemas)) continue
+    for (const schema of Object.values(schemas)) omitDefaultBackedRequiredProperties(schema)
+  }
+
+  for (const keyword of SCHEMA_VALUE_KEYWORDS) {
+    omitDefaultBackedRequiredProperties(value[keyword])
+  }
 }
 
 export function createOmoJsonSchema(): Record<string, unknown> {
