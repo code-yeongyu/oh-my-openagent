@@ -48,13 +48,13 @@ export async function withInboxConsumerLeaseAtPath<T>(
     const childScope: InboxLeaseScope = { active: true }
     const childLeases = new Map(currentLeases)
     childLeases.set(leasePath, { ownership: currentLease.ownership, scope: childScope })
-    const nestedRun = currentLease.ownership.tryRun(async () => {
+    const nestedRun = currentLease.ownership.tryRun(currentLease.scope.active, async () => {
       try {
         return await heldInboxLeases.run(childLeases, fn)
       } finally {
         childScope.active = false
       }
-    }, currentLease.scope.active)
+    })
     if (nestedRun !== null) return await nestedRun
   }
 

@@ -24,7 +24,7 @@ describe("InboxLeaseOwnership", () => {
     const childEntered = createSignal()
     const releaseChild = createSignal()
     const events: string[] = []
-    const child = ownership.tryRun(async () => {
+    const child = ownership.tryRun(true, async () => {
       events.push("child-entered")
       childEntered.resolve()
       await releaseChild.promise
@@ -35,7 +35,7 @@ describe("InboxLeaseOwnership", () => {
     // when
     const drained = ownership.closeAndDrain().then(() => events.push("drained"))
     events.push("closed")
-    const lateRun = ownership.tryRun(async () => events.push("late-ran"))
+    const lateRun = ownership.tryRun(false, async () => events.push("late-ran"))
     releaseChild.resolve()
     await Promise.all([child, drained])
 
@@ -51,7 +51,7 @@ describe("InboxLeaseOwnership", () => {
     const childAEntered = createSignal()
     const releaseChildA = createSignal()
     const events: string[] = []
-    const childA = ownershipA.tryRun(async () => {
+    const childA = ownershipA.tryRun(true, async () => {
       childAEntered.resolve()
       await releaseChildA.promise
       events.push("a-child-finished")
@@ -75,12 +75,12 @@ describe("InboxLeaseOwnership", () => {
     const childEntered = createSignal()
     const startDescendant = createSignal()
     const events: string[] = []
-    const child = ownership.tryRun(async () => {
+    const child = ownership.tryRun(true, async () => {
       childEntered.resolve()
       await startDescendant.promise
-      const descendant = ownership.tryRun(async () => {
+      const descendant = ownership.tryRun(true, async () => {
         events.push("descendant-finished")
-      }, true)
+      })
       await descendant
       events.push("child-finished")
     })
@@ -102,7 +102,7 @@ describe("InboxLeaseOwnership", () => {
     const releaseChild = createSignal()
     const events: string[] = []
     const childFailure = new Error("expected child failure")
-    const child = ownership.tryRun(async () => {
+    const child = ownership.tryRun(true, async () => {
       childEntered.resolve()
       await releaseChild.promise
       events.push("child-threw")

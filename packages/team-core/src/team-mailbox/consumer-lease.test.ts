@@ -137,6 +137,70 @@ describe("withInboxConsumerLease", () => {
     expect(events).toEqual(["child-entered", "outer-returned", "child-finished", "outer-settled"])
   }, 1_000)
 
+  test("#given a detached continuation inherits a finished child scope w2tc #when it runs while the outer owner is active #then it reacquires after the outer releases", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const childFinished = createSignal()
+    const triggerDetached = createSignal()
+    const releaseOuter = createSignal()
+    const events: string[] = []
+    let detached: Promise<void> | undefined
+
+    const outer = withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+        detached = (async () => {
+          await triggerDetached.promise
+          await withInboxConsumerLease(teamRunId, "m1", config, async () => {
+            events.push("detached-entered")
+          }, { staleAfterMs: 300_000 })
+        })()
+      }, { staleAfterMs: 300_000 })
+      childFinished.resolve()
+      await releaseOuter.promise
+      events.push("outer-finishing")
+    }, { staleAfterMs: 300_000 }).then(() => events.push("outer-settled"))
+    await childFinished.promise
+
+    // when
+    triggerDetached.resolve()
+    releaseOuter.resolve()
+    await outer
+    if (detached === undefined) throw new Error("detached operation was not initialized")
+    await detached
+
+    // then
+    expect(events).toEqual(["outer-finishing", "outer-settled", "detached-entered"])
+  }, 1_000)
+
+  test("#given inbox A drains an admitted child w2tc #when inbox B acquires its lease #then B completes independently", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+    const childAEntered = createSignal()
+    const releaseChildA = createSignal()
+    const events: string[] = []
+    let childA: Promise<void> | undefined
+    const outerA = withInboxConsumerLease(teamRunId, "m1", config, async () => {
+      childA = withInboxConsumerLease(teamRunId, "m1", config, async () => {
+        childAEntered.resolve()
+        await releaseChildA.promise
+        events.push("a-child-finished")
+      }, { staleAfterMs: 300_000 })
+    }, { staleAfterMs: 300_000 }).then(() => events.push("a-outer-settled"))
+    await childAEntered.promise
+
+    // when
+    await withInboxConsumerLease(teamRunId, "m2", config, async () => {
+      events.push("b-finished")
+    }, { staleAfterMs: 300_000 })
+    releaseChildA.resolve()
+    await Promise.all([outerA, childA])
+
+    // then
+    expect(events).toEqual(["b-finished", "a-child-finished", "a-outer-settled"])
+  }, 1_000)
+
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when
     const mailbox = await import("./index")
