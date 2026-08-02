@@ -198,8 +198,63 @@ describe("mailbox consumer atomicity", () => {
     await releaseDeliveryReservation(newReservation)
     expect((await stat(newReservation.inboxPath)).isFile()).toBe(true)
     await expect(access(newReservation.reservedPath)).rejects.toThrow()
-    expect((await stat(generationPath(messageId, newReservation.inboxPath))).isFile()).toBe(true)
+    await expect(access(generationPath(messageId, newReservation.inboxPath))).rejects.toThrow()
     await ackMessages(teamRunId, "m1", [messageId], config)
     await expect(access(generationPath(messageId, newReservation.inboxPath))).rejects.toThrow()
+  })
+
+  test("#given a message is already reserved w2tc #when the same reservation is acquired again #then both handles retain one generation", async () => {
+    // given
+    const { teamRunId, config } = await createFixture()
+    const messageId = await enqueueMessage(teamRunId, config)
+    const firstReservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (firstReservation === null) throw new Error("first delivery reservation was not created")
+
+    // when
+    const repeatedReservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (repeatedReservation === null) throw new Error("repeated delivery reservation was not returned")
+
+    // then
+    expect(repeatedReservation.generation).toBe(firstReservation.generation)
+    await commitDeliveryReservation(firstReservation)
+    expect((await stat(firstReservation.processedPath)).isFile()).toBe(true)
+  })
+
+  test("#given a reservation is explicitly released w2tc #when its old handle commits later #then unread ownership remains released", async () => {
+    // given
+    const { teamRunId, config } = await createFixture()
+    const messageId = await enqueueMessage(teamRunId, config)
+    const reservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (reservation === null) throw new Error("delivery reservation was not created")
+    await releaseDeliveryReservation(reservation)
+
+    // when
+    const delayedCommit = commitDeliveryReservation(reservation)
+
+    // then
+    await expect(delayedCommit).rejects.toThrow("stale delivery reservation")
+    expect((await stat(reservation.inboxPath)).isFile()).toBe(true)
+    await expect(access(reservation.processedPath)).rejects.toThrow()
+    await expect(access(generationPath(messageId, reservation.inboxPath))).rejects.toThrow()
+  })
+
+  test("#given reclaim already restored a reservation w2tc #when release observes it unread #then delayed commit cannot consume it", async () => {
+    // given
+    const { teamRunId, config } = await createFixture()
+    const messageId = await enqueueMessage(teamRunId, config)
+    const reservation = await reserveMessageForDelivery(teamRunId, "m1", messageId, config)
+    if (reservation === null) throw new Error("delivery reservation was not created")
+    await utimes(reservation.reservedPath, 0, 0)
+    expect(await reclaimStaleReservations(teamRunId, "m1", config, 0)).toEqual([messageId])
+
+    // when
+    await releaseDeliveryReservation(reservation)
+    const delayedCommit = commitDeliveryReservation(reservation)
+
+    // then
+    await expect(delayedCommit).rejects.toThrow("stale delivery reservation")
+    expect((await stat(reservation.inboxPath)).isFile()).toBe(true)
+    await expect(access(reservation.processedPath)).rejects.toThrow()
+    await expect(access(generationPath(messageId, reservation.inboxPath))).rejects.toThrow()
   })
 })

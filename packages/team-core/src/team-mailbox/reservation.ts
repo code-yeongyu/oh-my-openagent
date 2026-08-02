@@ -78,7 +78,7 @@ async function reserveMessageForDeliveryUnderLease(
   // Pre-reserved by sendMessage: confirm existence without renaming.
   try {
     await stat(reservation.reservedPath)
-    return await assignReservationGeneration(reservation)
+    return await reuseOrAssignReservationGeneration(reservation)
   } catch (error) {
     if (!isMissingPathError(error)) throw error
   }
@@ -113,9 +113,13 @@ export async function releaseDeliveryReservation(reservation: DeliveryReservatio
   await withReservationLease(reservation, async () => {
     if (!(await assertCurrentReservationGeneration(reservation))) return
     if (await moveFirstExisting([reservation.reservedPath], reservation.inboxPath)) {
+      await removeReservationGeneration(reservation)
       return
     }
-    if (await pathExists(reservation.inboxPath)) return
+    if (await pathExists(reservation.inboxPath)) {
+      await removeReservationGeneration(reservation)
+      return
+    }
     if (await pathExists(reservation.processedPath)) {
       await removeReservationGeneration(reservation)
       return
@@ -220,6 +224,15 @@ async function assignReservationGeneration(reservation: DeliveryReservation): Pr
   const generation = randomUUID()
   await atomicWrite(reservationGenerationPath(reservation), `${generation}\n`)
   return { ...reservation, generation }
+}
+
+async function reuseOrAssignReservationGeneration(
+  reservation: DeliveryReservation,
+): Promise<DeliveryReservation> {
+  const generation = await readReservationGeneration(reservation)
+  return generation === null
+    ? await assignReservationGeneration(reservation)
+    : { ...reservation, generation }
 }
 
 function reservationGenerationPath(reservation: DeliveryReservation): string {
