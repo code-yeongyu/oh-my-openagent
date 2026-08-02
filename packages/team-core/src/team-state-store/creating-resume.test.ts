@@ -107,6 +107,12 @@ describe("stale creating recovery", () => {
       config,
       { ...aliveProcess, now: () => leaseStartedAt + 100 },
     )
+    const spoofedClaim = await claimCreatingTeamFailure(
+      created.teamRunId,
+      { ...firstOwner, ownerPid: firstOwner.ownerPid + 1 },
+      config,
+      { ...aliveProcess, now: () => leaseStartedAt + 101 },
+    )
 
     // when
     const deniedClaim = await claimCreatingTeamFailure(
@@ -115,22 +121,30 @@ describe("stale creating recovery", () => {
       config,
       { ...aliveProcess, now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS - 1 },
     )
-    const takeover = await claimCreatingTeamFailure(
+    const expiredLiveOwnerClaim = await claimCreatingTeamFailure(
       created.teamRunId,
       successor,
       config,
       { ...aliveProcess, now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS },
     )
+    const takeover = await claimCreatingTeamFailure(
+      created.teamRunId,
+      successor,
+      config,
+      { isProcessAlive: () => false, now: () => leaseStartedAt + 100 + CREATE_CLEANUP_LEASE_TTL_MS },
+    )
 
     // then
     expect(firstClaim?.createCleanupLease?.ownerId).toBe(firstOwner.ownerId)
     expect(retriedClaim?.createCleanupLease?.claimedAt).toBe(leaseStartedAt + 100)
+    expect(spoofedClaim).toBeNull()
     expect(deniedClaim).toBeNull()
+    expect(expiredLiveOwnerClaim).toBeNull()
     expect(takeover?.createCleanupLease?.ownerId).toBe(successor.ownerId)
-    expect(await finalizeClaimedCreatingTeamFailure(created.teamRunId, firstOwner.ownerId, config)).toBe(false)
+    expect(await finalizeClaimedCreatingTeamFailure(created.teamRunId, firstOwner, config)).toBe(false)
     if (takeover === null) throw new Error("fixture failed to take over cleanup lease")
     await cleanupMemberWorktrees(takeover)
-    expect(await finalizeClaimedCreatingTeamFailure(created.teamRunId, successor.ownerId, config)).toBe(true)
+    expect(await finalizeClaimedCreatingTeamFailure(created.teamRunId, successor, config)).toBe(true)
     expect(existsSync(worktreePath)).toBe(false)
     const finalized = await loadRuntimeState(created.teamRunId, config)
     expect(finalized.status).toBe("failed")

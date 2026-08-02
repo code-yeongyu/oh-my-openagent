@@ -7,6 +7,7 @@ import {
   isCreatingStateStuck,
   listActiveTeams,
   loadRuntimeState,
+  releaseClaimedCreatingTeamFailure,
 } from "@oh-my-opencode/team-core/team-state-store"
 
 import { parseTeamMemberTaskIdentity } from "./liveness-ownership"
@@ -36,6 +37,7 @@ export async function recoverStaleCreatingTeams(
   const claimDeps = { now: deps.now }
 
   for (const journal of await listCreateCompensations(deps.stateDir)) {
+    let claimedTeamRunId: string | undefined
     try {
       let runtimeState
       try {
@@ -52,13 +54,14 @@ export async function recoverStaleCreatingTeams(
       if (runtimeState.status === "creating" || runtimeState.status === "create_cleanup_pending") {
         const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, claimant, config, claimDeps)
         if (claimedState === null) continue
+        claimedTeamRunId = claimedState.teamRunId
         const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
         errors.push(...compensation.errors)
         if (Object.keys(compensation.pending).length > 0) continue
         const renewedState = await claimCreatingTeamFailure(claimedState.teamRunId, claimant, config, claimDeps)
         if (renewedState === null) continue
         await cleanupMemberWorktrees(renewedState)
-        if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant.ownerId, config))) continue
+        if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant, config))) continue
         markedFailed += 1
       } else if (runtimeState.status === "failed") {
         const compensation = await compensateCreateMembers(journal.teamRunId, journal.members, deps)
@@ -70,11 +73,20 @@ export async function recoverStaleCreatingTeams(
       await clearCreateCompensation(deps.stateDir, journal.teamRunId)
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
+    } finally {
+      if (claimedTeamRunId !== undefined) {
+        try {
+          await releaseClaimedCreatingTeamFailure(claimedTeamRunId, claimant, config)
+        } catch (error) {
+          errors.push(error instanceof Error ? error : new Error(String(error)))
+        }
+      }
     }
   }
 
   const activeTeams = await listActiveTeams(config)
   for (const team of activeTeams) {
+    let claimedTeamRunId: string | undefined
     try {
       const runtimeState = await loadRuntimeState(team.teamRunId, config)
       const shouldRecover = runtimeState.status === "create_cleanup_pending"
@@ -82,6 +94,7 @@ export async function recoverStaleCreatingTeams(
       if (!shouldRecover) continue
       const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, claimant, config, claimDeps)
       if (claimedState === null) continue
+      claimedTeamRunId = claimedState.teamRunId
       const members = await discoverCreatingMembers(claimedState.teamRunId, claimedState.members.map((member) => member.name), deps)
       const compensation = await compensateCreateMembers(claimedState.teamRunId, members, deps)
       errors.push(...compensation.errors)
@@ -89,11 +102,19 @@ export async function recoverStaleCreatingTeams(
       const renewedState = await claimCreatingTeamFailure(claimedState.teamRunId, claimant, config, claimDeps)
       if (renewedState === null) continue
       await cleanupMemberWorktrees(renewedState)
-      if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant.ownerId, config))) continue
+      if (!(await finalizeClaimedCreatingTeamFailure(renewedState.teamRunId, claimant, config))) continue
       await clearCreateCompensation(deps.stateDir, renewedState.teamRunId)
       markedFailed += 1
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)))
+    } finally {
+      if (claimedTeamRunId !== undefined) {
+        try {
+          await releaseClaimedCreatingTeamFailure(claimedTeamRunId, claimant, config)
+        } catch (error) {
+          errors.push(error instanceof Error ? error : new Error(String(error)))
+        }
+      }
     }
   }
 

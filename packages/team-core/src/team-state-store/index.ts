@@ -15,6 +15,7 @@ export {
   finalizeClaimedCreatingTeamFailure,
   isCreatingStateStuck,
   markStuckCreatingTeamFailed,
+  releaseClaimedCreatingTeamFailure,
   type CreateCleanupClaimant,
 } from "./creating-resume"
 export { cleanupMemberWorktrees } from "./runtime-cleanup"

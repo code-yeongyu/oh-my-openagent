@@ -3,7 +3,12 @@ import { existsSync } from "node:fs"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 
-import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+import {
+  CREATE_CLEANUP_LEASE_TTL_MS,
+  createRuntimeState,
+  loadRuntimeState,
+  saveRuntimeState,
+} from "@oh-my-opencode/team-core/team-state-store"
 
 import { normalizeSenpiTeamSpec } from "./normalize"
 import { recoverStaleCreatingTeams } from "./runtime"
@@ -35,6 +40,7 @@ describe("recoverStaleCreatingTeams", () => {
     await saveRuntimeState({ ...runtime, createdAt: Date.now() - 31 * 60_000 }, config)
     const firstCancellationStarted = Promise.withResolvers<void>()
     const releaseFirstCancellation = Promise.withResolvers<void>()
+    let now = Date.now()
     let cancellationAttempts = 0
     const manager = new FakeTeamManager({
       beforeCancel: async () => {
@@ -57,9 +63,11 @@ describe("recoverStaleCreatingTeams", () => {
     if (member.kind !== "started") throw new Error("fixture failed to start")
 
     // when
-    const firstRecovery = recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
+    const recoveryDeps = { manager, stateDir, taskSettings: settings, now: () => now }
+    const firstRecovery = recoverStaleCreatingTeams(recoveryDeps)
     await firstCancellationStarted.promise
-    const secondRecovery = await recoverStaleCreatingTeams({ manager, stateDir, taskSettings: settings })
+    now += CREATE_CLEANUP_LEASE_TTL_MS
+    const secondRecovery = await recoverStaleCreatingTeams(recoveryDeps)
 
     // then
     expect(secondRecovery).toEqual({ markedFailed: 0, errors: [] })

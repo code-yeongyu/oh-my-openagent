@@ -28,7 +28,9 @@ function isProcessAlive(pid: number): boolean {
     return true
   } catch (error) {
     if (!(error instanceof Error)) throw error
-    return false
+    if ("code" in error && error.code === "EPERM") return true
+    if ("code" in error && error.code === "ESRCH") return false
+    throw error
   }
 }
 
@@ -47,8 +49,14 @@ export async function markStuckCreatingTeamFailed(
   const claimant = createCleanupClaimant()
   const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, claimant, config)
   if (claimedState === null) return false
-  await cleanupMemberWorktrees(claimedState)
-  return finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, claimant.ownerId, config)
+  let finalized = false
+  try {
+    await cleanupMemberWorktrees(claimedState)
+    finalized = await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, claimant, config)
+    return finalized
+  } finally {
+    if (!finalized) await releaseClaimedCreatingTeamFailure(claimedState.teamRunId, claimant, config)
+  }
 }
 
 export async function claimCreatingTeamFailure(
@@ -69,26 +77,38 @@ export async function claimCreatingTeamFailure(
       : currentRuntimeState
   ), config)
   return claimedState.status === "create_cleanup_pending"
-    && claimedState.createCleanupLease?.ownerId === claimant.ownerId
+    && isLeaseOwner(claimedState, claimant)
     ? claimedState
     : null
 }
 
 export async function finalizeClaimedCreatingTeamFailure(
   teamRunId: string,
-  ownerId: string,
+  claimant: CreateCleanupClaimant,
   config: TeamModeConfig,
 ): Promise<boolean> {
   let didFinalize = false
   const finalizedState = await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
     if (currentRuntimeState.status !== "create_cleanup_pending"
-      || currentRuntimeState.createCleanupLease?.ownerId !== ownerId) {
+      || !isLeaseOwner(currentRuntimeState, claimant)) {
       return currentRuntimeState
     }
     didFinalize = true
     return { ...currentRuntimeState, status: "failed", createCleanupLease: undefined }
   }, config)
   return didFinalize && finalizedState.status === "failed"
+}
+
+export async function releaseClaimedCreatingTeamFailure(
+  teamRunId: string,
+  claimant: CreateCleanupClaimant,
+  config: TeamModeConfig,
+): Promise<void> {
+  await transitionRuntimeState(teamRunId, (runtimeState) => (
+    runtimeState.status === "create_cleanup_pending" && isLeaseOwner(runtimeState, claimant)
+      ? { ...runtimeState, createCleanupLease: undefined }
+      : runtimeState
+  ), config)
 }
 
 function canClaimCreatingFailure(
@@ -100,6 +120,11 @@ function canClaimCreatingFailure(
   if (runtimeState.status === "creating") return true
   if (runtimeState.status !== "create_cleanup_pending") return false
   const lease = runtimeState.createCleanupLease
-  if (lease === undefined || lease.ownerId === claimant.ownerId) return true
-  return now - lease.claimedAt >= CREATE_CLEANUP_LEASE_TTL_MS || !processIsAlive(lease.ownerPid)
+  if (lease === undefined || isLeaseOwner(runtimeState, claimant)) return true
+  return now - lease.claimedAt >= CREATE_CLEANUP_LEASE_TTL_MS && !processIsAlive(lease.ownerPid)
+}
+
+function isLeaseOwner(runtimeState: RuntimeState, claimant: CreateCleanupClaimant): boolean {
+  return runtimeState.createCleanupLease?.ownerId === claimant.ownerId
+    && runtimeState.createCleanupLease.ownerPid === claimant.ownerPid
 }
