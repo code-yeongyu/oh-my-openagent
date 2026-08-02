@@ -1,7 +1,10 @@
 /// <reference types="bun-types" />
 
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 
+import { getTaskClaimLockPath, getTaskFilePath, resolveBaseDir } from "../team-registry"
+import * as locks from "../team-state-store/locks"
+import { TaskSchema } from "../types"
 import { claimTask } from "./claim"
 import { getTask } from "./get"
 import { createTask } from "./store"
@@ -47,6 +50,77 @@ test("updateTaskStatus auto-claims when a member starts a pending task directly"
     expect(loadedTask.status).toBe("in_progress")
     expect(loadedTask.owner).toBe("member-a")
     expect(typeof loadedTask.claimedAt).toBe("number")
+  } finally {
+    await fixture.cleanup()
+  }
+}, 30_000)
+
+test("#given deletion has captured a claimed task #when an in-progress update races #then the stale transition is rejected and deletion remains", async () => {
+  // given
+  const fixture = await createTasklistFixture()
+  const deletionWriteStarted = Promise.withResolvers<void>()
+  const staleWriteStarted = Promise.withResolvers<void>()
+  const releaseDeletionWrite = Promise.withResolvers<void>()
+  const releaseStaleWrite = Promise.withResolvers<void>()
+  const atomicWrite = locks.atomicWrite
+
+  try {
+    const task = await createTask(
+      fixture.teamRunId,
+      createTaskInput({ status: "claimed", owner: "member-a", claimedAt: Date.now() }),
+      fixture.config,
+    )
+    const baseDirectory = resolveBaseDir(fixture.config)
+    const taskPath = getTaskFilePath(baseDirectory, fixture.teamRunId, task.id)
+    const lockPath = getTaskClaimLockPath(baseDirectory, fixture.teamRunId, task.id)
+    const atomicWriteSpy = spyOn(locks, "atomicWrite").mockImplementation(async (filePath, content, deps) => {
+      const writtenTask = TaskSchema.parse(JSON.parse(content.toString()))
+
+      if (writtenTask.status === "deleted") {
+        deletionWriteStarted.resolve()
+        await releaseDeletionWrite.promise
+      }
+      if (writtenTask.status === "in_progress") {
+        staleWriteStarted.resolve()
+        await releaseStaleWrite.promise
+      }
+
+      await atomicWrite(filePath, content, deps)
+    })
+
+    try {
+      // when
+      const deletion = updateTaskStatus(fixture.teamRunId, task.id, "deleted", "lead-member", fixture.config)
+      await deletionWriteStarted.promise
+
+      const staleTransition = updateTaskStatus(fixture.teamRunId, task.id, "in_progress", "member-a", fixture.config)
+      const staleResult = staleTransition.then(
+        (updatedTask) => ({ kind: "fulfilled", updatedTask } as const),
+        (error: unknown) => ({ error, kind: "rejected" } as const),
+      )
+
+      if (!(await Bun.file(lockPath).exists())) {
+        await staleWriteStarted.promise
+      }
+
+      releaseDeletionWrite.resolve()
+      await deletion
+      releaseStaleWrite.resolve()
+
+      // then
+      const result = await staleResult
+      const persistedTask = TaskSchema.parse(await Bun.file(taskPath).json())
+      expect(persistedTask.status).toBe("deleted")
+      expect(result.kind).toBe("rejected")
+      if (result.kind === "rejected") {
+        expect(result.error).toBeInstanceOf(InvalidTaskTransitionError)
+        expect(result.error).toHaveProperty("message", "no reverse transitions from deleted to in_progress")
+      }
+    } finally {
+      releaseDeletionWrite.resolve()
+      releaseStaleWrite.resolve()
+      atomicWriteSpy.mockRestore()
+    }
   } finally {
     await fixture.cleanup()
   }
