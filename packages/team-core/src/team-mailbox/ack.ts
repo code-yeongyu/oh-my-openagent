@@ -3,8 +3,20 @@ import path from "node:path"
 
 import type { TeamModeConfig } from "../config"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
+import { DEAD_CONSUMER_LEASE_STALE_MS, withInboxConsumerLease } from "./consumer-lease"
 
 export async function ackMessages(
+  teamRunId: string,
+  memberName: string,
+  messageIds: string[],
+  config: TeamModeConfig,
+): Promise<void> {
+  await withInboxConsumerLease(teamRunId, memberName, config, async () => {
+    await ackMessagesUnderLease(teamRunId, memberName, messageIds, config)
+  }, { staleAfterMs: DEAD_CONSUMER_LEASE_STALE_MS })
+}
+
+async function ackMessagesUnderLease(
   teamRunId: string,
   memberName: string,
   messageIds: string[],

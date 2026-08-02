@@ -86,6 +86,30 @@ describe("withInboxConsumerLease", () => {
     await expect(readFile(leasePath, "utf8")).rejects.toThrow()
   }, 2_000)
 
+  test("#given a caller already owns an inbox lease w2tc #when a mailbox primitive reacquires it #then the nested transaction completes without deadlock", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: await createBaseDirectory() })
+    const teamRunId = randomUUID()
+
+    // when
+    const result = await withInboxConsumerLease(
+      teamRunId,
+      "m1",
+      config,
+      async () => await withInboxConsumerLease(
+        teamRunId,
+        "m1",
+        config,
+        async () => "nested",
+        { staleAfterMs: 300_000 },
+      ),
+      { staleAfterMs: 300_000 },
+    )
+
+    // then
+    expect(result).toBe("nested")
+  }, 1_000)
+
   test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
     // when
     const mailbox = await import("./index")
