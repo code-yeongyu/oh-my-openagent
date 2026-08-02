@@ -6,6 +6,15 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null
 }
 
+function collectSchemaIds(value: unknown): readonly string[] {
+  if (Array.isArray(value)) return value.flatMap(collectSchemaIds)
+  if (!isRecord(value)) return []
+  return [
+    ...(typeof value.$id === "string" ? [value.$id] : []),
+    ...Object.values(value).flatMap(collectSchemaIds),
+  ]
+}
+
 describe("build-omo-schema-document", () => {
   test("#given the omo config schema #when generated #then it is a draft-7 document with the config sections", () => {
     // given
@@ -35,6 +44,54 @@ describe("build-omo-schema-document", () => {
     // then
     expect(properties.$schema).toBeDefined()
     expect(schema.additionalProperties).toBe(false)
+  })
+
+  test("#given embedded OpenCode schemas #when generated #then only the unified root declares an identity", () => {
+    // given
+    const schema = createOmoJsonSchema()
+
+    // when
+    const schemaIds = collectSchemaIds(schema)
+
+    // then
+    expect(schemaIds).toEqual([OMO_SCHEMA_ID])
+  })
+
+  test("#given omitted default-backed config fields #when validated #then root and profile migration shapes are accepted", () => {
+    // given
+    const schema = createOmoJsonSchema()
+    const properties = isRecord(schema.properties) ? schema.properties : {}
+    const profiles = isRecord(properties.profiles) ? properties.profiles : {}
+    const profile = isRecord(profiles.additionalProperties) ? profiles.additionalProperties : {}
+    const profileProperties = isRecord(profile.properties) ? profile.properties : {}
+    const rootOpenCode = isRecord(properties["[opencode]"]) ? properties["[opencode]"] : {}
+    const profileOpenCode = isRecord(profileProperties["[opencode]"]) ? profileProperties["[opencode]"] : {}
+    const validator = z.fromJSONSchema(
+      schema as Parameters<typeof z.fromJSONSchema>[0],
+    )
+    const rootDocument = {
+      $schema: OMO_SCHEMA_ID,
+      "[opencode]": {},
+    }
+    const profileDocument = {
+      $schema: OMO_SCHEMA_ID,
+      profiles: {
+        kimi: {
+          "[opencode]": {},
+        },
+      },
+    }
+
+    // when
+    const rootResult = validator.safeParse(rootDocument)
+    const profileResult = validator.safeParse(profileDocument)
+
+    // then
+    expect(schema.required ?? []).not.toContain("profiles")
+    expect(rootOpenCode.required ?? []).not.toContain("git_master")
+    expect(profileOpenCode.required ?? []).not.toContain("git_master")
+    expect(rootResult.success).toBe(true)
+    expect(profileResult.success).toBe(true)
   })
 
   test("#given the todo-4 and todo-15 golden migrated document #when validated by the generated schema #then base and profile OpenCode blocks validate", () => {
