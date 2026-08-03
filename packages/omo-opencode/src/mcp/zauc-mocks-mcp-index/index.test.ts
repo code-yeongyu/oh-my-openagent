@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
+import { delimiter, join } from "node:path"
 
 afterEach(() => {
   mock.restore()
@@ -148,5 +149,25 @@ describe("createBuiltinMcps", () => {
     if (result.lsp?.type !== "local") throw new Error("expected local MCP config")
     expect(["node", "bun"]).not.toContain(result.lsp.command[0])
     expect([nodePath, bunPath]).toContain(result.lsp.command[0])
+  })
+
+  test("forwards the session cwd to the LSP MCP config", async () => {
+    // given
+    mock.restore()
+    const sessionCwd = join(process.cwd(), "session-cwd")
+    const nodePath = join(sessionCwd, "node")
+    const { createBuiltinMcps } = await import(`../index?lsp-cwd=${Date.now()}-${Math.random()}`)
+
+    // when
+    const result = createBuiltinMcps([], undefined, {
+      cwd: sessionCwd,
+      resolveExecutable: (commandName: string) =>
+        commandName === "node" ? { command: nodePath, available: true } : { command: commandName, available: false },
+    })
+
+    // then
+    expect(result.lsp?.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toBe(
+      [join(sessionCwd, ".opencode", "lsp.json"), join(sessionCwd, ".omo", "lsp.json"), join(sessionCwd, ".omo", "lsp-client.json")].join(delimiter),
+    )
   })
 })
