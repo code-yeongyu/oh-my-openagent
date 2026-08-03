@@ -61,3 +61,56 @@ describe("LSP client path confinement", () => {
 		).toThrow(LspInvalidPathError);
 	});
 });
+
+describe("findWorkspaceRoot marker priority", () => {
+	// given a project root with .git and a nested sub-package that has its own pyproject.toml
+	// when resolving workspace root for a file inside the sub-package
+	// then .git at the project root takes priority over the nearer pyproject.toml
+	it("#given .git at project root and nested pyproject.toml in sub-package #when resolving #then prefers .git over nearer pyproject.toml", () => {
+		const root = tempRoot("lsp-ws-priority-git-");
+		mkdirSync(join(root, ".git"), { recursive: true });
+		mkdirSync(join(root, "src", "modex_graph"), { recursive: true });
+		writeFileSync(join(root, "src", "modex_graph", "pyproject.toml"), "[project]\nname = 'modex-graph'\n");
+		writeFileSync(join(root, "src", "modex_graph", "compiled_graph.py"), "x = 1\n");
+
+		const workspace = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
+			findWorkspaceRoot("src/modex_graph/compiled_graph.py"),
+		);
+
+		expect(workspace).toBe(realpathSync(root));
+	});
+
+	// given a sub-package with pyproject.toml but NO .git anywhere up the tree
+	// when resolving workspace root for a file inside the sub-package
+	// then falls back to the first non-.git marker (pyproject.toml directory)
+	it("#given nested pyproject.toml and no .git anywhere #when resolving #then falls back to first non-git marker", () => {
+		const root = tempRoot("lsp-ws-priority-fallback-");
+		mkdirSync(join(root, "src", "modex_graph"), { recursive: true });
+		writeFileSync(join(root, "src", "modex_graph", "pyproject.toml"), "[project]\nname = 'modex-graph'\n");
+		writeFileSync(join(root, "src", "modex_graph", "compiled_graph.py"), "x = 1\n");
+
+		const workspace = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
+			findWorkspaceRoot("src/modex_graph/compiled_graph.py"),
+		);
+
+		expect(workspace).toBe(realpathSync(join(root, "src", "modex_graph")));
+	});
+
+	// given a directory with both .git and pyproject.toml at the same level
+	// when resolving workspace root
+	// then returns that directory (both markers agree)
+	it("#given .git and pyproject.toml at same level #when resolving #then returns that directory", () => {
+		const root = tempRoot("lsp-ws-priority-same-level-");
+		mkdirSync(join(root, ".git"), { recursive: true });
+		writeFileSync(join(root, "pyproject.toml"), "[project]\nname = 'my-project'\n");
+		mkdirSync(join(root, "src"), { recursive: true });
+		writeFileSync(join(root, "src", "main.py"), "x = 1\n");
+
+		const workspace = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
+			findWorkspaceRoot("src/main.py"),
+		);
+
+		expect(workspace).toBe(realpathSync(root));
+	});
+
+});

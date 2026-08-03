@@ -30,6 +30,11 @@ export function isDirectoryPath(filePath: string): boolean {
 	}
 }
 
+// Prefer .git as the authoritative workspace boundary so that sub-package
+// markers (e.g. a nested pyproject.toml in a monorepo) don't shadow the real
+// project root. Only fall back to other markers when no .git is found.
+const PRIMARY_MARKER = ".git";
+
 export function findWorkspaceRoot(filePath: string): string {
 	const abs = resolvePathInsideContext(filePath);
 	let dir = abs;
@@ -39,17 +44,25 @@ export function findWorkspaceRoot(filePath: string): string {
 	}
 
 	let prevDir = "";
+	let fallbackRoot: string | undefined;
 	while (dir !== prevDir) {
-		for (const marker of WORKSPACE_MARKERS) {
-			if (existsSync(join(dir, marker))) {
-				return dir;
+		if (existsSync(join(dir, PRIMARY_MARKER))) {
+			return dir;
+		}
+		if (fallbackRoot === undefined) {
+			for (const marker of WORKSPACE_MARKERS) {
+				if (marker === PRIMARY_MARKER) continue;
+				if (existsSync(join(dir, marker))) {
+					fallbackRoot = dir;
+					break;
+				}
 			}
 		}
 		prevDir = dir;
 		dir = dirname(dir);
 	}
 
-	return dirname(abs);
+	return fallbackRoot ?? dirname(abs);
 }
 
 export function resolvePathInsideContext(filePath: string): string {
