@@ -258,6 +258,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "Qwen", modelID: "qwen3.6-35b-a3b-nvfp4", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -735,6 +736,18 @@ describe("resolveCompatibleModelSettings", () => {
     })
 
     expect(result.maxTokens).toBeUndefined()
+    expect(result.changes).toEqual([])
+  })
+
+  test("uses Qwen provider metadata variants before heuristic family fallback", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "ksi",
+      modelID: "qwen3.7-plus",
+      capabilities: { variants: ["medium", "high", "xhigh", "max", "off"] },
+      desired: { variant: "xhigh" },
+    })
+
+    expect(result.variant).toBe("xhigh")
     expect(result.changes).toEqual([])
   })
 

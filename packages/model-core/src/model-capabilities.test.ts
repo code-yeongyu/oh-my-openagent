@@ -334,6 +334,26 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("falls back to Qwen heuristic rules for custom provider model IDs", () => {
+    const result = getModelCapabilities({
+      providerID: "ksi",
+      modelID: "qwen3.6-35b-a3b-nvfp4",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "qwen3.6-35b-a3b-nvfp4",
+      family: "qwen",
+      variants: ["low", "medium", "high"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      snapshot: { source: "none" },
+      family: { source: "heuristic" },
+      variants: { source: "heuristic" },
+    })
+  })
+
   test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
     const modelID = "minimax-m2.7"
