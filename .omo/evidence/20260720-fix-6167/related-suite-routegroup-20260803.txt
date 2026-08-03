@@ -1,0 +1,18 @@
+command: bun test packages/lsp-core
+note:    an earlier run of this exact command during this session reported 8 failures,
+         all in the two *.integration.test.ts files that spawn real node LSP fixture
+         processes with 3-15s timeouts. Those failures were ENOENT on the fixture's
+         scenario.json and 15s timeouts (wall time 111s vs 23s), i.e. resource
+         contention from concurrent WSL builds, NOT this change - which only edits the
+         pure string function normalizeDocumentUri() in workspace-document-state.ts.
+         Proof: with the two integration files run in isolation, they pass either way -
+         see flakiness-baseline-routegroup-20260803.txt.
+---
+bun test v1.3.14 (0d9b296a)
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-4EKf4l exited with code 0
+
+ 99 pass
+ 0 fail
+ 289 expect() calls
+Ran 99 tests across 21 files. [20.97s]
+EXIT_STATUS=0

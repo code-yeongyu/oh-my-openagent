@@ -1,0 +1,46 @@
+PR #6228: flakiness baseline for the two lsp-core integration suites - 2026-08-03
+
+WHY THIS FILE EXISTS
+
+While capturing the route-group widening evidence, one `bun test packages/lsp-core`
+run reported 8 failures, all in:
+  - packages/lsp-core/src/lsp/client-diagnostics-freshness.integration.test.ts
+  - packages/lsp-core/src/lsp/workspace-apply-edit-lease.integration.test.ts
+The failures were `ENOENT ... scenario.json`, `LspProcessExitedError ... exited with
+code null`, and 15s timeouts; that run took 111s wall time versus ~21s normally. Those
+two files spawn REAL node LSP fixture processes with 3-15s deadlines, and the machine was
+under concurrent WSL/build load at that moment. The change under review only edits the
+pure string function `normalizeDocumentUri()` in `workspace-document-state.ts`, which
+cannot open a fixture file or set a child exit code, so I proved the failures are
+load-induced flakiness rather than a regression.
+
+WHAT WAS TESTED
+
+1. BASELINE (my change stashed, tree at the dev merge commit), the two integration files
+   run in ISOLATION:
+     git stash push -- workspace-document-state.ts workspace-document-state.test.ts
+     bun test .../client-diagnostics-freshness.integration.test.ts \
+              .../workspace-apply-edit-lease.integration.test.ts
+2. WITH MY CHANGE restored (git stash pop), the same two files in isolation.
+3. Full suite with the machine no longer under load: bun test packages/lsp-core.
+
+WHAT WAS OBSERVED
+
+  1. BASELINE (stashed, no change present):   20 pass / 0 fail   [25.14s]
+  2. WITH MY CHANGE (isolation):              20 pass / 0 fail   [14.81s]
+  3. Full suite, no load:                     99 pass / 0 fail   [20.97s]
+
+WHY IT IS ENOUGH
+
+The two integration suites pass whether or not this change is present, so this change does
+not cause their failures. They also passed as part of the full suite once the machine was
+idle. The earlier 8-failure run is therefore load-induced flakiness in real-process
+integration tests, orthogonal to a pure string normalizer. The targeted regression file
+`workspace-document-state.test.ts` is 9 pass / 0 fail with the change and 3 fail / 6 pass
+without it (red-routegroup / green-routegroup files), which is the actual proof for the
+route-group behavior.
+
+WHAT WAS OMITTED
+
+Only tail summaries are recorded here. No secrets, tokens, credentials, or env dumps are
+involved; the only paths shown are ephemeral OS temp fixture directories.

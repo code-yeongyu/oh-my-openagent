@@ -66,14 +66,55 @@ actual platform where the bug occurs. The full `lsp-core` suite and monorepo typ
 regression. The unit test is `skipIf(process.platform !== "win32")` because drive letters only
 exist on Windows; CI's `windows-latest` job exercises it, and it ran RED→GREEN on this Windows host.
 
+## Widening — percent-encoded route-group paths (issue #6167 follow-up, 2026-08-03)
+
+On the issue thread `eliottness` reported the same diagnostics drop on macOS with
+`typescript-language-server` for paths containing a route-group segment such as
+`app/(auth)/login.tsx` (idiomatic in Expo Router / Next.js App Router). `pathToFileURL`
+leaves `(auth)` raw while tsserver publishes the same path percent-encoded (`%28auth%29`),
+so `openByUri.get()` misses exactly as it does for a lowercase drive letter and
+`diagnostics()` hits the freshness timeout. Same Map-key-mismatch defect class as the
+drive-letter case, one URI-canonicalization boundary — so it is hardened at the same site
+rather than left as a sibling symptom (the whole-class-at-one-boundary rule).
+
+`normalizeDocumentUri()` now folds percent-escapes first via `canonicalizeFileUriEncoding()`
+(a pure `decodeURIComponent` with a `%`-fast-path and a malformed-escape guard), then applies
+the existing Windows drive-letter fold. Decoding converges both sides regardless of which
+characters each side chose to encode: a raw store key and an encoded lookup (parens, spaces)
+both decode to one canonical form. The routing through `fileURLToPath` was deliberately NOT
+used — it re-encodes a drive-like POSIX URI (`file:///c:/...` → `file:///c%3A/...` on Linux)
+and throws on Windows for driveless paths, both of which would change keys this must leave
+alone. Product delta: +17 lines, 1 file, pure string.
+
+- **RED** `red-routegroup-20260803.txt`: product file reverted to HEAD, three new
+  route-group cases FAIL (fold-equality, encoded-space fold, and the end-to-end
+  `resolvePushDiagnostics → "missing"` drop). 6 pass / 3 fail.
+- **GREEN** `green-routegroup-20260803.txt`: encoding fold restored, 9 pass / 0 fail.
+- **Negative control** (in the RED capture): reverting only the product file re-fails the
+  three cases while the drive-letter cases stay green, coupling the tests to the fix.
+- **Regression** `related-suite-routegroup-20260803.txt`: `bun test packages/lsp-core`
+  → 99 pass / 0 fail.
+- **Flakiness baseline** `flakiness-baseline-routegroup-20260803.txt`: one earlier suite run
+  showed 8 failures in the two `*.integration.test.ts` files (real node LSP processes, 3-15s
+  timeouts, 111s wall time under concurrent load). Proven load-induced: those two files pass
+  20/0 both with the change stashed and with it restored when run in isolation, and the full
+  suite is 99/0 once idle. A pure string normalizer cannot ENOENT a fixture file.
+- **Typecheck** `typecheck-routegroup-20260803.txt`: `bun run typecheck:packages` (tsgo) → EXIT 0.
+
+The end-to-end route-group case is NOT `skipIf(win32)` — percent-encoding mismatch is
+cross-platform, so it runs on every CI OS, unlike the drive-letter case.
+
 ## Residuals / out of scope
 
 - The base transport `diagnosticsStore` is stored by the server URI and deleted by
   `pathToFileURL` state URI, so a drive-case difference could leave a stale entry there. It is not
   on the user-visible diagnostics path (`getStoredDiagnostics` is overridden to read `openByUri`),
   so it is intentionally left untouched to keep blast radius minimal.
-- Non-drive-letter URI quirks (percent-encoding, separators) are not addressed; the reported and
-  reproduced defect is drive-letter case only.
+- A path whose real filename literally contains the characters `%28` (rather than `(`) would,
+  after one decode, collide with a `(` path. This ambiguity is inherent to percent-encoding and
+  already present in the LSP wire protocol both peers use; folding to the decoded form is the
+  pragmatic canonical direction and matches the raw spelling `pathToFileURL` emits for these
+  characters. No such collision is reachable from a real editor workspace.
 
 ## Omitted
 

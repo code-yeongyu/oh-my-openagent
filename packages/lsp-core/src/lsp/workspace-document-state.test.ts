@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import type { Diagnostic } from "./types.js";
 import { normalizeDocumentUri, WorkspaceDocumentState } from "./workspace-document-state.js";
@@ -109,6 +110,60 @@ describe("WorkspaceDocumentState drive-letter case (issue #6167)", () => {
 			}
 		},
 	);
+});
+
+describe("WorkspaceDocumentState percent-encoded route-group URIs (issue #6167)", () => {
+	it("#given raw and percent-encoded forms of one path #when normalized #then both fold to the same key", () => {
+		const raw = pathToFileURL(join(tmpdir(), "app", "(auth)", "login.tsx")).href;
+		const encoded = raw.replaceAll("(", "%28").replaceAll(")", "%29");
+		expect(encoded).not.toBe(raw);
+		expect(normalizeDocumentUri(encoded)).toBe(normalizeDocumentUri(raw));
+	});
+
+	it("#given a percent-encoded space #when normalized #then it folds to the raw spelling", () => {
+		expect(normalizeDocumentUri("file:///srv/my%20app/x.ts", "linux")).toBe("file:///srv/my app/x.ts");
+	});
+
+	it("#given a malformed escape sequence #when normalized #then the URI is left untouched", () => {
+		expect(normalizeDocumentUri("file:///srv/100%bad/x.ts", "linux")).toBe("file:///srv/100%bad/x.ts");
+	});
+
+	it("#given a server publishes a route-group path percent-encoded #when the open document is resolved #then the diagnostics are recorded, not dropped", async () => {
+		// given: an open document under a route-group directory, keyed by pathToFileURL (parens left raw)
+		const dir = mkdtempSync(join(tmpdir(), "omo-lsp-uri-6167-group-"));
+		const groupDir = join(dir, "app", "(auth)");
+		mkdirSync(groupDir, { recursive: true });
+		const filePath = join(groupDir, "login.ts");
+		writeFileSync(filePath, "export const value = 1\n");
+		try {
+			const documents = new WorkspaceDocumentState(
+				async () => {},
+				() => {},
+				{ versionlessPublishQuiescenceMs: 0 },
+			);
+			await documents.openFile(filePath);
+			const snapshot = documents.captureDiagnosticSnapshot(filePath);
+			if (snapshot === null) throw new Error("expected an open-document snapshot");
+
+			// typescript-language-server publishes .../%28auth%29/... while openByUri is keyed .../(auth)/...
+			const publishedUri = snapshot.uri.replaceAll("(", "%28").replaceAll(")", "%29");
+			expect(publishedUri).not.toBe(snapshot.uri);
+
+			const diagnostic: Diagnostic = {
+				range: { start: { line: 0, character: 13 }, end: { line: 0, character: 18 } },
+				severity: 1,
+				message: "Type 'number' is not assignable to type 'string'.",
+			};
+
+			// when: the encoded URI flows through recordPublishedDiagnostics, as the transport does
+			documents.recordPublishedDiagnostics({ uri: publishedUri, diagnostics: [diagnostic] });
+
+			// then: the push resolves ready for the open snapshot instead of timing out as "missing"
+			expect(documents.resolvePushDiagnostics(snapshot)).toEqual({ status: "ready", diagnostics: [diagnostic] });
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
 });
 
 function notificationChanges(value: unknown): readonly unknown[] {

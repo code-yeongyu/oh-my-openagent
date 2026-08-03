@@ -1,0 +1,10 @@
+command: bun test packages/lsp-core/src/lsp/workspace-document-state.test.ts
+state:   encoding fold applied in normalizeDocumentUri()
+---
+bun test v1.3.14 (0d9b296a)
+
+ 9 pass
+ 0 fail
+ 20 expect() calls
+Ran 9 tests across 1 file. [1025.00ms]
+EXIT_STATUS=0

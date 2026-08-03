@@ -81,12 +81,33 @@ export interface WorkspaceDocumentStateOptions {
 
 const FILE_URI_DRIVE_LETTER = /^(file:\/\/\/)([a-zA-Z]):/;
 
-// On Windows, pathToFileURL keys openByUri with the realpath drive-letter case
-// (file:///C:/...), but language servers may publish their own case
-// (PowerShell Editor Services sends file:///c:/..., issue #6167).
+// openByUri is keyed by pathToFileURL(realpath), but language servers publish their own
+// spelling of the same path (issue #6167). Two variants are known to diverge:
+// the drive-letter case on Windows (PowerShell Editor Services sends file:///c:/...) and
+// percent-encoding of path characters (typescript-language-server sends %28auth%29 where
+// pathToFileURL leaves "(auth)" raw). Folding both here keeps the store key and every
+// lookup on one canonical form; state.uri and outgoing wire URIs are left untouched.
 export function normalizeDocumentUri(uri: string, platform: NodeJS.Platform = process.platform): string {
-	if (platform !== "win32") return uri;
-	return uri.replace(FILE_URI_DRIVE_LETTER, (_match, scheme: string, drive: string) => `${scheme}${drive.toUpperCase()}:`);
+	const canonical = canonicalizeFileUriEncoding(uri);
+	if (platform !== "win32") return canonical;
+	return canonical.replace(
+		FILE_URI_DRIVE_LETTER,
+		(_match, scheme: string, drive: string) => `${scheme}${drive.toUpperCase()}:`,
+	);
+}
+
+// Folds percent-escapes so raw and encoded spellings of one path converge. This stays a
+// pure string operation on purpose: routing through fileURLToPath would re-encode a
+// drive-like POSIX URI (file:///c:/... becomes file:///c%3A/... on Linux) and throw on
+// Windows for paths with no drive, both of which change keys this must leave alone.
+// A malformed escape sequence is left exactly as received.
+function canonicalizeFileUriEncoding(uri: string): string {
+	if (!uri.startsWith("file://") || !uri.includes("%")) return uri;
+	try {
+		return decodeURIComponent(uri);
+	} catch {
+		return uri;
+	}
 }
 
 function canonicalPath(filePath: string): string {

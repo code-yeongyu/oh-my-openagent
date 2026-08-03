@@ -1,0 +1,76 @@
+command: bun test packages/lsp-core/src/lsp/workspace-document-state.test.ts
+state:   product file reverted to HEAD (git diff on it is empty); new test cases present
+expect:  the three route-group cases FAIL
+---
+bun test v1.3.14 (0d9b296a)
+
+packages\lsp-core\src\lsp\workspace-document-state.test.ts:
+115 | describe("WorkspaceDocumentState percent-encoded route-group URIs (issue #6167)", () => {
+116 | 	it("#given raw and percent-encoded forms of one path #when normalized #then both fold to the same key", () => {
+117 | 		const raw = pathToFileURL(join(tmpdir(), "app", "(auth)", "login.tsx")).href;
+118 | 		const encoded = raw.replaceAll("(", "%28").replaceAll(")", "%29");
+119 | 		expect(encoded).not.toBe(raw);
+120 | 		expect(normalizeDocumentUri(encoded)).toBe(normalizeDocumentUri(raw));
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: "file:///C:/Users/pss/AppData/Local/Temp/app/(auth)/login.tsx"
+Received: "file:///C:/Users/pss/AppData/Local/Temp/app/%28auth%29/login.tsx"
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\lsp-core\src\lsp\workspace-document-state.test.ts:120:41)
+(fail) WorkspaceDocumentState percent-encoded route-group URIs (issue #6167) > #given raw and percent-encoded forms of one path #when normalized #then both fold to the same key [5.51ms]
+119 | 		expect(encoded).not.toBe(raw);
+120 | 		expect(normalizeDocumentUri(encoded)).toBe(normalizeDocumentUri(raw));
+121 | 	});
+122 | 
+123 | 	it("#given a percent-encoded space #when normalized #then it folds to the raw spelling", () => {
+124 | 		expect(normalizeDocumentUri("file:///srv/my%20app/x.ts", "linux")).toBe("file:///srv/my app/x.ts");
+                                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: "file:///srv/my app/x.ts"
+Received: "file:///srv/my%20app/x.ts"
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\lsp-core\src\lsp\workspace-document-state.test.ts:124:70)
+(fail) WorkspaceDocumentState percent-encoded route-group URIs (issue #6167) > #given a percent-encoded space #when normalized #then it folds to the raw spelling [5.41ms]
+157 | 
+158 | 			// when: the encoded URI flows through recordPublishedDiagnostics, as the transport does
+159 | 			documents.recordPublishedDiagnostics({ uri: publishedUri, diagnostics: [diagnostic] });
+160 | 
+161 | 			// then: the push resolves ready for the open snapshot instead of timing out as "missing"
+162 | 			expect(documents.resolvePushDiagnostics(snapshot)).toEqual({ status: "ready", diagnostics: [diagnostic] });
+                                                            ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "diagnostics": [
+-     {
+-       "message": "Type 'number' is not assignable to type 'string'.",
+-       "range": {
+-         "end": {
+-           "character": 18,
+-           "line": 0,
+-         },
+-         "start": {
+-           "character": 13,
+-           "line": 0,
+-         },
+-       },
+-       "severity": 1,
+-     },
+-   ],
+-   "status": "ready",
++   "status": "missing",
+  }
+
+- Expected  - 17
++ Received  + 1
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\lsp-core\src\lsp\workspace-document-state.test.ts:162:55)
+(fail) WorkspaceDocumentState percent-encoded route-group URIs (issue #6167) > #given a server publishes a route-group path percent-encoded #when the open document is resolved #then the diagnostics are recorded, not dropped [68.88ms]
+
+ 6 pass
+ 3 fail
+ 20 expect() calls
+Ran 9 tests across 1 file. [1393.00ms]
+EXIT_STATUS=1
