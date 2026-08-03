@@ -28,9 +28,14 @@ export async function activateTmuxPane(
   }
 
   const authEnvArgs = buildPaneAuthEnvironmentArgs()
-  if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+  const isCmuxOmoLaunch = process.env.CMUX_AGENT_LAUNCH_KIND === "omo"
+  if ((isCmuxCompatEnvironment() || isCmuxOmoLaunch) && authEnvArgs.length > 0) {
     deps.log("[activateTmuxPane] SKIP: authenticated cmux panes are unsupported", { paneId, sessionId })
     return false
+  }
+  if (isCmuxOmoLaunch) {
+    deps.log("[activateTmuxPane] SKIP: cmux OMO pane is already attached", { paneId, sessionId })
+    return true
   }
 
   const tmux = await deps.getTmuxPath()

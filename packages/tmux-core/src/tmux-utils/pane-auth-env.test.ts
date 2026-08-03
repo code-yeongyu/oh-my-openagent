@@ -10,6 +10,7 @@ import { spawnTmuxWindow } from "./window-spawn"
 
 const originalTmux = process.env.TMUX
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
+const originalCmuxAgentLaunchKind = process.env.CMUX_AGENT_LAUNCH_KIND
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -96,6 +97,7 @@ describe("tmux pane auth environment propagation", () => {
 	beforeEach(() => {
 		process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
 		delete process.env.CMUX_SOCKET_PATH
+		delete process.env.CMUX_AGENT_LAUNCH_KIND
 	})
 
 	afterEach(() => {
@@ -104,6 +106,35 @@ describe("tmux pane auth environment propagation", () => {
 		else process.env.TMUX = originalTmux
 		if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
 		else process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
+		if (originalCmuxAgentLaunchKind === undefined) delete process.env.CMUX_AGENT_LAUNCH_KIND
+		else process.env.CMUX_AGENT_LAUNCH_KIND = originalCmuxAgentLaunchKind
+	})
+
+	it("#given an official cmux OMO pane #when activated #then it stays attached without respawn", async () => {
+		// given
+		setAuthEnv()
+		process.env.CMUX_AGENT_LAUNCH_KIND = "omo"
+		let tmuxPathResolved = false
+		let runnerCalled = false
+
+		// when
+		const result = await activateTmuxPane("%42", "session-cmux-omo", "http://127.0.0.1:4321", "/tmp/project", {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => {
+				tmuxPathResolved = true
+				return "tmux"
+			},
+			runTmuxCommand: async () => {
+				runnerCalled = true
+				return successResult()
+			},
+			log: () => undefined,
+		})
+
+		// then
+		expect(result).toBe(true)
+		expect(tmuxPathResolved).toBe(false)
+		expect(runnerCalled).toBe(false)
 	})
 
 	it("#given auth env vars with spaces #when activateTmuxPane respawns attach #then tmux receives env args and quoted attach values", async () => {
