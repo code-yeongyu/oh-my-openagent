@@ -40,7 +40,7 @@
     "typebox": "1.1.38"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": ">=2026.8.3-3"
+    "@code-yeongyu/senpi": "2026.8.3-3"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {

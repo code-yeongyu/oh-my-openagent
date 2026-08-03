@@ -18,6 +18,6 @@ describe("Senpi child runtime alignment", () => {
     }
 
     expect(manifest.devDependencies?.["@code-yeongyu/senpi"]).toBe(SUPPORTED_SENPI_VERSION)
-    expect(manifest.peerDependencies?.["@code-yeongyu/senpi"]).toBe(`>=${SUPPORTED_SENPI_VERSION}`)
+    expect(manifest.peerDependencies?.["@code-yeongyu/senpi"]).toBe(SUPPORTED_SENPI_VERSION)
   })
 })
