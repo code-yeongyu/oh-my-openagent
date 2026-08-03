@@ -10,11 +10,12 @@ function shellQuoteForNestedCommand(value: string): string {
     .replace(/"/g, '\\"')
 }
 
-export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, directory: string = process.cwd()): string {
+export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, directory: string = process.cwd(), opencodePath?: string): string {
+  const executable = opencodePath ? shellQuoteForNestedCommand(opencodePath) : "opencode"
   const escapedUrl = shellQuoteForNestedCommand(serverUrl)
   const escapedSessionId = shellQuoteForNestedCommand(sessionId)
   const escapedDirectory = shellQuoteForNestedCommand(directory || process.cwd())
-  return `${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
+  return `${TMUX_COMMAND_SHELL} -c "${executable} attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
 }
 
 export function buildTmuxPlaceholderCommand(description: string): string {

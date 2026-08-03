@@ -7,6 +7,8 @@ import type { TmuxCommandResult } from "../runner"
 import { isTmuxPaneCompatibleEnvironment } from "./environment"
 
 const paneSpawnSpecifier = import.meta.resolve("./pane-spawn")
+const originalCmuxAgentLaunchKind = process.env.CMUX_AGENT_LAUNCH_KIND
+const originalOpencodeBinPath = process.env.OPENCODE_BIN_PATH
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -81,6 +83,8 @@ async function loadSpawnTmuxPane(): Promise<typeof import("./pane-spawn").spawnT
 
 describe("spawnTmuxPane runner integration", () => {
 	beforeEach(() => {
+		delete process.env.CMUX_AGENT_LAUNCH_KIND
+		delete process.env.OPENCODE_BIN_PATH
 		mock.restore()
 		runTmuxCommandMock.mockClear()
 		isInsideTmuxMock.mockClear()
@@ -104,6 +108,13 @@ describe("spawnTmuxPane runner integration", () => {
 		isServerRunningMock.mockResolvedValue(true)
 		getTmuxPathMock.mockResolvedValue("sh")
 		isCmuxCompatEnvironmentMock.mockReturnValue(false)
+	})
+
+	afterEach(() => {
+		if (originalCmuxAgentLaunchKind === undefined) delete process.env.CMUX_AGENT_LAUNCH_KIND
+		else process.env.CMUX_AGENT_LAUNCH_KIND = originalCmuxAgentLaunchKind
+		if (originalOpencodeBinPath === undefined) delete process.env.OPENCODE_BIN_PATH
+		else process.env.OPENCODE_BIN_PATH = originalOpencodeBinPath
 	})
 
 	it("#given healthy tmux environment #when spawnTmuxPane called #then delegates split-window and select-pane to shared runner", async () => {
@@ -190,6 +201,25 @@ describe("spawnTmuxPane runner integration", () => {
 			expect(cmd).toContain("--dir")
 			expect(cmd).not.toContain("Focus this pane to attach.")
 			expect(cmd).not.toContain("while :; do sleep 86400; done")
+		})
+
+		it("#given official cmux OMO launch #when spawning a pane #then attaches eagerly with the resolved OpenCode path", async () => {
+			// given
+			process.env.CMUX_AGENT_LAUNCH_KIND = "omo"
+			process.env.OPENCODE_BIN_PATH = "/usr/bin/true"
+			const spawnTmuxPane = await loadSpawnTmuxPane()
+
+			// when
+			await spawnTmuxPane("session-cmux-omo", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/tmp/omo-project", "%0", "-h", createDeps())
+
+			// then
+			const cmd = getSplitWindowCommand()
+			expect(cmd).toContain("'/usr/bin/true' attach")
+			expect(cmd).not.toContain("Focus this pane to attach.")
+			if (process.platform !== "win32") {
+				const cleanShellResult = Bun.spawnSync(["/bin/sh", "-c", cmd], { env: { PATH: "/usr/bin:/bin" } })
+				expect(cleanShellResult.exitCode).toBe(0)
+			}
 		})
 
 		it("#given CMUX_SOCKET_PATH without TMUX #when spawnTmuxPane called #then reaches eager split-window attach", async () => {

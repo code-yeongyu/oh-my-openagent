@@ -2,6 +2,7 @@ import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
+import { bunWhich } from "@oh-my-opencode/utils/runtime"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
@@ -79,13 +80,15 @@ export async function spawnTmuxPane(
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
 	const authEnvArgs = buildPaneAuthEnvironmentArgs()
-	if (deps.isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+	const isCmuxOmoLaunch = process.env.CMUX_AGENT_LAUNCH_KIND === "omo"
+	if ((deps.isCmuxCompatEnvironment() || isCmuxOmoLaunch) && authEnvArgs.length > 0) {
 		log("[spawnTmuxPane] SKIP: authenticated cmux panes are unsupported")
 		return { success: false }
 	}
 
-	const initialCmd = deps.isCmuxCompatEnvironment()
-		? buildTmuxAttachCommand(serverUrl, sessionId, _directory)
+	const opencodePath = isCmuxOmoLaunch ? process.env.OPENCODE_BIN_PATH || bunWhich("opencode") || undefined : undefined
+	const initialCmd = deps.isCmuxCompatEnvironment() || isCmuxOmoLaunch
+		? buildTmuxAttachCommand(serverUrl, sessionId, _directory, opencodePath)
 		: buildTmuxPlaceholderCommand(description)
 
 	const args = [
