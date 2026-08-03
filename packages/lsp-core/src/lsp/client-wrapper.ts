@@ -20,7 +20,8 @@ import { loadInstallDecision } from "./server-install-state.js";
 import { findServerForExtension } from "./server-resolution.js";
 import type { ServerLookupResult } from "./types.js";
 
-const WORKSPACE_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"];
+const PRIMARY_MARKER = ".git";
+const FALLBACK_MARKERS = ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"];
 
 export function isDirectoryPath(filePath: string): boolean {
 	try {
@@ -30,6 +31,9 @@ export function isDirectoryPath(filePath: string): boolean {
 	}
 }
 
+// Prefer .git as the authoritative workspace boundary so that sub-package
+// markers (e.g. a nested pyproject.toml in a monorepo) don't shadow the real
+// project root. Only fall back to other markers when no .git is found.
 export function findWorkspaceRoot(filePath: string): string {
 	const abs = resolvePathInsideContext(filePath);
 	let dir = abs;
@@ -39,17 +43,24 @@ export function findWorkspaceRoot(filePath: string): string {
 	}
 
 	let prevDir = "";
+	let fallbackRoot: string | undefined;
 	while (dir !== prevDir) {
-		for (const marker of WORKSPACE_MARKERS) {
-			if (existsSync(join(dir, marker))) {
-				return dir;
+		if (existsSync(join(dir, PRIMARY_MARKER))) {
+			return dir;
+		}
+		if (fallbackRoot === undefined) {
+			for (const marker of FALLBACK_MARKERS) {
+				if (existsSync(join(dir, marker))) {
+					fallbackRoot = dir;
+					break;
+				}
 			}
 		}
 		prevDir = dir;
 		dir = dirname(dir);
 	}
 
-	return dirname(abs);
+	return fallbackRoot ?? dirname(abs);
 }
 
 export function resolvePathInsideContext(filePath: string): string {
