@@ -182,16 +182,18 @@ function runSelfTest() {
   if (!teamCommand.args.includes(SCENARIOS.team.prompt)) throw new Error("self-test: team command prompt is incomplete")
   if (!teamActiveCommand.args.includes(SCENARIOS["team-active"].prompt)) throw new Error("self-test: team-active command prompt is incomplete")
   if (SCENARIOS.team.customMessages?.[0]?.customType !== "senpi-task.team-message") throw new Error("self-test: team custom message is incomplete")
-  // Cost/cache-hit stats only exist once usage rides on the step that is still streaming, so the
-  // live-capture scenarios must attach usage to the step that keeps the row on screen.
-  const activeToolStep = SCENARIOS.active.childSteps.find((step) => step.type === "tool_call")
+  // The final tool step is the request still visible while the child is parked. It must carry a
+  // different cache rate from the prior cold request so live QA distinguishes latest from run rate.
+  const activeToolStep = SCENARIOS.active.childSteps.at(-1)
   if (!hasCostUsage(activeToolStep)) throw new Error("self-test: active child tool step must carry cost/cache usage")
+  if (SCENARIOS.active.childSteps.at(0)?.usage?.cacheRead !== 0) throw new Error("self-test: active child needs a cold first request")
   const teamActive = SCENARIOS["team-active"]
   const teamCreate = teamActive.parentSteps.find((step) => step.type === "tool_call" && step.name === "team_create")
   if (teamCreate === undefined) throw new Error("self-test: team-active must create a real team")
   if ((teamCreate.arguments.inline_spec?.members ?? []).length === 0) throw new Error("self-test: team-active team needs a member")
-  const memberToolStep = teamActive.childSteps.find((step) => step.type === "tool_call")
+  const memberToolStep = teamActive.childSteps.at(-1)
   if (!hasCostUsage(memberToolStep)) throw new Error("self-test: team-active member step must carry cost/cache usage")
+  if (teamActive.childSteps.at(0)?.usage?.cacheRead !== 0) throw new Error("self-test: team-active member needs a cold first request")
   if (env.SENPI_CODING_AGENT_DIR !== prepared.sandbox.agentDir || env.OPENAI_API_KEY !== undefined) throw new Error("self-test: env isolation failed")
   const oldOutDir = process.env.TASK_TUI_E2E_OUT_DIR
   process.env.TASK_TUI_E2E_OUT_DIR = receiptDir

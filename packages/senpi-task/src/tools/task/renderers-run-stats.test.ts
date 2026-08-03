@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { taskResultLines } from "./renderers"
+import type { ThemeColor } from "@code-yeongyu/senpi"
+
+import { renderTaskResultComponent, taskResultLines } from "./renderers"
+
+const TEST_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  italic: (text: string) => text,
+}
 
 describe("taskResultLines run stats", () => {
   test("#given terminal details with run stats #when rendered #then runtime and tps tokens are appended", () => {
@@ -29,6 +36,35 @@ describe("taskResultLines run stats", () => {
 
     // then
     expect(line).toContain("ran:2m14s")
+    expect(line).toContain("tools:5")
+    expect(line).toContain("tps:118")
+  })
+
+  test("#given terminal details with run stats #when the width-aware result renders #then runtime tools and tps follow the completed status", () => {
+    // given
+    const details = {
+      task_id: "st_00000009",
+      status: "completed",
+      mode: "spawn" as const,
+      category: "deep",
+      execution_mode: "in-process",
+      model: "kimi-coding/kimi-k3-unlocked",
+      run_in_background: false,
+      run_stats: {
+        runtime_ms: 134_000,
+        turns: 3,
+        tool_calls: 5,
+        output_tokens: 900,
+        tokens_per_second: 118,
+      },
+    }
+
+    // when
+    const [line = ""] = renderTaskResultComponent(details, TEST_THEME).render(240)
+
+    // then
+    expect(line).toContain("foreground completed")
+    expect(line).toContain("ran:2m14s tools:5")
     expect(line).toContain("tps:118")
   })
 
@@ -46,7 +82,8 @@ describe("taskResultLines run stats", () => {
         output_tokens: 900,
         tokens_per_second: 118,
         cost_usd: 0.42131,
-        cache_hit_rate: 0.8712,
+        cache_hit_rate_last: 0.2,
+        cache_hit_rate_run: 0.8712,
       },
     }
 
@@ -87,7 +124,8 @@ describe("taskResultLines run stats", () => {
         tool_calls: 0,
         tokens_per_second: 10,
         cost_usd: Number.POSITIVE_INFINITY,
-        cache_hit_rate: 2,
+        cache_hit_rate_last: 0.2,
+        cache_hit_rate_run: 2,
       },
     })
 

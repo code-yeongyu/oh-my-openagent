@@ -68,7 +68,8 @@ describe("manager run stats wiring", () => {
     // then: cacheRead 300 of (100 + 300 + 100) = 60%
     const stats = store.load(started.task_id)?.run_stats
     expect(stats?.cost_usd).toBeCloseTo(0.12, 10)
-    expect(stats?.cache_hit_rate).toBeCloseTo(0.6, 10)
+    expect(stats?.cache_hit_rate_last).toBeCloseTo(0.6, 10)
+    expect(stats?.cache_hit_rate_run).toBeCloseTo(0.6, 10)
   })
 
   test("#given a live child with cost usage #when the snapshot is read mid-run #then cost and cache facts are already visible", async () => {
@@ -79,13 +80,21 @@ describe("manager run stats wiring", () => {
     const fake = inProcess.handles.get(started.task_id)
     if (fake === undefined) throw new Error("fake handle missing")
 
-    // when: usage arrives while the child is still running
+    // when: a cold-ish turn then a hot turn arrive while the child is still running
     fake.emit({
       type: "message_end",
       message: {
         role: "assistant",
         content: [{ type: "text", text: "partial" }],
-        usage: { input: 50, output: 10, cacheRead: 150, cacheWrite: 0, totalTokens: 210, cost: 0.0075 },
+        usage: { input: 50, output: 10, cacheRead: 50, cacheWrite: 0, totalTokens: 110, cost: 0.0025 },
+      },
+    })
+    fake.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "hot" }],
+        usage: { input: 10, output: 10, cacheRead: 90, cacheWrite: 0, totalTokens: 110, cost: 0.005 },
       },
     })
 
@@ -95,7 +104,8 @@ describe("manager run stats wiring", () => {
     if (snapshot === undefined) throw new Error("manager must expose runStatsSnapshot for live rows")
     const live = snapshot.call(manager, started.task_id)
     expect(live?.cost_usd).toBeCloseTo(0.0075, 10)
-    expect(live?.cache_hit_rate).toBeCloseTo(0.75, 10)
+    expect(live?.cache_hit_rate_last).toBeCloseTo(0.9, 10)
+    expect(live?.cache_hit_rate_run).toBeCloseTo(140 / 200, 10)
   })
 
   test("#given a spawned child #when it fails #then run stats persist on the error record", async () => {

@@ -86,7 +86,11 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
 
-      const statusUi = createTaskStatusUi({ manager: engine.manager, runtime: engine.runtime })
+      const statusUi = createTaskStatusUi({
+        manager: engine.manager,
+        runtime: engine.runtime,
+        terminalWidth: () => process.stdout.columns,
+      })
       engine.onStoreMutation(() => statusUi.scheduleSync())
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
