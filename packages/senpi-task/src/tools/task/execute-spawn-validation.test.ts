@@ -79,7 +79,7 @@ describe("buildTaskExecute spawn validation", () => {
 
     const result = await execute(
       "c",
-      { prompt: "p", category: "architect", model: "quotio-openai/gpt-5.4-mini-fast" },
+      { prompt: "p", category: "architect", model: "quotio-openai/gpt-5.6-luna-fast" },
       undefined,
       undefined,
       CTX,

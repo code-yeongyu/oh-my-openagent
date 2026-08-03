@@ -21,6 +21,7 @@ export function buildStartSpec(
   const executionMode = resolvedTaskExecutionMode(target, deps)
   return {
     prompt: skills.prepend + params.prompt,
+    ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
     parent_session_id: parentSessionId,
     root_session_id: ancestry?.rootSessionId ?? parentSessionId,
     depth: (ancestry?.depth ?? 0) + 1,
@@ -66,6 +67,7 @@ export function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: bool
   return {
     prompt: item.prompt,
     ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
+    ...(item.task_summary !== undefined && { task_summary: item.task_summary }),
     ...(item.description !== undefined && { description: item.description }),
     ...(item.name !== undefined && { name: item.name }),
     ...(item.model !== undefined && { model: item.model }),

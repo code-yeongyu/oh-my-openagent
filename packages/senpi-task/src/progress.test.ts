@@ -11,6 +11,19 @@ const RESOLVED_MODEL = {
 } as const
 
 describe("child task progress", () => {
+  test("#given a task summary #when progress is composed #then the activity identity is the summary", () => {
+    // given
+    const progress = createChildProgress(
+      "st_00000001",
+      { category: "quick", taskSummary: "Audit the boundary", description: "quick label" },
+      1_000,
+      () => 1_000,
+    )
+
+    // then
+    expect(progress.details().progress.activity.startsWith("Audit the boundary")).toBe(true)
+  })
+
   test("#given child events #when progress is composed #then activity carries target, model, turn and tool counts", () => {
     // given
     let nowMs = 1_000
@@ -84,7 +97,7 @@ describe("child task progress", () => {
 
     // then
     const details = progress.details()
-    expect(details.progress.activity).toBe("st_00000002 · momus · turn 1 (2 tools) · running grep TODO")
+    expect(details.progress.activity).toBe("st_00000002 · agent:momus · turn 1 (2 tools) · running grep TODO")
     expect(details.currentTool).toBe("grep TODO")
     expect(details.toolCalls).toBe(2)
   })
@@ -99,7 +112,7 @@ describe("child task progress", () => {
     )
 
     // when
-    progress.accept({ type: "retry_fallback_applied", to: "quotio-openai/gpt-5.4-mini-fast:high" })
+    progress.accept({ type: "retry_fallback_applied", to: "quotio-openai/gpt-5.6-luna-fast:high" })
     progress.accept({ type: "retry_fallback_applied", to: "anthropic-api/claude-haiku-4-5:medium" })
 
     // then

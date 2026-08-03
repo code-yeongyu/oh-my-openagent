@@ -1,4 +1,5 @@
 import type { TaskRunStats } from "../state"
+import { formatCacheHitPercent, formatCostUsd, formatRunSpend } from "../status-line"
 
 export function formatRunDuration(durationMs: number): string {
   const totalSeconds = Math.max(0, Math.round(durationMs / 1_000))
@@ -10,17 +11,27 @@ export function formatRunDuration(durationMs: number): string {
   return `${seconds}s`
 }
 
-// Prose-style suffix for the task_output status row: ` · ran 2m 14s · 118 tok/s`.
+// Prose-style suffix for the task_output status row: ` · ran 2m 14s · $0.4213 (CH: 87%) · 118 tok/s`.
+// Spend reads immediately before throughput so the money fact and the speed fact stay adjacent.
 export function runStatsSuffix(stats: TaskRunStats | undefined): string {
   if (stats === undefined) return ""
   const parts = [`ran ${formatRunDuration(stats.runtime_ms)}`]
+  const spend = formatRunSpend(stats)
+  if (spend !== undefined) parts.push(spend)
   if (stats.tokens_per_second !== undefined) parts.push(`${stats.tokens_per_second} tok/s`)
   return parts.map((part) => ` · ${part}`).join("")
 }
 
-// Token-style fragments for the task result row: `ran:2m14s tps:118`.
+// Token-style fragments for the task result row: `ran:2m14s cost:$0.4213 ch:87% tps:118`.
 export function runStatsResultTokens(stats: TaskRunStats | undefined): readonly string[] {
   if (stats === undefined) return []
   const duration = formatRunDuration(stats.runtime_ms).replaceAll(" ", "")
-  return [`ran:${duration}`, ...(stats.tokens_per_second === undefined ? [] : [`tps:${stats.tokens_per_second}`])]
+  const cost = formatCostUsd(stats.cost_usd)
+  const cacheHit = formatCacheHitPercent(stats.cache_hit_rate_run)
+  return [
+    `ran:${duration}`,
+    ...(cost === undefined ? [] : [`cost:${cost}`]),
+    ...(cacheHit === undefined ? [] : [`ch:${cacheHit.slice(5, -1)}`]),
+    ...(stats.tokens_per_second === undefined ? [] : [`tps:${stats.tokens_per_second}`]),
+  ]
 }

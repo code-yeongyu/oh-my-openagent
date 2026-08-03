@@ -2,6 +2,7 @@ import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry"
 import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
 import { isPlainRecord } from "@oh-my-opencode/utils"
 
+import { clampTaskSummary } from "../task-summary"
 import { SenpiTeamSpecError } from "./errors"
 
 /**
@@ -73,6 +74,20 @@ function remapAgentAliasKind(members: readonly unknown[]): unknown[] {
   })
 }
 
+// Harness-side length enforcement mirroring the task tool: an over-limit member task_summary is
+// clamped BEFORE TeamSpecSchema.parse so it truncates instead of rejecting the whole spec.
+function clampMemberTaskSummaries(members: readonly unknown[]): unknown[] {
+  return members.map((member) => {
+    if (!isPlainRecord(member) || typeof member.task_summary !== "string") return member
+    const clamped = clampTaskSummary(member.task_summary)
+    if (clamped === undefined) {
+      const { task_summary: _dropped, ...rest } = member
+      return rest
+    }
+    return { ...member, task_summary: clamped }
+  })
+}
+
 function assertNoReservedMemberName(members: readonly unknown[], teamName: string): void {
   for (const member of members) {
     if (isPlainRecord(member) && member.name === TEAM_LEAD_SENTINEL) {
@@ -115,7 +130,7 @@ export function normalizeSenpiTeamSpec(
 
   const preNormalized: Record<string, unknown> = { ...normalized }
   if (Array.isArray(preNormalized.members)) {
-    const members = remapAgentAliasKind(preNormalized.members)
+    const members = clampMemberTaskSummaries(remapAgentAliasKind(preNormalized.members))
     assertNoReservedMemberName(members, teamName)
     preNormalized.members = members
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { ULW_LOOP_FOOTER_FRAMES } from "./footer-status"
 import { createUlwLoopComponent } from "./index"
 import {
   activeStatus,
@@ -175,5 +176,46 @@ describe("omo-senpi ulw-loop continuation", () => {
     await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
 
     expect(pi.userMessages).toEqual([])
+  })
+
+  it("#given goal active before ulw-loop #when a shell tool result activates the run #then the footer starts immediately", async () => {
+    for (const toolName of ["bash", "interactive_bash"]) {
+      const pi = new FakeExtensionAPI()
+      const outputs = [completeStatus(), activeStatus()]
+      const calls: Array<{ bin: string; args: readonly string[]; cwd: string }> = []
+      const footerCalls: Array<{ key: string; text: string | undefined }> = []
+      await createUlwLoopComponent({
+        resolveOmoBin: () => "/tmp/omo",
+        runCommand: async (bin, args, options) => {
+          calls.push({ bin, args, cwd: options.cwd })
+          return { code: 0, stdout: outputs.shift() ?? activeStatus() }
+        },
+        footerStatus: {
+          isGoalActive: () => true,
+          timers: {
+            set: () => 1,
+            clear: () => undefined,
+          },
+        },
+      }).register(pi, { logger: createLogger(), config: { getFlag: () => false } })
+      const eventCtx = {
+        cwd: "/repo",
+        ui: {
+          setStatus(key: string, text: string | undefined) {
+            footerCalls.push({ key, text })
+          },
+        },
+      }
+
+      await pi.dispatch("session_start", { type: "session_start" }, eventCtx)
+      await pi.dispatch("tool_result", { toolName: "read" }, eventCtx)
+      await pi.dispatch("tool_result", { toolName }, eventCtx)
+
+      expect(calls).toEqual([
+        { bin: "/tmp/omo", args: ["ulw-loop", "status", "--json"], cwd: "/repo" },
+        { bin: "/tmp/omo", args: ["ulw-loop", "status", "--json"], cwd: "/repo" },
+      ])
+      expect(footerCalls).toEqual([{ key: "ulw-loop", text: ULW_LOOP_FOOTER_FRAMES[0] }])
+    }
   })
 })

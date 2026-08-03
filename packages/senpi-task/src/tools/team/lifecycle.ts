@@ -2,11 +2,12 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
 
+import { TASK_SUMMARY_MAX_LENGTH } from "../../task-summary"
 import { SenpiTeamRuntimeError, SenpiTeamSpecError } from "../../team"
 import type { CreatedMemberInfo } from "../../team"
 import type { ResolvedModelRecord } from "../../state"
+import { formatTargetIdentity, formatTargetWithModel } from "../../status-line"
 import { toolResult } from "../control"
-import { qualifyResolvedModelDisplay } from "../task/resolved-model-display"
 import type { TeamToolDeps, TeamToolsService } from "./types"
 
 const InlineTeamSpecMemberSchema = Type.Object(
@@ -20,6 +21,12 @@ const InlineTeamSpecMemberSchema = Type.Object(
     category: Type.Optional(Type.String({ description: "Category to route this member through (kind category)." })),
     subagent_type: Type.Optional(Type.String({ description: "Agent definition to run this member as (kind subagent_type or agent)." })),
     prompt: Type.Optional(Type.String({ description: "Member instructions; MUST be written in English." })),
+    task_summary: Type.Optional(
+      Type.String({
+        maxLength: TASK_SUMMARY_MAX_LENGTH,
+        description: "One-line summary of this member's assigned work, shown in the task footer/widget UI. Longer values are force-truncated to 80 chars.",
+      }),
+    ),
   },
   { additionalProperties: true },
 )
@@ -62,6 +69,7 @@ export type TeamCreateMemberView = {
   readonly task_id: string
   readonly model?: ResolvedModelRecord
   readonly prompt_excerpt?: string
+  readonly task_summary?: string
 }
 
 export type TeamCreateDetails =
@@ -123,6 +131,7 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
       task_id: member.taskId,
       ...(member.model !== undefined ? { model: member.model } : {}),
       ...(member.promptExcerpt !== undefined ? { prompt_excerpt: member.promptExcerpt } : {}),
+      ...(member.taskSummary !== undefined ? { task_summary: member.taskSummary } : {}),
     }))
     const lines = [
       `Created team '${state.teamName}' (${state.teamRunId}) with ${members.length} members.`,
@@ -157,23 +166,21 @@ export async function runTeamDelete(service: TeamToolsService, params: TeamDelet
 }
 
 function formatMemberRole(role: CreatedMemberInfo["role"]): string {
-  return role.kind === "category" ? `category:${role.category}` : `subagent_type:${role.subagentType}`
+  return formatTargetIdentity(
+    role.kind === "category" ? { category: role.category } : { agentType: role.subagentType },
+  ) ?? "task"
 }
 
 // Prompt excerpts stay in details, never in the text lines: echoing raw member prompts into the
 // lead conversation lets their content spoof scanners that match markers in the message stream
 // (e2e role detection, keyword triggers).
 function formatCreatedMemberLine(member: CreatedMemberInfo): string {
-  return `- ${member.name} [${member.status}] ${formatMemberRole(member.role)}${formatModelSegment(member.model)} task:${member.taskId}`
-}
-
-function formatModelSegment(model: ResolvedModelRecord | undefined): string {
-  if (model === undefined) return ""
-  const display = qualifyResolvedModelDisplay(model.provider, model.display) ?? model.model_id
-  const reasoningValue = model.reasoning ?? model.reasoning_effort
-  const reasoning = reasoningValue === undefined ? "" : ` reasoning:${reasoningValue}`
-  const variant = model.variant === undefined ? "" : ` variant:${model.variant}`
-  return ` (${display}${reasoning}${variant})`
+  const target = formatTargetWithModel({
+    category: member.role.kind === "category" ? member.role.category : undefined,
+    agentType: member.role.kind === "category" ? undefined : member.role.subagentType,
+    resolvedModel: member.model,
+  })
+  return `- ${member.name} [${member.status}] ${target ?? formatMemberRole(member.role)} task:${member.taskId}`
 }
 
 export function createTeamCreateTool(deps: TeamToolDeps): ToolDefinition {

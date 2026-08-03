@@ -306,7 +306,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "custom-agent", model)
 
     // then
-    expect(variant).toBe("xhigh")
+    expect(variant).toBe("max")
   })
 
   test("returns xhigh for oracle's openai GPT-5.6 Sol primary", () => {

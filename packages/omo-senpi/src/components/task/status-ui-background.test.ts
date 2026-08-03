@@ -135,6 +135,62 @@ describe("createTaskStatusUi.background progress", () => {
     expect(listCalls).toBe(1)
   })
 
+  it("#given live solo and process-member rows with cost and cache facts #when rendered #then the cost token sits immediately before tps", () => {
+    // given: st_solo is an in-process solo task, st_member is an rpc-backed team member
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const solo = record({ task_id: "st_solo", name: "Solo", status: "running", category: "quick" })
+    const member = record({ task_id: "st_member", name: "Member", status: "running", category: "quick", execution_mode: "process", pid: 4242 })
+    const manager: StatusUiManager = {
+      list: () => listed([solo, member]),
+      wasBackground: () => true,
+      subscribeChild: () => () => undefined,
+      runStatsSnapshot: (taskId) =>
+        taskId === "st_solo"
+          ? {
+              runtime_ms: 1_000,
+              turns: 2,
+              tool_calls: 1,
+              tokens_per_second: 40,
+              cost_usd: 0.4213,
+              cache_hit_rate_last: 0.8712,
+              cache_hit_rate_run: 0.4,
+            }
+          : {
+              runtime_ms: 1_000,
+              turns: 1,
+              tool_calls: 0,
+              tokens_per_second: 12,
+              cost_usd: 0.017,
+              cache_hit_rate_last: 0.5,
+              cache_hit_rate_run: 0.1,
+            },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({
+      manager,
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
+      timers,
+      now: () => Date.parse("2026-07-07T00:00:01.000Z"),
+    })
+
+    // when
+    statusUi.syncNow()
+
+    // then
+    const rows = ui.widgetCalls.at(-1)?.content ?? []
+    expect(rows[0]).toContain("$0.4213 (CH: 87%) · 40 tok/s")
+    expect(rows[1]).toContain("$0.0170 (CH: 50%) · 12 tok/s")
+  })
+
   it("#given a live refresh timer #when the final background task completes #then the timer stops", () => {
     // given
     const active = new Map<number, () => void>()
@@ -192,8 +248,8 @@ describe("createTaskStatusUi.background progress", () => {
       resolved_model: {
         source: "category",
         provider: "quotio-openai",
-        model_id: "gpt-5.4-mini-fast",
-        display: "quotio-openai/gpt-5.4-mini-fast",
+        model_id: "gpt-5.6-luna-fast",
+        display: "quotio-openai/gpt-5.6-luna-fast",
         reasoning_effort: "high",
       },
       fallback_attempts: [
@@ -206,8 +262,8 @@ describe("createTaskStatusUi.background progress", () => {
         {
           source: "category",
           provider: "quotio-openai",
-          model_id: "gpt-5.4-mini-fast",
-          display: "quotio-openai/gpt-5.4-mini-fast",
+          model_id: "gpt-5.6-luna-fast",
+          display: "quotio-openai/gpt-5.6-luna-fast",
           reasoning_effort: "high",
         },
       ],
@@ -221,8 +277,8 @@ describe("createTaskStatusUi.background progress", () => {
       resolved_model: {
         source: "agent",
         provider: "quotio-openai",
-        model_id: "gpt-5.4-mini-fast",
-        display: "quotio-openai/gpt-5.4-mini-fast",
+        model_id: "gpt-5.6-luna-fast",
+        display: "quotio-openai/gpt-5.6-luna-fast",
       },
     })
     const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
@@ -242,7 +298,7 @@ describe("createTaskStatusUi.background progress", () => {
     const statusUi = createTaskStatusUi({
       manager,
       runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
-      timers,
+      timers, terminalWidth: () => 220,
       now: () => Date.parse("2026-07-07T00:01:05.000Z"),
     })
 
@@ -253,8 +309,8 @@ describe("createTaskStatusUi.background progress", () => {
     for (const callback of [...active.values()]) callback()
 
     expect(ui.widgetCalls.at(-1)?.content).toEqual([
-      "⠋ Investig... · category:quick(quotio-openai/gpt-5.4-mini-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · rea...",
-      "⠋ Review t... · agent:explore · model:gpt-5.4-mini-fast · turn 1 (2 tools) · bash bun test · 1m 5s",
+      "⠋ Investigate the unexpectedly long background child description · category:quick(quotio-openai/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠋ Review tests · agent:explore(quotio-openai/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
     ])
     // C1: the duplicated footer task status line is gone; widget rows are the only task surface.
     expect(ui.statusCalls).toHaveLength(0)

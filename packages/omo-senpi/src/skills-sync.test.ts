@@ -8,6 +8,7 @@ const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
 const expectedSkillNames = [
   "ast-grep",
   "coding-agent-sessions",
+  "data-scientist",
   "debugging",
   "frontend",
   "git-master",
@@ -116,7 +117,7 @@ describe("OMO Senpi scoped skill sync", () => {
       const name = extractFrontmatterField(frontmatter, "name")
       expect(name, `${relative(repoRoot, skillFile)} frontmatter name must equal ${skillName}`).toBe(skillName)
 
-      const descriptionLine = frontmatter.match(/^description:\\s*(.*)$/m)?.[0] ?? ""
+      const descriptionLine = frontmatter.match(/^description:\s*(.*)$/m)?.[0] ?? ""
       expect(
         descriptionLine.length,
         `${relative(repoRoot, skillFile)} description line must be <= 1024 chars`,
@@ -189,6 +190,29 @@ describe("OMO Senpi scoped skill sync", () => {
   test("#given synced skill tree #when inspected #then no codex-only display metadata is packaged", () => {
     const openaiFiles = listFiles(skillsRoot).filter((file) => file.endsWith("agents/openai.yaml"))
     expect(openaiFiles.map((file) => relative(repoRoot, file))).toEqual([])
+  })
+
+  test("#given ported orchestration skills #when scanned #then no foreign-harness delegation guidance survives", () => {
+    const portedOrchestrationSkillNames = ["start-work", "ulw-plan"] as const
+    const foreignDelegationPattern = /\b(?:multi_agent|spawn_agent|lazycodex)\b/i
+    const leaks: string[] = []
+
+    for (const skillName of portedOrchestrationSkillNames) {
+      const skillRoot = join(skillsRoot, skillName)
+      if (!existsSync(skillRoot)) continue
+
+      for (const file of listFiles(skillRoot)) {
+        const content = readFileSync(file, "utf8")
+        if (foreignDelegationPattern.test(content)) {
+          leaks.push(`${relative(repoRoot, file)}: foreign delegation tool guidance`)
+        }
+        if (skillName === "ulw-plan" && /\boracle\b/i.test(content)) {
+          leaks.push(`${relative(repoRoot, file)}: oracle reviewer does not exist in omo-senpi`)
+        }
+      }
+    }
+
+    expect(leaks).toEqual([])
   })
 
   test("#given frontend skill #when inspected #then materialized design references exist", () => {

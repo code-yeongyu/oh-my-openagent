@@ -145,10 +145,24 @@ async function runScenario(name) {
   if (payload.result !== "PASS") process.exitCode = run.status || 1
 }
 
+// Cost is reported either as a plain number or as a per-bucket breakdown carrying `.total`; both
+// shapes must produce a visible `$cost (CH: rate%)` token, so both count as usable QA usage.
+function costTotal(cost) {
+  if (typeof cost === "number") return cost
+  return typeof cost?.total === "number" ? cost.total : undefined
+}
+
+function hasCostUsage(step) {
+  const usage = step?.usage
+  if (usage === undefined) return false
+  return (costTotal(usage.cost) ?? 0) > 0 && typeof usage.cacheRead === "number" && usage.cacheRead > 0
+}
+
 function runSelfTest() {
   if (parseArgs(["--scenario", "edge"]).scenario !== "edge") throw new Error("self-test: scenario parser failed")
   if (parseArgs(["--scenario", "active"]).scenario !== "active") throw new Error("self-test: active scenario parser failed")
   if (parseArgs(["--scenario", "team"]).scenario !== "team") throw new Error("self-test: team scenario parser failed")
+  if (parseArgs(["--scenario", "team-active"]).scenario !== "team-active") throw new Error("self-test: team-active scenario parser failed")
   try {
     parseArgs(["--scenario", "bogus"])
     throw new Error("self-test: bad scenario accepted")
@@ -160,12 +174,26 @@ function runSelfTest() {
   const command = composeCommand("/tmp/senpi", prepared.sessionDir, "full")
   const activeCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "active")
   const teamCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team")
+  const teamActiveCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team-active")
   const env = childEnv({ ...process.env, SENPI_CODING_AGENT_DIR: "/real/agent", OPENAI_API_KEY: "secret" }, prepared.sandbox, prepared.sessionDir, "/tmp/senpi")
   if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: TUI command must not force print/json mode")
   if (!command.args.includes(mockProviderEntry) || !command.args.includes("omo-mock") || !command.args.includes("mock-1")) throw new Error("self-test: mock provider command is incomplete")
   if (!activeCommand.args.includes(SCENARIOS.active.prompt)) throw new Error("self-test: active command prompt is incomplete")
   if (!teamCommand.args.includes(SCENARIOS.team.prompt)) throw new Error("self-test: team command prompt is incomplete")
+  if (!teamActiveCommand.args.includes(SCENARIOS["team-active"].prompt)) throw new Error("self-test: team-active command prompt is incomplete")
   if (SCENARIOS.team.customMessages?.[0]?.customType !== "senpi-task.team-message") throw new Error("self-test: team custom message is incomplete")
+  // The final tool step is the request still visible while the child is parked. It must carry a
+  // different cache rate from the prior cold request so live QA distinguishes latest from run rate.
+  const activeToolStep = SCENARIOS.active.childSteps.at(-1)
+  if (!hasCostUsage(activeToolStep)) throw new Error("self-test: active child tool step must carry cost/cache usage")
+  if (SCENARIOS.active.childSteps.at(0)?.usage?.cacheRead !== 0) throw new Error("self-test: active child needs a cold first request")
+  const teamActive = SCENARIOS["team-active"]
+  const teamCreate = teamActive.parentSteps.find((step) => step.type === "tool_call" && step.name === "team_create")
+  if (teamCreate === undefined) throw new Error("self-test: team-active must create a real team")
+  if ((teamCreate.arguments.inline_spec?.members ?? []).length === 0) throw new Error("self-test: team-active team needs a member")
+  const memberToolStep = teamActive.childSteps.at(-1)
+  if (!hasCostUsage(memberToolStep)) throw new Error("self-test: team-active member step must carry cost/cache usage")
+  if (teamActive.childSteps.at(0)?.usage?.cacheRead !== 0) throw new Error("self-test: team-active member needs a cold first request")
   if (env.SENPI_CODING_AGENT_DIR !== prepared.sandbox.agentDir || env.OPENAI_API_KEY !== undefined) throw new Error("self-test: env isolation failed")
   const oldOutDir = process.env.TASK_TUI_E2E_OUT_DIR
   process.env.TASK_TUI_E2E_OUT_DIR = receiptDir

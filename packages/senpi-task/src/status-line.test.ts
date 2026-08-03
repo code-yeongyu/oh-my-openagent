@@ -3,6 +3,23 @@ import { describe, expect, test } from "bun:test"
 import { composeStatusLine, formatStatusTarget, taskIdentityLabel } from "./status-line"
 
 describe("taskIdentityLabel", () => {
+  test("#given a task summary #when labelled #then the delegated-work summary wins over description, name and id", () => {
+    // given / when / then
+    expect(
+      taskIdentityLabel({
+        taskId: "st_00000001",
+        name: "task-1",
+        description: "quick label",
+        taskSummary: "Refactor auth into sessions",
+      }),
+    ).toBe("Refactor auth into sessions")
+  })
+
+  test("#given a blank task summary #when labelled #then it falls back to the description", () => {
+    // given / when / then
+    expect(taskIdentityLabel({ taskId: "st_00000001", description: "Audit renderers", taskSummary: "  " })).toBe("Audit renderers")
+  })
+
   test("#given a description #when labelled #then the human description wins over name and id", () => {
     // given / when / then
     expect(taskIdentityLabel({ taskId: "st_00000001", name: "task-1", description: "Audit renderers" })).toBe("Audit renderers")
@@ -41,18 +58,41 @@ describe("formatStatusTarget", () => {
         category: "quick",
         resolvedModel: {
           provider: "quotio-openai",
-          model_id: "gpt-5.4-mini-fast",
-          display: "gpt-5.4-mini-fast",
+          model_id: "gpt-5.6-luna-fast",
+          display: "gpt-5.6-luna-fast",
           reasoning_effort: "high",
           source: "category",
         },
       }),
-    ).toBe("category:quick(quotio-openai/gpt-5.4-mini-fast:high)")
+    ).toBe("category:quick(quotio-openai/gpt-5.6-luna-fast:high)")
   })
 
-  test("#given only an agent type #when formatted #then the agent name is the target", () => {
+  test("#given only an agent type #when formatted #then the agent target shares the category grammar", () => {
     // given / when / then
-    expect(formatStatusTarget({ agentType: "momus" })).toBe("momus")
+    expect(formatStatusTarget({ agentType: "momus" })).toBe("agent:momus")
+  })
+
+  test("#given an agent type and resolved model #when formatted #then model metadata qualifies the agent exactly like a category", () => {
+    // given / when / then
+    expect(
+      formatStatusTarget({
+        agentType: "momus",
+        resolvedModel: {
+          provider: "openai",
+          model_id: "gpt-5.6-sol-fast",
+          display: "gpt-5.6-sol-fast",
+          reasoning: "high",
+          source: "agent",
+        },
+      }),
+    ).toBe("agent:momus(openai/gpt-5.6-sol-fast:high)")
+  })
+
+  test("#given an agent type with only a raw model #when formatted #then the raw model qualifies the agent target", () => {
+    // given / when / then
+    expect(formatStatusTarget({ agentType: "explore", model: "anthropic/claude-sonnet-4-6" })).toBe(
+      "agent:explore(anthropic/claude-sonnet-4-6)",
+    )
   })
 
 
@@ -163,6 +203,39 @@ describe("composeStatusLine", () => {
 
     // then
     expect(line).toBe("Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · 62 tok/s")
+  })
+
+  test("#given cost and cache facts #when composed #then the cost token sits immediately before tps", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      target: "quick (kimi-coding/kimi-k3:max)",
+      stats: {
+        runtime_ms: 1_000,
+        turns: 3,
+        tool_calls: 7,
+        tokens_per_second: 62,
+        cost_usd: 0.4213,
+        cache_hit_rate_last: 0.8712,
+        cache_hit_rate_run: 0.4,
+      },
+      verb: "running read src/foo.ts",
+    })
+
+    // then
+    expect(line).toBe(
+      "Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · $0.4213 (CH: 87%) · 62 tok/s",
+    )
+  })
+
+  test("#given a cache hit rate without cost #when composed #then the cache token still renders before tps", () => {
+    // given / when / then
+    expect(
+      composeStatusLine({
+        identity: "t",
+        stats: { runtime_ms: 0, turns: 1, tool_calls: 0, tokens_per_second: 8, cache_hit_rate_last: 0.5, cache_hit_rate_run: 0.1 },
+      }),
+    ).toBe("t · turn 1 · (CH: 50%) · 8 tok/s")
   })
 
   test("#given a single tool call #when composed #then the tool noun is singular", () => {

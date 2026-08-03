@@ -9,33 +9,37 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
       name: "hephaestus",
       requirement: AGENT_MODEL_REQUIREMENTS.hephaestus,
       expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "medium",
     },
     {
       name: "momus",
       requirement: AGENT_MODEL_REQUIREMENTS.momus,
       expectedModel: "github-copilot/gpt-5.6-terra",
+      expectedVariant: "high",
     },
     {
       name: "ultrabrain",
       requirement: CATEGORY_MODEL_REQUIREMENTS.ultrabrain,
       expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "max",
     },
     {
       name: "deep",
       requirement: CATEGORY_MODEL_REQUIREMENTS.deep,
       expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "medium",
     },
     {
       name: "unspecified-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["unspecified-low"],
-      expectedModel: "github-copilot/gpt-5.6-luna",
+      expectedModel: "github-copilot/gpt-5.6-terra",
+      expectedVariant: "high",
     },
   ] as const
 
-  for (const { name, requirement, expectedModel } of selectionCases) {
+  for (const { name, requirement, expectedModel, expectedVariant } of selectionCases) {
     test(`${name} selects its Copilot GPT-5.6 model with its configured variant`, () => {
       // given
-      const expectedVariant = name === "hephaestus" ? "medium" : name === "deep" ? "medium" : "high"
       const availableModels = new Set([expectedModel, "github-copilot/gpt-5.5"])
 
       // when

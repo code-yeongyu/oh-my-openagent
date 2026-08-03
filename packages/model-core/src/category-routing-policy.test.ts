@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("category routing policy", () => {
-  test("visual-engineering prioritizes Opus max, Kimi K3 max, then GLM 5.2 max", () => {
+  test("visual-engineering prioritizes Opus max, Kimi K3 max, GLM 5.2 max, then Sol medium", () => {
     // given
     const visual = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -27,6 +27,11 @@ describe("category routing policy", () => {
         model: "glm-5.2",
         variant: "max",
       },
+      {
+        providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      },
     ])
   })
 
@@ -47,7 +52,7 @@ describe("category routing policy", () => {
     ])
   })
 
-  test("quick prioritizes kimi-for-coding-highspeed, gpt-5.4 mini fast minimal, then gpt-5.4 mini minimal", () => {
+  test("quick prioritizes Kimi high-speed, Luna low, DeepSeek off, then the speed tier", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -57,14 +62,29 @@ describe("category routing policy", () => {
     // then
     expect(leadingChain).toEqual([
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-      { providers: ["quotio-openai"], model: "gpt-5.4-mini-fast", variant: "minimal" },
-      { providers: ["openai"], model: "gpt-5.4-mini", variant: "minimal" },
+      { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      {
+        providers: ["deepseek"],
+        model: "deepseek-v4-flash",
+        variant: "off",
+      },
+      {
+        providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go", "vercel"],
+        model: "qwen3.6-flash",
+        variant: "low",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m3", variant: "max" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7", variant: "max" },
       { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
-      { providers: ["xiaomi"], model: "mimo-v2.5-pro-ultraspeed" },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "vercel"],
+        model: "claude-haiku-4-5",
+        variant: "off",
+      },
     ])
   })
 
-  test("unspecified-low follows the approved 7-rung chain", () => {
+  test("unspecified-low follows the approved 5-rung chain", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -74,19 +94,14 @@ describe("category routing policy", () => {
     // then
     expect(chain).toEqual([
       {
-        providers: ["openai", "quotio-openai", "vercel"],
-        model: "gpt-5.6-luna",
-        variant: "xhigh",
-      },
-      {
-        providers: ["github-copilot"],
-        model: "gpt-5.6-luna",
+        providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-terra",
         variant: "high",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
         model: "claude-sonnet-5",
-        variant: "medium",
+        variant: "low",
       },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
@@ -103,7 +118,6 @@ describe("category routing policy", () => {
         model: "mimo-v2.5-pro",
         variant: "max",
       },
-      { providers: ["cursor"], model: "composer-2.5" },
     ])
   })
 

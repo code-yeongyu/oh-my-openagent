@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentLogger } from "../../extension/types"
@@ -71,7 +74,89 @@ function visibleFrame(text: string | undefined): string | undefined {
   return text?.replaceAll("\u2800", "")
 }
 
+async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(), activeStatus()]) {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-footer-"))
+  const cwd = join(root, "project")
+  const sessionDir = join(root, "session")
+  const goalDir = join(cwd, ".omo", "goal")
+  mkdirSync(goalDir, { recursive: true })
+  mkdirSync(sessionDir, { recursive: true })
+  const timers = fakeTimers()
+  const ui = recordingUi()
+  const pi = new FakeExtensionAPI()
+  await createUlwLoopComponent({
+    resolveOmoBin: () => "/tmp/omo",
+    runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
+    footerStatus: { timers },
+  }).register(pi, {
+    logger: createLogger(),
+    config: { getFlag: () => false },
+  })
+  return {
+    context: {
+      cwd,
+      ui,
+      sessionManager: {
+        getSessionFile: () => join(sessionDir, "session.json"),
+        getSessionDir: () => sessionDir,
+        getSessionId: () => sessionId,
+      },
+    },
+    goalPath: join(goalDir, `${encodeURIComponent(sessionId)}.json`),
+    pi,
+    timers,
+    ui,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  }
+}
+
+function writeGoal(path: string, status: "active" | "complete"): void {
+  writeFileSync(path, `${JSON.stringify({ version: 1, goal: { status } })}\n`)
+}
+
 describe("omo-senpi ulw-loop footer status", () => {
+  it("reads the project goal store and publishes all four animation frames", async () => {
+    const scenario = await defaultFooterScenario("session-project-store")
+    try {
+      writeGoal(scenario.goalPath, "active")
+
+      await scenario.pi.dispatch("session_start", { type: "session_start" }, scenario.context)
+      scenario.timers.fire()
+      scenario.timers.fire()
+      scenario.timers.fire()
+
+      const frames = scenario.ui.calls.filter((call) => call.key === "ulw-loop").map((call) => call.text)
+      expect(frames.map(visibleFrame)).toEqual([
+        "⚡ ultraworking",
+        "⚡ ultraworking.",
+        "⚡ ultraworking..",
+        "⚡ ultraworking...",
+      ])
+      expect(scenario.timers.activeCount()).toBe(1)
+    } finally {
+      scenario.cleanup()
+    }
+  })
+
+  it("uses an encoded session id and clears when the project goal completes", async () => {
+    const scenario = await defaultFooterScenario("session/encoded")
+    try {
+      expect(scenario.goalPath).toEndWith("session%2Fencoded.json")
+      writeGoal(scenario.goalPath, "active")
+
+      await scenario.pi.dispatch("session_start", { type: "session_start" }, scenario.context)
+      expect(scenario.ui.calls.some((call) => call.key === "ulw-loop" && call.text !== undefined)).toBe(true)
+
+      writeGoal(scenario.goalPath, "complete")
+      await scenario.pi.dispatch("agent_end", { type: "agent_end" }, scenario.context)
+
+      expect(scenario.ui.calls.at(-1)).toEqual({ key: "ulw-loop", text: undefined })
+      expect(scenario.timers.activeCount()).toBe(0)
+    } finally {
+      scenario.cleanup()
+    }
+  })
+
   it("publishes animated ultraworking status only when goal and ulw-loop are active", async () => {
     const timers = fakeTimers()
     const ui = recordingUi()

@@ -50,7 +50,7 @@ const scenarios = [
     checks: (artifacts, stdoutText) => ({
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: artifacts.log.includes("retry_fallback_applied") ? "PASS" : "FAIL",
-      final_model: artifacts.task?.model === "quotio-openai/gpt-5.4-mini-fast" ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "quotio-openai/gpt-5.6-luna-fast" ? "PASS" : "FAIL",
       requested_model: artifacts.task?.requested_model?.display === "kimi-coding/kimi-for-coding-highspeed"
         ? "PASS"
         : "FAIL",
@@ -58,7 +58,7 @@ const scenarios = [
         artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
       ) === JSON.stringify([
         "kimi-coding/kimi-for-coding-highspeed",
-        "quotio-openai/gpt-5.4-mini-fast",
+        "quotio-openai/gpt-5.6-luna-fast",
       ]) ? "PASS" : "FAIL",
     }),
   },

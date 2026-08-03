@@ -22,6 +22,7 @@ export function evaluateReloadVeto(manager: ReloadGuardManager): ReloadVeto {
       taskId: entry.task_id,
       ...(entry.name !== undefined && { name: entry.name }),
       ...(entry.description !== undefined && { description: entry.description }),
+      ...(entry.task_summary !== undefined && { taskSummary: entry.task_summary }),
     }),
   )
   return {

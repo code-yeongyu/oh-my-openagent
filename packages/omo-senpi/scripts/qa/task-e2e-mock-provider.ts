@@ -34,6 +34,10 @@ interface MockStepUsage {
   input?: number
   output?: number
   totalTokens?: number
+  cacheRead?: number
+  cacheWrite?: number
+  // Senpi reports cost either as a plain number or as a per-bucket breakdown carrying `.total`.
+  cost?: number | { input?: number; output?: number; total: number }
 }
 
 type MockStep =
@@ -84,7 +88,14 @@ interface AssistantMessage {
   api: Api
   provider: "omo-mock"
   model: string
-  usage: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: number }
+  usage: {
+    input: number
+    output: number
+    cacheRead: number
+    cacheWrite: number
+    totalTokens: number
+    cost: number | { input?: number; output?: number; total: number }
+  }
   stopReason: StopReason
   errorMessage?: string
   timestamp: number

@@ -7,8 +7,8 @@ describe("agent model entries", () => {
     // given
     const definition = {
       models: [
-        { model: "quotio-openai/gpt-5.4-mini-fast", reasoningEffort: "minimal" },
-        { model: "quotio-openai/gpt-5.4-mini", reasoningEffort: "minimal" },
+        { model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" },
+        { model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" },
       ],
     }
 
@@ -22,7 +22,7 @@ describe("agent model entries", () => {
     if (entries === undefined) throw new Error("Expected models to be preserved")
     const first = entries[0]
     if (typeof first === "string") throw new Error("Expected the object entry to stay an object")
-    expect(first.model).toBe("quotio-openai/gpt-5.4-mini-fast")
+    expect(first.model).toBe("quotio-openai/gpt-5.6-luna-fast")
     expect(first.reasoning).toBe("minimal")
   })
 
@@ -30,7 +30,7 @@ describe("agent model entries", () => {
     // given
     const definition = {
       model: "kimi-coding/kimi-for-coding-highspeed",
-      models: ["quotio-openai/gpt-5.4-mini-fast", { model: "anthropic/claude-haiku-4-5", variant: "low" }],
+      models: ["quotio-openai/gpt-5.6-luna-fast", { model: "anthropic/claude-haiku-4-5", variant: "low" }],
     }
 
     // when
@@ -39,7 +39,7 @@ describe("agent model entries", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.models?.[0]).toBe("quotio-openai/gpt-5.4-mini-fast")
+    expect(result.data.models?.[0]).toBe("quotio-openai/gpt-5.6-luna-fast")
     const second = result.data.models?.[1]
     if (typeof second !== "object") throw new Error("Expected the second entry to stay an object")
     expect(second.reasoning).toBe("low")
@@ -48,7 +48,7 @@ describe("agent model entries", () => {
   test("#given an agent carrying top level variant and reasoning effort #when parsed #then effort wins as canonical reasoning", () => {
     // given
     const definition = {
-      model: "quotio-openai/gpt-5.4-mini-fast",
+      model: "quotio-openai/gpt-5.6-luna-fast",
       variant: "low",
       reasoningEffort: "minimal",
     }

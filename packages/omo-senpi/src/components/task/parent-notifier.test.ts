@@ -52,7 +52,7 @@ const completionDetails = [
     task_id: "st_1",
     name: "worker",
     status: "completed" as const,
-    model: "quotio-openai/gpt-5.4-mini-fast",
+    model: "quotio-openai/gpt-5.6-luna-fast",
     duration_ms: 10,
     final_response: "ok",
     continuation_hint: "continue",

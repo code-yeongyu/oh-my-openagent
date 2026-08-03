@@ -196,3 +196,29 @@ describe("normalizeSenpiTeamSpec lenient input", () => {
     expect(spec.members[0]?.kind).toBe("category")
   })
 })
+
+describe("normalizeSenpiTeamSpec task_summary", () => {
+  test("#given a member with a task_summary #when normalized #then the summary survives the schema parse", () => {
+    // given / when
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "category", category: "quick", prompt: "work", task_summary: "Investigate the failing test" }] },
+      "demo",
+    )
+
+    // then
+    expect(spec.members[0]?.task_summary).toBe("Investigate the failing test")
+  })
+
+  test("#given an over-limit member task_summary #when normalized #then it is clamped instead of rejected", () => {
+    // given / when
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "category", category: "quick", prompt: "work", task_summary: "s".repeat(200) }] },
+      "demo",
+    )
+
+    // then
+    expect(spec.members[0]?.task_summary).toHaveLength(80)
+    expect(spec.members[0]?.task_summary?.endsWith("...")).toBe(true)
+  })
+})
+

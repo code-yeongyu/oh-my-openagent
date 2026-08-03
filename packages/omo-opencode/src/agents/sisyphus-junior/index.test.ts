@@ -247,7 +247,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("GPT-5.4 file-edit protocol", () => {
     test("GPT-5.4 prompt instructs apply_patch for file edits", () => {
       // given / when
-      const prompt = buildSisyphusJuniorPrompt("openai/gpt-5.4-mini", false)
+      const prompt = buildSisyphusJuniorPrompt("openai/gpt-5.6-luna-fast", false)
 
       // then
       expect(prompt).toContain("Use `apply_patch`")

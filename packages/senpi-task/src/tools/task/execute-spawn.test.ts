@@ -195,7 +195,15 @@ describe("buildTaskExecute spawn", () => {
         return makeRecord({ task_id: "st_00000004", status: "completed", final_response: "THE FINAL ANSWER" })
       },
     })
-    const execute = buildTaskExecute(makeDeps(manager))
+    const execute = buildTaskExecute(
+      makeDeps(manager, {
+        resolveSkillInvocations: () => ({
+          hasInvoked: (skill: string) => skill === "ulw-plan",
+          hasUserRequested: (skill: string) => skill === "ulw-plan",
+          hasPlanArtifact: () => true,
+        }),
+      }),
+    )
 
     const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
 

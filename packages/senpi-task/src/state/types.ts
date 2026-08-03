@@ -41,7 +41,10 @@ export type ResolvedModelRecord = {
 // Usage/runtime facts accumulated over ONE run of the child (spawn to terminal transition).
 // total_tokens sums usage.totalTokens across assistant turns (billed volume: context re-sent
 // per turn counts every time); output_tokens sums completion tokens only. generation_ms sums
-// assistant streaming windows, so tokens_per_second reflects generation speed, not tool time.
+// assistant streaming windows. tokens_per_second is emitted ONLY when every token-bearing
+// generation window has a non-zero measured duration; when any token-bearing window collapsed
+// to zero (post-hoc RPC burst, clock coalescing), the lost timing makes generation throughput
+// unverifiable and the field is omitted rather than reporting a runtime-derived substitute.
 export type TaskRunStats = {
   readonly runtime_ms: number
   readonly turns: number
@@ -50,6 +53,14 @@ export type TaskRunStats = {
   readonly total_tokens?: number
   readonly generation_ms?: number
   readonly tokens_per_second?: number
+  /** Summed provider-reported spend for the run, in USD. */
+  readonly cost_usd?: number
+  /** cacheRead / (input + cacheRead + cacheWrite) for the latest assistant request with a nonzero
+   * denominator, as a 0..1 fraction. Running status surfaces use this to match Senpi's footer. */
+  readonly cache_hit_rate_last?: number
+  /** Sum(cacheRead) / Sum(input + cacheRead + cacheWrite) over the whole run, as a 0..1 fraction.
+   * Completed-run summaries use this aggregate. Omitted when no turn reported a denominator. */
+  readonly cache_hit_rate_run?: number
 }
 
 export type TaskNotification = {
@@ -67,8 +78,10 @@ export type TaskSpawnSpec = {
 
 export type TaskRecordInput = {
   readonly name?: string
-  // Human label supplied by the task tool's `description` param. Status surfaces lead with this,
-  // falling back to name and only then to the opaque task id.
+  // One-line delegated-work summary from the task tool's `task_summary` param. Status surfaces
+  // lead with this, then description, then name, and only then the opaque task id.
+  readonly task_summary?: string
+  // Human label supplied by the task tool's `description` param.
   readonly description?: string
   readonly parent_session_id: string
   readonly root_session_id: string

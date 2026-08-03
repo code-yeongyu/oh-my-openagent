@@ -142,6 +142,47 @@ describe("task argument normalization", () => {
     })
   })
 
+  test("#given an over-limit task_summary #when arguments are prepared #then the harness force-truncates it to the schema limit", () => {
+    // given
+    const tool = createTool()
+    const prepareArguments = tool.prepareArguments
+    if (prepareArguments === undefined) throw new Error("task prepareArguments is missing")
+
+    // when
+    const prepared = prepareArguments({
+      prompt: "TASK: Audit the task tool boundary.",
+      task_summary: `Audit ${"z".repeat(200)}`,
+      subagent_type: "explore",
+    })
+
+    // then
+    expect(prepared.task_summary).toHaveLength(80)
+    expect(prepared.task_summary?.endsWith("...")).toBe(true)
+  })
+
+  test("#given blank and item task_summary values #when arguments are prepared #then blanks drop and item summaries are clamped", () => {
+    // given
+    const tool = createTool()
+    const prepareArguments = tool.prepareArguments
+    if (prepareArguments === undefined) throw new Error("task prepareArguments is missing")
+
+    // when
+    const prepared = prepareArguments({
+      task_summary: "   ",
+      category: "quick",
+      tasks: [
+        { prompt: "TASK: Inspect the schema.", task_summary: "  Inspect the\n   schema surface  " },
+        { prompt: "TASK: Inspect the prompts.", task_summary: "w".repeat(120) },
+      ],
+    })
+
+    // then
+    expect(prepared.task_summary).toBeUndefined()
+    expect(prepared.tasks?.[0]?.task_summary).toBe("Inspect the schema surface")
+    expect(prepared.tasks?.[1]?.task_summary).toHaveLength(80)
+    expect(prepared.tasks?.[1]?.task_summary?.endsWith("...")).toBe(true)
+  })
+
   test("#given genuinely meaningful prompt and tasks #when arguments are prepared #then semantic ambiguity remains a hard error", () => {
     // given
     const tool = createTool()

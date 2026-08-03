@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import { messageability } from "../state"
 import type { TaskRecord } from "../state"
+import { formatTargetWithModel } from "../status-line"
 import {
   excerptRendererPromptText,
   joinRendererTokens,
@@ -91,9 +92,12 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
     "task completion",
     `name:${normalizeRendererText(detail.name)}`,
     `id:${normalizeRendererText(detail.task_id)}`,
-    detail.category === undefined ? undefined : `category:${normalizeRendererText(detail.category)}`,
-    detail.agent_type === undefined ? undefined : `agent:${normalizeRendererText(detail.agent_type)}`,
-    `model:${normalizeRendererText(detail.resolved_model?.display ?? detail.model)}`,
+    formatTargetWithModel({
+      category: detail.category,
+      agentType: detail.agent_type,
+      resolvedModel: detail.resolved_model,
+      model: detail.model,
+    }),
     fallbackToken(detail),
     `status:${normalizeRendererText(detail.status)}`,
     `duration:${formatDuration(detail.duration_ms)}`,

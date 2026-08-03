@@ -65,6 +65,7 @@ function startedDetail(item: ResolvedSpawnItem, start: StartedResult): TaskToolI
   return {
     task_id: start.task_id,
     name: start.name,
+    ...(item.task_summary === undefined ? {} : { task_summary: item.task_summary }),
     ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
     ...(item.model === undefined ? {} : { model: item.model }),
     ...(start.resolved_model === undefined ? {} : { resolved_model: start.resolved_model }),
@@ -152,7 +153,7 @@ function promotedOutput(start: Extract<BatchStart, { kind: "started" }>, budgetS
       ...startedDetail(start.item, start.result),
       run_in_background: true,
     },
-    body: backgroundConversionText(start.result, start.item.description, budgetSeconds),
+    body: backgroundConversionText(start.result, { taskSummary: start.item.task_summary, description: start.item.description }, budgetSeconds),
     continuation: false,
   }
 }

@@ -132,7 +132,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("openai", "gpt-5.4-mini-fast")]),
+      () => registry([model("openai", "gpt-5.6-luna-fast")]),
     )
 
     // when
@@ -145,12 +145,14 @@ describe("createTaskChildPlanner", () => {
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.plan.model).toBe("openai/gpt-5.4-mini-fast")
+    expect(resolved.plan.model).toBe("openai/gpt-5.6-luna-fast")
     expect(resolved.plan.resolved_model).toEqual({
       source: "agent",
       provider: "openai",
-      model_id: "gpt-5.4-mini-fast",
-      display: "openai/gpt-5.4-mini-fast",
+      model_id: "gpt-5.6-luna-fast",
+      display: "openai/gpt-5.6-luna-fast",
+      variant: "low",
+      reasoning: "low",
     })
     expect(resolved.plan.agentType).toBe("explore")
     expect(resolved.plan.instructions).toContain("codebase search specialist")

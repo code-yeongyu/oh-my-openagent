@@ -1,0 +1,2 @@
+db_path=/Users/yeongyu/.local/share/opencode/opencode.db
+session_count=21932

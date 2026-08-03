@@ -208,13 +208,13 @@
       "librarian": {
         "name": "Librarian",
         "role": "Docs & Code Search",
-        "model": "GPT 5.4 Mini Fast",
+        "model": "GPT 5.6 Luna Fast",
         "description": "実際のGitHub例と公式ドキュメントを見つける。証拠ベース、パーマリンク付き。"
       },
       "explore": {
         "name": "Explore",
         "role": "Codebase Grep",
-        "model": "GPT 5.4 Mini Fast",
+        "model": "GPT 5.6 Luna Fast",
         "description": "超高速コードベース検索。安価で、並列で、常にバックグラウンドで。"
       },
       "metis": {

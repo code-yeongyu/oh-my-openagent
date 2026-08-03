@@ -1,5 +1,6 @@
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
+import type { TaskLifecycle } from "../lifecycle"
 import type { ManagerStartSpec, StartResult } from "../manager"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering"
@@ -76,6 +77,7 @@ export type CreatedMemberInfo = {
   readonly role: CreatedMemberRole
   readonly model?: ResolvedModelRecord
   readonly promptExcerpt?: string
+  readonly taskSummary?: string
 }
 
 export type CreateTeamResult = {
@@ -85,7 +87,11 @@ export type CreateTeamResult = {
 }
 
 export type DeleteTeamDeps = {
-  readonly manager: Pick<TeamRuntimeManagerPort, "cancelTask">
+  readonly manager: Pick<TeamRuntimeManagerPort, "cancelTask" | "get">
+  // Lifecycle single-writer destruction port. Team deletion routes terminal-resident members
+  // through it directly because terminal `cancelTask` is an intentional noop (completed residents
+  // stay revivable outside deletion).
+  readonly destruction: Pick<TaskLifecycle, "destroyResidentTask">
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
 }

@@ -21,6 +21,7 @@ type TargetInput = {
 
 type SpawnItemInput = TargetInput & {
   readonly prompt: string
+  readonly task_summary?: string
   readonly description?: string
   readonly name?: string
   readonly model?: string
@@ -28,6 +29,7 @@ type SpawnItemInput = TargetInput & {
 }
 
 type SpawnParamsInput = TargetInput & {
+  readonly task_summary?: string
   readonly description?: string
   readonly name?: string
   readonly model?: string
@@ -122,6 +124,7 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
       : [
           {
             prompt: params.prompt,
+            ...(params.task_summary === undefined ? {} : { task_summary: params.task_summary }),
             ...(params.description === undefined ? {} : { description: params.description }),
             ...(params.name === undefined ? {} : { name: params.name }),
           },
@@ -154,6 +157,7 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
     const common = {
       prompt: input.prompt,
       load_skills: input.load_skills ?? params.load_skills ?? [],
+      ...(input.task_summary === undefined ? {} : { task_summary: input.task_summary }),
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(model === undefined ? {} : { model }),

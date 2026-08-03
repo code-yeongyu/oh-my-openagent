@@ -27,6 +27,7 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/transcript.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/agent_sessions/types.py",
   "packages/omo-codex/plugin/skills/coding-agent-sessions/scripts/find-agent-sessions.py",
+  "packages/omo-codex/plugin/skills/data-scientist/scripts/quick-query.py",
   "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/core.py",
   "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/design_system.py",
   "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/search.py",

@@ -29,8 +29,8 @@ describe("task record runtime fallback metadata", () => {
       {
         source: "category",
         provider: "quotio-openai",
-        model_id: "gpt-5.4-mini-fast",
-        display: "quotio-openai/gpt-5.4-mini-fast",
+        model_id: "gpt-5.6-luna-fast",
+        display: "quotio-openai/gpt-5.6-luna-fast",
         reasoning_effort: "minimal",
       },
     ] as const

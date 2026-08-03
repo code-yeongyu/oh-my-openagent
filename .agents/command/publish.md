@@ -209,6 +209,12 @@ After running the preview, present the output to the user and say:
 
 </decision-gate>
 
+### LAST RELEASE BEFORE THE OMO NATIVE CLI PUBLIC RELEASE
+
+When the user identifies this as the final release before the OmO Native CLI public release, the GitHub summary MUST begin with this dedicated heading and the Discord announcement MUST repeat it as a dedicated heading immediately after `@here`:
+
+`## LAST RELEASE BEFORE THE OMO NATIVE CLI PUBLIC RELEASE`
+
 ### What You're Writing (and What You're NOT)
 
 You are writing the **headline layer** — a product announcement that sits ABOVE the auto-generated commit log. Think "release blog post", not "git log".
@@ -219,6 +225,7 @@ You are writing the **headline layer** — a product announcement that sits ABOV
 - ALWAYS focus on USER IMPACT: what can users DO now that they couldn't before?
 - ALWAYS group by THEME or CAPABILITY, not by commit type (feat/fix/refactor).
 - ALWAYS use concrete language: "You can now do X" not "Added X feature".
+- NEVER include internal adapter changes matching `senpi`, `omo-senpi`, `senpi-task`, `pi-goal`, or `pi-webfetch` in either release-note variant.
 </rules>
 
 <examples>

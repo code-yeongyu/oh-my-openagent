@@ -658,7 +658,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       agent: "sisyphus-junior",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
-      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
     })
     await flushBackgroundNotifications()
@@ -758,9 +758,9 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
-      concurrencyGroup: "genai-proxy-openai/gpt-5.4-mini",
+      concurrencyGroup: "genai-proxy-openai/gpt-5.6-luna-fast",
     }
     getTaskMap(manager).set(task.id, task)
     const retried: Array<{ taskId: string; errorInfo: { name?: string; message?: string }; source: string }> = []
@@ -883,7 +883,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_visibility",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "running",
         },
       ],
@@ -928,7 +928,7 @@ describe("BackgroundManager retry observability", () => {
     expect(shouldReply).toBe(false)
     expect(notification).toContain("[BACKGROUND TASK RETRYING]")
     expect(notification).toContain("ses_retry_visibility")
-    expect(notification).toContain("genai-proxy-openai/gpt-5.4-mini")
+    expect(notification).toContain("genai-proxy-openai/gpt-5.6-luna-fast")
     expect(notification).toContain("anthropic/claude-haiku-4-5")
   })
 
@@ -957,7 +957,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_parent_agent_fallback",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "running",
         },
       ],
@@ -1016,7 +1016,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_no_parent_context",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "running",
         },
       ],
@@ -1100,7 +1100,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_visibility",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "Forbidden: Selected provider is forbidden",
         },
@@ -1158,7 +1158,7 @@ describe("BackgroundManager retry observability", () => {
     expect(retryReadyNotification).toContain("ses_retry_created")
     expect(retryReadyNotification).toContain(expectedRetryLink)
     expect(retryReadyNotification).toContain("ses_retry_visibility")
-    expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.4-mini")
+    expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.6-luna-fast")
     expect(retryReadyNotification).toContain("Forbidden: Selected provider is forbidden")
   })
 
@@ -1200,7 +1200,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_failed_parent_dir",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "Forbidden: Selected provider is forbidden",
         },
@@ -3505,7 +3505,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageId: "parent-message",
         model: {
           providerID: "openai",
-          modelID: "gpt-5.4-mini",
+          modelID: "gpt-5.6-luna-fast",
           variant: "medium",
         },
       }
@@ -3520,7 +3520,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         attemptId: task.currentAttemptID,
         attemptNumber: 1,
         providerId: "openai",
-        modelId: "gpt-5.4-mini",
+        modelId: "gpt-5.6-luna-fast",
         variant: "medium",
         status: "pending",
       })
@@ -8479,7 +8479,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
           attemptNumber: 1,
           sessionId: "session-attempt-1",
           providerId: "openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "first attempt failed",
           startedAt: new Date("2026-04-27T00:00:00.000Z"),
@@ -8613,7 +8613,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
           attemptNumber: 1,
           sessionId: "session-attempt-1",
           providerId: "openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "first attempt failed",
           startedAt: new Date("2026-04-27T00:00:00.000Z"),
@@ -8695,13 +8695,13 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
       agent: "sisyphus-junior",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
-      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
       attempts: [
         {
           attemptId: "attempt-1",
           attemptNumber: 1,
           providerId: "openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "pending",
         },
       ],
@@ -8727,7 +8727,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
         attemptNumber: 1,
         sessionId: "session-attempt-1",
         providerId: "openai",
-        modelId: "gpt-5.4-mini",
+        modelId: "gpt-5.6-luna-fast",
         status: "error",
         error: "first attempt failed",
         startedAt: new Date("2026-04-27T00:00:00.000Z"),

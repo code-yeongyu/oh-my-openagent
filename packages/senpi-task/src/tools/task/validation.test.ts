@@ -286,6 +286,40 @@ describe("resolveSpawnItems", () => {
   })
 })
 
+describe("resolveSpawnItems task_summary", () => {
+  test("#given a single spawn with a task_summary #when resolved #then the item carries the summary", () => {
+    // given / when
+    const resolved = resolveSpawnItems({
+      prompt: "TASK: Audit the boundary.",
+      task_summary: "Audit the boundary",
+      category: "quick",
+    })
+
+    // then
+    expect(resolved.kind).toBe("ok")
+    if (resolved.kind !== "ok") throw new Error(resolved.error.message)
+    expect(resolved.items[0]?.task_summary).toBe("Audit the boundary")
+  })
+
+  test("#given batch items with and without task_summary #when resolved #then summaries stay per-item and never inherit", () => {
+    // given / when
+    const resolved = resolveSpawnItems({
+      task_summary: "Top-level summary",
+      category: "quick",
+      tasks: [
+        { prompt: "TASK: first.", task_summary: "First summary" },
+        { prompt: "TASK: second." },
+      ],
+    })
+
+    // then
+    expect(resolved.kind).toBe("ok")
+    if (resolved.kind !== "ok") throw new Error(resolved.error.message)
+    expect(resolved.items[0]?.task_summary).toBe("First summary")
+    expect(resolved.items[1]?.task_summary).toBeUndefined()
+  })
+})
+
 describe("batch spawn types", () => {
   test("#given the new batch types w2val #when imported #then ResolvedSpawnItem and TaskToolItemDetail are exported with the documented shape", () => {
     // @allow construct values of the exported union types to prove both the export and shape
@@ -321,7 +355,7 @@ describe("batch spawn types", () => {
 describe("validateTaskTarget category+model exclusivity", () => {
   test("#given category with model #when validated #then returns a typed category_with_model error", () => {
     // given
-    const params = { prompt: "p", category: "architect", model: "quotio-openai/gpt-5.4-mini-fast" }
+    const params = { prompt: "p", category: "architect", model: "quotio-openai/gpt-5.6-luna-fast" }
 
     // when
     const result = validateTaskTarget(params)
@@ -348,7 +382,7 @@ describe("validateTaskTarget category+model exclusivity", () => {
 describe("resolveSpawnItems category+model exclusivity", () => {
   test("#given single-form category with a model override #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ prompt: "p", category: "quick", model: "openai/gpt-5.4-mini" })
+    const result = resolveSpawnItems({ prompt: "p", category: "quick", model: "openai/gpt-5.6-luna-fast" })
 
     // then
     expect(result.kind).toBe("error")
@@ -359,7 +393,7 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given a top-level model inherited by a category item #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ model: "openai/gpt-5.4-mini", tasks: [{ prompt: "one", category: "quick" }] })
+    const result = resolveSpawnItems({ model: "openai/gpt-5.6-luna-fast", tasks: [{ prompt: "one", category: "quick" }] })
 
     // then
     expect(result.kind).toBe("error")
@@ -370,7 +404,7 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given a top-level category and an item model #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ category: "quick", tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.4-mini" }] })
+    const result = resolveSpawnItems({ category: "quick", tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.6-luna-fast" }] })
 
     // then
     expect(result.kind).toBe("error")

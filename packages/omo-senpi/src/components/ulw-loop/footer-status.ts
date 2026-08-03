@@ -30,7 +30,7 @@ export interface UlwLoopFooterUi {
 
 export interface UlwLoopFooterRuntime {
   readonly ui: UlwLoopFooterUi
-  readonly goalPath: string | undefined
+  readonly goalPaths: readonly string[]
 }
 
 export interface UlwLoopFooterStatus {
@@ -117,45 +117,52 @@ function runtimeFromContext(value: unknown): UlwLoopFooterRuntime | undefined {
         Reflect.apply(setStatus, ui, [key, text])
       },
     },
-    goalPath: goalPathFromContext(value),
+    goalPaths: goalPathsFromContext(value),
   }
 }
 
 function goalActiveFromContext(runtime: UlwLoopFooterRuntime): boolean {
-  const goalPath = runtime.goalPath
-  if (goalPath === undefined) return false
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(goalPath, "utf8"))
-    return (
-      isRecord(parsed) &&
-      parsed["version"] === 1 &&
-      isRecord(parsed["goal"]) &&
-      parsed["goal"]["status"] === "active"
-    )
-  } catch {
-    return false
+  for (const goalPath of runtime.goalPaths) {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(goalPath, "utf8"))
+      if (
+        isRecord(parsed) &&
+        parsed["version"] === 1 &&
+        isRecord(parsed["goal"]) &&
+        typeof parsed["goal"]["status"] === "string"
+      ) {
+        return parsed["goal"]["status"] === "active"
+      }
+    } catch {
+      continue
+    }
   }
+  return false
 }
 
-function goalPathFromContext(value: unknown): string | undefined {
-  if (!isRecord(value)) return undefined
+function goalPathsFromContext(value: unknown): readonly string[] {
+  if (!isRecord(value)) return []
   const manager = value["sessionManager"]
-  if (!isRecord(manager)) return undefined
+  if (!isRecord(manager)) return []
   const getSessionFile = manager["getSessionFile"]
   const getSessionDir = manager["getSessionDir"]
   const getSessionId = manager["getSessionId"]
-  if (
-    typeof getSessionFile !== "function" ||
-    typeof getSessionDir !== "function" ||
-    typeof getSessionId !== "function"
-  ) {
-    return undefined
-  }
-  if (Reflect.apply(getSessionFile, manager, []) === undefined) return undefined
-  const sessionDir = Reflect.apply(getSessionDir, manager, [])
+  if (typeof getSessionId !== "function") return []
   const sessionId = Reflect.apply(getSessionId, manager, [])
-  if (typeof sessionDir !== "string" || typeof sessionId !== "string") return undefined
-  return join(sessionDir, "extensions", "goal", `${encodeURIComponent(sessionId)}.json`)
+  if (typeof sessionId !== "string") return []
+  const goalFile = `${encodeURIComponent(sessionId)}.json`
+  const paths: string[] = []
+  if (
+    typeof getSessionFile === "function" &&
+    typeof getSessionDir === "function" &&
+    Reflect.apply(getSessionFile, manager, []) !== undefined
+  ) {
+    const sessionDir = Reflect.apply(getSessionDir, manager, [])
+    if (typeof sessionDir === "string") paths.push(join(sessionDir, "extensions", "goal", goalFile))
+  }
+  const cwd = value["cwd"]
+  if (typeof cwd === "string") paths.push(join(cwd, ".omo", "goal", goalFile))
+  return paths
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

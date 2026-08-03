@@ -115,7 +115,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       })
 
       pi.on("tool_result", async (payload, eventCtx) => {
-        if (!isGoalToolResult(payload)) return
+        if (!shouldRefreshFooterAfterToolResult(payload)) return
         const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
       })
@@ -213,9 +213,13 @@ function isUserSourcedInput(value: InputEventLike): boolean {
   return value.source !== "extension"
 }
 
-function isGoalToolResult(value: unknown): boolean {
+function shouldRefreshFooterAfterToolResult(value: unknown): boolean {
   if (!isRecord(value)) return false
-  return value["toolName"] === "create_goal" || value["toolName"] === "update_goal"
+  const toolName = value["toolName"]
+  return toolName === "create_goal"
+    || toolName === "update_goal"
+    || toolName === "bash"
+    || toolName === "interactive_bash"
 }
 
 function extractSessionId(eventCtx: unknown): string | undefined {

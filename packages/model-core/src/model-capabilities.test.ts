@@ -406,19 +406,23 @@ describe("getModelCapabilities", () => {
 
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
-    const requirementModels = new Set<string>()
+    const requirementModels = new Map<string, string>()
 
     for (const requirement of Object.values(AGENT_MODEL_REQUIREMENTS)) {
-      for (const entry of requirement.fallbackChain) requirementModels.add(entry.model)
+      for (const entry of requirement.fallbackChain) {
+        requirementModels.set(entry.model, requirementModels.get(entry.model) ?? entry.providers[0] ?? "test-provider")
+      }
     }
 
     for (const requirement of Object.values(CATEGORY_MODEL_REQUIREMENTS)) {
-      for (const entry of requirement.fallbackChain) requirementModels.add(entry.model)
+      for (const entry of requirement.fallbackChain) {
+        requirementModels.set(entry.model, requirementModels.get(entry.model) ?? entry.providers[0] ?? "test-provider")
+      }
     }
 
-    for (const modelID of requirementModels) {
+    for (const [modelID, providerID] of requirementModels) {
       const result = getModelCapabilities({
-        providerID: "test-provider",
+        providerID,
         modelID,
         bundledSnapshot,
       })

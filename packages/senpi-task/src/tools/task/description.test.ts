@@ -61,6 +61,11 @@ describe("buildTaskToolDescription", () => {
     expect(description).toContain("momus")
   })
 
+  test("#given the guidelines #when read #then task_summary usage is advertised to the model", () => {
+    // given / when / then
+    expect(TASK_PROMPT_GUIDELINES.some((guideline) => guideline.includes("task_summary"))).toBe(true)
+  })
+
   test("#given the prompt surfaces #when read #then snippet and guidelines are present", () => {
     // then
     expect(TASK_PROMPT_SNIPPET.length).toBeGreaterThan(0)

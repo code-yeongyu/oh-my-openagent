@@ -12,6 +12,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
   const name = readOptionalString(value, "name")
+  const taskSummary = readOptionalString(value, "task_summary")
   const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
   const category = readOptionalString(value, "category")
@@ -43,6 +44,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     updated_at: readString(value, "updated_at"),
     notification: readNotification(value),
     ...(name === undefined ? {} : { name }),
+    ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),
@@ -71,6 +73,11 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
   const totalTokens = readOptionalNumber(value, "total_tokens")
   const generationMs = readOptionalNumber(value, "generation_ms")
   const tokensPerSecond = readOptionalNumber(value, "tokens_per_second")
+  const costUsd = readOptionalNumber(value, "cost_usd")
+  const cacheHitRateLast = readOptionalNumber(value, "cache_hit_rate_last")
+  const cacheHitRateRun = readOptionalNumber(value, "cache_hit_rate_run")
+  const legacyCacheHitRate = readOptionalNumber(value, "cache_hit_rate")
+  const resolvedCacheHitRateRun = cacheHitRateRun ?? legacyCacheHitRate
   return {
     runtime_ms: readNumber(value, "runtime_ms"),
     turns: readNumber(value, "turns"),
@@ -79,6 +86,9 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
     ...(totalTokens === undefined ? {} : { total_tokens: totalTokens }),
     ...(generationMs === undefined ? {} : { generation_ms: generationMs }),
     ...(tokensPerSecond === undefined ? {} : { tokens_per_second: tokensPerSecond }),
+    ...(costUsd === undefined ? {} : { cost_usd: costUsd }),
+    ...(cacheHitRateLast === undefined ? {} : { cache_hit_rate_last: cacheHitRateLast }),
+    ...(resolvedCacheHitRateRun === undefined ? {} : { cache_hit_rate_run: resolvedCacheHitRateRun }),
   }
 }
 

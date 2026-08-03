@@ -30,6 +30,7 @@ export type TaskSnapshot = {
   readonly task_id: string
   readonly name?: string
   readonly description?: string
+  readonly task_summary?: string
   readonly status: TaskStatus
   readonly execution_mode: string
   readonly model: string

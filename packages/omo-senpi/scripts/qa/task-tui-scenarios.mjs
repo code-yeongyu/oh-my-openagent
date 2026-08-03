@@ -41,7 +41,62 @@ export const SCENARIOS = {
       { type: "tool_call", name: "task", arguments: { category: "ultrabrain", prompt: "Run a long built-in bash command for active-task TUI visual proof, then wait for completion without summarizing early.", run_in_background: true, name: "active-child" } },
       { type: "text", text: "active scenario parent stopped while active-child continues" },
     ],
-    childSteps: [{ type: "tool_call", name: "bash", arguments: { command: "sleep 30" } }],
+    // A fast cold request completes first, then the hot request parks in the long tool call. The
+    // visible live row must therefore show the latest request's 81% rate, not the 51% run aggregate.
+    childSteps: [
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "pwd" },
+        usage: { input: 4_000, output: 80, cacheRead: 0, cacheWrite: 1_000, totalTokens: 5_080, cost: 0.006 },
+      },
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "sleep 30" },
+        usage: { input: 1_200, output: 240, cacheRead: 6_800, cacheWrite: 400, totalTokens: 8_640, cost: 0.0421 },
+      },
+    ],
+  },
+  // Separate from `team`, which only renders a custom peer-message envelope and spawns no member.
+  // This one creates a REAL team whose process-mode member parks in a long bash tool call, so the
+  // live widget row for an RPC-backed member can be captured with non-zero cost/cache stats.
+  "team-active": {
+    prompt: "Create a team with one member that starts long-running work, then stop so the active member row can be captured while it is still running.",
+    parentSteps: [
+      {
+        type: "tool_call",
+        name: "team_create",
+        arguments: {
+          inline_spec: {
+            name: "tui-active-team",
+            members: [
+              {
+                name: "active-member",
+                kind: "category",
+                category: "ultrabrain",
+                prompt: "You are team member 'active-member'. Run the long built-in bash command for active-member TUI visual proof and stay in it; do not summarize early.",
+              },
+            ],
+          },
+        },
+      },
+      { type: "text", text: "team-active scenario lead stopped while active-member continues" },
+    ],
+    childSteps: [
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "pwd" },
+        usage: { input: 3_000, output: 60, cacheRead: 0, cacheWrite: 1_000, totalTokens: 4_060, cost: 0.004 },
+      },
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "sleep 30" },
+        usage: { input: 900, output: 180, cacheRead: 5_100, cacheWrite: 0, totalTokens: 6_180, cost: { input: 0.004, output: 0.013, total: 0.017 } },
+      },
+    ],
   },
   team: {
     prompt: "Render one structured team message, then remain interactive for visual inspection.",

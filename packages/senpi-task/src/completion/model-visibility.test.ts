@@ -16,8 +16,8 @@ describe("task completion model visibility", () => {
       resolved_model: {
         source: "category",
         provider: "quotio-openai",
-        model_id: "gpt-5.4-mini-fast",
-        display: "quotio-openai/gpt-5.4-mini-fast",
+        model_id: "gpt-5.6-luna-fast",
+        display: "quotio-openai/gpt-5.6-luna-fast",
       },
     })
     const completed = {
@@ -30,8 +30,7 @@ describe("task completion model visibility", () => {
     const message = buildCompletionMessage([buildCompletionDetails(completed)])
 
     // then
-    expect(message.content).toContain("category:quick")
-    expect(message.content).toContain("model:quotio-openai/gpt-5.4-mini-fast")
-    expect(message.content).not.toContain("model:requested/model")
+    expect(message.content).toContain("category:quick(quotio-openai/gpt-5.6-luna-fast)")
+    expect(message.content).not.toContain("requested/model")
   })
 })

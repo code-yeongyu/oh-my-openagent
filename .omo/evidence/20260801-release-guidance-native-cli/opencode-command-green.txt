@@ -1,0 +1,13 @@
+Surface:
+source script/agent/qa-sandbox.sh
+opencode run --command get-unpublished-changes --format json \
+  "Analyze only commit d16c27b94. Return one sentence naming whether contained internal adapter surfaces belong in user-facing release notes. Do not modify files or external state."
+
+Observed final response:
+The OpenCode runtime-fallback change is a user-facing behavioral fix and belongs in the OpenCode release notes, while the canonical pattern extraction is an internal pure-component refactor with no standalone user note.
+
+Result:
+PASS. The real OpenCode command loaded and completed successfully in an isolated XDG sandbox without modifying files or external state.
+
+Cleanup:
+The QA sandbox was created under the system temporary directory and removed by the sandbox cleanup trap.

@@ -47,6 +47,17 @@ function advertisedAgentNames(engine: TaskEngine): string {
   return (end < 0 ? rest : rest.slice(0, end)).trim()
 }
 
+function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
+  const description = buildTaskToolDescription({ omoConfig: engine.omoConfig, agents: engine.agents })
+  const marker =
+    "Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and start-work was never invoked): "
+  const start = description.indexOf(marker)
+  if (start < 0) throw new Error("task tool description is missing the Plan-gated agents list")
+  const rest = description.slice(start + marker.length)
+  const end = rest.indexOf("\n")
+  return (end < 0 ? rest : rest.slice(0, end)).trim()
+}
+
 describe("task engine builtin agent overlay", () => {
   test("#given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas", () => {
     // given / when
@@ -112,12 +123,13 @@ describe("task engine builtin agent overlay", () => {
     expect(engine.agents["scout"]?.executionMode).toBe("process")
   })
 
-  test("#given the default engine agents #when the task tool description renders #then all 4 builtin names are advertised sorted", () => {
+  test("#given the default engine agents #when the task tool description renders #then plain builtins are advertised and the plan-gated tier is classified separately", () => {
     // given
     const engine = composeIn(tempProject())
 
     // when / then
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian, metis, momus")
+    expect(advertisedAgentNames(engine)).toBe("explore, librarian")
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis, momus")
   })
 
   test("#given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed", () => {
@@ -130,6 +142,7 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(engine.agents["momus"]?.disable).toBe(true)
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian, metis")
+    expect(advertisedAgentNames(engine)).toBe("explore, librarian")
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis")
   })
 })

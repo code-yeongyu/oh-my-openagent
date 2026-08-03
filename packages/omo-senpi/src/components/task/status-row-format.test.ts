@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { rendererVisibleWidth, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
-import { buildWidgetRows, formatTaskRow } from "./status-row-format"
+import { backgroundWidgetRows, buildWidgetRows, formatTaskRow } from "./status-row-format"
 
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
@@ -72,8 +72,81 @@ describe("buildWidgetRows", () => {
   })
 })
 
+describe("task_summary identity", () => {
+  it("#given a record with a task_summary #when building the widget row #then the summary leads over name and description", () => {
+    const row = buildWidgetRows([
+      record({ task_id: "st_sum", name: "finder", description: "quick label", task_summary: "Audit auth session flow", status: "running", category: "quick" }),
+    ])[0] ?? ""
+    expect(row.startsWith("Audi")).toBe(true)
+    expect(row).not.toContain("finder")
+    expect(row).not.toContain("quick label")
+  })
+
+  it("#given a record with a task_summary #when formatting the full row #then the summary is the identity", () => {
+    const row = formatTaskRow(record({ task_id: "st_sum", name: "finder", task_summary: "Audit auth session flow", status: "running" }))
+    expect(row.startsWith("Audit auth session flow")).toBe(true)
+  })
+})
+
+describe("backgroundWidgetRows", () => {
+  const now = Date.parse("2026-07-07T00:01:00.000Z")
+  const stats = {
+    turns: 2,
+    tool_calls: 4,
+    runtime_ms: 60_000,
+    cost_usd: 0.1303,
+    cache_hit_rate_last: 0.89,
+    tokens_per_second: 97,
+  }
+
+  it("#given a wide terminal #when a live task row renders #then the longer summary and adjacent metadata remain visible", () => {
+    const row = backgroundWidgetRows([
+      record({
+        task_id: "st_wide",
+        task_summary: "Plan the complete Spider-Man media library migration",
+        status: "running",
+        category: "unspecified-high",
+        resolved_model: {
+          provider: "anthropic",
+          model_id: "claude-opus-5",
+          display: "anthropic/claude-opus-5",
+          reasoning_effort: "xhigh",
+          source: "category",
+        },
+      }),
+    ], new Map([["st_wide", "running read src/library.ts"]]), now, () => stats, 220)[0] ?? ""
+
+    expect(row).toContain("Plan the complete Spider-Man media library migration")
+    expect(row).toContain("category:unspecified-high(anthropic/claude-opus-5:xhigh)")
+    expect(row).toContain("turn 2 (4 tools)")
+    expect(row).toContain("$0.1303 (CH: 89%)")
+    expect(row).toContain("97 tok/s")
+    expect(row).toContain("running read src/library.ts")
+    expect(row).toEndWith("1m 0s")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(220)
+  })
+
+  it("#given a narrow terminal #when a live task row renders #then it stays on one bounded physical line", () => {
+    const row = backgroundWidgetRows([
+      record({
+        task_id: "st_narrow",
+        task_summary: "Plan the complete Spider-Man media library migration",
+        status: "running",
+        category: "unspecified-high",
+      }),
+    ], new Map([["st_narrow", "running"]]), now, () => stats, 90)[0] ?? ""
+
+    expect(row).not.toContain("\n")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(90)
+    expect(row).toContain("Plan")
+    expect(row).toContain("category:unspec")
+    expect(row).toContain("running")
+    expect(row).toEndWith("1m 0s")
+  })
+})
+
 describe("formatTaskRow", () => {
-  it("#given resolved category metadata #when formatting #then target, model, reasoning, variant, mode, and status render", () => {
+  it("#given resolved category metadata #when formatting #then the unified target carries the model and effort", () => {
     const task = record({
       task_id: "st_resolved",
       name: "planner",
@@ -91,7 +164,7 @@ describe("formatTaskRow", () => {
       },
     })
     expect(formatTaskRow(task)).toBe(
-      "planner (st_resolved) category:ultrabrain model:openai/gpt-5.6-sol reasoning:xhigh variant:sol mode:rpc status:running",
+      "planner (st_resolved) category:ultrabrain(openai/gpt-5.6-sol:xhigh) mode:rpc status:running",
     )
   })
 
@@ -113,7 +186,7 @@ describe("formatTaskRow", () => {
       agent_type: "explore",
       model: "anthropic/claude-sonnet-4-6",
     }))
-    expect(row).toBe("st_legacy agent:explore model:anthropic/claude-sonnet-4-6 mode:in-process status:running")
+    expect(row).toBe("st_legacy agent:explore(anthropic/claude-sonnet-4-6) mode:in-process status:running")
   })
 
   it("#given empty resolved detail labels #when formatting #then they are omitted", () => {
@@ -131,13 +204,14 @@ describe("formatTaskRow", () => {
         source: "category",
       },
     }))
-    expect(row).toBe("st_empty category:ultrabrain model:google/gemini-3.1-pro mode:in-process status:running")
+    expect(row).toBe("st_empty category:ultrabrain(google/gemini-3.1-pro) mode:in-process status:running")
   })
 
-  it("#given matching reasoning and variant #when formatting #then duplicate variant is omitted", () => {
+  it("#given matching reasoning and variant #when formatting #then the effort renders once inside the target", () => {
     const row = formatTaskRow(longActiveRecord())
-    expect(row).toContain("reasoning:xhigh")
-    expect(row).not.toContain("variant:xhigh")
+    expect(row).toContain("category:ultrabrain(omo-mock/mock-1:xhigh)")
+    expect(row).not.toContain("variant:")
+    expect(row).not.toContain("reasoning:")
   })
 
   it("#given malformed running progress #when formatting #then the excerpt is width-safe", () => {

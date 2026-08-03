@@ -1,3 +1,4 @@
+import { clampTaskSummary } from "../../task-summary"
 import type { TaskToolParamsStatic } from "./params"
 
 type TaskItem = NonNullable<TaskToolParamsStatic["tasks"]>[number]
@@ -27,11 +28,16 @@ function stringList(value: unknown): string[] | undefined {
   return strings.length > 0 ? strings : undefined
 }
 
+function summaryText(value: unknown): string | undefined {
+  return clampTaskSummary(typeof value === "string" ? value : undefined)
+}
+
 function taskItem(value: unknown): TaskItem | undefined {
   if (!isRecord(value)) return undefined
   const prompt = nonBlankText(value.prompt)
   if (prompt === undefined) return undefined
 
+  const taskSummary = summaryText(value.task_summary)
   const description = nonBlankText(value.description)
   const category = identifier(value.category)
   const subagentType = identifier(value.subagent_type)
@@ -41,6 +47,7 @@ function taskItem(value: unknown): TaskItem | undefined {
 
   return {
     prompt,
+    ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
     ...(subagentType === undefined ? {} : { subagent_type: subagentType }),
@@ -73,6 +80,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
     normalizedTasks !== undefined &&
     (normalizedTasks.length === 0 || normalizedTasks.every(isProviderPaddingTask))
   const tasks = tasksAreSinglePadding ? undefined : normalizedTasks
+  const taskSummary = summaryText(raw.task_summary)
   const description = nonBlankText(raw.description)
   const category = identifier(raw.category)
   const subagentType = identifier(raw.subagent_type)
@@ -83,6 +91,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
 
   return {
     ...(prompt === undefined ? {} : { prompt }),
+    ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
     ...(subagentType === undefined ? {} : { subagent_type: subagentType }),

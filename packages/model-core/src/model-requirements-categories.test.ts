@@ -2,30 +2,31 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
-  test("ultrabrain keeps native gpt-5.6-sol xhigh before Copilot high and Gemini", () => {
+  test("ultrabrain is gpt-5.6-sol max on every rung", () => {
     // given
     const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when
-    const [primary, copilot, opencodeSol, geminiFallback] = ultrabrain.fallbackChain
+    const chain = ultrabrain.fallbackChain
 
     // then
-    expect(ultrabrain.fallbackChain.length).toBeGreaterThan(1)
-    expect(primary?.variant).toBe("xhigh")
-    expect(primary?.model).toBe("gpt-5.6-sol")
-    expect(primary?.providers[0]).toBe("openai")
-    expect(copilot).toEqual({
-      providers: ["github-copilot"],
-      model: "gpt-5.6-sol",
-      variant: "high",
-    })
-    expect(opencodeSol).toEqual({
-      providers: ["openai", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "xhigh",
-    })
-    expect(geminiFallback?.model).toBe("gemini-3.1-pro")
-    expect(geminiFallback?.variant).toBe("high")
+    expect(chain).toEqual([
+      {
+        providers: ["openai", "quotio-openai", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "max",
+      },
+      {
+        providers: ["github-copilot"],
+        model: "gpt-5.6-sol",
+        variant: "max",
+      },
+      {
+        providers: ["openai", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "max",
+      },
+    ])
   })
 
   test("deep is a single sol-family medium rung", () => {
@@ -44,7 +45,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("visual-engineering follows the approved 3-rung chain", () => {
+  test("visual-engineering follows the approved 4-rung chain", () => {
     // given
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -68,10 +69,15 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         model: "glm-5.2",
         variant: "max",
       },
+      {
+        providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      },
     ])
   })
 
-  test("quick follows the approved 5-rung chain", () => {
+  test("quick follows the approved 8-rung chain", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -81,14 +87,29 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     // then
     expect(chain).toEqual([
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-      { providers: ["quotio-openai"], model: "gpt-5.4-mini-fast", variant: "minimal" },
-      { providers: ["openai"], model: "gpt-5.4-mini", variant: "minimal" },
+      { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      {
+        providers: ["deepseek"],
+        model: "deepseek-v4-flash",
+        variant: "off",
+      },
+      {
+        providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go", "vercel"],
+        model: "qwen3.6-flash",
+        variant: "low",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m3", variant: "max" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7", variant: "max" },
       { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
-      { providers: ["xiaomi"], model: "mimo-v2.5-pro-ultraspeed" },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "vercel"],
+        model: "claude-haiku-4-5",
+        variant: "off",
+      },
     ])
   })
 
-  test("unspecified-low follows the approved 7-rung chain", () => {
+  test("unspecified-low follows the approved 5-rung chain", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -98,19 +119,14 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     // then
     expect(chain).toEqual([
       {
-        providers: ["openai", "quotio-openai", "vercel"],
-        model: "gpt-5.6-luna",
-        variant: "xhigh",
-      },
-      {
-        providers: ["github-copilot"],
-        model: "gpt-5.6-luna",
+        providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-terra",
         variant: "high",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
         model: "claude-sonnet-5",
-        variant: "medium",
+        variant: "low",
       },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
@@ -127,7 +143,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         model: "mimo-v2.5-pro",
         variant: "max",
       },
-      { providers: ["cursor"], model: "composer-2.5" },
     ])
   })
 

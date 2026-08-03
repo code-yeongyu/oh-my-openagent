@@ -9,16 +9,15 @@ import {
 } from "./model-capability-guardrails"
 
 describe("model-capability-guardrails", () => {
-  test("keeps the current alias registry and built-in requirements aligned with the bundled snapshot", () => {
+  test("keeps Luna Fast aligned with its bundled canonical model", () => {
     const issues = collectModelCapabilityGuardrailIssues({
       snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
     })
 
-    expect(issues).toContainEqual(
+    expect(issues).not.toContainEqual(
       expect.objectContaining({
         kind: "built-in-model-missing-from-snapshot",
-        modelID: "composer-2.5",
-        canonicalModelID: "composer-2.5",
+        modelID: "gpt-5.6-luna-fast",
       }),
     )
   })

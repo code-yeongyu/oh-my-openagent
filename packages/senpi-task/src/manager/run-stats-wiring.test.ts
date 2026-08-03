@@ -38,6 +38,76 @@ describe("manager run stats wiring", () => {
     expect(record?.run_stats?.runtime_ms).toBeGreaterThanOrEqual(0)
   })
 
+  test("#given a spawned child reporting cost and cache usage #when it completes #then cost and cache hit rate persist", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+
+    // when: the same usage shape a Senpi assistant message carries (cost object with a total)
+    fake.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "working" }],
+        usage: {
+          input: 100,
+          output: 120,
+          cacheRead: 300,
+          cacheWrite: 100,
+          totalTokens: 620,
+          cost: { input: 0.02, output: 0.1, total: 0.12 },
+        },
+      },
+    })
+    fake.settle({ status: "completed", finalResponse: "done" })
+    await manager.waitFor(started.task_id)
+
+    // then: cacheRead 300 of (100 + 300 + 100) = 60%
+    const stats = store.load(started.task_id)?.run_stats
+    expect(stats?.cost_usd).toBeCloseTo(0.12, 10)
+    expect(stats?.cache_hit_rate_last).toBeCloseTo(0.6, 10)
+    expect(stats?.cache_hit_rate_run).toBeCloseTo(0.6, 10)
+  })
+
+  test("#given a live child with cost usage #when the snapshot is read mid-run #then cost and cache facts are already visible", async () => {
+    // given: this is the seam the live TUI row (solo in-process AND rpc team members) reads
+    const { manager, inProcess } = makeManager()
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("fake handle missing")
+
+    // when: a cold-ish turn then a hot turn arrive while the child is still running
+    fake.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "partial" }],
+        usage: { input: 50, output: 10, cacheRead: 50, cacheWrite: 0, totalTokens: 110, cost: 0.0025 },
+      },
+    })
+    fake.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "hot" }],
+        usage: { input: 10, output: 10, cacheRead: 90, cacheWrite: 0, totalTokens: 110, cost: 0.005 },
+      },
+    })
+
+    // then: the live seam is optional on the manager interface, so the TUI wiring depends on it
+    // actually being present here, not just on the values it returns
+    const snapshot = manager.runStatsSnapshot
+    if (snapshot === undefined) throw new Error("manager must expose runStatsSnapshot for live rows")
+    const live = snapshot.call(manager, started.task_id)
+    expect(live?.cost_usd).toBeCloseTo(0.0075, 10)
+    expect(live?.cache_hit_rate_last).toBeCloseTo(0.9, 10)
+    expect(live?.cache_hit_rate_run).toBeCloseTo(140 / 200, 10)
+  })
+
   test("#given a spawned child #when it fails #then run stats persist on the error record", async () => {
     // given
     const { manager, store, inProcess } = makeManager()
