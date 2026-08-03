@@ -34,7 +34,13 @@ export function createMinimalSenpiResourceLoader(options: MinimalSenpiResourceLo
     getSystemPrompt() {
       return undefined
     },
+    getSystemPromptSource() {
+      return undefined
+    },
     getAppendSystemPrompt() {
+      return []
+    },
+    getAppendSystemPromptSources() {
       return []
     },
     extendResources() {},
