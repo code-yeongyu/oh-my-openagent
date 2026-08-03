@@ -1,4 +1,5 @@
 import type { ParentNotifier, ParentNotifierMessage } from "@oh-my-opencode/senpi-task"
+import { sendCmuxNotification } from "./cmux-notifier"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -22,6 +23,9 @@ export function createParentNotifier(
 ): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
+      if (message.customType === TASK_COMPLETION_MESSAGE_TYPE) {
+        void sendCmuxNotification("OMO task completed", message.content)
+      }
       if (coordinator !== undefined) {
         coordinator.enqueue({
           key: injectionKey(message),
