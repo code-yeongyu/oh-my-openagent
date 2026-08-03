@@ -1,0 +1,12 @@
+test file: packages/omo-opencode/src/cli/doctor/spawn-with-timeout.test.ts
+
+== WITH my change ==
+ 8 pass
+ 0 fail
+
+== PRISTINE dev (both my files reverted) ==
+ 8 pass
+ 0 fail
+
+  restored: [ 1 file changed, 5 insertions(+), 2 deletions(-)]
+

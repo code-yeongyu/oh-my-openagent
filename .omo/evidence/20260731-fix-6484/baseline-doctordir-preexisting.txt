@@ -1,0 +1,10 @@
+== FULL doctor directory WITH my change ==
+ 162 pass
+ 0 fail
+
+== FULL doctor directory on PRISTINE dev ==
+ 161 pass
+ 0 fail
+
+  restored: [ 1 file changed, 5 insertions(+), 2 deletions(-)]
+

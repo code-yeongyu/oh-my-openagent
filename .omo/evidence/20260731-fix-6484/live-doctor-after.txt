@@ -1,0 +1,21 @@
+=== LABEL: after (this branch) ===
+=== ISOLATION ===
+  XDG_DATA_HOME/CONFIG_HOME/CACHE_HOME/STATE_HOME -> <SANDBOX>\{data,config,cache,state}
+  real opencode DB: <HOME>\.local\share\opencode\opencode.db
+  sessions before: 2831
+
+=== REAL ROUTED CLI: bun packages/omo-opencode/src/cli/index.ts doctor --json ===
+  issue.title       : Model cache not found
+  issue.severity    : warning
+  issue.description : OpenCode model cache is missing at <SANDBOX>\cache\opencode\models.json, so model availability cannot be validated.
+  issue.fix         : Run: opencode models --refresh, then verify <SANDBOX>\cache\opencode\models.json. If it is still missing, update or report OpenCode because OpenCode core writes this cache.
+  doctor exit=1
+
+=== DB-UNTOUCHED PROOF (real DB, read outside the sandbox) ===
+  sessions after : 2831
+  count unchanged: True
+
+RESULT: PASS
+
+
+EXIT=0

@@ -1,0 +1,26 @@
+== revert ONLY the product file to pristine dev ==
+  product diff vs dev: []
+
+== run the SAME live driver on pristine dev (BEFORE) ==
+=== LABEL: before (pristine dev) ===
+=== ISOLATION ===
+  XDG_DATA_HOME/CONFIG_HOME/CACHE_HOME/STATE_HOME -> <SANDBOX>\{data,config,cache,state}
+  real opencode DB: <HOME>\.local\share\opencode\opencode.db
+  sessions before: 2831
+
+=== REAL ROUTED CLI: bun packages/omo-opencode/src/cli/index.ts doctor --json ===
+  issue.title       : Model cache not found
+  issue.severity    : warning
+  issue.description : OpenCode model cache is missing, so model availability cannot be validated.
+  issue.fix         : Run: opencode models --refresh
+  doctor exit=1
+
+=== DB-UNTOUCHED PROOF (real DB, read outside the sandbox) ===
+  sessions after : 2831
+  count unchanged: True
+
+RESULT: PASS
+
+== restore ==
+  restored: [ 1 file changed, 5 insertions(+), 2 deletions(-)]
+

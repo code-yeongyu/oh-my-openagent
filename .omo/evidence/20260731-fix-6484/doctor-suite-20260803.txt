@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:4 char:8
++ $log = bun test packages/omo-opencode/src/cli/doctor/ 2>&1 | Out-Stri ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-opencode\src\cli\doctor\spawn-with-timeout.test.ts:
+11 |       // when
+12 |       const result = await spawnWithTimeout(["echo", "hello"], { stdout: "pipe", stderr: "pipe" })
+13 | 
+14 |       // then
+15 |       expect(result.timedOut).toBe(false)
+16 |       expect(result.exitCode).toBe(0)
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\cli\doctor\spawn-with-timeout.test.ts:16:31)
+(fail) spawnWithTimeout > #given a command that completes quickly > returns stdout and exit code [7.48ms]
+
+ 161 pass
+ 1 fail
+ 432 expect() calls
+Ran 162 tests across 28 files. [2.41s]
+

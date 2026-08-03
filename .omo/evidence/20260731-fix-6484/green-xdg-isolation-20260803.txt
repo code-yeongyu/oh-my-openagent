@@ -1,0 +1,28 @@
+GREEN case A: XDG_CONFIG_HOME SET to a config defining provider.google (the RED condition)
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:12 char:10
++ $out += (bun test packages/omo-opencode/src/cli/doctor/checks/model-r ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 1 pass
+ 0 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [3.86s]
+
+GREEN case B: XDG_CONFIG_HOME UNSET (developer default)
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:15 char:10
++ $out += (bun test packages/omo-opencode/src/cli/doctor/checks/model-r ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 1 pass
+ 0 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [1012.00ms]
+
