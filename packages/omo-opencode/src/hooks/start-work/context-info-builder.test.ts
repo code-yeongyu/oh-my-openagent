@@ -171,6 +171,34 @@ describe("buildStartWorkContextInfo", () => {
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
 
+  test("does not auto-select an unrelated incomplete plan when the session affinity plan is complete", () => {
+    // given
+    const clearSpy = spyOn(boulderState, "clearBoulderState")
+    const completedPlanPath = writePlan("completed-session-plan", "## TODOs\n- [x] 1. Done")
+    const stalePlanPath = writePlan("abandoned-plan", "## TODOs\n- [ ] 1. Abandoned task")
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: null,
+      existingState: null,
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: undefined,
+      worktreeBlock: "",
+      preferredPlanPath: completedPlanPath,
+    })
+
+    // then
+    expect(contextInfo).toContain("No Plan for This Session")
+    expect(contextInfo).toContain("Invoke the Prometheus agent to create a new work plan")
+    expect(contextInfo).not.toContain("Auto-Selected Plan")
+    expect(contextInfo).not.toContain(stalePlanPath)
+    expect(existsSync(getBoulderFilePath(testDirectory))).toBe(false)
+    expect(clearSpy).toHaveBeenCalledTimes(0)
+  })
+
   test("#given multiple incomplete plans and a preferred session plan #when no work exists #then preferred plan is started", () => {
     // given
     const ignoredPlanPath = writePlan("ignored-plan", "## TODOs\n- [ ] 1. Ignored")

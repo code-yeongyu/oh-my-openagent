@@ -4,7 +4,7 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState, BoulderWorkResumeOption } from "../../features/boulder-state"
 import { buildAutoSelectedPlanContextWithStateInit } from "./work-initializer"
-import { formatIncompletePlanList, pickPreferredIncompletePlan } from "./plan-selection"
+import { pickPreferredIncompletePlan } from "./plan-selection"
 
 export function shouldResumeExistingState(input: {
   readonly existingState: BoulderState | null
@@ -103,37 +103,9 @@ export function buildPlanDiscoveryContext(params: {
     })
   }
 
-  if (!preferredPlanPath) {
-    return contextInfo + `
+  return contextInfo + `
 
 ## No Plan for This Session
 
 No incomplete plan was referenced in this session. Invoke the Prometheus agent to create a new work plan.`
-  }
-
-  if (incompletePlans.length === 1) {
-    return contextInfo + buildAutoSelectedPlanContextWithStateInit({
-      planPath: incompletePlans[0],
-      sessionId,
-      timestamp,
-      activeAgent,
-      worktreePath,
-      worktreeBlock,
-      directory,
-    })
-  }
-
-  return contextInfo + `
-
-<system-reminder>
-## Multiple Plans Found
-
-Current Time: ${timestamp}
-Session ID: ${sessionId}
-
-${formatIncompletePlanList(incompletePlans, true)}
-
-Ask the user which plan to work on. Present the options above and wait for their response.
-${worktreeBlock}
-</system-reminder>`
 }
