@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // allow: SIZE_OK - one live Senpi LSP QA driver keeps pack/install/daemon/harness evidence in one executable.
 import { spawnSync } from "node:child_process"
-import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { mkdir } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
 import { verifyRuntimeDist } from "../../plugin/scripts/stage-lsp-daemon-runtime.mjs"
+import { digestDirectory } from "./directory-digest.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -15,6 +15,23 @@ const repoRoot = resolve(packageRoot, "..", "..")
 const pluginRoot = join(packageRoot, "plugin")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
+const realSenpiDigestOptions = {
+  ignore: [
+    "bin",
+    "extensions",
+    "git",
+    "logs",
+    "omo-local-update",
+    "omo-senpi",
+    "sessions",
+    "omo-local-update-state.json",
+    "senpi-crash.log",
+    "senpi-debug.log",
+  ],
+}
+const realOmoDaemonDigestOptions = {
+  ignore: ["lsp-daemon-sweep.stamp", "lsp-proxy-sweep.stamp"],
+}
 
 function parseArgs(argv) {
   const args = { scenario: "runtime-package", selfTest: false, evidenceDir: undefined }
@@ -38,34 +55,28 @@ function parseArgs(argv) {
 }
 
 function findOnPath(bin) {
-  if (bin.includes("/")) return existsSync(bin) ? resolve(bin) : null
+  const suffixes = process.platform === "win32" ? [".exe", ".cmd", ".bat", ".com", ""] : [""]
+  if (bin.includes("/") || bin.includes("\\")) {
+    for (const suffix of suffixes) {
+      const candidate = `${resolve(bin)}${suffix}`
+      if (existsSync(candidate)) return candidate
+    }
+    return null
+  }
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
-    const candidate = resolve(dir || ".", bin)
-    if (existsSync(candidate)) return candidate
+    for (const suffix of suffixes) {
+      const candidate = resolve(dir || ".", `${bin}${suffix}`)
+      if (existsSync(candidate)) return candidate
+    }
   }
   return null
 }
 
-function digestDirectory(root) {
-  if (!existsSync(root)) return "absent"
-  const hash = createHash("sha256")
-  for (const file of listFiles(root).sort()) {
-    hash.update(relative(root, file))
-    hash.update("\0")
-    hash.update(createHash("sha256").update(readFileSync(file)).digest("hex"))
-    hash.update("\0")
-  }
-  return hash.digest("hex")
-}
-
-function listFiles(root) {
-  const files = []
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
-    const path = join(root, entry.name)
-    if (entry.isDirectory()) files.push(...listFiles(path))
-    else if (entry.isFile()) files.push(path)
-  }
-  return files
+function prepareSpawn(command, args) {
+  const isWindowsShim = process.platform === "win32" && (command === "npm" || /\.(?:cmd|bat)$/i.test(command))
+  return isWindowsShim
+    ? { command: command === "npm" ? "npm.cmd" : command, args, shell: true }
+    : { command, args, shell: false }
 }
 
 function writeJson(path, value) {
@@ -74,7 +85,7 @@ function writeJson(path, value) {
 }
 
 function isolatedHomeEnv(baseEnv, homeDir) {
-  return {
+  const env = {
     ...baseEnv,
     HOME: homeDir,
     USERPROFILE: homeDir,
@@ -82,6 +93,10 @@ function isolatedHomeEnv(baseEnv, homeDir) {
     HOMEPATH: homeDir,
     NODE_PATH: "",
   }
+  for (const key of ["PI_SESSION_FILE", "PI_SESSION_ID", "PI_MODEL", "PI_PROVIDER", "PI_REASONING_LEVEL"]) {
+    delete env[key]
+  }
+  return env
 }
 
 function parseJsonEvents(text) {
@@ -101,13 +116,17 @@ function findToolExecution(events, toolName) {
 }
 
 function runChecked(command, args, options) {
-  const result = spawnSync(command, args, {
+  const invocation = prepareSpawn(command, args)
+  const result = spawnSync(invocation.command, invocation.args, {
     ...options,
+    shell: invocation.shell,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   })
   if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr || result.stdout}`)
+    throw new Error(
+      `${command} ${args.join(" ")} failed: ${result.error?.message || result.stderr || result.stdout || "unknown error"}`,
+    )
   }
   return result
 }
@@ -118,7 +137,9 @@ function packAndExtract(workRoot) {
   spawnSync("mkdir", ["-p", packDir, extractDir])
   const pack = runChecked("npm", ["pack", pluginRoot, "--pack-destination", packDir], { cwd: repoRoot })
   const tarball = join(packDir, pack.stdout.trim().split(/\r?\n/).at(-1))
-  runChecked("tar", ["-xzf", tarball, "-C", extractDir], { cwd: repoRoot })
+  const tarCommand =
+    process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar"
+  runChecked(tarCommand, ["-xzf", tarball, "-C", extractDir], { cwd: repoRoot })
   return { tarball, extractedPlugin: join(extractDir, "package") }
 }
 
@@ -235,9 +256,10 @@ function runSenpiLoadProof(input) {
     "ulw runtime package proof",
   ]
   writeFileSync(join(input.projectDir, "mock-script.json"), `${JSON.stringify({ steps: [{ type: "text", text: "runtime package loaded" }] }, null, 2)}\n`)
+  const invocation = prepareSenpiSpawn(input.senpiBin, argv)
   const result = spawnSync(
-    input.senpiBin,
-    argv,
+    invocation.command,
+    invocation.args,
     {
       cwd: input.projectDir,
       env: {
@@ -248,6 +270,7 @@ function runSenpiLoadProof(input) {
         OMO_LSP_DAEMON_DIR: input.daemonDir,
       },
       encoding: "utf8",
+      shell: invocation.shell,
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,
     },
@@ -255,82 +278,15 @@ function runSenpiLoadProof(input) {
   const streamText = `${result.stdout ?? ""}\n${result.stderr ?? ""}`
   return {
     exitStatus: result.status,
+    signal: result.signal,
     argv,
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
+    spawnError: result.error?.message,
     extensionLoaded:
       result.status === 0 &&
       streamText.includes("<ultrawork-mode>") &&
       streamText.includes("\"customType\":\"senpi-task.usage\""),
-  }
-}
-
-function runSenpiToolProof(input) {
-  const argv = [
-    "-e",
-    mockProviderEntry,
-    "-p",
-    "--mode",
-    "json",
-    "--provider",
-    "omo-mock",
-    "--model",
-    "mock-1",
-    "--permission",
-    "edit=allow",
-    "--session-dir",
-    input.sessionDir,
-    "call the LSP goto definition tool",
-  ]
-  const samplePath = join(input.projectDir, "sample.ts")
-  writeFileSync(samplePath, "export function targetValue() { return 1 }\nconst result = targetValue()\n")
-  writeFileSync(
-    join(input.projectDir, "mock-script.json"),
-    `${JSON.stringify(
-      {
-        steps: [
-          {
-            type: "tool_call",
-            name: "lsp_goto_definition",
-            arguments: { filePath: samplePath, line: 2, character: 15 },
-          },
-          { type: "text", text: "tools scenario complete" },
-        ],
-      },
-      null,
-      2,
-    )}\n`,
-  )
-  const result = spawnSync(
-    input.senpiBin,
-    argv,
-    {
-      cwd: input.projectDir,
-      env: {
-        ...isolatedHomeEnv(process.env, input.homeDir),
-        SENPI_CODING_AGENT_DIR: input.agentDir,
-        SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
-        OMO_SENPI_QA: "1",
-        OMO_LSP_DAEMON_DIR: input.daemonDir,
-        OMO_LSP_DAEMON_CLI: input.cliPath,
-        OMO_LSP_DAEMON_VERSION: input.version,
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-      maxBuffer: 64 * 1024 * 1024,
-    },
-  )
-  const events = parseJsonEvents(result.stdout ?? "")
-  const toolEvent = findToolExecution(events, "lsp_goto_definition")
-  const resultText = JSON.stringify(toolEvent?.result ?? {})
-  return {
-    exitStatus: result.status,
-    argv,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-    toolEvent,
-    toolSucceeded: result.status === 0 && toolEvent?.result?.isError !== true && resultText.includes("sample.ts"),
-    warningCount: countProjectCommandWarnings(`${result.stdout ?? ""}\n${result.stderr ?? ""}`),
   }
 }
 
@@ -372,7 +328,7 @@ function runSeededArchitectureGuardProbe(evidenceDir) {
     mkdirSync(lspDir, { recursive: true })
     writeFileSync(join(lspDir, "transport.ts"), "export const staleTransport = true\n")
     writeFileSync(join(lspDir, "manager.ts"), "export const staleManager = true\n")
-    const hits = collectRemovedEngineHits(workRoot).map((path) => relative(workRoot, path))
+    const hits = collectRemovedEngineHits(workRoot).map((path) => relative(workRoot, path).replaceAll("\\", "/"))
     const payload = {
       seededTransportManagerFailure:
         hits.includes(["lsp", "transport.ts"].join("/")) && hits.includes(["lsp", "manager.ts"].join("/")),
@@ -440,12 +396,18 @@ async function inspectExtractedTools(input) {
     const unavailable = await lspTools
       .find((tool) => tool.name === "lsp_goto_definition")
       ?.execute("qa-unavailable", { filePath: unavailablePath, line: 1, character: 0 })
+    const samplePath = join(input.projectDir, "sample.ts")
+    writeFileSync(samplePath, "export function targetValue() { return 1 }\nconst result = targetValue()\n")
+    const gotoDefinition = await lspTools
+      .find((tool) => tool.name === "lsp_goto_definition")
+      ?.execute("qa-goto-definition", { filePath: samplePath, line: 2, character: 15 })
     return {
       descriptors: lspTools.map(describeTool),
       handlers: handlers.map((handler) => handler.event),
       warningCount: warnings.filter((warning) => String(warning.message).includes("project-local LSP commands")).length,
       warnings,
       unavailable,
+      gotoDefinition,
     }
   } finally {
     console.warn = originalWarn
@@ -696,9 +658,9 @@ async function runPostEdit(evidenceDir) {
   const tsServer = findOnPath("typescript-language-server")
   if (tsServer === null) throw new Error("typescript-language-server unavailable; post-edit scenario cannot SKIP")
   const workRoot = mkdtempSync(join(tmpdir(), "omo-senpi-lsp-post-edit-e2e-"))
-  const beforeRealSenpiHash = digestDirectory(realSenpiAgentDir)
+  const beforeRealSenpiHash = digestDirectory(realSenpiAgentDir, realSenpiDigestOptions)
   const beforeRealPiHash = digestDirectory(join(homedir(), ".pi"))
-  const beforeRealOmoDaemonHash = digestDirectory(join(homedir(), ".omo", "lsp-daemon"))
+  const beforeRealOmoDaemonHash = digestDirectory(join(homedir(), ".omo", "lsp-daemon"), realOmoDaemonDigestOptions)
   let status
   let extractedPlugin
   let inspect
@@ -760,9 +722,10 @@ async function runPostEdit(evidenceDir) {
         status.first.pid === status.second.pid &&
         status.first.endpoint.path === status.second.endpoint.path,
       realHomesUnchanged:
-        beforeRealSenpiHash === digestDirectory(realSenpiAgentDir) &&
+        beforeRealSenpiHash === digestDirectory(realSenpiAgentDir, realSenpiDigestOptions) &&
         beforeRealPiHash === digestDirectory(join(homedir(), ".pi")) &&
-        beforeRealOmoDaemonHash === digestDirectory(join(homedir(), ".omo", "lsp-daemon")),
+        beforeRealOmoDaemonHash ===
+          digestDirectory(join(homedir(), ".omo", "lsp-daemon"), realOmoDaemonDigestOptions),
       noSkip: true,
     }
     const payload = {
@@ -969,17 +932,14 @@ async function runRuntimePackage(evidenceDir) {
 }
 
 async function runTools(evidenceDir) {
-  const resolvedSenpi = findOnPath(process.env.SENPI_BIN?.trim() || "senpi")
-  if (resolvedSenpi === null) throw new Error("senpi binary unavailable; normal mode cannot SKIP")
   const tsServer = findOnPath("typescript-language-server")
   if (tsServer === null) throw new Error("typescript-language-server unavailable; tools scenario cannot SKIP")
   const workRoot = mkdtempSync(join(tmpdir(), "omo-senpi-lsp-tools-e2e-"))
-  const beforeRealSenpiHash = digestDirectory(realSenpiAgentDir)
+  const beforeRealSenpiHash = digestDirectory(realSenpiAgentDir, realSenpiDigestOptions)
   const beforeRealPiHash = digestDirectory(join(homedir(), ".pi"))
-  const beforeRealOmoDaemonHash = digestDirectory(join(homedir(), ".omo", "lsp-daemon"))
+  const beforeRealOmoDaemonHash = digestDirectory(join(homedir(), ".omo", "lsp-daemon"), realOmoDaemonDigestOptions)
   let status
   let extractedPlugin
-  let senpi
   let inspect
   try {
     const packed = packAndExtract(workRoot)
@@ -993,9 +953,8 @@ async function runTools(evidenceDir) {
     const homeDir = join(workRoot, "home")
     const projectDir = join(workRoot, "project")
     const emptyProjectDir = join(workRoot, "empty-project")
-    const sessionDir = join(workRoot, "sessions")
     const daemonDir = join(workRoot, "daemon")
-    spawnSync("mkdir", ["-p", agentDir, homeDir, projectDir, emptyProjectDir, sessionDir, daemonDir, join(homeDir, ".pi"), join(projectDir, ".pi")])
+    spawnSync("mkdir", ["-p", agentDir, homeDir, projectDir, emptyProjectDir, daemonDir, join(homeDir, ".pi"), join(projectDir, ".pi")])
     writeFileSync(
       join(homeDir, ".pi", "lsp-client.json"),
       `${JSON.stringify(
@@ -1045,23 +1004,21 @@ async function runTools(evidenceDir) {
       cliPath,
       version,
     })
-    senpi = runSenpiToolProof({
-      senpiBin: resolvedSenpi,
-      agentDir,
-      homeDir,
-      projectDir,
-      sessionDir,
-      daemonDir,
-      cliPath,
-      version,
-    })
     const descriptorNames = inspect.descriptors.map((descriptor) => descriptor.name).sort()
     const unavailableDetails = inspect.unavailable?.details
+    const homeChecks = {
+      senpi: beforeRealSenpiHash === digestDirectory(realSenpiAgentDir, realSenpiDigestOptions),
+      pi: beforeRealPiHash === digestDirectory(join(homedir(), ".pi")),
+      daemon:
+        beforeRealOmoDaemonHash ===
+        digestDirectory(join(homedir(), ".omo", "lsp-daemon"), realOmoDaemonDigestOptions),
+    }
     const checks = {
       sixCompleteDescriptors: descriptorNames.length === 6 && descriptorNames.every((name) => name.startsWith("lsp_")),
       sequentialRename: inspect.descriptors.find((descriptor) => descriptor.name === "lsp_rename")?.executionMode === "sequential",
       rendererParity: inspect.descriptors.every((descriptor) => descriptor.hasRenderCall && descriptor.hasRenderResult),
-      userPiGotoDefinition: senpi.toolSucceeded === true,
+      packagedGotoDefinition:
+        inspect.gotoDefinition?.isError !== true && JSON.stringify(inspect.gotoDefinition).includes("sample.ts"),
       projectCommandUnspawned: !existsSync(projectSentinel),
       oneWarning: inspect.warningCount === 1,
       unavailableShape:
@@ -1071,17 +1028,13 @@ async function runTools(evidenceDir) {
         JSON.stringify(inspect.unavailable).includes(".pi") &&
         !JSON.stringify(inspect.unavailable).includes("install_decision"),
       extractedRuntimePath: runtimeDist.startsWith(extractedPlugin) && !runtimeDist.startsWith(repoRoot),
-      realHomesUnchanged:
-        beforeRealSenpiHash === digestDirectory(realSenpiAgentDir) &&
-        beforeRealPiHash === digestDirectory(join(homedir(), ".pi")) &&
-        beforeRealOmoDaemonHash === digestDirectory(join(homedir(), ".omo", "lsp-daemon")),
+      realHomesUnchanged: Object.values(homeChecks).every(Boolean),
       noSkip: true,
     }
     const payload = {
       result: Object.values(checks).every(Boolean) ? "PASS" : "FAIL",
       scenario: "tools",
       checks,
-      senpiBin: resolvedSenpi,
       typescriptLanguageServer: tsServer,
       extractedPlugin,
       extractedExtension: join(extractedPlugin, "extensions", "omo.js"),
@@ -1092,10 +1045,10 @@ async function runTools(evidenceDir) {
       installedPackage: JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8")).packages?.[0],
       installStdout: install.stdout.trim(),
       descriptors: inspect.descriptors,
-      warningCount: { inspectedExtension: inspect.warningCount, senpi: senpi.warningCount },
-      senpiArgv: senpi.argv,
+      warningCount: { inspectedExtension: inspect.warningCount },
+      homeChecks,
       unavailable: inspect.unavailable,
-      gotoDefinitionToolEvent: senpi.toolEvent,
+      gotoDefinition: inspect.gotoDefinition,
       directStatus: {
         sameOwner: status.first.pid === status.second.pid,
         sameEndpoint: status.first.endpoint.path === status.second.endpoint.path,
@@ -1108,7 +1061,7 @@ async function runTools(evidenceDir) {
       projectCommandSentinel: projectSentinel,
       cleanup: "work root removed in finally; known daemon pid terminated",
     }
-    writeEvidence(evidenceDir, payload, { senpi, packed })
+    writeEvidence(evidenceDir, payload, { packed })
     if (payload.result !== "PASS") process.exitCode = 1
     return payload
   } catch (error) {
@@ -1118,10 +1071,9 @@ async function runTools(evidenceDir) {
       reason: error instanceof Error ? error.message : String(error),
       extractedPlugin,
       directStatusStarted: status !== undefined,
-      senpiExitStatus: senpi?.exitStatus,
       inspectStarted: inspect !== undefined,
     }
-    writeEvidence(evidenceDir, payload, { senpi })
+    writeEvidence(evidenceDir, payload)
     process.exitCode = 1
     return payload
   } finally {

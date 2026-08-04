@@ -123,6 +123,31 @@ describe("resolveAgent", () => {
     })
   })
 
+  test("#given an available explore overwrite model #when resolved #then the standard fallback chain remains available", () => {
+    // given
+    const agents = roster({
+      name: "explore",
+      models: [{ model: "openai-codex/gpt-5.6-luna", reasoning: "low" }],
+    })
+    const models = registry([
+      model("openai-codex", "gpt-5.6-luna"),
+      model("openai", "gpt-5.6-luna-fast"),
+    ])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.model).toBe("openai-codex/gpt-5.6-luna")
+    expect(result.fallback_models).toContainEqual({
+      source: "agent",
+      provider: "openai",
+      model_id: "gpt-5.6-luna-fast",
+      display: "openai/gpt-5.6-luna-fast",
+      variant: "low",
+    })
+  })
+
   test("#given an unavailable primary and ordered def.models #when resolved #then the first available model wins", () => {
     // given
     const agents = roster({

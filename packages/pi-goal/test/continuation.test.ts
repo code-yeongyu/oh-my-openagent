@@ -52,6 +52,23 @@ describe("goal continuation policy", () => {
 		);
 	});
 
+	it("waits for a running background command instead of creating a tight continuation loop", () => {
+		const backgroundTurn = [
+			{ role: "user", content: [{ type: "text", text: "run the long check" }] },
+			{ role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: "1", name: "bash" }] },
+			{
+				role: "toolResult",
+				isError: false,
+				content: [{ type: "text", text: "Command running in background with ID: bash_123" }],
+			},
+			{ role: "assistant", stopReason: "stop", content: [{ type: "text", text: "waiting for completion" }] },
+		];
+
+		expect(shouldQueueGoalContinuationAfterAgentEnd(testGoal({ status: "active" }), false, backgroundTurn)).toBe(
+			false,
+		);
+	});
+
 	it("requires idle state for command and session-start continuation", () => {
 		expect(shouldQueueGoalContinuationWhenIdle(testGoal({ status: "active" }), true, false)).toBe(true);
 		expect(shouldQueueGoalContinuationWhenIdle(testGoal({ status: "active" }), false, false)).toBe(false);

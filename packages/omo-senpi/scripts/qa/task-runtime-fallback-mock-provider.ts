@@ -69,8 +69,9 @@ const CHILD_IDENTITY = "running as an omo senpi-task child"
 const QUOTA_ERROR = `403: {"message":"You've reached your usage limit for this billing cycle. Your quota will be refreshed in the next cycle.","type":"access_terminated_error"}`
 const FINAL_TEXT = "omo e2e fallback child final text"
 // Scenarios: "user-fallback" (custom category, user fallback_models), "builtin-chain-fallback"
-// (builtin quick rung-1 dead, rung-2 healthy, no user fallback_models), "chain-exhausted"
-// (every available rung dead).
+// (builtin quick rung-1 dead, rung-2 healthy, no user fallback_models),
+// "overwrite-builtin-fallback" (configured quick overwrite dead, standard rung-2 healthy), and
+// "chain-exhausted" (every available rung dead).
 const SCENARIO = process.env.OMO_FALLBACK_SCENARIO ?? "user-fallback"
 let parentCalls = 0
 
