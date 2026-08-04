@@ -345,12 +345,14 @@ describe("createChatMessageHandler - cache warning behavior", () => {
 describe("createChatMessageHandler - /start-work integration", () => {
   let testDir = ""
   let originalWorkingDirectory = ""
+  let planPath = ""
 
   beforeEach(() => {
     testDir = join(tmpdir(), `chat-message-start-work-${randomUUID()}`)
     originalWorkingDirectory = process.cwd()
     mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
-    writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
+    planPath = join(testDir, ".omo", "plans", "worker-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1")
     process.chdir(testDir)
     _resetForTesting()
     registerAgentName("prometheus")
@@ -369,7 +371,10 @@ describe("createChatMessageHandler - /start-work integration", () => {
     args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
     args.hooks.startWork = createStartWorkHook({
       directory: testDir,
-      client: { tui: { showToast: async () => {} } },
+      client: {
+        tui: { showToast: async () => {} },
+        session: { messages: async () => ({ data: [{ parts: [{ text: planPath }] }] }) },
+      },
     } as never)
     const handler = createChatMessageHandler(args)
     const input = createMockInput("prometheus")

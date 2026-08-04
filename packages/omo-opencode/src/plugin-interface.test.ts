@@ -17,11 +17,13 @@ import {
 
 describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""
+  let planPath = ""
 
   beforeEach(() => {
     testDir = join(tmpdir(), `plugin-interface-start-work-${randomUUID()}`)
     mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
-    writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
+    planPath = join(testDir, ".omo", "plans", "worker-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1")
     _resetForTesting()
     registerAgentName("prometheus")
     registerAgentName("sisyphus")
@@ -52,7 +54,10 @@ describe("createPluginInterface - command.execute.before", () => {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
         startWork: createStartWorkHook({
           directory: testDir,
-          client: { tui: { showToast: async () => {} } },
+          client: {
+            tui: { showToast: async () => {} },
+            session: { messages: async () => ({ data: [{ parts: [{ text: planPath }] }] }) },
+          },
         } as never),
       } as never,
       tools: {},
@@ -99,7 +104,10 @@ describe("createPluginInterface - command.execute.before", () => {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
         startWork: createStartWorkHook({
           directory: testDir,
-          client: { tui: { showToast: async () => {} } },
+          client: {
+            tui: { showToast: async () => {} },
+            session: { messages: async () => ({ data: [{ parts: [{ text: planPath }] }] }) },
+          },
         } as never),
       } as never,
       tools: {},
@@ -145,7 +153,10 @@ describe("createPluginInterface - command.execute.before", () => {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
         startWork: createStartWorkHook({
           directory: testDir,
-          client: { tui: { showToast: async () => {} } },
+          client: {
+            tui: { showToast: async () => {} },
+            session: { messages: async () => ({ data: [{ parts: [{ text: planPath }] }] }) },
+          },
         } as never),
       } as never,
       tools: {},
