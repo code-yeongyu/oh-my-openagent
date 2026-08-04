@@ -14,6 +14,7 @@ const PERMISSIONS_KEY_PATTERN = /approval_policy|sandbox_mode|network_access/;
 const PLUGIN_VERSION = "9.9.9";
 
 const BUNDLED_EXPLORER_TOML = 'description = "Explorer agent"\nmodel_reasoning_effort = "medium"\n';
+const BUNDLED_EXPLORER_TOML_V2 = 'description = "Explorer agent v2"\nmodel_reasoning_effort = "medium"\n';
 const BUNDLED_METIS_TOML = 'description = "Metis agent"\nmodel_reasoning_effort = "high"\n';
 
 async function withSetupFixture(run) {
@@ -184,6 +185,24 @@ test("#given missing bootstrap state #when an Orca runtime has a bundled explore
 			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
 		);
 		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML);
+
+		await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
+
+		await assert.rejects(() => stat(join(orcaHome, "agents", "explorer.toml")), { code: "ENOENT" });
+	});
+});
+
+test("#given stale staged agent content #when an Orca runtime has the current bundled explorer #then the current duplicate is removed", async () => {
+	await withSetupFixture(async (fixture) => {
+		await runWorkerSetup(setupOptions(fixture));
+		await writeFile(join(fixture.pluginRoot, "components", "ultrawork", "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML_V2);
+		const orcaHome = join(fixture.root, "orca-codex-home");
+		await mkdir(join(orcaHome, "agents"), { recursive: true });
+		await writeFile(
+			join(orcaHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
+		);
+		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML_V2);
 
 		await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
 

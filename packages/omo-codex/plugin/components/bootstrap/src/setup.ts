@@ -97,8 +97,10 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		const foreignAgentFiles = await stageBundledAgents(options.pluginRoot, stageRoot, existingConfig);
 		for (const agentFile of foreignAgentFiles) {
 			const agentPath = join(agentsTarget, agentFile);
-			const expectedContent = previouslyStagedAgentContents.get(agentFile) ?? bundledAgentContents.get(agentFile);
-			if (await matchesAgentContent(agentPath, expectedContent)) {
+			if (
+				(await matchesAgentContent(agentPath, previouslyStagedAgentContents.get(agentFile))) ||
+				(await matchesAgentContent(agentPath, bundledAgentContents.get(agentFile)))
+			) {
 				await rm(agentPath, { force: true });
 			}
 		}
