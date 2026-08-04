@@ -1,6 +1,6 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { PLAN_GATED_AGENT_NAMES, type AgentDefinition } from "../../agents"
+import { BUILTIN_AGENTS, PLAN_GATED_AGENT_NAMES, type AgentDefinition } from "../../agents"
 import { listTaskAgents, listTaskCategories } from "./categories"
 import type { TaskAgentInfo, TaskCategoryInfo } from "./types"
 
@@ -13,6 +13,11 @@ export const TASK_PROMPT_GUIDELINES: readonly string[] = [
   "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
   "Pass task_summary (one line, <=80 chars) on every spawn: the user's footer/widget UI shows it instead of the raw prompt, so it should say WHAT was delegated.",
 ]
+
+export const TASK_RESEARCH_ROUTING = {
+  preferred: { kind: "subagent_type", name: "librarian" },
+  escalation: { kind: "category", name: "deep" },
+} as const
 
 type DescriptionInput = {
   readonly omoConfig: OmoConfig
@@ -34,6 +39,26 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
     gatedAgents.length === 0
       ? ""
       : `\n  Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and start-work was never invoked): ${gatedAgents.map((agent) => agent.name).join(", ")}`
+  const loadedLibrarian = input.agents[TASK_RESEARCH_ROUTING.preferred.name]
+  const builtinLibrarian = BUILTIN_AGENTS[TASK_RESEARCH_ROUTING.preferred.name]
+  const librarianAvailable =
+    agents.some((agent) => agent.name === TASK_RESEARCH_ROUTING.preferred.name) &&
+    loadedLibrarian?.description === builtinLibrarian?.description &&
+    loadedLibrarian?.prompt === builtinLibrarian?.prompt &&
+    loadedLibrarian?.tools === builtinLibrarian?.tools
+  const configuredDeep = input.omoConfig.categories?.[TASK_RESEARCH_ROUTING.escalation.name]
+  const deepAvailable =
+    categories.some((category) => category.name === TASK_RESEARCH_ROUTING.escalation.name) &&
+    configuredDeep?.description === undefined &&
+    configuredDeep?.prompt_append === undefined &&
+    configuredDeep?.tools === undefined
+  const preferredResearchRouting = librarianAvailable
+    ? `\nRouting: use ${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}" for routine official-source, documentation, and reference lookup.`
+    : ""
+  const deepResearchEscalation =
+    librarianAvailable && deepAvailable
+      ? ` Escalate to ${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}" only after routine lookup cannot resolve a goal that requires autonomous multi-step problem-solving.`
+      : ""
   return `Spawn one child task or fan out a batch.
 
 Choose exactly one input form:
@@ -44,7 +69,7 @@ Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO N
 
 - category routes through Sisyphus-Junior. Available categories:
 ${renderList(categories)}
-- subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}
+- subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}${preferredResearchRouting}${deepResearchEscalation}
 
 Blank provider padding is normalized automatically; do not add filler values.
 load_skills prepends named skills. run_in_background=true returns task ids for parallel work; false waits for results.
