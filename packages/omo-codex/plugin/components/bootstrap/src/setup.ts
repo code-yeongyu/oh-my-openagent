@@ -1,5 +1,5 @@
 import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
 // inlines the installer source modules into dist/cli.js so PLUGIN_ROOT ships
@@ -98,7 +98,7 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		for (const agentFile of foreignAgentFiles) {
 			const agentPath = join(agentsTarget, agentFile);
 			if (
-				previouslyInstalledAgents.has(agentPath) &&
+				hasPreviouslyInstalledAgent(previouslyInstalledAgents, agentFile) &&
 				(await matchesAgentContent(agentPath, previouslyStagedAgentContents.get(agentFile)))
 			) {
 				await rm(agentPath, { force: true });
@@ -168,6 +168,13 @@ async function readInstalledAgentPaths(stageRoot: string): Promise<ReadonlySet<s
 		if (errorCode(error) === "ENOENT") return new Set();
 		throw error;
 	}
+}
+
+function hasPreviouslyInstalledAgent(previouslyInstalledAgents: ReadonlySet<string>, agentFile: string): boolean {
+	for (const agentPath of previouslyInstalledAgents) {
+		if (basename(agentPath) === agentFile) return true;
+	}
+	return false;
 }
 
 async function readStagedAgentContents(stageRoot: string): Promise<ReadonlyMap<string, string>> {

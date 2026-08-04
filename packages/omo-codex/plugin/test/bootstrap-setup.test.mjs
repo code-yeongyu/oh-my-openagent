@@ -154,6 +154,25 @@ test("#given a config.toml that already declares [agents.explorer] at a differen
 	});
 });
 
+test("#given shared plugin data from another CODEX_HOME #when an Orca runtime has a mirrored explorer #then the managed runtime copy is removed", async () => {
+	await withSetupFixture(async (fixture) => {
+		await runWorkerSetup(setupOptions(fixture));
+		const orcaHome = join(fixture.root, "orca-codex-home");
+		await mkdir(join(orcaHome, "agents"), { recursive: true });
+		await writeFile(
+			join(orcaHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
+		);
+		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML);
+
+		const outcome = await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
+
+		assert.deepEqual(outcome.degraded, []);
+		await assert.rejects(() => stat(join(orcaHome, "agents", "explorer.toml")), { code: "ENOENT" });
+		assert.equal(await readFile(join(orcaHome, "agents", "metis.toml"), "utf8"), BUNDLED_METIS_TOML);
+	});
+});
+
 test("#given a config.toml with no pre-existing agent entries #when the worker setup runs #then all bundled registrations are written", async () => {
 	await withSetupFixture(async (fixture) => {
 		const outcome = await runWorkerSetup(setupOptions(fixture));
