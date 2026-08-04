@@ -1,25 +1,43 @@
 import { EventEmitter } from "node:events"
 import { describe, expect, test } from "bun:test"
 
-import { isCmuxEnvironment, resolveCmuxExecutable, sendCmuxNotification } from "./cmux-notifier"
+import { isCmuxEnvironment, resolveCmuxExecutable, sendCmuxNotification, type CmuxSpawnImpl } from "./cmux-notifier"
 
-class FakeChild extends EventEmitter {}
+class FakeChild extends EventEmitter {
+  killed = false
+  unrefCalls = 0
+
+  kill(): boolean {
+    this.killed = true
+    return true
+  }
+
+  unref(): void {
+    this.unrefCalls += 1
+  }
+}
 
 type SpawnCall = {
   readonly command: string
   readonly args: readonly string[]
-  readonly options: Record<string, unknown>
+  readonly options: Parameters<CmuxSpawnImpl>[2]
 }
 
-function fakeSpawn(exitCode = 0): { readonly calls: SpawnCall[]; readonly spawnImpl: typeof import("node:child_process").spawn } {
+function fakeSpawn(exitCode = 0, emitClose = true): {
+  readonly calls: SpawnCall[]
+  readonly children: FakeChild[]
+  readonly spawnImpl: CmuxSpawnImpl
+} {
   const calls: SpawnCall[] = []
-  const spawnImpl = ((command: string, args: readonly string[], options: Record<string, unknown>) => {
+  const children: FakeChild[] = []
+  const spawnImpl: CmuxSpawnImpl = (command, args, options) => {
     calls.push({ command, args, options })
     const child = new FakeChild()
-    queueMicrotask(() => child.emit("close", exitCode))
+    children.push(child)
+    if (emitClose) queueMicrotask(() => child.emit("close", exitCode))
     return child
-  }) as typeof import("node:child_process").spawn
-  return { calls, spawnImpl }
+  }
+  return { calls, children, spawnImpl }
 }
 
 describe("OMO Senpi cmux notification bridge", () => {
@@ -92,11 +110,48 @@ describe("OMO Senpi cmux notification bridge", () => {
     })).resolves.toBe(false)
   })
 
-  test("#given cmux environment variables #when detecting cmux #then socket, launch kind, and explicit opt-in qualify", () => {
+  test("#given cmux environment variables #when detecting cmux #then socket, cmux TMUX, launch kind, and explicit opt-in qualify", () => {
     expect(isCmuxEnvironment({ CMUX_SOCKET_PATH: "/tmp/cmux.sock" })).toBe(true)
+    expect(isCmuxEnvironment({ TMUX: "/tmp/cmuxterm-12345.sock,1234,0" })).toBe(true)
+    expect(isCmuxEnvironment({ TMUX: "/tmp/tmux-12345.sock,1234,0" })).toBe(false)
     expect(isCmuxEnvironment({ CMUX_AGENT_LAUNCH_KIND: "workspace" })).toBe(true)
     expect(isCmuxEnvironment({ OMO_SENPI_CMUX_NOTIFY: "1" })).toBe(true)
     expect(isCmuxEnvironment({})).toBe(false)
+  })
+
+  test("#given cmux spawn rejects synchronously #when notification is requested #then it reports false", async () => {
+    const spawnImpl: CmuxSpawnImpl = () => {
+      throw new TypeError("argument must be a string without null bytes")
+    }
+
+    await expect(sendCmuxNotification("title", "body\0with-nul", {
+      env: {
+        OMO_CMUX_BIN: "/tmp/fake-cmux",
+        CMUX_SOCKET_PATH: "/tmp/cmux.sock",
+        TMUX: "/tmp/cmuxterm-12345.sock,1234,0",
+      },
+      platform: "darwin",
+      spawnImpl,
+    })).resolves.toBe(false)
+  })
+
+  test("#given cmux notify stalls #when timeout elapses #then it is best-effort and cannot keep Senpi alive", async () => {
+    const spawn = fakeSpawn(0, false)
+
+    await expect(sendCmuxNotification("title", "body", {
+      env: {
+        OMO_CMUX_BIN: "/tmp/fake-cmux",
+        TMUX: "/tmp/cmuxterm-12345.sock,1234,0",
+      },
+      platform: "darwin",
+      spawnImpl: spawn.spawnImpl,
+      timeoutMs: 1,
+    })).resolves.toBe(false)
+
+    const child = spawn.children[0]
+    if (child === undefined) throw new Error("fake spawn should create one child process")
+    expect(child.unrefCalls).toBe(1)
+    expect(child.killed).toBe(true)
   })
 
   test("#given executable overrides #when resolving cmux #then explicit override wins", () => {

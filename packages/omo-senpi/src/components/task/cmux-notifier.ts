@@ -1,13 +1,28 @@
-import { spawn } from "node:child_process"
+import { spawn, type SpawnOptions } from "node:child_process"
 import { accessSync, constants, existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
 
 export interface CmuxNotificationOptions {
   readonly env?: NodeJS.ProcessEnv
   readonly platform?: NodeJS.Platform
-  readonly spawnImpl?: typeof spawn
+  readonly spawnImpl?: CmuxSpawnImpl
+  readonly timeoutMs?: number
 }
 
+export type CmuxSpawnImpl = (
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+) => CmuxNotificationChild
+
+interface CmuxNotificationChild {
+  once(event: "error", listener: () => void): CmuxNotificationChild
+  once(event: "close", listener: (code: number | null) => void): CmuxNotificationChild
+  unref(): void
+  kill(): boolean
+}
+
+const DEFAULT_CMUX_NOTIFICATION_TIMEOUT_MS = 5_000
 const KNOWN_MACOS_CMUX_PATHS = [
   "/Applications/cmux.app/Contents/Resources/bin/cmux",
 ]
@@ -21,7 +36,8 @@ export function resolveCmuxExecutable(env: NodeJS.ProcessEnv = process.env): str
 }
 
 export function isCmuxEnvironment(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(env.CMUX_SOCKET_PATH || env.CMUX_AGENT_LAUNCH_KIND || env.OMO_SENPI_CMUX_NOTIFY === "1")
+  return env.TMUX?.includes("cmuxterm") === true ||
+    Boolean(env.CMUX_SOCKET_PATH || env.CMUX_AGENT_LAUNCH_KIND || env.OMO_SENPI_CMUX_NOTIFY === "1")
 }
 
 export function sendCmuxNotification(
@@ -35,15 +51,40 @@ export function sendCmuxNotification(
   const executable = resolveCmuxExecutable(env)
   if (executable === null) return Promise.resolve(false)
 
-  const spawnImpl = options.spawnImpl ?? spawn
-  return new Promise((resolve) => {
-    const child = spawnImpl(executable, ["notify", "--title", title, "--body", body], {
+  const spawnImpl = options.spawnImpl ?? spawnCmuxProcess
+  let child: CmuxNotificationChild
+  try {
+    child = spawnImpl(executable, ["notify", "--title", title, "--body", body], {
       stdio: "ignore",
       windowsHide: true,
     })
-    child.once("error", () => resolve(false))
-    child.once("close", (code) => resolve(code === 0))
+  } catch (error) {
+    if (error instanceof Error) return Promise.resolve(false)
+    return Promise.resolve(false)
+  }
+  child.unref()
+
+  return new Promise((resolve) => {
+    let completed = false
+    const complete = (result: boolean) => {
+      if (completed) return
+      completed = true
+      clearTimeout(timeout)
+      resolve(result)
+    }
+    const timeout = setTimeout(() => {
+      child.kill()
+      complete(false)
+    }, options.timeoutMs ?? DEFAULT_CMUX_NOTIFICATION_TIMEOUT_MS)
+    timeout.unref()
+
+    child.once("error", () => complete(false))
+    child.once("close", (code) => complete(code === 0))
   })
+}
+
+function spawnCmuxProcess(command: string, args: readonly string[], options: SpawnOptions): CmuxNotificationChild {
+  return spawn(command, args, options)
 }
 
 function findFirstExecutable(candidates: readonly string[]): string | null {
@@ -51,7 +92,8 @@ function findFirstExecutable(candidates: readonly string[]): string | null {
     try {
       accessSync(candidate, constants.X_OK)
       return candidate
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
       // Continue searching the remaining known locations.
     }
   }
@@ -67,7 +109,8 @@ function findExecutableOnPath(command: string, pathValue: string | undefined): s
     try {
       accessSync(candidate, constants.X_OK)
       return candidate
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
       // Continue searching the remaining PATH entries.
     }
   }
