@@ -19,6 +19,8 @@ const realAgentDir = join(homedir(), ".senpi", "agent")
 // - builtin-chain-fallback: builtin "quick" with rung-1 (kimi-coding) dead and rung-2
 //   (quotio-openai) healthy; NO user fallback_models, so the runtime chain must come from the
 //   builtin category chain itself.
+// - overwrite-builtin-fallback: builtin "quick" with a configured dead overwrite model followed
+//   by the healthy standard rung-2, matching `[senpi].categories.quick.models`.
 // - chain-exhausted: every available "quick" rung dies; the session must record
 //   retry_fallback_exhausted without crashing or hanging.
 const scenarios = [
@@ -57,6 +59,31 @@ const scenarios = [
       fallback_attempts: JSON.stringify(
         artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
       ) === JSON.stringify([
+        "kimi-coding/kimi-for-coding-highspeed",
+        "quotio-openai/gpt-5.6-luna-fast",
+      ]) ? "PASS" : "FAIL",
+    }),
+  },
+  {
+    name: "overwrite-builtin-fallback",
+    omoConfig: {
+      categories: {
+        quick: {
+          models: ["omo-fallback-mock/dead-primary"],
+        },
+      },
+    },
+    checks: (artifacts, stdoutText) => ({
+      final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
+      fallback_event: artifacts.log.includes("retry_fallback_applied") ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "quotio-openai/gpt-5.6-luna-fast" ? "PASS" : "FAIL",
+      requested_model: artifacts.task?.requested_model?.display === "omo-fallback-mock/dead-primary"
+        ? "PASS"
+        : "FAIL",
+      fallback_attempts: JSON.stringify(
+        artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
+      ) === JSON.stringify([
+        "omo-fallback-mock/dead-primary",
         "kimi-coding/kimi-for-coding-highspeed",
         "quotio-openai/gpt-5.6-luna-fast",
       ]) ? "PASS" : "FAIL",
@@ -171,7 +198,21 @@ function runScenario(scenario, outDir) {
 function run() {
   const outDir = resolve(process.env.TASK_RUNTIME_FALLBACK_OUT_DIR ?? join(process.cwd(), ".omo", "evidence", "task-runtime-fallback"))
   mkdirSync(outDir, { recursive: true })
-  const verdicts = scenarios.map((scenario) => runScenario(scenario, outDir))
+  const requestedNames = new Set(
+    (process.env.TASK_RUNTIME_FALLBACK_SCENARIOS ?? "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean),
+  )
+  const selectedScenarios = requestedNames.size === 0
+    ? scenarios
+    : scenarios.filter((scenario) => requestedNames.has(scenario.name))
+  if (selectedScenarios.length !== requestedNames.size) {
+    throw new Error(`Unknown fallback scenario: ${[...requestedNames].filter(
+      (name) => !scenarios.some((scenario) => scenario.name === name),
+    ).join(", ")}`)
+  }
+  const verdicts = selectedScenarios.map((scenario) => runScenario(scenario, outDir))
   const result = verdicts.every((verdict) => verdict.result === "PASS") ? "PASS" : "FAIL"
   const summary = { result, scenarios: verdicts }
   writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(summary, null, 2)}\n`)

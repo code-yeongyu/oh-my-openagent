@@ -113,15 +113,23 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     const found = findExactAgentModel(candidate.model, registry)
     if (found === undefined) continue
     if (availableModels !== undefined && !availableModels.includes(`${found.provider}/${found.modelId}`)) continue
+    const availableModelSet = availableModels === undefined ? undefined : new Set(availableModels)
+    const chainCandidates = availableModelSet === undefined || fallbackChain === undefined
+      ? []
+      : chainRungCandidates({
+          chain: fallbackChain,
+          selectedModel: candidate.model,
+          availableModels: availableModelSet,
+        })
     return resolvedAgent(
       context,
       found,
       candidate.variant,
       candidate.reasoningEffort,
       buildRuntimeModelChain({
-        candidates: directModels,
+        candidates: [...directModels, ...chainCandidates],
         selectedModel: candidate.model,
-        ...(availableModels !== undefined ? { availableModels: new Set(availableModels) } : {}),
+        ...(availableModelSet !== undefined ? { availableModels: availableModelSet } : {}),
         source: "agent",
       }),
     )

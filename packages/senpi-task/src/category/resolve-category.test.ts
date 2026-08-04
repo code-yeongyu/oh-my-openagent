@@ -209,6 +209,39 @@ describe("resolveCategory", () => {
     expect(resolved.spec.fallback_models?.[0]?.model_id).toBe("fallback-model")
   })
 
+  test("#given an available quick overwrite model #when resolved #then the standard fallback chain remains available", () => {
+    // given
+    const models = registry([
+      model("openai-codex", "gpt-5.6-luna"),
+      model("quotio-openai", "gpt-5.6-luna-fast"),
+    ])
+
+    // when
+    const result = resolveCategory(
+      "quick",
+      {
+        categories: {
+          quick: {
+            models: [{ model: "openai-codex/gpt-5.6-luna", reasoning: "low" }],
+          },
+        },
+      },
+      models,
+    )
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("openai-codex")
+    expect(resolved.spec.modelId).toBe("gpt-5.6-luna")
+    expect(resolved.spec.fallback_models).toContainEqual({
+      source: "category",
+      provider: "quotio-openai",
+      model_id: "gpt-5.6-luna-fast",
+      display: "quotio-openai/gpt-5.6-luna-fast",
+      variant: "low",
+    })
+  })
+
   test("#given a canonical models chain plus a conflicting legacy fallback_models #when resolved #then canonical models wins", () => {
     // given
     const models = registry([model("vendor-a", "primary-model")])

@@ -49,14 +49,13 @@ export type ChainRungCandidateOptions = {
   readonly availableModels: ReadonlySet<string>
 }
 
-// Chain-derived runtime candidates for a resolved selection: the selected rung's concrete model
-// first (so buildRuntimeModelChain can locate it), then the remaining rungs after it, each resolved
-// to the first available provider with the provider-specific model-id transform applied. Rungs with
-// no available provider are skipped. Returns [] when the selected model cannot be located in the
-// chain (e.g. a user-forced model), leaving user-configured chains untouched.
+// Chain-derived runtime candidates for a resolved selection: the selected model first (so
+// buildRuntimeModelChain can locate it), then the remaining standard rungs after a selected
+// standard rung, or every standard rung after a configured overwrite. Each rung resolves to the
+// first available provider with the provider-specific model-id transform applied. Rungs with no
+// available provider are skipped.
 export function chainRungCandidates(options: ChainRungCandidateOptions): readonly ModelChainCandidate[] {
   const selectedIndex = locateSelectedRung(options)
-  if (selectedIndex === -1) return []
 
   const rungs: ModelChainCandidate[] = [{ model: options.selectedModel }]
   for (const entry of options.chain.slice(selectedIndex + 1)) {
