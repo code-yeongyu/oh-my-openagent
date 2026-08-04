@@ -89,6 +89,7 @@ describe("buildTaskToolDescription", () => {
     expect(preferredIndex).toBeGreaterThanOrEqual(0)
     expect(escalationIndex).toBeGreaterThanOrEqual(0)
     expect(preferredIndex).toBeLessThan(escalationIndex)
+    expect(description).toContain("available at spawn time")
   })
 
   test("#given deep is disabled #when built #then routine research still routes to librarian without escalation", () => {

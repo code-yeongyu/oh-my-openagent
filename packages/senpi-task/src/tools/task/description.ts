@@ -57,7 +57,7 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
     : ""
   const deepResearchEscalation =
     librarianAvailable && deepAvailable
-      ? ` Escalate to ${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}" only after routine lookup cannot resolve a goal that requires autonomous multi-step problem-solving.`
+      ? ` Escalate to ${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}" only when that category is available at spawn time and routine lookup cannot resolve a goal that requires autonomous multi-step problem-solving.`
       : ""
   return `Spawn one child task or fan out a batch.
 

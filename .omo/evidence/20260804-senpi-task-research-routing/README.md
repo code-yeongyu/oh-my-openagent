@@ -25,7 +25,7 @@
 - Project overrides of deep description, prompt append, or tool rules retained
   the librarian preference but suppressed deep escalation. Model-only tuning
   preserved escalation.
-- Focused tests: 15 passed, 0 failed, with 41 assertions.
+- Focused tests: 15 passed, 0 failed, with 42 assertions after the review fix qualifying deep escalation by spawn-time availability.
 - The full `senpi-task` package suite passed.
 - `senpi-task` typecheck exited successfully.
 - The live Senpi driver passed all 11 checks, leaked no processes, and attributed
@@ -33,6 +33,7 @@
 - Another concurrently running Senpi session changed its own transcript during
   QA. The driver classified that path separately and still reported
   `real_senpi_untouched: true` for QA-attributed writes.
+- Review follow-up changed the deep escalation wording to avoid promising `category="deep"` when the live Senpi registry rejects its model at spawn time.
 
 ## Why this is enough
 
