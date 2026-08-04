@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "mode": "fake-cmux",
+  "senpiExit": 0,
+  "senpiSignal": null,
+  "notificationCaptured": true,
+  "cmuxExecutable": "cmux",
+  "cmuxArgs": [
+    "notify",
+    "--title",
+    "OMO task completed",
+    "--body",
+    "task completion name:cmuxprobe id:st_019fcc1d category:mockcat(omo-mock/mock-1) fallback:omo-mock/mock-1->mock-1 status:completed duration:11ms tools:0\nresult:\"cmux notification probe child complete\"\nnext:Use task_send({ to: \"st_019fcc1d\", message: \"...\" }) to continue."
+  ],
+  "tmuxMarker": "/tmp/cmuxterm-probe.sock,1234,0",
+  "realSenpiCredentialsUntouched": true,
+  "realSenpiDigestUnchanged": true,
+  "providedAgentDir": "unset",
+  "sandboxAgentDir": "/var/folders/53/qz9w4j414998346rmjb67zpr0000gn/T/omo-senpi-qa-uN1iGO/agent",
+  "sandboxCwd": "/var/folders/53/qz9w4j414998346rmjb67zpr0000gn/T/omo-senpi-qa-uN1iGO/project",
+  "sessionDir": "/var/folders/53/qz9w4j414998346rmjb67zpr0000gn/T/omo-senpi-qa-uN1iGO/sessions"
+}

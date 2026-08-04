@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   createCompletionNotifier,
+  type ParentNotifierMessage,
   type PersistedTaskEvent,
   type TaskRecord,
 } from "@oh-my-opencode/senpi-task"
@@ -13,7 +14,7 @@ type SentMessage = {
   readonly options: Record<string, unknown> | undefined
 }
 
-function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[] } {
+function fakePi(config: { readonly throwOnSend?: boolean } = {}): SenpiExtensionAPI & { readonly sent: SentMessage[] } {
   const sent: SentMessage[] = []
   return {
     sent,
@@ -23,6 +24,7 @@ function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[] } {
     registerFlag: () => undefined,
     getFlag: () => undefined,
     sendMessage: (message, options) => {
+      if (config.throwOnSend === true) throw new Error("send failed")
       sent.push({ message, options })
     },
     sendUserMessage: () => undefined,
@@ -96,5 +98,25 @@ describe("OMO Senpi task component fallback completion", () => {
     const content = String(pi.sent[0]?.message.content)
     expect(content).toContain("fallback:vendor-a/primary-model->vendor-b/fallback-model")
     expect(content.match(/fallback:/gu)).toHaveLength(1)
+  })
+})
+
+describe("OMO Senpi parent notifier cmux ordering", () => {
+  test("#given parent send fails synchronously #when completion enqueue retries #then cmux is not sent for failed attempts", () => {
+    // given
+    const pi = fakePi({ throwOnSend: true })
+    const cmuxMessages: ParentNotifierMessage[] = []
+    const notifier = createParentNotifier(pi, undefined, undefined, (message) => cmuxMessages.push(message))
+    const message: ParentNotifierMessage = {
+      customType: "senpi-task.completion",
+      content: "task completion name:worker status:error",
+      display: true,
+      details: [],
+      triggerTurn: true,
+    }
+
+    // when / then
+    expect(() => notifier.enqueue(message)).toThrow("send failed")
+    expect(cmuxMessages).toHaveLength(0)
   })
 })

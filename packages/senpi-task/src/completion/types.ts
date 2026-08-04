@@ -68,6 +68,7 @@ export type CompletionNotifierDeps = {
   readonly schedule?: CompletionRetrySchedule
   readonly getParentState?: () => ParentState
   readonly getCurrentSessionId?: () => string | undefined
+  readonly onReplacedBufferedCompletion?: (message: ParentNotifierMessage) => void
 }
 
 export type CompletionRequest = {

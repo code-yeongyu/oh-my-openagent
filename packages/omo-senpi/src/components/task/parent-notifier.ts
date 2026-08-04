@@ -1,10 +1,13 @@
 import type { ParentNotifier, ParentNotifierMessage } from "@oh-my-opencode/senpi-task"
+import { sendCmuxNotification } from "./cmux-notifier"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
 
 // The senpi-task completion custom-message type; the component registers a renderer for it.
 export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
+
+export type CmuxTaskCompletionNotifier = (message: ParentNotifierMessage) => void
 
 /**
  * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. EVERY delivered
@@ -19,6 +22,7 @@ export function createParentNotifier(
   pi: SenpiExtensionAPI,
   coordinator?: IdleInjectionCoordinator,
   isStreaming?: () => boolean,
+  notifyCmux: CmuxTaskCompletionNotifier = notifyCmuxTaskCompletion,
 ): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
@@ -35,6 +39,7 @@ export function createParentNotifier(
         // Idle: flush on the next microtask so same-tick completions batch but delivery is immediate.
         if (isStreaming?.() === true) coordinator.scheduleFlush()
         else coordinator.flushSoon()
+        notifyCmux(message)
         return
       }
       pi.sendMessage(
@@ -46,8 +51,14 @@ export function createParentNotifier(
         },
         { triggerTurn: true, deliverAs: "steer" },
       )
+      notifyCmux(message)
     },
   }
+}
+
+export function notifyCmuxTaskCompletion(message: ParentNotifierMessage): void {
+  if (message.customType !== TASK_COMPLETION_MESSAGE_TYPE) return
+  void sendCmuxNotification("OMO task finished", message.content)
 }
 
 function injectionKey(message: ParentNotifierMessage): string {

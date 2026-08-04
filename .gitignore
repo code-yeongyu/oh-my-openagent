@@ -2,6 +2,12 @@
 .omo/*
 !.omo/rules/
 !.omo/rules/**
+!.omo/evidence/
+.omo/evidence/*
+!.omo/evidence/omo-senpi-adapter/
+.omo/evidence/omo-senpi-adapter/*
+!.omo/evidence/omo-senpi-adapter/20260804-senpi-cmux-completion-review/
+!.omo/evidence/omo-senpi-adapter/20260804-senpi-cmux-completion-review/**
 packages/*/.omo/*
 .sisyphus/*
 !.sisyphus/rules/
@@ -29,6 +35,7 @@ Thumbs.db
 
 # Logs
 *.log
+!.omo/evidence/omo-senpi-adapter/20260804-senpi-cmux-completion-review/*.log
 npm-debug.log*
 
 # Lock files (use bun.lockb instead)
