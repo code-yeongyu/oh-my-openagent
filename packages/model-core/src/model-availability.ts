@@ -43,6 +43,17 @@ export function fuzzyMatchModel(
 		return exactMatch
 	}
 
+	const terminalModelIdMatches = matches.filter((model) => {
+		const terminalModelId = model.slice(model.lastIndexOf("/") + 1)
+		return normalizeModelName(terminalModelId) === targetNormalized
+	})
+	if (terminalModelIdMatches.length === 1) {
+		return terminalModelIdMatches[0] ?? null
+	}
+	if (terminalModelIdMatches.length > 1) {
+		return null
+	}
+
 	const exactModelIdMatches = matches.filter((model) => {
 		const modelId = model.split("/").slice(1).join("/")
 		return normalizeModelName(modelId) === targetNormalized

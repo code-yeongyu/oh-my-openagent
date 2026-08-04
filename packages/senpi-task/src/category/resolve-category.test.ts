@@ -265,7 +265,7 @@ describe("resolveCategory", () => {
     expect(resolved.spec.variant).toBe("low")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["quotio-openai"],
+      providers: ["quotio-openai", "openai"],
       model: "gpt-5.6-luna-fast",
       variant: "low",
     })
@@ -353,6 +353,75 @@ describe("resolveCategory", () => {
       expect(result.spec.variant).toBe(mixedWinner.variant)
       expect(result.modelSelection.fallbackEntry?.model).toBe(modelId)
     }
+  })
+
+  test("#given OpenCodex republishes Gemini Flash with an AGY prefix #when writing resolves #then the intended Gemini rung retains the full registry ID", () => {
+    // given
+    const models = registry([model("opencodex", "agy/gemini-3.6-flash")])
+
+    // when
+    const result = resolveCategory("writing", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("opencodex")
+    expect(resolved.spec.modelId).toBe("agy/gemini-3.6-flash")
+    expect(resolved.modelSelection.fallbackEntry?.model).toBe("gemini-3.6-flash")
+  })
+
+  test("#given an untrusted OpenCodex namespace imitates a gated model #when ultrabrain resolves #then the gate stays closed", () => {
+    // given
+    const models = registry([model("opencodex", "attacker/gpt-5.6-sol")])
+
+    // when
+    const result = resolveCategory("ultrabrain", {}, models)
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+  })
+
+  test("#given the AGY namespace imitates a non-Gemini gated model #when ultrabrain resolves #then the gate stays closed", () => {
+    // given
+    const models = registry([model("opencodex", "agy/gpt-5.6-sol")])
+
+    // when
+    const result = resolveCategory("ultrabrain", {}, models)
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+  })
+
+  test("#given competing OpenCodex namespaces share a terminal model ID #when writing resolves #then ambiguous routing fails closed", () => {
+    // given
+    const models = registry([
+      model("opencodex", "agy/gemini-3.6-flash"),
+      model("opencodex", "x/gemini-3.6-flash"),
+    ])
+
+    // when
+    const result = resolveCategory("writing", {}, models)
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+  })
+
+  test("#given subscribed OpenAI Luna Fast #when quick resolves #then the Luna rung is selected before later speed models", () => {
+    // given
+    const models = registry([
+      model("openai", "gpt-5.6-luna-fast"),
+      model("deepseek", "deepseek-v4-flash"),
+    ])
+
+    // when
+    const result = resolveCategory("quick", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("openai")
+    expect(resolved.spec.modelId).toBe("gpt-5.6-luna-fast")
+    expect(resolved.spec.variant).toBe("low")
+    expect(resolved.modelSelection.fallbackEntry?.model).toBe("gpt-5.6-luna-fast")
+    expect(resolved.modelSelection.fallbackEntry?.providers).toEqual(["quotio-openai", "openai"])
   })
 
   test("#given only Copilot GPT-5.6 models #when deep categories resolve #then each uses its copilot rung", () => {
