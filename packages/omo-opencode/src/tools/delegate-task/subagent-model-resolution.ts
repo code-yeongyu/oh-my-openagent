@@ -24,6 +24,7 @@ export async function resolveSubagentModel(
   agentToUse: string,
   matchedAgent: AgentInfo,
   executorCtx: ExecutorContext,
+  systemDefaultModel?: string,
 ): Promise<ResolvedSubagentModel> {
   let categoryModel = undefined
   let fallbackChain = undefined
@@ -56,7 +57,7 @@ export async function resolveSubagentModel(
       categoryDefaultModel: matchedAgentModelStr,
       fallbackChain: agentRequirement?.fallbackChain,
       availableModels,
-      systemDefaultModel: undefined,
+      systemDefaultModel,
     })
 
     const resolutionSkipped = resolution && "skipped" in resolution

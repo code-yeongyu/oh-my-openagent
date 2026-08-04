@@ -194,7 +194,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
       } else {
-        const resolution = await resolveSubagentExecution(delegateTaskArgs, options, parentContext.agent, categoryExamples)
+        const resolution = await resolveSubagentExecution(delegateTaskArgs, options, parentContext.agent, categoryExamples, undefined, systemDefaultModel)
         if (resolution.error) {
           return resolution.error
         }

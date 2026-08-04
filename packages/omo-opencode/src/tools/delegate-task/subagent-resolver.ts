@@ -14,6 +14,7 @@ export async function resolveSubagentExecution(
   parentAgent: string | undefined,
   categoryExamples: string,
   options: ResolveSubagentExecutionOptions = {},
+  systemDefaultModel?: string,
 ): Promise<ResolveSubagentExecutionResult> {
   const preflight = validateSubagentRequest(args, parentAgent, categoryExamples, options)
   if (preflight.kind === "invalid") {
@@ -29,7 +30,7 @@ export async function resolveSubagentExecution(
     }
 
     agentToUse = agentMatch.agentToUse
-    const { categoryModel, fallbackChain } = await resolveSubagentModel(agentToUse, agentMatch.matchedAgent, executorCtx)
+    const { categoryModel, fallbackChain } = await resolveSubagentModel(agentToUse, agentMatch.matchedAgent, executorCtx, systemDefaultModel)
     return { agentToUse, categoryModel, fallbackChain }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
