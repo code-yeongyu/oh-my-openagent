@@ -13,6 +13,7 @@ describe("task completion model visibility", () => {
       execution_mode: "in-process",
       category: "quick",
       model: "requested/model",
+      notify_on_terminal: false,
       resolved_model: {
         source: "category",
         provider: "quotio-openai",

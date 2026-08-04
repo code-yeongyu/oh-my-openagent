@@ -1,0 +1,60 @@
+=== task 14: capacity-aware batch admission for session-resume revival ===
+date: 2026-08-04T08:59:48Z
+branch: feat/subagent-session-resume-revival
+
+=== RED (tests first, before implementation) ===
+bun test packages/senpi-task/src/lifecycle
+-> 3 tests failed + 2 errors: Cannot find module './admission-lease' (batch-admission.test.ts),
+   admitSuspendedBatch/reclaimOrphanedResident not exported (race child fixture),
+   two-OS-process race test timed out at the barrier (15008ms) because the child could not import admitSuspendedBatch.
+   62 pass / 3 fail / 2 errors across 9 files.
+
+=== GREEN: lifecycle suite (incl. two-OS-process race, long-holder, fenced-takeover) ===
+(pass) reconcileOnSessionStart reattach >  w2reattach #given reconcile reattach is disabled #when a durable session exists #then v1 lost behavior runs without respawn [3.58ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given this process already owns the live handle #when reconciled #then the record is skipped without signalling or respawn [1.94ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal [4.26ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a completed resident daemon with a live foreign pid #when reconciled #then it is terminated before reattach [6.29ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given overlapping reconcile sweeps #when both respawn #then the duplicate child is discarded without replacing the owner [5.50ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a process runner reports effective launch inputs #when persisted record is reloaded #then only safe spawn facts survive [4.82ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given switch_session is cancelled #when reconciled #then the fresh child is torn down and the record stays lost [4.14ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given one trusted launch resolver rejection #when reconciling multiple process tasks #then later tasks still reattach [6.24ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given a team member whose current runtime is missing #when reconciling #then it is lost without blocking later records [6.11ms]
+(pass) reconcileOnSessionStart reattach >  w2reattach #given one concurrency slot and two queued tasks #when a reattached task completes #then only the first queued task starts [8.27ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running in-process record owned by a LIVE foreign process #when reconciled #then it is skipped and stays running [1.26ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running process-mode record owned by a LIVE foreign process #when reconciled #then it is skipped with no signals and no loss [1.13ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running process-mode record whose owner process is DEAD #when reconciled #then it is lost as before [3.21ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a process-mode record owned by THIS process #when reconciled #then it is not skipped as foreign and reattaches as before [5.88ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a legacy running process-mode record with no host_pid #when reconciled #then it is lost as before [3.23ms]
+(pass) reconcileOnSessionStart cross-process ownership > #given a running in-process record owned by THIS process with no live handle #when reconciled #then it is lost [2.19ms]
+(pass) admitSuspendedBatch (capacity-aware batch admission) > #given 10 suspended (3 running, 7 completed) and 2 residents under cap 8 #when the batch admits #then 3 running + 3 MRU completed are claimed and 4 defer capacity [8.84ms]
+(pass) admitSuspendedBatch (capacity-aware batch admission) > #given cap 2 with 3 residents #when the batch admits #then nothing is revived and the residents are kept [2.02ms]
+(pass) admitSuspendedBatch (capacity-aware batch admission) > #given another session's, cancelled, and killed suspended records #when the batch admits #then only this session's revivable records are claimed [2.41ms]
+(pass) admitSuspendedBatch (capacity-aware batch admission) > #given a live holder holds the admission lease #when a batch contends past its bounded wait #then the whole batch defers lock_contended and nothing is claimed [203.84ms]
+(pass) admitSuspendedBatch (capacity-aware batch admission) > #given the lease is displaced mid-batch #when the holder re-reads it before each mutation #then it aborts the remaining claims [1.58ms]
+(pass) reclaimOrphanedResident (reclamation bypasses admission) > #given the cap fully consumed and an orphaned resident #when reclaiming the orphan #then it is claimed without touching the cap or the other residents [1.88ms]
+(pass) reclaimOrphanedResident (reclamation bypasses admission) > #given a reclaim raced and lost the expected-owner CAS #when retrying with the stale observation #then it reports not_claimable and touches nothing [1.25ms]
+ 74 pass
+ 0 fail
+
+=== GREEN: full package ===
+bun test packages/senpi-task
+ 1242 pass
+ 0 fail
+ 1 snapshots, 3903 expect() calls
+Ran 1242 tests across 187 files. [9.27s]
+
+=== typecheck ===
+./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json -> clean (exit 0)
+
+=== QA scenarios ===
+happy (prioritized batch selection): test '#given 10 suspended (3 running, 7 completed) and 2 residents under cap 8'
+  -> claims 3 non-terminal first (recency cannot jump the class boundary), then terminal MRU
+     with updated_at DESC and task_id ASC tie-break; 4 overflow records deferred/capacity; PASS
+failure (cap lowered below resident count): test '#given cap 2 with 3 residents'
+  -> zero revived, all overflow deferred/capacity, all 3 residents kept with host_pid intact,
+     no eviction and no destruction; PASS
+adversarial probes: cancel_resume (crashed holder reclaimed only after 3 missed renewals; late
+  release cannot delete the successor's lease), long-running (renewing holder never reclaimed
+  across multiple stale windows), concurrency (real two-OS-process Bun.spawn race over one store
+  released from a shared barrier file: 8 candidates, cap 5 -> exactly 5 total claims, no
+  duplicates, claims stamped with the two child pids).

@@ -31,6 +31,7 @@ const task: TaskRecord = {
   created_at: "2026-07-07T00:00:00.000Z",
   updated_at: "2026-07-07T00:01:00.000Z",
   notification: { run_epoch: 0, notified_epoch: -1 },
+  notify_on_terminal: false,
 }
 
 const stats: TaskRunStats = {

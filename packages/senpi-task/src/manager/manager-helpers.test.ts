@@ -50,6 +50,7 @@ describe("task_summary record roundtrip", () => {
       depth: 1,
       execution_mode: "in-process",
       model: "anthropic/claude-opus-4",
+      notify_on_terminal: false,
     })
 
     // when

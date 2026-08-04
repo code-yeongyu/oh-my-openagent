@@ -1,0 +1,17 @@
+Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+timestamp=2026-08-04T10:57:30.456Z level=INFO run=9d840cac message=loading path=/home/node/.config/opencode/config.json
+timestamp=2026-08-04T10:57:30.461Z level=INFO run=9d840cac message=loading path=/home/node/.config/opencode/opencode.json
+timestamp=2026-08-04T10:57:30.466Z level=INFO run=9d840cac message=loading path=/home/node/.config/opencode/opencode.jsonc
+opencode server listening on http://127.0.0.1:4096
+timestamp=2026-08-04T10:57:30.561Z level=INFO run=9d840cac message="creating instance" directory=/workspaces/oh-my-openagent
+timestamp=2026-08-04T10:57:30.562Z level=INFO run=9d840cac message=fromDirectory directory=/workspaces/oh-my-openagent
+timestamp=2026-08-04T10:57:30.575Z level=INFO run=9d840cac message=bootstrapping directory=/workspaces/oh-my-openagent
+timestamp=2026-08-04T10:57:30.577Z level=INFO run=9d840cac message=loading path=/home/node/.config/opencode/config.json
+timestamp=2026-08-04T10:57:30.577Z level=INFO run=9d840cac message=loading path=/home/node/.config/opencode/opencode.json
+timestamp=2026-08-04T10:57:30.577Z level=INFO run=9d840cac message=loading path=/home/node/.config/opencode/opencode.jsonc
+timestamp=2026-08-04T10:57:30.650Z level=INFO run=9d840cac message=loading path=/workspaces/oh-my-openagent/.opencode/opencode.json
+timestamp=2026-08-04T10:57:30.651Z level=INFO run=9d840cac message=loading path=/workspaces/oh-my-openagent/.opencode/opencode.jsonc
+[config-migration] legacy configuration changes were not applied: EBUSY: resource busy or locked, unlink '/home/node/.config/opencode/oh-my-openagent.json'
+timestamp=2026-08-04T10:57:34.248Z level=INFO run=9d840cac message="all LSPs are disabled"
+timestamp=2026-08-04T10:57:34.249Z level=INFO run=9d840cac message="all formatters are disabled"
+timestamp=2026-08-04T10:57:34.249Z level=INFO run=9d840cac message=init

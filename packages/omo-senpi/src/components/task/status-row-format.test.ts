@@ -15,6 +15,7 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
     created_at: "2026-07-07T00:00:00.000Z",
     updated_at: "2026-07-07T00:00:01.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }
@@ -143,6 +144,44 @@ describe("backgroundWidgetRows", () => {
     expect(row).toContain("category:unspec")
     expect(row).toContain("running")
     expect(row).toEndWith("1m 0s")
+  })
+})
+
+describe("suspended residency labeling", () => {
+  it("#given a persisted_only record #when formatting a full row #then the status shows suspended", () => {
+    const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" }))
+    expect(row).toContain("suspended")
+    expect(row).not.toContain("status:running")
+  })
+
+  it("#given an rpc_detached record #when formatting a full row #then the status shows suspended", () => {
+    const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" }))
+    expect(row).toContain("suspended")
+    expect(row).not.toContain("status:running")
+  })
+
+  it("#given a resident record #when formatting a full row #then the status label is unchanged (regression pin)", () => {
+    const row = formatTaskRow(record({ task_id: "st_live", status: "running", residency_state: "resident" }))
+    expect(row).toContain("status:running")
+    expect(row).not.toContain("suspended")
+  })
+
+  it("#given a persisted_only record #when building a widget row #then it contains suspended", () => {
+    const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })])
+    expect(row.length).toBeGreaterThan(0)
+    expect(row[0]).toContain("suspended")
+  })
+
+  it("#given an rpc_detached record #when building a widget row #then it contains suspended", () => {
+    const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })])
+    expect(row.length).toBeGreaterThan(0)
+    expect(row[0]).toContain("suspended")
+  })
+
+  it("#given a persisted_only record #when building a background widget row #then it contains suspended", () => {
+    const now = Date.parse("2026-07-07T00:01:00.000Z")
+    const row = backgroundWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })], new Map([]), now, () => undefined, 220)[0] ?? ""
+    expect(row).toContain("suspended")
   })
 })
 

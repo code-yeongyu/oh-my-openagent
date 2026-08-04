@@ -870,6 +870,10 @@
         "reattach_on_reconcile": {
           "type": "boolean"
         },
+        "resume_children": {
+          "default": true,
+          "type": "boolean"
+        },
         "warnings": {
           "default": {
             "unavailable_categories": true
@@ -961,6 +965,7 @@
         "max_depth",
         "residency_max_children",
         "ttl_ms",
+        "resume_children",
         "warnings",
         "wait",
         "team"
@@ -10647,6 +10652,9 @@
             "reattach_on_reconcile": {
               "type": "boolean"
             },
+            "resume_children": {
+              "type": "boolean"
+            },
             "warnings": {
               "type": "object",
               "properties": {
@@ -11775,6 +11783,9 @@
               "type": "string"
             },
             "reattach_on_reconcile": {
+              "type": "boolean"
+            },
+            "resume_children": {
               "type": "boolean"
             },
             "warnings": {
@@ -12911,6 +12922,9 @@
                 "type": "string"
               },
               "reattach_on_reconcile": {
+                "type": "boolean"
+              },
+              "resume_children": {
                 "type": "boolean"
               },
               "warnings": {
@@ -22640,6 +22654,9 @@
                   "reattach_on_reconcile": {
                     "type": "boolean"
                   },
+                  "resume_children": {
+                    "type": "boolean"
+                  },
                   "warnings": {
                     "type": "object",
                     "properties": {
@@ -23768,6 +23785,9 @@
                     "type": "string"
                   },
                   "reattach_on_reconcile": {
+                    "type": "boolean"
+                  },
+                  "resume_children": {
                     "type": "boolean"
                   },
                   "warnings": {

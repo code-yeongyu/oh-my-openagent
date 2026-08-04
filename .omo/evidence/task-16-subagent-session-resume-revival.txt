@@ -1,0 +1,75 @@
+task-16-subagent-session-resume-revival
+Plan todo 16: race-safe async TTL cleanup covering suspended child artifacts
+Worktree: /Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival (branch feat/subagent-session-resume-revival)
+
+WHAT SHIPPED
+- lifecycle/ttl.ts: cleanupExpiredRecords is now async and two-phase. Every sweep FIRST completes
+  phase 2 for leftover *.json.expunging tombstones (crash recovery, idempotent, lock-free), then
+  per scanned record: retention predicate -> store.tombstoneIfExpired (phase 1, inside the record
+  lock: re-read + re-validate + rename to <taskId>.json.expunging ONLY) -> live orphan rpc pid
+  destroyed via destroyResidentTask("ttl", orphanPid) BEFORE artifact deletion -> store.completeExpunge
+  (phase 2, outside the lock: children dir, spill, log, drop tombstone).
+- store/record-store.ts: new atomic conditional-TOMBSTONE op tombstoneIfExpired(taskId, shouldRetain)
+  (TombstoneResult: tombstoned+committed record | retained | missing), completeExpunge(taskId),
+  listExpunging(). Tombstoned records are invisible to load/list/mutate, so no claim can take them.
+- Retention predicate = live registry handle OR fresh host_pid claim (resident + live host_pid,
+  self or foreign) OR non-terminal status OR not past cutoff OR undelivered terminal notification
+  (BOTH populations: notify_on_terminal && notified_epoch < run_epoch, and legacy
+  notification_failed_epoch set with notified_epoch < run_epoch) OR lost-process record without
+  pid-dead proof (rule preserved).
+- lifecycle/destroy.ts: terminateOrphan gating extended to the "ttl" cause; the sweep passes the
+  committed tombstoned record's pid explicitly (store.load is null post-tombstone by design).
+- lifecycle/types.ts: cleanupExpiredRecords(): Promise<CleanupResult> (create.ts wiring unchanged).
+
+RED (failing-first, captured before implementation)
+Command: bun test packages/senpi-task/src/lifecycle packages/senpi-task/src/store
+Initial result: 18 failed / 116 pass. The todo-16 failures:
+- (fail) suspended-era artifacts > record claimed by revival between scan and delete -> retained
+  (old scan-then-remove deleted the claimed record; the race test interleaves a REAL store.mutate
+  claim at the deletion boundary via a store wrapper on list() and FAILS against scan-then-remove)
+- (fail) expired terminal + undelivered notify_on_terminal notification -> retained until delivered
+- (fail) expired legacy terminal record (only marker notification_failed_epoch) -> retained until delivered
+- (fail) crash after tombstoning -> next sweep finishes deleting idempotently
+- (fail) expired terminal rpc record with LIVE orphan pid -> orphan destroyed BEFORE artifact deletion
+- (fail) store tombstone expunge: 4 tests (tombstone invisibility to load/list/mutate, predicate
+  retain, missing record, completeExpunge idempotence) - TypeError: tombstoneIfExpired is not a function
+Also in that run: 9 reconcileOnSessionStart failures verified PRE-EXISTING on the clean tree
+(git stash -> 9 fail / 16 pass on reconcile.test.ts -> git stash pop); todo 13 in flight, not this task.
+
+GREEN (final verification, 2026-08-04T09:38:19Z, single clean sweep)
+- bun test packages/senpi-task/src/lifecycle: 100 pass, 0 fail (10 files)
+- bun test packages/senpi-task (full package): 1292 pass, 0 fail (189 files, 4064 expect calls)
+- ./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json: clean, exit 0
+
+QA (auxiliary) - .omo/evidence/qa-task-16-ttl.mjs against the REAL store + lifecycle composition
+- happy = sweep deletes exactly the expired terminal set:
+  seeds {expired completed, expired error, fresh completed, old running, expired completed with
+  undelivered notify_on_terminal}; sweep deleted exactly [st_00000aa1, st_00000aa2] incl. children
+  dirs + spill + logs; the other three retained with artifacts intact -> PASS
+- failure = TTL-vs-revival race -> no deletion of the claimed record:
+  a store.mutate claim (residency resident + live host_pid) lands at the deletion boundary; sweep
+  deleted nothing, record intact with residency_state "resident" and host_pid preserved -> PASS
+
+ADVERSARIAL COVERAGE
+- concurrency (claim-at-deletion-boundary race): ttl.test.ts "record claimed by revival between the
+  scan and the delete" + QA failure scenario. The atomic locked re-read in tombstoneIfExpired is
+  what closes it; proven RED against scan-then-remove.
+- cancel_resume (tombstone crash recovery): ttl.test.ts "a sweep crashed after tombstoning" -
+  leftover .expunging + artifacts completed idempotently by the next sweep, twice.
+- stale_state (legacy failed-epoch records): ttl.test.ts legacy notification_failed_epoch test;
+  retained until notified_epoch reaches run_epoch, then expunged.
+- probe: live orphan rpc pid -> SIGTERM then SIGKILL (orphanKillDelayMs injected 0), signals proven
+  to land BEFORE phase 2 artifact deletion (children dir existence sampled inside the signal hook).
+- rest: N/A.
+
+NOTES / RISKS
+- Concurrent todos 12/13/15 edit manager/, completion/, reconcile in this same worktree; their
+  transient in-flight failures (reconcile RED tests, a chaos-bench inv1 blip from the notifier
+  rewrite, a tsgo create.ts arity error) appeared and resolved during this task's runs. Verified
+  via targeted stash isolation that none were caused by this task's changes; the final sweep above
+  is fully green with all tasks' current worktree state.
+- omo-senpi event-bridge.ts:42 consumes cleanupExpiredRecords synchronously; the async signature
+  is todo 18's documented consumption point (plan: todo 18 awaits it), so omo-senpi typecheck is
+  expected to lag until todo 18 lands. packages/senpi-task itself is tsgo-clean and fully green.
+- Tombstone files whose stem is not a parseable task id are left untouched by listExpunging
+  (corrupt state; never silently acted on).
