@@ -91,7 +91,19 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		// first: bootstrap must never persist anything under PLUGIN_ROOT (the
 		// Codex-managed marketplace cache).
 		const stageRoot = join(options.pluginData, "bootstrap", "agents-stage");
-		await stageBundledAgents(options.pluginRoot, stageRoot);
+		const previouslyInstalledAgents = await readInstalledAgentPaths(stageRoot);
+		const previouslyStagedAgentContents = await readStagedAgentContents(stageRoot);
+		const existingConfig = await readConfigIfPresent(join(options.codexHome, "config.toml"));
+		const foreignAgentFiles = await stageBundledAgents(options.pluginRoot, stageRoot, existingConfig);
+		for (const agentFile of foreignAgentFiles) {
+			const agentPath = join(agentsTarget, agentFile);
+			if (
+				previouslyInstalledAgents.has(agentPath) &&
+				(await matchesAgentContent(agentPath, previouslyStagedAgentContents.get(agentFile)))
+			) {
+				await rm(agentPath, { force: true });
+			}
+		}
 		const preservedReasoning = await capturePreservedAgentReasoning({ codexHome: options.codexHome });
 		const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome: options.codexHome });
 		const linked = await linkCachedPluginAgents({
@@ -118,9 +130,14 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 	}
 }
 
-async function stageBundledAgents(pluginRoot: string, stageRoot: string): Promise<void> {
+async function stageBundledAgents(
+	pluginRoot: string,
+	stageRoot: string,
+	existingConfig: string,
+): Promise<readonly string[]> {
 	await rm(stageRoot, { force: true, recursive: true });
 	await mkdir(stageRoot, { recursive: true });
+	const foreignAgentFiles: string[] = [];
 	const componentsRoot = join(pluginRoot, "components");
 	for (const componentName of await directoryNames(componentsRoot)) {
 		const agentsDir = join(componentsRoot, componentName, "agents");
@@ -129,9 +146,54 @@ async function stageBundledAgents(pluginRoot: string, stageRoot: string): Promis
 		const stagedAgentsDir = join(stageRoot, "components", componentName, "agents");
 		await mkdir(stagedAgentsDir, { recursive: true });
 		for (const agentFile of agentFiles) {
+			const agentConfig = { configFile: `./agents/${agentFile}`, name: agentNameFromToml(agentFile) };
+			if (hasForeignAgentRegistration(existingConfig, agentConfig)) {
+				foreignAgentFiles.push(agentFile);
+				continue;
+			}
 			await copyFile(join(agentsDir, agentFile), join(stagedAgentsDir, agentFile));
 		}
 	}
+	return foreignAgentFiles;
+}
+
+const AGENT_MANIFEST = ".installed-agents.json";
+
+async function readInstalledAgentPaths(stageRoot: string): Promise<ReadonlySet<string>> {
+	try {
+		const parsed: unknown = JSON.parse(await readFile(join(stageRoot, AGENT_MANIFEST), "utf8"));
+		if (!isRecord(parsed) || !Array.isArray(parsed["agents"])) return new Set();
+		return new Set(parsed["agents"].filter((path): path is string => typeof path === "string"));
+	} catch (error) {
+		if (errorCode(error) === "ENOENT") return new Set();
+		throw error;
+	}
+}
+
+async function readStagedAgentContents(stageRoot: string): Promise<ReadonlyMap<string, string>> {
+	const contents = new Map<string, string>();
+	const componentsRoot = join(stageRoot, "components");
+	for (const componentName of await directoryNames(componentsRoot)) {
+		const agentsDir = join(componentsRoot, componentName, "agents");
+		for (const agentFile of await fileNames(agentsDir)) {
+			contents.set(agentFile, await readFile(join(agentsDir, agentFile), "utf8"));
+		}
+	}
+	return contents;
+}
+
+async function matchesAgentContent(path: string, expectedContent: string | undefined): Promise<boolean> {
+	if (expectedContent === undefined) return false;
+	try {
+		return (await readFile(path, "utf8")) === expectedContent;
+	} catch (error) {
+		if (errorCode(error) === "ENOENT") return false;
+		throw error;
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function updateConfigStep(
@@ -147,7 +209,8 @@ async function updateConfigStep(
 		// for such a role would collide with the mirrored entry once Codex
 		// discovers <codexHome>/agents/<name>.toml (two different file paths for
 		// one role name -> upstream warning), so foreign pre-existing blocks are
-		// left untouched; directory discovery still loads the linked toml.
+		// left untouched; the foreign role is excluded from staging so directory
+		// discovery does not load a second local toml.
 		const existingConfig = await readConfigIfPresent(configPath);
 		const agentConfigs = inputs.agentConfigs.filter(
 			(agentConfig) => !hasForeignAgentRegistration(existingConfig, agentConfig),
@@ -278,7 +341,9 @@ async function fileNames(root: string): Promise<string[]> {
 
 async function entryNames(root: string, keep: (entry: { isDirectory(): boolean; isFile(): boolean }) => boolean): Promise<string[]> {
 	try {
-		const entries = await readdir(root, { withFileTypes: true });
+		const entries: readonly { isDirectory(): boolean; isFile(): boolean; name: string }[] = await readdir(root, {
+			withFileTypes: true,
+		});
 		return entries
 			.filter((entry) => keep(entry))
 			.map((entry) => entry.name)
