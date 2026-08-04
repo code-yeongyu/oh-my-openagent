@@ -23,6 +23,7 @@ interface CmuxNotificationChild {
 }
 
 const DEFAULT_CMUX_NOTIFICATION_TIMEOUT_MS = 5_000
+const MAX_CMUX_BODY_CHARS = 4_000
 const KNOWN_MACOS_CMUX_PATHS = [
   "/Applications/cmux.app/Contents/Resources/bin/cmux",
 ]
@@ -54,7 +55,7 @@ export function sendCmuxNotification(
   const spawnImpl = options.spawnImpl ?? spawnCmuxProcess
   let child: CmuxNotificationChild
   try {
-    child = spawnImpl(executable, ["notify", "--title", title, "--body", body], {
+    child = spawnImpl(executable, ["notify", "--title", title, "--body", truncateNotificationBody(body)], {
       stdio: "ignore",
       windowsHide: true,
     })
@@ -115,4 +116,9 @@ function findExecutableOnPath(command: string, pathValue: string | undefined): s
     }
   }
   return null
+}
+
+function truncateNotificationBody(body: string): string {
+  if (body.length <= MAX_CMUX_BODY_CHARS) return body
+  return `${body.slice(0, MAX_CMUX_BODY_CHARS - 1)}…`
 }

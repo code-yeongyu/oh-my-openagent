@@ -60,6 +60,24 @@ describe("OMO Senpi cmux notification bridge", () => {
     }])
   })
 
+  test("#given oversized completion body #when notification is requested #then cmux argv stays bounded", async () => {
+    const spawn = fakeSpawn()
+    const body = "x".repeat(10_000)
+
+    await expect(sendCmuxNotification("OMO task completed", body, {
+      env: {
+        OMO_CMUX_BIN: "/tmp/fake-cmux",
+        OMO_SENPI_CMUX_NOTIFY: "1",
+      },
+      platform: "darwin",
+      spawnImpl: spawn.spawnImpl,
+    })).resolves.toBe(true)
+
+    const bodyArg = spawn.calls[0]?.args[4]
+    expect(bodyArg?.length).toBe(4_000)
+    expect(bodyArg?.endsWith("…")).toBe(true)
+  })
+
   test("#given cmux is unavailable #when notification is requested #then it skips without spawning", async () => {
     const spawn = fakeSpawn()
 

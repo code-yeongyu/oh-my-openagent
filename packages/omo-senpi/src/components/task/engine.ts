@@ -31,7 +31,7 @@ import {
   type TaskRunnerFactories,
 } from "./engine-runners"
 import { createOwnedMemberLivenessNotifier } from "./owned-member-liveness"
-import { createParentNotifier } from "./parent-notifier"
+import { createParentNotifier, notifyCmuxTaskCompletion } from "./parent-notifier"
 import { createTaskChildPlanner } from "./planner"
 import { createTeamMemberLivenessNotifier, type TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
@@ -146,6 +146,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     stateDir: baseStore.stateDir,
     getParentState: () => runtime.parentState(),
     getCurrentSessionId: () => runtime.sessionId(),
+    onReplacedBufferedCompletion: notifyCmuxTaskCompletion,
   })
 
   const appendTaskEvent = (taskId: string, event: PersistedTaskEvent): void => {

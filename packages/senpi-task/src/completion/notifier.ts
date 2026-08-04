@@ -130,6 +130,11 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     buffered.delete(input.sessionId)
 
     if (input.replaced) {
+      const message: ParentNotifierMessage = {
+        ...buildCompletionMessage(entries.map((entry) => entry.details)),
+        triggerTurn: true,
+      }
+      deps.onReplacedBufferedCompletion?.(message)
       for (const entry of entries) dropEntry(deps.store, entry)
       return { kind: "dropped", count: entries.length }
     }

@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process"
 import { homedir } from "node:os"
 import { basename, delimiter, join, resolve } from "node:path"
 import { createSandbox, credentialDigest, digestDirectory, seedSandbox } from "./drive.mjs"
+import { changedRealPaths, snapshotDir } from "./task-e2e-analysis.mjs"
 
 const packageRoot = resolve(import.meta.dirname, "../..")
 const mockProviderEntry = join(packageRoot, "scripts/qa/task-e2e-mock-provider.ts")
@@ -34,6 +35,7 @@ process.exit(exitCode)
 function runProbe() {
   const beforeCredentialDigest = credentialDigest(realSenpiAgentDir)
   const beforeFullDigest = digestDirectory(realSenpiAgentDir)
+  const beforeSnapshot = snapshotDir(realSenpiAgentDir)
   const senpiBin = findOnPath(process.env.SENPI_BIN?.trim() || "senpi")
   if (senpiBin === null) {
     return {
@@ -44,11 +46,8 @@ function runProbe() {
   }
 
   seedSandbox(sandbox)
-  seedCmuxExecutable()
-  seedProject()
-
-  const executable = real ? resolveRealCmuxExecutable() : fakeCmux
-  if (executable === null) {
+  const realCmuxExecutable = real ? resolveRealCmuxExecutable() : null
+  if (real && realCmuxExecutable === null) {
     return {
       result: "SKIP",
       reason: "real-cmux-binary-unavailable",
@@ -57,6 +56,9 @@ function runProbe() {
       sandboxCwd: sandbox.cwd,
     }
   }
+  seedCmuxExecutable(realCmuxExecutable)
+  seedProject()
+  const executable = fakeCmux
 
   const sessionDir = join(sandbox.root, "sessions")
   mkdirSync(sessionDir, { recursive: true })
@@ -95,20 +97,32 @@ function runProbe() {
 
   const afterCredentialDigest = credentialDigest(realSenpiAgentDir)
   const afterFullDigest = digestDirectory(realSenpiAgentDir)
-  const capturedArgs = readCapturedArgs()
-  const notificationCaptured = real ? run.status === 0 : isExpectedFakeNotification(capturedArgs)
+  const allRealSenpiChangedPaths = changedRealPaths(beforeSnapshot, snapshotDir(realSenpiAgentDir))
+  const capturedInvocation = readCapturedInvocation()
+  const capturedArgs = capturedInvocation.args
+  const cmuxExit = capturedInvocation.status
+  const notificationCaptured = isExpectedNotification(capturedArgs) && cmuxExit === 0
   const realSenpiCredentialsUntouched = beforeCredentialDigest === afterCredentialDigest
+  const realSenpiDigestUnchanged = beforeFullDigest === afterFullDigest
+  const { qaAttributedPaths, concurrentSessionPaths } = classifyProbeRealSenpiChanges(allRealSenpiChangedPaths, sandbox, capturedArgs)
+  const realSenpiUntouched = qaAttributedPaths.length === 0
   return {
-    result: run.status === 0 && notificationCaptured && realSenpiCredentialsUntouched ? "PASS" : "FAIL",
+    result: run.status === 0 && notificationCaptured && realSenpiUntouched ? "PASS" : "FAIL",
     mode: real ? "real-cmux" : "fake-cmux",
     senpiExit: run.status,
     senpiSignal: run.signal ?? null,
     notificationCaptured,
-    cmuxExecutable: real ? executable : basename(executable),
+    cmuxExecutable: real ? realCmuxExecutable : basename(executable),
+    cmuxProbeExecutable: basename(executable),
+    cmuxExit,
     cmuxArgs: capturedArgs,
     tmuxMarker: env.TMUX,
     realSenpiCredentialsUntouched,
-    realSenpiDigestUnchanged: beforeFullDigest === afterFullDigest,
+    realSenpiDigestUnchanged,
+    realSenpiUntouched,
+    realSenpiChangedPaths: qaAttributedPaths,
+    concurrentRealSenpiChangedPaths: concurrentSessionPaths,
+    allRealSenpiChangedPaths,
     providedAgentDir: process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset",
     sandboxAgentDir: sandbox.agentDir,
     sandboxCwd: sandbox.cwd,
@@ -118,13 +132,25 @@ function runProbe() {
   }
 }
 
-function seedCmuxExecutable() {
-  if (real) return
-  writeFileSync(
-    fakeCmux,
-    `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs"\nwriteFileSync(process.env.CMUX_PROBE_LOG, JSON.stringify(process.argv.slice(2)) + "\\n")\n`,
-    "utf8",
-  )
+function seedCmuxExecutable(realExecutable) {
+  const source = realExecutable === null ? `#!/usr/bin/env node
+import { writeFileSync } from "node:fs"
+const args = process.argv.slice(2)
+writeFileSync(process.env.CMUX_PROBE_LOG, JSON.stringify({ args, status: 0, signal: null, error: null }) + "\\n")
+` : `#!/usr/bin/env node
+import { spawnSync } from "node:child_process"
+import { writeFileSync } from "node:fs"
+const args = process.argv.slice(2)
+const run = spawnSync(${JSON.stringify(realExecutable)}, args, { encoding: "utf8" })
+writeFileSync(process.env.CMUX_PROBE_LOG, JSON.stringify({
+  args,
+  status: run.status,
+  signal: run.signal ?? null,
+  error: run.error instanceof Error ? run.error.message : null
+}) + "\\n")
+process.exit(run.status ?? 1)
+`
+  writeFileSync(fakeCmux, source, "utf8")
   chmodSync(fakeCmux, 0o755)
 }
 
@@ -164,22 +190,52 @@ function resolveRealCmuxExecutable() {
   return findOnPath("cmux")
 }
 
-function readCapturedArgs() {
-  if (!existsSync(logPath)) return []
+function readCapturedInvocation() {
+  if (!existsSync(logPath)) return { args: [], status: null }
   const parsed = JSON.parse(readFileSync(logPath, "utf8"))
-  return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : []
+  if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+    return { args: parsed, status: 0 }
+  }
+  if (parsed !== null && typeof parsed === "object" && Array.isArray(parsed.args)) {
+    return {
+      args: parsed.args.every((item) => typeof item === "string") ? parsed.args : [],
+      status: typeof parsed.status === "number" ? parsed.status : null,
+    }
+  }
+  return { args: [], status: null }
 }
 
-function isExpectedFakeNotification(args) {
+function isExpectedNotification(args) {
   return args[0] === "notify" &&
     args[1] === "--title" &&
-    args[2] === "OMO task completed" &&
+    args[2] === "OMO task finished" &&
     args[3] === "--body" &&
     typeof args[4] === "string" &&
     args[4].includes("cmuxprobe") &&
     args[4].includes("completed")
 }
 
+function classifyProbeRealSenpiChanges(changedPaths, sandbox, cmuxArgs) {
+  const taskIds = String(cmuxArgs.join("\n")).match(/st_[A-Za-z0-9]+/g) ?? []
+  const tokens = [
+    basename(sandbox.root),
+    sessionPathToken(sandbox.cwd),
+    sessionPathToken(sandbox.canonicalCwd),
+    ...taskIds,
+  ].filter((token) => token.length > 0)
+  const qaAttributedPaths = []
+  const concurrentSessionPaths = []
+  for (const path of changedPaths) {
+    const independentSession = path.startsWith("sessions/") && !tokens.some((token) => path.includes(token))
+    if (independentSession) concurrentSessionPaths.push(path)
+    else qaAttributedPaths.push(path)
+  }
+  return { qaAttributedPaths, concurrentSessionPaths }
+}
+
+function sessionPathToken(path) {
+  return `-${path.replaceAll("/", "-")}-`
+}
 function findOnPath(bin) {
   if (bin.includes("/") && existsSync(bin)) return bin
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {

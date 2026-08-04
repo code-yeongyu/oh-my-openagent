@@ -238,7 +238,12 @@ describe("createCompletionNotifier - buffering, flush, batching", () => {
     const record = baseRecord()
     const { store, events, replaced } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store })
+    const droppedCalls: EnqueueCall[] = []
+    const completion = createCompletionNotifier({
+      notifier,
+      store,
+      onReplacedBufferedCompletion: (message) => droppedCalls.push(message),
+    })
     completion.notifyTerminal({ record, parentState: { kind: "session_shutdown" }, runInBackground: true })
 
     // when
@@ -247,6 +252,9 @@ describe("createCompletionNotifier - buffering, flush, batching", () => {
     // then
     expect(flush).toEqual({ kind: "dropped", count: 1 })
     expect(calls).toHaveLength(0)
+    expect(droppedCalls).toHaveLength(1)
+    expect(droppedCalls[0]?.customType).toBe("senpi-task.completion")
+    expect(droppedCalls[0]?.content).toContain(record.name)
     expect(replaced).toHaveLength(0)
     expect(events.some((entry) => entry.event.type === "notification_dropped")).toBe(true)
   })
