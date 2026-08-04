@@ -23,6 +23,20 @@ writeFileSync(file, "$value = 1\n", "utf-8");
 const upperUri = pathToFileURL(realpathSync(file)).href; // openByUri key: file:///C:/...
 const lowerUri = upperUri.replace(/^(file:\/\/\/)([A-Z]):/, (_m, scheme, drive) => `${scheme}${drive.toLowerCase()}:`);
 
+// Off Windows there is no drive letter to lowercase, so the replace is a no-op and the server
+// would publish under the exact openByUri key. Diagnostics then arrive for a reason that has
+// nothing to do with #6167, and the driver would print PASS on unfixed code. Refuse to produce
+// a verdict at all unless the casing mismatch this driver exists to reproduce was really built.
+if (lowerUri === upperUri) {
+	console.log("openByUri store key (pathToFileURL):", upperUri);
+	console.log("server-published URI (PSES-style)  :", lowerUri);
+	console.log(
+		"RESULT: INCONCLUSIVE - no Windows drive letter in the file URI, so no casing mismatch was created. This driver only produces evidence for #6167 on Windows.",
+	);
+	rmSync(workspace, { recursive: true, force: true });
+	process.exit(2);
+}
+
 const diagnostic = {
 	range: { start: { line: 99, character: 4 }, end: { line: 99, character: 10 } },
 	severity: 1,

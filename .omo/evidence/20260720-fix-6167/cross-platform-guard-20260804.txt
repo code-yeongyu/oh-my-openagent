@@ -1,0 +1,37 @@
+# live-driver.mts cross-platform guard, verified 2026-08-04
+#
+# Review finding: running this driver outside Windows reported PASS without ever testing the
+# drive-letter mismatch, because pathToFileURL produces no [A-Z]: drive there, the lowercasing
+# replace is a no-op, and the fixture server then publishes under the exact openByUri key.
+# Diagnostics arrived for a reason unrelated to #6167, so the driver would have printed PASS
+# even on unfixed code.
+#
+# The driver now refuses to emit a verdict unless the casing mismatch was really constructed.
+
+== Windows (drive letter present, mismatch really created) ==
+$ bun .omo/evidence/20260720-fix-6167/live-driver.mts
+openByUri store key (pathToFileURL): file:///C:/Users/pss/AppData/Local/Temp/omo-6167-drive-ejI3Fc/gdrive-sync.ps1
+server-published URI (PSES-style)  : file:///c:/Users/pss/AppData/Local/Temp/omo-6167-drive-ejI3Fc/gdrive-sync.ps1
+diagnostics().items      = [{"range":{"start":{"line":99,"character":4},"end":{"line":99,"character":10}},"severity":1,"message":"Missing expression after unary operator '--'."}]
+diagnostics().transient  = null
+RESULT: PASS - diagnostics delivered end-to-end
+exit code: 0
+
+  The two URIs differ only in the drive-letter case (C: vs c:), which is the condition from
+  #6167. The real case is unaffected by the guard.
+
+== Linux, WSL Ubuntu-22.04 (no drive letter, mismatch cannot be created) ==
+$ bun .omo/evidence/20260720-fix-6167/live-driver.mts
+openByUri store key (pathToFileURL): file:///tmp/omo-6167-drive-lTHngn/gdrive-sync.ps1
+server-published URI (PSES-style)  : file:///tmp/omo-6167-drive-lTHngn/gdrive-sync.ps1
+RESULT: INCONCLUSIVE - no Windows drive letter in the file URI, so no casing mismatch was created. This driver only produces evidence for #6167 on Windows.
+
+  Both URIs are identical, which is exactly why the old driver passed vacuously. The guard now
+  stops before the client is started, so no PASS can be printed, and it exits 2 rather than 0.
+  `bun -e "process.exit(2)"` returns 2 on this toolchain, confirming the non-zero exit is real.
+
+== What this means for the record ==
+
+A green (exit 0) run of this driver now implies the drive-letter mismatch was actually built and
+exercised. Off Windows the driver reports INCONCLUSIVE and exits non-zero rather than
+contributing a meaningless pass to the evidence for #6167.
