@@ -101,6 +101,7 @@ function resolveInstallContext(options) {
     agentDir,
     settingsPath: join(agentDir, "settings.json"),
     pluginPath,
+    platform: options.platform ?? process.platform,
     allowBuild,
     runCommand: options.runCommand ?? defaultRunCommand
   };
@@ -121,7 +122,7 @@ async function ensurePluginArtifacts(context) {
       throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);
     }
   }
-  await verifyAstGrepRuntimeIntegrity(context.pluginPath);
+  await verifyAstGrepRuntimeIntegrity(context.pluginPath, context.platform);
 }
 async function hasMissingPluginArtifact(pluginPath) {
   for (const artifact of REQUIRED_PLUGIN_ARTIFACTS) {
@@ -130,7 +131,7 @@ async function hasMissingPluginArtifact(pluginPath) {
   }
   return false;
 }
-async function verifyAstGrepRuntimeIntegrity(pluginPath) {
+async function verifyAstGrepRuntimeIntegrity(pluginPath, platform) {
   const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js");
   const manifestPath = join(dirname(runtimeEntry), "manifest.json");
   let runtimeStat;
@@ -164,7 +165,7 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath) {
     throw astGrepIntegrityError(runtimeEntry, `sha256 mismatch: manifest=${manifest.sha256} actual=${actualSha256}`);
   }
   const actualMode = runtimeStat.mode & 511;
-  if (actualMode !== manifest.mode) {
+  if (platform !== "win32" && actualMode !== manifest.mode) {
     throw astGrepIntegrityError(runtimeEntry, `mode mismatch: manifest=${manifest.mode} actual=${actualMode}`);
   }
 }
