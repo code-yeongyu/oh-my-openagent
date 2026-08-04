@@ -24,6 +24,7 @@ const expectedSkillNames = [
   "ultimate-browsing",
   "ultrawork",
   "ulw-loop",
+  "ulw-mutation-test",
   "ulw-plan",
   "ulw-research",
   "visual-qa",
@@ -37,6 +38,7 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   hyperplan: true,
   ultrawork: true,
   "ulw-loop": true,
+  "ulw-mutation-test": true,
   "ulw-research": true,
 }
 const sharedSkillNames = expectedSkillNames.filter(
@@ -93,7 +95,7 @@ function extractFrontmatterField(frontmatter: string, field: string): string | u
 }
 
 describe("OMO Senpi scoped skill sync", () => {
-  test("#given synced skill output #when inspected #then exactly 20 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 21 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 

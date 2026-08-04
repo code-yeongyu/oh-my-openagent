@@ -34,6 +34,10 @@ const nativeSkillSources = [
     source: join(nativeSkillsRoot, "ultrawork"),
   },
   {
+    name: "ulw-mutation-test",
+    source: join(nativeSkillsRoot, "ulw-mutation-test"),
+  },
+  {
     name: "ulw-research",
     source: join(nativeSkillsRoot, "ulw-research"),
   },
