@@ -220,12 +220,24 @@ function missingChainProviders(
 // (e.g. `vercel/openai/gpt-5.6-sol`). Only these known upstream vendor prefixes are unwrapped, so an
 // unrelated model that merely ends in a gate model's name cannot open that gate.
 const GATEWAY_UPSTREAM_VENDOR_PREFIXES = ["openai", "anthropic", "google"] as const
+const OPENCODEX_NESTED_MODEL_IDS: ReadonlySet<string> = new Set([
+  "agy/gemini-3.6-flash",
+] as const)
 
 function modelIdsOf(models: readonly string[]): ReadonlySet<string> {
   const ids = new Set<string>()
   for (const entry of models) {
-    const modelId = entry.slice(entry.indexOf("/") + 1)
+    const providerSeparatorIndex = entry.indexOf("/")
+    const provider = entry.slice(0, providerSeparatorIndex)
+    const modelId = entry.slice(providerSeparatorIndex + 1)
     ids.add(modelId)
+    if (
+      provider === "opencodex"
+      && OPENCODEX_NESTED_MODEL_IDS.has(modelId)
+    ) {
+      const terminalModelId = modelId.slice(modelId.lastIndexOf("/") + 1)
+      ids.add(terminalModelId)
+    }
     const separatorIndex = modelId.indexOf("/")
     if (separatorIndex <= 0) continue
     const vendor = modelId.slice(0, separatorIndex)

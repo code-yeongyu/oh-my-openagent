@@ -61,7 +61,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ],
   quick: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-    { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+    { providers: ["quotio-openai", "openai"], model: "gpt-5.6-luna-fast", variant: "low" },
     { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "off" },
     {
       providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go", "vercel"],
@@ -134,7 +134,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     },
     {
       providers: ["google", "github-copilot", "opencode", "vercel"],
-      model: "gemini-3.1-pro",
+      model: "gemini-3.6-flash",
     },
   ],
 }
