@@ -8,8 +8,9 @@ import { fileURLToPath as fileURLToPath2 } from "url";
 
 // packages/omo-senpi/src/install/install-senpi.ts
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { constants, existsSync } from "node:fs";
-import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +36,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "ulw-plan", "SKILL.md"),
   join("skills", "ulw-research", "SKILL.md"),
   join("skills", "visual-qa", "SKILL.md"),
+  join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "index.js"),
   join("runtime", "lsp-daemon", "dist", "index.d.ts"),
@@ -105,16 +107,21 @@ function resolveInstallContext(options) {
 }
 async function ensurePluginArtifacts(context) {
   const missing = await hasMissingPluginArtifact(context.pluginPath);
-  if (!missing)
-    return;
-  if (!context.allowBuild) {
-    throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);
+  if (missing) {
+    if (!context.allowBuild) {
+      throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);
+    }
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot });
+    if (await hasMissingPluginArtifact(context.pluginPath)) {
+      throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);
+    }
   }
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot });
-  await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot });
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot });
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot });
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });
+  await verifyAstGrepRuntimeIntegrity(context.pluginPath);
 }
 async function hasMissingPluginArtifact(pluginPath) {
   for (const artifact of REQUIRED_PLUGIN_ARTIFACTS) {
@@ -122,6 +129,55 @@ async function hasMissingPluginArtifact(pluginPath) {
       return true;
   }
   return false;
+}
+async function verifyAstGrepRuntimeIntegrity(pluginPath) {
+  const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js");
+  const manifestPath = join(dirname(runtimeEntry), "manifest.json");
+  let runtimeStat;
+  try {
+    runtimeStat = await stat(runtimeEntry);
+    if (!runtimeStat.isFile())
+      throw new Error("runtime is not a file");
+    await access(runtimeEntry, constants.R_OK | constants.X_OK);
+  } catch (error) {
+    throw astGrepIntegrityError(runtimeEntry, `runtime is unreadable or non-executable: ${messageOf(error)}`);
+  }
+  if (!await fileExists(manifestPath)) {
+    throw astGrepIntegrityError(runtimeEntry, `manifest is missing: ${manifestPath}`);
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  } catch (error) {
+    throw astGrepIntegrityError(runtimeEntry, `manifest is unreadable or invalid JSON: ${messageOf(error)}`);
+  }
+  if (!isAstGrepRuntimeManifest(manifest)) {
+    throw astGrepIntegrityError(runtimeEntry, `manifest is malformed: ${manifestPath}`);
+  }
+  let actualSha256;
+  try {
+    actualSha256 = createHash("sha256").update(await readFile(runtimeEntry)).digest("hex");
+  } catch (error) {
+    throw astGrepIntegrityError(runtimeEntry, `runtime hash could not be computed: ${messageOf(error)}`);
+  }
+  if (actualSha256 !== manifest.sha256) {
+    throw astGrepIntegrityError(runtimeEntry, `sha256 mismatch: manifest=${manifest.sha256} actual=${actualSha256}`);
+  }
+  const actualMode = runtimeStat.mode & 511;
+  if (actualMode !== manifest.mode) {
+    throw astGrepIntegrityError(runtimeEntry, `mode mismatch: manifest=${manifest.mode} actual=${actualMode}`);
+  }
+}
+function isAstGrepRuntimeManifest(value) {
+  if (!isPlainObject(value))
+    return false;
+  return typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256) && typeof value.mode === "number" && Number.isInteger(value.mode) && typeof value.stagedAtUtc === "string" && !Number.isNaN(Date.parse(value.stagedAtUtc));
+}
+function astGrepIntegrityError(runtimeEntry, reason) {
+  return new Error(`Packed omo-senpi plugin ast-grep MCP runtime integrity error at ${runtimeEntry}: ${reason}`);
+}
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 async function defaultRunCommand(command, args, options) {
   const result = await execFileAsync(command, [...args], { cwd: options.cwd });

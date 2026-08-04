@@ -11,9 +11,9 @@ export interface SpawnTarget {
 
 // Windows .cmd/.bat shims must be invoked through cmd.exe; Node's BatBadBut hardening
 // (CVE-2024-27980, Node >= 18.20.2) throws EINVAL synchronously when spawning them
-// without a shell. Mirrors the codegraph component's wrap (`/d /s /c` preserves arg
-// quoting). `args` here are the fixed STATUS_ARGS constant, so cmd metacharacter
-// injection is not a concern for this call site.
+// without a shell. The `/d /s /c` prefix preserves arg quoting. `args` here are
+// the fixed STATUS_ARGS constant, so cmd metacharacter injection is not a concern
+// for this call site.
 export function toSpawnTarget(
   bin: string,
   args: readonly string[],

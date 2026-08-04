@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-tui": "0.80.3",
+    "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",

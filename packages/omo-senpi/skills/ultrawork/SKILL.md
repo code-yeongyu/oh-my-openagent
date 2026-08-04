@@ -239,21 +239,23 @@ production code before its failing test → rewrite.
 Never guess from memory — locate with the right tool, and re-read before
 you claim or change. **Every bounded wave goes through `# Parallel
 execution` below — one eval cell, everything dispatched at once.**
-- Architecture / flow / blast radius → `codegraph_explore` first when
-  `codegraph_*` exists; if unavailable, continue with repo tools and LSP.
-- **SYMBOLS REQUIRE LSP** — definitions, references, rename impact,
-  workspace symbols, and diagnostics use the available `lsp_*` tools, not
-  text search. Run diagnostics after edits and treat errors as blocking.
-- Repo text / filenames / history / bounded shell output → `rg`,
-  `rg --files`, `git`, and native utilities; narrow output in-program.
-- Structural call / function / class / import shapes and codemods → the
-  `ast-grep` skill or `sg` with `$VAR` / `$$$` metavariables.
-When discovery needs multiple angles or the module layout is
-unfamiliar, delegate to the `explore` subagent (read-only codebase
-search, absolute-path results). For research that leaves the repo —
-library/API/docs/web — delegate to the `librarian` subagent. Spawn them
-in background (`run_in_background: true`) and keep doing root work
-while they run.
+Discovery order:
+1. **SYMBOLS REQUIRE LSP** — definitions, references, rename impact,
+   workspace symbols, diagnostics: the built-in `lsp_*` tools, not
+   text search. Run diagnostics after edits; errors block.
+2. Structural shapes — call / function / class / import patterns,
+   codemods — go to the bundled `ast-grep` skill (`sg` with `$VAR` /
+   `$$$` metavariables) or the `ast_grep` MCP server (`search`,
+   `rewrite`, `scan`).
+3. Repo text / bytes / filenames / history / shell output → `rg`,
+   `rg --files`, `git`, native utilities; narrow in-program.
+4. Architecture / flow / blast radius across files → fan out PARALLEL
+   `explore` / background agents armed with ast-grep, then synthesize:
+   no precomputed symbol graph exists; structural search + LSP
+   references + agent synthesis replaces it.
+Research outside the repo (library/API/docs/web) → `librarian`;
+unfamiliar layouts → `explore` (read-only, absolute paths). Run both
+in background; keep working.
 
 # Parallel execution (EVAL TOOL MAXXING — batch as hell)
 The `eval` tool is your DEFAULT execution surface — think about how
