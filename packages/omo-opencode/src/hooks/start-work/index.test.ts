@@ -21,12 +21,14 @@ describe("start-work hook", () => {
   let testDir: string
   let omoDir: string
 
-  function createMockPluginInput() {
+  function createMockPluginInput(recentPlanPath?: string) {
     return unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
       directory: testDir,
       client: {
         session: {
-          messages: async () => ({ data: [] }),
+          messages: async () => ({
+            data: recentPlanPath ? [{ parts: [{ text: recentPlanPath }] }] : [],
+          }),
         },
       },
     })
@@ -367,7 +369,7 @@ You are starting an Atlas work session.
       const plan2Path = join(plansDir, "plan-incomplete.md")
       writeFileSync(plan2Path, "# Plan Incomplete\n- [ ] Task 1\n- [x] Task 2")
 
-      const hook = createStartWorkHook(createMockPluginInput())
+      const hook = createStartWorkHook(createMockPluginInput(plan2Path))
       const output = {
         parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
@@ -384,7 +386,7 @@ You are starting an Atlas work session.
       expect(output.parts[0].text).not.toContain("Multiple Plans Found")
     })
 
-    test("should wrap multiple plans message in system-reminder tag", async () => {
+    test("does not list multiple incomplete plans without session affinity", async () => {
       // given - multiple incomplete plans
       const plansDir = join(testDir, ".omo", "plans")
       mkdirSync(plansDir, { recursive: true })
@@ -406,13 +408,13 @@ You are starting an Atlas work session.
         output
       )
 
-      // then - should use system-reminder tag format
-      expect(output.parts[0].text).toContain("<system-reminder>")
-      expect(output.parts[0].text).toContain("</system-reminder>")
-      expect(output.parts[0].text).toContain("Multiple Plans Found")
+      // then
+      expect(output.parts[0].text).toContain("No Plan for This Session")
+      expect(output.parts[0].text).not.toContain("<system-reminder>")
+      expect(output.parts[0].text).not.toContain("Multiple Plans Found")
     })
 
-    test("should use 'ask user' prompt style for multiple plans", async () => {
+    test("does not expose incomplete plans from another session as actionable work", async () => {
       // given - multiple incomplete plans
       const plansDir = join(testDir, ".omo", "plans")
       mkdirSync(plansDir, { recursive: true })
@@ -434,9 +436,10 @@ You are starting an Atlas work session.
         output
       )
 
-      // then - should prompt agent to ask user, not ask directly
-      expect(output.parts[0].text).toContain("Ask the user")
-      expect(output.parts[0].text).not.toContain("Which plan would you like to work on?")
+      // then
+      expect(output.parts[0].text).toContain("No Plan for This Session")
+      expect(output.parts[0].text).not.toContain("plan-x")
+      expect(output.parts[0].text).not.toContain("plan-y")
     })
 
     test("should select explicitly specified plan name from user-request, ignoring existing boulder state", async () => {
@@ -808,9 +811,10 @@ You are starting an Atlas work session.
 
       const plansDir = join(testDir, ".omo", "plans")
       mkdirSync(plansDir, { recursive: true })
-      writeFileSync(join(plansDir, "worker-plan.md"), "# Plan\n- [ ] Task 1")
+      const planPath = join(plansDir, "worker-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
 
-      const hook = createStartWorkHook(createMockPluginInput())
+      const hook = createStartWorkHook(createMockPluginInput(planPath))
       const output = {
         message: {} as Record<string, unknown>,
         parts: [{ type: "text", text: createStartWorkPrompt() }],
@@ -1034,10 +1038,11 @@ You are starting an Atlas work session.
       // given - single plan + valid worktree path
       const plansDir = join(testDir, ".omo", "plans")
       mkdirSync(plansDir, { recursive: true })
-      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      const planPath = join(plansDir, "my-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
       detectSpy.mockReturnValue("/validated/worktree")
 
-      const hook = createStartWorkHook(createMockPluginInput())
+      const hook = createStartWorkHook(createMockPluginInput(planPath))
       const output = {
         parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /validated/worktree" }) }],
       }
@@ -1056,10 +1061,11 @@ You are starting an Atlas work session.
       // given - plan + valid worktree
       const plansDir = join(testDir, ".omo", "plans")
       mkdirSync(plansDir, { recursive: true })
-      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      const planPath = join(plansDir, "my-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
       detectSpy.mockReturnValue("/valid/wt")
 
-      const hook = createStartWorkHook(createMockPluginInput())
+      const hook = createStartWorkHook(createMockPluginInput(planPath))
       const output = {
         parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /valid/wt" }) }],
       }
@@ -1076,10 +1082,11 @@ You are starting an Atlas work session.
       // given - plan + invalid worktree path (detectWorktreePath returns null)
       const plansDir = join(testDir, ".omo", "plans")
       mkdirSync(plansDir, { recursive: true })
-      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      const planPath = join(plansDir, "my-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
       // detectSpy already returns null by default
 
-      const hook = createStartWorkHook(createMockPluginInput())
+      const hook = createStartWorkHook(createMockPluginInput(planPath))
       const output = {
         parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /nonexistent/wt" }) }],
       }

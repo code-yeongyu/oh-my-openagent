@@ -145,10 +145,10 @@ describe("buildStartWorkContextInfo", () => {
     expect(nextState?.active_work_id).toBe(selectedWork?.work_id)
   })
 
-  test("falls back to auto-select latest plan when no works exist", () => {
+  test("does not auto-select an incomplete plan when the session has no plan affinity", () => {
     // given
     const clearSpy = spyOn(boulderState, "clearBoulderState")
-    const coldStartPlanPath = writePlan("cold-start-plan", "## TODOs\n- [ ] 1. Cold start")
+    const stalePlanPath = writePlan("abandoned-plan", "## TODOs\n- [ ] 1. Abandoned task")
 
     // when
     const contextInfo = buildStartWorkContextInfo({
@@ -163,10 +163,11 @@ describe("buildStartWorkContextInfo", () => {
     })
 
     // then
-    expect(contextInfo).toContain("Auto-Selected Plan")
-    expect(contextInfo).toContain("cold-start-plan")
-    expect(contextInfo).toContain(coldStartPlanPath)
-    expect(existsSync(getBoulderFilePath(testDirectory))).toBe(true)
+    expect(contextInfo).toContain("No Plan for This Session")
+    expect(contextInfo).toContain("Invoke the Prometheus agent to create a new work plan")
+    expect(contextInfo).not.toContain("Auto-Selected Plan")
+    expect(contextInfo).not.toContain(stalePlanPath)
+    expect(existsSync(getBoulderFilePath(testDirectory))).toBe(false)
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
 
@@ -414,9 +415,9 @@ describe("buildStartWorkContextInfo", () => {
   })
 
   describe("notepad scaffolding side-effect", () => {
-    test("#given single incomplete plan and no active work #when buildStartWorkContextInfo auto-selects it #then scaffolds .omo/notepads/<plan-basename>/{learnings,decisions,issues,problems}.md", () => {
+    test("#given current session references the only incomplete plan #when buildStartWorkContextInfo auto-selects it #then scaffolds .omo/notepads/<plan-basename>/{learnings,decisions,issues,problems}.md", () => {
       // given
-      writePlan("auto-scaffold-plan", "## TODOs\n- [ ] 1. Auto task")
+      const planPath = writePlan("auto-scaffold-plan", "## TODOs\n- [ ] 1. Auto task")
 
       // when
       buildStartWorkContextInfo({
@@ -428,6 +429,7 @@ describe("buildStartWorkContextInfo", () => {
         activeAgent: "atlas",
         worktreePath: undefined,
         worktreeBlock: "",
+        preferredPlanPath: planPath,
       })
 
       // then

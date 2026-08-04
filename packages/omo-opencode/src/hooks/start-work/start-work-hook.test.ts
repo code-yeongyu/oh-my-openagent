@@ -36,12 +36,13 @@ You are starting an Atlas work session.
 
   test("#given raw chat session id #when processing start-work template #then boulder stores opencode-prefixed id", async () => {
     // given
-    writeFileSync(join(testDir, ".omo", "plans", "work.md"), "# Work\n- [ ] First task\n")
+    const planPath = join(testDir, ".omo", "plans", "work.md")
+    writeFileSync(planPath, "# Work\n- [ ] First task\n")
     const hook = createStartWorkHook(unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
       directory: testDir,
       client: {
         session: {
-          messages: async () => ({ data: [] }),
+          messages: async () => ({ data: [{ parts: [{ text: planPath }] }] }),
         },
       },
     }))

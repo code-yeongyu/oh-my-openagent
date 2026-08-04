@@ -103,6 +103,14 @@ export function buildPlanDiscoveryContext(params: {
     })
   }
 
+  if (!preferredPlanPath) {
+    return contextInfo + `
+
+## No Plan for This Session
+
+No incomplete plan was referenced in this session. Invoke the Prometheus agent to create a new work plan.`
+  }
+
   if (incompletePlans.length === 1) {
     return contextInfo + buildAutoSelectedPlanContextWithStateInit({
       planPath: incompletePlans[0],
