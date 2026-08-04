@@ -1,0 +1,27 @@
+Invocation:
+  node --input-type=module -e '<callDiagnosticsViaDaemon for changed files>'
+
+Runtime:
+  packages/lsp-daemon/dist/client.js
+  cwd=/Users/yeongyu/local-workspaces/omo-wt/fix/team-create-inline-precedence
+
+Results:
+  packages/senpi-task/src/tools/team/lifecycle.ts
+    isError=false
+    totalDiagnostics=0
+    text="No diagnostics found"
+
+  packages/senpi-task/src/tools/team/lifecycle-precedence.test.ts
+    isError=false
+    totalDiagnostics=0
+    text="No diagnostics found"
+
+  packages/senpi-task/src/tools/team/lifecycle.test.ts
+    isError=false
+    totalDiagnostics=0
+    text="No diagnostics found"
+
+Note:
+  The session-level lsp_diagnostics wrapper rejects sibling worktree paths.
+  This command invoked the same shared LSP daemon client directly with the
+  task worktree as request cwd.

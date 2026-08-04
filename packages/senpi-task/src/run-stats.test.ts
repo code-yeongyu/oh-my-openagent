@@ -128,12 +128,12 @@ describe("run stats tracker", () => {
     expect(snapshot.tokens_per_second).toBeUndefined()
   })
 
-  test("#given numeric cost and cache token usage #when snapshotted #then cost and cache hit rate accumulate", () => {
+  test("#given multiple cache-bearing turns #when snapshotted #then latest-request and whole-run cache hit rates stay distinct", () => {
     // given
     let nowMs = 1_000
     const tracker = createRunStatsTracker(1_000, () => nowMs)
 
-    // when: two turns, cost as a plain number, cache read 30 of (10 + 30 + 10) = 60%
+    // when: first turn is 60% cache hit, second (latest) turn is 90%
     nowMs = 2_000
     tracker.accept({
       type: "message_end",
@@ -152,11 +152,12 @@ describe("run stats tracker", () => {
       },
     })
 
-    // then: cost sums; cache hit rate is cacheRead / (input + cacheRead + cacheWrite) over the run,
-    // i.e. (30 + 90) reads over (10+30+10) + (10+90+0) = 150 cacheable tokens
+    // then: cost sums; the live/status rate is the latest request's 90 / 100 while the persisted
+    // whole-run rate remains (30 + 90) / ((10+30+10) + (10+90+0)) = 120 / 150.
     const snapshot = tracker.snapshot(2_000)
     expect(snapshot.cost_usd).toBeCloseTo(0.0225, 10)
-    expect(snapshot.cache_hit_rate).toBeCloseTo(120 / 150, 10)
+    expect(snapshot.cache_hit_rate_last).toBeCloseTo(90 / 100, 10)
+    expect(snapshot.cache_hit_rate_run).toBeCloseTo(120 / 150, 10)
   })
 
   test("#given cost as an object with a total #when snapshotted #then the total is summed", () => {
@@ -190,7 +191,8 @@ describe("run stats tracker", () => {
     // then
     const snapshot = tracker.snapshot(2_000)
     expect(snapshot.cost_usd).toBeUndefined()
-    expect(snapshot.cache_hit_rate).toBeUndefined()
+    expect(snapshot.cache_hit_rate_last).toBeUndefined()
+    expect(snapshot.cache_hit_rate_run).toBeUndefined()
   })
 
   test("#given snake_case cache fields and zero cache reads #when snapshotted #then the rate is zero not omitted", () => {
@@ -208,7 +210,8 @@ describe("run stats tracker", () => {
     })
 
     // then
-    expect(tracker.snapshot(2_000).cache_hit_rate).toBe(0)
+    expect(tracker.snapshot(2_000).cache_hit_rate_last).toBe(0)
+    expect(tracker.snapshot(2_000).cache_hit_rate_run).toBe(0)
   })
 
   test("#given non-finite cost and negative cache inputs #when snapshotted #then unsafe values cannot poison persisted stats", () => {
@@ -230,7 +233,8 @@ describe("run stats tracker", () => {
     // then: invalid facts are ignored; the remaining 30 cache-read tokens form a bounded 100% rate
     const snapshot = tracker.snapshot(2_000)
     expect(snapshot.cost_usd).toBeUndefined()
-    expect(snapshot.cache_hit_rate).toBe(1)
+    expect(snapshot.cache_hit_rate_last).toBe(1)
+    expect(snapshot.cache_hit_rate_run).toBe(1)
     expect(JSON.stringify(snapshot)).not.toContain("null")
   })
 
@@ -271,8 +275,32 @@ describe("run stats tracker", () => {
     // then
     const snapshot = tracker.snapshot(2_000)
     expect(snapshot.cost_usd).toBeUndefined()
-    expect(snapshot.cache_hit_rate).toBeUndefined()
+    expect(snapshot.cache_hit_rate_last).toBe(1)
+    expect(snapshot.cache_hit_rate_run).toBeUndefined()
     expect(JSON.stringify(snapshot)).not.toContain("null")
+  })
+
+  test("#given a later assistant turn without a cacheable denominator #when snapshotted #then the latest valid request rate is retained", () => {
+    // given
+    const tracker = createRunStatsTracker(1_000, () => 2_000)
+    tracker.accept({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        usage: { input: 10, cacheRead: 90, cacheWrite: 0 },
+      },
+    })
+
+    // when: a later assistant turn reports no cacheable input facts
+    tracker.accept({
+      type: "message_end",
+      message: { role: "assistant", content: [], usage: { output: 10, totalTokens: 10 } },
+    })
+
+    // then
+    expect(tracker.snapshot(2_000).cache_hit_rate_last).toBeCloseTo(0.9, 10)
+    expect(tracker.snapshot(2_000).cache_hit_rate_run).toBeCloseTo(0.9, 10)
   })
 
   test("#given one measured window and one token-bearing collapsed window #when snapshotted #then tps is omitted as unverifiable", () => {

@@ -1,0 +1,293 @@
+bun test v1.4.0-canary.1 (65c47c806)
+
+packages/senpi-task/src/status-line.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+(pass) taskIdentityLabel > #given a task summary #when labelled #then the delegated-work summary wins over description, name and id [1.78ms]
+(pass) taskIdentityLabel > #given a blank task summary #when labelled #then it falls back to the description [0.07ms]
+(pass) taskIdentityLabel > #given a description #when labelled #then the human description wins over name and id [0.14ms]
+(pass) taskIdentityLabel > #given no description #when labelled #then the stable name is used [0.08ms]
+(pass) taskIdentityLabel > #given neither description nor name #when labelled #then the id remains as the last-resort handle [0.07ms]
+(pass) taskIdentityLabel > #given blank labels #when labelled #then whitespace-only values are ignored [0.17ms]
+(pass) taskIdentityLabel > #given an overlong description #when labelled #then it is excerpted for one status row [0.17ms]
+(pass) formatStatusTarget > #given a category and resolved model #when formatted #then model metadata qualifies the category [0.13ms]
+(pass) formatStatusTarget > #given only an agent type #when formatted #then the agent target shares the category grammar [0.06ms]
+(pass) formatStatusTarget > #given an agent type and resolved model #when formatted #then model metadata qualifies the agent exactly like a category [0.05ms]
+(pass) formatStatusTarget > #given an agent type with only a raw model #when formatted #then the raw model qualifies the agent target [0.04ms]
+(pass) formatStatusTarget > #given resolved model metadata with effort and variant #when formatted #then reasoning effort wins in the status target [0.10ms]
+(pass) formatStatusTarget > #given resolved model metadata with variant only #when formatted #then the variant is rendered [0.07ms]
+(pass) formatStatusTarget > #given resolved model metadata with reasoning effort only #when formatted #then the reasoning effort is rendered [0.15ms]
+(pass) formatStatusTarget > #given resolved model metadata without effort or variant #when formatted #then the model name is rendered without a suffix [0.08ms]
+(pass) formatStatusTarget > #given model metadata with terminal controls #when formatted #then every part is normalized [0.14ms]
+(pass) formatStatusTarget > #given a category but only a raw model #when formatted #then the sanitized raw model qualifies the target [0.09ms]
+(pass) formatStatusTarget > #given no target facts #when formatted #then nothing is emitted [0.17ms]
+(pass) composeStatusLine > #given full live facts #when composed #then tokens follow the canonical identity-first grammar [0.21ms]
+221 |       },
+222 |       verb: "running read src/foo.ts",
+223 |     })
+224 |
+225 |     // then
+226 |     expect(line).toBe(
+                       ^
+error: expect(received).toBe(expected)
+
+Expected: "Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · $0.4213 (CH: 87%) · 62 tok/s"
+Received: "Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · $0.4213 · 62 tok/s"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/status-line.test.ts:226:18)
+(fail) composeStatusLine > #given cost and cache facts #when composed #then the cost token sits immediately before tps [0.30ms]
+233 |     expect(
+234 |       composeStatusLine({
+235 |         identity: "t",
+236 |         stats: { runtime_ms: 0, turns: 1, tool_calls: 0, tokens_per_second: 8, cache_hit_rate_last: 0.5, cache_hit_rate_run: 0.1 },
+237 |       }),
+238 |     ).toBe("t · turn 1 · (CH: 50%) · 8 tok/s")
+            ^
+error: expect(received).toBe(expected)
+
+Expected: "t · turn 1 · (CH: 50%) · 8 tok/s"
+Received: "t · turn 1 · 8 tok/s"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/status-line.test.ts:238:7)
+(fail) composeStatusLine > #given a cache hit rate without cost #when composed #then the cache token still renders before tps [0.14ms]
+(pass) composeStatusLine > #given a single tool call #when composed #then the tool noun is singular [0.05ms]
+(pass) composeStatusLine > #given no stats #when composed #then only known tokens are emitted [0.10ms]
+
+packages/senpi-task/src/run-stats.test.ts:
+(pass) run stats tracker > #given assistant turns with usage #when snapshotted #then totals and tps derive from generation time [0.28ms]
+(pass) run stats tracker > #given non-assistant messages and missing usage #when snapshotted #then only counted facts appear [0.09ms]
+(pass) run stats tracker > #given snake_case usage fields #when accumulated #then they are read as a fallback [0.08ms]
+(pass) run stats tracker > #given a sub-10 tps run #when snapshotted #then tps keeps one decimal [0.06ms]
+(pass) run stats tracker > #given message_start before message_end #when snapshotted #then the window is the arrival-clock gap [0.06ms]
+(pass) run stats tracker > #given bursty delivery collapsing the only generation window #when snapshotted #then tps is omitted as unverifiable [0.05ms]
+154 |
+155 |     // then: cost sums; the live/status rate is the latest request's 90 / 100 while the persisted
+156 |     // whole-run rate remains (30 + 90) / ((10+30+10) + (10+90+0)) = 120 / 150.
+157 |     const snapshot = tracker.snapshot(2_000)
+158 |     expect(snapshot.cost_usd).toBeCloseTo(0.0225, 10)
+159 |     expect(snapshot.cache_hit_rate_last).toBeCloseTo(90 / 100, 10)
+                                               ^
+TypeError: Expected received to be a number for 'expect'.
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/run-stats.test.ts:159:42)
+(fail) run stats tracker > #given multiple cache-bearing turns #when snapshotted #then latest-request and whole-run cache hit rates stay distinct [0.17ms]
+(pass) run stats tracker > #given cost as an object with a total #when snapshotted #then the total is summed [0.09ms]
+(pass) run stats tracker > #given usage without cache or cost facts #when snapshotted #then both fields are omitted [0.08ms]
+208 |         usage: { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 20 },
+209 |       },
+210 |     })
+211 |
+212 |     // then
+213 |     expect(tracker.snapshot(2_000).cache_hit_rate_last).toBe(0)
+                                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: undefined
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/run-stats.test.ts:213:57)
+(fail) run stats tracker > #given snake_case cache fields and zero cache reads #when snapshotted #then the rate is zero not omitted [0.49ms]
+231 |     })
+232 |
+233 |     // then: invalid facts are ignored; the remaining 30 cache-read tokens form a bounded 100% rate
+234 |     const snapshot = tracker.snapshot(2_000)
+235 |     expect(snapshot.cost_usd).toBeUndefined()
+236 |     expect(snapshot.cache_hit_rate_last).toBe(1)
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: undefined
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/run-stats.test.ts:236:42)
+(fail) run stats tracker > #given non-finite cost and negative cache inputs #when snapshotted #then unsafe values cannot poison persisted stats [0.21ms]
+(pass) run stats tracker > #given an object cost with a non-finite total #when snapshotted #then cost is omitted [0.10ms]
+273 |     tracker.accept(overflowingTurn)
+274 |
+275 |     // then
+276 |     const snapshot = tracker.snapshot(2_000)
+277 |     expect(snapshot.cost_usd).toBeUndefined()
+278 |     expect(snapshot.cache_hit_rate_last).toBe(1)
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: undefined
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/run-stats.test.ts:278:42)
+(fail) run stats tracker > #given finite values that overflow cumulative totals #when snapshotted #then non-finite metrics are omitted [0.19ms]
+297 |       type: "message_end",
+298 |       message: { role: "assistant", content: [], usage: { output: 10, totalTokens: 10 } },
+299 |     })
+300 |
+301 |     // then
+302 |     expect(tracker.snapshot(2_000).cache_hit_rate_last).toBeCloseTo(0.9, 10)
+                                                              ^
+TypeError: Expected received to be a number for 'expect'.
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/run-stats.test.ts:302:57)
+(fail) run stats tracker > #given a later assistant turn without a cacheable denominator #when snapshotted #then the latest valid request rate is retained [0.24ms]
+(pass) run stats tracker > #given one measured window and one token-bearing collapsed window #when snapshotted #then tps is omitted as unverifiable [0.08ms]
+
+packages/senpi-task/src/state/run-stats-record.test.ts:
+(pass) run stats on task records > #given a complete transition with run stats #when applied #then the terminal record carries them [0.22ms]
+(pass) run stats on task records > #given fail cancel and interrupt transitions #when applied with run stats #then they persist too [0.06ms]
+80 |
+81 |     // when
+82 |     const parsed = parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")
+83 |
+84 |     // then
+85 |     expect(parsed.run_stats).toEqual(RUN_STATS)
+                                  ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "cache_hit_rate_last": 0.9123,
+-   "cache_hit_rate_run": 0.8712,
+    "cost_usd": 0.4213,
+    "generation_ms": 7600,
+    "output_tokens": 900,
+    "runtime_ms": 12500,
+    "tokens_per_second": 118,
+    "tool_calls": 5,
+    "total_tokens": 4200,
+    "turns": 3,
+  }
+
+- Expected  - 2
++ Received  + 0
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/state/run-stats-record.test.ts:85:30)
+(fail) run stats on task records > #given a persisted record with run stats #when parsed #then the stats round-trip [0.36ms]
+(pass) run stats on task records > #given malformed run stats #when parsed #then parsing rejects the record [0.07ms]
+110 |     // when
+111 |     const parsed = parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")
+112 |
+113 |     // then
+114 |     expect(parsed.run_stats?.cost_usd).toBe(0.4213)
+115 |     expect(parsed.run_stats?.cache_hit_rate_last).toBe(0.9)
+                                                        ^
+error: expect(received).toBe(expected)
+
+Expected: 0.9
+Received: undefined
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/state/run-stats-record.test.ts:115:51)
+(fail) run stats on task records > #given a record with explicit latest-request and whole-run cache hit rates #when parsed #then both fields round-trip [0.10ms]
+125 |
+126 |     // when
+127 |     const parsed = parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")
+128 |
+129 |     // then
+130 |     expect(parsed.run_stats?.cache_hit_rate_run).toBe(0.6)
+                                                       ^
+error: expect(received).toBe(expected)
+
+Expected: 0.6
+Received: undefined
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/state/run-stats-record.test.ts:130:50)
+(fail) run stats on task records > #given a legacy record with ambiguous cache_hit_rate #when parsed #then it is treated as the whole-run rate [0.08ms]
+(pass) run stats on task records > #given a non-numeric cost_usd #when parsed #then parsing rejects the record [0.06ms]
+
+packages/senpi-task/src/manager/run-stats-wiring.test.ts:
+(pass) manager run stats wiring > #given a spawned child #when it completes #then the terminal record carries accumulated run stats [5.09ms]
+66 |     await manager.waitFor(started.task_id)
+67 |
+68 |     // then: cacheRead 300 of (100 + 300 + 100) = 60%
+69 |     const stats = store.load(started.task_id)?.run_stats
+70 |     expect(stats?.cost_usd).toBeCloseTo(0.12, 10)
+71 |     expect(stats?.cache_hit_rate_last).toBeCloseTo(0.6, 10)
+                                            ^
+TypeError: Expected received to be a number for 'expect'.
+ code: "ERR_INVALID_ARG_TYPE"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/manager/run-stats-wiring.test.ts:71:40)
+(fail) manager run stats wiring > #given a spawned child reporting cost and cache usage #when it completes #then cost and cache hit rate persist [2.79ms]
+102 |     // actually being present here, not just on the values it returns
+103 |     const snapshot = manager.runStatsSnapshot
+104 |     if (snapshot === undefined) throw new Error("manager must expose runStatsSnapshot for live rows")
+105 |     const live = snapshot.call(manager, started.task_id)
+106 |     expect(live?.cost_usd).toBeCloseTo(0.0075, 10)
+107 |     expect(live?.cache_hit_rate_last).toBeCloseTo(0.9, 10)
+                                            ^
+TypeError: Expected received to be a number for 'expect'.
+ code: "ERR_INVALID_ARG_TYPE"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/manager/run-stats-wiring.test.ts:107:39)
+(fail) manager run stats wiring > #given a live child with cost usage #when the snapshot is read mid-run #then cost and cache facts are already visible [1.96ms]
+(pass) manager run stats wiring > #given a spawned child #when it fails #then run stats persist on the error record [2.50ms]
+(pass) manager run stats wiring > #given a spawned child #when it is cancelled #then run stats persist on the cancelled record [1.93ms]
+(pass) manager run stats through steering transitions > #given a running child with usage #when cancelled through cancelTask #then the cancelled record carries run stats [2.37ms]
+(pass) manager run stats through steering transitions > #given a completed run revived then cancelled #when the revived run has no events #then no stale run stats survive [3.25ms]
+
+packages/omo-senpi/src/components/task/status-ui-background.test.ts:
+(pass) createTaskStatusUi.background progress > #given only terminal background tasks #when syncing #then no refresh timer remains active [1.86ms]
+(pass) createTaskStatusUi.background progress > #given an idle parent with a running background task #when time advances quietly #then live status refreshes [5.44ms]
+185 |     // when
+186 |     statusUi.syncNow()
+187 |
+188 |     // then
+189 |     const rows = ui.widgetCalls.at(-1)?.content ?? []
+190 |     expect(rows[0]).toContain("$0.4213 (CH: 87%) · 40 tok/s")
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "$0.4213 (CH: 87%) · 40 tok/s"
+Received: "⠼ Solo · category:quick(anthropic/claude-sonnet-4-6) · turn 2 (1 tool) · $0.4213 · 40 tok/s · running · 1s"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/omo-senpi/src/components/task/status-ui-background.test.ts:190:21)
+(fail) createTaskStatusUi.background progress > #given live solo and process-member rows with cost and cache facts #when rendered #then the cost token sits immediately before tps [0.49ms]
+(pass) createTaskStatusUi.background progress > #given a live refresh timer #when the final background task completes #then the timer stops [0.25ms]
+(pass) createTaskStatusUi.background progress > #given two background children #when latest events arrive #then rows show identity, model, stats, activity, and elapsed time [0.49ms]
+
+packages/senpi-task/src/tools/output/renderers.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '@code-yeongyu/senpi' from '/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/tools/control/send.ts'
+-------------------------------
+
+
+packages/senpi-task/src/tools/task/renderers-run-stats.test.ts:
+(pass) taskResultLines run stats > #given terminal details with run stats #when rendered #then runtime and tps tokens are appended [0.47ms]
+54 |     // when
+55 |     const [line = ""] = taskResultLines(details)
+56 |
+57 |     // then: 4-decimal cost, integer percent cache hit, and tps last
+58 |     expect(line).toContain("cost:$0.4213")
+59 |     expect(line).toContain("ch:87%")
+                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "ch:87%"
+Received: "task foreground completed id:st_00000009 ran:2m14s cost:$0.4213 tps:118"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-latest-cache-hit-rate/packages/senpi-task/src/tools/task/renderers-run-stats.test.ts:59:18)
+(fail) taskResultLines run stats > #given run stats with cost and cache hits #when rendered #then cost then ch then tps tokens appear in order [0.20ms]
+(pass) taskResultLines run stats > #given run stats without cost or cache facts #when rendered #then neither token appears [0.09ms]
+(pass) taskResultLines run stats > #given malformed persisted spend facts #when rendered #then impossible money and cache values are omitted [0.12ms]
+(pass) taskResultLines run stats > #given details without run stats #when rendered #then no runtime tokens appear [0.08ms]
+
+15 tests failed:
+(fail) composeStatusLine > #given cost and cache facts #when composed #then the cost token sits immediately before tps [0.30ms]
+(fail) composeStatusLine > #given a cache hit rate without cost #when composed #then the cache token still renders before tps [0.14ms]
+(fail) run stats tracker > #given multiple cache-bearing turns #when snapshotted #then latest-request and whole-run cache hit rates stay distinct [0.17ms]
+(fail) run stats tracker > #given snake_case cache fields and zero cache reads #when snapshotted #then the rate is zero not omitted [0.49ms]
+(fail) run stats tracker > #given non-finite cost and negative cache inputs #when snapshotted #then unsafe values cannot poison persisted stats [0.21ms]
+(fail) run stats tracker > #given finite values that overflow cumulative totals #when snapshotted #then non-finite metrics are omitted [0.19ms]
+(fail) run stats tracker > #given a later assistant turn without a cacheable denominator #when snapshotted #then the latest valid request rate is retained [0.24ms]
+(fail) run stats on task records > #given a persisted record with run stats #when parsed #then the stats round-trip [0.36ms]
+(fail) run stats on task records > #given a record with explicit latest-request and whole-run cache hit rates #when parsed #then both fields round-trip [0.10ms]
+(fail) run stats on task records > #given a legacy record with ambiguous cache_hit_rate #when parsed #then it is treated as the whole-run rate [0.08ms]
+(fail) manager run stats wiring > #given a spawned child reporting cost and cache usage #when it completes #then cost and cache hit rate persist [2.79ms]
+(fail) manager run stats wiring > #given a live child with cost usage #when the snapshot is read mid-run #then cost and cache facts are already visible [1.96ms]
+(fail) createTaskStatusUi.background progress > #given live solo and process-member rows with cost and cache facts #when rendered #then the cost token sits immediately before tps [0.49ms]
+(fail) taskResultLines run stats > #given run stats with cost and cache hits #when rendered #then cost then ch then tps tokens appear in order [0.20ms]
+
+ 48 pass
+ 15 fail
+ 1 error
+ 119 expect() calls
+Ran 63 tests across 7 files. [3.46s]

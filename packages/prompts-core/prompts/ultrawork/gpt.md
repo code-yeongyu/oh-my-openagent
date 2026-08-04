@@ -126,18 +126,18 @@ Maintain a live todo list for every multi-step task: one atomic item per action 
 
 ## SCENARIO CONTRACT (binding, defined BEFORE coding)
 
-Define 3+ scenarios covering: **happy path**, **edge** (boundary / empty / malformed / concurrent), **adjacent-surface regression**. For each, write:
+Define scenarios sized to the change — 1-2 for small single-surface work, 3+ for risky or multi-surface work — covering: **happy path**, plus **edge** (boundary / empty / malformed / concurrent) and **adjacent-surface regression** when the change is risky or multi-surface. For each, write:
 - Binary pass condition ("returns 200 with schema-matching body"), not "should work".
 - The real surface that proves it.
-- The test file + test id (written test-first; see TDD).
+- The cheapest faithful proof: a test file + test id at a code seam (test-first; see TDD), or the real-surface scenario itself when no seam exists (prose, docs, visual-only: review + real-surface QA, no test).
 
 Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured. Then declare WHEN TO STOP for the whole run, in one line: "I'll stop right away when <the exact observable state that ends this run>" — its end state MUST be the full STOP GOAL from the Stop rules, never scenario completion alone. The Stop rules bind to this line — the moment it holds, you stop.
 
-## TDD (MANDATORY on every production change)
+## TDD (MANDATORY on every production code change with a test seam)
 
-Features, fixes, refactors, perf, glue, config-with-logic — all follow RED→GREEN→SURFACE. Write the failing test FIRST; capture the assertion proving it fails for the right reason; write the SMALLEST change to flip it green; exercise the real surface; capture both artifacts. **If you wrote production code without a failing test preceding it: STOP, revert, write the test, redo.**
+Code features, fixes, refactors, perf, glue, config-with-logic — all follow RED→GREEN→SURFACE. Prose, docs, and visual-only changes have no test seam: prove them through the real-surface channel; a test pinning their text is pretend-coverage. Write the failing test FIRST; capture the assertion proving it fails for the right reason; write the SMALLEST change to flip it green; exercise the real surface; capture both artifacts. **If you wrote production code without a failing test preceding it: STOP, revert, write the test, redo.**
 
-Refactors: write characterization tests pinning current behavior FIRST, watch them GREEN against old code, THEN refactor. They stay green throughout.
+Refactors of behavior whose regressions the change could hide: write characterization tests pinning current behavior FIRST, watch them GREEN against old code, THEN refactor. They stay green throughout.
 
 Exemption whitelist (no new test required): formatting, comment-only, version bumps with no behavior delta, rename-only. Each must be justified in writing. Unjustified exemption is rejection.
 

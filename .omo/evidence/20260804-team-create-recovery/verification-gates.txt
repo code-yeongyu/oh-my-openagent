@@ -1,0 +1,28 @@
+All commands ran from:
+  /Users/yeongyu/local-workspaces/omo-wt/fix/team-create-inline-precedence
+
+Package gates:
+  bun run --cwd packages/senpi-task test
+    exit code 0
+
+  bun test ./packages/omo-senpi/src/components/task/team-service.test.ts
+    7 pass
+    0 fail
+    19 expect() calls
+
+  node packages/omo-senpi/scripts/qa/team-e2e.mjs --self-test
+    SELF-TEST OK
+
+Repository gates:
+  bun run test:senpi
+    exit code 0
+    0 fail
+
+  bun run typecheck:packages
+    exit code 0
+
+  bun run build
+    exit code 0
+    build: all steps completed
+
+Changed-file LSP diagnostics are recorded separately in lsp-diagnostics.txt.

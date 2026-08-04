@@ -55,9 +55,12 @@ export type TaskRunStats = {
   readonly tokens_per_second?: number
   /** Summed provider-reported spend for the run, in USD. */
   readonly cost_usd?: number
-  /** cacheRead / (input + cacheRead + cacheWrite) over the run, as a 0..1 fraction. Omitted when
-   * no turn reported a cacheable denominator (never inferred as zero). */
-  readonly cache_hit_rate?: number
+  /** cacheRead / (input + cacheRead + cacheWrite) for the latest assistant request with a nonzero
+   * denominator, as a 0..1 fraction. Running status surfaces use this to match Senpi's footer. */
+  readonly cache_hit_rate_last?: number
+  /** Sum(cacheRead) / Sum(input + cacheRead + cacheWrite) over the whole run, as a 0..1 fraction.
+   * Completed-run summaries use this aggregate. Omitted when no turn reported a denominator. */
+  readonly cache_hit_rate_run?: number
 }
 
 export type TaskNotification = {

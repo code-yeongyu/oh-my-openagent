@@ -13,7 +13,8 @@ const RUN_STATS: TaskRunStats = {
   generation_ms: 7_600,
   tokens_per_second: 118,
   cost_usd: 0.4213,
-  cache_hit_rate: 0.8712,
+  cache_hit_rate_last: 0.9123,
+  cache_hit_rate_run: 0.8712,
 }
 
 function runningRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
@@ -92,11 +93,18 @@ describe("run stats on task records", () => {
     expect(() => parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")).toThrow()
   })
 
-  test("#given a record with cost and cache hit rate #when parsed #then both fields round-trip", () => {
+  test("#given a record with explicit latest-request and whole-run cache hit rates #when parsed #then both fields round-trip", () => {
     // given
     const record = {
       ...runningRecord({ status: "completed" }),
-      run_stats: { runtime_ms: 10, turns: 1, tool_calls: 0, cost_usd: 0.4213, cache_hit_rate: 0 },
+      run_stats: {
+        runtime_ms: 10,
+        turns: 2,
+        tool_calls: 0,
+        cost_usd: 0.4213,
+        cache_hit_rate_last: 0.9,
+        cache_hit_rate_run: 0.4,
+      },
     }
 
     // when
@@ -104,7 +112,24 @@ describe("run stats on task records", () => {
 
     // then
     expect(parsed.run_stats?.cost_usd).toBe(0.4213)
-    expect(parsed.run_stats?.cache_hit_rate).toBe(0)
+    expect(parsed.run_stats?.cache_hit_rate_last).toBe(0.9)
+    expect(parsed.run_stats?.cache_hit_rate_run).toBe(0.4)
+  })
+
+  test("#given a legacy record with ambiguous cache_hit_rate #when parsed #then it is treated as the whole-run rate", () => {
+    // given
+    const record = {
+      ...runningRecord({ status: "completed" }),
+      run_stats: { runtime_ms: 10, turns: 1, tool_calls: 0, cache_hit_rate: 0.6 },
+    }
+
+    // when
+    const parsed = parseTaskRecord(JSON.parse(JSON.stringify(record)), "/tmp/record.json")
+
+    // then
+    expect(parsed.run_stats?.cache_hit_rate_run).toBe(0.6)
+    expect(parsed.run_stats?.cache_hit_rate_last).toBeUndefined()
+    expect(parsed.run_stats).not.toHaveProperty("cache_hit_rate")
   })
 
   test("#given a non-numeric cost_usd #when parsed #then parsing rejects the record", () => {

@@ -300,7 +300,8 @@ describe("task_output run stats rendering", () => {
           output_tokens: 900,
           tokens_per_second: 118,
           cost_usd: 0.4213,
-          cache_hit_rate: 0.8712,
+          cache_hit_rate_last: 0.2,
+          cache_hit_rate_run: 0.8712,
         },
       }),
     }

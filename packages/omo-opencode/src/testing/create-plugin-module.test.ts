@@ -429,20 +429,28 @@ describe("createPluginModule()", () => {
       const loadConfigChain = mock(() => ({ config: {}, messages: ["invalid config"], path: null, valid: false }))
       const showToast = mock(async () => ({}))
       const pluginModule = createTestPluginModule({ loadConfigChain, runOpenCodeStartupMigration })
+      const consoleWarn = mock(() => {})
+      const originalWarn = console.warn
+      console.warn = consoleWarn
 
-      // when
-      const hooks = await pluginModule.server({
-        directory: "/tmp/project",
-        client: { tui: { showToast } },
-      } as Parameters<typeof pluginModule.server>[0])
+      try {
+        // when
+        const hooks = await pluginModule.server({
+          directory: "/tmp/project",
+          client: { tui: { showToast } },
+        } as Parameters<typeof pluginModule.server>[0])
 
-      // then
-      expect(hooks).toBeDefined()
-      expect(showToast).toHaveBeenCalledTimes(1)
-      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
-        body: { title: "Configuration migration failed", variant: "error" },
-      })
-      expect(mockCreateManagers.mock.calls.at(-1)?.[0]?.pluginConfig).toEqual({})
+        // then
+        expect(hooks).toBeDefined()
+        expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining("legacy configuration changes were not applied"))
+        expect(showToast).toHaveBeenCalledTimes(1)
+        expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+          body: { title: "Configuration migration failed", variant: "error" },
+        })
+        expect(mockCreateManagers.mock.calls.at(-1)?.[0]?.pluginConfig).toEqual({})
+      } finally {
+        console.warn = originalWarn
+      }
     })
   })
 

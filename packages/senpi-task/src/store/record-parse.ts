@@ -74,7 +74,10 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
   const generationMs = readOptionalNumber(value, "generation_ms")
   const tokensPerSecond = readOptionalNumber(value, "tokens_per_second")
   const costUsd = readOptionalNumber(value, "cost_usd")
-  const cacheHitRate = readOptionalNumber(value, "cache_hit_rate")
+  const cacheHitRateLast = readOptionalNumber(value, "cache_hit_rate_last")
+  const cacheHitRateRun = readOptionalNumber(value, "cache_hit_rate_run")
+  const legacyCacheHitRate = readOptionalNumber(value, "cache_hit_rate")
+  const resolvedCacheHitRateRun = cacheHitRateRun ?? legacyCacheHitRate
   return {
     runtime_ms: readNumber(value, "runtime_ms"),
     turns: readNumber(value, "turns"),
@@ -84,7 +87,8 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
     ...(generationMs === undefined ? {} : { generation_ms: generationMs }),
     ...(tokensPerSecond === undefined ? {} : { tokens_per_second: tokensPerSecond }),
     ...(costUsd === undefined ? {} : { cost_usd: costUsd }),
-    ...(cacheHitRate === undefined ? {} : { cache_hit_rate: cacheHitRate }),
+    ...(cacheHitRateLast === undefined ? {} : { cache_hit_rate_last: cacheHitRateLast }),
+    ...(resolvedCacheHitRateRun === undefined ? {} : { cache_hit_rate_run: resolvedCacheHitRateRun }),
   }
 }
 

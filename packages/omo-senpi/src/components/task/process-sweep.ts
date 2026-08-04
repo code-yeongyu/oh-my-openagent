@@ -1,5 +1,4 @@
 import {
-  sweepCodegraphZombies,
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
 } from "@oh-my-opencode/utils/process-sweep"
@@ -11,15 +10,14 @@ import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 // extension session start, mirroring the task component's session-start
 // recovery chain event ("session_start"). No config keys — hygiene always
 // runs and each family self-throttles via its stamp file inside the sweep
-// functions. Mirrors the codex sweepCodegraphZombiesBestEffort pattern
-// (packages/omo-codex/plugin/components/codegraph/src/hook-sweep.ts).
+// functions. Mirrors the codex best-effort process-sweep pattern
+// (packages/omo-codex/plugin/components/ — codex hook-sweep.ts).
 
 export const SENPI_RPC_CHILD_MARKER_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 
 export type OmoFamilySweep = () => Promise<unknown>
 
 interface OmoFamilySweeps {
-  readonly sweepCodegraph: (options: { readonly log?: (message: string) => void }) => Promise<unknown>
   readonly sweepLspProxies: (options: { readonly log?: (message: string) => void }) => Promise<unknown>
   readonly sweepStaleLspDaemons: (options: {
     readonly currentVersion: string
@@ -28,7 +26,6 @@ interface OmoFamilySweeps {
 }
 
 const DEFAULT_FAMILY_SWEEPS: OmoFamilySweeps = {
-  sweepCodegraph: sweepCodegraphZombies,
   sweepLspProxies: sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemons: sweepStaleLspDaemonVersions,
 }
@@ -88,7 +85,6 @@ async function sweepOmoFamiliesBestEffort(
     ctx.logger.warn(message)
   }
   await Promise.all([
-    bestEffort("CodeGraph zombie sweep", log, () => sweeps.sweepCodegraph({ log })),
     bestEffort("lsp-daemon proxy sweep", log, () => sweeps.sweepLspProxies({ log })),
     bestEffort("lsp-daemon stale-version sweep", log, () => {
       const currentVersion = resolveLspDaemonVersion()

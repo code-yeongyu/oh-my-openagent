@@ -122,6 +122,11 @@ function buildDeps(fixture: Fixture, overrides: Partial<CodexComponentsDoctorDep
     env: {},
     platform: TEST_PLATFORM,
     arch: TEST_ARCH,
+    // The sg fixtures are byte-filled placeholders, not runnable binaries, and the resolver now
+    // requires every candidate to answer `--version` with `ast-grep`. These cases assert doctor
+    // reporting, not probe behaviour (that is pinned in packages/utils/src/ast-grep), so stand in
+    // for the probe here instead of shipping a platform-specific executable stub.
+    sgRunVersionProbeSync: () => "ast-grep 0.43.0",
     sgWhich: () => null,
     ...overrides,
   }

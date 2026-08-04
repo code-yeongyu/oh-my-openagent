@@ -25,7 +25,8 @@ export type StatusLineStats = Pick<TaskRunStats, "turns" | "tool_calls"> & {
   readonly runtime_ms?: number
   readonly tokens_per_second?: number
   readonly cost_usd?: number
-  readonly cache_hit_rate?: number
+  readonly cache_hit_rate_last?: number
+  readonly cache_hit_rate_run?: number
 }
 
 export type StatusLineInput = {
@@ -75,25 +76,34 @@ export function formatStatusTarget(input: StatusTargetInput): string | undefined
 }
 
 // The canonical grammar every live/status row shares:
-//   <identity> · <target (model)> · turn N (M tools) · <verb> · $C (CH: R%) · T tok/s
+//   <identity> · <target (model)> · turn N (M tools) · <verb> · $C · T tok/s
 export function composeStatusLine(input: StatusLineInput): string {
   const tokens = [
     input.identity,
     input.target,
     input.stats === undefined ? undefined : `turn ${input.stats.turns}${toolCountSuffix(input.stats.tool_calls)}`,
     input.verb,
-    input.stats === undefined ? undefined : formatSpend(input.stats),
+    input.stats === undefined ? undefined : formatLiveSpend(input.stats),
     input.stats?.tokens_per_second === undefined ? undefined : `${input.stats.tokens_per_second} tok/s`,
   ]
   return tokens.filter((token): token is string => typeof token === "string" && token.length > 0).join(" · ")
 }
 
-// The one compound spend token shared by every prose/live surface: `$0.4213 (CH: 87%)`, degrading
-// to `$0.4213` or `(CH: 87%)` when only one fact is known. Rendered immediately before throughput
-// so the money fact and the speed fact stay adjacent on every row.
-export function formatSpend(stats: Pick<TaskRunStats, "cost_usd" | "cache_hit_rate">): string | undefined {
-  const cost = formatCostUsd(stats.cost_usd)
-  const cacheHit = formatCacheHitPercent(stats.cache_hit_rate)
+// Running task rows keep spend compact; cache-hit rate remains available in completed-run details.
+export function formatLiveSpend(stats: Pick<TaskRunStats, "cost_usd">): string | undefined {
+  return formatCostUsd(stats.cost_usd)
+}
+
+// Completed-run summaries pair spend with the cumulative whole-run cache-hit rate.
+export function formatRunSpend(
+  stats: Pick<TaskRunStats, "cost_usd" | "cache_hit_rate_run">,
+): string | undefined {
+  return formatSpendFacts(stats.cost_usd, stats.cache_hit_rate_run)
+}
+
+function formatSpendFacts(costUsd: number | undefined, cacheHitRate: number | undefined): string | undefined {
+  const cost = formatCostUsd(costUsd)
+  const cacheHit = formatCacheHitPercent(cacheHitRate)
   if (cost === undefined) return cacheHit
   return cacheHit === undefined ? cost : `${cost} ${cacheHit}`
 }

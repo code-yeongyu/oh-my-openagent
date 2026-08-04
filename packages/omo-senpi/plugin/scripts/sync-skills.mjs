@@ -30,8 +30,19 @@ const nativeSkillSources = [
     source: join(nativeSkillsRoot, "hyperplan"),
   },
   {
+    name: "init-deep",
+    source: join(nativeSkillsRoot, "init-deep"),
+  },
+  {
     name: "ultrawork",
     source: join(nativeSkillsRoot, "ultrawork"),
+  },
+  {
+    // Senpi-local override of the shared ulw-plan (omo-opencode consumes the shared file, so the
+    // ast-grep/LSP-first rewrite cannot land there). Seeded from the fully senpi-adapted bundle
+    // output, so it already carries the review-policy overlays and compatibility banner verbatim.
+    name: "ulw-plan",
+    source: join(nativeSkillsRoot, "ulw-plan"),
   },
   {
     name: "ulw-research",
@@ -45,6 +56,7 @@ const sectionHeadingsToStrip = new Set([
   "Codex Harness Tool Compatibility",
   "Codex Tool Mapping",
   "Codex subagent reliability",
+  "Codex Subagent Reliability",
   "Subagent-dependent transition barrier",
   "Senpi Harness Tool Compatibility",
 ])
@@ -68,9 +80,10 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 
 | OpenCode example | Senpi tool to use |
 | --- | --- |
-| \`call_omo_agent(subagent_type="explore", ...)\` | \`task\` tool with category/agent matching \`.omo/omo.json\` (e.g. \`agent: "scout"\`) |
-| \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with category/agent matching \`.omo/omo.json\` (e.g. \`agent: "librarian"\`) |
-| \`task(...)\` | \`task\` tool |
+| \`call_omo_agent(subagent_type="explore", ...)\` | \`task\` tool with \`subagent_type: "explore"\` |
+| \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with \`subagent_type: "librarian"\` |
+| worker/implementation \`task(...)\` | \`task\` tool with \`category\` from the delegation router (\`quick\`, \`unspecified-low\`, \`unspecified-high\`, \`deep\`, \`ultrabrain\`, \`visual-engineering\`, \`writing\`, \`git\`); honor the plan's \`Recommended task executor category:\` line |
+| final-review / gate-reviewer \`task(...)\` | fresh \`task\` with \`category: "unspecified-high"\` (or \`"deep"\`) and an adversarial-verifier prompt; \`momus\`/\`metis\` are plan-gated curated reviewers, spawnable only while the plan gate is open |
 | \`background_output(task_id="...")\` | \`task_output\` tool with the task id |
 | \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, ...); send with \`task_send\`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
 
@@ -154,15 +167,45 @@ function applyStartWorkOverlay(content) {
   return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
 }
 
-const ulwPlanReviewOverride = `## Senpi Review Override (authoritative)
+const ulwPlanReviewOverride = `## Senpi Review Policy (authoritative)
 
-In omo-senpi the curated \`oracle\` subagent does not exist. The high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file. Ignore every "dual" review instruction, every "independent" reviewer lane, and every \`independent_reviewer\` state field below; never spawn \`task(subagent_type="oracle")\`. A momus approval whose remaining items are notes counts as approval.
+In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval.
 
 Only a plan file produced by this skill and recorded with \`review_required\` authorizes a \`momus\` or \`metis\` review. A bare \`ulw\` run without that file uses notepad self-review instead, however large the work feels.
 
 If a section below conflicts with this section, this section wins.
 
 `
+
+const ulwPlanMomusOnlyRewrites = [
+  [
+    'The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native \`momus\` reviewer subagent, and (2) an independent Oracle review via \`task(subagent_type="oracle", ...)\` on the strongest available reasoning model, in a fully isolated sub-session with normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing.',
+    'In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file.',
+  ],
+  ["### High-accuracy review (dual review)", "### High-accuracy review (momus-only in omo-senpi)"],
+  [
+    'One round = exactly ONE \`momus\` + ONE independent review, dispatched together',
+    'One round = exactly ONE \`momus\` review, dispatched',
+  ],
+  ['"independent_reviewer": "oracle",', '"independent_reviewer": null,'],
+  ['"lanes": ["momus", "independent"],', '"lanes": ["momus"],'],
+  [
+    '(all read-only, plus \`oracle\` for the high-accuracy review)',
+    '(all read-only; \`momus\` also runs the high-accuracy review)',
+  ],
+  [
+    'the dual high-accuracy review (native \`momus\` + the independent Oracle review) is now REQUIRED',
+    'the high-accuracy review (momus-only in omo-senpi) is now REQUIRED',
+  ],
+]
+
+function rewriteUlwPlanReviewToMomusOnly(content) {
+  let rewritten = content
+  for (const [source, replacement] of ulwPlanMomusOnlyRewrites) {
+    rewritten = rewritten.replaceAll(source, replacement)
+  }
+  return rewritten
+}
 
 const ulwPlanConsultationLanes = `## Senpi Design Consultation Lanes (authoritative)
 
@@ -180,13 +223,14 @@ This section is an EXPLICIT EXCEPTION to the later rule "Never dispatch with \`c
 `
 
 function applyUlwPlanOverlay(content) {
-  if (content.includes("# ulw-plan - full workflow")) {
-    return insertAfterFrontmatter(content, ulwPlanReviewOverride)
+  const rewritten = rewriteUlwPlanReviewToMomusOnly(content)
+  if (rewritten.includes("# ulw-plan - full workflow")) {
+    return insertAfterFrontmatter(rewritten, ulwPlanReviewOverride)
   }
-  if (/^#\s+ulw-plan\s*$/m.test(content)) {
-    return insertAfterFrontmatter(content, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
+  if (/^#\s+ulw-plan\s*$/m.test(rewritten)) {
+    return insertAfterFrontmatter(rewritten, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
   }
-  return content
+  return rewritten
 }
 
 function insertAfterFrontmatter(content, section) {
@@ -256,6 +300,7 @@ function applySharedTierAdaptation(skillName, content) {
     adapted = applyUlwPlanOverlay(adapted)
   }
   adapted = stripNamedSections(adapted)
+  adapted = stripForbiddenGuidanceLines(adapted)
   adapted = insertSenpiCompatibilityGuidance(adapted)
   return normalizeBlankLines(adapted)
 }

@@ -1,0 +1,12 @@
+Command:
+  cd /Users/yeongyu/local-workspaces/omo-wt/fix/team-create-inline-precedence
+  bun test ./packages/senpi-task/src/tools/team/lifecycle-precedence.test.ts
+
+Observed after production change:
+  1 pass
+  0 fail
+  2 expect() calls
+
+Behavior proven:
+  A call containing stale team_name plus a complete inline_spec returns
+  details.kind=created and forwards only { inlineSpec } to the service.
