@@ -85,6 +85,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "服务不可用",         // "service unavailable"
   "server_error",
   "an error occurred while processing",
+  "upstream request failed",
 ]
 
 /**
