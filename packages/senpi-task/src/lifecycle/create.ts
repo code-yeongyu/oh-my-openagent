@@ -3,9 +3,9 @@ import { destroyResidentTask } from "./destroy"
 import type { DestroyCause, LifecycleDeps } from "./port"
 import { admitResident } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"
-import { teardownOnSessionShutdown } from "./shutdown"
+import { suspendOnSessionShutdown } from "./shutdown"
 import { cleanupExpiredRecords } from "./ttl"
-import type { TaskLifecycle } from "./types"
+import type { SuspendInput, TaskLifecycle } from "./types"
 
 /**
  * Bind the lifecycle operations to a store + residency registry + config. The returned object is the
@@ -17,8 +17,8 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
   return {
     destroyResidentTask: (taskId: string, cause: DestroyCause) => destroyResidentTask(context, taskId, cause),
     admitResident: (parentSessionId: string) => admitResident(context, parentSessionId),
-    reconcileOnSessionStart: () => reconcileOnSessionStart(context),
+    reconcileOnSessionStart: (parentSessionId?: string) => reconcileOnSessionStart(context, parentSessionId),
     cleanupExpiredRecords: () => cleanupExpiredRecords(context),
-    teardownOnSessionShutdown: () => teardownOnSessionShutdown(context),
+    suspendOnSessionShutdown: (input: SuspendInput) => suspendOnSessionShutdown(context, input),
   }
 }

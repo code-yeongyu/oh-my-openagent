@@ -44,6 +44,7 @@ export function makeRecord(overrides: Partial<TaskRecord>): TaskRecord {
     depth: 1,
     execution_mode: "in-process",
     model: "anthropic/claude",
+    notify_on_terminal: false,
   })
   return { ...base, ...overrides }
 }

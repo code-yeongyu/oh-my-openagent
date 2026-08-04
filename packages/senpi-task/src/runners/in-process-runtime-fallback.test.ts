@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import { resolveCategory } from "../category"
@@ -23,6 +27,7 @@ function baseSpec(): ChildSpec {
   return {
     taskId: "task-runtime-fallback",
     cwd: process.cwd(),
+    sessionDir: mkdtempSync(join(tmpdir(), "senpi-task-runtime-fallback-")),
     depth: 0,
     parentSessionId: "parent-1",
     rootSessionId: "root-1",

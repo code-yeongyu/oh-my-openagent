@@ -32,6 +32,7 @@ try {
             depth: 0,
             execution_mode: "in-process",
             model: "test/model",
+            notify_on_terminal: false,
           },
           0x123 * 0x10000,
         ).task_id,

@@ -28,7 +28,7 @@ const stagedRuntimeManifest = join(pluginRoot, "runtime", "ast-grep-mcp", "manif
 const stageScript = join(pluginRoot, "scripts", "stage-ast-grep-mcp-runtime.mjs")
 const defaultEvidenceDir = join(repoRoot, ".omo", "evidence", "20260803-senpi-ast-grep-mcp")
 const expectedRawTools = ["search", "rewrite", "scan"]
-const expectedSenpiTools = expectedRawTools.map((name) => `mcp_ast_grep_${name}`)
+const expectedSenpiTools = expectedRawTools.map((name) => `mcp__ast_grep_${name}`)
 const realAgentDir = join(homedir(), ".senpi", "agent")
 const timestamp = () => new Date().toISOString()
 

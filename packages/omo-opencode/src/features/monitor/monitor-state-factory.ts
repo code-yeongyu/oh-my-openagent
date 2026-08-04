@@ -6,6 +6,7 @@ import { LineStream } from "./line-stream"
 import type { DEFAULT_MONITOR_CONFIG, InternalMonitorState, MonitorInjector, MonitorManagerDeps, MonitorPromptClient } from "./manager-internals"
 import {
   MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS,
+  MONITOR_OUTPUT_MAX_ACTIVE_DEFER_MS,
   MONITOR_OUTPUT_PENDING_RETRY_MS,
   MONITOR_OUTPUT_POST_DISPATCH_HOLD_MS,
   MONITOR_OUTPUT_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
@@ -92,7 +93,7 @@ export function observeProcessExit(
       state.record.signal = result.signal
     }
     state.record.counters = state.ring.getCounters()
-    state.batcher.flushNow()
+    state.batcher.flushNow({ allowEmpty: true })
     state.batcher.destroy()
     state.pipeline.stop()
     void state.injector.flushMonitor(state.record.id).catch((flushError) => {
@@ -108,7 +109,7 @@ export function observeProcessExit(
     }
 
     state.record.status = "failed"
-    state.batcher.flushNow()
+    state.batcher.flushNow({ allowEmpty: true })
     state.batcher.destroy()
     state.pipeline.stop()
     void state.injector.flushMonitor(state.record.id).catch((flushError) => {
@@ -157,6 +158,7 @@ export function createMonitorInjector(
     acceptedMessageSkewMs: MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS,
     userMessageInProgressWindowMs: MONITOR_OUTPUT_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
     postDispatchHoldMs: MONITOR_OUTPUT_POST_DISPATCH_HOLD_MS,
+    maxActiveDeferMs: MONITOR_OUTPUT_MAX_ACTIVE_DEFER_MS,
     scheduleFlush,
   })
 }

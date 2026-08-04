@@ -11,7 +11,7 @@ export interface AstGrepComponentOptions {
 }
 
 const AST_GREP_COMPONENT_NAME = "ast-grep"
-const AST_GREP_MCP_SERVER_NAME = "ast_grep"
+const AST_GREP_MCP_SERVER_NAME = "_ast_grep"
 const PROJECT_CWD_ENV = "OMO_AST_GREP_PROJECT_CWD"
 
 export function createAstGrepComponent(options: AstGrepComponentOptions = {}): OmoSenpiComponent {

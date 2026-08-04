@@ -21,6 +21,7 @@ test("#given a record with fallback attempts #when result details are built #the
     depth: 0,
     execution_mode: "in-process",
     model: "quotio-openai/gpt-5.6-luna-fast",
+    notify_on_terminal: false,
     fallback_attempts: fallbackAttempts,
   }, 1)
 
@@ -40,6 +41,7 @@ test("#given a record with a task_summary #when result details are built #then t
     depth: 0,
     execution_mode: "in-process",
     model: "quotio-openai/gpt-5.6-luna-fast",
+    notify_on_terminal: false,
   }, 1)
 
   // when

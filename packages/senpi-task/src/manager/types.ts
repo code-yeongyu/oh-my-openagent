@@ -29,10 +29,19 @@ export type ManagedStartSpec = {
   readonly model?: string
   readonly requestedModel?: ResolvedModelRecord
   readonly fallbackModels?: readonly ResolvedModelRecord[]
+  // The canonical resolved model (provider + model_id) chosen at plan time. Resume-time resolution
+  // matches on this pair - never on the human display string, which need not be a registry id.
+  readonly resolvedModel?: ResolvedModelRecord
   readonly variant?: string
   readonly agentType?: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
+  // Names of tools the child must NOT get (the agent definition's disallowedTools), applied through
+  // senpi's excludeTools so a resumed child never comes back with a wider tool surface.
+  readonly toolDenylist?: readonly string[]
+  // Names of the member-scoped ToolDefinitions, persisted on spawn_spec so a respawn can re-resolve
+  // the executable definitions against the live parent registries.
+  readonly memberScopedToolNames?: readonly string[]
   readonly memberScopedTools?: readonly ToolDefinition[]
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
@@ -40,6 +49,9 @@ export type ManagedStartSpec = {
 
 export type ManagedRunner = {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle>
+  // Rebuild a persisted child from its session transcript without replaying its prompt. Optional
+  // until the mode adapters grow their resume paths (todo 10); start-only fakes keep compiling.
+  resume?(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle>
 }
 
 export type ManagerStartSpec = {
@@ -74,6 +86,8 @@ export type ResolvedChildPlan = {
   readonly category?: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
+  // The resolved agent's disallowedTools, threaded onto the record as tool_deny.
+  readonly toolDenylist?: readonly string[]
   readonly promptAppend?: string
   readonly allowedSubagents?: readonly string[]
   readonly maxDepth?: number

@@ -32,6 +32,7 @@ import {
   SYNC_SCRIPT,
 } from "./task-e2e-scenarios.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
+import { runTaskResumeScenarios } from "./task-resume-e2e.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -151,7 +152,7 @@ function runNegativeFlow(senpiBin, checks, capture, pids) {
   return scenario.sandbox
 }
 
-function main() {
+async function main() {
   const configuredOutDir = process.env.TASK_E2E_OUT_DIR?.trim()
   const outDir = configuredOutDir ? resolve(configuredOutDir) : undefined
   const beforeDigest = digestDirectory(realSenpiAgentDir)
@@ -171,6 +172,8 @@ function main() {
     for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) {
       sandboxes.push(runner(senpiBin, checks, capture, pids))
     }
+    // Plan todo 22: quit->resume revival scenarios live in their own module (this driver is oversize).
+    sandboxes.push(...await runTaskResumeScenarios({ senpiBin, checks, capture, pids, outDir }))
   } finally {
     for (const pid of pids) if (isAlive(pid)) killTree(pid)
   }
@@ -326,5 +329,5 @@ function runSelfTest() {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.includes("--self-test")) runSelfTest()
-  else main()
+  else await main()
 }

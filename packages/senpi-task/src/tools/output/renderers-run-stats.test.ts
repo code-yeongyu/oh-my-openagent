@@ -20,6 +20,7 @@ describe("task_output run stats rendering", () => {
       snapshot: {
         task_id: "st_done",
         status: "completed",
+        residency_state: "resident",
         execution_mode: "in-process",
         model: "raw-model",
         parent_session_id: "session-parent",
