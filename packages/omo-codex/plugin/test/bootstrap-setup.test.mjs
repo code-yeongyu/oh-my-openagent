@@ -173,6 +173,24 @@ test("#given shared plugin data from another CODEX_HOME #when an Orca runtime ha
 	});
 });
 
+test("#given missing bootstrap state #when an Orca runtime has a bundled explorer copy #then the exact bundled duplicate is removed", async () => {
+	await withSetupFixture(async (fixture) => {
+		await runWorkerSetup(setupOptions(fixture));
+		await rm(join(fixture.pluginData, "bootstrap", "agents-stage"), { force: true, recursive: true });
+		const orcaHome = join(fixture.root, "orca-codex-home");
+		await mkdir(join(orcaHome, "agents"), { recursive: true });
+		await writeFile(
+			join(orcaHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
+		);
+		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML);
+
+		await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
+
+		await assert.rejects(() => stat(join(orcaHome, "agents", "explorer.toml")), { code: "ENOENT" });
+	});
+});
+
 test("#given a config.toml with no pre-existing agent entries #when the worker setup runs #then all bundled registrations are written", async () => {
 	await withSetupFixture(async (fixture) => {
 		const outcome = await runWorkerSetup(setupOptions(fixture));

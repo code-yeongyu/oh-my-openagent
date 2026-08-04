@@ -1,5 +1,5 @@
 import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
 // inlines the installer source modules into dist/cli.js so PLUGIN_ROOT ships
@@ -91,16 +91,14 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		// first: bootstrap must never persist anything under PLUGIN_ROOT (the
 		// Codex-managed marketplace cache).
 		const stageRoot = join(options.pluginData, "bootstrap", "agents-stage");
-		const previouslyInstalledAgents = await readInstalledAgentPaths(stageRoot);
 		const previouslyStagedAgentContents = await readStagedAgentContents(stageRoot);
+		const bundledAgentContents = await readStagedAgentContents(options.pluginRoot);
 		const existingConfig = await readConfigIfPresent(join(options.codexHome, "config.toml"));
 		const foreignAgentFiles = await stageBundledAgents(options.pluginRoot, stageRoot, existingConfig);
 		for (const agentFile of foreignAgentFiles) {
 			const agentPath = join(agentsTarget, agentFile);
-			if (
-				hasPreviouslyInstalledAgent(previouslyInstalledAgents, agentFile) &&
-				(await matchesAgentContent(agentPath, previouslyStagedAgentContents.get(agentFile)))
-			) {
+			const expectedContent = previouslyStagedAgentContents.get(agentFile) ?? bundledAgentContents.get(agentFile);
+			if (await matchesAgentContent(agentPath, expectedContent)) {
 				await rm(agentPath, { force: true });
 			}
 		}
@@ -157,26 +155,6 @@ async function stageBundledAgents(
 	return foreignAgentFiles;
 }
 
-const AGENT_MANIFEST = ".installed-agents.json";
-
-async function readInstalledAgentPaths(stageRoot: string): Promise<ReadonlySet<string>> {
-	try {
-		const parsed: unknown = JSON.parse(await readFile(join(stageRoot, AGENT_MANIFEST), "utf8"));
-		if (!isRecord(parsed) || !Array.isArray(parsed["agents"])) return new Set();
-		return new Set(parsed["agents"].filter((path): path is string => typeof path === "string"));
-	} catch (error) {
-		if (errorCode(error) === "ENOENT") return new Set();
-		throw error;
-	}
-}
-
-function hasPreviouslyInstalledAgent(previouslyInstalledAgents: ReadonlySet<string>, agentFile: string): boolean {
-	for (const agentPath of previouslyInstalledAgents) {
-		if (basename(agentPath) === agentFile) return true;
-	}
-	return false;
-}
-
 async function readStagedAgentContents(stageRoot: string): Promise<ReadonlyMap<string, string>> {
 	const contents = new Map<string, string>();
 	const componentsRoot = join(stageRoot, "components");
@@ -197,10 +175,6 @@ async function matchesAgentContent(path: string, expectedContent: string | undef
 		if (errorCode(error) === "ENOENT") return false;
 		throw error;
 	}
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function updateConfigStep(
