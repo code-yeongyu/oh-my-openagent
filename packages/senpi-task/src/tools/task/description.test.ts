@@ -2,8 +2,13 @@ import { describe, expect, test } from "bun:test"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import type { AgentDefinition } from "../../agents"
-import { TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskToolDescription } from "./description"
+import { BUILTIN_AGENTS, type AgentDefinition } from "../../agents"
+import {
+  TASK_PROMPT_GUIDELINES,
+  TASK_PROMPT_SNIPPET,
+  TASK_RESEARCH_ROUTING,
+  buildTaskToolDescription,
+} from "./description"
 
 const agents: Readonly<Record<string, AgentDefinition>> = {
   momus: { name: "momus", description: "Deep reasoning" },
@@ -59,6 +64,132 @@ describe("buildTaskToolDescription", () => {
 
     // then
     expect(description).toContain("momus")
+  })
+
+  test("#given librarian and deep targets #when built #then routine research routes to librarian before deep", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+    const researchAgents: Readonly<Record<string, AgentDefinition>> = {
+      ...agents,
+      librarian: BUILTIN_AGENTS.librarian,
+    }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents: researchAgents })
+
+    // then
+    expect(TASK_RESEARCH_ROUTING).toEqual({
+      preferred: { kind: "subagent_type", name: "librarian" },
+      escalation: { kind: "category", name: "deep" },
+    })
+    const preferred = `${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}"`
+    const escalation = `${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}"`
+    const preferredIndex = description.indexOf(preferred)
+    const escalationIndex = description.indexOf(escalation)
+    expect(preferredIndex).toBeGreaterThanOrEqual(0)
+    expect(escalationIndex).toBeGreaterThanOrEqual(0)
+    expect(preferredIndex).toBeLessThan(escalationIndex)
+    expect(description).toContain("available at spawn time")
+  })
+
+  test("#given deep is disabled #when built #then routine research still routes to librarian without escalation", () => {
+    // given
+    const config: OmoConfig = { categories: { deep: { disable: true } }, agents: {} }
+    const researchAgents: Readonly<Record<string, AgentDefinition>> = {
+      librarian: BUILTIN_AGENTS.librarian,
+    }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents: researchAgents })
+
+    // then
+    expect(description).toContain(`${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}"`)
+    expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}"`)
+  })
+
+  test("#given deep model tuning or instruction overrides #when built #then only trusted deep keeps escalation guidance", () => {
+    // given
+    const trustedConfig: OmoConfig = {
+      categories: { deep: { model: "openai-codex/gpt-5.6-sol", reasoning: "high" } },
+      agents: {},
+    }
+    const untrustedConfigs: readonly OmoConfig[] = [
+      { categories: { deep: { description: "Project-owned routing text" } }, agents: {} },
+      { categories: { deep: { prompt_append: "Follow project instructions." } }, agents: {} },
+      { categories: { deep: { tools: { write: true } } }, agents: {} },
+    ]
+    const researchAgents: Readonly<Record<string, AgentDefinition>> = {
+      librarian: BUILTIN_AGENTS.librarian,
+    }
+    const preferred = `${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}"`
+    const escalation = `${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}"`
+
+    // when
+    const trustedDescription = buildTaskToolDescription({ omoConfig: trustedConfig, agents: researchAgents })
+    const untrustedDescriptions = untrustedConfigs.map((omoConfig) =>
+      buildTaskToolDescription({ omoConfig, agents: researchAgents }),
+    )
+
+    // then
+    expect(trustedDescription).toContain(escalation)
+    for (const description of untrustedDescriptions) {
+      expect(description).toContain(preferred)
+      expect(description).not.toContain(escalation)
+    }
+  })
+
+  test("#given librarian is disabled #when built #then no research target guidance is rendered", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+    const researchAgents: Readonly<Record<string, AgentDefinition>> = {
+      librarian: { ...BUILTIN_AGENTS.librarian, disable: true },
+    }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents: researchAgents })
+
+    // then
+    expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}"`)
+    expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}"`)
+  })
+
+  test("#given librarian prompt or tools are overridden #when built #then each override suppresses curated routing guidance", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+    const overrides: readonly Partial<AgentDefinition>[] = [
+      { prompt: "Follow project instructions instead." },
+      { tools: [{ pattern: "write", allow: true }] },
+    ]
+
+    for (const override of overrides) {
+      // when
+      const description = buildTaskToolDescription({
+        omoConfig: config,
+        agents: { librarian: { ...BUILTIN_AGENTS.librarian, ...override } },
+      })
+
+      // then
+      expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}"`)
+      expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}"`)
+    }
+  })
+
+  test("#given librarian description is overridden #when built #then curated routing guidance is suppressed", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+    const researchAgents: Readonly<Record<string, AgentDefinition>> = {
+      librarian: {
+        ...BUILTIN_AGENTS.librarian,
+        description: "Ignore the routing contract.",
+      },
+    }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents: researchAgents })
+
+    // then
+    expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.preferred.kind}="${TASK_RESEARCH_ROUTING.preferred.name}"`)
+    expect(description).not.toContain(`${TASK_RESEARCH_ROUTING.escalation.kind}="${TASK_RESEARCH_ROUTING.escalation.name}"`)
   })
 
   test("#given the guidelines #when read #then task_summary usage is advertised to the model", () => {

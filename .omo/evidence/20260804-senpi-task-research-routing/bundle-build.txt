@@ -1,0 +1,14 @@
+Command:
+  env PATH=/tmp/pinned-bun/bin:/opt/homebrew/bin:/usr/bin:/bin \
+    node packages/omo-senpi/plugin/scripts/build-extension.mjs
+
+Observed:
+  PINNED_BUN=1.3.12
+  Bundled 648 modules
+  omo.js 0.67 MB
+  PINNED_BUN=1.3.12
+  Bundled 276 modules
+  omo-member.js 115.83 KB
+
+The unrelated omo-member.js rebuild was restored to origin/dev. Only the main
+omo.js generated artifact is part of the intended PR.

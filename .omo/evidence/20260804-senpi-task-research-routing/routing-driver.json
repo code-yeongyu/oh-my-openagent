@@ -1,0 +1,10 @@
+{
+  "result": "PASS",
+  "preferred": "subagent_type=\"librarian\"",
+  "escalation": "category=\"deep\"",
+  "preferredBeforeEscalation": true,
+  "deepUnavailablePreferredRetained": true,
+  "unavailableAgentSuppressed": true,
+  "overriddenLibrarianSuppressed": true,
+  "overriddenDeepEscalationSuppressed": true
+}
