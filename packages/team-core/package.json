@@ -37,6 +37,10 @@
       "types": "./src/team-layout-tmux/index.ts",
       "import": "./src/team-layout-tmux/index.ts"
     },
+    "./team-layout-herdr": {
+      "types": "./src/team-layout-herdr/index.ts",
+      "import": "./src/team-layout-herdr/index.ts"
+    },
     "./*": {
       "types": "./src/*.ts",
       "import": "./src/*.ts"
@@ -48,6 +52,7 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/herdr-core": "workspace:*",
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "zod": "^4.4.3"

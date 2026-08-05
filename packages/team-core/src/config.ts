@@ -3,6 +3,8 @@ import * as z from "zod"
 export const TeamModeConfigSchema = z.object({
   enabled: z.boolean().default(false),
   tmux_visualization: z.boolean().default(false),
+  /** Multiplexer backend for TeamMode visualization: "auto" picks herdr when inside herdr, otherwise tmux. */
+  multiplexer: z.enum(["auto", "tmux", "herdr"]).default("auto"),
   max_parallel_members: z.number().int().min(1).max(8).default(4),
   max_members: z.number().int().min(1).max(8).default(8),
   max_messages_per_run: z.number().int().min(1).default(10000),

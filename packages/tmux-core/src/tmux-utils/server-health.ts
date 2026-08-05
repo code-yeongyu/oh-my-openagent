@@ -59,12 +59,12 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 		const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
 		try {
-			const response = await fetchImplementation(healthUrl, {
-				signal: controller.signal,
-			}).catch(() => null)
+			// opencode exposes `/health` (returns {"ok":true}); older builds used
+			// `/global/health`. Probe both so the check works against either.
+			const response = await probeServerHealth(fetchImplementation, serverUrl, controller.signal)
 			clearTimeout(timeout)
 
-			if (response?.ok) {
+			if (response) {
 				if (state) {
 					state.serverCheckUrl = serverUrl
 					state.serverAvailable = true
@@ -83,6 +83,19 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 		}
 	}
 
+	return false
+}
+
+async function probeServerHealth(
+	fetchImplementation: typeof fetch,
+	serverUrl: string,
+	signal: AbortSignal,
+): Promise<boolean> {
+	for (const path of ["/health", "/global/health"]) {
+		const url = new URL(path, serverUrl).toString()
+		const response = await fetchImplementation(url, { signal }).catch(() => null)
+		if (response?.ok) return true
+	}
 	return false
 }
 

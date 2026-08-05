@@ -336,6 +336,8 @@ describe("team-runtime shutdown", () => {
     const deps = {
       canVisualize: () => true,
       removeTeamLayout: async () => { throw new Error("layout failed") },
+      canVisualizeHerdr: () => false,
+      removeHerdrTeamLayout: async () => { throw new Error("layout failed") },
       log: logMock,
     } satisfies DeleteTeamDeps
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
@@ -349,7 +351,7 @@ describe("team-runtime shutdown", () => {
     // when
     const result = await deleteTeam(
       fixture.teamRunId,
-      { ...fixture.config, tmux_visualization: true },
+      { ...fixture.config, tmux_visualization: true, multiplexer: "tmux" },
       { getServerUrl: () => "http://localhost" } as never,
       undefined,
       { force: true },
@@ -378,6 +380,8 @@ describe("team-runtime shutdown", () => {
     const deps = {
       canVisualize: () => true,
       removeTeamLayout: removeLayoutMock,
+      canVisualizeHerdr: () => false,
+      removeHerdrTeamLayout: removeLayoutMock,
       log: () => {},
     } satisfies DeleteTeamDeps
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {

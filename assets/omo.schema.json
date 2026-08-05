@@ -10803,6 +10803,15 @@
               "default": false,
               "type": "boolean"
             },
+            "multiplexer": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "tmux",
+                "herdr"
+              ]
+            },
             "max_parallel_members": {
               "default": 4,
               "type": "integer",
@@ -10858,6 +10867,7 @@
           "required": [
             "enabled",
             "tmux_visualization",
+            "multiplexer",
             "max_parallel_members",
             "max_members",
             "max_messages_per_run",
@@ -24140,6 +24150,15 @@
                     "default": false,
                     "type": "boolean"
                   },
+                  "multiplexer": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "tmux",
+                      "herdr"
+                    ]
+                  },
                   "max_parallel_members": {
                     "default": 4,
                     "type": "integer",
@@ -24195,6 +24214,7 @@
                 "required": [
                   "enabled",
                   "tmux_visualization",
+                  "multiplexer",
                   "max_parallel_members",
                   "max_members",
                   "max_messages_per_run",

@@ -2,6 +2,14 @@ import type { OhMyOpenCodeConfig } from "./config"
 import type { ModelCacheState } from "./plugin-state"
 import type { PluginContext, TmuxConfig } from "./plugin/types"
 
+import { setTeamCoreLogger } from "@oh-my-opencode/team-core"
+
+// Wire the team-core swappable logger to the OMO logger so team-layout modules
+// (tmux/herdr) surface their failure/skip decisions in the plugin log. This must
+// run at plugin startup — the wiring used to live in features/team-mode/index.ts,
+// which nothing imports (dead module), leaving team-core logs as no-ops.
+setTeamCoreLogger(log)
+
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
 import type { MonitorManager } from "./features/monitor"

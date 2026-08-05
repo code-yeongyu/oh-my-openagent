@@ -144,6 +144,13 @@
         "diff": "^9.0.0",
       },
     },
+    "packages/herdr-core": {
+      "name": "@oh-my-opencode/herdr-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+    },
     "packages/lsp-core": {
       "name": "@oh-my-opencode/lsp-core",
       "version": "0.1.0",
@@ -377,6 +384,7 @@
       "name": "@oh-my-opencode/team-core",
       "version": "0.1.0",
       "dependencies": {
+        "@oh-my-opencode/herdr-core": "workspace:*",
         "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "zod": "^4.4.3",
@@ -685,6 +693,8 @@
     "@oh-my-opencode/git-bash-mcp": ["@oh-my-opencode/git-bash-mcp@workspace:packages/git-bash-mcp"],
 
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
+
+    "@oh-my-opencode/herdr-core": ["@oh-my-opencode/herdr-core@workspace:packages/herdr-core"],
 
     "@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@workspace:packages/lsp-core"],
 

@@ -163,8 +163,8 @@ describe("isServerRunning", () => {
     await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
     await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
 
-    // then - should call fetch 4 times (2 attempts per call, 2 calls)
-    expect(fetchMock.calls.length).toBe(4)
+    // then - should call fetch 8 times (2 health paths × 2 attempts per call, 2 calls)
+    expect(fetchMock.calls.length).toBe(8)
   })
 
   test("uses different cache for different URLs", async () => {
