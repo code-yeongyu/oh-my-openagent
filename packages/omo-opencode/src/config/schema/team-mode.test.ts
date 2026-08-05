@@ -17,6 +17,7 @@ describe("TeamModeConfigSchema", () => {
       expect(result).toEqual({
         enabled: false,
         tmux_visualization: false,
+        multiplexer: "auto",
         max_parallel_members: 4,
         max_members: 8,
         max_messages_per_run: 10000,
