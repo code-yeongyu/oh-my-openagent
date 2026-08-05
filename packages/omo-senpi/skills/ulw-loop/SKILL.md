@@ -35,7 +35,7 @@ This skill is intentionally compact. The full workflow lives in `references/full
 
 ## Team mode: decide it, do not default to it
 
-Solo execution with parallel background `task` workers is the default. A team (`team_create`) adds per-member briefing, shared-state, and relay overhead, so it must be paid for by the work's shape. Decide ONCE, when the plan's work units are known, and record the verdict plus its reason in the notepad.
+Solo execution with parallel background `task` workers is the default: fan independent units out in one batched spawn, each routed to the `category` (or configured `subagent_type`) that fits it, with scopes cut so no two workers write the same files. A team (`team_create`) adds per-member briefing, shared-state, and relay overhead, so it must be paid for by the work's shape. Decide ONCE, when the plan's work units are known, and record the verdict plus its reason in the notepad.
 
 Stand up a team when BOTH hold:
 

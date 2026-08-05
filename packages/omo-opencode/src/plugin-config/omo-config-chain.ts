@@ -66,7 +66,7 @@ function recordFields(value: unknown, fields: readonly string[]): Record<string,
 function modelInput(view: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const agents = isPlainRecord(view.agents)
     ? Object.fromEntries(Object.entries(view.agents).flatMap(([name, definition]) => {
-      const fields = recordFields(definition, ["description", "prompt", "model", "variant", "reasoningEffort", "tools", "temperature", "disable"])
+      const fields = recordFields(definition, ["description", "prompt", "model", "models", "variant", "reasoningEffort", "tools", "temperature", "disable"])
       return fields === undefined ? [] : [[name, fields]]
     }))
     : undefined
