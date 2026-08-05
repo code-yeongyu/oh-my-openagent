@@ -17,6 +17,7 @@ import {
   getRuntimeFallbackStatusCode,
 } from "./runtime-fallback-error-shape"
 import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "./runtime-fallback-retryable-patterns"
+import { isExplicitUserAbortSignal } from "./model-abort-signal"
 
 export type RuntimeFallbackErrorType =
   | "missing_api_key"
@@ -25,6 +26,7 @@ export type RuntimeFallbackErrorType =
   | "quota_exceeded"
   | "context_overflow"
   | "abort"
+  | "stream_failure"
 
 export interface RuntimeFallbackRetryOptions {
   onUnsafeRetryableSignalRejected?: (details: {
@@ -48,8 +50,12 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
   const message = getRuntimeFallbackErrorMessage(error)
   const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
 
-  if (errorName?.includes("messageabortederror") || errorName?.includes("aborterror")) {
-    return "abort"
+  if (
+    errorName?.includes("messageabortederror") ||
+    errorName?.includes("aborterror") ||
+    errorName?.includes("responseaborted")
+  ) {
+    return isExplicitUserAbortSignal(message) ? "abort" : "stream_failure"
   }
 
   if (errorName === "contextoverflowerror") {
@@ -118,6 +124,8 @@ export function isRuntimeFallbackRetryableError(
 
   // OpenCode starts native compaction for this error; fallback would abort that compaction on its timeout.
   if (errorType === "abort" || errorType === "context_overflow") return false
+
+  if (errorType === "stream_failure") return true
 
   if (
     errorType === "missing_api_key" ||

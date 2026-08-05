@@ -191,3 +191,93 @@ describe("runtime fallback error classifier", () => {
     expect(signal).toEqual({ signal: retryInfo.summary })
   })
 })
+
+describe("mid-stream MessageAbortedError (issue #6424)", () => {
+  test("classifies mid-stream stream failures as retryable stream_failure", () => {
+    //#given
+    const cases = [
+      {
+        label: "MessageAbortedError with connection reset message",
+        error: { name: "MessageAbortedError", message: "Connection terminated unexpectedly" },
+        expectedType: "stream_failure",
+        expectedRetryable: true,
+      },
+      {
+        label: "AbortError with ended stream message",
+        error: { name: "AbortError", message: "stream ended" },
+        expectedType: "stream_failure",
+        expectedRetryable: true,
+      },
+      {
+        label: "ResponseAborted with closed stream message",
+        error: { name: "ResponseAborted", message: "server closed the stream" },
+        expectedType: "stream_failure",
+        expectedRetryable: true,
+      },
+      {
+        label: "MessageAbortedError without any message",
+        error: { name: "MessageAbortedError" },
+        expectedType: "stream_failure",
+        expectedRetryable: true,
+      },
+      {
+        label: "abort-family name takes precedence over quota message branch",
+        error: { name: "MessageAbortedError", message: "Quota exceeded for this billing period" },
+        expectedType: "stream_failure",
+        expectedRetryable: true,
+      },
+    ] as const
+
+    //#when
+    const results = cases.map(({ error, ...metadata }) => {
+      // widen to unknown: "stream_failure" is not yet part of RuntimeFallbackErrorType,
+      // so a typed matcher cannot accept the expected literal until the fix lands
+      const actualType: unknown = classifyRuntimeFallbackError(error)
+      return {
+        ...metadata,
+        actualType,
+        actualRetryable: isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES),
+      }
+    })
+
+    //#then
+    for (const result of results) {
+      expect(result.actualType, result.label).toBe(result.expectedType)
+      expect(result.actualRetryable, result.label).toBe(result.expectedRetryable)
+    }
+  })
+
+  test("keeps explicit user cancellation non-retryable", () => {
+    //#given
+    const error = { name: "MessageAbortedError", message: "The user aborted this request." }
+
+    //#when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    //#then
+    expect(type).toBe("abort")
+    expect(retryable).toBe(false)
+  })
+
+  test("preserves context overflow and quota exceeded classification", () => {
+    //#given
+    const contextOverflow = {
+      name: "ContextOverflowError",
+      data: { message: "Your input exceeds the context window of this model. Please adjust your input and try again." },
+    }
+    const quotaExceeded = { name: "QuotaExceededError", message: "Quota exceeded" }
+
+    //#when
+    const contextType = classifyRuntimeFallbackError(contextOverflow)
+    const contextRetryable = isRuntimeFallbackRetryableError(contextOverflow, DEFAULT_RETRY_CODES)
+    const quotaType = classifyRuntimeFallbackError(quotaExceeded)
+    const quotaRetryable = isRuntimeFallbackRetryableError(quotaExceeded, DEFAULT_RETRY_CODES)
+
+    //#then
+    expect(contextType).toBe("context_overflow")
+    expect(contextRetryable).toBe(false)
+    expect(quotaType).toBe("quota_exceeded")
+    expect(quotaRetryable).toBe(true)
+  })
+})
