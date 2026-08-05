@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { shouldRetryError as realShouldRetryError } from "@oh-my-opencode/model-core"
 import { tryFallbackRetry, TeamModeFallbackError, type FallbackRetryHandlerDeps } from "./fallback-retry-handler"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ProviderModelsCache } from "../../shared/connected-providers-cache"
@@ -513,6 +514,47 @@ describe("tryFallbackRetry", () => {
       const retryInput = args.queuesByKey.get(key)?.[0]?.input
       expect(retryInput?.teamRunId).toBe("team-run-abc")
       expect(retryInput?.onSessionCreated).toBe(onSessionCreated)
+    })
+  })
+
+  describe("mid-stream MessageAbortedError driven by the real shouldRetryError (issue #6424)", () => {
+    test("schedules a fallback retry for a mid-stream MessageAbortedError", async () => {
+      //#given
+      const args = createDefaultArgs()
+      args.errorInfo = { name: "MessageAbortedError", message: "Connection terminated unexpectedly" }
+      args.deps = { ...retryHandlerDeps, shouldRetryError: realShouldRetryError }
+
+      //#when
+      const result = await tryFallbackRetry(args)
+
+      //#then
+      expect(result).toBe(true)
+      expect(args.task.status).toBe("pending")
+      expect(args.task.attemptCount).toBe(1)
+      expect(args.task.model?.providerID).toBe("provider-a")
+      expect(args.task.model?.modelID).toBe("fallback-model-1")
+      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
+      const queue = args.queuesByKey.get(key)
+      expect(queue).toBeDefined()
+      expect(queue!.length).toBe(1)
+      expect(args.processKey).toHaveBeenCalledWith(key)
+    })
+
+    test("does not schedule a fallback retry for an explicit user cancellation", async () => {
+      //#given
+      const args = createDefaultArgs()
+      args.errorInfo = { name: "MessageAbortedError", message: "The user aborted this request." }
+      args.deps = { ...retryHandlerDeps, shouldRetryError: realShouldRetryError }
+
+      //#when
+      const result = await tryFallbackRetry(args)
+
+      //#then
+      expect(result).toBe(false)
+      expect(args.task.status).toBe("error")
+      expect(args.task.attemptCount).toBe(0)
+      expect(args.task.model?.providerID).toBe("provider-a")
+      expect(args.task.model?.modelID).toBe("original-model")
     })
   })
 })
