@@ -17,6 +17,7 @@ const corePackagePaths: readonly string[] = [
   "packages/mcp-client-core",
   "packages/comment-checker-core",
   "packages/hashline-core",
+  "packages/herdr-core",
   "packages/tmux-core",
   "packages/team-core",
   "packages/openclaw-core",

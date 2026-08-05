@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-06-13. Total shim exports found: 316.
+Snapshot date: 2026-08-05. Total shim exports found: 320.
 
 ## Aggregate By Target Package
 
@@ -28,7 +28,7 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `@oh-my-opencode/openclaw-core` | 30 |
 | `@oh-my-opencode/rules-engine` | 4 |
 | `@oh-my-opencode/skills-loader-core` | 65 |
-| `@oh-my-opencode/team-core` | 45 |
+| `@oh-my-opencode/team-core` | 49 |
 | `@oh-my-opencode/tmux-core` | 3 |
 | `@oh-my-opencode/utils` | 53 |
 
@@ -199,6 +199,10 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/features/skill-mcp-manager/stdio-client.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/skill-mcp-manager/types.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/team-mode/member-parser.ts` | `@oh-my-opencode/team-core` |
+| `packages/omo-opencode/src/features/team-mode/team-layout-herdr/index.ts` | `@oh-my-opencode/team-core` |
+| `packages/omo-opencode/src/features/team-mode/team-layout-herdr/layout.ts` | `@oh-my-opencode/team-core` |
+| `packages/omo-opencode/src/features/team-mode/team-layout-herdr/resolve-caller-herdr-pane.ts` | `@oh-my-opencode/team-core` |
+| `packages/omo-opencode/src/features/team-mode/team-layout-herdr/sweep-stale-herdr-panes.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/close-team-member-pane.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/index.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/layout.ts` | `@oh-my-opencode/team-core` |
