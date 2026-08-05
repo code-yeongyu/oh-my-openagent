@@ -34,7 +34,7 @@ export function createServerHealthState(): ServerHealthState {
 	}
 }
 
-export const createServerHealthStateForTesting = createServerHealthState
+	export const createServerHealthStateForTesting = createServerHealthState
 
 export async function isServerRunning(serverUrl: string, options: IsServerRunningOptions = {}): Promise<boolean> {
 	const fetchImplementation = options.fetchImplementation ?? fetch
@@ -50,32 +50,23 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 		return true
 	}
 
-	const healthUrl = new URL("/global/health", serverUrl).toString()
 	const timeoutMs = 3000
 	const maxAttempts = 2
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-		const controller = new AbortController()
-		const timeout = setTimeout(() => controller.abort(), timeoutMs)
+		// opencode exposes `/health` (returns {"ok":true}); older builds used
+		// `/global/health`. Probe both so the check works against either.
+		const response = await probeServerHealth(fetchImplementation, serverUrl, timeoutMs)
 
-		try {
-			// opencode exposes `/health` (returns {"ok":true}); older builds used
-			// `/global/health`. Probe both so the check works against either.
-			const response = await probeServerHealth(fetchImplementation, serverUrl, controller.signal)
-			clearTimeout(timeout)
-
-			if (response) {
-				if (state) {
-					state.serverCheckUrl = serverUrl
-					state.serverAvailable = true
-				} else {
-					serverCheckUrl = serverUrl
-					serverAvailable = true
-				}
-				return true
+		if (response) {
+			if (state) {
+				state.serverCheckUrl = serverUrl
+				state.serverAvailable = true
+			} else {
+				serverCheckUrl = serverUrl
+				serverAvailable = true
 			}
-		} finally {
-			clearTimeout(timeout)
+			return true
 		}
 
 		if (attempt < maxAttempts) {
@@ -89,12 +80,20 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 async function probeServerHealth(
 	fetchImplementation: typeof fetch,
 	serverUrl: string,
-	signal: AbortSignal,
+	timeoutMs: number,
 ): Promise<boolean> {
+	// Each probe gets its own AbortController + full timeout budget, so a slow
+	// `/health` response cannot starve the `/global/health` fallback.
 	for (const path of ["/health", "/global/health"]) {
-		const url = new URL(path, serverUrl).toString()
-		const response = await fetchImplementation(url, { signal }).catch(() => null)
-		if (response?.ok) return true
+		const controller = new AbortController()
+		const timeout = setTimeout(() => controller.abort(), timeoutMs)
+		try {
+			const url = new URL(path, serverUrl).toString()
+			const response = await fetchImplementation(url, { signal: controller.signal }).catch(() => null)
+			if (response?.ok) return true
+		} finally {
+			clearTimeout(timeout)
+		}
 	}
 	return false
 }
