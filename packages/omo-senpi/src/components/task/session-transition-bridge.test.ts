@@ -26,6 +26,7 @@ function completedRecord(sessionId: string): TaskRecord {
     updated_at: "2026-07-07T00:00:02.000Z",
     final_response: "done",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
   }
 }
 
@@ -43,6 +44,12 @@ function fakeStore(initial: TaskRecord): FakeStore {
     load: () => current,
     replace: (next) => {
       current = next
+    },
+    mutate: (taskId, mutation) => {
+      if (current.task_id !== taskId) return null
+      const next = mutation(current)
+      if (next !== current) current = next
+      return next
     },
     appendEvent: (taskId, event) => {
       events.push({ taskId, type: event.type })

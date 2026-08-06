@@ -71,6 +71,7 @@ describe("in-process child extension suppression", () => {
       const handle = await runner.start({
         taskId: "task-marker",
         cwd,
+        sessionDir: join(rootDir, "child-sessions"),
         agentDir,
         depth: 0,
         parentSessionId: "parent-1",

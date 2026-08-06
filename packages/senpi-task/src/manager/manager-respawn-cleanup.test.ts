@@ -6,8 +6,11 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
-import { FakeRunner, categoryPlanner, cleanupProjects, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { FakeRunner, categoryPlanner, cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import type { ManagedStartSpec } from "./types"
 import { createTaskManager } from "./manager"
+import { createParentRegistrySessionContext } from "./parent-registry-context"
+import { createInProcessManagedRunner } from "./runner"
 
 afterEach(cleanupProjects)
 
@@ -20,7 +23,8 @@ function respawnRecord(): TaskRecord {
     depth: 1,
     execution_mode: "process",
     model: "openai/gpt-5.6",
-    status: "lost",
+    notify_on_terminal: false,
+    status: "running",
     residency_state: "resident",
     created_at: "2026-07-12T00:00:00.000Z",
     updated_at: "2026-07-12T00:01:00.000Z",
@@ -76,7 +80,12 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
     const result = await manager.respawn(record, "/tmp/session.jsonl")
 
     // then
-    expect(result).toEqual({ ok: false, reason: "rpc respawn cleanup failed" })
+    expect(result).toEqual({
+      ok: false,
+      disposition: "retryable",
+      code: "respawn_failed",
+      reason: "rpc respawn cleanup failed",
+    })
     expect(disposeCalls).toBe(1)
   })
 })
@@ -273,6 +282,242 @@ describe("TaskManager respawn variant", () => {
   })
 })
 
+describe("TaskManager in-process respawn", () => {
+  test("#given a claimed in-process record #when respawned #then resume receives the rebuilt persisted spec", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    store.list()
+    const record: TaskRecord = {
+      ...respawnRecord(),
+      execution_mode: "in-process",
+      host_pid: 7001,
+      resolved_model: {
+        source: "agent",
+        provider: "anthropic",
+        model_id: "claude",
+        display: "Claude",
+      },
+      tool_allow: ["read"],
+      tool_deny: ["write"],
+      spawn_spec: {
+        version: 1,
+        cwd: project,
+        prompt: "persisted effective prompt",
+        instructions: "persisted instructions",
+        member_scoped_tool_names: ["team_ping"],
+      },
+    }
+    store.replace(record)
+    let resumedSpec: ManagedStartSpec | undefined
+    let resumedPath: string | undefined
+    const restored = makeHandle(record.task_id)
+    const inProcessRunner = {
+      start: () => Promise.resolve(restored.handle),
+      resume: (spec: ManagedStartSpec, sessionPath: string) => {
+        resumedSpec = spec
+        resumedPath = sessionPath
+        return Promise.resolve(restored.handle)
+      },
+    }
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": inProcessRunner, process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      hostPid: 7001,
+    })
+
+    // when
+    const result = await manager.respawn(record, "/tmp/in-process-session.jsonl")
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(resumedPath).toBe("/tmp/in-process-session.jsonl")
+    expect(resumedSpec).toMatchObject({
+      taskId: record.task_id,
+      prompt: "persisted effective prompt",
+      instructions: "persisted instructions",
+      resolvedModel: record.resolved_model,
+      toolAllowlist: ["read"],
+      toolDenylist: ["write"],
+      memberScopedToolNames: ["team_ping"],
+    })
+  })
+
+  test("#given resolveResumeContext cannot find the persisted model #when respawned #then failure is retryable and no child is spawned", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const record: TaskRecord = {
+      ...respawnRecord(),
+      execution_mode: "in-process",
+      resolved_model: {
+        source: "agent",
+        provider: "removed-provider",
+        model_id: "removed-model",
+        display: "Removed Model",
+      },
+      spawn_spec: { version: 1, cwd: project, prompt: "continue safely" },
+    }
+    let childResumeCalls = 0
+    const managedRunner = createInProcessManagedRunner({
+      start: () => {
+        throw new Error("start must not be called during respawn")
+      },
+      resume: () => {
+        childResumeCalls += 1
+        throw new Error("resume must be guarded before child spawn")
+      },
+    }, createParentRegistrySessionContext(() => undefined))
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": managedRunner, process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+    })
+
+    // when
+    const result = await manager.respawn(record, "/tmp/session.jsonl")
+
+    // then
+    expect(result).toEqual({
+      ok: false,
+      disposition: "retryable",
+      code: "model_unavailable",
+      reason: "no live parent model registry available",
+    })
+    expect(childResumeCalls).toBe(0)
+  })
+
+  test("#given an in-process record without v1 rebuild facts #when respawned #then it fails unrecoverably without spawning", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const record: TaskRecord = { ...respawnRecord(), execution_mode: "in-process" }
+    let resumeCalls = 0
+    const runner = {
+      start: () => Promise.resolve(makeHandle(record.task_id).handle),
+      resume: () => {
+        resumeCalls += 1
+        return Promise.resolve(makeHandle(record.task_id).handle)
+      },
+    }
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": runner, process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+    })
+
+    // when
+    const result = await manager.respawn(record, "/tmp/session.jsonl")
+
+    // then
+    expect(result).toEqual({
+      ok: false,
+      disposition: "unrecoverable",
+      code: "spawn_spec_unavailable",
+      reason: "record has no persisted v1 spawn_spec to rebuild from",
+    })
+    expect(resumeCalls).toBe(0)
+  })
+})
+
+describe("TaskManager guarded reattach", () => {
+  test("#given no prior host ownership claim #when reattached #then the handle is rejected", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    store.list()
+    const { host_pid: _hostPid, ...record } = respawnRecord()
+    store.replace(record)
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      hostPid: 7001,
+    })
+
+    // when
+    const result = await manager.reattach(record, makeHandle(record.task_id).handle)
+
+    // then
+    expect(result).toEqual({ ok: false, kind: "failed", reason: "task ownership claim is not held by this host" })
+  })
+
+  test("#given a claimed non-terminal record with stale output #when reattached #then output clears and run_epoch bumps exactly once", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    store.list()
+    const record: TaskRecord = {
+      ...respawnRecord(),
+      status: "running",
+      error_message: "stale error",
+      final_response: "stale response",
+      host_pid: 7001,
+      notification: { run_epoch: 4, notified_epoch: 3 },
+    }
+    store.replace(record)
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      hostPid: 7001,
+    })
+
+    // when
+    const result = await manager.reattach(record, makeHandle(record.task_id).handle)
+
+    // then
+    expect(result).toEqual({ ok: true })
+    expect(store.load(record.task_id)).toMatchObject({
+      status: "running",
+      notification: { run_epoch: 5, notified_epoch: 3 },
+    })
+    expect(store.load(record.task_id)?.error_message).toBeUndefined()
+    expect(store.load(record.task_id)?.final_response).toBeUndefined()
+  })
+
+  test("#given a claimed terminal record #when reattached #then run_epoch is unchanged", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    store.list()
+    const record: TaskRecord = {
+      ...respawnRecord(),
+      status: "completed",
+      final_response: "done",
+      host_pid: 7001,
+      notification: { run_epoch: 4, notified_epoch: 3 },
+    }
+    store.replace(record)
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      hostPid: 7001,
+    })
+
+    // when
+    const result = await manager.reattach(record, makeHandle(record.task_id).handle)
+
+    // then
+    expect(result).toEqual({ ok: true })
+    expect(store.load(record.task_id)?.notification.run_epoch).toBe(4)
+  })
+})
+
 describe("TaskManager respawn continuation", () => {
   const CONTINUATION_MESSAGE =
     "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
@@ -351,6 +596,70 @@ describe("TaskManager respawn continuation", () => {
     // then
     expect(result.ok).toBe(true)
     expect(followUpCalls).toEqual([CONTINUATION_MESSAGE])
+  })
+
+  test("#given a trailing user message #when respawned #then the revived child gets exactly one continuation followUp", async () => {
+    // given
+    const sessionPath = writeSession([
+      `{"type":"message","message":{"role":"user","content":[{"type":"text","text":"continue"}]}}`,
+    ])
+    const { manager, followUpCalls } = continuationHarness()
+
+    // when
+    const result = await manager.respawn(respawnRecord(), sessionPath)
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(followUpCalls).toEqual([CONTINUATION_MESSAGE])
+  })
+
+  test("#given an aborted assistant tail #when respawned #then the revived child gets exactly one continuation followUp", async () => {
+    // given
+    const sessionPath = writeSession([
+      `{"type":"message","message":{"role":"assistant","stopReason":"aborted","content":[{"type":"text","text":"partial"}]}}`,
+    ])
+    const { manager, followUpCalls } = continuationHarness()
+
+    // when
+    const result = await manager.respawn(respawnRecord(), sessionPath)
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(followUpCalls).toEqual([CONTINUATION_MESSAGE])
+  })
+
+  test("#given a terminal record with a user tail #when respawned #then no continuation is sent", async () => {
+    // given
+    const sessionPath = writeSession([
+      `{"type":"message","message":{"role":"user","content":[{"type":"text","text":"stale"}]}}`,
+    ])
+    const { manager, followUpCalls } = continuationHarness()
+
+    // when
+    const result = await manager.respawn({ ...respawnRecord(), status: "completed", final_response: "done" }, sessionPath)
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(followUpCalls).toEqual([])
+  })
+
+  test("#given a completed assistant JSON line larger than 64 KiB #when respawned #then no preceding user false-positive continuation is sent", async () => {
+    // given
+    const sessionPath = writeSession([
+      `{"type":"message","message":{"role":"user","content":[{"type":"text","text":"work"}]}}`,
+      JSON.stringify({
+        type: "message",
+        message: { role: "assistant", content: [{ type: "text", text: "x".repeat(70 * 1024) }] },
+      }),
+    ])
+    const { manager, followUpCalls } = continuationHarness()
+
+    // when
+    const result = await manager.respawn(respawnRecord(), sessionPath)
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(followUpCalls).toEqual([])
   })
 
   test("#given an assistant text-only tail #when respawned #then no continuation is sent", async () => {

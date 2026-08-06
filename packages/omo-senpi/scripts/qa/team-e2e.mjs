@@ -18,6 +18,7 @@ import {
 } from "./team-e2e-support.mjs"
 import { analyzeMain, injectionEvidence, teamMessageEnqueues, verdict } from "./team-e2e-analysis.mjs"
 import { runCrashRestartScenario } from "./team-e2e-crash.mjs"
+import { runTeamResumeScenarios } from "./team-resume-e2e.mjs"
 import { createOwnedProcessRegistry, pollUntil, startSenpiRun } from "./team-e2e-runtime.mjs"
 import { LEAD_SCRIPT, DURA_REVIVE_SCRIPT, DURA_SEED_SCRIPT, NOOP_SCRIPT } from "./team-e2e-scripts.mjs"
 
@@ -215,7 +216,9 @@ async function main() {
     try {
       const main = await runMain(senpiBin, outDir)
       const crash = await runCrashRestartScenario({ senpiBin, outDir, createSandbox, seedProject, startRun, memberExtensionEntry })
-      checks = { ...main.checks, ...crash }
+      // Plan todo 22: member quit->resume revival + shutdown-approved non-revival (own module).
+      const resume = await runTeamResumeScenarios({ senpiBin, outDir, startRun })
+      checks = { ...main.checks, ...crash, ...resume }
     } finally {
       leakedPids = await killGroups()
     }

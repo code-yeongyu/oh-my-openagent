@@ -178,6 +178,7 @@ function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
   const reason = optionalRendererText(details.reason)
   return [
     taskId === undefined ? undefined : `id:${taskId}`,
+    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ].filter((token): token is string => token !== undefined)

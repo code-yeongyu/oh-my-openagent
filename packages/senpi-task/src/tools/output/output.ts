@@ -106,6 +106,7 @@ function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): Tas
 
 function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
+  if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
   if (snapshot.pid !== undefined) parts.push(`pid ${snapshot.pid}`)
   if (snapshot.lost !== undefined) parts.push(snapshot.lost.explanation)
   if (snapshot.error_message !== undefined) parts.push(`error: ${snapshot.error_message}`)

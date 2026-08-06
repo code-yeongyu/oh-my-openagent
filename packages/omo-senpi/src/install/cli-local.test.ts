@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
@@ -43,6 +44,17 @@ async function makePackagedPlugin(): Promise<string> {
   for (const skillName of requiredSkillNames) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+  await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
+  await chmod(astGrepRuntime, 0o755)
+  await writeFixtureFile(
+    join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
+    `${JSON.stringify({
+      sha256: createHash("sha256").update(await readFile(astGrepRuntime)).digest("hex"),
+      mode: 0o755,
+      stagedAtUtc: "2026-08-03T00:00:00.000Z",
+    }, null, 2)}\n`,
+  )
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")

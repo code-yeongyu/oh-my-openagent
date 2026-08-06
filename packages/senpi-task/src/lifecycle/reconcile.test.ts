@@ -110,7 +110,13 @@ class EffectiveSpawnRunner extends FakeRunner {
   }
 }
 
-function createManager(store: TaskRecordStore, respawnRunner: FakeRespawnRunner, defaultConcurrency = 5, processRunner = new FakeRunner()) {
+function createManager(
+  store: TaskRecordStore,
+  respawnRunner: FakeRespawnRunner,
+  defaultConcurrency = 5,
+  processRunner = new FakeRunner(),
+  hostPid?: number,
+) {
   const inProcess = new FakeRunner()
   const manager = createTaskManager({
     store,
@@ -119,6 +125,7 @@ function createManager(store: TaskRecordStore, respawnRunner: FakeRespawnRunner,
     config: settings({ default_concurrency: defaultConcurrency }),
     cwd: "/tmp/project",
     rpcRespawnRunner: respawnRunner,
+    ...(hostPid === undefined ? {} : { hostPid }),
   })
   return { manager, inProcess }
 }
@@ -384,7 +391,7 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(manager.getResidentHandle("st_0000000a")?.pid).toBe(1001)
   })
 
-  test(" w2reattach #given overlapping reconcile sweeps #when both respawn #then the duplicate child is discarded without replacing the owner", async () => {
+  test(" w2reattach #given overlapping reconcile sweeps #when ownership claims race #then exactly one child respawns and the loser defers", async () => {
     // given
     const { store, respawnRunner, manager, lifecycle } = createHarness({ taskId: "st_0000000b" })
 
@@ -392,13 +399,13 @@ describe("reconcileOnSessionStart reattach", () => {
     const results = await Promise.all([lifecycle.reconcileOnSessionStart(), lifecycle.reconcileOnSessionStart()])
 
     // then
-    expect(respawnRunner.startedSpecs).toHaveLength(2)
-    const discardedIndex = respawnRunner.controls.findIndex((control) => control.terminated() === 1)
-    expect(respawnRunner.controls.map((control) => [control.terminated(), control.disposed()]).sort())
-      .toEqual([[0, 0], [1, 1]])
-    expect(results.flatMap((result) => result.outcomes.map((outcome) => outcome.kind))).toEqual(["resumed", "resumed"])
+    expect(respawnRunner.startedSpecs).toHaveLength(1)
+    expect(respawnRunner.controls.map((control) => [control.terminated(), control.disposed()]))
+      .toEqual([[0, 0]])
+    expect(results.flatMap((result) => result.outcomes.map((outcome) => outcome.kind)).sort())
+      .toEqual(["foreign_live_owner", "resumed"])
     expect(store.load("st_0000000b")?.notification.run_epoch).toBe(1)
-    expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1002 - discardedIndex)
+    expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1001)
   })
 
   test(" w2reattach #given a process runner reports effective launch inputs #when persisted record is reloaded #then only safe spawn facts survive", async () => {
@@ -409,9 +416,10 @@ describe("reconcileOnSessionStart reattach", () => {
     // when
     const result = await manager.start({ prompt: "bootstrap", parent_session_id: "parent-1", depth: 1, execution_mode: "process" })
 
-    // then
+    // then the v1 rebuild facts persisted at spawn survive, while the runner-reported extensions
+    // and member env (untrusted launch inputs) never reach the record
     if (result.kind !== "started") throw new Error("expected started task")
-    expect(store.load(result.task_id)?.spawn_spec).toEqual({ cwd: "/tmp/project" })
+    expect(store.load(result.task_id)?.spawn_spec).toEqual({ version: 1, cwd: "/tmp/project", prompt: "bootstrap" })
   })
 
   test(" w2reattach #given switch_session is cancelled #when reconciled #then the fresh child is torn down and the record stays lost", async () => {
@@ -651,7 +659,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     store.replace({ ...seeded, host_pid: thisPid })
     const sessionPath = persistSessions(store, taskId)
     const respawnRunner = new FakeRespawnRunner()
-    createManager(store, respawnRunner)
+    createManager(store, respawnRunner, 5, new FakeRunner(), thisPid)
     const calls: SignalCall[] = []
     const lifecycle = createTaskLifecycle({
       store,

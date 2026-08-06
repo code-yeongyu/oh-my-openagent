@@ -85,7 +85,8 @@ function isObjectPathTypeError(error: unknown): boolean {
   const message = error instanceof Error
     ? error.message
     : typeof error === "string" ? error : ""
-  return message.includes('The "path" property must be of type string') && message.includes("got object")
+  return message.includes('The "path" property must be of type string')
+    && (message.includes("got object") || message.includes("got undefined"))
 }
 
 async function dispatchWithPathCompatibility<TInput>(

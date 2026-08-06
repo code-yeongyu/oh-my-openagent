@@ -30,8 +30,19 @@ const nativeSkillSources = [
     source: join(nativeSkillsRoot, "hyperplan"),
   },
   {
+    name: "init-deep",
+    source: join(nativeSkillsRoot, "init-deep"),
+  },
+  {
     name: "ultrawork",
     source: join(nativeSkillsRoot, "ultrawork"),
+  },
+  {
+    // Senpi-local override of the shared ulw-plan (omo-opencode consumes the shared file, so the
+    // ast-grep/LSP-first rewrite cannot land there). Seeded from the fully senpi-adapted bundle
+    // output, so it already carries the review-policy overlays and compatibility banner verbatim.
+    name: "ulw-plan",
+    source: join(nativeSkillsRoot, "ulw-plan"),
   },
   {
     name: "ulw-research",
