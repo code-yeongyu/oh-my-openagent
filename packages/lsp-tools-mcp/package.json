@@ -1,0 +1,54 @@
+{
+	"name": "@code-yeongyu/lsp-tools-mcp",
+	"version": "0.1.0",
+	"description": "Standalone Language Server Protocol tools exposed as a stdio MCP server.",
+	"type": "module",
+	"packageManager": "npm@11.16.0",
+	"license": "MIT",
+	"homepage": "https://github.com/code-yeongyu/lsp-tools-mcp",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/code-yeongyu/lsp-tools-mcp.git"
+	},
+	"bugs": {
+		"url": "https://github.com/code-yeongyu/lsp-tools-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"lsp",
+		"language-server-protocol",
+		"model-context-protocol",
+		"typescript",
+		"nodejs"
+	],
+	"bin": {
+		"omo-lsp": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"LICENSE",
+		"NOTICE",
+		"README.md",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"build": "node scripts/ensure-core-links.mjs && rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm",
+		"test": "vitest --run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"check": "tsc --noEmit && biome check . && npm run build"
+	},
+	"devDependencies": {
+		"@oh-my-opencode/lsp-core": "file:../lsp-core",
+		"@oh-my-opencode/mcp-stdio-core": "file:../mcp-stdio-core",
+		"@biomejs/biome": "2.4.16",
+		"@types/node": "^25.9.2",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}

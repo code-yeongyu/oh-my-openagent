@@ -4,11 +4,13 @@ export interface DelegatedModelConfig {
   providerID: string
   modelID: string
   variant?: string
+  reasoning?: string
   reasoningEffort?: string
   temperature?: number
   top_p?: number
   maxTokens?: number
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+  tools?: Record<string, boolean>
 }
 
 export type ModelResolutionRequest = {

@@ -1,0 +1,5 @@
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"running","residency_state":"resident"}}
+{"type":"child_error","payload":{"message":"Connection error.","stop_reason":"error"}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"running","residency_state":"disposed"}}
+{"type":"destroyed","payload":{"cause":"shutdown"}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"cancelled","residency_state":"disposed"}}

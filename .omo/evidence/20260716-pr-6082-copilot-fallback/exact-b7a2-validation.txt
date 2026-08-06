@@ -1,0 +1,19 @@
+validated_at_utc=2026-07-16T07:12:47Z
+live_base=b7a2e33ac25bf103a11c06b5c7e30073a19ee935
+published_pr_head=896ac48cba4a365736c3a8b8c0041afacdf26d06
+source_repair_head=2704556aa27ed870f239d53b2da5037099224b2c
+synthetic_merge_commit=eba2c94cadab55ae64edb74002172fe1a4ee6864
+synthetic_merge_tree=37dc802b11156cec8de12ba5856a0aae36692edf
+merge_base=dec381ed201a1326883db9f42bdb3c2add91b299
+
+focused_command=bun test <17 focused model/provider/fallback/runtime/plan/alias test files>
+focused_result=233 pass, 0 fail, 1 snapshot, 656 expect calls
+focused_artifact=exact-b7a2-focused-tests.txt
+
+setup_command=bun install --frozen-lockfile
+typecheck_command=bun run typecheck:packages
+typecheck_result=exit 0
+typecheck_artifact=exact-b7a2-typecheck-packages.txt
+
+note=The first typecheck attempt used the temporary worktree's incomplete dependency state and failed in unrelated pi-webfetch resolution. A frozen-lockfile install repaired the local dependency graph; the unchanged exact merge tree then passed the full package typecheck.
+verdict=PASS; live-base overlap preserves custom/native xhigh before later Copilot high, Copilot-only high selection, runtime-fallback inheritance, plan behavior, and OpenAI GPT-5.6 fast-alias capability handling.

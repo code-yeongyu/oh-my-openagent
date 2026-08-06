@@ -16,7 +16,7 @@ This project treats model capability resolution as a layered system:
 
 ## When adding an alias
 
-- Add the alias rule to `src/shared/model-capability-aliases.ts`.
+- Add the alias rule to `packages/model-core/src/model-capability-aliases.ts`.
 - Include a rationale for why the alias exists.
 - Add or update tests so the alias is covered explicitly.
 - Ensure the alias canonical target exists in the bundled `models.dev` snapshot.

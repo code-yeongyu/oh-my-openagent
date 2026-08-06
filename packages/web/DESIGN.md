@@ -1,6 +1,14 @@
 # Oh My OpenAgent Web — Design System
 
-> **Extracted from existing code as of 2026-05-20.** This document codifies the current system and flags inconsistencies for consolidation. The dark + cyan terminal/hacker identity is the brand and stays. Refinement consolidates the rainbow secondary accents into a disciplined token set, sharpens typography rhythm, and tightens motion choreography — without altering the soul of the site.
+> **Extracted from existing code and rendered baseline evidence. Refreshed 2026-06-24.** This document is the implementation contract for the current site. The dark + cyan terminal/hacker identity is the brand and stays. This contract preserves the current rendered experience first; consolidation ideas are design debt unless a later PR explicitly changes the visual language.
+
+## 0. Implementation Contract
+
+- CSS source of truth: `app/styles/design-system.css` owns the Tailwind entrypoint, theme mappings, root tokens, base rules, shared utilities, docs prose styles, and motion primitives. `app/globals.css` is a filesystem alias to that entry so Next/Tailwind continue to read the same single global stylesheet surface without an import-wrapper layer.
+- Component primitives: `components/ui/*` provide shadcn-style Button, Badge, Card, Input, Section, and Separator variants. New repeated UI patterns must use these primitives or document a new primitive here first.
+- Page surfaces: `app/_components/landing-page.tsx`, `components/landing/**`, `components/docs/docs-shell.tsx`, `components/nav-header.tsx`, and `components/footer.tsx` consume the contract.
+- Current PR intent: no redesign, no copy change, no interaction change. Extraction work must be pixel-identical to the baseline screenshots under `.omo/ultrawork/design-system-fidelity/evidence/baseline/screenshots/`.
+- Pre-existing accepted debt for this extraction: `/docs` at 390x844 has horizontal overflow in the baseline (`scrollWidth - innerWidth = 538`). Do not worsen it in this PR; fixing it requires a docs-shell layout PR with fresh design review.
 
 ## 1. Atmosphere & Identity
 
@@ -12,26 +20,26 @@ A senior engineer's command center, glowing in the dark. Surfaces are near-black
 
 ### Palette
 
-| Role                    | Token                     | Hex                      | Usage                                                 |
-| ----------------------- | ------------------------- | ------------------------ | ----------------------------------------------------- |
-| Surface / primary       | `--surface-primary`       | `#0a0a0a`                | Page background                                       |
-| Surface / secondary     | `--surface-secondary`     | `#111111`                | Cards (current `--card`)                              |
-| Surface / elevated      | `--surface-elevated`      | `#1a1a1a`                | Popovers, hover states (current `--muted`/`--accent`) |
-| Surface / tint          | `--surface-tint`          | `rgba(255,255,255,0.02)` | Subtle card backgrounds                               |
-| Text / primary          | `--text-primary`          | `#ededed`                | Headlines, body emphasis                              |
-| Text / secondary        | `--text-secondary`        | `#a1a1a1`                | Body copy (current `--muted-foreground`)              |
-| Text / tertiary         | `--text-tertiary`         | `#71717a`                | Captions, metadata (zinc-500)                         |
-| Border / default        | `--border-default`        | `#262626`                | Card borders, dividers (current `--border`)           |
-| Border / subtle         | `--border-subtle`         | `rgba(255,255,255,0.05)` | Whisper-thin separators (used in nav/footer)          |
-| Accent / primary        | `--accent-primary`        | `#00d4ff`                | Brand cyan — CTAs, links, focus, terminal `$`         |
-| Accent / primary-soft   | `--accent-primary-soft`   | `rgba(0,212,255,0.10)`   | Cyan backgrounds, glow tints                          |
-| Accent / primary-border | `--accent-primary-border` | `rgba(0,212,255,0.20)`   | Cyan-tinted borders on badges                         |
-| Accent / secondary      | `--accent-secondary`      | `#7c3aed`                | Reserved — currently overused (see below)             |
-| Status / success        | `--status-success`        | `#10b981`                | Success indicators only                               |
-| Status / warning        | `--status-warning`        | `#f59e0b`                | Cautions only                                         |
-| Status / error          | `--status-error`          | `#ef4444`                | Errors / destructive only                             |
-| Code / bg               | `--code-bg`               | `#1e1e2e`                | Code block backgrounds                                |
-| Code / fg               | `--code-text`             | `#cdd6f4`                | Code text                                             |
+| Role                    | Token                     | Hex                       | Usage                                         |
+| ----------------------- | ------------------------- | ------------------------- | --------------------------------------------- |
+| Surface / 0             | `--surface-0`             | `#0a0a0a`                 | Page background                               |
+| Surface / 1             | `--surface-1`             | `rgba(255,255,255,0.018)` | Subtle section/card tint                      |
+| Surface / 2             | `--surface-2`             | `rgba(255,255,255,0.035)` | Default elevated tint                         |
+| Surface / 3             | `--surface-3`             | `rgba(255,255,255,0.055)` | Hover/elevated tint                           |
+| Text / primary          | `--text-primary`          | `#ededed`                 | Headlines, body emphasis                      |
+| Text / secondary        | `--text-secondary`        | `#a1a1a1`                 | Body copy (current `--muted-foreground`)      |
+| Text / tertiary         | `--text-tertiary`         | `#71717a`                 | Captions, metadata (zinc-500)                 |
+| Border / default        | `--border-default`        | `#262626`                 | Card borders, dividers (current `--border`)   |
+| Border / subtle         | `--border-subtle`         | `rgba(255,255,255,0.06)`  | Whisper-thin separators (used in nav/footer)  |
+| Accent / primary        | `--accent-primary`        | `#00d4ff`                 | Brand cyan — CTAs, links, focus, terminal `$` |
+| Accent / primary-soft   | `--accent-primary-soft`   | `rgba(0,212,255,0.10)`    | Cyan backgrounds, glow tints                  |
+| Accent / primary-border | `--accent-primary-border` | `rgba(0,212,255,0.20)`    | Cyan-tinted borders on badges                 |
+| Accent / secondary      | legacy `--secondary`      | `#7c3aed`                 | Reserved — currently overused (see below)     |
+| Status / success        | `--status-success`        | `#10b981`                 | Success indicators only                       |
+| Status / warning        | `--status-warning`        | `#f59e0b`                 | Cautions only                                 |
+| Status / error          | `--status-error`          | `#ef4444`                 | Errors / destructive only                     |
+| Code / bg               | `--code-bg`               | `#1e1e2e`                 | Code block backgrounds                        |
+| Code / fg               | `--code-text`             | `#cdd6f4`                 | Code text                                     |
 
 ### Rules
 
@@ -41,16 +49,16 @@ A senior engineer's command center, glowing in the dark. Surfaces are near-black
 - **Never use pure `#ffffff`** for text — `#ededed` is the ceiling. Pure white screams.
 - **No purple/blue "AI gradient"** decoratively. The `--accent-secondary` purple (`#7c3aed`) exists as a token but should be reserved for genuine semantic moments (Sisyphus / agent identity), not as eye candy on CTAs or backgrounds.
 
-### Inconsistencies to consolidate (current state → target)
+### Inconsistencies to consolidate (design debt, not this extraction)
 
-The current landing page assigns a distinct accent color _per section_ — purple, orange, pink, fuchsia, teal, indigo, amber, green, blue. This is the candy-store anti-pattern. Refinement target:
+The current landing page assigns a distinct accent color _per section_ — purple, orange, pink, fuchsia, teal, indigo, amber, green, blue. Because this PR must preserve the current rendered baseline, these colors remain in component class names for now. Refinement target:
 
 - **Cyan**: Primary CTA, install command, hero, CTA section, default link/hover.
-- **`--accent-secondary` (single muted indigo `#7c3aed`)**: Agent identity (Sisyphus, sub-agents) — when an agent name appears, it gets the secondary accent badge. Not the whole card.
+- **Legacy `--secondary` / future `--accent-secondary` (single muted indigo `#7c3aed`)**: Agent identity (Sisyphus, sub-agents) — when an agent name appears, it gets the secondary accent badge. Not the whole card.
 - **Status colors**: ONLY for actual status (success/warning/error). NOT for decorative section accents.
 - **Everything else**: monochrome (white opacity ladder for surfaces, zinc/neutral for text).
 
-Result: 2 chromatic colors total (cyan + indigo), all per-section colors removed.
+Target for a future visual-refinement PR: 2 chromatic colors total (cyan + indigo), all per-section colors removed. This extraction PR does not apply that visual change because it must preserve the current rendered baseline exactly.
 
 ## 3. Typography
 
@@ -125,7 +133,7 @@ Result: 2 chromatic colors total (cyan + indigo), all per-section colors removed
 
 ### Hero
 
-- **Structure**: `<section className="relative flex min-h-[100dvh] items-center pt-32 md:pt-24">` with absolute-positioned background image (decorative, ~30% opacity) and gradient overlay.
+- **Structure**: `<section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden pt-16">` with absolute-positioned background image (decorative, ~30% opacity) and gradient overlay.
 - **Background**: `hero.webp` preloaded `fetchPriority="low"` so the headline is the LCP. Image fades in via CSS keyframe over 600ms, respects `prefers-reduced-motion`.
 - **Variants**: Landing hero (centered), manifesto hero (centered with stronger gradient).
 - **Spacing**: `gap-8` between stack items, max-width `max-w-3xl` for headline.
@@ -136,16 +144,18 @@ Result: 2 chromatic colors total (cyan + indigo), all per-section colors removed
 - **Structure**: cva variants `default | secondary | ghost | outline | link | destructive` × sizes `sm | default | lg | icon`.
 - **Primary CTA**: `bg-cyan-500 text-black hover:bg-cyan-600` — black-on-cyan reads as a primary "system action".
 - **Outline**: `border-zinc-700 text-white hover:bg-zinc-800` — secondary.
-- **States**: default, hover (color shift), focus-visible (ring), active (`-translate-y-px` for tactile feedback — to be added).
+- **States**: default, hover (color shift), focus-visible (`ring-1 ring-ring`), disabled (`pointer-events-none opacity-50`). Active translation is not part of the current implementation.
 - **Radius**: 6px (`rounded-md`).
-- **Padding**: lg = `h-12 px-8`, default = `h-10 px-6`, sm = `h-9 px-3`.
+- **Primitive sizes**: lg = `h-10 px-8`, default = `h-9 px-4 py-2`, sm = `h-8 px-3 text-xs`, icon = `h-9 w-9`.
+- **Hero/CTA overrides**: primary hero buttons add `h-12 px-8 text-lg font-bold` and outline hero buttons add `h-12 px-8 text-lg`.
 
 ### Card (shadcn-based)
 
 - **Structure**: `Card / CardHeader / CardTitle / CardDescription / CardContent`.
-- **Background**: `bg-zinc-900/30` (translucent over page bg) → consolidate to `bg-[--surface-tint]`.
-- **Border**: `border-zinc-800` → `border-[--border-default]`.
-- **Radius**: 8px (`rounded-lg`).
+- **Background**: primitive default is `bg-card`; landing sections commonly override with `bg-zinc-900/30`, `bg-black/40`, or related white-alpha tints. New shared surfaces should map to `--surface-1/2/3`.
+- **Border**: primitive default is `border`; landing sections commonly override with `border-zinc-800`, `border-white/10`, and `border-border`. New shared surfaces should map to `--border-default` or `--border-subtle`.
+- **Radius**: primitive default is 12px (`rounded-xl`); section-local cards may use `rounded-lg`, `rounded-xl`, or `rounded-3xl` where currently rendered.
+- **Shadow**: primitive default includes Tailwind `shadow`; many landing card usages visually rely on border + translucent surface more than strong shadows. Do not remove the primitive shadow in this extraction.
 - **Hover**: Optional border-color shift to `border-cyan-500/30` for interactive cards.
 - **States**: default, hover (border lifts), focus-within (cyan border).
 
@@ -226,7 +236,7 @@ Shadows are reserved for the cyan glow accent on the install command (`shadow-2x
 
 ## 8. Accessibility (mandatory checks)
 
-- `lang` on `<html>` and on locale wrapper.
+- Root `<html lang="en">` plus locale wrapper `lang`/`data-locale` for localized routes.
 - `<title>` per route (`generateMetadata` provides).
 - Every `<button>` and `<a>` has a discernible name (icon-only buttons require `aria-label`).
 - Skip link to `#main-content` at the top of `<body>`.
@@ -236,7 +246,34 @@ Shadows are reserved for the cyan glow accent on the install command (`shadow-2x
 - `prefers-reduced-motion: reduce` disables animations.
 - Form fields: label above input, helper/error below.
 
-## 9. Refinement Targets
+## 9. Inclusive Personas & Adaptive Constraints
+
+- **Terminal power user**: keyboard-first, scans dense command/reference content, expects instant docs section navigation and copyable commands. Pass criteria: nav/search/focus states are visible and keyboard reachable; code blocks remain readable.
+- **Mobile evaluator**: checks the project from a narrow viewport before installing. Pass criteria: landing and manifesto have no horizontal overflow; docs mobile behavior is preserved and its known overflow debt is not worsened.
+- **CJK reader**: reads Korean/Japanese/Chinese localized pages. Pass criteria: heading letter spacing resets to normal, CJK line breaking avoids clipped glyphs, and body text can wrap without layout breakage.
+- **Motion-sensitive user**: uses reduced motion. Pass criteria: hero/background/reveal motion respects `prefers-reduced-motion`; no layout-property animation is required for comprehension.
+
+Adaptive preferences:
+
+- Honor `prefers-reduced-motion`.
+- Maintain dark color scheme and current contrast ratios.
+- Preserve visible focus rings and 44px mobile hit targets where current components provide them.
+- Preserve locale-aware CJK line-breaking rules in the design-system base layer.
+
+## 10. Verification Matrix
+
+This contract is valid only when implementation evidence proves the current surface still matches it:
+
+| Scenario                  | Surface                              | Evidence                                                                          |
+| ------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
+| Landing visual fidelity   | `/` at 1280x800 and 390x844          | Baseline/after screenshots plus image diff                                        |
+| Docs visual fidelity      | `/docs` at 1280x800 and 390x844      | Baseline/after screenshots plus image diff; mobile overflow delta must not worsen |
+| Manifesto visual fidelity | `/manifesto` at 1280x800 and 390x844 | Baseline/after screenshots plus image diff                                        |
+| Docs interactions         | `/docs` mobile and desktop           | Sidebar toggle, search filtering, section/hash navigation                         |
+| Landing navigation        | `/` mobile and desktop               | Mobile nav toggle and Docs/Manifesto navigation                                   |
+| Regression gates          | `packages/web`                       | format, lint, type-check, build, Playwright e2e; Lighthouse when available        |
+
+## 11. Refinement Targets
 
 The 5 areas the refinement PR will improve while keeping the soul:
 
@@ -246,9 +283,9 @@ The 5 areas the refinement PR will improve while keeping the soul:
 4. **Dynamic OG image**: Static `hero.webp` (1024×683) → `app/opengraph-image.tsx` via `next/og` at 1200×630, brand-aligned.
 5. **Motion choreography**: Add cascaded fade-in-up on section entry via CSS + IntersectionObserver. Respect `prefers-reduced-motion`. No motion library.
 
-## 10. Banned Patterns (project-specific)
+## 12. Banned Patterns (project-specific)
 
-- Inline raw hex outside this file or `globals.css`.
+- New or changed UI hardcoding raw hex outside this file or `app/styles/design-system.css`. Existing rendered class names such as `bg-[#0a0a0a]`, `text-[#ededed]`, and gradient stops remain accepted debt in this extraction because this PR preserves the current pixels.
 - Pure `#000000` or `#ffffff`.
 - Per-section accent colors not in the consolidated palette.
 - `h-screen` (use `min-h-[100dvh]`).

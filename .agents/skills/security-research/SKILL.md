@@ -201,4 +201,3 @@ For each finding:
 - Do not claim CVSS precision unless you actually scored the metrics.
 - Include exact file paths and commands for every surviving finding.
 - If no findings survive PoC, say that plainly and list residual risk.
-

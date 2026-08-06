@@ -1,0 +1,6 @@
+codex-telemetry
+
+This package provides the omo-codex anonymous daily-active telemetry hook.
+
+The bundled telemetry client is adapted from @oh-my-opencode/telemetry-core.
+The built hook output includes posthog-node telemetry transport code.

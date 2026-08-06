@@ -5,10 +5,11 @@ import { runMcpStdioServer } from "./mcp";
 async function main(): Promise<void> {
   const [command = "mcp"] = argv.slice(2);
   if (command === "mcp") {
-    await runMcpStdioServer();
+    await runMcpStdioServer(process.stdin, process.stdout);
     return;
   }
-  stderr.write("Usage: ast-grep-mcp [mcp]\n");
+
+  stderr.write("Usage: omo-ast-grep [mcp]\n");
   process.exitCode = 2;
 }
 

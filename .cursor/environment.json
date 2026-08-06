@@ -1,0 +1,3 @@
+{
+  "install": "bash script/agent/setup.sh"
+}

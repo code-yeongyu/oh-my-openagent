@@ -1,0 +1,76 @@
+name: LazyCodex Bug Report
+description: Report a LazyCodex, lazycodex-ai, or Codex Light issue
+title: "[LazyCodex Bug]: "
+labels: ["bug", "needs-triage", "lazycodex"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please file source-level LazyCodex work in [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), where `packages/omo-codex` lives.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Describe the LazyCodex failure.
+      placeholder: Describe what failed and when it happens.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Include exact commands or UI actions.
+      placeholder: |
+        1. Install with npx lazycodex-ai install
+        2. Run ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What happened instead?
+    validations:
+      required: true
+
+  - type: input
+    id: lazycodex-version
+    attributes:
+      label: LazyCodex version
+      placeholder: "lazycodex-ai 4.7.5"
+    validations:
+      required: true
+
+  - type: input
+    id: codex-version
+    attributes:
+      label: Codex version
+      placeholder: "codex 0.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: Paste relevant Codex or LazyCodex config with secrets removed.
+      render: toml
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant terminal output or logs.
+      render: shell

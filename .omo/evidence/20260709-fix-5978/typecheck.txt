@@ -1,0 +1,9 @@
+$ tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+(no diagnostics)
+TSGO_EXIT=0
+
+Note: tsgo prints nothing on a clean run; the clean result is the exit code 0.
+This covers all three changed files, which all live under packages/omo-opencode:
+  - packages/omo-opencode/src/shared/file-reference-resolver.ts
+  - packages/omo-opencode/src/shared/file-reference-resolver.test.ts
+  - packages/omo-opencode/src/tools/slashcommand/command-output-formatter.test.ts

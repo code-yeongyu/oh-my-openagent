@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { z } from "zod"
-import { DoctorResultSchema as DoctorSchema } from "../src/help/schema/doctor"
-import { StatusResultSchema as StatusSchema } from "../src/help/schema/status"
-import { SandboxResultSchema as SandboxSchema } from "../src/help/schema/sandbox"
-import { AcpResultSchema as AcpSchema } from "../src/help/schema/acp"
+import { DoctorResultSchema as DoctorSchema } from "../packages/omo-opencode/src/help/schema/doctor"
+import { StatusResultSchema as StatusSchema } from "../packages/omo-opencode/src/help/schema/status"
+import { SandboxResultSchema as SandboxSchema } from "../packages/omo-opencode/src/help/schema/sandbox"
+import { AcpResultSchema as AcpSchema } from "../packages/omo-opencode/src/help/schema/acp"
 
 const SCHEMA_OUTPUT_DIR = "assets/help"
 

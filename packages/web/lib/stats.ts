@@ -5,6 +5,13 @@ const NPM_FIRST_PUBLISH_YEAR = 2025
 
 const CACHE_TTL_MS = 60 * 60 * 1000
 
+export const FALLBACK_STATS_DATA: StatsData = {
+  stars: 40_000,
+  totalDownloads: 1_000_000,
+  monthlyDownloads: 580_000,
+  weeklyDownloads: 90_000,
+}
+
 interface StatsCache {
   data: StatsData
   timestamp: number
@@ -145,3 +152,5 @@ export function formatStats(stats: StatsData): FormattedStatsData {
     weeklyDownloads: formatCount(stats.weeklyDownloads),
   }
 }
+
+export const FALLBACK_FORMATTED_STATS: FormattedStatsData = formatStats(FALLBACK_STATS_DATA)

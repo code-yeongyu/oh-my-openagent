@@ -1,0 +1,27 @@
+{
+  "title": "Senpi live task status",
+  "connector": "xterm-replay",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "file-replay",
+    "path": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-raw-pty/terminal-ansi.txt"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 140,
+    "rows": 12
+  },
+  "cleanup": "no pty (replay)",
+  "files": {
+    "png": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-web-terminal/terminal.png",
+    "text": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-web-terminal/terminal.txt",
+    "ansi": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-web-terminal/terminal-ansi.txt",
+    "metadata": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-web-terminal/metadata.json"
+  }
+}

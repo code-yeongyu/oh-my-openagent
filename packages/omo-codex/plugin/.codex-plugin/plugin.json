@@ -1,0 +1,72 @@
+{
+	"name": "omo",
+	"version": "4.19.4",
+	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
+	"author": {
+		"name": "Yeongyu Kim",
+		"email": "yeongyu@users.noreply.github.com",
+		"url": "https://github.com/code-yeongyu"
+	},
+	"homepage": "https://github.com/sisyphuslabs/omo",
+	"repository": "https://github.com/sisyphuslabs/omo",
+	"license": "MIT",
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"omo",
+		"hooks",
+		"mcp",
+		"skills"
+	],
+	"skills": "./skills/",
+	"hooks": [
+		"./hooks/session-start-loading-project-rules.json",
+		"./hooks/session-start-recording-session-telemetry.json",
+		"./hooks/session-start-checking-auto-update.json",
+		"./hooks/session-start-checking-bootstrap-provisioning.json",
+		"./hooks/session-start-checking-codegraph-bootstrap.json",
+		"./hooks/user-prompt-submit-loading-project-rules.json",
+		"./hooks/user-prompt-submit-checking-ultrawork-trigger.json",
+		"./hooks/user-prompt-submit-checking-ulw-loop-steering.json",
+		"./hooks/pre-tool-use-recommending-git-bash-mcp.json",
+		"./hooks/pre-tool-use-enforcing-unlimited-goal-budget.json",
+		"./hooks/pre-tool-use-guarding-ulw-loop-spawns.json",
+		"./hooks/post-tool-use-checking-comments.json",
+		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
+		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
+		"./hooks/post-tool-use-matching-project-rules.json",
+		"./hooks/post-tool-use-checking-thread-title-hygiene.json",
+		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
+		"./hooks/post-compact-resetting-project-rule-cache.json",
+		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",
+		"./hooks/stop-checking-start-work-continuation.json",
+		"./hooks/stop-checking-ulw-loop-resume.json",
+		"./hooks/subagent-stop-checking-start-work-continuation.json",
+		"./hooks/subagent-stop-verifying-lazycodex-executor-evidence.json"
+	],
+	"mcpServers": "./.mcp.json",
+	"interface": {
+		"displayName": "OMO",
+		"shortDescription": "Unified local Codex components",
+		"longDescription": "OMO exposes local Codex Rules, Comment Checker, Git Bash, LSP, Ultrawork, ulw-loop, start-work continuation, and telemetry components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
+		"developerName": "Yeongyu Kim",
+		"category": "Developer Tools",
+		"capabilities": [
+			"Hooks",
+			"MCP Tools",
+			"Code Intelligence",
+			"Workflow",
+			"Context Injection"
+		],
+		"websiteURL": "https://github.com/sisyphuslabs/omo",
+		"privacyPolicyURL": "https://github.com/sisyphuslabs/omo#privacy",
+		"termsOfServiceURL": "https://github.com/sisyphuslabs/omo#license",
+		"defaultPrompt": [
+			"Use OMO LSP diagnostics on this workspace.",
+			"Show which OMO rules matched this file.",
+			"ulw: run this change with evidence."
+		],
+		"brandColor": "#7C3AED",
+		"screenshots": []
+	}
+}

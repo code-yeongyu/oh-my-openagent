@@ -1,0 +1,90 @@
+Task 17: Config key `task.resume_children`
+============================================
+
+## Scope
+Add `resume_children: z.boolean().default(true)` to the BASE task schema and
+the OPTIONAL override (layer) schema in packages/omo-config-core/src/schema/task.ts.
+Thread through OmoTaskSettings so lifecycle code reads a typed field.
+Regenerate assets/omo.schema.json. Document in docs/reference if task section exists.
+
+## RED (failing-first)
+Added 4 tests to packages/omo-config-core/src/schema/task.test.ts:
+- default parse yields resume_children === true
+- explicit false preserved
+- explicit true preserved
+- non-boolean value rejected
+
+Initial run (before schema change):
+  4 tests failed:
+  (fail) OmoTaskSettingsSchema resume_children > defaults to true
+  (fail) OmoTaskSettingsSchema resume_children > explicit false preserved
+  (fail) OmoTaskSettingsSchema resume_children > explicit true preserved
+  (fail) OmoTaskSettingsSchema resume_children > non-boolean rejected
+
+Also fixed: top-level-senpi-config-characterization.test.ts snapshot needed
+resume_children: true added to EXPECTED_CONFIG (schema now emits the key by default).
+
+## GREEN
+After adding `resume_children: z.boolean().default(true)` to OmoTaskSettingsSchema
+and `resume_children: z.boolean().optional()` to OmoTaskSettingsLayerSchema:
+
+  bun test packages/omo-config-core packages/senpi-task/src/lifecycle
+  => 173 pass, 0 fail, 498 expect() calls
+
+## Typecheck
+  tsgo --noEmit -p packages/omo-config-core/tsconfig.json  => clean
+  tsgo --noEmit -p packages/senpi-task/tsconfig.json       => clean
+  tsgo --noEmit -p packages/omo-senpi/tsconfig.json        => clean
+
+## Schema artifact regeneration
+  bun run build:omo-schema
+  => ✓ omo JSON Schema generated: assets/omo.schema.json
+
+  grep resume_children assets/omo.schema.json
+  => 7 occurrences (base schema + nested profiles/harness variants)
+
+  Verified base schema entry:
+    "resume_children": {
+      "default": true,
+      "type": "boolean"
+    }
+
+## QA: schema round-trip
+
+### Key present (explicit false):
+  OmoTaskSettingsSchema.parse({ resume_children: false }).resume_children === false
+  (not coerced to true; explicit false is preserved)
+
+### Key absent (default):
+  OmoTaskSettingsSchema.parse({}).resume_children === true
+  (defaults to true)
+
+### Key present (explicit true):
+  OmoTaskSettingsSchema.parse({ resume_children: true }).resume_children === true
+
+### Non-boolean rejected:
+  OmoTaskSettingsSchema.safeParse({ resume_children: "yes" }).success === false
+  Error path contains "resume_children"
+
+## Docs
+docs/reference/omo-json.md has a `### task` section (line 253).
+Added `resume_children` row to the settings table:
+  | `resume_children` | boolean | `true` |
+
+## Adversarial: new-input-parsing
+- Absent key -> default true (verified)
+- Explicit false -> false preserved, not coerced (verified)
+- Non-boolean -> parse rejected (verified)
+
+## Adversarial: stale_state (schema drift)
+- Regenerated schema artifact gains the key (verified via grep)
+- Existing records without the key still parse (default true; strict() passes)
+- reattach_on_reconcile untouched (no semantic change)
+
+## Changed files
+- packages/omo-config-core/src/schema/task.ts (schema field added)
+- packages/omo-config-core/src/schema/task.test.ts (4 new tests)
+- packages/omo-config-core/src/loader/top-level-senpi-config-characterization.test.ts (snapshot update)
+- packages/senpi-task/src/tools/task/execute-spawn.test.ts (fixture: add resume_children)
+- docs/reference/omo-json.md (docs table row)
+- assets/omo.schema.json (regenerated artifact)

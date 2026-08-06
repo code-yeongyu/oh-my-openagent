@@ -213,4 +213,3 @@ If `$ARGUMENTS` is provided, narrow the scan:
 STOP and report if:
 - More than 50 candidates found (ask user to narrow scope or confirm proceeding)
 - Build breaks and cannot be fixed by reverting
-

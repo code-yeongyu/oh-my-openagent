@@ -1,0 +1,12 @@
+
+3 tests skipped:
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+
+ 12146 pass
+ 3 skip
+ 0 fail
+ 2 snapshots, 60356 expect() calls
+Ran 12149 tests across 1554 files. [243.01s]
+EXIT=0

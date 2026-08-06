@@ -1,0 +1,10 @@
+# The presence of this .npmignore makes npm ignore the sibling .gitignore for
+# packing. The frontend third-party references (references/design/*.md,
+# references/ui-ux-db/**, and references/designpowers/vendor/**) are gitignored
+# because they are materialized from the upstreams/ submodules at build/prepack
+# time, but they MUST ship in the npm tarball and Codex marketplace bundle. By
+# NOT listing those paths here, they are included in the package. Keep this file
+# minimal so the materialized refs pack.
+
+# OS / editor junk that must never ship.
+.DS_Store

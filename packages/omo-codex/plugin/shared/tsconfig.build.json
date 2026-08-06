@@ -1,0 +1,9 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"declaration": false,
+		"noEmit": true
+	},
+	"include": ["src/**/*"],
+	"exclude": ["test/**/*"]
+}

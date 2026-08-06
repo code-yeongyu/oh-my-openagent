@@ -1,0 +1,17 @@
+SUPERSEDED BY `review-round-2-green.log`.
+
+Targeted regression coverage from review round 1:
+
+- Standard tmux:
+  `TMUX=/tmp/tmux-1000/default` remains eligible.
+- Standard pane behavior:
+  non-cmux spawn still contains `Focus this pane to attach.` and the detached
+  placeholder loop, and does not contain `opencode attach`.
+- Disabled boundary:
+  an environment with neither `TMUX` nor `CMUX_SOCKET_PATH` remains ineligible.
+- Empty boundary:
+  `TMUX=""` with no cmux socket remains ineligible.
+- Existing shell escaping:
+  cmux directories with spaces remain shell-escaped.
+
+Result: all targeted regression checks passed in the 44-pass suite.

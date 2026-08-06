@@ -1,0 +1,17 @@
+{
+	"name": "sisyphuslabs",
+	"interface": {
+		"displayName": "Sisyphus Labs"
+	},
+	"plugins": [
+		{
+			"name": "omo",
+			"source": "./plugins/omo",
+			"category": "Developer Tools",
+			"policy": {
+				"installation": "AVAILABLE",
+				"authentication": "ON_INSTALL"
+			}
+		}
+	]
+}

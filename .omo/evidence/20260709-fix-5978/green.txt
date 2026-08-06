@@ -1,0 +1,31 @@
+bun test v1.3.11 (af24e281)
+bun.exe : 
+At C:\Users\pss\AppData\Roaming\npm\bun.ps1:14 char:3
++   & "$basedir/node_modules/bun/bin/bun.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-opencode\src\shared\file-reference-resolver.test.ts:
+(pass) resolveFilePath > expands bare environment variables before resolving absolute paths
+(pass) resolveFilePath > expands braced environment variables before resolving absolute paths
+(pass) resolveFilePath > keeps POSIX absolute paths absolute when cwd is POSIX-shaped [16.00ms]
+(pass) resolveFilePath > keeps Windows absolute paths absolute when cwd is POSIX-shaped
+(pass) resolveFilePath > resolves relative paths from POSIX-shaped cwd
+(pass) resolveFileReferencesInText > resolves file references within cwd
+(pass) resolveFileReferencesInText > rejects traversal references that escape cwd
+(pass) resolveFileReferencesInText > rejects absolute references outside cwd
+(pass) resolveFileReferencesInText > rejects symlink references that escape cwd [16.00ms]
+(pass) resolveFileReferencesInText > preserves literal @tokens that do not resolve to an existing file
+(pass) resolveFileReferencesInText > inlines existing references while leaving unresolved @tokens untouched
+
+packages\omo-opencode\src\tools\slashcommand\command-output-formatter.test.ts:
+(pass) command output formatter > #given command template includes argument placeholders > #then replaces both 
+placeholder forms
+(pass) command output formatter > #given command content mixes a real @file reference with literal @token prose > 
+#then inlines the real file but leaves the documentation token uncorrupted
+
+ 13 pass
+ 0 fail
+ 23 expect() calls
+Ran 13 tests across 2 files. [387.00ms]

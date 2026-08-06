@@ -1,0 +1,75 @@
+{
+  "name": "@oh-my-opencode/skills-loader-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-neutral skill loading, builtin skill, runtime skill, and skill matching primitives for oh-my-opencode.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./opencode-skill-loader": {
+      "types": "./src/features/opencode-skill-loader/index.ts",
+      "import": "./src/features/opencode-skill-loader/index.ts"
+    },
+    "./opencode-skill-loader/*": {
+      "types": "./src/features/opencode-skill-loader/*.ts",
+      "import": "./src/features/opencode-skill-loader/*.ts"
+    },
+    "./builtin-skills": {
+      "types": "./src/features/builtin-skills/index.ts",
+      "import": "./src/features/builtin-skills/index.ts"
+    },
+    "./builtin-skills/*": {
+      "types": "./src/features/builtin-skills/*.ts",
+      "import": "./src/features/builtin-skills/*.ts"
+    },
+    "./opencode-runtime-skills": {
+      "types": "./src/features/opencode-runtime-skills/index.ts",
+      "import": "./src/features/opencode-runtime-skills/index.ts"
+    },
+    "./opencode-runtime-skills/*": {
+      "types": "./src/features/opencode-runtime-skills/*.ts",
+      "import": "./src/features/opencode-runtime-skills/*.ts"
+    },
+    "./skill": {
+      "types": "./src/tools/skill/index.ts",
+      "import": "./src/tools/skill/index.ts"
+    },
+    "./skill/*": {
+      "types": "./src/tools/skill/*.ts",
+      "import": "./src/tools/skill/*.ts"
+    },
+    "./auto-slash-command": {
+      "types": "./src/hooks/auto-slash-command/index.ts",
+      "import": "./src/hooks/auto-slash-command/index.ts"
+    },
+    "./auto-slash-command/*": {
+      "types": "./src/hooks/auto-slash-command/*.ts",
+      "import": "./src/hooks/auto-slash-command/*.ts"
+    },
+    "./shared/*": {
+      "types": "./src/shared/*.ts",
+      "import": "./src/shared/*.ts"
+    },
+    "./config/*": {
+      "types": "./src/config/*.ts",
+      "import": "./src/config/*.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/claude-code-compat-core": "workspace:*",
+    "@oh-my-opencode/model-core": "workspace:*",
+    "@oh-my-opencode/shared-skills": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*",
+    "js-yaml": "^4.1.1",
+    "picomatch": "^4.0.4",
+    "zod": "^4.4.3"
+  }
+}

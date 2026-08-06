@@ -1,0 +1,35 @@
+name: PR source guidance
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  close-with-source-guidance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close PR with source repository guidance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          PR_URL="https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
+
+          body="$(mktemp)"
+          cat > "$body" <<MARKDOWN
+          Thanks for the PR! Changes to LazyCodex land through [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) — could you open this against [omo-codex](https://github.com/code-yeongyu/oh-my-openagent/tree/dev/packages/omo-codex) over there instead? PRs in this repository can't be merged.
+
+          If you're working with a coding agent, prompt it like this:
+
+          > I opened $PR_URL ("$PR_TITLE") against code-yeongyu/lazycodex, but changes there land through code-yeongyu/oh-my-openagent, where the Codex implementation lives under packages/omo-codex. Read my original PR, then open an equivalent PR against code-yeongyu/oh-my-openagent. In the new PR body, link the original PR ($PR_URL), explain that it was first opened against lazycodex, and describe in detail what that PR changed and why.
+          MARKDOWN
+
+          gh pr close "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --comment "$(cat "$body")"

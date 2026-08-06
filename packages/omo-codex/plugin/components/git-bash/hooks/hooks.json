@@ -1,0 +1,29 @@
+{
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "^Bash$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use",
+						"timeout": 5,
+						"statusMessage": "(OmO 4.19.4) Recommending Git Bash MCP"
+					}
+				]
+			}
+		],
+		"PostCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-compact",
+						"timeout": 5,
+						"statusMessage": "(OmO 4.19.4) Resetting Git Bash MCP Reminder"
+					}
+				]
+			}
+		]
+	}
+}

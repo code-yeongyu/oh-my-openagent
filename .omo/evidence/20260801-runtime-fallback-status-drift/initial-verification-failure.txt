@@ -1,0 +1,10 @@
+The first repository-wide typecheck and full-test runs stopped in untouched Senpi code because the dedicated worktree lacked current workspace package links.
+
+Representative errors:
+- Cannot find module '@oh-my-opencode/omo-opencode/config-migration'.
+- Cannot find module '@code-yeongyu/senpi'.
+
+Resolution:
+- Ran `bun install` in the dedicated worktree.
+- Reverted generated build artifacts produced by postinstall.
+- Reran `bun run typecheck` and `bun test`; both passed.

@@ -1,10 +1,10 @@
 {
   "name": "@oh-my-opencode/ast-grep-mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "private": true,
   "bin": {
-    "ast-grep-mcp": "dist/cli.js"
+    "omo-ast-grep": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -15,11 +15,11 @@
   "scripts": {
     "build": "bun build src/cli.ts --outdir dist --target node --format esm",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "bun test src/*.test.ts"
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
-    "@oh-my-opencode/ast-grep-core": "workspace:*",
-    "@ast-grep/cli": "^0.41.1"
+    "@oh-my-opencode/mcp-stdio-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
   },
   "devDependencies": {
     "bun-types": "1.3.12"

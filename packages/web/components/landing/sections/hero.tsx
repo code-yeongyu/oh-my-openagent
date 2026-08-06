@@ -1,28 +1,21 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import { getStats, formatStats } from "@/lib/stats"
+import { getStats, formatStats, FALLBACK_FORMATTED_STATS } from "@/lib/stats"
 import { HeroStats } from "@/components/landing/hero-stats"
 import { InstallCommand } from "@/components/landing/install-command"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
 import { GithubIcon } from "@/components/icons/github-icon"
 
-const FALLBACK_STATS = {
-  stars: "40k+",
-  totalDownloads: "1M+",
-  monthlyDownloads: "580k+",
-  weeklyDownloads: "90k+",
-}
-
 export async function HeroSection(): Promise<JSX.Element> {
   const t = await getTranslations("landing")
 
-  let formattedStats = FALLBACK_STATS
+  let formattedStats = FALLBACK_FORMATTED_STATS
   try {
     const stats = await getStats()
     formattedStats = formatStats(stats)
   } catch {
-    formattedStats = FALLBACK_STATS
+    formattedStats = FALLBACK_FORMATTED_STATS
   }
 
   return (
@@ -63,12 +56,16 @@ export async function HeroSection(): Promise<JSX.Element> {
             specializedAgents: t("hero.specializedAgents", { count: "11" }),
             totalDownloads: t("hero.totalDownloads", { count: "{count}" }),
             monthlyDownloads: t("hero.monthlyDownloads", { count: "{count}" }),
-            lifecycleHooks: t("hero.lifecycleHooks", { count: "54+" }),
+            lifecycleHooks: t("hero.lifecycleHooks", { count: "60+" }),
           }}
         />
 
         <div className="w-full max-w-md">
           <InstallCommand command={t("hero.installCommand")} />
+        </div>
+        <div className="w-full max-w-md">
+          <p className="mb-1 text-xs text-zinc-500">{t("hero.codexLabel")}</p>
+          <InstallCommand command={t("hero.codexInstallCommand")} />
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row">

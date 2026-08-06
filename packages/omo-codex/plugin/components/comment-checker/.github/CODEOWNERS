@@ -1,0 +1,12 @@
+* @code-yeongyu
+
+.github/workflows/* @code-yeongyu
+.github/dependabot.yml @code-yeongyu
+package.json @code-yeongyu
+package-lock.json @code-yeongyu
+LICENSE @code-yeongyu
+NOTICE @code-yeongyu
+README.md @code-yeongyu
+CHANGELOG.md @code-yeongyu
+.codex-plugin/plugin.json @code-yeongyu
+hooks/hooks.json @code-yeongyu

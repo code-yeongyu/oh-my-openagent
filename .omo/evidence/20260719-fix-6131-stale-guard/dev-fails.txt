@@ -1,0 +1,4 @@
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 19 roots exist with valid names [1.38ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.53ms]
+(fail) readOpencodeConfigAgents > handles malformed opencode.json gracefully [2.26ms]
+(fail) readOpencodeConfigAgents > returns empty record when no opencode.json exists [4.60ms]

@@ -1,4 +1,7 @@
+import { isRecord } from "@oh-my-opencode/utils/record-type-guard"
 import type { ApplyPatchAccumulator, ApplyPatchFileMetadata, CheckerEdit } from "./types"
+
+export { isRecord } from "@oh-my-opencode/utils/record-type-guard"
 
 export function extractApplyPatchEdits(
   details: unknown,
@@ -157,8 +160,4 @@ export function getString(input: Record<string, unknown>, keys: readonly string[
 
 export function joinPatchLines(lines: readonly string[]): string {
   return lines.length === 0 ? "" : `${lines.join("\n")}\n`
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
 }

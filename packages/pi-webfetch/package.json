@@ -1,0 +1,47 @@
+{
+	"name": "@oh-my-opencode/pi-webfetch",
+	"version": "4.15.1",
+	"type": "module",
+	"private": true,
+	"description": "Web fetch tool Pi extension: fetches URL content as markdown, plain text, or HTML with bounded time and size controls. Vendored from code-yeongyu/pi-webfetch.",
+	"license": "MIT",
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		]
+	},
+	"scripts": {
+		"typecheck": "tsgo --noEmit -p tsconfig.json",
+		"test": "bun test test"
+	},
+	"dependencies": {
+		"turndown": "^7.2.4"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-ai": "*",
+		"@mariozechner/pi-coding-agent": "*",
+		"@mariozechner/pi-tui": "*",
+		"typebox": "*"
+	},
+	"peerDependenciesMeta": {
+		"@mariozechner/pi-ai": {
+			"optional": true
+		},
+		"@mariozechner/pi-coding-agent": {
+			"optional": true
+		},
+		"@mariozechner/pi-tui": {
+			"optional": true
+		},
+		"typebox": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@mariozechner/pi-ai": "0.73.0",
+		"@mariozechner/pi-coding-agent": "0.73.0",
+		"@mariozechner/pi-tui": "0.73.0",
+		"@types/turndown": "^5.0.5",
+		"typebox": "1.1.38"
+	}
+}

@@ -46,6 +46,10 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     variants: ["low", "medium", "high"],
   },
   {
+    family: "qwen",
+    includes: ["qwen"],
+  },
+  {
     family: "grok",
     includes: ["grok"],
     variants: ["low", "medium", "high"],
@@ -54,20 +58,30 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   {
     family: "kimi-thinking",
     includes: ["kimi-thinking", "k2-thinking", "k2-think"],
-    pattern: /(?:kimi|k2).*-(?:thinking|think)/,
+    // Matches models with -thinking/-think suffix, OR k2p* models (k2p5, k2p6, k2-p6, k2.p6)
+    // which are kimi-for-coding provider models that support thinking (#3945, #4418, #4707).
+    pattern: /(?:kimi.*-(?:thinking|think)|k2(?:.*-(?:thinking|think)|[-.]?p\d))/,
     variants: ["low", "medium", "high"],
     supportsThinking: true,
   },
   {
     family: "kimi",
-    includes: ["kimi", "k2"],
+    // Match "kimi" anywhere, or "k2" NOT followed by optional separator + "p" + digit.
+    // Excludes k2p6, k2-p6, k2.p6 from kimi-for-coding which support thinking (#4418).
+    pattern: /(?:kimi|k2(?![-.]?p\d))/,
     variants: ["low", "medium", "high"],
     supportsThinking: false,
   },
   {
     family: "glm",
     includes: ["glm"],
-    variants: ["low", "medium", "high"],
+    variants: ["low", "medium", "high", "max"],
+    reasoningEfforts: ["high", "max"],
+    reasoningEffortAliases: {
+      low: "high",
+      medium: "high",
+      xhigh: "max",
+    },
   },
   {
     family: "minimax",
@@ -78,7 +92,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   {
     family: "deepseek",
     includes: ["deepseek"],
-    variants: ["low", "medium", "high"],
+    variants: ["low", "medium", "high", "max"],
     reasoningEfforts: ["high", "max"],
     reasoningEffortAliases: {
       low: "high",

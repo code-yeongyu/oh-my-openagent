@@ -1,12 +1,5 @@
 import { NextResponse } from "next/server"
-import { getStats, formatStats } from "@/lib/stats"
-
-const FALLBACK = {
-  stars: "37.3k",
-  totalDownloads: "1M+",
-  monthlyDownloads: "580k+",
-  weeklyDownloads: "90k+",
-}
+import { getStats, formatStats, FALLBACK_FORMATTED_STATS } from "@/lib/stats"
 
 export async function GET() {
   try {
@@ -22,7 +15,7 @@ export async function GET() {
       },
     )
   } catch {
-    return NextResponse.json(FALLBACK, {
+    return NextResponse.json(FALLBACK_FORMATTED_STATS, {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
       },

@@ -1,0 +1,31 @@
+import { composeOmoSenpiExtension } from "./compose"
+import type { OmoSenpiComponent } from "./types"
+import { createConfigStartupComponent } from "../components/config-startup"
+import { createCommentCheckerComponent } from "../components/comment-checker"
+import { createConfigWatchComponent } from "../components/config-watch"
+import { createAstGrepComponent } from "../components/ast-grep"
+import { createLspComponent } from "../components/lsp"
+import { createSenpiTelemetryComponent } from "../components/telemetry"
+import { createTaskComponent } from "../components/task"
+import { createStartWorkContinuationComponent } from "../components/start-work-continuation"
+import { createUltraworkComponent } from "../components/ultrawork"
+import { createUlwLoopComponent } from "../components/ulw-loop"
+import { createFallbackArchitectComponent } from "../components/fallback-architect"
+
+const components: OmoSenpiComponent[] = [
+  createConfigStartupComponent(),
+  createUltraworkComponent(),
+  createStartWorkContinuationComponent(),
+  createUlwLoopComponent(),
+  createFallbackArchitectComponent(),
+  createCommentCheckerComponent(),
+  createSenpiTelemetryComponent(),
+  createAstGrepComponent(),
+  createLspComponent(),
+  createTaskComponent(),
+  createConfigWatchComponent(),
+]
+
+export default composeOmoSenpiExtension(components)
+export { composeOmoSenpiExtension }
+export type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"

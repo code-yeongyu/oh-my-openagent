@@ -1,0 +1,47 @@
+Focused GREEN with CI Bun
+=========================
+
+Command:
+  mise x bun@1.3.12 -- bun --cwd <task-worktree> test script/gpt-mini-reference-audit.test.ts
+
+Observed:
+  bun test v1.3.12
+  (pass) GPT Mini reference audit > repository root decodes a platform-native file URL
+  (pass) GPT Mini reference audit > tracked shipped files no longer reference the retired GPT Mini model
+  2 pass
+  0 fail
+  2 expect() calls
+  exit 0
+
+Type diagnostic:
+  mise x bun@1.3.12 -- bun run --cwd <task-worktree> typecheck:script
+  $ tsgo --noEmit -p script/tsconfig.json
+  exit 0
+
+TypeScript no-excuse audit:
+  No violations in 1 file(s).
+  exit 0
+
+Full repository gate:
+  mise x bun@1.3.12 -- bun --cwd <task-worktree> test
+  12626 pass
+  3 skip
+  0 fail
+  1 snapshot
+  76049 expect() calls
+  Ran 12629 tests across 1665 files in 143.97s
+  exit 0
+
+Structure:
+  Changed file pure LOC: 48
+  git diff --check: exit 0
+
+Post-merge base integration:
+  origin/dev already contained the native-path fix in f4b1b0f93.
+  Generated Senpi conflicts were rebuilt with Bun 1.3.12.
+  build-extension.mjs --check: current
+  conflict marker detector: clean
+  unmerged index entries: none
+  test:senpi: 511 pass, 0 fail, 1431 expect() calls across 81 files
+  focused GPT Mini audit: 2 pass, 0 fail
+

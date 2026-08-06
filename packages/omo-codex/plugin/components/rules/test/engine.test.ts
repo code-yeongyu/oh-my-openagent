@@ -1,0 +1,306 @@
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+import { configFromEnvironment } from "../src/config.js";
+import { createEngine, defaultConfig, type EngineDeps } from "@oh-my-opencode/rules-engine/engine";
+import { matchRule as defaultMatchRule } from "@oh-my-opencode/rules-engine/engine";
+import type { RuleCandidate } from "@oh-my-opencode/rules-engine/engine";
+
+const projectRoot = "/tmp/codex-rules-engine";
+
+function makeCandidate(overrides: Partial<RuleCandidate> = {}): RuleCandidate {
+	const candidate = {
+		path: join(projectRoot, ".omo", "rules", "typescript.md"),
+		realPath: join(projectRoot, ".omo", "rules", "typescript.md"),
+		source: ".omo/rules",
+		distance: 0,
+		isGlobal: false,
+		isSingleFile: false,
+		relativePath: ".omo/rules/typescript.md",
+	} satisfies RuleCandidate;
+	return { ...candidate, ...overrides };
+}
+
+describe("rule engine dynamic matching", () => {
+	it("#given duplicate target paths #when loading dynamic rules #then repeated discovery and parsing work is avoided", () => {
+		// given
+		const targetPath = join(projectRoot, "src", "app.ts");
+		const candidate = makeCandidate();
+		const counters = {
+			findProjectRoot: 0,
+			findCandidates: 0,
+			readFile: 0,
+		};
+		const deps = {
+			findProjectRoot: () => {
+				counters.findProjectRoot += 1;
+				return projectRoot;
+			},
+			findCandidates: () => {
+				counters.findCandidates += 1;
+				return [candidate];
+			},
+			readFile: () => {
+				counters.readFile += 1;
+				return ["---", "globs: **/*.ts", "---", "", "Prefer strict TypeScript."].join("\n");
+			},
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadDynamicRules(projectRoot, [targetPath, targetPath, targetPath]);
+
+		// then
+		expect(result.rules).toHaveLength(1);
+		expect(counters).toEqual({
+			findProjectRoot: 1,
+			findCandidates: 1,
+			readFile: 1,
+		});
+	});
+
+	it("#given distinct target files in same directory #when loading dynamic rules #then candidate discovery is reused", () => {
+		// given
+		const firstTarget = join(projectRoot, "src", "first.ts");
+		const secondTarget = join(projectRoot, "src", "second.ts");
+		const thirdTarget = join(projectRoot, "src", "third.ts");
+		const candidate = makeCandidate();
+		let findCandidatesCalls = 0;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => {
+				findCandidatesCalls += 1;
+				return [candidate];
+			},
+			readFile: () => ["---", "globs: **/*.ts", "---", "", "Prefer strict TypeScript."].join("\n"),
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadDynamicRules(projectRoot, [firstTarget, secondTarget, thirdTarget]);
+
+		// then
+		expect(result.rules).toHaveLength(1);
+		expect(findCandidatesCalls).toBe(1);
+	});
+
+	it("#given same rule content and target across loads #when loading dynamic rules repeats #then cached match decision is reused", () => {
+		// given
+		const targetPath = join(projectRoot, "src", "app.ts");
+		const candidate = makeCandidate();
+		let matchCalls = 0;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [candidate],
+			readFile: () => ["---", "globs: **/*.ts", "---", "", "Prefer strict TypeScript."].join("\n"),
+			matchRule: (input) => {
+				matchCalls += 1;
+				return defaultMatchRule(input);
+			},
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const firstResult = engine.loadDynamicRules(projectRoot, [targetPath]);
+		const secondResult = engine.loadDynamicRules(projectRoot, [targetPath]);
+
+		// then
+		expect(firstResult.rules).toHaveLength(1);
+		expect(secondResult.rules).toHaveLength(1);
+		expect(matchCalls).toBe(1);
+	});
+
+	it("#given same rule path changes body #when loading dynamic rules repeats #then cached match decision invalidates", () => {
+		// given
+		const targetPath = join(projectRoot, "src", "app.ts");
+		const candidate = makeCandidate();
+		let body = "Prefer strict TypeScript.";
+		let matchCalls = 0;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [candidate],
+			readFile: () => ["---", "globs: **/*.ts", "---", "", body].join("\n"),
+			matchRule: (input) => {
+				matchCalls += 1;
+				return defaultMatchRule(input);
+			},
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		engine.loadDynamicRules(projectRoot, [targetPath]);
+		body = "Prefer readonly TypeScript.";
+		engine.loadDynamicRules(projectRoot, [targetPath]);
+
+		// then
+		expect(matchCalls).toBe(2);
+	});
+
+	it("#given same rule path changes frontmatter #when loading dynamic rules repeats #then cached match decision invalidates", () => {
+		// given
+		const targetPath = join(projectRoot, "src", "app.ts");
+		const candidate = makeCandidate();
+		let globs = "**/*.ts";
+		let matchCalls = 0;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [candidate],
+			readFile: () => ["---", `globs: ${globs}`, "---", "", "Prefer strict TypeScript."].join("\n"),
+			matchRule: (input) => {
+				matchCalls += 1;
+				return defaultMatchRule(input);
+			},
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const firstResult = engine.loadDynamicRules(projectRoot, [targetPath]);
+		globs = "**/*.tsx";
+		const secondResult = engine.loadDynamicRules(projectRoot, [targetPath]);
+
+		// then
+		expect(firstResult.rules).toHaveLength(1);
+		expect(secondResult.rules).toHaveLength(0);
+		expect(matchCalls).toBe(2);
+	});
+
+	it("#given same rule and different targets #when loading dynamic rules repeats #then target-specific decisions do not leak", () => {
+		// given
+		const sourceTarget = join(projectRoot, "src", "app.ts");
+		const testTarget = join(projectRoot, "src", "app.test.ts");
+		const candidate = makeCandidate();
+		let matchCalls = 0;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [candidate],
+			readFile: () =>
+				["---", 'globs: ["**/*.ts", "!**/*.test.ts"]', "---", "", "Prefer strict TypeScript."].join("\n"),
+			matchRule: (input) => {
+				matchCalls += 1;
+				return defaultMatchRule(input);
+			},
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const sourceResult = engine.loadDynamicRules(projectRoot, [sourceTarget]);
+		const testResult = engine.loadDynamicRules(projectRoot, [testTarget]);
+
+		// then
+		expect(sourceResult.rules).toHaveLength(1);
+		expect(testResult.rules).toHaveLength(0);
+		expect(matchCalls).toBe(2);
+	});
+});
+
+describe("rule engine default source selection", () => {
+	it("#given auto source selection #when loading static rules #then Codex-native and Claude-home sources are disabled by default", () => {
+		// given
+		let capturedDisabledSources: ReadonlySet<string> | undefined;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: (options) => {
+				capturedDisabledSources = options.disabledSources;
+				return [];
+			},
+			readFile: () => null,
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(capturedDisabledSources?.has("AGENTS.md")).toBe(true);
+		expect(capturedDisabledSources?.has("~/.claude/rules")).toBe(true);
+		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(true);
+		expect(capturedDisabledSources?.has("CLAUDE.md")).toBe(false);
+	});
+
+	it("#given removed agent-doc sources and a real source are requested #when loading static rules #then only real sources are enabled", () => {
+		// given
+		let capturedDisabledSources: ReadonlySet<string> | undefined;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: (options) => {
+				capturedDisabledSources = options.disabledSources;
+				return [];
+			},
+			readFile: () => null,
+		} satisfies EngineDeps;
+		const engine = createEngine(
+			configFromEnvironment({ CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,~/.claude/CLAUDE.md,plugin-bundled" }),
+			deps,
+		);
+
+		// when
+		engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(capturedDisabledSources?.has("AGENTS.md")).toBe(false);
+		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(false);
+		expect(capturedDisabledSources?.has("plugin-bundled")).toBe(false);
+		expect(capturedDisabledSources?.has(".omo/rules")).toBe(true);
+	});
+});
+
+describe("rule engine static loading", () => {
+	it("#given multiple root single-file candidates #when loading static rules #then only one root single-file rule is selected", () => {
+		// given
+		const firstCandidate = makeCandidate({
+			path: join(projectRoot, "CONTEXT.md"),
+			realPath: join(projectRoot, "CONTEXT.md"),
+			source: "CONTEXT.md",
+			isSingleFile: true,
+			relativePath: "CONTEXT.md",
+		});
+		const secondCandidate = makeCandidate({
+			path: join(projectRoot, "nested", "CONTEXT.md"),
+			realPath: join(projectRoot, "nested", "CONTEXT.md"),
+			source: "CONTEXT.md",
+			isSingleFile: true,
+			relativePath: "nested/CONTEXT.md",
+		});
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [firstCandidate, secondCandidate],
+			readFile: () => "Shared project context.",
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(result.rules).toHaveLength(1);
+		expect(result.rules[0]?.matchReason).toBe("single-file");
+	});
+
+	it("#given project candidate resolves outside project #when loading static rules #then the rule is skipped with a diagnostic", () => {
+		// given
+		const outsidePath = "/tmp/codex-rules-outside/.omo/rules/typescript.md";
+		const outsideCandidate = makeCandidate({
+			path: outsidePath,
+			realPath: outsidePath,
+		});
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [outsideCandidate],
+			readFile: () => "Should not be read.",
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(result.rules).toEqual([]);
+		expect(result.diagnostics).toEqual([
+			{
+				severity: "warning",
+				source: outsidePath,
+				message: "Rule file resolves outside project root",
+			},
+		]);
+	});
+});

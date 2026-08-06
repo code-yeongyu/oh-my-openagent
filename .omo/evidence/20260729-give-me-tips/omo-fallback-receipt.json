@@ -1,0 +1,53 @@
+{
+  "mode": "omo-fallback",
+  "checks": [
+    {
+      "name": "tmux session started",
+      "ok": true,
+      "detail": "ulw-tip-omo-fallback-35793"
+    },
+    {
+      "name": "TUI booted (startup Tip visible)",
+      "ok": true,
+      "detail": "2573ms"
+    },
+    {
+      "name": "fallback model answered after refusal",
+      "ok": true,
+      "detail": "519ms"
+    },
+    {
+      "name": "give-me-tips pointer rendered",
+      "ok": true,
+      "detail": "5ms"
+    },
+    {
+      "name": "Tip line present",
+      "ok": true
+    },
+    {
+      "name": "fallback model id (mock-weak) rendered in tip",
+      "ok": true
+    },
+    {
+      "name": "xterm-render triplet produced",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "give-me-tips present in cell grid",
+      "ok": true
+    },
+    {
+      "name": "mock-weak present in cell grid",
+      "ok": true
+    }
+  ],
+  "startedAt": "2026-07-29T04:19:51.338Z",
+  "finishedAt": "2026-07-29T04:19:55.618Z",
+  "cleanup": {
+    "tmuxSessionKilled": true,
+    "sandboxRemoved": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tip-tui-omo-fallback-IQYhIG",
+    "realAuthUnchanged": true
+  }
+}

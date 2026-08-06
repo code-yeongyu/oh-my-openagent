@@ -1,6 +1,6 @@
 import type { BoulderState, BoulderWorkState, TaskSessionState } from "../types"
 import { getBoulderWorks, readBoulderState } from "./read-state"
-import { getElapsedMs, nowIsoString, projectWorkToMirror, RESERVED_KEYS } from "./shared"
+import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror, RESERVED_KEYS } from "./shared"
 import { writeBoulderState } from "./write-state"
 
 export function upsertTaskSessionState(
@@ -24,12 +24,13 @@ export function upsertTaskSessionState(
     return null
   }
 
+  const normalizedSessionId = normalizeSessionId(input.sessionId)
   const taskSessions = state.task_sessions ?? {}
   taskSessions[input.taskKey] = {
     task_key: input.taskKey,
     task_label: input.taskLabel,
     task_title: input.taskTitle,
-    session_id: input.sessionId,
+    session_id: normalizedSessionId,
     ...(input.agent !== undefined ? { agent: input.agent } : {}),
     ...(input.category !== undefined ? { category: input.category } : {}),
     updated_at: nowIsoString(),
@@ -66,12 +67,13 @@ export function upsertTaskSessionStateForWork(
     return null
   }
 
+  const normalizedSessionId = normalizeSessionId(input.sessionId)
   const previousTaskSession = targetWork.task_sessions?.[input.taskKey]
   const nextTaskSession: TaskSessionState = {
     task_key: input.taskKey,
     task_label: input.taskLabel,
     task_title: input.taskTitle,
-    session_id: input.sessionId,
+    session_id: normalizedSessionId,
     ...(input.agent !== undefined ? { agent: input.agent } : {}),
     ...(input.category !== undefined ? { category: input.category } : {}),
     ...(previousTaskSession?.started_at !== undefined ? { started_at: previousTaskSession.started_at } : {}),
@@ -116,7 +118,10 @@ export function startTaskTimer(
     startedAt?: string
   },
 ): BoulderState | null {
-  const nextState = upsertTaskSessionStateForWork(directory, workId, input)
+  const nextState = upsertTaskSessionStateForWork(directory, workId, {
+    ...input,
+    sessionId: normalizeSessionId(input.sessionId),
+  })
   if (!nextState) {
     return null
   }

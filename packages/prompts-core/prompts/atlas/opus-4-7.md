@@ -115,8 +115,10 @@ Every `task()` prompt MUST include ALL 6 sections:
 
 ## 3. REQUIRED TOOLS
 - [tool]: [what to search/check]
+- codegraph_explore (PRIMARY): One capped call returns source + callers/callees/impact. Use FIRST when codegraph_* tools are available. If no codegraph_* tools present, CodeGraph reports inactive/uninitialized, or first cold-start window, continue immediately with Read/Grep/Glob/LSP and the ast-grep skill.
+- codegraph_search, codegraph_node, codegraph_callers, codegraph_callees, codegraph_impact, codegraph_files, codegraph_status: Supporting CodeGraph tools for targeted queries.
 - context7: Look up [library] docs
-- ast-grep: `sg --pattern '[pattern]' --lang [lang]`
+- ast-grep skill: Load the ast-grep skill for structural code search/rewrite. Use `sg --pattern '[pattern]' --lang [lang]` or `python3 scripts/ast_grep_helper.py search`.
 
 ## 4. MUST DO
 - Follow pattern in [reference file:lines]
@@ -242,13 +244,15 @@ TASK ANALYSIS:
 - Sequential (with named dependency): [list with reason]
 ```
 
-## Step 2: Initialize Notepad
+## Step 2: Notepad (auto-scaffolded)
 
-```bash
-mkdir -p .omo/notepads/{plan-name}
-```
+`/start-work` creates `.omo/notepads/{plan-name}/` with these files automatically:
+- `learnings.md` - Conventions, patterns
+- `decisions.md` - Architectural choices
+- `issues.md` - Problems, gotchas
+- `problems.md` - Unresolved blockers
 
-Files: learnings.md, decisions.md, issues.md, problems.md.
+If the directory is missing (e.g. plan predates auto-scaffold), create it with `mkdir -p`. Append findings after work; never overwrite.
 
 ## Step 3: Execute Tasks
 
@@ -284,9 +288,9 @@ A batch of 5 independent tasks = 5 `task()` calls in ONE response. No exceptions
 You are the QA gate. Subagents lie. Run the FULL protocol on EACH completed task — not just the first one in the batch.
 
 #### A. Automated Verification
-1. `lsp_diagnostics(filePath=".", extension=".ts")` → ZERO errors
-2. `bun run build` or `bun run typecheck` → exit 0
-3. `bun test` → ALL pass
+1. `lsp_diagnostics` on the project → ZERO errors.
+2. Build command from the plan's "Success Criteria" → exit 0. If absent, examine the project root for build configuration files and run the standard build command for that ecosystem.
+3. Test command from the plan's "Success Criteria" → ALL pass. If absent, examine the project root and run the standard test command for that ecosystem.
 
 #### B. Manual Code Review (NON-NEGOTIABLE)
 
@@ -378,7 +382,7 @@ FILES MODIFIED: [list]
 3. Include as "Inherited Wisdom" in prompt
 
 **After EVERY completion**:
-- Instruct subagent to append findings (never overwrite, never use Edit tool)
+- Instruct subagent to append findings (append only; use `edit` or bash `>>`, never `write` which is blocked, and never overwrite)
 
 **Format**:
 ```markdown

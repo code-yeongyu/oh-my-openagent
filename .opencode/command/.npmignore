@@ -1,0 +1,10 @@
+# Internal-only assets — never ship to npm registry.
+# See script/package-layout-exclusion.test.ts for the enforcing guard.
+# Root .npmignore does not work for directories listed in package.json#files
+# under Bun 1.3.x, so the guard lives co-located with the published content.
+__*/
+__*.md
+.private/
+.draft/
+.private.md
+.draft.md

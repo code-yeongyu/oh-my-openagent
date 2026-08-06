@@ -1,0 +1,4 @@
+sandbox_root=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-L8fEQ8
+sandbox_removed=true
+credential_digest_unchanged=true
+initial capture sandbox manually removed after tmux termination

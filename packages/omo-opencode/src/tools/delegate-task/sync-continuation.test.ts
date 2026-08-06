@@ -1,0 +1,1076 @@
+const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
+
+const TEAM_TOOL_DENIALS = {
+  team_create: false,
+  team_delete: false,
+  team_shutdown_request: false,
+  team_approve_shutdown: false,
+  team_reject_shutdown: false,
+  team_send_message: false,
+  team_task_create: false,
+  team_task_list: false,
+  team_task_update: false,
+  team_task_get: false,
+  team_status: false,
+  team_list: false,
+}
+
+type AddTaskArg = Parameters<import("../../features/task-toast-manager/manager").TaskToastManager["addTask"]>[0]
+
+describe("executeSyncContinuation - toast cleanup error paths", () => {
+  let removeTaskCalls: string[] = []
+  let addTaskCalls: AddTaskArg[] = []
+  let resetToastManager: (() => void) | null = null
+
+  beforeEach(() => {
+    //#given - configure fast timing for all tests
+    const { __setTimingConfig } = require("./timing")
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 10,
+      MIN_STABILITY_TIME_MS: 0,
+      STABILITY_POLLS_REQUIRED: 1,
+      MAX_POLL_TIME_MS: 100,
+    })
+
+    //#given - reset call tracking
+    removeTaskCalls = []
+    addTaskCalls = []
+
+    //#given - initialize real task toast manager (avoid global module mocks)
+    const { initTaskToastManager, _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
+    _resetTaskToastManagerForTesting()
+    resetToastManager = _resetTaskToastManagerForTesting
+
+    const toastManager = initTaskToastManager({
+      tui: { showToast: mock(() => Promise.resolve()) },
+    })
+
+    spyOn(toastManager, "addTask").mockImplementation((task: AddTaskArg) => {
+      addTaskCalls.push(task)
+    })
+    spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
+      removeTaskCalls.push(id)
+    })
+  })
+
+  afterEach(() => {
+    //#given - reset timing after each test
+    const { __resetTimingConfig } = require("./timing")
+    __resetTimingConfig()
+
+		mock.restore()
+
+		resetToastManager?.()
+		resetToastManager = null
+  })
+
+  test("removes toast when fetchSyncResult throws", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => {
+        throw new Error("Network error")
+      },
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation with fetchSyncResult throwing
+    let error: unknown = null
+    let result: string | null = null
+    try {
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+    } catch (e) {
+      error = e
+    }
+
+    //#then - error should be thrown but toast should still be removed
+    expect(error).not.toBeNull()
+    expect((error as Error).message).toBe("Network error")
+    expect(removeTaskCalls.length).toBe(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+  })
+
+  test("removes toast when pollSyncSession throws", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => {
+        throw new Error("Poll error")
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation with pollSyncSession throwing
+    let error: unknown = null
+    let result: string | null = null
+    try {
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+    } catch (e) {
+      error = e
+    }
+
+    //#then - error should be thrown but toast should still be removed
+    expect(error).not.toBeNull()
+    expect((error as Error).message).toBe("Poll error")
+    expect(removeTaskCalls.length).toBe(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+  })
+
+  test("recovers from MessageAbortedError poll error when result already exists", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then
+    expect(result).toContain("Task continued and completed in")
+    expect(result).toContain("Recovered result")
+    expect(removeTaskCalls.length).toBe(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+  })
+
+  test("recovers from canonical aborted-operation message", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "The operation was aborted.",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then
+    expect(result).toContain("Task continued and completed in")
+    expect(result).toContain("Recovered result")
+  })
+
+  test("returns MessageAbortedError poll error when recovery fetch has no result", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      fetchSyncResult: async () => ({ ok: false as const, error: "No assistant response found" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then
+    expect(result).toBe("MessageAbortedError: aborted by user")
+    expect(removeTaskCalls.length).toBe(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+  })
+
+  test("does not recover abort poll error when anchor cannot be established", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => {
+          throw new Error("messages unavailable")
+        },
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+    let fetchSyncResultCalled = false
+
+    const deps = {
+      pollSyncSession: async () => "The operation was aborted.",
+      fetchSyncResult: async () => {
+        fetchSyncResultCalled = true
+        return { ok: true as const, textContent: "Recovered result" }
+      },
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then
+    expect(result).toBe("The operation was aborted.")
+    expect(fetchSyncResultCalled).toBe(false)
+  })
+
+  test("removes toast on successful completion", async () => {
+    //#given - mock successful completion with messages growing after anchor
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "New response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation completes successfully
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - toast should be removed exactly once
+    expect(removeTaskCalls.length).toBe(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+    expect(result).toContain("Task continued and completed")
+    expect(result).toContain("Result")
+  })
+
+  test("marks and aborts resumed sync session after successful handback", async () => {
+    //#given - a resumed sync continuation completes successfully
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "New response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation hands the completed result back to the parent
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - todo-continuation wake paths can identify and stop the handed-back child
+    expect(result).toContain("Task continued and completed")
+    expect(handedBackSyncSessions.has("ses_test_12345678")).toBe(true)
+    expect(abortCalls).toEqual([{ path: { id: "ses_test_12345678" } }])
+
+    handedBackSyncSessions.clear()
+  })
+
+  test("does not mark or abort resumed sync session when handback fails", async () => {
+    //#given - a resumed sync continuation returns a poll error instead of a handback result
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "Task failed before handback",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_87654321",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation cannot hand a result back to the parent
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - todo-continuation wake paths are not told to ignore a still-unreturned child
+    expect(result).toBe("Task failed before handback")
+    expect(handedBackSyncSessions.has("ses_test_87654321")).toBe(false)
+    expect(abortCalls).toEqual([])
+
+    handedBackSyncSessions.clear()
+  })
+
+  test("removes toast when abort happens", async () => {
+    //#given - create a context with abort signal
+    const controller = new AbortController()
+    controller.abort()
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { toastManager?: { removeTask: (id: string) => void } | null; taskId?: string }) => {
+        if (input.toastManager && input.taskId) {
+          input.toastManager.removeTask(input.taskId)
+        }
+        return "Task aborted.\n\nSession ID: ses_test_12345678"
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+      abort: controller.signal,
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation with abort signal
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - removeTask should be called at least once (poller and finally may both call it)
+    expect(removeTaskCalls.length).toBeGreaterThanOrEqual(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+    expect(result).toBe("Task aborted.\n\nSession ID: ses_test_12345678")
+  })
+
+  test("no crash when toastManager is null", async () => {
+		//#given - reset toast manager instance to null
+    const { _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
+    _resetTaskToastManagerForTesting()
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation with null toastManager
+    let error: unknown = null
+    let result: string | null = null
+    try {
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+    } catch (e) {
+      error = e
+    }
+
+    //#then - should not crash and should complete successfully
+    expect(error).toBeNull()
+    expect(addTaskCalls.length).toBe(0)
+    expect(removeTaskCalls.length).toBe(0)
+  })
+
+  test("includes subagent in task_metadata when agent info is present in session messages", async () => {
+    //#given - mock session messages with agent info on the last assistant message
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "oracle" } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn", agent: "oracle", providerID: "openai", modelID: "gpt-5.4" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume oracle task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation completes with agent info in messages
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - task_metadata should contain subagent field with the agent name
+    expect(result).toContain("<task_metadata>")
+    expect(result).toContain("subagent: oracle")
+    expect(result).toContain("session_id: ses_test_12345678")
+  })
+
+  test("omits subagent from task_metadata when no agent info in session messages", async () => {
+    //#given - mock session messages without any agent info
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation completes without agent info
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - task_metadata should NOT contain subagent field
+    expect(result).toContain("<task_metadata>")
+    expect(result).toContain("session_id: ses_test_12345678")
+    expect(result).not.toContain("subagent:")
+  })
+
+  test("preserves restricted tool permissions for resumed explore sessions", async () => {
+    //#given - a resumed explore session should not regain delegation tools
+    const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "explore",
+              },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume explore task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.tools).toEqual({
+      task: false,
+      call_omo_agent: false,
+      question: false,
+      write: false,
+      edit: false,
+      ...TEAM_TOOL_DENIALS,
+    })
+  })
+
+  test("preserves restricted tool permissions for resumed librarian sessions", async () => {
+    //#given - a resumed librarian session should stay read-only for delegation tools
+    const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "librarian",
+              },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue researching",
+      description: "resume librarian task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.tools).toEqual({
+      task: false,
+      call_omo_agent: false,
+      question: false,
+      write: false,
+      edit: false,
+      ...TEAM_TOOL_DENIALS,
+    })
+  })
+
+  test("keeps task delegation enabled during prometheus sync continuation", async () => {
+    //#given - a resumed prometheus session should keep plan-family task permission
+    const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "prometheus",
+              },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue planning",
+      description: "resume prometheus task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.tools).toEqual({
+      task: true,
+      call_omo_agent: true,
+      question: false,
+      ...TEAM_TOOL_DENIALS,
+    })
+  })
+})

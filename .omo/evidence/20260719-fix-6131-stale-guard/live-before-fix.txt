@@ -1,0 +1,24 @@
+initialize: {"name":"lsp","version":"0.1.0"}
+workspace: /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-6131-live-N5jkSK
+marksman: /opt/homebrew/bin/marksman
+elapsedMs: 3368
+lsp_diagnostics result:
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Timed out waiting for fresh diagnostics for /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-6131-live-N5jkSK/README.md within 3000ms."
+    }
+  ],
+  "isError": true,
+  "details": {
+    "filePath": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-6131-live-N5jkSK/README.md",
+    "severity": "all",
+    "mode": "file",
+    "diagnostics": [],
+    "totalDiagnostics": 0,
+    "truncated": false,
+    "error": "Timed out waiting for fresh diagnostics for /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-6131-live-N5jkSK/README.md within 3000ms.",
+    "errorKind": "freshness_timeout"
+  }
+}

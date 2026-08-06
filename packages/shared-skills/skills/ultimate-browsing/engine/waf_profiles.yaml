@@ -1,0 +1,162 @@
+# WAF Product Profiles — never site-specific.
+#
+# NO-SITE-NAME RULE:
+#   * Key names are WAF products (akamai_bot_manager), not sites.
+#   * Detectors use product artifacts (cookies / headers / vendor strings).
+#   * Field values (markers, cookie names) must appear in any site running
+#     that WAF, not just one. If a value only fits one site, it belongs
+#     to runtime hints / observations, not this file.
+#
+# Profiles are *recommendations*, not deterministic recipes. The planner
+# treats them as priors; attempts always evaluate real responses.
+#
+# Timestamp each profile entry. If stale (> 6 months), cross-validate.
+
+_meta:
+  schema_version: 1
+  last_reviewed: "2026-04-21"
+
+akamai_bot_manager:
+  detectors:
+    cookie: ["_abck", "bm_sz", "ak_bmsc", "bm_sv", "bm_so"]
+    header: ["X-Akamai-*"]
+    server_contains: ["AkamaiGHost"]
+    body: ["sec-if-cpt-container", "Powered and protected by Akamai"]
+  confidence_rules:
+    # Multi-signal gating — single marker insufficient.
+    strong: 2     # any 2 signals from above → confidence 0.9
+    weak: 1       # 1 signal → confidence 0.6
+  capabilities_needed:
+    - needs_real_tls_stack   # Playwright Chromium (BoringSSL) is detected
+    - needs_js_exec          # 2.6KB challenge requires JS sensor
+  tls_impersonate_candidates:
+    # Every impersonate target curl_cffi supports that historically yielded
+    # at least a challenge page (i.e. IP still alive) rather than an outright
+    # TLS reject. Grouped by family; planner tries top groups first.
+    # Refresh quarterly — vendor WAFs shift which TLS fingerprints they trust.
+    - [safari, safari15_3, safari15_5, safari17_0, safari260]
+    - [safari_ios, safari17_2_ios, safari260_ios]
+    - [chrome99, chrome100, chrome101, chrome104, chrome110, chrome116, chrome119, chrome124, chrome131, chrome133a, chrome136, chrome145, chrome146]
+    - [chrome_android, chrome131_android]
+    - [edge99, edge101]
+  tls_impersonate_avoid:
+    # Empirically observed to 403 immediately (TLS fingerprint blacklisted).
+    # DO NOT hard-block — planner deprioritizes only. Refresh quarterly.
+    - safari18_0
+    - chrome107
+    - chrome120
+    - chrome123
+    - chrome145     # curl_cffi 0.11+ needed — mark avoid for older installs
+    - chrome146
+    - firefox
+    - firefox133
+    - firefox135
+  referer_strategies:
+    - self_root    # scheme://host/
+  url_transform_order:
+    - original
+    - mobile_subdomain   # www.* → m.* — strong observational win in SSR sites
+  fallback_when_challenge:
+    - curl_grid_exhaust   # try more impersonate × referer × url combos
+    - playwright_real_chrome
+  notes: |
+    DO NOT encode site-specific selectors or byte-size fingerprints here.
+    Those belong to caller's success_selectors param or observations log.
+
+cloudflare_turnstile:
+  detectors:
+    cookie: ["cf_clearance", "__cf_bm", "__cfduid"]
+    header: ["cf-ray", "cf-cache-status"]
+    server_contains: ["cloudflare"]
+    body: ["Just a moment...", "Checking your browser", "cf-chl-bypass", "Attention Required! | Cloudflare"]
+  capabilities_needed:
+    - needs_js_exec        # MCP Playwright Chromium OK — no real-TLS required
+  tls_impersonate_candidates:
+    - [chrome, chrome_android]
+  referer_strategies:
+    - google_search
+    - self_root
+  fallback_when_challenge:
+    - playwright_mcp       # MCP sufficient; Chromium TLS passes CF baseline
+    - playwright_real_chrome
+
+f5_big_ip:
+  detectors:
+    cookie: ["BigIPServer", "TS01*", "F5_*"]
+    body: ["The requested URL was rejected", "support ID is:"]
+  capabilities_needed:
+    - needs_real_tls_stack
+  tls_impersonate_candidates:
+    - [safari, chrome]
+  referer_strategies:
+    - self_root
+
+aws_waf:
+  detectors:
+    cookie: ["aws-waf-token"]
+    header: ["x-amzn-requestid", "x-amzn-errortype", "x-amzn-waf-*"]
+  capabilities_needed:
+    - needs_real_tls_stack
+  tls_impersonate_candidates:
+    - [chrome]
+  referer_strategies:
+    - self_root
+
+datadome_probable:
+  detectors:
+    cookie: ["datadome"]
+    body: ["DataDome"]
+  capabilities_needed:
+    - needs_real_tls_stack
+    - needs_js_exec
+  tls_impersonate_candidates:
+    - [safari, chrome]
+  fallback_when_challenge:
+    - playwright_real_chrome
+  notes: |
+    "_probable" suffix reminds us this is a growing attack surface — mark
+    as tentative until cross-site evidence accumulates in observations/.
+
+perimeterx_human:
+  detectors:
+    cookie: ["_px3", "_pxhd", "_px2", "pxcts"]
+    body: ["px-captcha", "Press & Hold to confirm you are a human"]
+  capabilities_needed:
+    - needs_real_tls_stack
+    - needs_js_exec
+  tls_impersonate_candidates:
+    - [safari, chrome]
+  fallback_when_challenge:
+    - playwright_real_chrome
+  notes: |
+    PerimeterX (now HUMAN Bot Defender). Distinct cookie family from
+    DataDome. Keep profiles separate so planner does not pick wrong
+    fallback strategy.
+
+# ---------------------------------------------------------------------------
+# Safety net: always-valid fallback profile.
+# ---------------------------------------------------------------------------
+unknown_challenge:
+  detectors: {}   # never matches actively — used only when no other profile fires
+  confidence_rules:
+    strong: 0
+    weak: 0
+  capabilities_needed:
+    - needs_js_exec     # conservative default
+  tls_impersonate_candidates:
+    - [safari, chrome, firefox]
+    - [safari_ios, chrome_android]
+  referer_strategies:
+    - self_root
+    - google_search
+    - none
+  url_transform_order:
+    - original
+    - mobile_subdomain
+  fallback_when_challenge:
+    - playwright_mcp
+    - playwright_real_chrome
+  notes: |
+    When detector returns low-confidence results we land here. Broad,
+    conservative grid. Evidence from these runs should feed observations/
+    for eventual profile promotion.

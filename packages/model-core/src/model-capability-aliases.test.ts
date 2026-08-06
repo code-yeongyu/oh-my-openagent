@@ -56,25 +56,23 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes Kimi for Coding k2pb aliases to the snapshot ID", () => {
+  test("leaves discontinued Kimi k2pb IDs unaliased", () => {
     const result = resolveModelIDAlias("kimi-for-coding/k2pb")
 
     expect(result).toEqual({
       requestedModelID: "kimi-for-coding/k2pb",
-      canonicalModelID: "k2p5",
-      source: "exact-alias",
-      ruleID: "kimi-k2pb-alias",
+      canonicalModelID: "k2pb",
+      source: "canonical",
     })
   })
 
-  test("normalizes GitHub Copilot dotted Claude Opus aliases to the snapshot ID", () => {
+  test("treats GitHub Copilot dotted Claude Opus 4.7 as canonical since models.dev now serves it natively", () => {
     const result = resolveModelIDAlias("github-copilot/claude-opus-4.7")
 
     expect(result).toEqual({
       requestedModelID: "github-copilot/claude-opus-4.7",
-      canonicalModelID: "claude-opus-4-7",
-      source: "exact-alias",
-      ruleID: "claude-opus-dotted-version-alias",
+      canonicalModelID: "claude-opus-4.7",
+      source: "canonical",
     })
   })
 
@@ -136,6 +134,42 @@ describe("model-capability-aliases", () => {
     expect(result).toEqual({
       requestedModelID: "claude-opus-4-6-thinking",
       canonicalModelID: "claude-opus-4-6-thinking",
+      source: "canonical",
+    })
+  })
+
+  test("normalizes OpenAI GPT-5.6 fast service-tier aliases", () => {
+    const aliases = ["gpt-5.6-sol-fast", "gpt-5.6-terra-fast", "gpt-5.6-luna-fast"]
+
+    for (const aliasModelID of aliases) {
+      const result = resolveModelIDAlias(aliasModelID, "openai")
+
+      expect(result).toEqual({
+        requestedModelID: aliasModelID,
+        canonicalModelID: aliasModelID.slice(0, -"-fast".length),
+        source: "pattern-alias",
+        ruleID: "openai-gpt-5.6-fast-service-tier-alias",
+      })
+    }
+  })
+
+  test("does not normalize GPT-5.6 fast suffixes for unrelated providers or nearby IDs", () => {
+    expect(resolveModelIDAlias("gpt-5.6-sol-fast", "github-copilot")).toMatchObject({
+      canonicalModelID: "gpt-5.6-sol-fast",
+      source: "canonical",
+    })
+    expect(resolveModelIDAlias("gpt-5.6-sol-fast-preview", "openai")).toMatchObject({
+      canonicalModelID: "gpt-5.6-sol-fast-preview",
+      source: "canonical",
+    })
+  })
+
+  test("does not normalize OpenAI subprovider aliases for unrelated top-level providers", () => {
+    const result = resolveModelIDAlias("openai/gpt-5.6-sol-fast", "anthropic")
+
+    expect(result).toEqual({
+      requestedModelID: "openai/gpt-5.6-sol-fast",
+      canonicalModelID: "gpt-5.6-sol-fast",
       source: "canonical",
     })
   })

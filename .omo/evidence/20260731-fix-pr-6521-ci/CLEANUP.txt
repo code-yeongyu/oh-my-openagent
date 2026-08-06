@@ -1,0 +1,17 @@
+Cleanup receipts
+================
+
+- Removed an initial worktree after unpinned postinstall rebuilt unrelated
+  tracked bundles.
+- Recreated the worktree and installed with --ignore-scripts.
+- Built once with pinned Bun 1.3.12 for the full-suite environment.
+- Full suite passed.
+- Removed the build-drifted worktree.
+- Recreated the final worktree from PR head f75375603.
+- Installed final dependencies with --ignore-scripts.
+- Merged current origin/dev without rewriting PR history.
+- Resolved generated-bundle conflicts through the pinned authoritative Senpi
+  generator, then verified marker-free output and an empty unmerged index.
+- Exact-SHA CI run 30632258545 completed successfully; its monitor exited 0.
+- Final worktree removal will be verified after PR merge.
+

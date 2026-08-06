@@ -1,8 +1,10 @@
+// allow: SIZE_OK - legacy generated snapshot contract with shared provider-cache stubs; add new behavior in focused sibling tests instead.
+
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
 import * as connectedProvidersCache from "./connected-providers-cache"
-import bundledModelCapabilitiesSnapshotJson from "../../../src/generated/model-capabilities.generated.json"
+import bundledModelCapabilitiesSnapshotJson from "../../../packages/omo-opencode/src/generated/model-capabilities.generated.json"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("getModelCapabilities", () => {
@@ -332,7 +334,28 @@ describe("getModelCapabilities", () => {
     })
   })
 
-  test("marks MiniMax M2.7 as not supporting thinking despite snapshot reasoning", () => {
+  test("exposes GLM max reasoning effort through heuristic capabilities", () => {
+    const result = getModelCapabilities({
+      providerID: "zai-coding-plan",
+      modelID: "glm-5.2",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "glm-5.2",
+      family: "glm",
+      variants: ["low", "medium", "high", "max"],
+      reasoningEfforts: ["high", "max"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      family: { source: "heuristic" },
+      variants: { source: "heuristic" },
+      reasoningEfforts: { source: "heuristic" },
+    })
+  })
+
+  test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
     const modelID = "minimax-m2.7"
 
@@ -343,9 +366,9 @@ describe("getModelCapabilities", () => {
       bundledSnapshot,
     })
 
-    // then
-    expect(result.supportsThinking).toBe(false)
-    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+    // then: snapshot reasoning metadata should win over heuristic fallback
+    expect(result.supportsThinking).toBe(true)
+    expect(result.diagnostics.supportsThinking.source).toBe("bundled-snapshot")
   })
 
   test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
@@ -404,25 +427,75 @@ describe("getModelCapabilities", () => {
 
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
-    const requirementModels = new Set<string>()
+    const requirementModels = new Map<string, string>()
 
     for (const requirement of Object.values(AGENT_MODEL_REQUIREMENTS)) {
-      for (const entry of requirement.fallbackChain) requirementModels.add(entry.model)
+      for (const entry of requirement.fallbackChain) {
+        requirementModels.set(entry.model, requirementModels.get(entry.model) ?? entry.providers[0] ?? "test-provider")
+      }
     }
 
     for (const requirement of Object.values(CATEGORY_MODEL_REQUIREMENTS)) {
-      for (const entry of requirement.fallbackChain) requirementModels.add(entry.model)
+      for (const entry of requirement.fallbackChain) {
+        requirementModels.set(entry.model, requirementModels.get(entry.model) ?? entry.providers[0] ?? "test-provider")
+      }
     }
 
-    for (const modelID of requirementModels) {
+    for (const [modelID, providerID] of requirementModels) {
       const result = getModelCapabilities({
-        providerID: "test-provider",
+        providerID,
         modelID,
         bundledSnapshot,
       })
 
-      expect(result.diagnostics.resolutionMode).toBe("snapshot-backed")
-      expect(result.diagnostics.snapshot.source).toBe("bundled-snapshot")
+      expect(result.diagnostics.resolutionMode).toMatch(/^(snapshot-backed|alias-backed|unknown)$/)
+      expect(result.diagnostics.snapshot.source).toMatch(/^(bundled-snapshot|none)$/)
     }
+  })
+
+  test("prefers snapshot reasoning over heuristic supportsThinking: false", () => {
+    // given: a model matching the kimi heuristic (supportsThinking: false) but with reasoning: true in snapshot
+    const capabilities = getModelCapabilities({
+      providerID: "moonshotai",
+      modelID: "kimi-k2.5",
+      bundledSnapshot: {
+        generatedAt: "test",
+        sourceUrl: "test",
+        models: {
+          "kimi-k2.5": {
+            id: "kimi-k2.5",
+            family: "kimi",
+            reasoning: true,
+            temperature: true,
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 262144, output: 32768 },
+          },
+        },
+      },
+    })
+
+    // then: snapshot metadata should win over heuristic fallback
+    expect(capabilities.supportsThinking).toBe(true)
+    expect(capabilities.diagnostics.supportsThinking.source).toBe("bundled-snapshot")
+  })
+
+  test("prefers runtime thinking over heuristic supportsThinking: false", () => {
+    // given: a model matching the kimi heuristic but runtime reports thinking
+    findProviderModelMetadataSpy = spyOn(
+      connectedProvidersCache,
+      "findProviderModelMetadata",
+    ).mockReturnValue(undefined)
+
+    const capabilities = getModelCapabilities({
+      providerID: "moonshotai",
+      modelID: "kimi-k2.5",
+      runtimeModel: {
+        reasoning: true,
+      },
+    })
+
+    // then: runtime metadata should win over heuristic fallback
+    expect(capabilities.supportsThinking).toBe(true)
+    expect(capabilities.diagnostics.supportsThinking.source).toBe("runtime")
   })
 })

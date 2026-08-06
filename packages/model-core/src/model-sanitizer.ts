@@ -4,7 +4,7 @@ export function sanitizeModelField(model: unknown, source: CommandSource = "clau
   if (source === "claude-code") {
     return undefined
   }
-  
+
   if (typeof model === "string" && model.trim().length > 0) {
     return model.trim()
   }

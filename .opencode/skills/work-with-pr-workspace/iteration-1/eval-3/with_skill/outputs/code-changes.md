@@ -8,7 +8,7 @@ import type { CategoryConfig } from "../../config/schema"
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": { model: "google/gemini-3.1-pro", variant: "high" },
   ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
-  deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
+  deep: { model: "openai/gpt-5.5-codex", variant: "medium" },
   artistry: { model: "google/gemini-3.1-pro", variant: "high" },
   quick: { model: "anthropic/claude-haiku-4-5" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-6" },

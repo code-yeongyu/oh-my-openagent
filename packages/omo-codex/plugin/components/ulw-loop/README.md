@@ -1,0 +1,82 @@
+# codex-ulw-loop
+
+[![ci](https://img.shields.io/badge/ci-pending-lightgrey.svg)](#) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Codex plugin component for durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit. State lives under `.omo/ulw-loop/` and is mutated through the `omo ulw-loop` CLI.
+
+## CLI
+
+Every subcommand below is implemented. Pass `--json` where supported for machine-readable output, and pass `--session-id <id>` or set `OMO_ULW_LOOP_SESSION_ID` to scope state to a parallel session.
+
+| Subcommand | Purpose |
+|------------|---------|
+| `omo ulw-loop help` | Print CLI usage. |
+| `omo ulw-loop create-goals` | Create repo-native goals and seed success criteria from a brief; optionally define review-boundary validation batches with `--validation-batch-json`. |
+| `omo ulw-loop status` | Report active goal, criteria, and evidence state. |
+| `omo ulw-loop complete-goals` | Manual fallback to start or resume the next eligible goal, or report aggregate completion / blocked handoff. |
+| `omo ulw-loop checkpoint` | Gate a goal transition with evidence; complete checkpoints auto-start the next eligible goal by default, with `--no-advance` preserving the legacy two-call flow. |
+| `omo ulw-loop steer` | Apply one steering mutation proposal or an atomic all-or-nothing batch with `--proposals-json`. |
+| `omo ulw-loop add-goal` | Append a goal to the active plan. |
+| `omo ulw-loop criteria` | Inspect one goal's success criteria. |
+| `omo ulw-loop record-evidence` | Record observable evidence for one criterion. |
+| `omo ulw-loop record-review-blockers` | Mark a goal as review-blocked and add follow-up work from final-review findings. |
+
+The final quality gate parsed by `checkpoint` validates `codeReview`, `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`. `criteriaCoverage` records the original intent, desired outcome, user-facing outcome review, pass counts, and covered adversarial classes.
+
+Validation batches are optional review boundaries declared at plan creation with `--validation-batch-json '[{"batchId":"VB001","memberIds":[...],"finalGoalId":"..."}]'`. The batch-final goal cannot complete until every other member is complete or superseded-resolved, every member criterion is pass, and a quality gate's coverage counts match the recomputed member criteria. Steering split/supersede mutations keep batch membership consistent and record `batch_updated`.
+
+## Codex Plugin
+
+This directory is a component of the aggregate `@sisyphuslabs/omo-codex-plugin` root. Plugin discovery (`.codex-plugin/plugin.json`) is owned by that aggregate root, not by this component. The component ships:
+
+- `hooks/hooks.json` registering four hooks:
+  - `UserPromptSubmit` -> `node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit --with-ultrawork`
+  - `PreToolUse` matching `^create_goal$` -> `node "${PLUGIN_ROOT}/dist/cli.js" hook pre-tool-use`
+  - `PreToolUse` matching the spawn tool tokens -> `node "${PLUGIN_ROOT}/dist/cli.js" hook pre-tool-use-spawn` (fan-out cap + gate-artifact preflight)
+  - `Stop` -> `node "${PLUGIN_ROOT}/dist/cli.js" hook stop` (auto-resume with a two-strike no-progress cap)
+- `skills/ulw-loop/` for the bundled `ulw-loop` skill.
+- `bin.omo-ulw-loop` -> `dist/cli.js` for standalone CLI invocation.
+
+This component ships a CLI, a skill, and hooks. It does not expose an MCP server.
+
+## Local Development
+
+```bash
+npm install
+npm test
+npm run typecheck
+npm run check
+npm pack --dry-run
+```
+
+`npm test` runs Vitest, `npm run typecheck` runs `tsc --noEmit`, and `npm run check` runs typecheck, Biome, and the build.
+
+## Local Codex Installation
+
+```bash
+npx lazycodex-ai install
+```
+
+The installer builds and copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0`, registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository, installs runtime dependencies there, and enables:
+
+```toml
+[features]
+plugins = true
+plugin_hooks = true
+
+[plugins."omo@sisyphuslabs"]
+enabled = true
+```
+
+## Privacy
+
+This component runs locally and does not call a network service by itself.
+
+## License
+
+[MIT](LICENSE).
+
+## Related
+
+- [lazycodex](https://github.com/code-yeongyu/lazycodex) - Sisyphus Labs Codex marketplace repository.
+- [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) - the monorepo this component is developed in.

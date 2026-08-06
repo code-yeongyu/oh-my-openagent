@@ -81,7 +81,10 @@ task(subagent_type="oracle", load_skills=[], prompt="I need architectural review
 ---
 
 YOU MUST LEVERAGE ALL AVAILABLE AGENTS / **CATEGORY + SKILLS** TO THEIR FULLEST POTENTIAL.
-TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
+
+**FIRST, SURVEY THE SKILLS.** Before exploring or planning, enumerate every skill available in this system and read the description of each one even loosely relevant to the task. Decide deliberately and explicitly which skills apply, and prefer to USE as many genuinely-applicable skills as fit rather than working raw — a skill that matches the task and goes unused is a defect. State the chosen skills (with a one-line reason each) before you act.
+
+TELL THE USER WHAT AGENTS + SKILLS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
 ## MANDATORY: PLAN AGENT INVOCATION (NON-NEGOTIABLE)
 
@@ -97,6 +100,8 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 ```
 task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gathered context + user request>")
 ```
+
+**SIZE THE SCOPE FIRST.** Count the distinct surfaces, files, and steps; that count decides whether the plan agent is required (any 2+ step / multi-file / unclear-scope / architecture task = required). After the plan agent returns, execute in the EXACT wave order and parallel grouping it specifies, and run the verification IT defines for each task — do not invent your own ordering or skip its verification.
 
 **WHY PLAN AGENT IS MANDATORY:**
 - Plan agent analyzes dependencies and parallel execution opportunities
@@ -145,13 +150,15 @@ task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here
 | Hard problem (non-conventional) | task(category="artistry", load_skills=[...], run_in_background=true) | Different approach needed |
 | Implementation | task(category="...", load_skills=[...], run_in_background=true) | Domain-optimized models |
 
+**CODEGRAPH-FIRST:** When `codegraph_*` tools exist, use `codegraph_explore` for codebase how/where/what/flow questions and before edits; if absent, inactive/uninitialized, or cold-start unavailable, continue with explore agents, Read/Grep/Glob/LSP, and the ast-grep skill.
+
 **CATEGORY + SKILL DELEGATION:**
 ```
 // Frontend work
-task(category="visual-engineering", load_skills=["frontend-ui-ux"], run_in_background=true)
+task(category="visual-engineering", load_skills=["frontend"], run_in_background=true)
 
 // Complex logic
-task(category="ultrabrain", load_skills=["typescript-programmer"], run_in_background=true)
+task(category="ultrabrain", load_skills=[...], run_in_background=true)
 
 // Quick fixes
 task(category="quick", load_skills=["git-master"], run_in_background=true)
@@ -168,7 +175,7 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 ## EXECUTION RULES
 - **TODO format**: `path: <action> for <scenario-id> — verify by <check>` encoding WHERE / WHY (which scenario it advances) / HOW / VERIFY. Exactly ONE in_progress at a time. Mark completed IMMEDIATELY — never batch.
-  - GOOD pair (test-first, ordered): `foo.test.ts: Write FAILING case invalid-email→ValidationError for S2 — verify by RED with assertion msg` → `src/foo/bar.ts: Implement validateEmail() for S2 — verify by foo.test.ts GREEN + curl 400 body`
+  - GOOD pair (test-first, ordered): `module.test: Write FAILING case invalid-email→ValidationError for S2 - verify by RED with assertion msg` → `src/module: Implement validateEmail() for S2 - verify by module.test GREEN + curl 400 body`
   - BAD: "Implement feature" / "Fix bug" / "Add tests later" / production code before its failing test → rewrite.
 - **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) — NEVER wait sequentially. But NEVER parallelise RED and GREEN of the same scenario.
 - **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).
@@ -185,20 +192,24 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 **NOTHING is "done" without PROOF it works.**
 
+### Goal Registration (BINDING)
+
+When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation: the full objective, the scenario contract below, and one line "I'll stop right away when <the exact observable state that ends this run>". Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
+
 ### Pre-Implementation: Scenario Contract (BINDING)
 
-BEFORE writing ANY code, define **3+ realistic scenarios** covering:
+BEFORE writing ANY code, define realistic scenarios sized to the change — **1-2 for a small single-surface change, 3+ for multi-surface or risky work** — drawn from:
 
 | Class | Required | Example |
 |-------|----------|---------|
 | **Happy path** | yes | Valid input → 200 OK with expected body |
-| **Edge** (boundary / empty / malformed / concurrent) | yes | Empty list, max-length input, two writers race |
-| **Adjacent-surface regression** | yes | Caller X still works, sibling endpoint Y unchanged |
+| **Edge** (boundary / empty / malformed / concurrent) | when risky | Empty list, max-length input, two writers race |
+| **Adjacent-surface regression** | when multi-surface | Caller X still works, sibling endpoint Y unchanged |
 
 Each scenario MUST specify, upfront:
 - Pass condition as a binary observable ("returns 200 + body matches schema"), not "should work".
 - The REAL surface that proves it: tmux transcript, curl status+body, browser/Playwright assertion, computer-use action log, CLI stdout, parsed config dump, DB state diff. Asserting "tests pass" alone is NOT evidence.
-- The automated test file + test id that exercises this scenario (written test-first — see TDD below).
+- The cheapest faithful proof: a test file + test id at a code seam (written test-first — see TDD below), or the real-surface scenario itself when no seam exists. Prose, docs, prompt, and visual-only changes take review + real-surface QA — a test pinning their text is pretend-coverage, not proof.
 
 **These scenarios are the CONTRACT.** Record them in your TODO/notepad. You are not done until every one PASSES with both pieces of evidence captured (RED→GREEN proof + real-surface artifact).
 
@@ -231,7 +242,7 @@ Every scenario requires TWO captured artifacts — both mandatory:
 
 Supporting (necessary, not sufficient): build exit 0, full suite green, lsp_diagnostics clean on changed files, regression scenarios still PASS.
 
-Tests are the FLOOR (always required). Surface artifact is the CEILING (also required). "tests pass" alone is NOT done.
+The real-surface artifact is always required. A test is required only where a code seam exists. "tests pass" alone is NOT done, and a test pinning prose or visual text is NOT evidence.
 
 <MANUAL_QA_MANDATE>
 ### YOU MUST EXECUTE MANUAL QA YOURSELF. THIS IS NOT OPTIONAL.
@@ -245,7 +256,9 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify the output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Changes UI rendering | Describe what renders. Use a browser tool if available. |
+| Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. |
+| Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
+| Changes a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
 | Modifies config handling | Load the config. Verify it parses correctly. |
 
@@ -257,11 +270,15 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 
 **You have Bash, you have tools. There is ZERO excuse for not running manual QA.**
 **Manual QA is the FINAL gate before reporting completion. Skip it and your work is INCOMPLETE.**
+
+**NAME THE EXACT TOOL + EXACT INVOCATION** for every scenario — the literal `curl ...`, `tmux send-keys ...`, `page.click(...)` with concrete inputs and the binary observable. "run it" / "open the page" is not a scenario.
+
+**CLEANUP IS PART OF QA — TRACK IT AS TODOS.** The moment a QA scenario spawns any resource, add a teardown todo for it (QA scripts, tmux assets, browser / agent-browser sessions, PIDs, ports, containers, temp dirs). Execute every teardown todo and capture the receipt before declaring done. A leftover process / tmux session / browser context / bound port / temp dir = NOT done.
 </MANUAL_QA_MANDATE>
 
-### TDD Workflow (MANDATORY on every production change)
+### TDD Workflow (MANDATORY on every production code change with a test seam)
 
-Test-first is not optional. Every behavior change — features, fixes, refactors, perf, glue, config-with-logic — follows RED → GREEN → SURFACE.
+Test-first is not optional for code. Every code behavior change — features, fixes, refactors, perf, glue, config-with-logic — follows RED → GREEN → SURFACE. Prose, docs, and visual-only changes have no seam: skip RED→GREEN and prove them through the surface channel.
 
 1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message proving it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
 2. **GREEN**: Write the SMALLEST change that flips RED→GREEN. Re-run. Capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.
@@ -269,11 +286,15 @@ Test-first is not optional. Every behavior change — features, fixes, refactors
 4. **REFACTOR**: Optional, only if needed. Tests MUST stay green throughout.
 5. **REGRESSION**: Re-run the FULL scenario list. Record PASS/FAIL inline with both evidence paths.
 
-**Refactor exception**: Write characterization tests pinning current observable behavior FIRST, watch them go GREEN against old code, THEN refactor. They remain green throughout.
+**Refactor exception**: when refactoring behavior whose regressions the change could hide, write characterization tests pinning current observable behavior FIRST, watch them go GREEN against old code, THEN refactor. They remain green throughout.
 
 **Exemption whitelist** (no new test required): pure formatting, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption MUST be justified in `## Findings` with the exact reason. Unjustified exemption is rejection.
 
 **If you typed production code without a failing test preceding it in the notepad: STOP, revert, write the test, watch it fail, then redo.**
+
+### Commit Discipline (MANDATORY)
+
+Commit frequently: one atomic commit per verified increment (RED→GREEN + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Load the `git-master` skill for the commit workflow when available. Skip committing only when the user forbade commits this session.
 
 ### Verification Anti-Patterns (BLOCKING)
 
@@ -294,10 +315,10 @@ Trigger when ANY apply: user said "엄밀" / "strictly" / "rigorously" / "proper
 
 Procedure (non-negotiable):
 1. Spawn a reviewer via `task(category="ultrabrain", subagent_type="plan", load_skills=[...], run_in_background=false, prompt="<goal + scenarios + evidence + diff + notepad path>")` — or any high-rigor reviewer agent available.
-2. Reviewer verdict is BINDING. There is no "false positive". Do not argue, minimise, or explain away.
-3. Fix every concern. Re-run the FULL scenario QA. Capture fresh evidence. Update notepad.
-4. Re-submit to the SAME reviewer. Loop until UNCONDITIONAL approval. "looks good but..." = REJECTION.
-5. Only on unconditional approval may you declare done.
+2. Verify each reviewer concern yourself. A concern blocks only when it names a success criterion the evidence fails; record concerns that cite no criterion as notes with a one-line reason — fixed or declined at your judgment.
+3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA affected by the fix; capture fresh evidence for the delta. Update notepad.
+4. Re-submit to the SAME reviewer at most twice, passing only the delta diff, the blockers it cited, and the already-approved criteria marked out-of-scope. An approval whose only remaining items are notes counts as approval.
+5. On approval, declare done. If criterion-cited blockers remain after two re-reviews, stop and surface them to the user — do not loop further.
 
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
@@ -316,4 +337,3 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 NOW.
 
 </ultrawork-mode>
-

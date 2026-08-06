@@ -1,0 +1,51 @@
+# AGENTS.md
+
+This project uses Oh My OpenAgent with OpenCode. Read this file before planning
+or changing files.
+
+## Orchestrator Contract
+
+- Start by identifying the real user goal and the smallest observable result
+  that satisfies it.
+- Delegate independent search, implementation, and verification work to
+  background agents when the task has separable parts.
+- Keep direct edits focused on work that does not need specialist context.
+- Verify worker results yourself before using them as evidence.
+
+## Agent Selection Rules
+
+- Use `explore` for fast codebase search, policy lookup, and path discovery.
+- Use `librarian` for docs, external references, and examples from other repos.
+- Use `oracle` for architecture review, risk checks, and debugging analysis.
+- Use `sisyphus` or `sisyphus-junior` for execution work that needs file edits.
+- Use `prometheus` for plans that need user approval before implementation.
+
+## Calling Conventions
+
+- Give each delegated agent one goal, a clear deliverable, and exact paths or
+  commands to inspect.
+- Ask read-only agents for findings with file paths and evidence, not edits.
+- Ask implementation agents to include the verification commands they ran.
+- Retrieve background output before marking a delegated task complete.
+
+## Instruction Phrasing
+
+- Prefer affirmative constraints: "Keep scratch files under ./.omo/session-work/"
+  instead of broad negative phrasing.
+- State required artifacts directly: evidence files, screenshots, transcripts,
+  command output, or PR links.
+- Name the allowed work area when the task must avoid unrelated files.
+
+## Workflow Loop
+
+- Plan the work, then split independent tasks before starting edits.
+- Run the cheapest useful failing check or missing-docs search before the fix.
+- Apply the smallest change that satisfies the request.
+- Run targeted checks and one real surface QA step.
+- Summarize what changed, what passed, and any remaining risk.
+
+## Project Scratch Space
+
+Use `./.omo/session-work/` for temporary clones, downloaded references, logs, and
+agent scratch files. Keep generated evidence under `./.omo/evidence/` when the
+project wants durable QA records.
