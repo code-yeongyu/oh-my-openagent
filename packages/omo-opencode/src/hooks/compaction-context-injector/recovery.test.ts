@@ -3,6 +3,11 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 import { OMO_INTERNAL_INITIATOR_METADATA_KEY } from "../../shared/internal-initiator-marker"
+import {
+  dispatchInternalPrompt,
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../shared/prompt-async-gate"
 import { createCompactionContextInjector } from "./index"
 
 type SessionMessageResponse = Array<{
