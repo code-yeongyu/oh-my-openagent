@@ -56,6 +56,7 @@ export {
   ensureTeamRuntimeDirs,
   loadTeamRegistry,
   normalizeSenpiTeamSpec,
+  recoverStaleCreatingTeams,
   resolveProjectTeamSpecPath,
   resolveTeamMemberInboxDir,
   resolveTeamRuntimeDirs,

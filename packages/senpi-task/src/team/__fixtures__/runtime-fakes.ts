@@ -46,6 +46,7 @@ export type StartBehavior =
 export type FakeTeamManagerOptions = {
   readonly behaviors?: readonly StartBehavior[]
   readonly defaultBehavior?: StartBehavior
+  readonly beforeCancel?: (taskId: string) => Promise<void>
   readonly beforeCancelReturn?: (taskId: string) => Promise<void>
 }
 
@@ -129,7 +130,13 @@ export class FakeTeamManager {
         reason: `Task ${idOrName} is ${record.status}, not running.`,
       }
     }
-    this.#records.set(idOrName, { ...record, status: "cancelled", updated_at: new Date().toISOString() })
+    await this.#options.beforeCancel?.(idOrName)
+    this.#records.set(idOrName, {
+      ...record,
+      status: "cancelled",
+      residency_state: "disposed",
+      updated_at: new Date().toISOString(),
+    })
     await this.#options.beforeCancelReturn?.(idOrName)
     return { kind: "cancelled", task_id: idOrName, previous_status: record.status }
   }
@@ -143,6 +150,10 @@ export class FakeTeamManager {
     const updated = hook(record, readCount)
     this.#records.set(taskId, updated)
     return updated
+  }
+
+  list(): readonly { readonly record: TaskRecord }[] {
+    return [...this.#records.values()].map((record) => ({ record }))
   }
 
   setGetHook(taskId: string, hook: (record: TaskRecord, readCount: number) => TaskRecord): void {

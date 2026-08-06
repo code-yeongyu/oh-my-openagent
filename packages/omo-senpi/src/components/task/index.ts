@@ -25,7 +25,7 @@ import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poll
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
-import { createTeamMailboxReconciler, createTeamService } from "./team-service"
+import { createStaleTeamCreateReconciler, createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 import { createSkillInvocationTracker, type SkillInvocationTracker } from "./skill-invocation-tracker"
 import { wireSessionStartProcessSweep } from "./process-sweep"
@@ -95,6 +95,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
       wireEventBridge(pi, ctx, engine, statusUi, transitions, {
+        reconcileStaleTeamCreates: teamTools.reconcileStaleTeamCreates,
         reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
         leadPollers: teamTools.leadPollers,
       })
@@ -184,11 +185,18 @@ function createTeamToolContext(
     logger: ctx.logger,
     ...(ctx.idleCoordinator !== undefined ? { coordinator: ctx.idleCoordinator } : {}),
   })
-  return { service, reconcileTeamMailbox: createTeamMailboxReconciler(serviceDeps), deliveryJournal, leadPollers }
+  return {
+    service,
+    reconcileStaleTeamCreates: createStaleTeamCreateReconciler(serviceDeps),
+    reconcileTeamMailbox: createTeamMailboxReconciler(serviceDeps),
+    deliveryJournal,
+    leadPollers,
+  }
 }
 
 type TeamToolContext = {
   readonly service: TeamToolsService
+  readonly reconcileStaleTeamCreates: () => Promise<void>
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly deliveryJournal: LeadDeliveryJournal
   readonly leadPollers: LeadPollerLifecycle

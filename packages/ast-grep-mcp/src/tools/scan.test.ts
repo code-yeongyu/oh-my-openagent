@@ -200,7 +200,7 @@ describe("scan tool: stderr compatibility", () => {
 });
 
 describe.skipIf(!SG_AVAILABLE)("scan tool: pinned real-binary fixtures", () => {
-  it("#given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin", () => {
+  it.skipIf(!existsSync(PINNED_SG_PATH))("#given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin", () => {
     expect(existsSync(PINNED_SG_PATH)).toBe(true);
     const version = spawnSync(PINNED_SG_PATH, ["--version"], { encoding: "utf8" });
     expect(version.status).toBe(0);

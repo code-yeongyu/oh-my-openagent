@@ -1,7 +1,55 @@
+import { randomUUID } from "node:crypto"
+
+import { readProcessStartIdentity } from "@oh-my-opencode/utils/process-sweep"
+
 import type { TeamModeConfig } from "../config"
+import { log } from "../logger"
 import type { RuntimeState } from "../types"
 import { cleanupMemberWorktrees } from "./runtime-cleanup"
-import { transitionRuntimeState } from "./store"
+import { loadRuntimeState, transitionRuntimeState } from "./store"
+
+export const CREATING_TIMEOUT_MS = 30 * 60 * 1000
+export const CREATE_CLEANUP_LEASE_TTL_MS = 5 * 60 * 1000
+
+export type CreateCleanupClaimant = {
+  readonly ownerId: string
+  readonly ownerPid: number
+}
+
+type CreateCleanupClaimDeps = {
+  readonly now?: () => number
+  readonly isProcessAlive?: (pid: number) => boolean
+  readonly probeProcess?: (pid: number) => void
+  readonly readProcessIdentity?: (pid: number) => Promise<string | null>
+}
+
+type MarkStuckCreatingDeps = {
+  readonly cleanupMemberWorktrees?: typeof cleanupMemberWorktrees
+  readonly releaseClaim?: typeof releaseClaimedCreatingTeamFailure
+}
+
+type ObservedLeaseOwner = {
+  readonly claimedAt: number
+  readonly ownerId: string
+  readonly ownerPid: number
+  readonly status: "dead" | "reused" | "unknown" | "alive"
+}
+
+export function createCleanupClaimant(): CreateCleanupClaimant {
+  return { ownerId: randomUUID(), ownerPid: process.pid }
+}
+
+function isProcessAlive(pid: number, probeProcess: (pid: number) => void): boolean {
+  try {
+    probeProcess(pid)
+    return true
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    if ("code" in error && error.code === "EPERM") return true
+    if ("code" in error && error.code === "ESRCH") return false
+    throw error
+  }
+}
 
 export function isCreatingStateStuck(
   runtimeState: RuntimeState,
@@ -14,10 +62,138 @@ export function isCreatingStateStuck(
 export async function markStuckCreatingTeamFailed(
   runtimeState: RuntimeState,
   config: TeamModeConfig,
+  deps: MarkStuckCreatingDeps = {},
+): Promise<boolean> {
+  const claimant = createCleanupClaimant()
+  const claimedState = await claimCreatingTeamFailure(runtimeState.teamRunId, claimant, config)
+  if (claimedState === null) return false
+  const cleanup = deps.cleanupMemberWorktrees ?? cleanupMemberWorktrees
+  const release = deps.releaseClaim ?? releaseClaimedCreatingTeamFailure
+  try {
+    await cleanup(claimedState)
+    const finalized = await finalizeClaimedCreatingTeamFailure(claimedState.teamRunId, claimant, config)
+    if (!finalized) await release(claimedState.teamRunId, claimant, config)
+    return finalized
+  } catch (primaryError) {
+    try {
+      await release(claimedState.teamRunId, claimant, config)
+    } catch (releaseError) {
+      log("team create cleanup lease release failed while preserving primary recovery error", {
+        event: "team-create-cleanup-lease-release-failed",
+        teamRunId: claimedState.teamRunId,
+        error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+      })
+    }
+    throw primaryError
+  }
+}
+
+export async function claimCreatingTeamFailure(
+  teamRunId: string,
+  claimant: CreateCleanupClaimant,
+  config: TeamModeConfig,
+  deps: CreateCleanupClaimDeps = {},
+): Promise<RuntimeState | null> {
+  const now = (deps.now ?? Date.now)()
+  const probeProcess = deps.probeProcess ?? ((pid: number) => process.kill(pid, 0))
+  const processIsAlive = deps.isProcessAlive ?? ((pid: number) => isProcessAlive(pid, probeProcess))
+  const readProcessIdentity = deps.readProcessIdentity ?? readProcessStartIdentity
+  const observedState = await loadRuntimeState(teamRunId, config)
+  const observedOwner = await observeLeaseOwner(observedState, processIsAlive, readProcessIdentity)
+  const claimantIdentity = await readProcessIdentity(claimant.ownerPid)
+  const claimedState = await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
+    if (!canClaimCreatingFailure(currentRuntimeState, claimant, now, observedOwner)) return currentRuntimeState
+    const retainedIdentity = isLeaseOwner(currentRuntimeState, claimant)
+      ? currentRuntimeState.createCleanupLease?.ownerIdentity
+      : undefined
+    const ownerIdentity = claimantIdentity ?? retainedIdentity
+    return {
+      ...currentRuntimeState,
+      status: "create_cleanup_pending",
+      createCleanupLease: {
+        ...claimant,
+        claimedAt: now,
+        ...(ownerIdentity === undefined ? {} : { ownerIdentity }),
+      },
+    }
+  }, config)
+  return claimedState.status === "create_cleanup_pending"
+    && isLeaseOwner(claimedState, claimant)
+    ? claimedState
+    : null
+}
+
+export async function finalizeClaimedCreatingTeamFailure(
+  teamRunId: string,
+  claimant: CreateCleanupClaimant,
+  config: TeamModeConfig,
+): Promise<boolean> {
+  let didFinalize = false
+  const finalizedState = await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
+    if (currentRuntimeState.status !== "create_cleanup_pending"
+      || !isLeaseOwner(currentRuntimeState, claimant)) {
+      return currentRuntimeState
+    }
+    didFinalize = true
+    return { ...currentRuntimeState, status: "failed", createCleanupLease: undefined }
+  }, config)
+  return didFinalize && finalizedState.status === "failed"
+}
+
+export async function releaseClaimedCreatingTeamFailure(
+  teamRunId: string,
+  claimant: CreateCleanupClaimant,
+  config: TeamModeConfig,
 ): Promise<void> {
-  await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    status: "failed",
-  }), config)
-  await cleanupMemberWorktrees(runtimeState)
+  try {
+    await transitionRuntimeState(teamRunId, (runtimeState) => (
+      runtimeState.status === "create_cleanup_pending" && isLeaseOwner(runtimeState, claimant)
+        ? { ...runtimeState, createCleanupLease: undefined }
+        : runtimeState
+    ), config)
+  } catch (error) {
+    if (isMissingRuntimeError(error)) return
+    throw error
+  }
+}
+
+function canClaimCreatingFailure(
+  runtimeState: RuntimeState,
+  claimant: CreateCleanupClaimant,
+  now: number,
+  observedOwner: ObservedLeaseOwner | null,
+): boolean {
+  if (runtimeState.status === "creating") return true
+  if (runtimeState.status !== "create_cleanup_pending") return false
+  const lease = runtimeState.createCleanupLease
+  if (lease === undefined || isLeaseOwner(runtimeState, claimant)) return true
+  if (observedOwner === null
+    || observedOwner.ownerId !== lease.ownerId
+    || observedOwner.ownerPid !== lease.ownerPid
+    || observedOwner.claimedAt !== lease.claimedAt) return false
+  return now - lease.claimedAt >= CREATE_CLEANUP_LEASE_TTL_MS
+    && (observedOwner.status === "dead" || observedOwner.status === "reused")
+}
+
+function isLeaseOwner(runtimeState: RuntimeState, claimant: CreateCleanupClaimant): boolean {
+  return runtimeState.createCleanupLease?.ownerId === claimant.ownerId
+    && runtimeState.createCleanupLease.ownerPid === claimant.ownerPid
+}
+
+async function observeLeaseOwner(
+  runtimeState: RuntimeState,
+  processIsAlive: (pid: number) => boolean,
+  readProcessIdentity: (pid: number) => Promise<string | null>,
+): Promise<ObservedLeaseOwner | null> {
+  const lease = runtimeState.createCleanupLease
+  if (runtimeState.status !== "create_cleanup_pending" || lease === undefined) return null
+  if (!processIsAlive(lease.ownerPid)) return { ...lease, status: "dead" }
+  if (lease.ownerIdentity === undefined) return { ...lease, status: "unknown" }
+  const currentIdentity = await readProcessIdentity(lease.ownerPid)
+  if (currentIdentity === null) return { ...lease, status: "unknown" }
+  return { ...lease, status: currentIdentity === lease.ownerIdentity ? "alive" : "reused" }
+}
+
+function isMissingRuntimeError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT"
 }

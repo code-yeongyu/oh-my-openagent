@@ -1,4 +1,5 @@
 import { isPlainRecord } from "@oh-my-opencode/utils"
+import { isProcessStartIdentity } from "@oh-my-opencode/utils/process-sweep"
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import path from "node:path"
@@ -13,7 +14,8 @@ const STATE_FILE_NAME = "state.json"
 export const STALE_DELETING_TTL_MS = 60_000
 
 const ALLOWED_RUNTIME_TRANSITIONS: Readonly<Record<RuntimeState["status"], ReadonlySet<RuntimeState["status"]>>> = {
-  creating: new Set(["active", "failed"]),
+  creating: new Set(["active", "create_cleanup_pending", "failed"]),
+  create_cleanup_pending: new Set(["failed"]),
   active: new Set(["shutdown_requested", "deleting"]),
   shutdown_requested: new Set(["deleting"]),
   deleting: new Set(["deleted"]),
@@ -89,15 +91,23 @@ function stripLegacyRuntimeStateFields(rawState: unknown): unknown {
     return rawState
   }
 
+  const createCleanupLease = rawState["createCleanupLease"]
+  const normalizedLease = isPlainRecord(createCleanupLease)
+    && !isProcessStartIdentity(createCleanupLease["ownerIdentity"])
+    ? stripInvalidOwnerIdentity(createCleanupLease)
+    : createCleanupLease
   const members = rawState["members"]
-  if (!Array.isArray(members)) {
-    return rawState
-  }
 
   return {
     ...rawState,
-    members: members.map(stripLegacyRuntimeStateMemberFields),
+    ...(normalizedLease === undefined ? {} : { createCleanupLease: normalizedLease }),
+    ...(Array.isArray(members) ? { members: members.map(stripLegacyRuntimeStateMemberFields) } : {}),
   }
+}
+
+function stripInvalidOwnerIdentity(lease: Record<string, unknown>): Record<string, unknown> {
+  const { ownerIdentity: _ownerIdentity, ...leaseWithoutInvalidIdentity } = lease
+  return leaseWithoutInvalidIdentity
 }
 
 function validateRuntimeState(rawState: unknown, teamRunId: string): RuntimeState {

@@ -50,6 +50,12 @@ export {
   parseWindowsProcessTable,
   type ProcessInfo,
 } from "./process-table"
+export {
+  isProcessStartIdentity,
+  parseLinuxProcessStartTicks,
+  readProcessStartIdentity,
+  type ProcessStartIdentityDeps,
+} from "./process-identity"
 export { discoverCodegraphOwnedRoots, discoverOmoOwnedRoots, type CodegraphOwnedRootsOptions } from "./roots"
 export {
   sweepCodegraphZombies,

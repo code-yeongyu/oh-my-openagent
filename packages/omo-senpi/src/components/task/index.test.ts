@@ -97,6 +97,7 @@ function wiredBridge(): {
   pi: FakeExtensionAPI
   engine: ReturnType<typeof composeTaskEngine>
   reconcileCalls: { count: number }
+  recoveryCalls: { count: number }
   leadCalls: { ticks: number; shutdowns: number }
 } {
   const cwd = tempProject()
@@ -105,8 +106,13 @@ function wiredBridge(): {
   const engine = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
   const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
   const reconcileCalls = { count: 0 }
+  const recoveryCalls = { count: 0 }
   const leadCalls = { ticks: 0, shutdowns: 0 }
   wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
+    reconcileStaleTeamCreates: () => {
+      recoveryCalls.count += 1
+      return Promise.resolve()
+    },
     reconcileTeamMailbox: () => {
       reconcileCalls.count += 1
       return Promise.resolve()
@@ -119,7 +125,7 @@ function wiredBridge(): {
       shutdown: () => { leadCalls.shutdowns += 1 },
     },
   })
-  return { pi, engine, reconcileCalls, leadCalls }
+  return { pi, engine, reconcileCalls, recoveryCalls, leadCalls }
 }
 
 async function seedTeamRuntime(cwd: string, leadSessionId: string, memberName = "crash"): Promise<string> {
@@ -255,7 +261,7 @@ describe("omo-senpi task component wiring", () => {
 
   it("#given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start", async () => {
     // given
-    const { pi, reconcileCalls, leadCalls } = wiredBridge()
+    const { pi, reconcileCalls, recoveryCalls, leadCalls } = wiredBridge()
     const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
 
     // when the session starts twice
@@ -264,6 +270,7 @@ describe("omo-senpi task component wiring", () => {
 
     // then
     expect(reconcileCalls.count).toBe(2)
+    expect(recoveryCalls.count).toBe(1)
     expect(leadCalls.ticks).toBe(2)
   })
 
@@ -294,6 +301,10 @@ describe("omo-senpi task component wiring", () => {
     }
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
     wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
+      reconcileStaleTeamCreates: () => {
+        order.push("recover-create")
+        return Promise.resolve()
+      },
       reconcileTeamMailbox: () => {
         order.push("reclaim")
         return Promise.resolve()
@@ -315,7 +326,7 @@ describe("omo-senpi task component wiring", () => {
     })
 
     // then
-    expect(order).toEqual(["reattach:session-a", "reclaim", "notify", "cleanup", "poll"])
+    expect(order).toEqual(["reattach:session-a", "recover-create", "reclaim", "notify", "cleanup", "poll"])
   })
 
   it("#given a terminal member owned by lead A #when lead B reconciles then lead A reconciles #then only the owning lead receives replay", async () => {

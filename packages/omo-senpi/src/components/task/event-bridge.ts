@@ -11,6 +11,7 @@ import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
+  readonly reconcileStaleTeamCreates?: () => Promise<void>
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
 }
@@ -30,6 +31,7 @@ export function wireEventBridge(
   state: EventBridgeState,
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  let shouldRecoverStaleTeamCreates = true
   wireReloadGuard(pi, engine.manager)
 
   pi.on("session_start", async (_payload, eventCtx) => {
@@ -43,6 +45,10 @@ export function wireEventBridge(
       // flushes. Re-observe every reconciled record; the notifier filters non-team/non-error states and
       // its persisted liveness epoch suppresses records already delivered in an earlier process.
       if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
+    }
+    if (shouldRecoverStaleTeamCreates) {
+      shouldRecoverStaleTeamCreates = false
+      await reconcileStaleTeamCreatesBestEffort(ctx, state)
     }
     await reconcileTeamMailboxBestEffort(ctx, state)
     if (sessionId !== undefined) {
@@ -118,6 +124,17 @@ export function wireEventBridge(
     )
     return undefined
   })
+}
+
+async function reconcileStaleTeamCreatesBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
+  if (state.reconcileStaleTeamCreates === undefined) return
+  try {
+    await state.reconcileStaleTeamCreates()
+  } catch (error) {
+    ctx.logger.warn("omo-senpi task session-start stale team create recovery failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
