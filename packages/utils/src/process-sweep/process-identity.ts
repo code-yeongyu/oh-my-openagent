@@ -37,7 +37,7 @@ export async function readProcessStartIdentity(
       if (systemRoot === undefined || !windowsPath.isAbsolute(systemRoot)) return null
       const powershellPath = windowsPath.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
       const execFileText = deps.execFileText ?? defaultExecFileText
-      const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`
+      const script = `(Get-Process -Id ${pid}).StartTime.ToUniversalTime().Ticks`
       const startTicks = (await execFileText(powershellPath, ["-NoProfile", "-Command", script])).trim()
       return /^\d+$/.test(startTicks) ? `win32:${startTicks}` : null
     }
