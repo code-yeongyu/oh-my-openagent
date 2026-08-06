@@ -1,4 +1,9 @@
 export {
+  selectOrphanedGitBashProxies,
+  type GitBashProxyProcess,
+  type SelectOrphanedGitBashProxiesOptions,
+} from "./git-bash-proxy-family"
+export {
   hasExecutableToken,
   hasExecutableTokenUnderRootWithSuffix,
   normalizeForComparison,
@@ -24,6 +29,7 @@ export {
 } from "./exec"
 export {
   attestLspDaemonCliProcess,
+  isValidLspDaemonVersion,
   listLspDaemonVersionDirs,
   OMO_LSP_DAEMON_DIR_ENV,
   OMO_LSP_DAEMON_VERSION_ENV,
@@ -53,6 +59,7 @@ export {
 export { discoverCodegraphOwnedRoots, discoverOmoOwnedRoots, type CodegraphOwnedRootsOptions } from "./roots"
 export {
   sweepCodegraphZombies,
+  sweepOrphanedGitBashProxies,
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
   type CodegraphSweepAction,
@@ -62,6 +69,8 @@ export {
   type ProcessSweepAction,
   type SweepCodegraphZombiesOptions,
   type SweepCodegraphZombiesResult,
+  type SweepOrphanedGitBashProxiesOptions,
+  type SweepOrphanedGitBashProxiesResult,
   type SweepOrphanedLspDaemonProxiesOptions,
   type SweepOrphanedLspDaemonProxiesResult,
   type SweepStaleLspDaemonVersionsOptions,

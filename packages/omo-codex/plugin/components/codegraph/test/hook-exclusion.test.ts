@@ -20,7 +20,7 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 		// given
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
-		let sweepCalls = 0;
+		const sweepCalls: string[] = [];
 		const stateRoot = createAllowedWorkspace("codegraph-omo-state");
 		const workspace = join(stateRoot, ".omo", "ulw-research", "run", "clones", "repo");
 		mkdirSync(workspace, { recursive: true });
@@ -37,14 +37,17 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				ancestorProbe: () => {
 					throw new Error("excluded projects must not probe CodeGraph ancestors");
 				},
-				sweepZombies: () => {
-					sweepCalls += 1;
+				sweepFamilies: {
+					sweepCodegraph: () => sweepCalls.push("codegraph"),
+					sweepGitBashProxies: () => sweepCalls.push("git-bash-proxy"),
+					sweepLspProxies: () => sweepCalls.push("lsp-proxy"),
+					sweepStaleLspDaemons: () => sweepCalls.push("lsp-daemon"),
 				},
 			});
 
 			// then
 			expect(result).toEqual({ action: "skipped-excluded", exitCode: 0 });
-			expect(sweepCalls).toBe(0);
+			expect(sweepCalls.sort()).toEqual(["codegraph", "git-bash-proxy", "lsp-daemon", "lsp-proxy"]);
 			expect(spawned).toEqual([]);
 			expect(stdout.join("")).toBe("");
 		} finally {
@@ -70,6 +73,12 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
+				sweepFamilies: {
+					sweepCodegraph: () => undefined,
+					sweepGitBashProxies: () => undefined,
+					sweepLspProxies: () => undefined,
+					sweepStaleLspDaemons: () => undefined,
+				},
 			});
 
 			// then

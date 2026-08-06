@@ -1,3 +1,4 @@
+import { homedir } from "node:os"
 import { join } from "node:path"
 
 import {
@@ -16,6 +17,7 @@ import {
   type StaleLspDaemonVersionTarget,
 } from "./lsp-daemon-family"
 import { attestLspDaemonOwner } from "./lsp-daemon-owner-attestation"
+import { selectOrphanedGitBashProxies, type GitBashProxyProcess } from "./git-bash-proxy-family"
 import { selectOrphanedLspDaemonProxies, type LspDaemonProxyProcess } from "./lsp-proxy-family"
 import type { ProcessInfo } from "./process-table"
 import { discoverCodegraphOwnedRoots, type CodegraphOwnedRootsOptions } from "./roots"
@@ -45,6 +47,36 @@ export interface SweepOrphanedLspDaemonProxiesResult extends ProcessFamilySweepR
 }
 
 const LSP_PROXY_SWEEP_STAMP_FILE = "lsp-proxy-sweep.stamp"
+
+export interface SweepOrphanedGitBashProxiesOptions extends CodegraphOwnedRootsOptions, ProcessFamilySweepOptions {
+  readonly ownedRoots?: readonly string[]
+  readonly processProvider?: () => Promise<readonly ProcessInfo[]>
+}
+
+export interface SweepOrphanedGitBashProxiesResult extends ProcessFamilySweepResult<GitBashProxyProcess> {
+  readonly ownedRoots: readonly string[]
+}
+
+export async function sweepOrphanedGitBashProxies(
+  options: SweepOrphanedGitBashProxiesOptions = {},
+): Promise<SweepOrphanedGitBashProxiesResult> {
+  const homeDir = options.homeDir ?? options.env?.["HOME"] ?? options.env?.["USERPROFILE"] ?? homedir()
+  const stampFile = join(homeDir, ".omo", "git-bash-mcp", "proxy-sweep.stamp")
+  const ownedRoots = options.ownedRoots ?? discoverCodegraphOwnedRoots(options)
+  const result = await runProcessFamilySweep<GitBashProxyProcess>({
+    familyLabel: "git-bash proxy sweep",
+    stampFile,
+    collect: async () => {
+      const provider = options.processProvider ?? (() => enumerateProcesses(options.platform))
+      const candidates = selectOrphanedGitBashProxies(await provider(), {
+        ownedRoots,
+        ...(options.platform === undefined ? {} : { platform: options.platform }),
+      })
+      return { candidates, killList: candidates, spared: [] }
+    },
+  }, options)
+  return { ...result, ownedRoots }
+}
 
 export async function sweepOrphanedLspDaemonProxies(
   options: SweepOrphanedLspDaemonProxiesOptions = {},
@@ -101,10 +133,11 @@ export async function sweepStaleLspDaemonVersions(
   }
 
   const platform = options.platform ?? process.platform
+  const attest = options.attest
   const attestTarget = options.attestTarget
-    ?? (options.attest === undefined
+    ?? (attest === undefined
       ? (target: StaleLspDaemonVersionTarget) => attestLspDaemonOwner(target)
-      : (target: StaleLspDaemonVersionTarget) => options.attest!(target.pid, platform))
+      : (target: StaleLspDaemonVersionTarget) => attest(target.pid, platform))
   const result = await runProcessFamilySweep<StaleLspDaemonVersionTarget, SparedLspDaemonVersion>({
     attestBeforeSignal: (target) => attestTarget(target, platform),
     familyLabel: "lsp-daemon stale-version sweep",

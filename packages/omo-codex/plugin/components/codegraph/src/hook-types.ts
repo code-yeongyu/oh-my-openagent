@@ -3,6 +3,7 @@ import type { Readable } from "node:stream";
 import type { CodexOmoConfig as SharedCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import type { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import type { SweepCodegraphZombiesOptions } from "../../../../../utils/src/codegraph/process-sweep.ts";
+import type { OmoFamilySweeps } from "./hook-sweep.js";
 import type { CodegraphProvisionResult as SharedCodegraphProvisionResult } from "../../../../../utils/src/codegraph/provision.ts";
 import type {
 	CodegraphCommandResolution,
@@ -109,6 +110,7 @@ export interface SessionStartHookOptions {
 	readonly spawnWorker?: (invocation: WorkerSpawnInvocation) => void;
 	readonly stdin?: Readable & { readonly isTTY?: boolean };
 	readonly stdout?: HookStdout;
+	readonly sweepFamilies?: OmoFamilySweeps;
 	readonly sweepZombies?: (options: SweepCodegraphZombiesOptions) => Promise<unknown> | unknown;
 	readonly workerCliPath?: string;
 }

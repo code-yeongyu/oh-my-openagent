@@ -12,7 +12,7 @@ import { shouldExcludeCodegraphProject } from "../../../../../utils/src/codegrap
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { pruneCodegraphProjectStoresBestEffort } from "./cache-gc.js";
 import { readHookInput, resolveHomeDir, resolveHookProjectRoot } from "./hook-input.js";
-import { sweepCodegraphZombiesBestEffort } from "./hook-sweep.js";
+import { sweepCodegraphZombiesBestEffort, sweepOmoFamiliesBestEffort } from "./hook-sweep.js";
 import type {
 	CodegraphSessionStartOutcome,
 	SessionStartHookOptions,
@@ -83,6 +83,17 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	const projectRoot = resolveHookProjectRoot(input, options.cwd ?? processCwd());
 	const homeDir = resolveHomeDir(env);
 	const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
+	const sweepOptions = {
+		env,
+		homeDir,
+		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
+		log: writeDebugLog,
+	};
+	if (options.sweepZombies === undefined) {
+		await sweepOmoFamiliesBestEffort(sweepOptions, options.sweepFamilies);
+	} else {
+		await sweepCodegraphZombiesBestEffort(sweepOptions, options.sweepZombies);
+	}
 	if (config.codegraph?.enabled === false) return { action: "skipped-disabled", exitCode: 0 };
 
 	const excludedRoots = config.codegraph?.excluded_roots;
@@ -93,13 +104,6 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	if (exclusion.excluded) return { action: "skipped-excluded", exitCode: 0 };
 
 	pruneCodegraphProjectStoresBestEffort(homeDir, { debugLog: writeDebugLog });
-	await sweepCodegraphZombiesBestEffort({
-		env,
-		homeDir,
-		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
-		log: writeDebugLog,
-	}, options.sweepZombies);
-
 	const nowMs = options.nowMs ?? Date.now();
 	const context: HookContext = {
 		baseCooldownMs: config.codegraph?.session_start_cooldown_ms ?? DEFAULT_SESSION_START_COOLDOWN_MS,
