@@ -314,7 +314,9 @@ describe("TaskManager claim characterization", () => {
     expect(inner.load(result.task_id)?.error_message).toBe("spawn bookkeeping failed")
     expect(transitions.map((transition) => transition.type)).toEqual(["start", "fail"])
     expect(bookkeeping.applied()).toEqual([true, true])
-    expect(manager.wasBackground(result.task_id)).toBe(false)
+    // wasBackground reads the RECORD: the claim persisted notify_on_terminal from the spec before
+    // bookkeeping failed, so the durable intent survives the failed start.
+    expect(manager.wasBackground(result.task_id)).toBe(true)
   })
 
   test("#given a whitespace requested name #when a collision is claimed #then the fallback follows the final id", async () => {

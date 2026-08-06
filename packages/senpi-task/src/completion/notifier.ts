@@ -16,7 +16,7 @@ import type {
   ParentNotifier,
   ParentNotifierMessage,
   ParentState,
-  ReconcileFailedNotificationsInput,
+  ReconcileUnnotifiedNotificationsInput,
   RoutingDecision,
 } from "./types"
 
@@ -85,7 +85,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     const delivered = deliverWithRetry(deps.notifier, buildDeliveryMessage([entry.details], decision))
     if (delivered.ok) {
       finishRetryChain(entry)
-      persistNotified(deps.store, fresh, entry.epoch)
+      persistNotified(deps.store, fresh.task_id, entry.epoch)
       return
     }
     scheduleRetry(entry)
@@ -102,10 +102,10 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     const delivered = deliverWithRetry(deps.notifier, buildDeliveryMessage([details], decision))
     if (delivered.ok) {
       finishRetryChain(entry)
-      persistNotified(deps.store, record, entry.epoch)
+      persistNotified(deps.store, record.task_id, entry.epoch)
       return { kind: "delivered", decision: deliveredDecision(decision) }
     }
-    recordFailure(deps.store, record, entry.epoch, delivered.error)
+    recordFailure(deps.store, record.task_id, entry.epoch, delivered.error)
     scheduleRetry(entry)
     return { kind: "failed" }
   }
@@ -151,17 +151,31 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     return buffered.get(sessionId)?.length ?? 0
   }
 
-  function reconcileFailedNotifications(input: ReconcileFailedNotificationsInput): void {
+  // Crash recovery: the in-memory buffer dies with the process, so on session start every
+  // terminal child of THIS session that still owes a notification goes through the normal
+  // delivery path (dedupe identity stays (task_id, run_epoch)). Two populations owe one:
+  // (a) notify_on_terminal records whose latest run_epoch was never recorded notified, and
+  // (b) legacy pre-upgrade records with an in-flight failed delivery (notification_failed_epoch
+  // set) so their retries survive the upgrade.
+  function reconcileUnnotifiedNotifications(input: ReconcileUnnotifiedNotificationsInput): void {
     const listed = deps.store.list()
     for (const record of listed.records) {
       const epoch = record.notification.run_epoch
       if (record.parent_session_id !== input.sessionId) continue
-      if (record.notification.notification_failed_epoch !== epoch) continue
       if (record.notification.notified_epoch >= epoch) continue
       if (!TERMINAL_STATUSES.has(record.status)) continue
       if (!shouldNotifyStatus(record.status)) continue
+      if (!owesNotification(record)) continue
+      // A LIVE in-memory buffered entry already owns delivery of this (task_id, run_epoch) - the
+      // next flush delivers it. Reconcile only recovers notifications whose buffer died with the
+      // process; delivering here too would double-notify (chaos inv1).
+      if (hasBuffered(buffered, record.parent_session_id, record.task_id, epoch)) continue
       deliverRecord(record, buildDetails(record), input.parentState)
     }
+  }
+
+  function owesNotification(record: TaskRecord): boolean {
+    return record.notify_on_terminal || record.notification.notification_failed_epoch !== undefined
   }
 
   function buildDetails(record: TaskRecord, tokens?: number): CompletionDetails {
@@ -171,7 +185,13 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     })
   }
 
-  return { notifyTerminal, flushBuffered, reconcileFailedNotifications, bufferedCount }
+  return {
+    notifyTerminal,
+    flushBuffered,
+    reconcileUnnotifiedNotifications,
+    reconcileFailedNotifications: reconcileUnnotifiedNotifications,
+    bufferedCount,
+  }
 }
 
 // Every delivered notification stamps triggerTurn:true; the omo-senpi adapter routes it through the
@@ -207,6 +227,10 @@ function retryKey(entry: BufferedEntry): string {
   return `${entry.task_id}:${entry.epoch}`
 }
 
+function hasBuffered(buffered: Map<string, BufferedEntry[]>, sessionId: string, taskId: string, epoch: number): boolean {
+  return (buffered.get(sessionId) ?? []).some((entry) => entry.task_id === taskId && entry.epoch === epoch)
+}
+
 function deliverWithRetry(
   notifier: ParentNotifier,
   message: ParentNotifierMessage,
@@ -238,24 +262,33 @@ function pushBuffered(buffered: Map<string, BufferedEntry[]>, sessionId: string,
   buffered.set(sessionId, existing)
 }
 
-function persistNotified(store: CompletionNotifierStore, record: TaskRecord, epoch: number): void {
-  store.replace({ ...record, notification: { ...record.notification, notified_epoch: epoch } })
+// Epoch-only bookkeeping: a conditional mutate re-reads fresh inside the record lock and patches
+// ONLY the notification epochs, leaving every other field untouched, so a concurrent
+// residency/host_pid claim written by reconcile is never clobbered by a stale whole-record replace.
+function persistNotified(store: CompletionNotifierStore, taskId: string, epoch: number): void {
+  store.mutate(taskId, (fresh) =>
+    fresh.notification.notified_epoch >= epoch
+      ? fresh
+      : { ...fresh, notification: { ...fresh.notification, notified_epoch: epoch } },
+  )
 }
 
-function recordFailure(store: CompletionNotifierStore, record: TaskRecord, epoch: number, error: unknown): void {
-  store.appendEvent(record.task_id, { type: "notification_failed", payload: { epoch, error: String(error) } })
-  store.replace({ ...record, notification: { ...record.notification, notification_failed_epoch: epoch } })
-  log("senpi-task completion delivery failed", { taskId: record.task_id, epoch })
+function recordFailure(store: CompletionNotifierStore, taskId: string, epoch: number, error: unknown): void {
+  store.appendEvent(taskId, { type: "notification_failed", payload: { epoch, error: String(error) } })
+  store.mutate(taskId, (fresh) =>
+    fresh.notification.notified_epoch >= epoch || fresh.notification.notification_failed_epoch === epoch
+      ? fresh
+      : { ...fresh, notification: { ...fresh.notification, notification_failed_epoch: epoch } },
+  )
+  log("senpi-task completion delivery failed", { taskId, epoch })
 }
 
 function persistEntry(store: CompletionNotifierStore, entry: BufferedEntry): void {
-  const fresh = store.load(entry.task_id)
-  if (fresh !== null) persistNotified(store, fresh, entry.epoch)
+  persistNotified(store, entry.task_id, entry.epoch)
 }
 
 function recordEntryFailure(store: CompletionNotifierStore, entry: BufferedEntry, error: unknown): void {
-  const fresh = store.load(entry.task_id)
-  if (fresh !== null) recordFailure(store, fresh, entry.epoch, error)
+  if (store.load(entry.task_id) !== null) recordFailure(store, entry.task_id, entry.epoch, error)
 }
 
 function dropEntry(store: CompletionNotifierStore, entry: BufferedEntry): void {

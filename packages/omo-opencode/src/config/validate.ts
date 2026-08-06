@@ -95,6 +95,43 @@ function protectUserFields(
   }
 }
 
+function materializeAgentModelChains(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  if (config.agents === undefined) return config
+
+  let changed = false
+  const agents = Object.fromEntries(Object.entries(config.agents).map(([name, agent]) => {
+    if (agent?.models === undefined) return [name, agent]
+
+    const [primary, ...fallbacks] = agent.models
+    const {
+      models: _models,
+      model: _model,
+      fallback_models: _fallbackModels,
+      reasoning: _reasoning,
+      variant: _variant,
+      reasoningEffort: _reasoningEffort,
+      temperature: _temperature,
+      top_p: _topP,
+      maxTokens: _maxTokens,
+      thinking: _thinking,
+      ...rest
+    } = agent
+    const primarySettings = primary === undefined
+      ? {}
+      : typeof primary === "string"
+        ? { model: primary }
+        : primary
+    changed = true
+    return [name, {
+      ...rest,
+      ...primarySettings,
+      fallback_models: fallbacks,
+    }]
+  })) as typeof config.agents
+
+  return changed ? { ...config, agents } : config
+}
+
 function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
   const legacy = config.ralph_loop
   if (legacy === undefined) return config
@@ -126,7 +163,9 @@ export function validatePluginConfig(
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]
   const userConfig = parseConfig(chain.protectedUserView)
-  const config = applyDisabledProviders(protectUserFields(mergeViews(views), userConfig))
+  const config = applyDisabledProviders(materializeAgentModelChains(
+    protectUserFields(mergeViews(views), userConfig),
+  ))
 
   return {
     valid: messages.length === 0,

@@ -15,6 +15,7 @@ function text(value) {
 export const LEAD_SCRIPT = {
   lead: [
     toolCall("team_create", {
+      team_name: "stale-named-team",
       inline_spec: {
         name: "e2eteam",
         members: [

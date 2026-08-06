@@ -183,6 +183,45 @@ describe("task-family custom message renderers", () => {
     expect(text).toContain("last state:error")
   })
 
+  test("#given a completed team member with a long target #when rendering at 140 cells #then minute duration tools and tps remain visible", () => {
+    // given
+    const details = [{
+      task_id: "st_team_member",
+      name: "stats-member",
+      status: "completed" as const,
+      category: "quick",
+      model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+      duration_ms: 65_000,
+      run_stats: {
+        runtime_ms: 65_000,
+        turns: 3,
+        tool_calls: 4,
+        output_tokens: 840,
+        tokens_per_second: 250,
+      },
+      final_response: "team statistics member complete",
+      continuation_hint: 'Use task_send({ to: "stats-member", message: "..." }) to continue.',
+    }]
+
+    // when
+    const lines = renderContentLines(
+      renderTaskCompletion,
+      "senpi-task.completion",
+      "<task-notification>raw</task-notification>",
+      details,
+      140,
+    )
+    const text = lines.map(normalizeRendererText).join("\n")
+
+    // then
+    expect(text).toContain("name:stats-member")
+    expect(text).toContain("status:completed")
+    expect(text).toContain("duration:1m 5s")
+    expect(text).toContain("tools:4")
+    expect(text).toContain("tps:250")
+    for (const line of lines) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(140)
+  })
+
   test("#given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries", () => {
     // given
     const details = [{

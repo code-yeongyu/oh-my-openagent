@@ -44,6 +44,7 @@ function draftRecord(taskId: string): TaskRecord {
     model: "test/model",
     created_at: timestamp,
     updated_at: timestamp,
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
     name: taskId,
   }

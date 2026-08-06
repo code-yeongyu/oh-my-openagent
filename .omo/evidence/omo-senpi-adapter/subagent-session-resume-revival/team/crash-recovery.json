@@ -1,0 +1,144 @@
+{
+  "target": {
+    "ready": true,
+    "markerPath": "/Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival/.omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/team/crash-after-inject.json",
+    "messageId": "5f7fbf4c-1c87-49bb-98a3-f1e9decf4ded",
+    "runId": "2c39c612-f6c1-4b9c-9914-a56a7faabc86",
+    "taskId": "st_019fcc9f",
+    "pid": 17261,
+    "leadSessionId": "019fcc9f-72f1-70ca-8934-11a515032c68"
+  },
+  "before": {
+    "reservedExists": true,
+    "processedExists": false,
+    "eventCount": 0
+  },
+  "parentAliveAtHold": true,
+  "memberAliveAtHold": true,
+  "memberKilled": true,
+  "memberTerminal": {
+    "kind": "record",
+    "status": "error"
+  },
+  "parentAliveBeforeTermination": true,
+  "parentTermination": {
+    "kind": "terminated",
+    "pid": 17225,
+    "platform": "darwin"
+  },
+  "reservationAged": true,
+  "afterKillRecord": {
+    "task_id": "st_019fcc9f",
+    "status": "error",
+    "residency_state": "resident",
+    "parent_session_id": "019fcc9f-72f1-70ca-8934-11a515032c68",
+    "root_session_id": "019fcc9f-72f1-70ca-8934-11a515032c68",
+    "depth": 1,
+    "execution_mode": "process",
+    "model": "omo-mock/mock-1",
+    "notify_on_terminal": true,
+    "created_at": "2026-08-04T11:53:50.264Z",
+    "updated_at": "2026-08-04T11:53:51.601Z",
+    "notification": {
+      "run_epoch": 0,
+      "notified_epoch": 0
+    },
+    "name": "team:2c39c612-f6c1-4b9c-9914-a56a7faabc86:crash",
+    "category": "quick",
+    "requested_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "omo-mock/mock-1",
+      "source": "category"
+    },
+    "resolved_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "Mock 1",
+      "source": "category"
+    },
+    "spawn_spec": {
+      "version": 1,
+      "cwd": "/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-W1Y2Lu/project",
+      "prompt": "You are 'crash', a member of team 'crashteam' running under the senpi-task team runtime.\n\nWork arrives as injected messages from the lead and other members; coordinate with task_send.\n\nAfter completing any immediate instructions below, report with task_send, then end your turn. Injected messages revive this resident session with more work.\n\nWhen you finish assigned work, task_send the lead a summary, then end your turn and wait for an injected message.\n\nYou are team member 'crash'. MOCKROLE=quick. End your turn, then accept one crash-window injection.\n\n<Category_Context>\nYou are working on SMALL / QUICK tasks.\n\nEfficient execution mindset:\n- Fast, focused, minimal overhead\n- Get to the point immediately\n- No over-engineering\n- Simple solutions for simple problems\n\nApproach:\n- Minimal viable implementation\n- Skip unnecessary abstractions\n- Direct and concise\n</Category_Context>\n\n<Caller_Warning>\nTHIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.6-luna-fast).\n\nThe model executing this task is optimized for speed over depth. Your prompt MUST be:\n\n**EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:\n1. MUST DO: List every required action as atomic, numbered steps\n2. MUST NOT DO: Explicitly forbid likely mistakes and deviations\n3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples\n\n**WHY THIS MATTERS:**\n- Smaller models benefit from explicit guardrails\n- Vague instructions may lead to unpredictable results\n- Implicit expectations may be missed\n**PROMPT STRUCTURE (MANDATORY):**\n```\nTASK: [One-sentence goal]\n\nMUST DO:\n1. [Specific action with exact details]\n2. [Another specific action]\n...\n\nMUST NOT DO:\n- [Forbidden action + why]\n- [Another forbidden action]\n...\n\nEXPECTED OUTPUT:\n- [Exact deliverable description]\n- [Success criteria / verification method]\n```\n\nIf your prompt lacks this structure, REWRITE IT before delegating.\n</Caller_Warning>"
+    },
+    "pid": 17261,
+    "host_pid": 17226,
+    "error_message": "RPC child killed by signal SIGKILL (pid=17261)",
+    "killed": true,
+    "run_stats": {
+      "runtime_ms": 1335,
+      "turns": 0,
+      "tool_calls": 0
+    }
+  },
+  "afterRestartRecord": {
+    "task_id": "st_019fcc9f",
+    "status": "error",
+    "residency_state": "disposed",
+    "parent_session_id": "019fcc9f-72f1-70ca-8934-11a515032c68",
+    "root_session_id": "019fcc9f-72f1-70ca-8934-11a515032c68",
+    "depth": 1,
+    "execution_mode": "process",
+    "model": "omo-mock/mock-1",
+    "notify_on_terminal": true,
+    "created_at": "2026-08-04T11:53:50.264Z",
+    "updated_at": "2026-08-04T11:53:52.994Z",
+    "notification": {
+      "run_epoch": 0,
+      "notified_epoch": 0,
+      "liveness_notified_epoch": 0
+    },
+    "name": "team:2c39c612-f6c1-4b9c-9914-a56a7faabc86:crash",
+    "category": "quick",
+    "requested_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "omo-mock/mock-1",
+      "source": "category"
+    },
+    "resolved_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "Mock 1",
+      "source": "category"
+    },
+    "spawn_spec": {
+      "version": 1,
+      "cwd": "/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-W1Y2Lu/project",
+      "prompt": "You are 'crash', a member of team 'crashteam' running under the senpi-task team runtime.\n\nWork arrives as injected messages from the lead and other members; coordinate with task_send.\n\nAfter completing any immediate instructions below, report with task_send, then end your turn. Injected messages revive this resident session with more work.\n\nWhen you finish assigned work, task_send the lead a summary, then end your turn and wait for an injected message.\n\nYou are team member 'crash'. MOCKROLE=quick. End your turn, then accept one crash-window injection.\n\n<Category_Context>\nYou are working on SMALL / QUICK tasks.\n\nEfficient execution mindset:\n- Fast, focused, minimal overhead\n- Get to the point immediately\n- No over-engineering\n- Simple solutions for simple problems\n\nApproach:\n- Minimal viable implementation\n- Skip unnecessary abstractions\n- Direct and concise\n</Category_Context>\n\n<Caller_Warning>\nTHIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.6-luna-fast).\n\nThe model executing this task is optimized for speed over depth. Your prompt MUST be:\n\n**EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:\n1. MUST DO: List every required action as atomic, numbered steps\n2. MUST NOT DO: Explicitly forbid likely mistakes and deviations\n3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples\n\n**WHY THIS MATTERS:**\n- Smaller models benefit from explicit guardrails\n- Vague instructions may lead to unpredictable results\n- Implicit expectations may be missed\n**PROMPT STRUCTURE (MANDATORY):**\n```\nTASK: [One-sentence goal]\n\nMUST DO:\n1. [Specific action with exact details]\n2. [Another specific action]\n...\n\nMUST NOT DO:\n- [Forbidden action + why]\n- [Another forbidden action]\n...\n\nEXPECTED OUTPUT:\n- [Exact deliverable description]\n- [Success criteria / verification method]\n```\n\nIf your prompt lacks this structure, REWRITE IT before delegating.\n</Caller_Warning>"
+    },
+    "pid": 17261,
+    "host_pid": 17335,
+    "error_message": "RPC child killed by signal SIGKILL (pid=17261)",
+    "killed": true,
+    "run_stats": {
+      "runtime_ms": 1335,
+      "turns": 0,
+      "tool_calls": 0
+    }
+  },
+  "afterReclaim": {
+    "unread": 1,
+    "reserved": 0,
+    "processed": 0,
+    "reservedExists": false,
+    "unreadExists": true,
+    "processedExists": false,
+    "eventCount": 0,
+    "envelopeCount": 0
+  },
+  "afterReplacement": {
+    "unread": 0,
+    "reserved": 0,
+    "processed": 1,
+    "reservedExists": false,
+    "unreadExists": false,
+    "processedExists": true,
+    "eventCount": 1,
+    "envelopeCount": 1
+  },
+  "initialStatus": null,
+  "restartStatus": 0,
+  "livenessInjected": true
+}

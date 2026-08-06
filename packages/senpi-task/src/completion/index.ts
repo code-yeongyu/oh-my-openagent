@@ -17,6 +17,7 @@ export type {
   ParentNotifierMessage,
   ParentState,
   ReconcileFailedNotificationsInput,
+  ReconcileUnnotifiedNotificationsInput,
   RoutingDecision,
   SkipReason,
   TransitionReason,

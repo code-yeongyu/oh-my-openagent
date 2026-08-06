@@ -192,6 +192,8 @@ async function readBuiltEntry(output) {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.includes("--check")) {
+    run("node", [join(scriptDir, "stage-lsp-daemon-runtime.mjs"), "--check"])
+    run("node", [join(scriptDir, "stage-ast-grep-mcp-runtime.mjs"), "--check"])
     const result = await checkExtensionCurrent()
     if (!result.ok) {
       console.error(`omo-senpi extension build is not current: ${result.reason}`)

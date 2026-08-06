@@ -64,7 +64,8 @@ export function createTeamMemberRespawnLaunchResolver(
     if (runtime.status !== "active" && runtime.status !== "shutdown_requested") {
       throw new TeamMemberRespawnLaunchError("runtime_inactive", identity)
     }
-    if (!runtime.members.some((member) => member.name === identity.memberName)) {
+    const member = runtime.members.find((entry) => entry.name === identity.memberName)
+    if (member === undefined || member.status === "shutdown_approved") {
       throw new TeamMemberRespawnLaunchError("member_missing", identity)
     }
     const map = await readMemberTaskMap(resolveTeamRuntimeDirs(options.stateDir, identity.teamRunId).runtimeDir)

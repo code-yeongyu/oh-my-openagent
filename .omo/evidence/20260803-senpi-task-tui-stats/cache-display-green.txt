@@ -1,0 +1,16 @@
+Scenario: running Senpi task rows omit cache-hit-rate text while retaining cost and throughput.
+
+Command:
+  bun test packages/senpi-task/src/status-line.test.ts packages/omo-senpi/src/components/task/status-row-format.test.ts
+
+Observed:
+- `composeStatusLine` passed with `$0.4213 · 62 tok/s`.
+- `backgroundWidgetRows` passed with `$0.1303`, `97 tok/s`, and no `CH:`.
+- All tests in both focused files passed.
+- Exit code 0.
+
+Production seam:
+  packages/senpi-task/src/status-line.ts:formatLiveSpend
+
+Adjacent surface:
+- `formatRunSpend` remains unchanged, so completed-run summaries can still expose cumulative cache-hit rate.

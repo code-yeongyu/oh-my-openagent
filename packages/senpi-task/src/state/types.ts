@@ -55,9 +55,12 @@ export type TaskRunStats = {
   readonly tokens_per_second?: number
   /** Summed provider-reported spend for the run, in USD. */
   readonly cost_usd?: number
-  /** cacheRead / (input + cacheRead + cacheWrite) over the run, as a 0..1 fraction. Omitted when
-   * no turn reported a cacheable denominator (never inferred as zero). */
-  readonly cache_hit_rate?: number
+  /** cacheRead / (input + cacheRead + cacheWrite) for the latest assistant request with a nonzero
+   * denominator, as a 0..1 fraction. Running status surfaces use this to match Senpi's footer. */
+  readonly cache_hit_rate_last?: number
+  /** Sum(cacheRead) / Sum(input + cacheRead + cacheWrite) over the whole run, as a 0..1 fraction.
+   * Completed-run summaries use this aggregate. Omitted when no turn reported a denominator. */
+  readonly cache_hit_rate_run?: number
 }
 
 export type TaskNotification = {
@@ -67,10 +70,39 @@ export type TaskNotification = {
   readonly liveness_notified_epoch?: number
 }
 
-export type TaskSpawnSpec = {
+// The shape persisted today: process-mode children respawn over RPC from cwd alone, with
+// extensions/member_env carried as untrusted launch inputs (the store parser discards them).
+// RPC respawn may keep consuming this shape; in-process rebuild must NOT (see SpawnSpecV1).
+export type LegacyProcessSpawnSpec = {
   readonly cwd: string
   readonly extensions?: readonly string[]
   readonly member_env?: Readonly<Record<string, string>>
+}
+
+// Mode-neutral rebuild spec. Carries ONLY plain-data launch facts - never executable
+// ToolDefinitions, auth, registries, extensions, or member_env; those are rebuilt from the
+// resumed process's live registries. In-process rebuild REQUIRES this shape and otherwise
+// fails spawn_spec_unavailable.
+export type SpawnSpecV1 = {
+  readonly version: 1
+  readonly cwd: string
+  readonly prompt: string
+  readonly instructions?: string
+  readonly member_scoped_tool_names?: readonly string[]
+}
+
+export type TaskSpawnSpec = LegacyProcessSpawnSpec | SpawnSpecV1
+
+export function isSpawnSpecV1(spec: TaskSpawnSpec): spec is SpawnSpecV1 {
+  return "version" in spec && spec.version === 1
+}
+
+// One durable prelaunch steering message. deliver_as mirrors the live steering vocabulary:
+// "steer" nudges the active turn, "followUp" starts a fresh one.
+export type PendingSteeringEntry = {
+  readonly id: string
+  readonly message: string
+  readonly deliver_as: "steer" | "followUp"
 }
 
 export type TaskRecordInput = {
@@ -93,6 +125,11 @@ export type TaskRecordInput = {
   readonly resolved_model?: ResolvedModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
+  // Durable intent to notify the parent when this child reaches a terminal state. Persisted so a
+  // resumed process can still fire (or skip) the notification for children it did not spawn.
+  readonly notify_on_terminal: boolean
+  // Durable prelaunch steering queue, drained in order once the child starts. Omitted when empty.
+  readonly pending_steering?: readonly PendingSteeringEntry[]
 }
 
 export type TaskRecord = TaskRecordInput & {

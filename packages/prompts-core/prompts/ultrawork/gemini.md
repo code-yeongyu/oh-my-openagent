@@ -213,10 +213,10 @@ When the `create_goal` tool exists, you MUST register the run's goal with it BEF
 
 ### SCENARIO CONTRACT (binding, defined BEFORE coding)
 
-Define 3+ scenarios, each with a binary pass condition, the real surface that proves it, AND the test file+test id (test-first). Required classes:
-- **Happy path** (the main expected use)
-- **Edge** (boundary, empty, malformed, concurrent)
-- **Adjacent-surface regression** (callers, sibling endpoints, related modules)
+Define scenarios sized to the change — 1-2 for a small single-surface change, 3+ for risky or multi-surface work — each with a binary pass condition and the cheapest faithful proof: a test file+test id at a code seam (test-first), or the real-surface scenario itself when no seam exists (prose, docs, visual-only: review + real-surface QA, no test). Classes:
+- **Happy path** (always)
+- **Edge** (boundary, empty, malformed, concurrent — when risky)
+- **Adjacent-surface regression** (callers, sibling endpoints, related modules — when multi-surface)
 
 Scenarios are the contract. Done = every scenario PASSES with both artifacts (RED→GREEN proof AND real-surface artifact).
 
@@ -224,9 +224,9 @@ Scenarios are the contract. Done = every scenario PASSES with both artifacts (RE
 
 At start: `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)`. Echo the path. APPEND-ONLY sections: Plan, Scenarios, Now, Todo, Findings (file:line), Learnings. If context is lost, re-read and resume — this is your only durable memory.
 
-### TDD (MANDATORY, NO EXCEPTIONS)
+### TDD (MANDATORY for code with a test seam)
 
-Every production change — features, fixes, refactors, perf, glue, config-with-logic — follows RED→GREEN→SURFACE.
+Every production code change — features, fixes, refactors, perf, glue, config-with-logic — follows RED→GREEN→SURFACE. Prose, docs, and visual-only changes have no seam: skip RED→GREEN, prove them through the surface channel.
 
 1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message that proves it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
 2. **GREEN**: Smallest change to flip RED→GREEN. Re-run, capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.

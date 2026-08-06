@@ -1,0 +1,53 @@
+Scenario: count the outer eval call plus two nested eval tool calls.
+
+Command:
+  bun test packages/senpi-task/src/run-stats-eval.test.ts -t 'outer and nested calls total three'
+
+Expected:
+  3
+
+Received:
+  1
+
+Result:
+  0 pass
+  1 fail
+  Exit code 1
+
+Scenario: a duplicated eval end must not recount nested calls.
+
+Command:
+  bun test packages/senpi-task/src/run-stats-eval.test.ts -t 'nested calls are counted only once'
+
+Expected:
+  3
+
+Received:
+  1
+
+Result:
+  0 pass
+  1 fail
+  Exit code 1
+
+The failures prove the unchanged tracker counts only the outer `tool_execution_start` and ignores eval `result.details.toolCalls`.
+
+## Cubic review RED
+
+Input-only eval control:
+
+```text
+Expected: 1
+Received: 3
+0 pass, 1 fail
+```
+
+Malformed nested summaries:
+
+```text
+Expected: 3
+Received: 6
+0 pass, 1 fail
+```
+
+These failures prove input-only `peek` payloads were misclassified as eval runs and every array element was counted without validating the eval summary contract.

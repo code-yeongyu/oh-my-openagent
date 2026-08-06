@@ -5,21 +5,28 @@ import type { DestroyCause, ResidentHandle } from "./port"
 
 /**
  * THE single-writer destruction port. This is the ONLY function in the package that invokes a
- * handle's dispose()/terminate() or (for a previous-process orphan) an OS kill. Cancel (todo 10),
- * LRU eviction, TTL, session shutdown, and reconciliation all route here so terminal state never
- * auto-disposes and every teardown is bookkept identically.
+ * handle's dispose()/terminate() for TERMINAL teardown, or (for a previous-process orphan) an OS
+ * kill. Cancel (todo 10), LRU eviction, TTL, and reconciliation all route here so terminal state
+ * never auto-disposes and every teardown is bookkept identically.
+ *
+ * The ONLY sibling caller of handle abort/terminate/dispose is shutdown.ts's
+ * suspendOnSessionShutdown (a deliberate deviation from the single-writer rule, recorded in the
+ * work plan): suspension is NOT destruction - this port's contract is terminal teardown (forget +
+ * dispose transition), while suspension must keep the record continuable as persisted_only /
+ * rpc_detached, so it cannot route through destroyResidentTask.
  */
 export async function destroyResidentTask(
   context: LifecycleContext,
   taskId: string,
   cause: DestroyCause,
+  orphanPid?: number,
 ): Promise<void> {
   const handle = context.registry.get(taskId)
   if (handle !== undefined) {
     await teardownHandle(handle)
     if (cause !== "fallback_handoff") context.registry.forget(taskId)
-  } else if (cause === "reconcile_lost") {
-    await terminateOrphan(context, taskId)
+  } else if (cause === "reconcile_lost" || cause === "ttl") {
+    await terminateOrphan(context, taskId, orphanPid)
   }
   if (cause !== "fallback_handoff") recordResidency(context, taskId, cause)
 }
@@ -44,12 +51,13 @@ async function bestEffort(taskId: string, step: "abort" | "terminate", run: () =
 
 // Kill a live orphan process left behind by a previous session: SIGTERM, then SIGKILL after the
 // escalation window if it is still alive. Upholds the no-orphan law - a process nobody can reach
-// must not survive reconciliation. Breadcrumbs are already persisted on the `lost` record by the
-// caller BEFORE this runs.
-async function terminateOrphan(context: LifecycleContext, taskId: string): Promise<void> {
+// must not survive reconciliation or TTL expunge. Breadcrumbs are already persisted on the `lost`
+// record by the caller BEFORE this runs. For TTL the record is already tombstoned (invisible to
+// load), so the sweep passes the committed record's pid explicitly as orphanPid.
+async function terminateOrphan(context: LifecycleContext, taskId: string, orphanPid?: number): Promise<void> {
   const record = context.store.load(taskId)
-  const pid = record?.pid
-  if (record === null || record.execution_mode !== "process" || pid === undefined) return
+  const pid = record === null ? orphanPid : record.execution_mode === "process" ? record.pid : undefined
+  if (pid === undefined) return
   if (!context.signaller.isAlive(pid)) return
 
   context.signaller.signal(pid, "SIGTERM")

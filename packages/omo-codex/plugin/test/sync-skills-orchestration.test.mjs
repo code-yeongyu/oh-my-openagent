@@ -261,7 +261,7 @@ test("#given start-work skill #when synced for Codex #then the difficulty-tier d
 	const content = await readSkill("start-work");
 
 	assert.match(content, /lazycodex-worker-medium/);
-	assert.match(content, /Delegation by difficulty/);
+	assert.match(content, /Codex tier mapping for the delegation router/);
 	assert.match(content, /Global Review and Debugging Gate/);
 	assert.match(content, /full commit SHA/);
 	assert.match(content, /re-read the ledger record/);

@@ -1,27 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
-export type ToolUsePart = {
-  type: "tool_use"
-  id: string
-  [key: string]: unknown
-}
-
-export type ToolResultPart = {
-  type: "tool_result"
-  toolUseId: string
-  tool_use_id?: string
-  isError?: boolean
-  content: Array<{ type: "text"; text: string }>
-  [key: string]: unknown
-}
-
-export type TextPart = {
-  type: "text"
-  text: string
-  synthetic: true
-}
-
-export type TransformPart = Part | ToolUsePart | ToolResultPart | TextPart
+export type TransformPart = Part
 
 export type TransformMessageInfo = Message | {
   role: "user"
@@ -31,6 +10,11 @@ export type TransformMessageInfo = Message | {
 export interface MessageWithParts {
   info: TransformMessageInfo
   parts: TransformPart[]
+}
+
+export type UnpairedToolPart = {
+  readonly callID: string
+  readonly status: string
 }
 
 export type MessagesTransformHook = {
