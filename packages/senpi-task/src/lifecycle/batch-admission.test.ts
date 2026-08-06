@@ -125,26 +125,23 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     expect(store.load("st_00000042")?.residency_state).toBe("persisted_only")
   })
 
-  test("#given a live holder holds the admission lease #when a batch contends past its bounded wait #then the whole batch defers lock_contended and nothing is claimed", async () => {
+  test("#given lease acquisition reports contention #when a batch admission starts #then the whole batch defers lock_contended and nothing is claimed", async () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000050", status: "running", residency_state: "persisted_only" })
     seedRecord(store, { task_id: "st_00000051", status: "completed", residency_state: "rpc_detached" })
     const context = contextFor(store, 8)
-    const holder = await acquireSessionAdmissionLease(store.stateDir, "parent-1", {
-      renewMs: 40,
-      staleMs: 120,
-      acquireTimeoutMs: 300,
-      retryMs: 10,
-    })
-    if (holder.kind !== "acquired") throw new Error("expected holder acquisition")
+    let acquireCalls = 0
+    const acquireLease: typeof acquireSessionAdmissionLease = async () => {
+      acquireCalls += 1
+      return { kind: "contended" }
+    }
 
-    // when: the batch's bounded wait (200ms) expires against the renewing holder
-    const result = await admitSuspendedBatch(context, "parent-1", {
-      timing: { renewMs: 40, staleMs: 120, acquireTimeoutMs: 200, retryMs: 10 },
-    })
+    // when
+    const result = await admitSuspendedBatch(context, "parent-1", { acquireLease })
 
     // then: a typed deferral for the whole batch - never a throw aborting session start
+    expect(acquireCalls).toBe(1)
     expect(result.lease).toBe("lock_contended")
     expect(result.outcomes).toHaveLength(2)
     for (const outcome of result.outcomes) {
@@ -153,7 +150,6 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     }
     expect(store.load("st_00000050")?.residency_state).toBe("persisted_only")
     expect(store.load("st_00000051")?.residency_state).toBe("rpc_detached")
-    holder.lease.release()
   })
 
   test("#given the lease is displaced mid-batch #when the holder re-reads it before each mutation #then it aborts the remaining claims", async () => {

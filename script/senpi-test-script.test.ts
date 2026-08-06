@@ -147,6 +147,7 @@ describe("Senpi compatibility test script", () => {
       const result = await runSenpiInstaller({
         repoRoot: tempRoot,
         agentDir,
+        pluginPath: pluginRoot,
         runCommand: async (command, args) => {
           commands.push([command, ...args].join(" "))
         },
