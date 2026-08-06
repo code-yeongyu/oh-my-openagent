@@ -1,0 +1,6 @@
+targeted_tests=211 passed, 0 failed, 445 expect() calls
+typecheck=passed
+build=passed
+full_suite_host=3 unrelated Codex doctor failures caused by the host ast-grep runtime being present
+full_suite_isolated_home=2 unrelated configuration-fixture failures; scoped doctor test passes under isolation
+manual_qa=passed; glm=CELESTIA_PRESENT; gpt=CELESTIA_ABSENT; host_sessions=224->224; sandbox_sessions=2
