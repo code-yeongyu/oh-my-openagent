@@ -2,7 +2,7 @@
 
 import { describe, expect, it, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, link as createHardLink, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
@@ -139,10 +139,14 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     )
     const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
     if (link === null) throw new Error("expected runtime wrapper link")
+    const spacedNodeDir = join(fixture.repoRoot, "node runtime")
+    const spacedNodePath = join(spacedNodeDir, "bun.exe")
+    await mkdir(spacedNodeDir, { recursive: true })
+    await createHardLink(process.execPath, spacedNodePath)
 
     // when
     const child = Bun.spawn(["cmd.exe", "/v:on", "/d", "/c", "call", link.path, "--probe"], {
-      env: { ...Bun.env, NODE_REPL_NODE_PATH: `"${process.execPath}"`, OMO_RUNTIME: "node" },
+      env: { ...Bun.env, NODE_REPL_NODE_PATH: `"${spacedNodePath}"`, OMO_RUNTIME: "node" },
       stderr: "pipe",
       stdout: "pipe",
     })

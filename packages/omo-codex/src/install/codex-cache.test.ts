@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
+import { link as createHardLink, mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, join, relative, sep } from "node:path"
 import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
@@ -640,10 +640,14 @@ describe("codex-cache", () => {
     await writeFile(join(pluginRoot, "dist", "cli.js"), 'console.log("component target", process.argv.slice(2).join(" "))\n')
     const [link] = await linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" })
     if (link === undefined) throw new Error("expected cached component shim")
+    const spacedNodeDir = join(root, "node runtime")
+    const spacedNodePath = join(spacedNodeDir, "bun.exe")
+    await mkdir(spacedNodeDir, { recursive: true })
+    await createHardLink(process.execPath, spacedNodePath)
 
     // when
     const child = Bun.spawn(["cmd.exe", "/v:on", "/d", "/c", "call", link.path, "--probe"], {
-      env: { ...Bun.env, NODE_REPL_NODE_PATH: `"${process.execPath}"` },
+      env: { ...Bun.env, NODE_REPL_NODE_PATH: `"${spacedNodePath}"` },
       stderr: "pipe",
       stdout: "pipe",
     })
