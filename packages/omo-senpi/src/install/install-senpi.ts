@@ -1,11 +1,22 @@
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { constants, existsSync } from "node:fs"
-import { access, copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises"
+import { access, readFile, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
+
+import {
+  dedupePackages,
+  isRecord,
+  readPackages,
+  readSettings,
+  removeLegacyBuiltinShadows,
+  removeSupersededOmoPackages,
+  type SettingsRecord,
+  writeSettingsAtomically,
+} from "./senpi-settings"
 
 const execFileAsync = promisify(execFile)
 
@@ -30,8 +41,6 @@ export interface SenpiInstallResult {
   readonly backupPath: string
   readonly removed?: boolean
 }
-
-type SettingsRecord = Record<string, unknown>
 
 const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
@@ -64,21 +73,20 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("scripts", "install.mjs"),
 ] as const
 
-const LEGACY_BUILTIN_SHADOW_PACKAGES = [
-  join("packages", "pi-goal"),
-  join("packages", "pi-webfetch"),
-] as const
-
 export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Promise<SenpiInstallResult> {
   const context = resolveInstallContext(options)
   await ensurePluginArtifacts(context)
   const settings = await readSettings(context.settingsPath)
   const before = JSON.stringify(settings)
-  const packages = removeLegacyBuiltinShadows(
-    dedupePackages(readPackages(settings)),
-    context.repoRoot,
+  const packages = dedupePackages(await removeSupersededOmoPackages(
+    removeLegacyBuiltinShadows(
+      dedupePackages(readPackages(settings)),
+      context.repoRoot,
+      context.agentDir,
+    ),
+    context.pluginPath,
     context.agentDir,
-  )
+  ))
   if (!packages.includes(context.pluginPath)) packages.push(context.pluginPath)
   settings.packages = packages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
@@ -143,22 +151,17 @@ function resolveInstallContext(options: SenpiInstallOptions): {
 }
 
 async function ensurePluginArtifacts(context: ReturnType<typeof resolveInstallContext>): Promise<void> {
-  const missing = await hasMissingPluginArtifact(context.pluginPath)
-  if (missing) {
-    if (!context.allowBuild) {
-      throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
-    }
-
+  if (context.allowBuild) {
     await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+  }
 
-    if (await hasMissingPluginArtifact(context.pluginPath)) {
-      throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
-    }
+  if (await hasMissingPluginArtifact(context.pluginPath)) {
+    throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
   }
 
   await verifyAstGrepRuntimeIntegrity(context.pluginPath, context.platform)
@@ -217,7 +220,7 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJ
 }
 
 function isAstGrepRuntimeManifest(value: unknown): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
-  if (!isPlainObject(value)) return false
+  if (!isRecord(value)) return false
   return (
     typeof value.sha256 === "string" &&
     /^[a-f0-9]{64}$/.test(value.sha256) &&
@@ -246,66 +249,6 @@ async function defaultRunCommand(
   if (result.stdout.trim().length > 0) process.stdout.write(result.stdout)
 }
 
-async function readSettings(settingsPath: string): Promise<SettingsRecord> {
-  let raw: string
-  try {
-    raw = await readFile(settingsPath, "utf8")
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) return {}
-    throw error
-  }
-
-  const parsed: unknown = JSON.parse(raw)
-  if (!isPlainObject(parsed)) throw new Error(`${settingsPath} must contain a JSON object`)
-  return parsed
-}
-
-function readPackages(settings: SettingsRecord): string[] {
-  const packages = settings.packages
-  if (packages === undefined) return []
-  if (!Array.isArray(packages) || !packages.every((entry) => typeof entry === "string")) {
-    throw new Error("Senpi settings packages must be an array of strings")
-  }
-  return packages
-}
-
-function dedupePackages(packages: readonly string[]): string[] {
-  return [...new Set(packages)]
-}
-
-function removeLegacyBuiltinShadows(packages: readonly string[], repoRoot: string, agentDir: string): string[] {
-  const shadowPaths = new Set(LEGACY_BUILTIN_SHADOW_PACKAGES.map((path) => resolve(repoRoot, path)))
-  return packages.filter((entry) => !shadowPaths.has(resolve(agentDir, entry)))
-}
-
-async function writeSettingsAtomically(settingsPath: string, settings: SettingsRecord): Promise<string> {
-  await mkdir(dirname(settingsPath), { recursive: true })
-  const backupPath = await nextBackupPath(settingsPath)
-  if (await fileExists(settingsPath)) {
-    await copyFile(settingsPath, backupPath)
-  } else {
-    await writeFile(backupPath, "{}\n", "utf8")
-  }
-
-  const tempPath = `${settingsPath}.${process.pid}.${Date.now()}.tmp`
-  await writeFile(tempPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8")
-  await rename(tempPath, settingsPath)
-  return backupPath
-}
-
-async function nextBackupPath(settingsPath: string): Promise<string> {
-  for (let index = 0; index < 1000; index += 1) {
-    const suffix = index === 0 ? "" : `-${index}`
-    const candidate = `${settingsPath}.${timestampForBackup()}${suffix}.backup`
-    if (!(await fileExists(candidate))) return candidate
-  }
-  throw new Error(`Unable to allocate backup path for ${settingsPath}`)
-}
-
-function timestampForBackup(): string {
-  return new Date().toISOString().replace(/[-:.]/g, "")
-}
-
 function findRepoRoot(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 7; depth += 1) {
@@ -313,10 +256,6 @@ function findRepoRoot(importerDir: string): string {
     current = resolve(current, "..")
   }
   throw new Error("Unable to locate packages/omo-senpi/plugin/package.json from installer module")
-}
-
-function isPlainObject(value: unknown): value is SettingsRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 async function fileExists(path: string): Promise<boolean> {
