@@ -1,0 +1,50 @@
+[
+  {
+    "model": "openai/gpt-5.6-sol",
+    "repeat": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 230.183,
+    "input_tokens": 76092,
+    "output_tokens": 3798,
+    "reasoning_tokens": 498,
+    "report_summary": "AgentControl enforces one validated project-local handoff across all five launch tools before any worker/workflow row is created, persists its resolved path/ID/SHA-256, injects them into worker runtime contracts, and lets Dispatch display only digest-verified content with a per-refresh shared cache. Focused tests pin forwarding, rejection, propagation, rendering, and substitution defense.",
+    "details_bytes": 10329,
+    "stderr_tail": ""
+  },
+  {
+    "model": "openai/gpt-5.6-sol",
+    "repeat": 2,
+    "exit_code": 0,
+    "elapsed_seconds": 137.543,
+    "input_tokens": 125776,
+    "output_tokens": 3231,
+    "reasoning_tokens": 749,
+    "report_summary": "The mandatory handoff is enforced on all five public launch tools, validated before any worker/workflow row is created, persisted as trusted ID/absolute-path/SHA-256 metadata, injected into worker contracts, and integrity-checked by the Dispatch dashboard. Focused TypeScript and Python tests pin forwarding, rejection, propagation, rendering, and substitution defense.",
+    "details_bytes": 8730,
+    "stderr_tail": ""
+  },
+  {
+    "model": "openai/gpt-5.6-luna",
+    "repeat": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 172.594,
+    "input_tokens": 112391,
+    "output_tokens": 3451,
+    "reasoning_tokens": 790,
+    "report_summary": "The mandatory handoff path is implemented end to end: all five launch tools require one project-local v1 Markdown handoff, Python validates it before any ledger row or process/pending launch, then persists and injects ID/path/SHA-256. Workers receive a read-first/revalidate/report contract, while Dispatch’s monitor verifies the digest, caches shared reads per refresh, and exposes an H view without showing substituted content.",
+    "details_bytes": 7687,
+    "stderr_tail": ""
+  },
+  {
+    "model": "openai/gpt-5.6-luna",
+    "repeat": 2,
+    "exit_code": 0,
+    "elapsed_seconds": 164.918,
+    "input_tokens": 81784,
+    "output_tokens": 2862,
+    "reasoning_tokens": 429,
+    "report_summary": "AgentControl handoff is enforced end to end: all five launch tools require a project-local v1 document, Python validates it before any worker/workflow row exists, then persists and injects ID/path/SHA-256; workers receive read-first/revalidation instructions, while Dispatch’s monitor rechecks the digest and suppresses changed content.",
+    "details_bytes": 6824,
+    "stderr_tail": ""
+  }
+]

@@ -11,6 +11,7 @@
   - valid `Dispatch` launch, final report, and group completion.
 - Dispatch dashboard rendering from the real QA ledger, including the `H` handoff view.
 - 5,000-iteration valid and rejected handoff validation benchmarks.
+- Two identical real Explore runs each on `openai/gpt-5.6-sol` and `openai/gpt-5.6-luna`.
 
 ## What was observed
 
@@ -31,6 +32,10 @@
 
 The monitor caches each shared `(path, digest)` once per refresh, so a Dispatch group sharing one handoff performs one read and hash per refresh rather than one per worker.
 
+## Explore model comparison
+
+`explore-model-comparison.md` contains the scored comparison. Luna averaged 8.2% lower wall time, 10.2% fewer output tokens, and 23.9% shorter detailed reports while covering all eight acceptance atoms. Sol averaged 2 quality points higher on the reviewer-applied 100-point rubric because it surfaced more non-obvious implementation risks. The two-run sample supports trying Luna for bounded, handoff-rich Explore work but does not justify changing the Sol default yet.
+
 ## Remaining limitation
 
 The repository-wide `bun test` could not complete under the installed Bun `1.3.13-canary.1`: after the change-related failure was corrected and its focused test passed, the full process still ended with Bun signal 139. `bun-test-failure.txt` records the runtime failure. No test failure preceded that crash. CI pins Bun 1.3.12; the scoped suites, typecheck, build, and real OpenCode QA all passed.
@@ -45,3 +50,5 @@ The repository-wide `bun test` could not complete under the installed Bun `1.3.1
 - `fake-openai.mjs`: deterministic local provider used by the isolated run.
 - `explore-handoff.md`, `dispatch-handoff.md`: validated QA handoff documents.
 - `bun-test-failure.txt`: full-suite Bun runtime crash summary.
+- `explore-model-comparison.md`, `explore-model-metrics.json`, and the four model report files: Sol/Luna comparison.
+- `run-explore-model-benchmark.py`, `explore-model-handoff.md`: reproducible isolated benchmark driver and task contract.
