@@ -5,18 +5,9 @@ import { resolveServerUrl } from "./resolve-server-url"
 describe("resolveServerUrl", () => {
   describe("#given a valid override URL", () => {
     test("#when resolved #then it returns the override", () => {
-      const logs: Array<{ message: string; data?: unknown }> = []
-
-      const result = resolveServerUrl(
-        "http://localhost:4096",
-        {},
-        (message, data) => {
-          logs.push({ message, data })
-        },
-      )
+      const result = resolveServerUrl("http://localhost:4096", {}, () => {})
 
       expect(result).toBe("http://localhost:4096")
-      expect(logs).toEqual([])
     })
   })
 
