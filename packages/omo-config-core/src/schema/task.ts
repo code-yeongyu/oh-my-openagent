@@ -26,6 +26,7 @@ export const OmoTaskSettingsSchema = z.object({
   ttl_ms: z.number().int().positive().default(86400000),
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
+  resume_children: z.boolean().default(true),
   warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
   team: OmoTaskTeamSettingsSchema.default({
@@ -61,6 +62,7 @@ export const OmoTaskSettingsLayerSchema = z.object({
   ttl_ms: z.number().int().positive().optional(),
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
+  resume_children: z.boolean().optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
   team: OmoTaskTeamSettingsLayerSchema.optional(),

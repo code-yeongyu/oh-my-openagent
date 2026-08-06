@@ -1,7 +1,8 @@
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import type { ChildHandle as InProcessChildHandle } from "../runners/in-process/child-handle"
-import type { ChildSpec } from "../runners/in-process"
+import { RunnerError, type ChildSpec } from "../runners/in-process"
+import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
@@ -17,10 +18,17 @@ export type InProcessSessionContext = {
   readonly thinkingLevel?: CreateAgentSessionOptions["thinkingLevel"]
 }
 
-export type InProcessSessionContextProvider = (spec: ManagedStartSpec) => InProcessSessionContext
+export type ResumeSessionContextResult =
+  | { readonly ok: true; readonly context: InProcessSessionContext }
+  | { readonly ok: false; readonly code: "model_unavailable"; readonly reason: string }
+
+export type InProcessSessionContextProvider = ((spec: ManagedStartSpec) => InProcessSessionContext) & {
+  readonly resolveResumeContext?: (spec: ManagedStartSpec) => ResumeSessionContextResult
+}
 
 export type InProcessRunnerLike = {
   start(spec: ChildSpec): Promise<InProcessChildHandle>
+  resume?(spec: ChildSpec, sessionPath: string): Promise<InProcessChildHandle>
 }
 
 export type RpcRunnerLike = {
@@ -35,6 +43,17 @@ export function createInProcessManagedRunner(
     async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
       const childSpec = toChildSpec(spec, context(spec))
       return adaptInProcessHandle(await runner.start(childSpec))
+    },
+    async resume(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle> {
+      const resolved = context.resolveResumeContext?.(spec)
+      if (resolved !== undefined && !resolved.ok) {
+        throw new RunnerError({ kind: resolved.code, message: resolved.reason })
+      }
+      if (runner.resume === undefined) {
+        throw new RunnerError({ kind: "session_unavailable", message: "in-process runner cannot resume sessions" })
+      }
+      const childSpec = toChildSpec(spec, resolved?.context ?? context(spec))
+      return adaptInProcessHandle(await runner.resume(childSpec, sessionPath))
     },
   }
 }
@@ -63,6 +82,9 @@ function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): 
   return {
     taskId: spec.taskId,
     cwd: spec.cwd,
+    // ManagedStartSpec.stateDir is already join(stateDir, "children", taskId); the session dir
+    // nests sessions/<taskId>/ under it, identical to the rpc child's layout (spawn.ts).
+    sessionDir: resolveChildSessionDir(spec.stateDir, spec.taskId),
     depth: spec.depth,
     parentSessionId: spec.parentSessionId,
     rootSessionId: spec.rootSessionId,
@@ -76,9 +98,12 @@ function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): 
     ...(spec.model !== undefined ? { selectedModel: spec.model } : {}),
     ...(spec.requestedModel !== undefined ? { requestedModel: spec.requestedModel } : {}),
     ...(spec.fallbackModels !== undefined ? { fallbackModels: spec.fallbackModels } : {}),
+    ...(spec.resolvedModel !== undefined ? { resolvedModel: spec.resolvedModel } : {}),
     ...(spec.agentType !== undefined ? { agentType: spec.agentType } : {}),
     ...(spec.instructions !== undefined ? { instructions: spec.instructions } : {}),
     ...(spec.toolAllowlist !== undefined ? { toolAllowlist: spec.toolAllowlist } : {}),
+    ...(spec.toolDenylist !== undefined ? { toolDenylist: spec.toolDenylist } : {}),
+    ...(spec.memberScopedToolNames !== undefined ? { memberScopedToolNames: spec.memberScopedToolNames } : {}),
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
   }
 }

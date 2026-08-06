@@ -84,6 +84,7 @@ const EXPECTED_CONFIG = {
     default_execution_mode: "in-process",
     max_depth: 1,
     residency_max_children: 8,
+    resume_children: true,
     team: {
       max_members: 8,
       max_parallel_members: 4,

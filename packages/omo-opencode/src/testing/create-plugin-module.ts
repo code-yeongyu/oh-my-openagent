@@ -176,6 +176,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       migratedFrom: startupMigration.migratedFrom,
       skippedConflictCount: startupMigration.skippedConflictCount,
     })
+    if (startupMigration.error !== undefined) {
+      console.warn(`[config-migration] legacy configuration changes were not applied: ${startupMigration.error}`)
+    }
     const toast = startupToastBody({
       diagnostics: startupDiagnostics,
       ...(startupMigration.error === undefined ? {} : { error: startupMigration.error }),

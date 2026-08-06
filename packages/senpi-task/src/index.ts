@@ -1,5 +1,6 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
 export {
+  isSpawnSpecV1,
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
@@ -9,14 +10,18 @@ export {
   transitionTaskRecord,
 } from "./state"
 export type {
+  LegacyProcessSpawnSpec,
   Messageability,
+  PendingSteeringEntry,
   ResidencyState,
   ResolvedModelRecord,
   ResolvedModelSource,
+  SpawnSpecV1,
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
+  TaskSpawnSpec,
   TaskStatus,
   TaskTransition,
   TaskTransitionAudit,
@@ -32,7 +37,8 @@ export type {
 } from "./store"
 export {
   composeStatusLine,
-  formatSpend,
+  formatLiveSpend,
+  formatRunSpend,
   formatStatusTarget,
   formatTargetIdentity,
   formatTargetWithModel,
@@ -270,8 +276,10 @@ export type {
   ResidencyRegistry,
   RespawnPort,
   RespawnResult,
+  SuspendFailure,
+  SuspendInput,
+  SuspendSummary,
   TaskLifecycle,
-  TeardownSummary,
 } from "./lifecycle"
 export { DEFAULT_SEND_DELIVERY, createSteeringEngine } from "./steering"
 export type {
@@ -382,6 +390,7 @@ export type {
   OutputManager,
   RenderOptions,
   RenderedTranscript,
+  SuspendedDetails,
   TaskOutputDeps,
   TaskOutputDetails,
   TaskOutputInput,

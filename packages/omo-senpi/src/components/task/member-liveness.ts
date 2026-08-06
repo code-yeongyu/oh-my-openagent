@@ -172,6 +172,9 @@ export function livenessDeliveryKeysFromSessionText(text: string): readonly stri
 export function livenessDetails(record: TaskRecord): TeamMemberLivenessDetails | undefined {
   const memberName = parseTeamMemberTaskIdentity(record)?.memberName
   if (memberName === undefined || (record.status !== "error" && record.status !== "lost")) return undefined
+  // A suspended record (persisted_only/rpc_detached) sits between shutdown and revival: the member
+  // is not dead, and reconcile may still revive it, so it must never produce a death event.
+  if (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached") return undefined
   return {
     memberName,
     lastKnownState: record.status,

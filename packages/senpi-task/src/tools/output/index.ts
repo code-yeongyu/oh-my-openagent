@@ -15,6 +15,7 @@ export {
 export type {
   LostBreadcrumbs,
   OutputManager,
+  SuspendedDetails,
   TaskOutputDeps,
   TaskOutputDetails,
   TaskOutputToolResult,

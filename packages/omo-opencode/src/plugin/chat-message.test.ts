@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -8,6 +8,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, getSessionAgent, registerAgentName, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
+import { validateObjective } from "../hooks/goal/validation"
 import { createStartWorkHook } from "../hooks/start-work"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
@@ -617,6 +618,40 @@ describe("createChatMessageHandler - goal command handling and stop continuation
 })
 
 describe("createChatMessageHandler - /goal raw slash fallback", () => {
+  test("does not route an auto-slash-expanded skill payload into goal handling", async () => {
+    // given
+    const setGoal = mock((_: string, objective: string) => {
+      validateObjective(objective)
+      return { objective, status: "active" }
+    })
+    const goalMock = createGoalHookMock()
+    const args = createMockHandlerArgs()
+    args.hooks.autoSlashCommand = createAutoSlashCommandHook({
+      skills: unsafeTestValue([{
+        name: "long-skill",
+        definition: {
+          description: "Long skill regression fixture",
+          template: "x".repeat(2_100),
+        },
+        scope: "user",
+      }]),
+    })
+    args.hooks.goal = { ...goalMock.hook, setGoal }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/long-skill" }],
+    }
+
+    // when
+    const run = handler(createMockInput("sisyphus"), output)
+
+    // then
+    await expect(run).resolves.toBeUndefined()
+    expect(setGoal).not.toHaveBeenCalled()
+    expect(output.parts[0].text).toContain("<auto-slash-command>")
+  })
+
   test("sets goal when /goal <objective> arrives through chat.message without native command expansion", async () => {
     // given
     const goalMock = createGoalHookMock()

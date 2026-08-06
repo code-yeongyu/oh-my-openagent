@@ -41,10 +41,15 @@ export const SCENARIOS = {
       { type: "tool_call", name: "task", arguments: { category: "ultrabrain", prompt: "Run a long built-in bash command for active-task TUI visual proof, then wait for completion without summarizing early.", run_in_background: true, name: "active-child" } },
       { type: "text", text: "active scenario parent stopped while active-child continues" },
     ],
-    // Usage rides on the tool-call step itself: the assistant message that REQUESTS the long bash
-    // call is the last one to settle before the child parks in the tool, so this is the only place
-    // cost/cache facts can exist while the live row is still on screen.
+    // A fast cold request completes first, then the hot request parks in the long tool call. The
+    // visible live row must therefore show the latest request's 81% rate, not the 51% run aggregate.
     childSteps: [
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "pwd" },
+        usage: { input: 4_000, output: 80, cacheRead: 0, cacheWrite: 1_000, totalTokens: 5_080, cost: 0.006 },
+      },
       {
         type: "tool_call",
         name: "bash",
@@ -79,6 +84,12 @@ export const SCENARIOS = {
       { type: "text", text: "team-active scenario lead stopped while active-member continues" },
     ],
     childSteps: [
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "pwd" },
+        usage: { input: 3_000, output: 60, cacheRead: 0, cacheWrite: 1_000, totalTokens: 4_060, cost: 0.004 },
+      },
       {
         type: "tool_call",
         name: "bash",

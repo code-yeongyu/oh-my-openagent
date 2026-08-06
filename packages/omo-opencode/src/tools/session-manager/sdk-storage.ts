@@ -59,7 +59,10 @@ export async function getSdkMainSessions(
 export async function getSdkAllSessions(client: PluginInput["client"]): Promise<string[]> {
   const response = await fetchSdkResponse(() => client.session.list())
   const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
-  return sessions.map((session) => session.id)
+  return sessions
+    .slice()
+    .sort((a, b) => b.time.updated - a.time.updated)
+    .map((session) => session.id)
 }
 
 export async function sdkSessionExists(client: PluginInput["client"], sessionID: string): Promise<boolean> {

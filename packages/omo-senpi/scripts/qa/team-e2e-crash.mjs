@@ -42,6 +42,12 @@ export async function runCrashRestartScenario(input) {
   try {
     input.seedProject(sandbox)
     const markerPath = join(input.outDir, "crash-after-inject.json")
+    // The marker is a per-run rendezvous living in the PERSISTENT outDir: a stale marker from a
+    // previous run satisfies readCrashTarget with a foreign message id before the current member's
+    // afterInject overwrites it, so every id-keyed assertion then fails against a message that
+    // never existed in this sandbox. Clear it (and any stale release) before the run starts.
+    rmSync(markerPath, { force: true })
+    rmSync(`${markerPath}.release`, { force: true })
     const initial = input.startRun({
       senpiBin: input.senpiBin,
       sandbox,

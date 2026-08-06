@@ -1,8 +1,9 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { readFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runSenpiInstaller } from "../packages/omo-senpi/src/install/install-senpi"
@@ -50,17 +51,19 @@ describe("Senpi compatibility test script", () => {
     const shipsPluginTree = files.includes("packages/omo-senpi/plugin")
     const hasStandaloneBuildScript = manifest.scripts?.["build:senpi-plugin"] === [
       "bun run build:lsp-daemon",
+      "bun run build:ast-grep-mcp",
       "bun run build:senpi-plugin:stage",
     ].join(" && ")
     const hasStageScript = manifest.scripts?.["build:senpi-plugin:stage"] === [
       "bun run build:materialize-frontend",
       "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
+      "node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
       "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
       "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
       "node packages/omo-senpi/plugin/scripts/build-install.mjs",
     ].join(" && ")
-    const senpiNode = /id: "senpi-plugin"[\s\S]*?args: \["run", "build:senpi-plugin:stage"\][\s\S]*?deps: \["lsp-daemon"\]/.test(
+    const senpiNode = /id: "senpi-plugin"[\s\S]*?args: \["run", "build:senpi-plugin:stage"\][\s\S]*?deps: \["ast-grep-mcp", "lsp-daemon"\]/.test(
       buildOrchestrator,
     )
 
@@ -74,7 +77,7 @@ describe("Senpi compatibility test script", () => {
     expect(buildOrchestrator, "the build orchestrator must generate Senpi plugin artifacts before publishing").toContain(
       "build:senpi-plugin:stage",
     )
-    expect(senpiNode, "build graph senpi-plugin must depend on lsp-daemon and call only the stage script").toBe(true)
+    expect(senpiNode, "build graph senpi-plugin must depend on ast-grep-mcp and lsp-daemon and call only the stage script").toBe(true)
     expect(prepublishOnlyScript, "prepublishOnly must route through build, which includes the Senpi plugin build").toContain(
       "bun run build",
     )
@@ -123,6 +126,20 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "package.json"), JSON.stringify({ version: "0.1.0" }))
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
+      await mkdir(join(pluginRoot, "runtime", "ast-grep-mcp"), { recursive: true })
+      const astGrepRuntime = join(pluginRoot, "runtime", "ast-grep-mcp", "cli.js")
+      const astGrepRuntimeContent = "console.log('ast-grep mcp')\n"
+      await writeFile(astGrepRuntime, astGrepRuntimeContent)
+      await chmod(astGrepRuntime, 0o755)
+      const astGrepManifestPath = join(pluginRoot, "runtime", "ast-grep-mcp", "manifest.json")
+      await writeFile(
+        astGrepManifestPath,
+        JSON.stringify({
+          sha256: createHash("sha256").update(astGrepRuntimeContent).digest("hex"),
+          mode: 0o755,
+          stagedAtUtc: new Date().toISOString(),
+        }),
+      )
 
       const commands: string[] = []
 
@@ -130,6 +147,7 @@ describe("Senpi compatibility test script", () => {
       const result = await runSenpiInstaller({
         repoRoot: tempRoot,
         agentDir,
+        pluginPath: pluginRoot,
         runCommand: async (command, args) => {
           commands.push([command, ...args].join(" "))
         },

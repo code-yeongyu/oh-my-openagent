@@ -1,0 +1,27 @@
+{
+  "title": "Senpi task running status row",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "task-stats-renderer background eval scenario"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 160,
+    "rows": 12
+  },
+  "cleanup": "pty pid 98365 killed",
+  "files": {
+    "png": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-tui-eval-count/.omo/evidence/20260803-senpi-task-tui-stats/terminal/terminal.png",
+    "text": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-tui-eval-count/.omo/evidence/20260803-senpi-task-tui-stats/terminal/terminal.txt",
+    "ansi": null,
+    "metadata": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-tui-eval-count/.omo/evidence/20260803-senpi-task-tui-stats/terminal/metadata.json"
+  }
+}

@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../../config"
 
+import { AUTO_SLASH_COMMAND_TAG_OPEN } from "../../hooks/auto-slash-command/constants"
 import { parseGoalCommand } from "../../hooks/goal/command-arguments"
 import { log } from "../../shared"
 import { extractPromptText } from "./prompt-text"
@@ -19,6 +20,9 @@ export function handleGoalMessage(args: {
   }
 
   const promptText = extractPromptText(output.parts)
+  if (promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN)) {
+    return
+  }
   const parsed = parseGoalCommand(promptText)
 
   switch (parsed.kind) {

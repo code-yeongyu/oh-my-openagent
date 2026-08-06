@@ -58,6 +58,7 @@ function completedFallbackRecord(): TaskRecord {
     updated_at: "2026-07-28T08:00:03.000Z",
     final_response: "team worker completed",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
   }
 }
 
@@ -74,6 +75,13 @@ describe("OMO Senpi task component fallback completion", () => {
         list: () => ({ records: [...records.values()], diagnostics: [] }),
         replace: (next: TaskRecord) => {
           records.set(next.task_id, next)
+        },
+        mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord) => {
+          const current = records.get(taskId)
+          if (current === undefined) return null
+          const next = mutation(current)
+          if (next !== current) records.set(taskId, next)
+          return next
         },
         appendEvent: (_taskId: string, _event: PersistedTaskEvent) => "events.jsonl",
       },
