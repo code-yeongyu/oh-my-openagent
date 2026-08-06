@@ -86,19 +86,35 @@ if [ -z "$ULW_LOOP_NODE" ]; then
 fi
 
 ULW_LOOP_CLI=
+ULW_LOOP_CLI_KIND=
 if command -v omo >/dev/null 2>&1 && omo ulw-loop help >/dev/null 2>&1; then
   ULW_LOOP_CLI=omo
-elif [ -n "$ULW_LOOP_NODE" ]; then
-  for candidate in "$HOME/.local/bin/omo" "$CODEX_HOME/bin/omo" "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
+else
+  for candidate in "$HOME/.local/bin/omo" "$HOME/.local/bin/omo.cmd" "$CODEX_HOME/bin/omo" "$CODEX_HOME/bin/omo.cmd" "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
     [ -f "$candidate" ] || [ -x "$candidate" ] || continue
-    if "$ULW_LOOP_NODE" "$candidate" ulw-loop help >/dev/null 2>&1; then
-      ULW_LOOP_CLI="$candidate"
-      break
-    fi
+    case "$candidate" in
+      *.js)
+        [ -n "$ULW_LOOP_NODE" ] || continue
+        if "$ULW_LOOP_NODE" "$candidate" ulw-loop help >/dev/null 2>&1; then
+          ULW_LOOP_CLI="$candidate"
+          ULW_LOOP_CLI_KIND=node
+          break
+        fi
+        ;;
+      *)
+        if "$candidate" ulw-loop help >/dev/null 2>&1; then
+          ULW_LOOP_CLI="$candidate"
+          ULW_LOOP_CLI_KIND=exec
+          break
+        fi
+        ;;
+    esac
   done
 
-  if [ -n "$ULW_LOOP_CLI" ] && [ -n "$ULW_LOOP_NODE" ]; then
+  if [ -n "$ULW_LOOP_CLI" ] && [ "$ULW_LOOP_CLI_KIND" = node ]; then
     omo() { "$ULW_LOOP_NODE" "$ULW_LOOP_CLI" "$@"; }
+  elif [ -n "$ULW_LOOP_CLI" ] && [ "$ULW_LOOP_CLI_KIND" = exec ]; then
+    omo() { "$ULW_LOOP_CLI" "$@"; }
   fi
 fi
 
