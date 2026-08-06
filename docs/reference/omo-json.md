@@ -147,6 +147,7 @@ A record of agent name to definition (`schema/agent.ts`).
 | `model` | string | Sugar for a single-entry `models` list. |
 | `models` | model entries | Ordered chain; each entry is a bare string or `{ model, reasoning?, temperature?, top_p?, max_tokens?, provider_options? }`. |
 | `reasoning` | `off \| minimal \| low \| medium \| high \| xhigh \| max \| auto` \| string | Canonical reasoning field. |
+| `provider_options` | record<string, unknown> | Provider-native settings. Codex reads `service_tier` from this object for managed agent TOMLs. |
 | `tools` | record<string, boolean> | |
 | `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
 | `background` | boolean | |
@@ -164,27 +165,42 @@ Deprecated keys accepted for back-compat and rewritten by migration:
 | `textVerbosity` | `provider_options.textVerbosity` | Provider-native passthrough. |
 | `fallback_models` | `models` | Ordered model list. |
 
-#### Builtin agents
+#### Codex managed-agent model settings
 
-### `agents`
+LazyCodex applies the resolved Codex `agents` view to the agent TOMLs it manages under `CODEX_HOME/agents/`. Configure the same user and project `.omo/omo.json[c]` layers described above; there is no separate Codex agent-model config file. Put Codex-only choices under `[codex].agents`, or under `profiles.<name>.[codex].agents` when the active profile should win over the shared and top-level Codex views.
 
-A record of agent name to definition (`schema/agent.ts`).
+```jsonc
+{
+  "models": {
+    "review-model": {
+      "model": "openai/gpt-5.6-sol",
+      "reasoning": "high"
+    }
+  },
+  "[codex]": {
+    "agents": {
+      "lazycodex-code-reviewer": {
+        "model": "review-model",
+        "provider_options": { "service_tier": "priority" }
+      },
+      "explorer": {
+        "models": [
+          {
+            "model": "openai/gpt-5.6-terra",
+            "reasoning": "off",
+            "provider_options": { "service_tier": "flex" }
+          },
+          "openai/gpt-5.6-sol"
+        ]
+      }
+    }
+  }
+}
+```
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `description` | string | |
-| `prompt` | string | |
-| `model` | string | |
-| `models` | model entries | fallback chain; each entry is a bare string or `{ model, variant?, reasoningEffort? }` (see [fallback models](#fallback-models)) |
-| `variant` | string | default variant for this agent's models; a per-entry `variant` overrides it |
-| `reasoningEffort` | `none \| minimal \| low \| medium \| high \| xhigh \| max` | default effort for this agent's models; a per-entry `reasoningEffort` overrides it |
-| `tools` | record<string, boolean> | |
-| `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
-| `background` | boolean | |
-| `max_depth` | int >= 0 | |
-| `allowed_subagents` | string[] | |
-| `temperature` | number 0..2 | |
-| `disable` | boolean | |
+For each matching LazyCodex-managed role, `model` selects the model directly. Otherwise the first `models` entry is the primary Codex selection; later entries remain fallback metadata for harnesses that support fallback chains. A catalog alias such as `review-model` supplies its resolved model and reasoning, while reasoning written on the agent or primary entry wins. Codex reads `service_tier` from `provider_options` on the agent or primary entry, not from the catalog entry. The canonical input keys are `model`, `reasoning`, and `provider_options.service_tier`; `reasoning: "off"` becomes Codex TOML `model_reasoning_effort = "none"`.
+
+During install and bootstrap, an explicit resolved override wins over a setting preserved from the existing managed TOML, which in turn wins over the bundled default. Only roles discovered from the installed LazyCodex plugin are updated. Unrelated agent TOMLs and foreign `[agents.<name>]` registrations in `config.toml` remain untouched. A configured name that is not a discovered managed role, an unsupported Codex reasoning value, or a non-string `service_tier` produces a warning and skips only that invalid setting; installation and bootstrap continue.
 
 #### Builtin agents
 

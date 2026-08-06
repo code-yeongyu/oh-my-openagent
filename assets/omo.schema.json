@@ -709,6 +709,13 @@
               }
             ]
           },
+          "provider_options": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
           "tools": {
             "type": "object",
             "propertyNames": {
@@ -11841,6 +11848,13 @@
                   }
                 ]
               },
+              "provider_options": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
               "tools": {
                 "type": "object",
                 "propertyNames": {
@@ -12973,6 +12987,13 @@
                     "type": "string"
                   }
                 ]
+              },
+              "provider_options": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
               },
               "tools": {
                 "type": "object",
@@ -14112,6 +14133,13 @@
                       "type": "string"
                     }
                   ]
+                },
+                "provider_options": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
                 },
                 "tools": {
                   "type": "object",
@@ -25178,6 +25206,13 @@
                         }
                       ]
                     },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
                     "tools": {
                       "type": "object",
                       "propertyNames": {
@@ -26310,6 +26345,13 @@
                           "type": "string"
                         }
                       ]
+                    },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
                     },
                     "tools": {
                       "type": "object",
