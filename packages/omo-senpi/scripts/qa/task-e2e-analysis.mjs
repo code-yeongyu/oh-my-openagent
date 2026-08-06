@@ -8,7 +8,14 @@ import { join } from "node:path"
 // Senpi writes machine-global append-only diagnostics under the real agent directory. Every concurrent
 // Senpi process on the host can append to these files, so they cannot identify QA pollution.
 export const SHARED_SENPI_LOG = "senpi-debug.log"
-const SHARED_SENPI_LOGS = new Set([SHARED_SENPI_LOG, "logs/config-reload.log", "logs/fallback.log"])
+// Machine-global append-only diagnostics every concurrent senpi process on the host writes: the
+// whole logs/ tree (debug journals per subsystem), the TUI crash dump, and the shared MCP cache.
+// They cannot identify QA pollution, exactly per the contract above.
+const SHARED_SENPI_LOGS = new Set([SHARED_SENPI_LOG, "senpi-crash.log", "cache/mcp-cache.json"])
+
+function isSharedSenpiDiagnostic(rel) {
+  return SHARED_SENPI_LOGS.has(rel) || rel.startsWith("logs/")
+}
 
 // Per-file content snapshot of a directory (relpath -> sha256), for precise pollution attribution.
 // Returns an empty map when the directory is absent.
@@ -52,7 +59,10 @@ function snapshotDigest(rel, abs, readFile) {
     if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
       return createHash("sha256").update(content).digest("hex")
     }
+    // Volatile interactive-session stamps a concurrent host rewrites on its own lifecycle events
+    // (tip dismissals, per-boot changelog version); everything else stays gated.
     delete settings.tipsHistory
+    delete settings.lastChangelogVersion
     return createHash("sha256").update(JSON.stringify(settings)).digest("hex")
   } catch {
     return createHash("sha256").update(content).digest("hex")
@@ -62,8 +72,8 @@ function snapshotDigest(rel, abs, readFile) {
 // Real config/state paths that changed between two snapshots, EXCLUDING the shared diagnostic log.
 export function changedRealPaths(before, after) {
   const changed = []
-  for (const [rel, sha] of after) if (!SHARED_SENPI_LOGS.has(rel) && before.get(rel) !== sha) changed.push(rel)
-  for (const rel of before.keys()) if (!SHARED_SENPI_LOGS.has(rel) && !after.has(rel)) changed.push(rel)
+  for (const [rel, sha] of after) if (!isSharedSenpiDiagnostic(rel) && before.get(rel) !== sha) changed.push(rel)
+  for (const rel of before.keys()) if (!isSharedSenpiDiagnostic(rel) && !after.has(rel)) changed.push(rel)
   return changed
 }
 

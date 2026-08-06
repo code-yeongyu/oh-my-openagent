@@ -1,0 +1,30 @@
+Scenario: running Senpi task rows omit cache-hit-rate text.
+Command 1:
+  bun test packages/senpi-task/src/status-line.test.ts -t 'only cost sits immediately before tps'
+Observable: FAIL because unchanged production code still includes `(CH: 87%)`.
+
+Expected:
+Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · $0.4213 · 62 tok/s
+
+Received:
+Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · $0.4213 (CH: 87%) · 62 tok/s
+
+Result:
+0 pass
+1 fail
+Exit code 1
+
+Command 2:
+  bun test packages/omo-senpi/src/components/task/status-row-format.test.ts -t 'wide terminal'
+Observable: FAIL because unchanged live widget still includes `CH:`.
+
+Expected not to contain:
+CH:
+
+Received:
+⠋ Plan the complete Spider-Man media library migration · category:unspecified-high(anthropic/claude-opus-5:xhigh) · turn 2 (4 tools) · $0.1303 (CH: 89%) · 97 tok/s · running read src/library.ts · 1m 0s
+
+Result:
+0 pass
+1 fail
+Exit code 1

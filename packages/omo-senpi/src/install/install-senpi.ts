@@ -1,10 +1,22 @@
 import { execFile } from "node:child_process"
+import { createHash } from "node:crypto"
 import { constants, existsSync } from "node:fs"
-import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { access, readFile, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
+
+import {
+  dedupePackages,
+  isRecord,
+  readPackages,
+  readSettings,
+  removeLegacyBuiltinShadows,
+  removeSupersededOmoPackages,
+  type SettingsRecord,
+  writeSettingsAtomically,
+} from "./senpi-settings"
 
 const execFileAsync = promisify(execFile)
 
@@ -15,6 +27,7 @@ export interface SenpiInstallOptions {
   readonly repoRoot?: string
   readonly agentDir?: string
   readonly pluginPath?: string
+  readonly platform?: NodeJS.Platform
   readonly runCommand?: (command: string, args: readonly string[], options: { readonly cwd: string }) => Promise<void>
 }
 
@@ -28,8 +41,6 @@ export interface SenpiInstallResult {
   readonly backupPath: string
   readonly removed?: boolean
 }
-
-type SettingsRecord = Record<string, unknown>
 
 const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
@@ -51,6 +62,7 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "ulw-plan", "SKILL.md"),
   join("skills", "ulw-research", "SKILL.md"),
   join("skills", "visual-qa", "SKILL.md"),
+  join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "index.js"),
   join("runtime", "lsp-daemon", "dist", "index.d.ts"),
@@ -61,21 +73,20 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("scripts", "install.mjs"),
 ] as const
 
-const LEGACY_BUILTIN_SHADOW_PACKAGES = [
-  join("packages", "pi-goal"),
-  join("packages", "pi-webfetch"),
-] as const
-
 export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Promise<SenpiInstallResult> {
   const context = resolveInstallContext(options)
   await ensurePluginArtifacts(context)
   const settings = await readSettings(context.settingsPath)
   const before = JSON.stringify(settings)
-  const packages = removeLegacyBuiltinShadows(
-    dedupePackages(readPackages(settings)),
-    context.repoRoot,
+  const packages = dedupePackages(await removeSupersededOmoPackages(
+    removeLegacyBuiltinShadows(
+      dedupePackages(readPackages(settings)),
+      context.repoRoot,
+      context.agentDir,
+    ),
+    context.pluginPath,
     context.agentDir,
-  )
+  ))
   if (!packages.includes(context.pluginPath)) packages.push(context.pluginPath)
   settings.packages = packages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
@@ -118,6 +129,7 @@ function resolveInstallContext(options: SenpiInstallOptions): {
   readonly agentDir: string
   readonly settingsPath: string
   readonly pluginPath: string
+  readonly platform: NodeJS.Platform
   readonly allowBuild: boolean
   readonly runCommand: (command: string, args: readonly string[], options: { readonly cwd: string }) => Promise<void>
 } {
@@ -132,23 +144,27 @@ function resolveInstallContext(options: SenpiInstallOptions): {
     agentDir,
     settingsPath: join(agentDir, "settings.json"),
     pluginPath,
+    platform: options.platform ?? process.platform,
     allowBuild,
     runCommand: options.runCommand ?? defaultRunCommand,
   }
 }
 
 async function ensurePluginArtifacts(context: ReturnType<typeof resolveInstallContext>): Promise<void> {
-  const missing = await hasMissingPluginArtifact(context.pluginPath)
-  if (!missing) return
-  if (!context.allowBuild) {
+  if (context.allowBuild) {
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+  }
+
+  if (await hasMissingPluginArtifact(context.pluginPath)) {
     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
   }
 
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
-  await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot })
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
-  await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
+  await verifyAstGrepRuntimeIntegrity(context.pluginPath, context.platform)
 }
 
 async function hasMissingPluginArtifact(pluginPath: string): Promise<boolean> {
@@ -156,6 +172,71 @@ async function hasMissingPluginArtifact(pluginPath: string): Promise<boolean> {
     if (!(await fileExists(join(pluginPath, artifact)))) return true
   }
   return false
+}
+
+async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJS.Platform): Promise<void> {
+  const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+  const manifestPath = join(dirname(runtimeEntry), "manifest.json")
+  let runtimeStat
+  try {
+    runtimeStat = await stat(runtimeEntry)
+    if (!runtimeStat.isFile()) throw new Error("runtime is not a file")
+    await access(runtimeEntry, constants.R_OK | constants.X_OK)
+  } catch (error) {
+    throw astGrepIntegrityError(runtimeEntry, `runtime is unreadable or non-executable: ${messageOf(error)}`)
+  }
+
+  if (!(await fileExists(manifestPath))) {
+    throw astGrepIntegrityError(runtimeEntry, `manifest is missing: ${manifestPath}`)
+  }
+
+  let manifest: unknown
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, "utf8"))
+  } catch (error) {
+    throw astGrepIntegrityError(runtimeEntry, `manifest is unreadable or invalid JSON: ${messageOf(error)}`)
+  }
+  if (!isAstGrepRuntimeManifest(manifest)) {
+    throw astGrepIntegrityError(runtimeEntry, `manifest is malformed: ${manifestPath}`)
+  }
+
+  let actualSha256: string
+  try {
+    actualSha256 = createHash("sha256").update(await readFile(runtimeEntry)).digest("hex")
+  } catch (error) {
+    throw astGrepIntegrityError(runtimeEntry, `runtime hash could not be computed: ${messageOf(error)}`)
+  }
+  if (actualSha256 !== manifest.sha256) {
+    throw astGrepIntegrityError(
+      runtimeEntry,
+      `sha256 mismatch: manifest=${manifest.sha256} actual=${actualSha256}`,
+    )
+  }
+
+  const actualMode = runtimeStat.mode & 0o777
+  if (platform !== "win32" && actualMode !== manifest.mode) {
+    throw astGrepIntegrityError(runtimeEntry, `mode mismatch: manifest=${manifest.mode} actual=${actualMode}`)
+  }
+}
+
+function isAstGrepRuntimeManifest(value: unknown): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
+  if (!isRecord(value)) return false
+  return (
+    typeof value.sha256 === "string" &&
+    /^[a-f0-9]{64}$/.test(value.sha256) &&
+    typeof value.mode === "number" &&
+    Number.isInteger(value.mode) &&
+    typeof value.stagedAtUtc === "string" &&
+    !Number.isNaN(Date.parse(value.stagedAtUtc))
+  )
+}
+
+function astGrepIntegrityError(runtimeEntry: string, reason: string): Error {
+  return new Error(`Packed omo-senpi plugin ast-grep MCP runtime integrity error at ${runtimeEntry}: ${reason}`)
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function defaultRunCommand(
@@ -168,66 +249,6 @@ async function defaultRunCommand(
   if (result.stdout.trim().length > 0) process.stdout.write(result.stdout)
 }
 
-async function readSettings(settingsPath: string): Promise<SettingsRecord> {
-  let raw: string
-  try {
-    raw = await readFile(settingsPath, "utf8")
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) return {}
-    throw error
-  }
-
-  const parsed: unknown = JSON.parse(raw)
-  if (!isPlainObject(parsed)) throw new Error(`${settingsPath} must contain a JSON object`)
-  return parsed
-}
-
-function readPackages(settings: SettingsRecord): string[] {
-  const packages = settings.packages
-  if (packages === undefined) return []
-  if (!Array.isArray(packages) || !packages.every((entry) => typeof entry === "string")) {
-    throw new Error("Senpi settings packages must be an array of strings")
-  }
-  return packages
-}
-
-function dedupePackages(packages: readonly string[]): string[] {
-  return [...new Set(packages)]
-}
-
-function removeLegacyBuiltinShadows(packages: readonly string[], repoRoot: string, agentDir: string): string[] {
-  const shadowPaths = new Set(LEGACY_BUILTIN_SHADOW_PACKAGES.map((path) => resolve(repoRoot, path)))
-  return packages.filter((entry) => !shadowPaths.has(resolve(agentDir, entry)))
-}
-
-async function writeSettingsAtomically(settingsPath: string, settings: SettingsRecord): Promise<string> {
-  await mkdir(dirname(settingsPath), { recursive: true })
-  const backupPath = await nextBackupPath(settingsPath)
-  if (await fileExists(settingsPath)) {
-    await copyFile(settingsPath, backupPath)
-  } else {
-    await writeFile(backupPath, "{}\n", "utf8")
-  }
-
-  const tempPath = `${settingsPath}.${process.pid}.${Date.now()}.tmp`
-  await writeFile(tempPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8")
-  await rename(tempPath, settingsPath)
-  return backupPath
-}
-
-async function nextBackupPath(settingsPath: string): Promise<string> {
-  for (let index = 0; index < 1000; index += 1) {
-    const suffix = index === 0 ? "" : `-${index}`
-    const candidate = `${settingsPath}.${timestampForBackup()}${suffix}.backup`
-    if (!(await fileExists(candidate))) return candidate
-  }
-  throw new Error(`Unable to allocate backup path for ${settingsPath}`)
-}
-
-function timestampForBackup(): string {
-  return new Date().toISOString().replace(/[-:.]/g, "")
-}
-
 function findRepoRoot(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 7; depth += 1) {
@@ -235,10 +256,6 @@ function findRepoRoot(importerDir: string): string {
     current = resolve(current, "..")
   }
   throw new Error("Unable to locate packages/omo-senpi/plugin/package.json from installer module")
-}
-
-function isPlainObject(value: unknown): value is SettingsRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 async function fileExists(path: string): Promise<boolean> {

@@ -13,6 +13,8 @@ type TestPart = {
   sessionID?: string
   messageID?: string
   callID?: string
+  tool?: string
+  state?: { status?: string; input?: Record<string, unknown>; time?: { start: number; end?: number } }
   tool_use_id?: string
   content?: string
   text?: string
@@ -192,12 +194,18 @@ describe("createMessagesTransformHandler", () => {
     expect(toolPairRan).toBe(true)
   })
 
-  it("repairs orphaned tool_use after upstream hook throws (regression for ses_22bd806)", async () => {
+  it("repairs orphaned tool calls after upstream hook throws (regression for ses_22bd806)", async () => {
     //#given
     const messages: TestMessage[] = [
       { info: { role: "user" }, parts: [{ type: "text", text: "summary stand-in" }] },
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA" }] },
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_01Lu5cHvRtEvzoifP1UVBVRb" }] },
+      {
+        info: { role: "assistant" },
+        parts: [createRunningToolPart("toolu_01SRMQs3DUtVKWoSxC8bxxVA")],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [createRunningToolPart("toolu_01Lu5cHvRtEvzoifP1UVBVRb")],
+      },
       { info: { role: "user" }, parts: [{ type: "text", text: "next" }] },
     ]
     const hooks = makeHooks({
@@ -211,32 +219,13 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(hooks, messages)
 
     //#then
-    expect(messages).toHaveLength(5)
-    expect(messages[2]).toEqual({
-      info: { role: "user" },
-      parts: [{
-        type: "tool_result",
-        toolUseId: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
-        tool_use_id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
-        isError: true,
-        content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
-      }, {
-        type: "text",
-        text: "Recovered missing tool results. Continue from the repaired tool output.",
-        synthetic: true,
-      }],
-    })
-    expect(messages[4]?.parts[0]).toEqual({
-      type: "tool_result",
-      toolUseId: "toolu_01Lu5cHvRtEvzoifP1UVBVRb",
-      tool_use_id: "toolu_01Lu5cHvRtEvzoifP1UVBVRb",
-      isError: true,
-      content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
-    })
-    expect(messages[4]?.parts[1]).toEqual({ type: "text", text: "next" })
+    expect(messages).toHaveLength(4)
+    expect(readToolStatus(messages[1])).toEqual("error")
+    expect(readToolStatus(messages[2])).toEqual("error")
+    expect(messages[3]?.parts).toEqual([{ type: "text", text: "next" }])
   })
 
-  it("keeps an ID-less tool-pair repair separate from reminder request identity", async () => {
+  it("keeps a tool-pair repair separate from reminder request identity", async () => {
     //#given
     const sessionID = "ses_tool_pair_reminder"
     const categorySkillReminder = createCategorySkillReminderHook({} as never)
@@ -259,7 +248,7 @@ describe("createMessagesTransformHandler", () => {
       },
       {
         info: { id: "msg_orphaned_tool", role: "assistant", sessionID },
-        parts: [{ type: "tool_use", id: "toolu_missing_result" }],
+        parts: [createRunningToolPart("toolu_missing_result")],
       },
     ]
 
@@ -267,7 +256,8 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(hooks, messages)
 
     //#then
-    expect(messages.at(-1)?.info).toEqual({ role: "user", sessionID })
+    expect(messages).toHaveLength(2)
+    expect(readToolStatus(messages[1])).toEqual("error")
     expect(messages[0]?.parts[0]).toMatchObject({
       id: "prt_category_skill_reminder_msg_real_request",
       messageID: "msg_real_request",
@@ -803,4 +793,19 @@ function createRealToolPairValidator(): TransformHook {
   const handler = validator["experimental.chat.messages.transform"]
   if (!handler) throw new Error("validator missing transform")
   return handler as never
+}
+
+function createRunningToolPart(callID: string): TestPart {
+  return {
+    id: `prt_${callID}`,
+    type: "tool",
+    callID,
+    tool: "bash",
+    state: { status: "running", input: {}, time: { start: 1_700_000_000_000 } },
+  }
+}
+
+function readToolStatus(message: TestMessage | undefined): string | undefined {
+  const state = message?.parts.find((part) => part.type === "tool")?.state
+  return typeof state?.status === "string" ? state.status : undefined
 }

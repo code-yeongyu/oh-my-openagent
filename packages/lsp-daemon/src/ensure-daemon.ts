@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { Socket } from "node:net";
-import { dirname } from "node:path";
-import { execPath } from "node:process";
+import { dirname, isAbsolute } from "node:path";
+import { argv0, execPath } from "node:process";
 
 import { authEnvelope, readAuthToken } from "./ipc-protocol.js";
 import type { OwnerPing } from "./ownership.js";
@@ -124,14 +124,30 @@ export function spawnDaemonProcess(paths: DaemonPaths): void {
 	mkdirSync(dirname(paths.log), { recursive: true });
 	const logFd = openSync(paths.log, "a");
 	try {
-		const child = spawn(execPath, [paths.cliPath, "daemon"], {
+		const child = spawn(resolveDaemonNodeExecutable(), [paths.cliPath, "daemon"], {
 			detached: true,
 			stdio: ["ignore", logFd, logFd],
 		});
+		child.once("spawn", () => closeSync(logFd));
+		child.once("error", (error) => {
+			writeSync(logFd, `[lsp-daemon] failed to spawn daemon: ${error.message}\n`);
+			closeSync(logFd);
+		});
 		child.unref();
-	} finally {
+	} catch (error) {
 		closeSync(logFd);
+		throw error;
 	}
+}
+
+export function resolveDaemonNodeExecutable(
+	cachedExecPath: string = execPath,
+	originalArgv0: string = argv0,
+	pathExists: (path: string) => boolean = existsSync,
+): string {
+	if (pathExists(cachedExecPath)) return cachedExecPath;
+	if (isAbsolute(originalArgv0) && pathExists(originalArgv0)) return originalArgv0;
+	return "node";
 }
 
 export function resolveDaemonCliPath(

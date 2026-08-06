@@ -1,7 +1,7 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { TaskManager } from "../../manager"
-import type { ResolvedModelRecord, TaskRunStats, TaskStatus } from "../../state"
+import type { ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus } from "../../state"
 import type { CallerSessionResolver } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list">
@@ -26,12 +26,18 @@ export type LostBreadcrumbs = {
   readonly pid?: number
 }
 
+export type SuspendedDetails = {
+  readonly explanation: string
+}
+
 export type TaskSnapshot = {
   readonly task_id: string
   readonly name?: string
   readonly description?: string
   readonly task_summary?: string
   readonly status: TaskStatus
+  readonly residency_state: ResidencyState
+  readonly suspended?: SuspendedDetails
   readonly execution_mode: string
   readonly model: string
   readonly resolved_model?: ResolvedModelRecord

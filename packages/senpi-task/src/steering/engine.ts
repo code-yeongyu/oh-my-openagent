@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { messageability } from "../state"
-import type { TaskRecord } from "../state"
+import type { PendingSteeringEntry, TaskRecord } from "../state"
 import {
   DEFAULT_SEND_DELIVERY,
   type CancelOutcome,
@@ -17,11 +17,11 @@ import {
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 
-type QueuedMessage = { readonly message: string; readonly deliverAs: SendDelivery }
-
 export function createSteeringEngine(port: SteeringPort): SteeringEngine {
-  // Messages sent to a still-pending (queued) child buffer here and drain, in order, on start.
-  const pending = new Map<string, QueuedMessage[]>()
+  // Prelaunch steering is DURABLE: messages sent to a still-pending (queued) child append to the
+  // record's pending_steering via store.mutate, so the queue survives a process restart (and a
+  // session shutdown that suspends the pending child) and drains, in persisted order, when the
+  // child eventually launches. The record is the single source of truth - no in-memory shadow.
 
   function resolve(idOrName: string): TaskRecord | undefined {
     const byId = tryLoad(idOrName)
@@ -50,7 +50,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (denied !== undefined) return denied
 
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
-    if (record.status === "pending") return enqueuePending(record.task_id, input.message, deliverAs)
+    if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
 
     const mode = messageability(record.status, record.residency_state)
     if (mode === "not-continuable") {
@@ -87,33 +87,65 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
   }
 
-  function enqueuePending(taskId: string, message: string, deliverAs: SendDelivery): SendOutcome {
-    const queue = pending.get(taskId) ?? []
-    queue.push({ message, deliverAs })
-    pending.set(taskId, queue)
-    port.store.appendEvent(taskId, { type: "steer_queued", payload: { queue_position: queue.length, deliverAs } })
-    return { kind: "queued", task_id: taskId, queue_position: queue.length }
+  function enqueuePending(record: TaskRecord, message: string, deliverAs: SendDelivery): SendOutcome {
+    let position = 0
+    const updated = port.store.mutate(record.task_id, (fresh) => {
+      const entry: PendingSteeringEntry = {
+        id: `ps-${port.now()}-${(fresh.pending_steering ?? []).length + 1}`,
+        message,
+        deliver_as: deliverAs,
+      }
+      const queue = [...(fresh.pending_steering ?? []), entry]
+      position = queue.length
+      return { ...fresh, pending_steering: queue }
+    })
+    if (updated === null) {
+      return { kind: "not_found", reason: `No task found for "${record.task_id}".`, suggestion: NOT_FOUND_SUGGESTION }
+    }
+    port.store.appendEvent(record.task_id, { type: "steer_queued", payload: { queue_position: position, deliverAs } })
+    return { kind: "queued", task_id: record.task_id, queue_position: position }
   }
 
   function dropPending(taskId: string): void {
-    pending.delete(taskId)
+    clearPersistedQueue(taskId)
+  }
+
+  // Removes persisted queue entries. With drainedIds, only the entries that were just delivered
+  // are cleared, so a concurrent enqueue that landed after the drain read survives; without it
+  // the whole queue goes (cancel / manager-forget paths, where the child will never start).
+  function clearPersistedQueue(taskId: string, drainedIds?: ReadonlySet<string>): void {
+    port.store.mutate(taskId, (fresh) => {
+      const queue = fresh.pending_steering
+      if (queue === undefined || queue.length === 0) return fresh
+      const remaining = drainedIds === undefined ? [] : queue.filter((entry) => !drainedIds.has(entry.id))
+      if (remaining.length === queue.length) return fresh
+      if (remaining.length === 0) {
+        const { pending_steering: _cleared, ...rest } = fresh
+        return rest
+      }
+      return { ...fresh, pending_steering: remaining }
+    })
   }
 
   async function notifyStarted(taskId: string): Promise<void> {
-    const queue = pending.get(taskId)
-    if (queue === undefined || queue.length === 0) return
+    // Drain from the FRESH record (not a cached copy): a restarted engine must see exactly what
+    // was persisted, in persisted order. Malformed entries never reach here - the store parser
+    // already dropped them with a diagnostic (todo-2 entry-drop policy).
+    const fresh = tryLoad(taskId)
+    const queue = fresh?.pending_steering
+    if (fresh === undefined || queue === undefined || queue.length === 0) return
     const handle = port.liveHandle(taskId)
     if (handle === undefined) return
-    pending.delete(taskId)
-    for (const item of queue) {
+    for (const entry of queue) {
       try {
-        if (item.deliverAs === "steer") await handle.steer(item.message)
-        else await handle.followUp(item.message)
-        port.store.appendEvent(taskId, { type: "steered", payload: { delivered: item.deliverAs, queued: true } })
+        if (entry.deliver_as === "steer") await handle.steer(entry.message)
+        else await handle.followUp(entry.message)
+        port.store.appendEvent(taskId, { type: "steered", payload: { delivered: entry.deliver_as, queued: true } })
       } catch (error) {
         log("senpi-task steering queued delivery failed", { taskId, error: String(error) })
       }
     }
+    clearPersistedQueue(taskId, new Set(queue.map((entry) => entry.id)))
   }
 
   async function interruptTask(idOrName: string): Promise<InterruptOutcome> {
@@ -151,7 +183,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
         return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from pending.` }
       }
       port.dequeuePending(record.task_id)
-      pending.delete(record.task_id)
+      clearPersistedQueue(record.task_id)
       port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "pending", ...(reason !== undefined ? { reason } : {}) } })
       await port.destruction.destroyResidentTask(record.task_id, "cancel")
       return { kind: "cancelled", task_id: record.task_id, previous_status: "pending" }
@@ -206,6 +238,11 @@ function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefi
 }
 
 function notContinuableReason(record: TaskRecord): string {
+  // Suspended (session shutdown) is NOT terminal: the record is continuable, just not from this
+  // process. No lazy revive-on-send - resuming the session is the wake-up path (user decision).
+  if (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached") {
+    return `Task ${record.task_id} is suspended - resumes when its session is resumed.`
+  }
   if (record.residency_state === "disposed") return `Task ${record.task_id} was disposed and can no longer be continued.`
   if (record.residency_state === "evicted") return `Task ${record.task_id} was evicted from residency and can no longer be continued.`
   return `Task ${record.task_id} is ${record.status} and can no longer be continued.`

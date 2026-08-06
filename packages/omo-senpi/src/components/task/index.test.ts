@@ -156,6 +156,7 @@ function terminalRecord(teamRunId: string, memberName = "crash"): TaskRecord {
     updated_at: "2026-07-29T00:00:01.000Z",
     error_message: "RPC child exited with code 1",
     notification: { run_epoch: 0, notified_epoch: 0 },
+    notify_on_terminal: false,
   }
 }
 
@@ -284,18 +285,18 @@ describe("omo-senpi task component wiring", () => {
       ...base,
       lifecycle: {
         ...base.lifecycle,
-        reconcileOnSessionStart: async () => {
-          order.push("reattach")
+        reconcileOnSessionStart: async (sessionId) => {
+          order.push(`reattach:${sessionId}`)
           return { outcomes: [] }
         },
-        cleanupExpiredRecords: () => {
+        cleanupExpiredRecords: async () => {
           order.push("cleanup")
           return { deleted: [], retained: [] }
         },
       },
       notifier: {
         ...base.notifier,
-        reconcileFailedNotifications: () => { order.push("notify") },
+        reconcileUnnotifiedNotifications: () => { order.push("notify") },
       },
     }
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
@@ -325,7 +326,7 @@ describe("omo-senpi task component wiring", () => {
     })
 
     // then
-    expect(order).toEqual(["reattach", "recover-create", "cleanup", "reclaim", "notify", "poll"])
+    expect(order).toEqual(["reattach:session-a", "recover-create", "reclaim", "notify", "cleanup", "poll"])
   })
 
   it("#given a terminal member owned by lead A #when lead B reconciles then lead A reconciles #then only the owning lead receives replay", async () => {
@@ -341,7 +342,7 @@ describe("omo-senpi task component wiring", () => {
       lifecycle: {
         ...base.lifecycle,
         reconcileOnSessionStart: async () => ({ outcomes: [{ task_id: terminal.task_id, kind: "resumed" }] }),
-        cleanupExpiredRecords: () => ({ deleted: [], retained: [] }),
+        cleanupExpiredRecords: async () => ({ deleted: [], retained: [] }),
       },
     }
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
@@ -395,7 +396,7 @@ describe("omo-senpi task component wiring", () => {
       lifecycle: {
         ...base.lifecycle,
         reconcileOnSessionStart: async () => ({ outcomes: [{ task_id: terminal.task_id, kind: "resumed" }] }),
-        cleanupExpiredRecords: () => ({ deleted: [], retained: [] }),
+        cleanupExpiredRecords: async () => ({ deleted: [], retained: [] }),
       },
     }
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })

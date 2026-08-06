@@ -22,6 +22,7 @@ export class MonitorOutputInjector {
   private readonly pendingOutputs: Map<string, PendingMonitorOutput> = new Map()
   private readonly dispatchedOutputs: Map<string, DispatchedMonitorOutput> = new Map()
   private readonly deliveredSources: Set<string> = new Set()
+  private readonly queuedAtBySource: Map<string, number> = new Map()
 
   constructor(private readonly deps: MonitorOutputInjectorDeps) {
     if (deps.postDispatchHoldMs <= 0) {
@@ -34,6 +35,8 @@ export class MonitorOutputInjector {
     if (this.deliveredSources.has(source)) {
       return
     }
+
+    this.rememberQueuedAt(source)
 
     const pending = this.pendingOutputs.get(record.id)
     if (pending) {
@@ -60,18 +63,30 @@ export class MonitorOutputInjector {
     }
 
     const sessionID = pending.record.parentSessionId
-    const sessionActive = await this.isSessionActive(sessionID)
+    const hasForcedTerminalBatch = this.hasTerminalBatchOverActiveDeferCeiling(pending)
+    let sessionActive = await this.isSessionActive(sessionID)
     if (!sessionActive) {
       await this.settleAfterSessionIdle()
-      if (await this.isSessionActive(sessionID)) {
+      sessionActive = await this.isSessionActive(sessionID)
+      if (sessionActive && !hasForcedTerminalBatch) {
         this.scheduleFlush(monitorId)
         return
       }
-    }
-
-    if (sessionActive) {
+    } else if (!hasForcedTerminalBatch) {
       this.scheduleFlush(monitorId)
       return
+    }
+
+    if (sessionActive && hasForcedTerminalBatch) {
+      const forcedTerminalBatches: OutputBatch[] = []
+      const remainingBatches: OutputBatch[] = []
+      for (const batch of pending.batches) {
+        const destination = this.shouldForceActiveDispatch(pending.record, batch)
+          ? forcedTerminalBatches
+          : remainingBatches
+        destination.push(batch)
+      }
+      pending.batches = [...forcedTerminalBatches, ...remainingBatches]
     }
 
     if (await latestAssistantTurnBlocksMonitorOutput(this.deps.client, this.deps.directory, sessionID)) {
@@ -98,12 +113,18 @@ export class MonitorOutputInjector {
         continue
       }
 
+      const forceActiveDispatch = this.shouldForceActiveDispatch(pending.record, batch)
+      if (sessionActive && !forceActiveDispatch) {
+        this.scheduleFlush(monitorId)
+        return
+      }
+
       pending.batches.shift()
       if (pending.batches.length === 0) {
         this.pendingOutputs.delete(monitorId)
       }
 
-      const delivered = await this.dispatchBatch(pending.record, batch, source)
+      const delivered = await this.dispatchBatch(pending.record, batch, source, forceActiveDispatch)
       if (!delivered) {
         this.requeueBatch(pending.record, batch)
         return
@@ -115,10 +136,16 @@ export class MonitorOutputInjector {
     }
   }
 
-  private async dispatchBatch(record: MonitorRecord, batch: OutputBatch, source: string): Promise<boolean> {
+  private async dispatchBatch(
+    record: MonitorRecord,
+    batch: OutputBatch,
+    source: string,
+    forceActiveDispatch: boolean,
+  ): Promise<boolean> {
     const sessionID = record.parentSessionId
     const content = formatMonitorBatch(record, batch, record.counters)
     const dispatchStartedAt = this.now()
+    const shouldReply = this.isTerminalBatch(batch)
 
     try {
       const promptResult = await this.dispatchInternalPrompt({
@@ -129,13 +156,17 @@ export class MonitorOutputInjector {
         settleMs: 0,
         queueBehavior: "defer",
         postDispatchHoldMs: this.deps.postDispatchHoldMs,
-        checkStatus: true,
+        checkStatus: !forceActiveDispatch,
         checkToolState: true,
         input: {
           path: { id: sessionID },
           body: {
-            noReply: true,
-            parts: [withInternalNoReplyMarker(createInternalAgentTextPart(content))],
+            noReply: !shouldReply,
+            parts: [
+              shouldReply
+                ? createInternalAgentTextPart(content)
+                : withInternalNoReplyMarker(createInternalAgentTextPart(content)),
+            ],
           },
           query: { directory: this.deps.directory },
         },
@@ -188,7 +219,13 @@ export class MonitorOutputInjector {
       }
 
       this.trackDelivered(source, { record, batch, content, dispatchedAt: dispatchStartedAt })
-      log("[monitor] Sent deferred monitor output:", { sessionID, monitorId: record.id, batchSeq: batch.batchSeq })
+      log("[monitor] Sent deferred monitor output:", {
+        sessionID,
+        monitorId: record.id,
+        batchSeq: batch.batchSeq,
+        shouldReply,
+        forceActiveDispatch,
+      })
       return true
     } catch (error) {
       this.scheduleFlush(record.id)
@@ -203,6 +240,8 @@ export class MonitorOutputInjector {
       return
     }
 
+    this.rememberQueuedAt(source)
+
     const pending = this.pendingOutputs.get(record.id)
     if (pending) {
       pending.record = record
@@ -213,6 +252,34 @@ export class MonitorOutputInjector {
     }
 
     this.pendingOutputs.set(record.id, { record, batches: [batch] })
+  }
+
+  private isTerminalBatch(batch: OutputBatch): boolean {
+    return !batch.stillRunning
+  }
+
+  private hasTerminalBatchOverActiveDeferCeiling(pending: PendingMonitorOutput): boolean {
+    return pending.batches.some((batch) => this.shouldForceActiveDispatch(pending.record, batch))
+  }
+
+  private shouldForceActiveDispatch(record: MonitorRecord, batch: OutputBatch): boolean {
+    const maxActiveDeferMs = this.deps.maxActiveDeferMs
+    if (maxActiveDeferMs === undefined || maxActiveDeferMs <= 0) {
+      return false
+    }
+    return this.isTerminalBatch(batch)
+      && this.getQueuedAgeMs(this.createSource(record, batch)) >= maxActiveDeferMs
+  }
+
+  private rememberQueuedAt(source: string): void {
+    if (!this.queuedAtBySource.has(source)) {
+      this.queuedAtBySource.set(source, this.now())
+    }
+  }
+
+  private getQueuedAgeMs(source: string): number {
+    const queuedAt = this.queuedAtBySource.get(source)
+    return queuedAt === undefined ? 0 : this.now() - queuedAt
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
@@ -242,6 +309,7 @@ export class MonitorOutputInjector {
   private trackDelivered(source: string, output: DispatchedMonitorOutput): void {
     this.deliveredSources.add(source)
     this.dispatchedOutputs.set(source, output)
+    this.queuedAtBySource.delete(source)
   }
 
   private createSource(record: MonitorRecord, batch: OutputBatch): string {

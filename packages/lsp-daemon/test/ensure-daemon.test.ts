@@ -1,7 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-import { DaemonUnreachableError, type EnsureDaemonDeps, ensureDaemonRunning } from "../src/ensure-daemon.js";
+import {
+	DaemonUnreachableError,
+	type EnsureDaemonDeps,
+	ensureDaemonRunning,
+	resolveDaemonNodeExecutable,
+} from "../src/ensure-daemon.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const PATHS = daemonTestPaths("/tmp/ensure-test", "9.9.9");
@@ -33,6 +38,28 @@ function makeHarness(config: { probeQueue: boolean[]; onSpawnPush?: boolean[] })
 }
 
 describe("ensureDaemonRunning", () => {
+	it("#given the cached Node executable was removed #when resolving the daemon launcher #then uses argv0", () => {
+		const executable = resolveDaemonNodeExecutable(
+			"/opt/homebrew/Cellar/node/26.5.0/bin/node",
+			"/opt/homebrew/bin/node",
+			(path) => path === "/opt/homebrew/bin/node",
+		);
+
+		expect(executable).toBe("/opt/homebrew/bin/node");
+	});
+
+	it("#given no absolute Node launcher remains #when resolving the daemon launcher #then uses PATH", () => {
+		const executable = resolveDaemonNodeExecutable("/removed/node", "node", () => false);
+
+		expect(executable).toBe("node");
+	});
+
+	it("#given the cached Node executable still exists #when resolving the daemon launcher #then preserves it", () => {
+		const executable = resolveDaemonNodeExecutable("/runtime/node", "node", (path) => path === "/runtime/node");
+
+		expect(executable).toBe("/runtime/node");
+	});
+
 	it("#given daemon already reachable #when ensure #then does not lock or spawn", async () => {
 		const { deps, counts } = makeHarness({ probeQueue: [true] });
 		await ensureDaemonRunning(PATHS, deps);

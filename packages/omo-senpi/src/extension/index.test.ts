@@ -47,7 +47,6 @@ describe("omo-senpi extension entry", () => {
         "omo-senpi-comment-checker-disabled",
         "omo-senpi-telemetry-disabled",
         "omo-senpi-lsp-disabled",
-        "omo-senpi-codegraph-disabled",
         "omo-senpi-config-watch-disabled",
       ]),
     )

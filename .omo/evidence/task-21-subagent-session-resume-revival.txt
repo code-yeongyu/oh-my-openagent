@@ -1,0 +1,80 @@
+Task 21 - chaos coverage for suspend/revive lifecycle invariants
+Date: 2026-08-04
+Worktree: /Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival
+
+TDD RED
+- Added chaos-lifecycle.test.ts before implementation.
+- Command: bun test packages/senpi-task/src/__adversarial__/chaos-lifecycle.test.ts
+- Observed RED: SyntaxError: Export named 'runLifecycleProbe' not found in chaos-drive.ts (0 pass, 1 fail, 1 error).
+
+Implemented deterministic actions in the existing PRNG pool
+- suspend_session
+- resume_session(parentSessionId)
+- crash_mid_suspend
+- sibling_reconcile_race (two lifecycle/manager engines over one record store)
+- mass_revive_at_cap
+
+Implemented lifecycle invariant witnesses
+- inv6: no task has two live manager handles across engines.
+- inv7: a record with a session transcript or v1 spawn_spec never becomes lost.
+- inv8: run_epoch is monotonic and suspension does not change it.
+- inv9: no orphan fake child pid remains; replacement launch before retained-pid termination is detected.
+- inv10: cancelled/evicted/disposed/killed tasks never regain residency; killed resident orphans are disposed.
+- inv11: resident count for a parent never exceeds residency_max_children.
+- inv12: resident-orphan reclamation succeeds at a full cap.
+- inv13: a terminal record without a session transcript is never relaunched.
+
+Mutation proofs (mutants are injected only by the test probe and are not production behavior)
+Command: bun -e importing runLifecycleMutationProbe for all eight mutations
+Observed:
+- double_revive -> inv6: task live in engine-1 and engine-2.
+- lose_recoverable -> inv7: recoverable task transitioned to lost.
+- suspension_bumps_epoch -> inv8: suspension changed run_epoch 4 -> 5.
+- spawn_before_orphan_kill -> inv9: replacement spawned before retained pid termination; orphan replacement pid remained alive.
+- revive_forbidden -> inv10: deliberately stopped task regained residency.
+- over_admit -> inv11: resident count 2 exceeded cap 1.
+- capacity_gate_reclamation -> inv12: orphan was capacity-gated at full cap.
+- relaunch_terminal_without_session -> inv13: terminal record without session was relaunched.
+
+The double-revive mutation models the exact disabled-CAS failure by transferring the persisted owner to engine 2 while engine 1 retains its handle, then attaching engine 2. The inv6 cross-manager witness fires. The committed green path uses the real reconcile CAS and never produces this state.
+
+Regression fixes during verification
+- Scoped synthetic task IDs below the process-global generated-ID floor, preventing chaos fixtures from contaminating later reconcile-revival tests.
+- Kept destruction invocation behind lifecycle registry definitions; single-writer destruction audit remains unchanged and green.
+- Routed random steer/interrupt/cancel/revive operations to the engine that owns the live handle.
+- Suspension is skipped only when this runner-level harness has a pending queue, because the adapter's private dequeue composition is not exposed here; pending suspension remains covered by lifecycle/shutdown.test.ts.
+
+GREEN / robustness
+- bun test packages/senpi-task/src/__adversarial__
+  - default seed senpi-task-w1-chaos, 200 iterations: 10 pass, 0 fail.
+- SEED=revival-alpha bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts
+  - 200 iterations: 1 pass, 0 fail.
+- SEED=revival-beta bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts
+  - 200 iterations: 1 pass, 0 fail.
+- SEED=revival-gamma bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts
+  - 200 iterations: 1 pass, 0 fail.
+- SEED=revival-delta bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts
+  - 200 iterations: 1 pass, 0 fail.
+- Combined cross-suite order check:
+  bun test packages/senpi-task/src/__adversarial__ packages/senpi-task/src/lifecycle/reconcile-revival.test.ts packages/senpi-task/src/lifecycle/single-writer-audit.test.ts
+  - 33 pass, 0 fail.
+- bun test packages/senpi-task
+  - 1312 pass, 0 fail, 1 snapshot, 4116 expect() calls across 191 files.
+- ./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json
+  - clean, no output.
+- Static discipline check: no `as any`, setTimeout, or sleep in packages/senpi-task/src/__adversarial__.
+- git diff --check for adversarial files: clean.
+
+Manual QA
+- Happy: deterministic lifecycle probe ran every new action exactly once and returned zero violations.
+- Failure: all eight injected lifecycle regressions fired their corresponding invariant; double-revive specifically fired inv6.
+
+Inv12 mutation-proof correction after adversarial review
+- Removed the synthetic mutation-probe write to `reclamationBreaches`.
+- The capacity-gate mutant now seeds one ownerless resident into a cap of one and routes the buggy reconcile path through `lifecycle.admitResident(CHAOS_SESSION)`.
+- Admission genuinely returns `rejected` because the orphan itself consumes the only residency slot; the mutant then incorrectly skips resident-orphan reclamation.
+- The same `observeReclamationPostcondition` used by the happy full-cap action derives the failure from persisted residency plus live-handle state. The mutation probe does not author a breach.
+- Witness output:
+  [{"invariant":12,"detail":"orphan st_0000bad0 remained ownerless after capacity-gated reconcile at full cap"}]
+- Corrected RED: the focused test initially expected the derived postcondition detail but received the old synthetic `was capacity-gated at full cap` detail.
+- Corrected GREEN: focused inv12 mutation test 1 pass / 0 fail; adversarial suite 10 pass / 0 fail; full package 1312 pass / 0 fail / 4117 expects; tsgo clean.

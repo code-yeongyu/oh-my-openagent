@@ -52,6 +52,7 @@ export interface TaskStatusUiDeps {
   readonly runtime: StatusUiRuntime
   readonly debounceMs?: number
   readonly timers?: StatusUiTimers
+  readonly terminalWidth?: () => number | undefined
   // Local rendering time used by the live-refresh timer and deterministic tests.
   readonly now?: () => number
 }
@@ -115,9 +116,10 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       : records.filter((record) => deps.manager.wasBackground?.(record.task_id) === true)
     const renderedAt = now()
     const liveStats = deps.manager.runStatsSnapshot?.bind(deps.manager)
+    const terminalWidth = deps.terminalWidth?.() ?? process.stdout.columns
     const rows = deps.manager.wasBackground === undefined
       ? buildWidgetRows(records)
-      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats)
+      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, terminalWidth)
     if (rows.length === 0) {
       clearLiveRefresh()
       ui.setWidget(UI_KEY, undefined)

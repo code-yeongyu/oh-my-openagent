@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
     environment:
       name: web-production

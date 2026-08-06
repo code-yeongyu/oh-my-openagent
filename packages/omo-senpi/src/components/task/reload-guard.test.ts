@@ -16,6 +16,7 @@ function record(overrides: Partial<TaskRecord> & Pick<TaskRecord, "task_id" | "s
     created_at: "2026-07-28T00:00:00.000Z",
     updated_at: "2026-07-28T00:00:00.000Z",
     notification: { run_epoch: 1, notified_epoch: 0 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }

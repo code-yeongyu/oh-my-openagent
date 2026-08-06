@@ -35,6 +35,7 @@ jobs:
   # - Uploads compressed artifacts for the publish job
   # =============================================================================
   build:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}
     defaults:
       run:
@@ -198,7 +199,7 @@ jobs:
 
   publish:
     needs: build
-    if: always() && !cancelled()
+    if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

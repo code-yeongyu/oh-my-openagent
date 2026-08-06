@@ -68,8 +68,8 @@ describe("validatePluginConfig", () => {
     withOmoConfig("defaults", (fixture) => {
       const result = validatePluginConfig(fixture.project)
 
-      expect(result.valid).toBe(true)
       expect(result.messages).toEqual([])
+      expect(result.valid).toBe(true)
       expect(result.path).toBeNull()
       expect(result.config.tui?.sidebar.enabled).toBe(true)
     })
@@ -245,6 +245,33 @@ describe("validatePluginConfig", () => {
       const result = validatePluginConfig(fixture.project)
 
       expect(result.config.agents?.sisyphus?.model).toBe("provider/kimi")
+    })
+  })
+
+  it("#given a migrated canonical agent model chain #when validating #then materializes the runtime model fields", () => {
+    withOmoConfig("canonical-agent-models", (fixture) => {
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          agents: {
+            explore: {
+              models: [
+                { model: "provider/primary", reasoning: "low" },
+                { model: "provider/fallback", reasoning: "medium" },
+              ],
+            },
+          },
+        },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.messages).toEqual([])
+      expect(result.valid).toBe(true)
+      expect(result.config.agents?.explore?.model).toBe("provider/primary")
+      expect(result.config.agents?.explore?.reasoning).toBe("low")
+      expect(result.config.agents?.explore?.fallback_models).toEqual([
+        { model: "provider/fallback", reasoning: "medium" },
+      ])
     })
   })
 })

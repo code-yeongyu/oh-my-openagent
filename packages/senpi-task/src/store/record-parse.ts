@@ -2,13 +2,15 @@ import {
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
+  type PendingSteeringEntry,
   type ResolvedModelRecord,
   type TaskRecord,
   type TaskRunStats,
+  type TaskSpawnSpec,
 } from "../state"
 import { parseTaskId } from "../state/id"
 
-export function parseTaskRecord(value: unknown, path: string): TaskRecord {
+export function parseTaskRecord(value: unknown, path: string, warnings?: string[]): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
   const name = readOptionalString(value, "name")
@@ -24,11 +26,14 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
+  // Legacy records predate the field: they never asked for a terminal notification, so false.
+  const notifyOnTerminal = readOptionalBoolean(value, "notify_on_terminal") ?? false
   const requestedModel = readOptionalResolvedModel(value, "requested_model")
   const fallbackModels = readOptionalResolvedModelArray(value, "fallback_models")
   const fallbackAttempts = readOptionalResolvedModelArray(value, "fallback_attempts")
   const resolvedModel = readOptionalResolvedModel(value, "resolved_model")
   const spawnSpec = readOptionalSpawnSpec(value)
+  const pendingSteering = readOptionalPendingSteering(value, path, warnings)
   const runStats = readOptionalRunStats(value)
 
   return {
@@ -40,6 +45,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     depth: readNumber(value, "depth"),
     execution_mode: readString(value, "execution_mode"),
     model: readString(value, "model"),
+    notify_on_terminal: notifyOnTerminal,
     created_at: readString(value, "created_at"),
     updated_at: readString(value, "updated_at"),
     notification: readNotification(value),
@@ -55,6 +61,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
+    ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),
     ...(pid === undefined ? {} : { pid }),
     ...(hostPid === undefined ? {} : { host_pid: hostPid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
@@ -92,11 +99,67 @@ function readOptionalRunStats(record: Record<string, unknown>): TaskRunStats | u
   }
 }
 
-function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spawn_spec"] {
+function readOptionalSpawnSpec(record: Record<string, unknown>): TaskSpawnSpec | undefined {
   const value = record["spawn_spec"]
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("spawn_spec is not an object")
+
+  // v1 spec: requires version === 1 and prompt; carries cwd, instructions, member_scoped_tool_names.
+  // Legacy spec: {cwd} with optional extensions/member_env that are DISCARDED as untrusted inputs.
+  if (value["version"] === 1) {
+    const cwd = readString(value, "cwd")
+    const prompt = readString(value, "prompt")
+    const instructions = readOptionalString(value, "instructions")
+    const memberScopedToolNames = readOptionalStringArray(value, "member_scoped_tool_names")
+    return {
+      version: 1,
+      cwd,
+      prompt,
+      ...(instructions === undefined ? {} : { instructions }),
+      ...(memberScopedToolNames === undefined ? {} : { member_scoped_tool_names: memberScopedToolNames }),
+    }
+  }
+
+  // Legacy: only cwd survives; extensions/member_env are untrusted launch inputs, never persisted.
   return { cwd: readString(value, "cwd") }
+}
+
+function readOptionalPendingSteering(
+  record: Record<string, unknown>,
+  path: string,
+  warnings: string[] | undefined,
+): readonly PendingSteeringEntry[] | undefined {
+  const value = record["pending_steering"]
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new Error("pending_steering is not an array")
+
+  // BINDING policy: a malformed ENTRY is dropped, siblings are kept, and the record remains valid.
+  // Whole-record rejection is banned: a live child must never be orphaned over one bad steering entry.
+  const entries: PendingSteeringEntry[] = []
+  for (let index = 0; index < value.length; index++) {
+    const candidate = value[index]
+    if (!isRecord(candidate)) {
+      warnings?.push(`pending_steering[${index}] at ${path}: entry is not an object, dropped`)
+      continue
+    }
+    const id = candidate["id"]
+    const message = candidate["message"]
+    const deliverAs = candidate["deliver_as"]
+    if (typeof id !== "string") {
+      warnings?.push(`pending_steering[${index}] at ${path}: entry missing string id, dropped`)
+      continue
+    }
+    if (typeof message !== "string") {
+      warnings?.push(`pending_steering[${index}] at ${path}: entry missing string message, dropped`)
+      continue
+    }
+    if (deliverAs !== "steer" && deliverAs !== "followUp") {
+      warnings?.push(`pending_steering[${index}] at ${path}: entry has invalid deliver_as, dropped`)
+      continue
+    }
+    entries.push({ id, message, deliver_as: deliverAs })
+  }
+  return entries
 }
 
 function readOptionalResolvedModel(

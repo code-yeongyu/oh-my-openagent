@@ -182,4 +182,50 @@ describe("runTaskOutput", () => {
       expect(result.details.snapshot.task_id).toBe("st_named")
     }
   })
+
+  test("#given a persisted_only record #when read in status mode #then the status text states it is suspended", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_susp" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.residency_state).toBe("persisted_only")
+      expect(result.details.snapshot.suspended).toBeDefined()
+    }
+    expect(firstText(result)).toContain("suspended")
+  })
+
+  test("#given an rpc_detached record #when read in status mode #then the status text states it is suspended", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_susp" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.residency_state).toBe("rpc_detached")
+      expect(result.details.snapshot.suspended).toBeDefined()
+    }
+    expect(firstText(result)).toContain("suspended")
+  })
+
+  test("#given a resident record #when read in status mode #then no suspended text appears (regression pin)", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_live", status: "running", residency_state: "resident" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_live" }, "session-parent")
+
+    // then
+    expect(firstText(result)).not.toContain("suspended")
+  })
 })

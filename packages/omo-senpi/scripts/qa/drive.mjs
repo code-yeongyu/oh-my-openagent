@@ -17,7 +17,9 @@ const commentCheckerHeader = "comment-checker found issues in"
 
 // Isolation is proven by these four files staying byte-identical: a live dev machine writes
 // senpi-debug.log, mcp caches, and concurrent session JSONL into the real agent dir throughout any
-// run, so a whole-directory digest can only ever be informational.
+// run, so a whole-directory digest can only ever be informational. settings.json is compared after
+// dropping its volatile interactive-session stamps (tipsHistory, lastChangelogVersion): a concurrent
+// host TUI rewrites those on its own lifecycle events, which cannot identify QA pollution.
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
 
 export function credentialDigest(agentDir) {
@@ -26,10 +28,24 @@ export function credentialDigest(agentDir) {
     const path = join(agentDir, name)
     hash.update(name)
     hash.update("\0")
-    hash.update(existsSync(path) ? readFileSync(path) : Buffer.from("absent"))
+    hash.update(existsSync(path) ? credentialBytes(path, name) : Buffer.from("absent"))
     hash.update("\0")
   }
   return hash.digest("hex")
+}
+
+function credentialBytes(path, name) {
+  const content = readFileSync(path)
+  if (name !== "settings.json") return content
+  try {
+    const settings = JSON.parse(content.toString("utf8"))
+    if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return content
+    delete settings.tipsHistory
+    delete settings.lastChangelogVersion
+    return JSON.stringify(settings)
+  } catch {
+    return content
+  }
 }
 
 export function digestDirectory(root) {
@@ -52,13 +68,15 @@ export function createSandbox() {
   const cwd = join(root, "project")
   const agentDir = join(root, "agent")
   const xdgConfigHome = join(root, "xdg")
+  const homeDir = join(root, "home")
   const canonicalCwd = realpathSync(root)
-  return { root, cwd, agentDir, xdgConfigHome, canonicalCwd: join(canonicalCwd, "project") }
+  return { root, cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd: join(canonicalCwd, "project") }
 }
 
-export function seedSandbox({ cwd, agentDir, xdgConfigHome, canonicalCwd }) {
+export function seedSandbox({ cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd }) {
   mkdirp(cwd)
   mkdirp(agentDir)
+  if (homeDir !== undefined) mkdirp(homeDir)
   // The omo config loader reads the user scope from XDG_CONFIG_HOME; without an isolated one every
   // lane inherits the developer's real ~/.config/omo agents and categories and stops being reproducible.
   if (xdgConfigHome !== undefined) mkdirp(xdgConfigHome)

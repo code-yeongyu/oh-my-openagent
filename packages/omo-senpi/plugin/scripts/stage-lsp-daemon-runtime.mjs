@@ -239,8 +239,14 @@ function toPortablePath(path) {
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     if (process.argv.includes("--check")) {
-      await checkRuntimeDistFresh()
-      console.log(`Senpi LSP runtime is current: ${defaultTargetDist}`)
+      // Fresh-checkout-safe: if the LSP daemon was never built locally (its dist is a gitignored
+      // build output), there is nothing to verify — CI covers the full build in its dedicated job.
+      if (!(await fileExists(defaultSourceDist))) {
+        console.log(`runtime dist not built locally; skipping freshness check: ${defaultSourceDist}`)
+      } else {
+        await checkRuntimeDistFresh()
+        console.log(`Senpi LSP runtime is current: ${defaultTargetDist}`)
+      }
     } else {
       const result = await stageLspDaemonRuntime()
       console.log(`Staged Senpi LSP runtime: ${result.targetDist}`)

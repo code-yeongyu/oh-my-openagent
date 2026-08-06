@@ -2,6 +2,7 @@ import { dirname, posix } from "node:path"
 
 import { isPlainObject } from "../internal/plain-object"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
+import { moveMigrationBackup } from "./backup-move"
 import { prepareTargetReplacement, prepareTargetWrite, targetDocument, writeOmoMigrationTarget, writePreparedTarget } from "./commit"
 import { type MigrationBackupMove, migrationJournalPath, removeMigrationJournal, writeMigrationJournal } from "./journal"
 import { acquireMigrationLock, migrationLockPath } from "./lock"
@@ -160,7 +161,7 @@ function executePlan(input: {
   for (const move of targetRecorded.backupMoves) {
     input.renewLock()
     if (fileSystem.existsSync(move.to)) throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`)
-    fileSystem.renameSync(move.from, move.to)
+    moveMigrationBackup(fileSystem, move.from, move.to)
     input.onBoundary?.("source-moved")
     Object.assign(targetRecorded, { completedMoves: [...targetRecorded.completedMoves, move.from] })
     writeMigrationJournal(targetRecorded, fileSystem, env, input.process, input.clock)
