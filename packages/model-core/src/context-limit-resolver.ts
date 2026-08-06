@@ -28,7 +28,7 @@ function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState):
 
 function hasGA1MContext(modelID: string): boolean {
   const normalizedModelID = modelID.replace(/^(?:[^.]+\.)?anthropic\./, "")
-  return /^claude-(opus|sonnet)-4(?:-|\.)(?:6|7|8)(?:-high)?$/.test(normalizedModelID) ||
+  return /^claude-(opus|sonnet)-4(?:-|\.)(?:6|7|8)(?:-(?:high|fast))?$/.test(normalizedModelID) ||
     /^claude-(?:fable|mythos|sonnet|opus)-5(?:[-.]0|\[1m\])?(?:-high|-fast|@default)?$/.test(normalizedModelID)
 }
 

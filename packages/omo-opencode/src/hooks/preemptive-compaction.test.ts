@@ -797,6 +797,70 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 
+  it("should use the GA 1M limit for a 4-series fast alias", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache: new Map(),
+    })
+    const sessionID = "ses_opus_4_8_fast_ga_1m"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-4-8-fast",
+            finish: true,
+            tokens: {
+              input: 200000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_below_fast_1m_threshold" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-4-8-fast",
+            finish: true,
+            tokens: {
+              input: 790000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_above_fast_1m_threshold" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
   it("should use the GA 1M limit for claude-opus-5 compaction decisions", async () => {
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
       anthropicContext1MEnabled: false,

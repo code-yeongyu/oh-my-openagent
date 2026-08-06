@@ -169,6 +169,24 @@ describe("resolveActualContextLimit", () => {
       anthropicContext1MEnabled: false,
     })).toBe(1_000_000)
   })
+  it("returns GA 1M for 4-series fast aliases", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of [
+      "claude-opus-4-6-fast",
+      "claude-opus-4-7-fast",
+      "claude-opus-4-8-fast",
+      "claude-sonnet-4-6-fast",
+      "claude-sonnet-4-7-fast",
+      "claude-sonnet-4-8-fast",
+    ]) {
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
   it("returns GA 1M for claude-opus-5", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
