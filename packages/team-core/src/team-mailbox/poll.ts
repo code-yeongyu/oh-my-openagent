@@ -1,6 +1,7 @@
 import type { TeamModeConfig } from "../config"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { Message } from "../types"
+import { DEAD_CONSUMER_LEASE_STALE_MS, withInboxConsumerLease } from "./consumer-lease"
 import { listUnreadMessages } from "./inbox"
 
 export interface InjectionResult {
@@ -42,6 +43,18 @@ ${message.body}
 }
 
 export async function pollAndBuildInjection(
+  sessionID: string,
+  memberName: string,
+  teamRunId: string,
+  config: TeamModeConfig,
+  turnMarker: string,
+): Promise<InjectionResult> {
+  return await withInboxConsumerLease(teamRunId, memberName, config, async () => {
+    return await pollAndBuildInjectionUnderLease(sessionID, memberName, teamRunId, config, turnMarker)
+  }, { staleAfterMs: DEAD_CONSUMER_LEASE_STALE_MS })
+}
+
+async function pollAndBuildInjectionUnderLease(
   sessionID: string,
   memberName: string,
   teamRunId: string,
