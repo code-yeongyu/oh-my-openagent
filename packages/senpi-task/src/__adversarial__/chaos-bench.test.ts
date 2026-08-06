@@ -14,11 +14,13 @@ import { deriveSeed, hashSeed } from "./prng"
 //   (3) no concurrency slot leak (all slots released + queue drained when every task is terminal)
 //   (4) no unhandled rejection for the whole run
 //   (5) every waitFor settles and a cancelled-pending task never launches
+//   (6-13) suspend/revive ownership, recovery, epoch, pid, deliberate-stop, cap, reclamation,
+//          and no-terminal-rerun lifecycle laws
 // Rerun a single seed with SEED=<label> bun test src/__adversarial__/chaos-bench.test.ts.
 
 const DEFAULT_SEED = "senpi-task-w1-chaos"
 const ITERATIONS = 200
-const INVARIANT_IDS = [1, 2, 3, 4, 5] as const satisfies readonly InvariantId[]
+const INVARIANT_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const satisfies readonly InvariantId[]
 
 type RejectionRecord = { readonly iteration: number; readonly reason: string }
 
@@ -44,11 +46,11 @@ describe("W1-V chaos bench", () => {
   })
 
   test(
-    "#given 200 randomized event interleavings #when each is driven to quiescence #then all five invariants hold",
+    "#given 200 randomized event interleavings #when each is driven to quiescence #then all thirteen invariants hold",
     async () => {
       // given
       const failures: string[] = []
-      expect(INVARIANT_IDS).toHaveLength(5)
+      expect(INVARIANT_IDS).toHaveLength(13)
       const seamHarness = buildHarness({ concurrency: 1, residencyMax: 1, maxDepth: 1 })
       try {
         expect(seamHarness.retryScheduler.pendingCount).toBe(0)

@@ -235,8 +235,9 @@ library/API/docs/web — delegate to the `librarian` subagent. Spawn them
 # Execution loop (PIN → RED → GREEN → SURFACE → CLEAN)
 Until every success criterion PASSES with its evidence captured:
 1. Pick next criterion → mark in_progress → update notepad `## Now`.
-2. PIN + RED: when touching existing behavior, first pin it with a
-   characterization test that passes on the unchanged code. Then
+2. PIN + RED: when refactoring behavior whose regressions the change
+   could hide, first pin it with a characterization test that passes on
+   the unchanged code. Then
    capture the failing-first proof through the cheapest faithful
    channel — a unit test where a seam exists, an integration/e2e test
    where the behavior lives in wiring, or the criterion's real-surface

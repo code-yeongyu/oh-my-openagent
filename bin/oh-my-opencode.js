@@ -95,9 +95,22 @@ function getWrapperPackageRoot() {
   return fileURLToPath(new URL("..", import.meta.url));
 }
 
+function readInstallerCommand(args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--platform" || arg === "--repo-root") {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    return arg;
+  }
+  return undefined;
+}
+
 function maybeRunLazyCodexNodeInstaller(invocationName) {
   if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false;
-  const command = process.argv[2];
+  const command = readInstallerCommand(process.argv.slice(2));
   if (command !== "update" && command !== "uninstall") return false;
 
   const installerPath = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url));

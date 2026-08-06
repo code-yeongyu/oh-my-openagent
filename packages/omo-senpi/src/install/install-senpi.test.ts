@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, relative, resolve } from "node:path"
 import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
@@ -53,6 +54,18 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
   }
   await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
   if (options.runtime !== false) {
+    const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
+    await chmod(astGrepRuntime, 0o755)
+    const astGrepRuntimeBytes = await readFile(astGrepRuntime)
+    await writeFixtureFile(
+      join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
+      `${JSON.stringify({
+        sha256: createHash("sha256").update(astGrepRuntimeBytes).digest("hex"),
+        mode: 0o755,
+        stagedAtUtc: "2026-08-03T00:00:00.000Z",
+      }, null, 2)}\n`,
+    )
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
@@ -140,6 +153,90 @@ describe("runSenpiInstaller", () => {
     // then
     const settings = await readSettings(agentDir)
     expect(settings.packages).toEqual(["keep-me", pluginPath])
+  })
+
+  test("#given a Windows packed runtime with a POSIX manifest mode #when installing #then matching content passes integrity", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    await chmod(runtimeEntry, 0o700)
+
+    // when
+    const result = await runSenpiInstaller({
+      env: { SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+      platform: "win32",
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(await readSettings(agentDir)).toEqual({ packages: [pluginPath] })
+  })
+
+  test("#given a POSIX packed runtime with a mismatched manifest mode #when installing #then integrity fails", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    await chmod(runtimeEntry, 0o700)
+
+    // when
+    const install = runSenpiInstaller({
+      env: { SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+      platform: "linux",
+    })
+
+    // then
+    await expect(install).rejects.toThrow("mode mismatch: manifest=493 actual=")
+  })
+
+  test("#given packed ast-grep runtime differs from its manifest #when installing #then integrity failure leaves settings unchanged", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    const original = await readFile(runtimeEntry)
+    await writeFixtureFile(
+      join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
+      `${JSON.stringify({
+        sha256: createHash("sha256").update(original).digest("hex"),
+        mode: 0o755,
+        stagedAtUtc: "2026-08-03T00:00:00.000Z",
+      }, null, 2)}\n`,
+    )
+    await writeFile(runtimeEntry, "#!/usr/bin/env node\nthrow new Error('corrupted runtime')\n", "utf8")
+    await chmod(runtimeEntry, 0o755)
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
+  test("#given packed ast-grep runtime missing its manifest #when installing #then integrity failure leaves settings unchanged", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"))
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
   })
 
   test("#given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written", async () => {

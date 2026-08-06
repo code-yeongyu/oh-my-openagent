@@ -5,76 +5,17 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { createUltraworkComponent } from "./index"
 import { FORBIDDEN_DIRECTIVE_TOKENS, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import {
+  dispatchInput,
+  expectAtomicQueuedInjection,
+  expectHiddenInjection,
+  expectNoInjection,
+  markerCount,
+  registerIsolatedUltrawork,
+} from "./ultrawork.test-support"
 
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
-const ULTRAWORK_CUSTOM_TYPE = "omo-ultrawork:directive"
-
-function createTestContext(pi: FakeExtensionAPI): ComponentContext {
-  const logger: ComponentLogger = {
-    info() {},
-    warn() {},
-    error() {},
-  }
-
-  return {
-    logger,
-    config: {
-      getFlag(name) {
-        return pi.getFlag(name)
-      },
-    },
-  }
-}
-
-async function dispatchInput(
-  pi: FakeExtensionAPI,
-  text: unknown,
-  source: unknown = "interactive",
-  streamingBehavior?: unknown,
-): Promise<unknown> {
-  const [result] = await pi.dispatch("input", {
-    type: "input",
-    text,
-    source,
-    ...(streamingBehavior === undefined ? {} : { streamingBehavior }),
-  })
-  return result
-}
-
-/** The directive must ride in as ONE hidden custom message, never as rewritten user text. */
-function expectHiddenInjection(pi: FakeExtensionAPI, result: unknown, expectedDeliverAs?: "steer" | "followUp"): void {
-  expect(result).toEqual({ action: "continue" })
-  expect(pi.messages).toHaveLength(1)
-
-  const [call] = pi.messages
-  expect(call?.message["customType"]).toBe(ULTRAWORK_CUSTOM_TYPE)
-  expect(call?.message["display"]).toBe(false)
-  expect(call?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
-  expect(call?.options?.["deliverAs"]).toBe(expectedDeliverAs)
-}
-
-function expectNoInjection(pi: FakeExtensionAPI, result: unknown): void {
-  expect(result).toEqual({ action: "continue" })
-  expect(pi.messages).toHaveLength(0)
-}
-
-/**
- * A prompt queued mid-stream must carry its directive INSIDE the same message.
- * Senpi drains steering and follow-up queues one message at a time by default, and
- * runs an assistant turn per drained message, so a separate hidden message would
- * burn its own turn before the user's ask ever arrives.
- */
-function expectAtomicQueuedInjection(pi: FakeExtensionAPI, result: unknown, prompt: string): void {
-  expect(result).toEqual({ action: "transform", text: `${prompt}\n${SENPI_ULTRAWORK_DIRECTIVE}` })
-  expect(pi.messages).toHaveLength(0)
-}
-
-function markerCount(text: string): number {
-  return text.match(/<ultrawork-mode>/g)?.length ?? 0
-}
 
 describe("omo-senpi ultrawork component", () => {
   it("#given trigger words #when user input dispatches #then arms via one hidden custom message", async () => {
@@ -83,7 +24,7 @@ describe("omo-senpi ultrawork component", () => {
 
     for (const prompt of prompts) {
       const pi = new FakeExtensionAPI()
-      await createUltraworkComponent().register(pi, createTestContext(pi))
+      await registerIsolatedUltrawork(pi)
 
       // when
       const result = await dispatchInput(pi, prompt)
@@ -96,7 +37,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given a trigger word #when the user text is dispatched #then the typed text is never rewritten", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "ulw fix the login bug"
 
     // when
@@ -110,7 +51,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given an idle session #when a trigger arms #then the injection carries no delivery override", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
 
     // when
     const result = await dispatchInput(pi, "ulw ship it")
@@ -123,7 +64,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given a steer-queued prompt #when a trigger arms #then the directive stays atomic with the prompt", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "ulw redirect this"
 
     // when
@@ -136,7 +77,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given a followUp-queued prompt #when a trigger arms #then the directive stays atomic with the prompt", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "ulw queue this"
 
     // when
@@ -149,7 +90,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given a queued /skill: command #when a trigger arms #then the directive is appended so expansion survives", async () => {
     // given: senpi expands /skill: only while the text still STARTS with the command
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "/skill:frontend ulw 수준으로 다듬어줘"
 
     // when
@@ -157,13 +98,13 @@ describe("omo-senpi ultrawork component", () => {
 
     // then
     expectAtomicQueuedInjection(pi, result, prompt)
-    expect((result as { text: string }).text.startsWith("/skill:frontend")).toBe(true)
+    expect(result.action === "transform" && result.text.startsWith("/skill:frontend")).toBe(true)
   })
 
   it("#given any queued prompt #when a trigger arms #then no hidden message is emitted for it", async () => {
     // given: senpi queues ANY defined streamingBehavior, defaulting to steer
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
 
     // when
     const result = await dispatchInput(pi, "ulw odd payload", "interactive", "bogus")
@@ -176,7 +117,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given non-trigger input #when user input dispatches #then injects nothing", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
 
     // when
     const result = await dispatchInput(pi, "please explain this file")
@@ -188,7 +129,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given recursion guard source extension #when trigger input dispatches #then injects nothing", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
 
     // when
     const result = await dispatchInput(pi, "ultrawork again", "extension")
@@ -201,7 +142,7 @@ describe("omo-senpi ultrawork component", () => {
     // given
     const pi = new FakeExtensionAPI()
     pi.setFlag("omo-senpi-ultrawork-disabled", true)
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
 
     // when
     const result = await dispatchInput(pi, "ulw fix this")
@@ -213,7 +154,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given malformed input #when input dispatches #then no-ops safely", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const malformedInputs: readonly unknown[] = [undefined, null, "", 42, { text: "ulw" }]
 
     // when
@@ -243,7 +184,7 @@ describe("omo-senpi ultrawork component", () => {
 
     for (const prompt of prompts) {
       const pi = new FakeExtensionAPI()
-      await createUltraworkComponent().register(pi, createTestContext(pi))
+      await registerIsolatedUltrawork(pi)
 
       // when
       const result = await dispatchInput(pi, prompt)
@@ -256,7 +197,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given input already carrying an ultrawork block #when trigger word dispatches #then does not reinject", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "이 기록 확인해줘 <ultrawork-mode>\n# Role\n</ultrawork-mode> 그리고 ulw 모드로 부탁해"
 
     // when
@@ -270,7 +211,7 @@ describe("omo-senpi ultrawork component", () => {
     // given: senpi only expands /skill: while the prompt still STARTS with the
     // command, so the hidden-message route must leave the text byte-identical.
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "/skill:frontend ulw 수준으로 다듬어줘"
 
     // when
@@ -283,7 +224,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given a lone open-tag mention without a closing tag #when trigger word dispatches #then still injects", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "Explain what <ultrawork-mode> means, then ulw this fix"
 
     // when
@@ -300,7 +241,7 @@ describe("omo-senpi ultrawork component", () => {
 
     for (const prompt of prompts) {
       const pi = new FakeExtensionAPI()
-      await createUltraworkComponent().register(pi, createTestContext(pi))
+      await registerIsolatedUltrawork(pi)
 
       // when
       const result = await dispatchInput(pi, prompt)
@@ -313,7 +254,7 @@ describe("omo-senpi ultrawork component", () => {
   it("#given /skill: command whose trigger appears only in the skill name #when dispatched #then injects nothing", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await createUltraworkComponent().register(pi, createTestContext(pi))
+    await registerIsolatedUltrawork(pi)
     const prompt = "/skill:myulw run it"
 
     // when
@@ -329,7 +270,7 @@ describe("omo-senpi ultrawork component", () => {
 
     for (const prompt of armingPrompts) {
       const pi = new FakeExtensionAPI()
-      await createUltraworkComponent().register(pi, createTestContext(pi))
+      await registerIsolatedUltrawork(pi)
 
       // when
       const result = await dispatchInput(pi, prompt)
@@ -354,7 +295,6 @@ describe("omo-senpi ultrawork component", () => {
     expect(description).not.toContain("short bootstrap")
     expect(description).not.toContain("Read the whole file")
   })
-
 
   it("#given embedded directive #when inspected #then contains zero forbidden non-senpi tokens", () => {
     // then

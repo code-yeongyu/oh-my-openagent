@@ -1,13 +1,17 @@
-export { RESIDENCY_STATES, RESOLVED_MODEL_SOURCES, TASK_STATUSES } from "./types"
+export { isSpawnSpecV1, RESIDENCY_STATES, RESOLVED_MODEL_SOURCES, TASK_STATUSES } from "./types"
 export type {
+  LegacyProcessSpawnSpec,
   Messageability,
+  PendingSteeringEntry,
   ResidencyState,
   ResolvedModelRecord,
   ResolvedModelSource,
+  SpawnSpecV1,
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
+  TaskSpawnSpec,
   TaskStatus,
   TaskTransition,
   TaskTransitionAudit,

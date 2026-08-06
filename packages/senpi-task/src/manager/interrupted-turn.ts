@@ -1,24 +1,48 @@
-import { readFile } from "node:fs/promises"
+import { open } from "node:fs/promises"
 
-const SESSION_TAIL_BYTES = 64 * 1024
+const INITIAL_TAIL_BYTES = 64 * 1024
 
 export async function sessionTailNeedsContinuation(sessionPath: string): Promise<boolean> {
   try {
-    const text = await readTail(sessionPath)
-    const lastMessage = lastSessionMessage(text)
-    if (lastMessage === undefined) return false
-    if (lastMessage.message.role === "user" || lastMessage.message.role === "toolResult") return true
-    if (lastMessage.message.role !== "assistant" || !Array.isArray(lastMessage.message.content)) return false
-    return lastMessage.message.content.some((part) => isRecord(part) && part.type === "toolCall")
+    const line = await readLastJsonlLine(sessionPath)
+    if (line === undefined) return false
+    const parsed = JSON.parse(line) as unknown
+    if (!isSessionMessageEntry(parsed)) return false
+    const message = parsed.message
+    if (message.role === "user" || message.role === "toolResult") return true
+    if (message.role !== "assistant") return false
+    if (message.stopReason === "aborted") return true
+    if (!Array.isArray(message.content)) return false
+    return message.content.some((part) => isRecord(part) && part.type === "toolCall")
   } catch {
     return false
   }
 }
 
-async function readTail(sessionPath: string): Promise<string> {
-  const file = await readFile(sessionPath)
-  if (file.byteLength <= SESSION_TAIL_BYTES) return file.toString("utf8")
-  return file.subarray(file.byteLength - SESSION_TAIL_BYTES).toString("utf8")
+// Read the ACTUAL final non-empty JSONL record. Start with the normal 64 KiB tail, but if that
+// window begins in the middle of an oversized final line, grow backwards until its delimiter (or
+// the start of file) is included. Never skip a malformed final record and reinterpret an earlier
+// user message as unanswered.
+async function readLastJsonlLine(sessionPath: string): Promise<string | undefined> {
+  const file = await open(sessionPath, "r")
+  try {
+    const size = (await file.stat()).size
+    if (size === 0) return undefined
+    let bytes = Math.min(size, INITIAL_TAIL_BYTES)
+    for (;;) {
+      const start = size - bytes
+      const buffer = Buffer.allocUnsafe(bytes)
+      const { bytesRead } = await file.read(buffer, 0, bytes, start)
+      const text = buffer.subarray(0, bytesRead).toString("utf8").replace(/[\r\n]+$/, "")
+      if (text.length === 0) return undefined
+      const delimiter = text.lastIndexOf("\n")
+      if (delimiter >= 0) return text.slice(delimiter + 1).trim() || undefined
+      if (start === 0) return text.trim() || undefined
+      bytes = Math.min(size, bytes * 2)
+    }
+  } finally {
+    await file.close()
+  }
 }
 
 type SessionMessageEntry = {
@@ -26,24 +50,8 @@ type SessionMessageEntry = {
   readonly message: {
     readonly role?: string
     readonly content?: readonly unknown[]
+    readonly stopReason?: string
   }
-}
-
-function lastSessionMessage(text: string): SessionMessageEntry | undefined {
-  const lines = text.split("\n")
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index].trim()
-    if (line.length === 0) continue
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(line) as unknown
-    } catch {
-      continue
-    }
-    if (!isSessionMessageEntry(parsed)) continue
-    return parsed
-  }
-  return undefined
 }
 
 function isSessionMessageEntry(value: unknown): value is SessionMessageEntry {

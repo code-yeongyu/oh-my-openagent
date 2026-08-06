@@ -262,6 +262,7 @@ Task engine settings; every field has a default, so the whole object is optional
 | `residency_max_children` | positive int | `8` |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (defaults to `<project>/.omo/senpi-task`) |
+| `resume_children` | boolean | `true` |
 | `wait.min_ms` | positive int | `5000` |
 | `wait.default_ms` | positive int | `60000` |
 | `wait.max_ms` | positive int | `600000` |

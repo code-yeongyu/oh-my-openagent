@@ -1,0 +1,37 @@
+Task 13 evidence - scoped session-resume revival with ownership CAS and deferred outcomes
+Date: 2026-08-04
+Worktree: /Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival
+
+RED
+- Baseline: `bun test packages/senpi-task/src/lifecycle/reconcile.test.ts`
+- Result before implementation: 16 pass, 9 fail. The failures were the todo-12 guarded reattach cases whose records had not yet been ownership-claimed.
+- Added `reconcile-revival.test.ts`; initial run: 2 pass, 13 fail, confirming scoped suspended revival, rollback, no-rerun, capacity, and deferral behavior were absent.
+
+GREEN
+- `bun test packages/senpi-task/src/lifecycle`
+  - 100 pass, 0 fail, 408 expect() calls.
+  - Includes admission lease tests, same-process reclaim, full-cap reclaim, killed normalization, pending fresh launch with durable steering drain, retryable rollback, lock contention, capacity overflow, legacy other-session global reattach, and the real two-OS-process orphan CAS race.
+- `bun test packages/senpi-task`
+  - 1292 pass, 0 fail, 1 snapshot, 4064 expect() calls across 189 files.
+  - Includes the package adversarial/chaos coverage.
+- `./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json`
+  - Clean (no output, exit 0).
+- `git diff --check`
+  - Clean.
+- Build: N/A; packages/senpi-task has no build script. Its package typecheck above is the runnable compile validator.
+
+QA - happy
+- Test: `#given one in-process and one rpc child of this session plus another-session child #when reconciled #then only this session revives end to end`.
+- Store-level result: exactly one in-process and one fake RPC child for `session-resumed` were claimed resident and respawned; the suspended child belonging to `session-other` remained persisted_only and was never launched.
+
+QA - failure / CAS race
+- In-process admission race test: two lifecycle managers over one store observed one suspended child; exactly one launched, the loser returned deferred/foreign_live_owner, and persisted ownership remained with the winner.
+- Authoritative OS-process reclamation race: two `Bun.spawn` workers shared one store and synchronously captured the same dead-owner resident before release. Exactly one expected-owner CAS launched (`race-launches.log` had one line); the loser returned deferred/foreign_live_owner. Both workers exited 0.
+- Retryable rollback test: model_unavailable returned the record to persisted_only, removed host_pid, and emitted deferred/model_unavailable.
+
+Adversarial probes
+- concurrency: PASS - admission lease, per-record lock throw continuation, same-process in-flight claim, and real two-process expected-owner CAS.
+- cancel_resume: PASS - cancelled and killed suspended records never launch; a post-claim non-revivable re-read rolls ownership back before I/O.
+- stale_state: PASS - legacy other-session process orphan still globally reattaches; lost/cancelled/killed residents normalize without revival.
+- malformed_input: PASS - no transcript + v1 spec fresh-launches only non-terminal work; no transcript + no v1 spec loses non-terminal records; terminal records preserve result and dispose without rerun.
+- Remaining adversarial categories: N/A to reconciliation policy.

@@ -1,0 +1,17 @@
+Changed-file diagnostics:
+  packages/senpi-task/src/tools/run-stats-format.ts: no diagnostics
+  packages/senpi-task/src/tools/task/renderers-run-stats.test.ts: no diagnostics
+
+Commands:
+  bun test packages/senpi-task
+  tsgo --noEmit -p packages/senpi-task/tsconfig.json
+  node packages/omo-senpi/plugin/scripts/build-extension.mjs
+  node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+
+Observed:
+  All commands exited 0.
+  After installing worktree-local dependencies, the generated Senpi extension was refreshed and its `--check` verification exited 0.
+  The committed implementation consists of the formatter, focused test, and required generated Senpi bundle.
+
+Environment note:
+  The first pre-PR build ran without worktree-local node_modules, so Bun resolved workspace dependencies from the shared checkout and incorrectly produced no generated diff. CI caught the stale bundle. See `ci-remediation.txt` for the corrected build and verification.

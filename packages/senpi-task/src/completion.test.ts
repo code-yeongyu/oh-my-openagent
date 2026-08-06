@@ -11,6 +11,7 @@ function completedFallbackRecord() {
     depth: 1,
     execution_mode: "in-process",
     model: "vendor-b/fallback-model",
+    notify_on_terminal: false,
     requested_model: {
       source: "category",
       provider: "vendor-a",

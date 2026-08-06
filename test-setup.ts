@@ -56,6 +56,7 @@ ensureVendoredLspDaemonBuilt()
 const HERMETIC_HOME = mkdtempSync(join(tmpdir(), "omo-test-home-"))
 process.env.HOME = HERMETIC_HOME
 process.env.USERPROFILE = HERMETIC_HOME
+delete process.env.OPENCODE_SERVER_PASSWORD
 
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {

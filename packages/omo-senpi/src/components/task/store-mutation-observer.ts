@@ -31,5 +31,15 @@ export function createMutationNotifyingStore(backing: TaskRecordStore, onMutatio
       onMutation()
       return result
     },
+    tombstoneIfExpired: (taskId, shouldRetain) => {
+      const result = backing.tombstoneIfExpired(taskId, shouldRetain)
+      if (result.kind === "tombstoned") onMutation()
+      return result
+    },
+    completeExpunge: (taskId) => {
+      backing.completeExpunge(taskId)
+      onMutation()
+    },
+    listExpunging: () => backing.listExpunging(),
   }
 }
