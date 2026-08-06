@@ -91,6 +91,10 @@ class HangingInitLspClient extends LspClient {
 }
 
 class HealthyLspClient extends LspClient {
+	constructor(resolvedServer: ResolvedServer) {
+		super("/workspace", resolvedServer);
+	}
+
 	override async start(): Promise<void> {}
 	override async initialize(): Promise<void> {}
 	override async stop(): Promise<void> {}

@@ -693,6 +693,11 @@ and reads the server map from that file. The schema lives in the
 `packages/lsp-tools-mcp` vendored package (upstream:
 [code-yeongyu/lsp-tools-mcp](https://github.com/code-yeongyu/lsp-tools-mcp)).
 
+A language server that spawns but then hangs on `initialize` or fails
+asynchronously right after spawn is bounded by `OMO_LSP_START_TIMEOUT_MS`
+(default `10000`; see [Environment Variables](#environment-variables)) rather
+than stalling for the 60s init ceiling.
+
 To disable the LSP MCP entirely:
 
 ```json
@@ -1107,6 +1112,7 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `LAZYCODEX_CONFIG_MIGRATION_DISABLED` | Set to `1` to skip the Codex config migration that runs on every session start (including the `multi_agent_v2` force-disable and managed reasoning-profile sync), leaving `config.toml` untouched |
 | `OMO_CODEX_CONFIG_MIGRATION_DISABLED` | Alias of `LAZYCODEX_CONFIG_MIGRATION_DISABLED` |
 | `LSP_TOOLS_MCP_INSTALL_DECISIONS` | Override the path of the LSP install-decisions file (default `~/.codex/lsp-install-decisions.json`) |
+| `OMO_LSP_START_TIMEOUT_MS` | Timeout in milliseconds bounding a language server's `start()` + `initialize()`. A server that spawns but hangs or crashes asynchronously fails after this bound instead of stalling for the 60s init ceiling. Defaults to `10000` (10s); empty, non-numeric, zero, or negative values fall back to `10000` |
 | `POSTHOG_API_KEY` | Optional override for the built-in PostHog project API key |
 | `POSTHOG_HOST` | Override the PostHog ingestion host. Defaults to `https://us.i.posthog.com` |
 
