@@ -474,6 +474,42 @@ describe("applyAgentConfig builtin override protection", () => {
     expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.4", false)
   })
 
+  test("registers the fixed AgentControl worker preset in worker processes", async () => {
+    // given
+    const originalRole = process.env.AGENT_CONTROL_ROLE
+    const originalName = process.env.AGENT_CONTROL_NAME
+    const originalReportPath = process.env.AGENT_CONTROL_REPORT_PATH
+    const originalKind = process.env.AGENT_CONTROL_KIND
+    process.env.AGENT_CONTROL_ROLE = "worker"
+    process.env.AGENT_CONTROL_KIND = "execute"
+    process.env.AGENT_CONTROL_NAME = "worker-a"
+    process.env.AGENT_CONTROL_REPORT_PATH = "/tmp/worker-a.md"
+
+    try {
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig: createPluginConfig(),
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["agentcontrol-execute"]).toMatchObject({ mode: "all" })
+      const prompt = result["agentcontrol-execute"]?.prompt
+      expect(typeof prompt === "string" && prompt.includes("<agentcontrol-worker-contract>")).toBe(true)
+    } finally {
+      if (originalRole === undefined) delete process.env.AGENT_CONTROL_ROLE
+      else process.env.AGENT_CONTROL_ROLE = originalRole
+      if (originalName === undefined) delete process.env.AGENT_CONTROL_NAME
+      else process.env.AGENT_CONTROL_NAME = originalName
+      if (originalReportPath === undefined) delete process.env.AGENT_CONTROL_REPORT_PATH
+      else process.env.AGENT_CONTROL_REPORT_PATH = originalReportPath
+      if (originalKind === undefined) delete process.env.AGENT_CONTROL_KIND
+      else process.env.AGENT_CONTROL_KIND = originalKind
+    }
+  })
+
   test("defaults mode to subagent for configAgent entries missing mode", async () => {
     // given
     const config = createBaseConfig()

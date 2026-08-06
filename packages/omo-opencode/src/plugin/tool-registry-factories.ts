@@ -15,6 +15,7 @@ import {
 } from "../features/team-mode/tools/tasks"
 import {
   createBackgroundTools,
+  createAgentControlTools,
   createCallOmoAgent,
   createDelegateTask,
   createGlobTools,
@@ -35,6 +36,7 @@ import {
 
 export type ToolRegistryFactories = {
   createBackgroundTools: typeof createBackgroundTools
+  createAgentControlTools: typeof createAgentControlTools
   createCallOmoAgent: typeof createCallOmoAgent
   createLookAt: typeof createLookAt
   createMonitorTools: typeof createMonitorTools
@@ -67,6 +69,7 @@ export type ToolRegistryFactories = {
 
 export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createBackgroundTools,
+  createAgentControlTools,
   createCallOmoAgent,
   createLookAt,
   createMonitorTools,

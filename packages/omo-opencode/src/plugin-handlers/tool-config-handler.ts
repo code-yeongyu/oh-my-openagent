@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
+import { getSelectedAgentControlDefinition } from "../tools/agentcontrol/agent-definitions";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
@@ -85,6 +86,53 @@ export function applyToolConfig(params: {
 
   for (const agentKey of TASK_DENIED_SUBAGENT_KEYS) {
     denyTaskForAgent(params.agentResult, agentKey, params.pluginConfig);
+  }
+
+  if (process.env.AGENT_CONTROL_ROLE === "worker") {
+    const selected = getSelectedAgentControlDefinition();
+    const worker = selected
+      ? agentByKey(params.agentResult, selected.preset, params.pluginConfig)
+      : undefined;
+    if (worker) {
+      const readOnly = selected?.kind === "explore" || selected?.kind === "plan" || selected?.kind === "research";
+      const localSearchDenied = selected?.kind === "research";
+      const webDenied = selected?.kind === "explore" || selected?.kind === "plan";
+      worker.permission = {
+        ...worker.permission,
+        Report: "allow",
+        Execute: "deny",
+        Explore: "deny",
+        Plan: "deny",
+        Research: "deny",
+        Dispatch: "deny",
+        Send: "deny",
+        List: "deny",
+        Collect: "deny",
+        Peek: "deny",
+        Cancel: "deny",
+        agentcontrol: "deny",
+        call_omo_agent: "deny",
+        task: "deny",
+        "task_*": "deny",
+        teammate: "deny",
+        ...(readOnly ? {
+          write: "deny",
+          edit: "deny",
+          apply_patch: "deny",
+          bash: "deny",
+          interactive_bash: "deny",
+        } : {}),
+        ...(localSearchDenied ? {
+          grep: "deny",
+          glob: "deny",
+          "lsp_*": "deny",
+        } : {}),
+        ...(webDenied ? {
+          webfetch: "deny",
+          websearch: "deny",
+        } : {}),
+      };
+    }
   }
 
   const librarian = agentByKey(params.agentResult, "librarian", params.pluginConfig);

@@ -3,6 +3,7 @@ import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import { isTaskSystemEnabled } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { assembleAgentConfig } from "./agent-config-assembly";
+import { getSelectedAgentControlDefinition } from "../tools/agentcontrol/agent-definitions";
 import { finalizeAgentConfig } from "./agent-config-finalizer";
 import { discoverAgentSkills } from "./agent-skill-discovery";
 import { loadAgentSources } from "./agent-source-loader";
@@ -38,6 +39,10 @@ export async function applyAgentConfig(
     disableOmoEnv,
     params.pluginConfig.team_mode?.enabled ?? false,
   );
+  if (process.env.AGENT_CONTROL_ROLE === "worker") {
+    const selected = getSelectedAgentControlDefinition();
+    if (selected) builtinAgents[selected.preset] = { ...selected.config };
+  }
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase()),
   );

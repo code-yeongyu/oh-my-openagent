@@ -45,6 +45,8 @@
   "files": [
     "THIRD-PARTY-NOTICES.md",
     "dist",
+    "tools/agent_control",
+    "scripts/agent-control-mcp",
     "bin",
     "postinstall.mjs",
     "script/qa/strip-ansi.mjs",

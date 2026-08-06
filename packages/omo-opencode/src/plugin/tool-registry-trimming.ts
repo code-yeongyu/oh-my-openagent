@@ -10,6 +10,14 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "interactive_bash",
   "look_at",
   "call_omo_agent",
+  "Execute",
+  "Explore",
+  "Plan",
+  "Research",
+  "Send",
+  "List",
+  "Peek",
+  "Cancel",
   "task_create",
   "task_get",
   "task_list",
@@ -50,6 +58,11 @@ export function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): vo
     delete filteredTools[toolName]
     currentCount -= 1
     removed += 1
+  }
+
+  if ((filteredTools.Dispatch === undefined) !== (filteredTools.Collect === undefined)) {
+    delete filteredTools.Dispatch
+    delete filteredTools.Collect
   }
 
   log(

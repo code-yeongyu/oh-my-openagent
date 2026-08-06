@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PROJECT_ROOT="${AGENT_CONTROL_PROJECT_ROOT:-$(realpath "$(dirname "$0")/..")}"
+export PYTHONDONTWRITEBYTECODE=1
+exec python -m tools.agent_control.mcp_server --project "$PROJECT_ROOT"

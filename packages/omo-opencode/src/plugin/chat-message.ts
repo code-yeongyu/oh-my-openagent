@@ -3,6 +3,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import { updateSessionAgent } from "../features/claude-code-session-state"
 import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-command/detector"
 import { isSyntheticOrInternalOnlyTextParts, log } from "../shared"
+import { clearAgentControlAgentFromReport } from "../tools/agentcontrol/wait-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
@@ -100,7 +101,9 @@ export function createChatMessageHandler(args: {
       updateSessionAgent(input.sessionID, input.agent)
     }
 
-    const slashCommand = detectSlashCommand(extractPromptText(output.parts))
+    const promptText = extractPromptText(output.parts)
+    clearAgentControlAgentFromReport(input.sessionID, promptText)
+    const slashCommand = detectSlashCommand(promptText)
     if (slashCommand?.command === "stop-continuation") {
       stopContinuation({
         directory: ctx.directory,

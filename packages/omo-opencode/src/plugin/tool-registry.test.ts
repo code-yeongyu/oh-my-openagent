@@ -113,6 +113,20 @@ describe("#given tool trimming prioritization", () => {
     expect(filteredTools).toHaveProperty("bash")
     expect(filteredTools).toHaveProperty("read")
   })
+
+  test("#when a cap would retain only half of Dispatch and Collect #then the workflow capability is removed together", () => {
+    const filteredTools = {
+      Dispatch: fakeTool,
+      Collect: fakeTool,
+      read: fakeTool,
+    } satisfies ToolsRecord
+
+    trimToolsToCap(filteredTools, 2)
+
+    expect(filteredTools.Dispatch).toBeUndefined()
+    expect(filteredTools.Collect).toBeUndefined()
+    expect(filteredTools.read).toBeDefined()
+  })
 })
 
 describe("#given task_system configuration", () => {

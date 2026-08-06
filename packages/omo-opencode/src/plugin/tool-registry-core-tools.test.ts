@@ -17,6 +17,7 @@ const fakeTool = tool({
 function createFactories(createSkillTool: (options: SkillLoadOptions) => typeof fakeTool): ToolRegistryFactories {
   return {
     createBackgroundTools: () => ({}),
+    createAgentControlTools: () => ({ Execute: fakeTool, Dispatch: fakeTool, Collect: fakeTool }),
     createCallOmoAgent: () => fakeTool,
     createLookAt: () => fakeTool,
     createMonitorTools: () => ({}),
@@ -124,5 +125,33 @@ describe("#given core skill tools are registered", () => {
     expect(typeof skillResolver).toBe("function")
     expect(createDelegateTask.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
     expect(createSkillMcpTool.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
+  })
+})
+
+describe("#given AgentControl direct actions are enabled", () => {
+  test("#when core tools are created #then direct action names are registered without the facade", () => {
+    const tools = createCoreTools({
+      ctx: unsafeTestValue({ directory: "/tmp/project", client: {} }),
+      pluginConfig: unsafeTestValue({ disabled_agents: ["multimodal-looker"] }),
+      managers: unsafeTestValue({
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+        modelFallbackControllerAccessor: {},
+      }),
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      factories: createFactories(() => fakeTool),
+    })
+
+    expect(tools.Execute).toBeDefined()
+    expect(tools.Dispatch).toBeDefined()
+    expect(tools.Collect).toBeDefined()
+    expect(tools.agentcontrol).toBeUndefined()
   })
 })

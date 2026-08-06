@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { spawn, spawnSync } from "node:child_process";
+import { cp, rm } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -74,6 +75,17 @@ async function run() {
 	await materializeOnce();
 	const childEnv = { ...process.env, OMO_SKIP_MATERIALIZE: "1" };
 	await runGraph(nodes, childEnv);
+	const agentControlSource = fileURLToPath(new URL("../tools/agent_control", import.meta.url));
+	const agentControlDist = fileURLToPath(new URL("../dist/tools/agent_control", import.meta.url));
+	await rm(agentControlDist, { recursive: true, force: true });
+	await cp(
+		agentControlSource,
+		agentControlDist,
+		{
+			recursive: true,
+			filter: (source) => !source.includes("__pycache__") && !source.endsWith(".pyc"),
+		},
+	);
 	process.stdout.write("build: all steps completed\n");
 }
 

@@ -7,11 +7,12 @@ import { stopContinuation } from "./stop-continuation"
 
 import type { CreatedHooks } from "../create-hooks"
 import type { BackgroundManager } from "../features/background-agent"
+import { hasPendingAgentControlWait } from "../tools/agentcontrol/wait-state"
 
 const BACKGROUND_WAIT_BLOCK_MESSAGE = [
-  "Background task wait is already managed by the plugin.",
-  "End this response now and wait for the <system-reminder> completion notification.",
-  "After that reminder arrives, call background_output with the task_id from the launch result.",
+  "Asynchronous worker waiting is already managed by the plugin.",
+  "End this response now and wait for the pushed completion event.",
+  "For background tasks use background_output only after <system-reminder>; for AgentControl collect only a dispatch group after its wake event.",
 ].join(" ")
 
 function isPureSleepCommand(command: string): boolean {
@@ -62,6 +63,7 @@ export function createToolExecuteBeforeHandler(args: {
         && (
           backgroundManager?.hasActiveChildTasks(input.sessionID) === true
           || backgroundManager?.hasPendingParentWake(input.sessionID) === true
+          || hasPendingAgentControlWait(input.sessionID)
         )
       ) {
         throw new Error(BACKGROUND_WAIT_BLOCK_MESSAGE)

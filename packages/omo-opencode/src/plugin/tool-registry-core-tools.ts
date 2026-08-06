@@ -26,6 +26,7 @@ export function createCoreTools(args: {
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
+  const agentControlTools = factories.createAgentControlTools(ctx)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
     managers.backgroundManager,
@@ -128,6 +129,7 @@ export function createCoreTools(args: {
     ...factories.createGlobTools(ctx),
     ...factories.createSessionManagerTools(ctx),
     ...backgroundTools,
+    ...agentControlTools,
     call_omo_agent: callOmoAgent,
   }
   if (isMultimodalLookerEnabled) {
