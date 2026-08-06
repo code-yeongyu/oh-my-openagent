@@ -1,0 +1,6 @@
+command: HOME=<isolated-temp-home> bun test
+bun: 1.3.13-canary.1 (bf2e2cec)
+exit: 139
+observed test failures before crash: none after the focused AgentControl fixture was corrected
+terminal error: panic: Segmentation fault at address 0xC41EFC
+CI runtime noted by repository: Bun 1.3.12

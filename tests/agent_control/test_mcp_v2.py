@@ -69,12 +69,14 @@ def test_role_tool_visibility(project, monkeypatch):
     ]
     execute = next(tool for tool in tools if tool["name"] == "Execute")
     assert set(execute["inputSchema"]["properties"]) == {
-        "name", "prompt", "isolation", "base", "target",
+        "name", "prompt", "handoff", "isolation", "base", "target",
     }
+    assert set(execute["inputSchema"]["required"]) == {"name", "prompt", "handoff"}
     dispatch = next(tool for tool in tools if tool["name"] == "Dispatch")
     assert set(dispatch["inputSchema"]["properties"]) == {
-        "template", "items", "group", "isolation", "base",
+        "template", "items", "group", "handoff", "isolation", "base",
     }
+    assert set(dispatch["inputSchema"]["required"]) == {"template", "items", "group", "handoff"}
     assert "개입 채널(send)이 없는" in dispatch["description"]
     assert "not completed" in execute["description"]
     send = next(tool for tool in tools if tool["name"] == "Send")

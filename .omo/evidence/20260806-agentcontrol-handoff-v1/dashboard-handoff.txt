@@ -1,0 +1,50 @@
+┌ HANDOFF alpha ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ id qa-dispatch-v1 · VERIFIED · sha256 67eba523e8fb3b6720b11f54b7fc3805e50f2b97c0d01bfebe87cd3ee5c4bf87                                   │
+│ path /home/lucy/workspace/agentcontrol-worktrees/handoff-v1/.omo/evidence/20260806-agentcontrol-handoff-v1/dispatch-handoff.md           │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ---                                                                                                                                      │
+│ schema: agentcontrol-handoff/v1                                                                                                          │
+│ id: qa-dispatch-v1                                                                                                                       │
+│ action: dispatch                                                                                                                         │
+│ projectRoot: .                                                                                                                           │
+│ sourceRevision: qa-fixture                                                                                                               │
+│ status: ready                                                                                                                            │
+│ ---                                                                                                                                      │
+│                                                                                                                                          │
+│ ## Goal                                                                                                                                  │
+│ Confirm a real Dispatch launch shares validated handoff metadata.                                                                        │
+│                                                                                                                                          │
+│ ## Done when                                                                                                                             │
+│ The workflow worker reaches the ledger with the expected handoff metadata.                                                               │
+│                                                                                                                                          │
+│ ## Workspace                                                                                                                             │
+│ Use the current AgentControl worktree.                                                                                                   │
+│                                                                                                                                          │
+│ ## Scope                                                                                                                                 │
+│ Process the supplied synthetic item only.                                                                                                │
+│                                                                                                                                          │
+│ ## Source map                                                                                                                            │
+│ The Dispatch item is the only source.                                                                                                    │
+│                                                                                                                                          │
+│ ## Claims and decisions                                                                                                                  │
+│ Revalidate the supplied item before reporting.                                                                                           │
+│                                                                                                                                          │
+│ ## Acceptance atoms                                                                                                                      │
+│ Report the exact item.                                                                                                                   │
+│                                                                                                                                          │
+│ ## Verification                                                                                                                          │
+│ Compare the reported item with the input.                                                                                                │
+│                                                                                                                                          │
+│ ## Deliverable                                                                                                                           │
+│ One concise Report summary.                                                                                                              │
+│                                                                                                                                          │
+│ ## Mutation boundary                                                                                                                     │
+│ Do not modify project files.                                                                                                             │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│ ↑↓ scroll · PgUp/PgDn · Esc/H back                                                                                                1-38/38│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

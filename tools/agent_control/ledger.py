@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS workers (
     base_ref TEXT,
     prompt_source TEXT,
     prompt_text TEXT,
+    handoff_id TEXT,
+    handoff_path TEXT,
+    handoff_sha256 TEXT,
     status TEXT NOT NULL DEFAULT 'starting',
     missing_since REAL,
     spawned_at REAL NOT NULL,
@@ -89,6 +92,9 @@ _WORKER_COLUMN_UPGRADES = {
     "agent": "TEXT",
     "prompt_source": "TEXT",
     "prompt_text": "TEXT",
+    "handoff_id": "TEXT",
+    "handoff_path": "TEXT",
+    "handoff_sha256": "TEXT",
 }
 
 
@@ -129,6 +135,9 @@ def add_worker(
     isolation: str | None = None,
     base_ref: str | None = None,
     agent: str | None = None,
+    handoff_id: str | None = None,
+    handoff_path: str | None = None,
+    handoff_sha256: str | None = None,
 ) -> int:
     # 중복 검사와 삽입을 같은 쓰기 트랜잭션으로 묶는다 — 병렬 spawn(스레드화된
     # tools/call)의 check-then-act race를 SQLite write lock으로 직렬화한다.
@@ -153,10 +162,10 @@ def add_worker(
     )
     cursor = conn.execute(
         "INSERT INTO workers (name, owner, group_name, model, cwd, oneshot, mode,"
-        " status, isolation, base_ref, agent, spawned_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " status, isolation, base_ref, agent, handoff_id, handoff_path, handoff_sha256, spawned_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (name, owner, group, model, cwd, 1 if oneshot else 0, mode,
-         status, isolation, base_ref, agent, time.time()),
+         status, isolation, base_ref, agent, handoff_id, handoff_path, handoff_sha256, time.time()),
     )
     return int(cursor.lastrowid)
 

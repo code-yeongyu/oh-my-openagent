@@ -57,6 +57,7 @@ function createAgentAction(
   const args = {
     name: tool.schema.string(),
     prompt: tool.schema.string(),
+    handoff: tool.schema.string().min(1).describe("Project-local agentcontrol-handoff/v1 Markdown path"),
     target: tool.schema.string().optional(),
     ...(action === "Execute" ? {
       isolation: tool.schema.literal("worktree").optional(),
@@ -67,7 +68,7 @@ function createAgentAction(
     } : {}),
   }
   return tool({
-    description: `${description} Launch is asynchronous; its Report arrives directly. Do not Collect, poll, or Cancel after completion; final Agents expire automatically after five idle minutes.`,
+    description: `${description} Requires a validated project-local handoff document. Launch is asynchronous; its Report arrives directly. Do not Collect, poll, or Cancel after completion; final Agents expire automatically after five idle minutes.`,
     args,
     async execute(input, context): Promise<string> {
       const output = await call(action, input, context)
@@ -107,11 +108,12 @@ export function createAgentControlTools(
     Plan: createAgentAction("Plan", "Plan the smallest implementation grounded in inspected local code read-only.", call),
     Research: createAgentAction("Research", "Research current external contracts from authoritative sources read-only.", call),
     Dispatch: tool({
-      description: "Fan one {item} workflow contract over a grouped paneless queue. Wait for a real group wake, then Collect once.",
+      description: "Fan one {item} workflow contract over a grouped paneless queue sharing one validated handoff. Wait for a real group wake, then Collect once.",
       args: {
         template: tool.schema.string(),
         items: tool.schema.array(tool.schema.string()).min(1).max(1000),
         group: tool.schema.string().min(1).max(64),
+        handoff: tool.schema.string().min(1).describe("Project-local agentcontrol-handoff/v1 Markdown path"),
         isolation: tool.schema.literal("worktree").optional(),
         base: tool.schema.string().optional(),
       },

@@ -21,6 +21,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from . import handoff as handoff_contract
 from . import herdr, ledger
 
 SERVER_VERSION = "3.0.0"
@@ -302,6 +303,8 @@ def _agent_action_tool(action: str) -> dict[str, Any]:
                  "description": "persistent Agent identity"},
         "prompt": {"type": "string", "minLength": 1,
                    "description": "task only; lifecycle instructions are injected by the runtime"},
+        "handoff": {"type": "string", "minLength": 1,
+                    "description": "project-local agentcontrol-handoff/v1 Markdown path"},
         "target": {"type": "string",
                    "description": "optional AgentControl parent Agent that receives reports"},
     }
@@ -327,7 +330,7 @@ def _agent_action_tool(action: str) -> dict[str, Any]:
         "inputSchema": {
             "type": "object",
             "properties": properties,
-            "required": ["name", "prompt"],
+            "required": ["name", "prompt", "handoff"],
             "additionalProperties": False,
         },
         "annotations": {"readOnlyHint": False, "idempotentHint": False},
@@ -356,12 +359,14 @@ LEADER_TOOLS: list[dict[str, Any]] = [
                           "description": "처리할 항목들. worker 이름은 항목에서 자동 생성된다"},
                 "group": {"type": "string", "minLength": 1, "maxLength": 64,
                           "description": "필수 workflow 그룹. 그룹당 monitor와 completion wake가 하나씩 생성된다"},
+                "handoff": {"type": "string", "minLength": 1,
+                            "description": "모든 item worker가 공유할 project-local agentcontrol-handoff/v1 Markdown 경로"},
                 "isolation": {"type": "string", "enum": ["worktree"],
                               "description": "선택하면 각 worker가 격리된 git worktree에서 작업한다. branch 분리가 필요할 때만 사용한다"},
                 "base": {"type": "string",
                          "description": "worktree branch의 시작 ref. 생략 시 현재 HEAD"},
             },
-            "required": ["template", "items", "group"],
+            "required": ["template", "items", "group", "handoff"],
             "additionalProperties": False,
         },
         "annotations": {"readOnlyHint": False, "idempotentHint": False},
@@ -545,12 +550,18 @@ class MCPServer:
             return {"status": "REJECTED", "error": "TOOL_FORBIDDEN_FOR_ROLE", "role": self.role}
         try:
             if name in ACTION_KINDS:
+                metadata = self._validate_handoff(args.get("handoff"), ACTION_KINDS[name])
+                if isinstance(metadata, dict):
+                    return metadata
                 return self.spawn(ACTION_KINDS[name], args["name"], args["prompt"],
                                   args.get("isolation"), args.get("base"), args.get("target"),
-                                  args.get("breadth"))
+                                  args.get("breadth"), handoff=metadata)
             if name == "Dispatch":
+                metadata = self._validate_handoff(args.get("handoff"), "dispatch")
+                if isinstance(metadata, dict):
+                    return metadata
                 return self.dispatch(args["template"], args["items"], args.get("group"),
-                                     args.get("isolation"), args.get("base"))
+                                     args.get("isolation"), args.get("base"), metadata)
             if name == "Send":
                 return self.send(args["target"], args["message"])
             if name == "List":
@@ -567,6 +578,16 @@ class MCPServer:
         except herdr.HerdrError as exc:
             return {"status": "ERROR", "error": str(exc)}
         raise ValueError(f"unknown tool: {name}")
+
+    def _validate_handoff(
+        self, supplied_path: Any, action: str,
+    ) -> handoff_contract.HandoffMetadata | dict[str, Any]:
+        if not isinstance(supplied_path, str) or not supplied_path.strip():
+            return {"status": "REJECTED", "error": "HANDOFF_REQUIRED"}
+        try:
+            return handoff_contract.validate_handoff(self.project, supplied_path, action)
+        except handoff_contract.HandoffValidationError as exc:
+            return {"status": "REJECTED", "error": exc.code, "detail": exc.detail}
 
     # ── Leader ──────────────────────────────────────────────────
 
@@ -636,6 +657,7 @@ class MCPServer:
         breadth: str | None = None,
         group: str | None = None,
         oneshot: bool = False,
+        handoff: handoff_contract.HandoffMetadata | None = None,
     ) -> dict[str, Any]:
         preset = AGENT_PRESETS.get(kind)
         if preset is None or kind == "dispatch":
@@ -676,6 +698,9 @@ class MCPServer:
                 worker_id = ledger.add_worker(
                     conn, name, owner, model="", cwd=str(self.project),
                     group=group, oneshot=oneshot, live_pane_ids=pane_ids, agent=preset,
+                    handoff_id=handoff.id if handoff else None,
+                    handoff_path=str(handoff.path) if handoff else None,
+                    handoff_sha256=handoff.sha256 if handoff else None,
                 )
         except ledger.DuplicateWorkerError:
             return {"status": "REJECTED", "error": "DUPLICATE_NAME",
@@ -704,6 +729,12 @@ class MCPServer:
             "AGENT_CONTROL_REPORT_PATH": str(report_path),
             "AGENT_CONTROL_HERDR_BIN": herdr.herdr_bin(),
         }
+        if handoff is not None:
+            worker_env.update({
+                "AGENT_CONTROL_HANDOFF_ID": handoff.id,
+                "AGENT_CONTROL_HANDOFF_PATH": str(handoff.path),
+                "AGENT_CONTROL_HANDOFF_SHA256": handoff.sha256,
+            })
         if os.environ.get(SPAWN_IDLE_TTL_ENV):
             worker_env[SPAWN_IDLE_TTL_ENV] = os.environ[SPAWN_IDLE_TTL_ENV]
         if kind == "explore":
@@ -777,6 +808,8 @@ class MCPServer:
         if worktree is not None:
             result["worktree"] = str(worktree)
             result["branch"] = branch
+        if handoff is not None:
+            result["handoff"] = handoff.public()
         result["status"] = "OK"
         return result
 
@@ -787,6 +820,7 @@ class MCPServer:
         group: str | None = None,
         isolation: str | None = None,
         base: str | None = None,
+        handoff: handoff_contract.HandoffMetadata | None = None,
     ) -> dict[str, Any]:
         if not group:
             return {"status": "REJECTED", "error": "GROUP_REQUIRED"}
@@ -816,6 +850,9 @@ class MCPServer:
                         group=group, oneshot=True, mode="run",
                         live_pane_ids=pane_ids, status="pending",
                         isolation=isolation, base_ref=base, agent=AGENT_PRESETS["dispatch"],
+                        handoff_id=handoff.id if handoff else None,
+                        handoff_path=str(handoff.path) if handoff else None,
+                        handoff_sha256=handoff.sha256 if handoff else None,
                     )
             except ledger.DuplicateWorkerError:
                 rejected.append({"item": str(item), "error": "DUPLICATE_NAME"})
@@ -843,6 +880,8 @@ class MCPServer:
             result["rejected"] = rejected
         if failures:
             result["launch_failures"] = failures
+        if handoff is not None:
+            result["handoff"] = handoff.public()
         return result
 
     def _launch_pending(self, owner: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -904,6 +943,12 @@ class MCPServer:
             "AGENT_CONTROL_REPORT_PATH": str(report_path),
             "AGENT_CONTROL_HERDR_BIN": herdr.herdr_bin(),
         }
+        if row["handoff_id"] and row["handoff_path"] and row["handoff_sha256"]:
+            worker_env.update({
+                "AGENT_CONTROL_HANDOFF_ID": str(row["handoff_id"]),
+                "AGENT_CONTROL_HANDOFF_PATH": str(row["handoff_path"]),
+                "AGENT_CONTROL_HANDOFF_SHA256": str(row["handoff_sha256"]),
+            })
         if worktree is not None:
             worker_env["AGENT_CONTROL_WORKTREE"] = str(worktree)
             worker_env["AGENT_CONTROL_BRANCH"] = str(branch)

@@ -11,11 +11,48 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_control import herdr, ledger, reaper
+from tools.agent_control import handoff, herdr, ledger, reaper
 from tools.agent_control import mcp_server
 from tools.agent_control.mcp_server import MCPServer
 
 LEADER_PANE = "w1:p1"
+
+
+RuntimeMCPServer = MCPServer
+
+
+def write_handoff(project: Path, action: str, *, name: str = "test-handoff",
+                  body_overrides: dict[str, str] | None = None) -> Path:
+    sections = {
+        "Goal": "Prove the delegated task result.",
+        "Done when": "The requested evidence is returned.",
+        "Workspace": f"Project root: `{project}`.",
+        "Scope": "Only the delegated task is in scope.",
+        "Source map": "- `AGENTS.md` — project instructions — primary.",
+        "Claims and decisions": "- Revalidate every prior implementation claim.",
+        "Acceptance atoms": "- [ ] A1: requested result is evidenced.",
+        "Verification": "Inspect the real target surface.",
+        "Deliverable": "Return one final Report with citations.",
+    }
+    if action in {"execute", "dispatch"}:
+        sections["Mutation boundary"] = "Modify only files named by the task."
+    sections.update(body_overrides or {})
+    content = "\n".join([
+        "---",
+        "schema: agentcontrol-handoff/v1",
+        f"id: {name}",
+        f"action: {action}",
+        "projectRoot: .",
+        "sourceRevision: test-revision",
+        "status: ready",
+        "---",
+        "",
+        *[f"## {heading}\n\n{text}\n" for heading, text in sections.items()],
+    ])
+    path = project / ".agent-control" / "handoffs" / f"{name}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
 
 
 class LegacyTestMCPServer(MCPServer):
@@ -33,6 +70,9 @@ class LegacyTestMCPServer(MCPServer):
             "dispatch": "Dispatch", "send": "Send", "list": "List", "collect": "Collect",
             "peek": "Peek", "cancel": "Cancel", "report": "Report",
         }.get(name, name)
+        if mapped in {"Execute", "Explore", "Plan", "Research", "Dispatch"} and "handoff" not in args:
+            action = "dispatch" if mapped == "Dispatch" else mapped.lower()
+            args = {**args, "handoff": str(write_handoff(self.project, action, name=f"legacy-{action}"))}
         if mapped == "Report" and "message" in args:
             args = {**args, "summary": args["message"]}
             args.pop("message")
@@ -59,6 +99,9 @@ def clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "AGENT_CONTROL_POSTRUN",
         "AGENT_LEADER_PANE",
         "AGENT_CONTROL_REPORT_PATH",
+        "AGENT_CONTROL_HANDOFF_ID",
+        "AGENT_CONTROL_HANDOFF_PATH",
+        "AGENT_CONTROL_HANDOFF_SHA256",
         "AGENT_CONTROL_SPAWN_IDLE_TTL_SECONDS",
         "HERDR_PANE_ID",
         "HERDR_WORKSPACE_ID",
@@ -2088,3 +2131,130 @@ def test_report_artifact_failure_does_not_publish_final_report(project, monkeypa
     with ledger.open_db(project) as conn:
         worker_id = int(state["spawn_envs"]["docs"]["AGENT_CONTROL_WORKER_ID"])
         assert ledger.has_final_report(conn, worker_id) is False
+
+
+def make_runtime_leader(project: Path, monkeypatch: pytest.MonkeyPatch) -> RuntimeMCPServer:
+    clear_env(monkeypatch)
+    monkeypatch.setenv("HERDR_PANE_ID", LEADER_PANE)
+    monkeypatch.setenv("HERDR_WORKSPACE_ID", "w1")
+    return RuntimeMCPServer(project)
+
+
+def test_direct_action_rejects_missing_handoff_before_creating_worker(project, monkeypatch):
+    fake_herdr(monkeypatch)
+    leader = make_runtime_leader(project, monkeypatch)
+
+    result = leader.call_tool("Explore", {"name": "trace", "prompt": "trace code"})
+
+    assert result == {"status": "REJECTED", "error": "HANDOFF_REQUIRED"}
+    with ledger.open_db(project) as conn:
+        assert ledger.select_workers(conn, LEADER_PANE) == []
+
+
+@pytest.mark.parametrize(
+    ("setup", "action", "error"),
+    [
+        ("missing-section", "explore", "HANDOFF_SECTION_EMPTY"),
+        ("wrong-action", "plan", "HANDOFF_ACTION_MISMATCH"),
+        ("outside-project", "explore", "HANDOFF_OUTSIDE_PROJECT"),
+        ("oversized", "explore", "HANDOFF_TOO_LARGE"),
+    ],
+)
+def test_handoff_validation_rejects_unsafe_or_incomplete_documents(
+    project, setup, action, error,
+):
+    path = write_handoff(project, action)
+    requested = action
+    if setup == "missing-section":
+        path = write_handoff(project, action, body_overrides={"Verification": ""})
+    elif setup == "wrong-action":
+        requested = "explore"
+    elif setup == "outside-project":
+        path = project.parent / "outside-handoff.md"
+        path.write_text(write_handoff(project, action).read_text(), encoding="utf-8")
+    elif setup == "oversized":
+        path.write_text(path.read_text() + ("x" * (handoff.MAX_HANDOFF_BYTES + 1)), encoding="utf-8")
+
+    with pytest.raises(handoff.HandoffValidationError) as exc:
+        handoff.validate_handoff(project, str(path), requested)
+
+    assert exc.value.code == error
+
+
+def test_valid_handoff_is_injected_as_trusted_direct_agent_metadata(project, monkeypatch):
+    state = fake_herdr(monkeypatch)
+    leader = make_runtime_leader(project, monkeypatch)
+    path = write_handoff(project, "explore", name="p20-revalidation")
+
+    result = leader.call_tool("Explore", {
+        "name": "trace", "prompt": "trace code", "handoff": str(path),
+    })
+
+    metadata = handoff.validate_handoff(project, str(path), "explore")
+    assert result["status"] == "OK"
+    assert result["handoff"] == {
+        "id": metadata.id,
+        "path": str(metadata.path),
+        "sha256": metadata.sha256,
+    }
+    worker_env = state["spawn_envs"]["trace"]
+    assert worker_env["AGENT_CONTROL_HANDOFF_ID"] == metadata.id
+    assert worker_env["AGENT_CONTROL_HANDOFF_PATH"] == str(metadata.path)
+    assert worker_env["AGENT_CONTROL_HANDOFF_SHA256"] == metadata.sha256
+
+
+def test_dispatch_shares_validated_handoff_with_every_item(project, monkeypatch):
+    state = fake_herdr(monkeypatch)
+    leader = make_runtime_leader(project, monkeypatch)
+    path = write_handoff(project, "dispatch", name="shared-review")
+
+    result = leader.call_tool("Dispatch", {
+        "template": "review {item}",
+        "items": ["alpha", "beta"],
+        "group": "review",
+        "handoff": str(path),
+    })
+
+    metadata = handoff.validate_handoff(project, str(path), "dispatch")
+    assert result["status"] == "OK"
+    assert result["handoff"]["sha256"] == metadata.sha256
+    for name in ("alpha", "beta"):
+        worker_env = state["spawn_envs"][name]
+        assert worker_env["AGENT_CONTROL_HANDOFF_ID"] == metadata.id
+        assert worker_env["AGENT_CONTROL_HANDOFF_PATH"] == str(metadata.path)
+        assert worker_env["AGENT_CONTROL_HANDOFF_SHA256"] == metadata.sha256
+        with ledger.open_db(project) as conn:
+            row = next(row for row in ledger.select_workers(conn, LEADER_PANE) if row["name"] == name)
+            assert row["handoff_path"] == str(metadata.path)
+            assert row["handoff_sha256"] == metadata.sha256
+
+
+def test_dispatch_monitor_exposes_verified_handoff_document(project, monkeypatch):
+    from tools.agent_control import monitor
+
+    fake_herdr(monkeypatch)
+    leader = make_runtime_leader(project, monkeypatch)
+    path = write_handoff(project, "dispatch", name="dashboard-context")
+    leader.call_tool("Dispatch", {
+        "template": "review {item}", "items": ["alpha"], "group": "review",
+        "handoff": str(path),
+    })
+
+    snap = monitor.snapshot(project, LEADER_PANE, "review")
+    item = snap["items"][0]
+    assert item["handoff_id"] == "dashboard-context"
+    assert item["handoff_status"] == "verified"
+    assert "## Acceptance atoms" in item["handoff"]
+    dashboard = mcp_server.strip_ansi(monitor.render(snap, width=140, height=24))
+    assert "handoff dashboard-context · VERIFIED" in dashboard
+    assert "H handoff" in dashboard
+    detail = mcp_server.strip_ansi(monitor.render_handoff(item, 180, 60))
+    assert "HANDOFF alpha" in detail
+    assert "dashboard-context.md" in detail
+    assert "## Acceptance atoms" in detail
+
+    path.write_text("substituted content", encoding="utf-8")
+    changed = monitor.snapshot(project, LEADER_PANE, "review")["items"][0]
+    assert changed["handoff_status"] == "changed"
+    assert changed["handoff"] == ""
+    assert "substituted content" not in monitor.render_handoff(changed, 100, 24)

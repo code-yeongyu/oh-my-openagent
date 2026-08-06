@@ -1,0 +1,24 @@
+┌ batch:qa-handoff ─────────────────────────────────────────────────────────────────────────────────────────────[1/1 TERMINAL]  [0 ACTIVE] ┐
+│ [########################] 100%                                                                            RUN 0  WAIT 0  DONE 1  DEAD 0 │
+├───────────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────────┤
+│ WORKERS / INJECTED PROMPT                                                 │ INSPECTOR                                                    │
+│▶ DONE alpha              00:05  Report the item alpha.                    │ alpha  DONE                                                  │
+│                                                                           │ pid 2477733 ·                                                │
+│                                                                           │ agent agentcontrol-dispatch · attempt 2                      │
+│                                                                           │ handoff qa-dispatch-v1 · VERIFIED                            │
+│                                                                           │                                                              │
+│                                                                           │ Report the item alpha.                                       │
+│                                                                           │                                                              │
+│                                                                           │ — injected contract —                                        │
+│                                                                           │ Use Report exactly once.                                     │
+│                                                                           │ Detailed evidence → report document.                         │
+│                                                                           │                                                              │
+│                                                                           │                                                              │
+│                                                                           │                                                              │
+│                                                                           │                                                              │
+│                                                                           │                                                              │
+│                                                                           │                                                              │
+│ LATEST alpha · QA worker read handoff and completed                       │                                                              │
+├───────────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────────┤
+│ Complete · waiting for leader collect                                                                                                    │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import select
@@ -16,7 +17,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from . import herdr, ledger, mcp_server
+from . import handoff, herdr, ledger, mcp_server
 
 try:
     from wcwidth import wcswidth as _wcswidth
@@ -59,6 +60,29 @@ def _one_line(value: Any) -> str:
     return " ".join(_safe_text(value).split())
 
 
+def _load_handoff(project: Path, path_value: Any, expected_sha256: Any) -> tuple[str, str]:
+    if not path_value:
+        return "unavailable", ""
+    try:
+        root = project.resolve()
+        path = Path(str(path_value)).resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file():
+            return "unavailable", ""
+        raw = path.read_bytes()
+    except OSError:
+        return "unavailable", ""
+    if len(raw) > handoff.MAX_HANDOFF_BYTES:
+        return "too-large", ""
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return "invalid-utf8", ""
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != str(expected_sha256 or ""):
+        return "changed", ""
+    return "verified", content
+
+
 def snapshot(project: Path, owner: str, group: str) -> dict[str, Any]:
     with ledger.open_db(project) as conn:
         rows = [r for r in ledger.select_workers(conn, owner, group=group)
@@ -76,6 +100,7 @@ def snapshot(project: Path, owner: str, group: str) -> dict[str, Any]:
                 (owner, group),
             )
         ]
+        handoff_cache: dict[tuple[str, str], tuple[str, str]] = {}
         for row in rows:
             final = conn.execute(
                 "SELECT created_at FROM reports"
@@ -102,12 +127,21 @@ def snapshot(project: Path, owner: str, group: str) -> dict[str, Any]:
                     prompt = prompt_path.read_text(encoding="utf-8")
                 except OSError:
                     pass
+            handoff_key = (str(row["handoff_path"] or ""), str(row["handoff_sha256"] or ""))
+            if handoff_key not in handoff_cache:
+                handoff_cache[handoff_key] = _load_handoff(project, *handoff_key)
+            handoff_status, handoff_content = handoff_cache[handoff_key]
             items.append({
                 "id": int(row["id"]), "name": row["name"], "state": state,
                 "elapsed": max(0, int(elapsed_until - row["spawned_at"])),
                 "close_reason": row["close_reason"],
                 "pid": row["pid"], "model": row["model"], "agent": row["agent"] or "build",
                 "prompt": prompt, "prompt_preview": _one_line(prompt),
+                "handoff_id": row["handoff_id"],
+                "handoff_path": row["handoff_path"],
+                "handoff_sha256": row["handoff_sha256"],
+                "handoff_status": handoff_status,
+                "handoff": handoff_content,
                 "events_path": str(mcp_server.run_live_dir(project, str(row["name"]), int(row["id"])) / "events.jsonl"),
                 "stderr_path": str(mcp_server.run_live_dir(project, str(row["name"]), int(row["id"])) / "stderr.log"),
             })
@@ -385,13 +419,17 @@ def render(snap: dict[str, Any], selected: int = 0, width: int | None = None,
                 right_parts = [(f" pid {item['pid'] or '-'} · {item['model']}", DIM)]
             elif row_index == 2:
                 right_parts = [(f" agent {item['agent']} · attempt {item['id']}", DIM)]
-            elif 4 <= row_index < 4 + len(prompt_lines):
-                right_parts = [(" " + prompt_lines[row_index - 4], None)]
-            elif row_index == 5 + len(prompt_lines):
-                right_parts = [(" — injected contract —", CYAN)]
+            elif row_index == 3:
+                status = str(item.get("handoff_status", "unavailable")).upper()
+                color = GREEN if status == "VERIFIED" else AMBER
+                right_parts = [(f" handoff {item.get('handoff_id') or '-'} · ", DIM), (status, color)]
+            elif 5 <= row_index < 5 + len(prompt_lines):
+                right_parts = [(" " + prompt_lines[row_index - 5], None)]
             elif row_index == 6 + len(prompt_lines):
-                right_parts = [(" Use Report exactly once.", DIM)]
+                right_parts = [(" — injected contract —", CYAN)]
             elif row_index == 7 + len(prompt_lines):
+                right_parts = [(" Use Report exactly once.", DIM)]
+            elif row_index == 8 + len(prompt_lines):
                 right_parts = [(" Detailed evidence → report document.", DIM)]
             else:
                 right_parts = []
@@ -422,10 +460,12 @@ def render(snap: dict[str, Any], selected: int = 0, width: int | None = None,
         footer_parts = [(_safe_text(flash), AMBER)]
     elif snap["complete"]:
         footer_parts = [(" Complete · ", GREEN),
-                        ("waiting for leader collect" if snap["unconsumed"] else "reports collected", DIM)]
+                        ("waiting for leader collect" if snap["unconsumed"] else "reports collected", DIM),
+                        ("  H", INVERSE), (" handoff  ", DIM), ("Enter", INVERSE), (" prompt  ", DIM),
+                        ("L", INVERSE), (" live", DIM)]
     else:
         footer_parts = [(" ↑↓", INVERSE), (" select  ", DIM), ("Enter", INVERSE), (" prompt  ", DIM),
-                        ("L", INVERSE), (" live  ", DIM), ("K", INVERSE), (" kill  ", DIM),
+                        ("H", INVERSE), (" handoff  ", DIM), ("L", INVERSE), (" live  ", DIM), ("K", INVERSE), (" kill  ", DIM),
                         ("R", INVERSE), (" restart", DIM)]
         if width >= 72:
             used = sum(_cell_width(text) for text, _ in footer_parts)
@@ -468,10 +508,48 @@ def render_prompt(item: dict[str, Any], width: int, height: int, scroll: int = 0
     return "\n".join(lines[:height])
 
 
+def render_handoff(item: dict[str, Any], width: int, height: int, scroll: int = 0) -> str:
+    width = max(40, width)
+    height = max(16, height)
+    body_width = max(30, width - 4)
+    content = _safe_text(item.get("handoff") or "(handoff unavailable)", keep_newlines=True)
+    wrapped = _wrap_cells(content, body_width)
+    page = max(1, height - 8)
+    scroll = max(0, min(scroll, max(0, len(wrapped) - page)))
+    name = _safe_text(item.get("name", "-"))
+    title = f" HANDOFF {name} "
+    lines = [_style("┌", DIM) + _style(title, BRIGHT)
+             + _style("─" * max(0, width - _cell_width(title) - 2) + "┐", DIM)]
+    status = str(item.get("handoff_status", "unavailable")).upper()
+    status_color = GREEN if status == "VERIFIED" else AMBER
+    lines.append(_style("│", DIM) + _parts([
+        (f" id {item.get('handoff_id') or '-'} · ", DIM), (status, status_color),
+        (f" · sha256 {item.get('handoff_sha256') or '-'}", DIM),
+    ], width - 2) + _style("│", DIM))
+    path_lines = _wrap_cells(f" path {item.get('handoff_path') or '-'}", width - 2)
+    for path_line in path_lines:
+        lines.append(_style("│", DIM) + _parts([(path_line, DIM)], width - 2) + _style("│", DIM))
+    lines.append(_style("├" + "─" * (width - 2) + "┤", DIM))
+    available = max(1, height - len(lines) - 2)
+    for line in wrapped[scroll:scroll + available]:
+        color = CYAN if line.startswith("## ") or line == "---" else None
+        lines.append(_style("│ ", DIM) + _parts([(line, color)], width - 4) + _style(" │", DIM))
+    while len(lines) < height - 2:
+        lines.append(_style("│", DIM) + " " * (width - 2) + _style("│", DIM))
+    position = f"{scroll + 1}-{min(len(wrapped), scroll + available)}/{len(wrapped)}"
+    hint = " ↑↓ scroll · PgUp/PgDn · Esc/H back"
+    gap = max(1, width - 2 - _cell_width(hint) - _cell_width(position))
+    lines.append(_style("│", DIM) + _parts([(hint, DIM), (" " * gap, None), (position, CYAN)], width - 2)
+                 + _style("│", DIM))
+    lines.append(_border("└", "─", "┘", width))
+    return "\n".join(lines[:height])
+
+
 def render_help(width: int, height: int) -> str:
     width, height = max(40, width), max(16, height)
     content = [
         (" ↑/↓ or j/k   Move selection", None), (" Enter or p    View full injected prompt", None),
+        (" H             View validated handoff document", CYAN),
         (" K             Kill selected active worker", RED),
         (" R             Restart from regenerated contract", AMBER),
         (" L             Open live OpenCode event stream", CYAN),
@@ -634,6 +712,8 @@ def run_interactive(project: Path, owner: str, group: str) -> str:
                 screen = render_confirm(confirm[0], confirm[1], render_width, size.lines)
             elif view == "prompt" and snap["items"]:
                 screen = render_prompt(snap["items"][selected], render_width, size.lines, scroll)
+            elif view == "handoff" and snap["items"]:
+                screen = render_handoff(snap["items"][selected], render_width, size.lines, scroll)
             elif view == "live" and snap["items"]:
                 screen = render_live_session(
                     snap["items"][selected], render_width, size.lines,
@@ -708,16 +788,16 @@ def run_interactive(project: Path, owner: str, group: str) -> str:
                 elif key in {"r", "R"}:
                     live_raw = not live_raw
                 continue
-            if view in {"prompt", "help"}:
-                if key in {"ESC", "ENTER", "?"}:
+            if view in {"prompt", "handoff", "help"}:
+                if key in {"ESC", "ENTER", "?", "H"}:
                     view, scroll = "list", 0
-                elif view == "prompt" and key in {"UP", "k"}:
+                elif view in {"prompt", "handoff"} and key in {"UP", "k"}:
                     scroll = max(0, scroll - 1)
-                elif view == "prompt" and key in {"DOWN", "j"}:
+                elif view in {"prompt", "handoff"} and key in {"DOWN", "j"}:
                     scroll += 1
-                elif view == "prompt" and key == "PGUP":
+                elif view in {"prompt", "handoff"} and key == "PGUP":
                     scroll = max(0, scroll - max(1, size.lines - 7))
-                elif view == "prompt" and key == "PGDN":
+                elif view in {"prompt", "handoff"} and key == "PGDN":
                     scroll += max(1, size.lines - 7)
                 continue
             if key in {"UP", "k"}:
@@ -726,6 +806,8 @@ def run_interactive(project: Path, owner: str, group: str) -> str:
                 selected = min(max(0, len(snap["items"]) - 1), selected + 1)
             elif key in {"ENTER", "p"} and snap["items"]:
                 view, scroll = "prompt", 0
+            elif key == "H" and snap["items"]:
+                view, scroll = "handoff", 0
             elif key in {"l", "L"} and snap["items"]:
                 view, live_scroll, live_follow, live_raw = "live", 0, True, False
             elif key == "?":

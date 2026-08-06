@@ -1,0 +1,3 @@
+valid_read_parse_hash: n=5000 median_ms=0.0603 p95_ms=0.1057 mean_ms=0.0701
+missing_path_rejection: n=5000 median_ms=0.0191 p95_ms=0.0284 mean_ms=0.0208
+observed_real_opencode_tool_ms: invalid=91 explore=4686 dispatch=276

@@ -480,10 +480,16 @@ describe("applyAgentConfig builtin override protection", () => {
     const originalName = process.env.AGENT_CONTROL_NAME
     const originalReportPath = process.env.AGENT_CONTROL_REPORT_PATH
     const originalKind = process.env.AGENT_CONTROL_KIND
+    const originalHandoffId = process.env.AGENT_CONTROL_HANDOFF_ID
+    const originalHandoffPath = process.env.AGENT_CONTROL_HANDOFF_PATH
+    const originalHandoffSha256 = process.env.AGENT_CONTROL_HANDOFF_SHA256
     process.env.AGENT_CONTROL_ROLE = "worker"
     process.env.AGENT_CONTROL_KIND = "execute"
     process.env.AGENT_CONTROL_NAME = "worker-a"
     process.env.AGENT_CONTROL_REPORT_PATH = "/tmp/worker-a.md"
+    process.env.AGENT_CONTROL_HANDOFF_ID = "worker-a-handoff"
+    process.env.AGENT_CONTROL_HANDOFF_PATH = "/tmp/worker-a-handoff.md"
+    process.env.AGENT_CONTROL_HANDOFF_SHA256 = "a".repeat(64)
 
     try {
       // when
@@ -507,6 +513,12 @@ describe("applyAgentConfig builtin override protection", () => {
       else process.env.AGENT_CONTROL_REPORT_PATH = originalReportPath
       if (originalKind === undefined) delete process.env.AGENT_CONTROL_KIND
       else process.env.AGENT_CONTROL_KIND = originalKind
+      if (originalHandoffId === undefined) delete process.env.AGENT_CONTROL_HANDOFF_ID
+      else process.env.AGENT_CONTROL_HANDOFF_ID = originalHandoffId
+      if (originalHandoffPath === undefined) delete process.env.AGENT_CONTROL_HANDOFF_PATH
+      else process.env.AGENT_CONTROL_HANDOFF_PATH = originalHandoffPath
+      if (originalHandoffSha256 === undefined) delete process.env.AGENT_CONTROL_HANDOFF_SHA256
+      else process.env.AGENT_CONTROL_HANDOFF_SHA256 = originalHandoffSha256
     }
   })
 

@@ -56,6 +56,10 @@ describe("#given direct AgentControl actions", () => {
       "Execute", "Explore", "Plan", "Research", "Dispatch",
       "Send", "List", "Collect", "Peek", "Cancel",
     ])
+    for (const action of ["Execute", "Explore", "Plan", "Research", "Dispatch"] as const) {
+      expect(Object.keys(tools[action].args)).toContain("handoff")
+      expect(tools[action].args.handoff?.isOptional()).toBe(false)
+    }
   })
 
   test("#when a worker process creates tools #then AgentControl exposes only Report", () => {
@@ -74,12 +78,18 @@ describe("#given direct AgentControl actions", () => {
     const output = JSON.parse(await execute(tools.Explore, {
       name: "trace-auth",
       prompt: "trace auth",
+      handoff: ".agent-control/handoffs/trace-auth.md",
       breadth: "thorough",
     }))
 
     expect(requests[0]).toMatchObject({
       action: "Explore",
-      arguments: { name: "trace-auth", prompt: "trace auth", breadth: "thorough" },
+      arguments: {
+        name: "trace-auth",
+        prompt: "trace auth",
+        handoff: ".agent-control/handoffs/trace-auth.md",
+        breadth: "thorough",
+      },
     })
     expect(output).toMatchObject({ result_delivery: "direct_to_leader", collect: false, do_not_poll: true })
     expect(hasPendingAgentControlWait(toolContext.sessionID)).toBe(true)
@@ -90,7 +100,11 @@ describe("#given direct AgentControl actions", () => {
     const tools = createAgentControlTools({ directory: "/project" }, async () => (
       JSON.stringify({ status: "OK", name: "trace-auth" })
     ))
-    await execute(tools.Explore, { name: "trace-auth", prompt: "trace auth" })
+    await execute(tools.Explore, {
+      name: "trace-auth",
+      prompt: "trace auth",
+      handoff: ".agent-control/handoffs/trace-auth.md",
+    })
 
     const cleared = clearAgentControlAgentFromReport(
       toolContext.sessionID,
@@ -108,12 +122,47 @@ describe("#given direct AgentControl actions", () => {
       return JSON.stringify({ status: "OK", group: "batch" })
     })
 
-    await execute(tools.Dispatch, { template: "work {item}", items: ["one"], group: "batch" })
+    await execute(tools.Dispatch, {
+      template: "work {item}",
+      items: ["one"],
+      group: "batch",
+      handoff: ".agent-control/handoffs/batch.md",
+    })
     expect(hasPendingAgentControlWait(toolContext.sessionID)).toBe(true)
     await execute(tools.Collect, { group: "batch" })
 
     expect(requests[1]?.action).toBe("Collect")
     expect(requests[1]?.arguments).toEqual({ group: "batch", timeout_ms: 0, consume: true })
     expect(hasPendingAgentControlWait(toolContext.sessionID)).toBe(false)
+  })
+
+  test("#when every launch action runs #then its handoff path is forwarded unchanged", async () => {
+    const requests: AgentControlRuntimeRequest[] = []
+    const tools = createAgentControlTools({ directory: "/project" }, async (request) => {
+      requests.push(request)
+      return JSON.stringify({ status: "OK", name: "worker", group: "batch" })
+    })
+
+    for (const action of ["Execute", "Explore", "Plan", "Research"] as const) {
+      await execute(tools[action], {
+        name: action.toLowerCase(),
+        prompt: `${action} task`,
+        handoff: `.agent-control/handoffs/${action.toLowerCase()}.md`,
+      })
+    }
+    await execute(tools.Dispatch, {
+      template: "work {item}",
+      items: ["one"],
+      group: "batch",
+      handoff: ".agent-control/handoffs/dispatch.md",
+    })
+
+    expect(requests.map((request) => request.arguments.handoff)).toEqual([
+      ".agent-control/handoffs/execute.md",
+      ".agent-control/handoffs/explore.md",
+      ".agent-control/handoffs/plan.md",
+      ".agent-control/handoffs/research.md",
+      ".agent-control/handoffs/dispatch.md",
+    ])
   })
 })

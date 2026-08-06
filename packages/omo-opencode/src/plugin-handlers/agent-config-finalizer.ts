@@ -17,13 +17,21 @@ function buildAgentControlWorkerContract(): string | undefined {
   const selected = getSelectedAgentControlDefinition();
   const name = process.env.AGENT_CONTROL_NAME?.trim();
   const reportPath = process.env.AGENT_CONTROL_REPORT_PATH?.trim();
-  if (!selected || !name || !reportPath) return undefined;
+  const handoffId = process.env.AGENT_CONTROL_HANDOFF_ID?.trim();
+  const handoffPath = process.env.AGENT_CONTROL_HANDOFF_PATH?.trim();
+  const handoffSha256 = process.env.AGENT_CONTROL_HANDOFF_SHA256?.trim();
+  if (!selected || !name || !reportPath || !handoffId || !handoffPath || !handoffSha256) {
+    return undefined;
+  }
   const worktree = process.env.AGENT_CONTROL_WORKTREE?.trim();
   const branch = process.env.AGENT_CONTROL_BRANCH?.trim();
   const runtime = {
     name,
     kind: selected.kind,
     reportPath,
+    handoffId,
+    handoffPath,
+    handoffSha256,
     ...(worktree ? { worktree } : {}),
     ...(branch ? { branch } : {}),
   };
@@ -31,7 +39,7 @@ function buildAgentControlWorkerContract(): string | undefined {
     .replaceAll("<", "\\u003c")
     .replaceAll(">", "\\u003e");
   return `<agentcontrol-worker-contract>
-You are an AgentControl ${selected.kind} worker. For each leader request, call Report exactly once. Keep summary to one conclusion of at most 600 characters. Put longer Markdown in details; AgentControl writes it to reportPath. When branch is present, commit task changes and include the branch name in summary.
+You are an AgentControl ${selected.kind} worker. Read the handoff document before any other task work. Treat its claims and decisions as inputs to revalidate, not conclusions. Independently inspect authoritative sources and follow the handoff's scope, acceptance atoms, mutation boundary, and verification contract. If the handoff cannot be read, call Report once with a blocker and stop. For each leader request, call Report exactly once. Keep summary to one conclusion of at most 600 characters. Put longer Markdown in details; AgentControl writes it to reportPath. When branch is present, commit task changes and include the branch name in summary.
 <runtime-json>${runtimeJson}</runtime-json>
 </agentcontrol-worker-contract>`;
 }

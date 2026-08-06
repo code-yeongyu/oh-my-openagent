@@ -1,6 +1,6 @@
 # AgentControl Action Agent System
 
-> Status: approved architecture and implementation design. Runtime implementation pending.
+> Status: implemented runtime contract.
 > Authority: this document supersedes the fixed `spawn` / `agentcontrol-worker`
 > public-agent design in `.omo/plans/agentcontrol-v3-revival.md`. The existing v3
 > ledger, Herdr, queue, monitor, wake, collect, process-identity, and cleanup
@@ -92,6 +92,40 @@ Workers never receive `Execute`, `Explore`, `Plan`, `Research`, `Dispatch`, or
 leader lifecycle tools. This must be enforced by role-specific tool registration
 and repeated as a permission denylist for defense in depth.
 
+### Mandatory handoff
+
+Every `Execute`, `Explore`, `Plan`, `Research`, and `Dispatch` call requires a
+`handoff` path. The path may be relative to the launch project or absolute, but
+its resolved regular file must remain inside that project. The runtime validates
+the document before creating a worker row, pane, process, or pending Dispatch
+entry.
+
+The UTF-8 Markdown document is at most 128 KiB and begins with scalar
+frontmatter containing `schema`, `id`, `action`, `projectRoot`,
+`sourceRevision`, and `status`. Required values are:
+
+```yaml
+schema: agentcontrol-handoff/v1
+id: trace-auth-v1
+action: explore
+projectRoot: .
+sourceRevision: abc1234
+status: ready
+```
+
+The required H2 sections are `Goal`, `Done when`, `Workspace`, `Scope`,
+`Source map`, `Claims and decisions`, `Acceptance atoms`, `Verification`, and
+`Deliverable`. `Execute` and `Dispatch` also require `Mutation boundary`.
+Required sections must be present, unique, and non-empty. The declared action
+and project root must match the launch.
+
+The server computes SHA-256 from the validated bytes and persists the handoff
+ID, absolute path, and digest in the ledger. Workers receive those trusted
+values in their system contract, read the handoff before task work, and
+independently revalidate its claims. An unreadable handoff is reported once as
+a blocker. The handoff is a source map and acceptance contract, not an answer
+to copy.
+
 ## 4. Agent Action Contracts
 
 All four Agent actions create an interactive, named Herdr/OpenCode worker. The
@@ -111,6 +145,7 @@ fit a narrower read-only action.
 Execute({
   name: "implement-auth",
   prompt: "Implement the approved authentication change and verify it.",
+  handoff: ".agent-control/handoffs/implement-auth.md",
   isolation: "worktree",
   base: "dev",
   target: "agent:lead"
@@ -123,6 +158,7 @@ Schema:
 |---|---|---|
 | `name` | yes | Lowercase Agent identity, existing v3 name rules. |
 | `prompt` | yes | Task only. No lifecycle or reporting instructions. |
+| `handoff` | yes | Valid project-local `agentcontrol-handoff/v1` document for `execute`. |
 | `isolation` | no | Only `"worktree"`; use when branch separation is required. |
 | `base` | no | Starting ref for an isolated worktree. |
 | `target` | no | Existing AgentControl parent Agent that receives reports. |
@@ -144,6 +180,7 @@ Use to locate local files, symbols, references, conventions, and execution flows
 Explore({
   name: "trace-auth",
   prompt: "Locate authentication entry points and trace request validation.",
+  handoff: ".agent-control/handoffs/trace-auth.md",
   breadth: "thorough",
   target: "agent:lead"
 })
@@ -155,6 +192,7 @@ Schema:
 |---|---|---|
 | `name` | yes | Persistent Agent identity. |
 | `prompt` | yes | Local discovery question and desired evidence. |
+| `handoff` | yes | Valid project-local `agentcontrol-handoff/v1` document for `explore`. |
 | `breadth` | no | `quick`, `medium`, or `thorough`; default `medium`. |
 | `target` | no | Existing AgentControl parent Agent that receives reports. |
 
@@ -179,6 +217,7 @@ implementation plan.
 Plan({
   name: "plan-auth",
   prompt: "Design the smallest implementation plan for the authentication change.",
+  handoff: ".agent-control/handoffs/plan-auth.md",
   target: "agent:lead"
 })
 ```
@@ -189,6 +228,7 @@ Schema:
 |---|---|---|
 | `name` | yes | Persistent Agent identity. |
 | `prompt` | yes | Requirements, constraints, and expected outcome. |
+| `handoff` | yes | Valid project-local `agentcontrol-handoff/v1` document for `plan`. |
 | `target` | no | Existing AgentControl parent Agent that receives reports. |
 
 Behavior:
@@ -211,6 +251,7 @@ upstream source, changelogs, issues, and production-quality examples.
 Research({
   name: "oauth-contract",
   prompt: "Research the current upstream OAuth refresh-token contract and migration notes.",
+  handoff: ".agent-control/handoffs/oauth-contract.md",
   target: "agent:lead"
 })
 ```
@@ -221,6 +262,7 @@ Schema:
 |---|---|---|
 | `name` | yes | Persistent Agent identity. |
 | `prompt` | yes | External contract or prior-art question. |
+| `handoff` | yes | Valid project-local `agentcontrol-handoff/v1` document for `research`. |
 | `target` | no | Existing AgentControl parent Agent that receives reports. |
 
 Behavior:
@@ -263,6 +305,7 @@ Dispatch({
   template: "Review {item} and report the result.",
   items: ["auth", "billing", "sessions"],
   group: "review-wave",
+  handoff: ".agent-control/handoffs/review-wave.md",
   isolation: "worktree",
   base: "dev"
 })
@@ -270,14 +313,16 @@ Dispatch({
 
 Invariants:
 
-- input remains `template`, `items`, required `group`, optional `isolation`, and
-  optional `base`;
+- input is `template`, `items`, required `group`, required shared `handoff`,
+  optional `isolation`, and optional `base`;
 - `{item}` expansion, duplicate rejection, concurrency cap, pending queue,
   monitor, completion wake, restart, cancellation, and cleanup remain unchanged;
 - it does not accept an Agent action, type, role, category, prompt persona, or
   model override;
 - every item uses one fixed internal `workflow` definition;
 - workers remain paneless `opencode run --auto --format json` one-shots;
+- the Dispatch monitor inspector shows each worker's handoff ID and digest state;
+  `H` opens the project-local handoff metadata and document body;
 - the leader calls `Collect({ group })` once only after a real group completion,
   dead-worker, or workflow-stopped wake;
 - no polling with `Collect`, `List`, `Peek`, artifact reads, or sleep.
@@ -438,6 +483,9 @@ Trusted runtime metadata contains:
   "name": "trace-auth",
   "kind": "explore",
   "reportPath": "/project/.agent-control/reports/trace-auth.md",
+  "handoffId": "trace-auth-v1",
+  "handoffPath": "/project/.agent-control/handoffs/trace-auth.md",
+  "handoffSha256": "<64 lowercase hexadecimal characters>",
   "worktree": null,
   "branch": null
 }
@@ -480,10 +528,10 @@ grant recursive control.
 ```text
 Explore(input)
   -> TypeScript public tool fixes kind=explore
-  -> Python MCP Explore tool validates input
+  -> Python MCP Explore tool validates input and handoff before worker creation
   -> launch_agent(kind=explore, ...)
   -> ledger row stores agent=agentcontrol-explore, mode=tui
-  -> env injects AGENT_CONTROL_KIND=explore and trusted runtime identity
+  -> env injects AGENT_CONTROL_KIND=explore and trusted runtime/handoff identity
   -> Herdr starts: opencode --agent agentcontrol-explore
   -> plain task prompt is queued
   -> worker calls Report
@@ -495,6 +543,7 @@ Explore(input)
 
 ```text
 Dispatch(template, items, group, ...)
+  -> validate one shared dispatch handoff before pending rows are created
   -> existing pending ledger rows store agent=agentcontrol-dispatch, mode=run
   -> existing cap-aware launch queue
   -> opencode run --auto --format json --agent agentcontrol-dispatch
