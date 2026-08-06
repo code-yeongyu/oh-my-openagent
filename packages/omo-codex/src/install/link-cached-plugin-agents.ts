@@ -1,5 +1,6 @@
-import { copyFile, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises"
+import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
+import { applyCodexAgentModelOverride, type CodexAgentModelOverride } from "./codex-agent-model-overrides"
 import type { PreservedAgentReasoning } from "./managed-agent-reasoning-defaults"
 import { restorePreservedReasoning, restorePreservedServiceTier } from "./preserved-agent-settings"
 import { purgeRetiredManagedAgentFiles } from "./retired-managed-agent-purge"
@@ -20,6 +21,7 @@ export async function linkCachedPluginAgents(input: {
   readonly codexHome: string
   readonly pluginRoot: string
   readonly platform?: LinkPlatform
+  readonly agentModelOverrides?: ReadonlyMap<string, CodexAgentModelOverride>
   readonly preservedReasoning?: ReadonlyMap<string, PreservedAgentReasoning>
   readonly preservedServiceTier?: ReadonlyMap<string, string | null>
 }): Promise<readonly LinkedAgent[]> {
@@ -48,6 +50,11 @@ export async function linkCachedPluginAgents(input: {
       preserved: input.preservedServiceTier?.has(agentName) ?? false,
       value: input.preservedServiceTier?.get(agentName) ?? null,
     })
+    const agentModelOverride = input.agentModelOverrides?.get(agentName)
+    if (agentModelOverride !== undefined) {
+      const content = await readFile(linkPath, "utf8")
+      await writeFile(linkPath, applyCodexAgentModelOverride(content, agentModelOverride))
+    }
     linked.push({ name: agentFileName, path: linkPath, target: agentPath })
   }
   await writeManifest(
