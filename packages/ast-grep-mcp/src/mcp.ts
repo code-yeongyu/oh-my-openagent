@@ -191,8 +191,8 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
       // Exactly one explicit rule source per call (ub §11): ruleFile XOR inlineRules.
       // Advertised so a client sees the contract before the parser rejects the call.
       oneOf: [
-        { required: ["ruleFile"], not: { required: ["inlineRules"] } },
-        { required: ["inlineRules"], not: { required: ["ruleFile"] } },
+        { type: "object", required: ["ruleFile"], not: { required: ["inlineRules"] } },
+        { type: "object", required: ["inlineRules"], not: { required: ["ruleFile"] } },
       ],
       additionalProperties: false,
     },
