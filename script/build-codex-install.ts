@@ -29,9 +29,10 @@ if (!buildResult.success) {
 await mkdir(dirname(generatedEntrypoint), { recursive: true })
 const generatedSource = await readFile(generatedEntrypoint, "utf8")
 const nodeBuiltinSource = rewriteBareBuiltinSpecifiers(generatedSource)
-const executableSource = nodeBuiltinSource.startsWith("#!/usr/bin/env node")
-  ? nodeBuiltinSource
-  : `#!/usr/bin/env node\n${nodeBuiltinSource}`
+const normalizedSource = stripWhitespaceOnlyLines(nodeBuiltinSource)
+const executableSource = normalizedSource.startsWith("#!/usr/bin/env node")
+  ? normalizedSource
+  : `#!/usr/bin/env node\n${normalizedSource}`
 await writeFile(generatedEntrypoint, executableSource)
 await chmod(generatedEntrypoint, 0o755)
 
@@ -44,4 +45,8 @@ function rewriteBareBuiltinSpecifiers(source: string): string {
       return `${prefix}node:${specifier}${suffix}`
     },
   )
+}
+
+function stripWhitespaceOnlyLines(source: string): string {
+  return source.replaceAll(/^[\t ]+(?=\r?$)/gm, "")
 }
