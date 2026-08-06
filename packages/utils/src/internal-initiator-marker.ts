@@ -1,4 +1,5 @@
 export const OMO_INTERNAL_INITIATOR_MARKER = "<!-- OMO_INTERNAL_INITIATOR -->"
+export const OMO_INTERNAL_INITIATOR_METADATA_KEY = "omo_internal_initiator"
 
 export const OMO_INTERNAL_NOREPLY_MARKER = "<!-- OMO_INTERNAL_NOREPLY -->"
 
@@ -11,6 +12,7 @@ export type InternalInitiatorTextPartLike = {
   type?: string
   text?: string
   synthetic?: boolean
+  metadata?: Record<string, unknown>
 }
 
 export type InternalInitiatorMessageLike = {
@@ -36,9 +38,16 @@ export function isTextPartLike(
 export function isSyntheticOrInternalTextPart(
   part: InternalInitiatorTextPartLike
 ): boolean {
+  if (!isTextPartLike(part)) return false
+
+  if (part.synthetic === true && !hasInternalInitiatorMarker(part.text)) {
+    return true
+  }
+
   return (
-    isTextPartLike(part) &&
-    (part.synthetic === true || hasInternalInitiatorMarker(part.text))
+    part.synthetic === true &&
+    part.metadata?.[OMO_INTERNAL_INITIATOR_METADATA_KEY] === true &&
+    hasInternalInitiatorMarker(part.text)
   )
 }
 
@@ -94,11 +103,15 @@ export function stripInternalInitiatorMarkers(text: string): string {
 export function createInternalAgentTextPart(text: string): {
   type: "text"
   text: string
+  synthetic: true
+  metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true }
 } {
   const cleanText = stripInternalInitiatorMarkers(text)
   return {
     type: "text",
     text: `${cleanText}\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+    synthetic: true,
+    metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true },
   }
 }
 
@@ -106,12 +119,12 @@ export function createInternalAgentContinuationTextPart(text: string): {
   type: "text"
   text: string
   synthetic: true
-  metadata: { compaction_continue: true }
+  metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true; compaction_continue: true }
 } {
+  const part = createInternalAgentTextPart(text)
   return {
-    ...createInternalAgentTextPart(text),
-    synthetic: true,
-    metadata: { compaction_continue: true },
+    ...part,
+    metadata: { ...part.metadata, compaction_continue: true },
   }
 }
 

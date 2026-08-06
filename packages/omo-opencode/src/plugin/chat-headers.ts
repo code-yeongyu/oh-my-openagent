@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { isSyntheticOrInternalUserMessage } from "../shared"
 import type { PluginContext } from "./types"
 
