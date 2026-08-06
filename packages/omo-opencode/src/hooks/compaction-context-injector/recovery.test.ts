@@ -2,11 +2,7 @@
 
 import { afterEach, describe, expect, it } from "bun:test"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
-import {
-  dispatchInternalPrompt,
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
+import { OMO_INTERNAL_INITIATOR_METADATA_KEY } from "../../shared/internal-initiator-marker"
 import { createCompactionContextInjector } from "./index"
 
 type SessionMessageResponse = Array<{
@@ -24,7 +20,7 @@ type PromptAsyncInput = {
       type: "text"
       text: string
       synthetic?: true
-      metadata?: { compaction_continue?: true }
+      metadata?: Record<string, unknown>
     }>
   }
   query?: { directory: string }
@@ -259,7 +255,10 @@ describe("createCompactionContextInjector recovery", () => {
     expect(promptAsyncRecorder.calls.length).toBe(1)
     const recoveryPart = promptAsyncRecorder.calls[0]?.body.parts[0]
     expect(recoveryPart?.synthetic).toBe(true)
-    expect(recoveryPart?.metadata).toEqual({ compaction_continue: true })
+    expect(recoveryPart?.metadata).toEqual({
+      [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true,
+      compaction_continue: true,
+    })
   })
 
   it("does not immediately retry recovery when the recovered prompt config still mismatches expected model or tools", async () => {
