@@ -35,6 +35,7 @@ const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
 const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   "give-me-tips": true,
   hyperplan: true,
+  "init-deep": true,
   ultrawork: true,
   "ulw-loop": true,
   "ulw-research": true,

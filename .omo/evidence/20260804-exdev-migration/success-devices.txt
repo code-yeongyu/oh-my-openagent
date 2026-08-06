@@ -1,0 +1,4 @@
+mode=success
+opencode_version=1.17.7
+legacy_device=37
+omo_device=63

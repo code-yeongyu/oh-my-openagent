@@ -34,6 +34,7 @@ function taskWithId(taskId: string): TaskRecord {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     }),
     task_id: taskId,
   }

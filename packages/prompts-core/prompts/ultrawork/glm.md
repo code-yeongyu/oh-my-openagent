@@ -170,7 +170,7 @@ Each scenario needs a binary pass condition. "Looks good" is not a pass conditio
 
 ## TDD WORKFLOW
 
-TDD is mandatory on production behavior changes.
+TDD is mandatory on production code changes with a test seam; prose, docs, and visual-only changes take review + real-surface QA instead (a test pinning their text is pretend-coverage).
 
 1. RED: write or identify a failing test that proves the needed behavior.
 2. GREEN: make the smallest change that flips the test to passing.

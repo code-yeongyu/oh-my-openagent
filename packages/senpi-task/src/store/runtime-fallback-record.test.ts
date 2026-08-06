@@ -43,6 +43,7 @@ describe("task record runtime fallback metadata", () => {
       requested_model: requestedModel,
       fallback_models: fallbackModels,
       resolved_model: requestedModel,
+      notify_on_terminal: false,
     }
     const record = createTaskRecord(input)
     store.save(record)

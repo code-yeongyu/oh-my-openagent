@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { rendererVisibleWidth, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
-import { buildWidgetRows, formatTaskRow } from "./status-row-format"
+import { backgroundWidgetRows, buildWidgetRows, formatTaskRow } from "./status-row-format"
 
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
@@ -15,6 +15,7 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
     created_at: "2026-07-07T00:00:00.000Z",
     updated_at: "2026-07-07T00:00:01.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }
@@ -85,6 +86,102 @@ describe("task_summary identity", () => {
   it("#given a record with a task_summary #when formatting the full row #then the summary is the identity", () => {
     const row = formatTaskRow(record({ task_id: "st_sum", name: "finder", task_summary: "Audit auth session flow", status: "running" }))
     expect(row.startsWith("Audit auth session flow")).toBe(true)
+  })
+})
+
+describe("backgroundWidgetRows", () => {
+  const now = Date.parse("2026-07-07T00:01:00.000Z")
+  const stats = {
+    turns: 2,
+    tool_calls: 4,
+    runtime_ms: 60_000,
+    cost_usd: 0.1303,
+    cache_hit_rate_last: 0.89,
+    tokens_per_second: 97,
+  }
+
+  it("#given a wide terminal #when a live task row renders #then the longer summary and adjacent metadata remain visible", () => {
+    const row = backgroundWidgetRows([
+      record({
+        task_id: "st_wide",
+        task_summary: "Plan the complete Spider-Man media library migration",
+        status: "running",
+        category: "unspecified-high",
+        resolved_model: {
+          provider: "anthropic",
+          model_id: "claude-opus-5",
+          display: "anthropic/claude-opus-5",
+          reasoning_effort: "xhigh",
+          source: "category",
+        },
+      }),
+    ], new Map([["st_wide", "running read src/library.ts"]]), now, () => stats, 220)[0] ?? ""
+
+    expect(row).toContain("Plan the complete Spider-Man media library migration")
+    expect(row).toContain("category:unspecified-high(anthropic/claude-opus-5:xhigh)")
+    expect(row).toContain("turn 2 (4 tools)")
+    expect(row).toContain("$0.1303")
+    expect(row).not.toContain("CH:")
+    expect(row).toContain("97 tok/s")
+    expect(row).toContain("running read src/library.ts")
+    expect(row).toEndWith("1m 0s")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(220)
+  })
+
+  it("#given a narrow terminal #when a live task row renders #then it stays on one bounded physical line", () => {
+    const row = backgroundWidgetRows([
+      record({
+        task_id: "st_narrow",
+        task_summary: "Plan the complete Spider-Man media library migration",
+        status: "running",
+        category: "unspecified-high",
+      }),
+    ], new Map([["st_narrow", "running"]]), now, () => stats, 90)[0] ?? ""
+
+    expect(row).not.toContain("\n")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(90)
+    expect(row).toContain("Plan")
+    expect(row).toContain("category:unspec")
+    expect(row).toContain("running")
+    expect(row).toEndWith("1m 0s")
+  })
+})
+
+describe("suspended residency labeling", () => {
+  it("#given a persisted_only record #when formatting a full row #then the status shows suspended", () => {
+    const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" }))
+    expect(row).toContain("suspended")
+    expect(row).not.toContain("status:running")
+  })
+
+  it("#given an rpc_detached record #when formatting a full row #then the status shows suspended", () => {
+    const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" }))
+    expect(row).toContain("suspended")
+    expect(row).not.toContain("status:running")
+  })
+
+  it("#given a resident record #when formatting a full row #then the status label is unchanged (regression pin)", () => {
+    const row = formatTaskRow(record({ task_id: "st_live", status: "running", residency_state: "resident" }))
+    expect(row).toContain("status:running")
+    expect(row).not.toContain("suspended")
+  })
+
+  it("#given a persisted_only record #when building a widget row #then it contains suspended", () => {
+    const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })])
+    expect(row.length).toBeGreaterThan(0)
+    expect(row[0]).toContain("suspended")
+  })
+
+  it("#given an rpc_detached record #when building a widget row #then it contains suspended", () => {
+    const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })])
+    expect(row.length).toBeGreaterThan(0)
+    expect(row[0]).toContain("suspended")
+  })
+
+  it("#given a persisted_only record #when building a background widget row #then it contains suspended", () => {
+    const now = Date.parse("2026-07-07T00:01:00.000Z")
+    const row = backgroundWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })], new Map([]), now, () => undefined, 220)[0] ?? ""
+    expect(row).toContain("suspended")
   })
 })
 

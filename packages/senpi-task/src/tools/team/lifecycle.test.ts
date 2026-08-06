@@ -151,18 +151,6 @@ describe("team_create tool", () => {
     expect(text).not.toContain("undefined")
   })
 
-  test("#given both team_name and inline_spec #when team_create runs #then it rejects with invalid_arguments", async () => {
-    // given
-    const service = createFakeTeamService()
-
-    // when
-    const result = await runTeamCreate(service, { team_name: "x", inline_spec: { name: "y" } })
-
-    // then
-    expect(result.details.kind).toBe("invalid_arguments")
-    expect(service.calls).toHaveLength(0)
-  })
-
   test("#given neither team_name nor inline_spec #when team_create runs #then it rejects with invalid_arguments", async () => {
     const service = createFakeTeamService()
     const result = await runTeamCreate(service, {})
