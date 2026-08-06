@@ -73,6 +73,12 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
+				sweepFamilies: {
+					sweepCodegraph: () => undefined,
+					sweepGitBashProxies: () => undefined,
+					sweepLspProxies: () => undefined,
+					sweepStaleLspDaemons: () => undefined,
+				},
 			});
 
 			// then
