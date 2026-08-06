@@ -254,3 +254,23 @@ test("detects and reaps stale lock entries", async () => {
   await expect(readFile(lockPath, "utf8")).rejects.toThrow()
   await rm(rootDirectory, { recursive: true, force: true })
 })
+
+test("withLock keeps newline owner tags recoverable after a crash", async () => {
+  // given
+  const { detectStaleLock, withLock } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-newline-owner-")
+  const lockPath = join(rootDirectory, "lock")
+  let ownerContent = ""
+
+  // when
+  await withLock(
+    lockPath,
+    async () => { ownerContent = await readFile(lockPath, "utf8") },
+    { ownerTag: "member-a\nmember-b" },
+  )
+  await writeFile(lockPath, ownerContent.replace(/\n\d+\n\d+\n$/, "\n999999999\n1\n"))
+
+  // then
+  expect(await detectStaleLock(lockPath, 0)).toBe(true)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
