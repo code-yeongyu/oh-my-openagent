@@ -164,4 +164,149 @@ describe("deprecated reasoning keys check", () => {
       }
     }
   })
+
+  it("does not flag deprecated keys inside provider_options passthrough maps", async () => {
+    //#given canonical config where verbosity lives in the provider passthrough maps
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const originalHome = process.env.HOME
+    const originalCwd = process.cwd()
+    const testRootDir = mkdtempSync(join(tmpdir(), "omo-doctor-provider-options-"))
+    const projectDir = join(testRootDir, "project")
+    const configPath = join(testRootDir, ".omo", "omo.jsonc")
+
+    try {
+      mkdirSync(projectDir, { recursive: true })
+      mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+      process.env.HOME = testRootDir
+      delete process.env.OPENCODE_CONFIG_DIR
+      writeFileSync(
+        configPath,
+        JSON.stringify(
+          {
+            categories: {
+              deep: {
+                model: "openai/gpt-5.6-sol",
+                provider_options: {
+                  textVerbosity: "high",
+                },
+              },
+            },
+            agents: {
+              oracle: {
+                model: "openai/gpt-5.6-sol",
+                providerOptions: {
+                  textVerbosity: "high",
+                },
+              },
+            },
+            "[opencode]": {
+              categories: {
+                planner: {
+                  model: "minimax-coding-plan/MiniMax-M3",
+                  provider_options: {
+                    textVerbosity: "high",
+                  },
+                },
+              },
+            },
+            "[senpi]": {
+              categories: {
+                quick: {
+                  model: "openai/gpt-5.6-luna",
+                  provider_options: {
+                    textVerbosity: "low",
+                  },
+                },
+              },
+            },
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf-8",
+      )
+      process.chdir(projectDir)
+
+      //#when running the deprecated reasoning keys check
+      const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
+      const result = await checkDeprecatedReasoningKeys()
+
+      //#then the canonical passthrough keys are not reported
+      expect(result.status).toBe("pass")
+      expect(result.issues).toEqual([])
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(testRootDir, { recursive: true, force: true })
+      if (originalConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+      }
+      if (originalHome === undefined) {
+        delete process.env.HOME
+      } else {
+        process.env.HOME = originalHome
+      }
+    }
+  })
+
+  it("still reports deprecated keys next to provider passthrough maps", async () => {
+    //#given a config mixing canonical passthrough keys with a deprecated legacy key
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const originalHome = process.env.HOME
+    const originalCwd = process.cwd()
+    const testRootDir = mkdtempSync(join(tmpdir(), "omo-doctor-provider-options-legacy-"))
+    const projectDir = join(testRootDir, "project")
+    const configPath = join(testRootDir, ".omo", "omo.jsonc")
+
+    try {
+      mkdirSync(projectDir, { recursive: true })
+      mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+      process.env.HOME = testRootDir
+      delete process.env.OPENCODE_CONFIG_DIR
+      writeFileSync(
+        configPath,
+        JSON.stringify(
+          {
+            categories: {
+              deep: {
+                model: "openai/gpt-5.6-sol",
+                provider_options: {
+                  textVerbosity: "high",
+                },
+                variant: "high",
+              },
+            },
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf-8",
+      )
+      process.chdir(projectDir)
+
+      //#when running the deprecated reasoning keys check
+      const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
+      const result = await checkDeprecatedReasoningKeys()
+
+      //#then only the legacy key is reported, never the canonical passthrough key
+      expect(result.status).toBe("warn")
+      expect(result.issues.map((issue) => issue.description)).toEqual([
+        `${configPath}: categories.deep.variant`,
+      ])
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(testRootDir, { recursive: true, force: true })
+      if (originalConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+      }
+      if (originalHome === undefined) {
+        delete process.env.HOME
+      } else {
+        process.env.HOME = originalHome
+      }
+    }
+  })
 })

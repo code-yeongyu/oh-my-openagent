@@ -49,6 +49,9 @@ function collectIssues(configPath: string, value: unknown, prefix: string): Doct
       continue
     }
     if (key === "[opencode]") continue
+    // Provider option passthrough maps are not model definitions; keys inside
+    // them (e.g. provider_options.textVerbosity) are canonical, not deprecated.
+    if (key === "provider_options" || key === "providerOptions") continue
     if (TUNING_CONTAINERS.has(key) || isHarnessBlock(key) || prefix.length > 0) {
       issues.push(...collectIssues(configPath, child, path))
     }
