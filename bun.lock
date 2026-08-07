@@ -32,6 +32,7 @@
         "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
+        "@oh-my-opencode/herdr-core": "workspace:*",
         "@oh-my-opencode/lsp-core": "workspace:*",
         "@oh-my-opencode/mcp-client-core": "workspace:*",
         "@oh-my-opencode/mcp-stdio-core": "workspace:*",
