@@ -91,7 +91,7 @@ Fan out read-only research before deciding. Every delegated prompt names TASK / 
 task(subagent_type="explore", description="Map the implementation surface", prompt="TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...")
 ```
 
-Roles - the ONLY subagents you may spawn (all read-only, plus `oracle` for the high-accuracy review): `explore` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Never dispatch with `category=` - categories spawn implementers - and never instruct a child to edit files. Mandatory Momus/Oracle review lanes use synchronous `task` calls exactly as bounded in `references/full-workflow.md`; ordinary research keeps normal delegation discipline.
+Roles - the ONLY subagents you may spawn (all read-only, plus `oracle` for the high-accuracy review): `explore` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Never dispatch with `category=` - categories spawn implementers - and never instruct a child to edit files. Mandatory Momus/Oracle review lanes use parallel synchronous `task` calls exactly as semantically bounded in `references/full-workflow.md`; ordinary research keeps normal delegation discipline.
 
 ## Stop rules
 
