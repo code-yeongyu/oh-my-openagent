@@ -23,46 +23,22 @@ const SCAFFOLD_PLAN_URL = pathToFileURL(
 	),
 ).href;
 
-type ReviewBudget = {
-	readonly limit?: number;
-	readonly used?: number;
-};
-
 type ReviewProtocol = {
 	readonly protocol_version?: string;
 	readonly coverage_matrix_version?: string;
 	readonly phase?: string;
-	readonly budgets?: {
-		readonly full_rounds?: ReviewBudget;
-		readonly correction_a?: ReviewBudget;
-		readonly final_repair_b?: ReviewBudget;
-		readonly targeted_closure?: ReviewBudget;
-		readonly pre_receipt_replacements_per_lane?: number;
-	};
-	readonly identities?: Record<string, string | null>;
-	readonly rounds?: readonly unknown[];
-	readonly corrections?: readonly unknown[];
-	readonly closures?: readonly unknown[];
-	readonly lanes?: readonly unknown[];
-	readonly attempts?: readonly unknown[];
-	readonly raw_completions?: readonly unknown[];
-	readonly semantic_receipts?: readonly unknown[];
-	readonly findings?: readonly unknown[];
-	readonly root_causes?: readonly unknown[];
-	readonly repair_impacts?: readonly unknown[];
-	readonly audit_events?: readonly unknown[];
+	readonly recovery_used?: boolean;
 	readonly terminal?: null;
 };
 
 type DraftState = {
+	readonly approach?: null;
 	readonly review_required?: boolean;
 	readonly review_protocol?: ReviewProtocol;
 };
 
 function parseDraftState(draft: string): DraftState {
-	const parsed = parseFrontmatter<DraftState>(
-		draft.replace(/^approach: .+$/m, "approach: null"),
-	);
+	const parsed = parseFrontmatter<DraftState>(draft);
 	if (!parsed.hadFrontmatter || parsed.parseError) {
 		throw new Error("Expected scaffold draft frontmatter to parse");
 	}
@@ -82,7 +58,7 @@ async function withTemporaryDirectory<T>(
 }
 
 describe("ulw-plan bounded review scaffold state", () => {
-	test("#given a review-required draft #when its scaffold state is parsed #then bounded protocol seed is complete and unused", async () => {
+	test("#given a review-required draft #when its raw scaffold state is parsed #then review state is compact and unused", async () => {
 		// given
 		const { buildDraft } = await import(SCAFFOLD_PLAN_URL);
 
@@ -92,45 +68,13 @@ describe("ulw-plan bounded review scaffold state", () => {
 		);
 
 		// then
+		expect(state.approach).toBeNull();
 		expect(state.review_required).toBe(true);
 		expect(state.review_protocol).toEqual({
-			protocol_version: "bounded-review/v1",
+			protocol_version: "bounded-review/v2",
 			coverage_matrix_version: "D01-D10/v1",
-			phase: "review_requested",
-			budgets: {
-				full_rounds: { limit: 2, used: 0 },
-				correction_a: { limit: 1, used: 0 },
-				final_repair_b: { limit: 1, used: 0 },
-				targeted_closure: { limit: 1, used: 0 },
-				pre_receipt_replacements_per_lane: 1,
-			},
-			identities: {
-				scope_id: null,
-				workspace_root: null,
-				runtime_home: null,
-				target_path: ".omo/plans/bounded-seed.md",
-				target_sha256: null,
-				target_bytes: null,
-				target_byte_count: null,
-				snapshot_id: null,
-				phase_id: null,
-				round_id: null,
-				closure_id: null,
-				reviewer_id: null,
-				launch_id: null,
-				expected_receipt_id: null,
-			},
-			rounds: [],
-			corrections: [],
-			closures: [],
-			lanes: [],
-			attempts: [],
-			raw_completions: [],
-			semantic_receipts: [],
-			findings: [],
-			root_causes: [],
-			repair_impacts: [],
-			audit_events: [],
+			phase: "discovery_pending",
+			recovery_used: false,
 			terminal: null,
 		});
 	});
@@ -169,7 +113,7 @@ describe("ulw-plan bounded review scaffold state", () => {
 			expect(
 				parseDraftState(await readFile(draftPath, "utf8")).review_protocol
 					?.phase,
-			).toBe("review_requested");
+			).toBe("discovery_pending");
 			expect(await Bun.file(planPath).exists()).toBe(false);
 		});
 	});

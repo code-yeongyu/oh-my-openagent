@@ -163,41 +163,10 @@ plan_sha256: null
 review_round_id: null
 pending-action: write and review .omo/plans/${slug}.md
 review_protocol:
-  protocol_version: bounded-review/v1
+  protocol_version: bounded-review/v2
   coverage_matrix_version: D01-D10/v1
-  phase: review_requested
-  budgets:
-    full_rounds: { limit: 2, used: 0 }
-    correction_a: { limit: 1, used: 0 }
-    final_repair_b: { limit: 1, used: 0 }
-    targeted_closure: { limit: 1, used: 0 }
-    pre_receipt_replacements_per_lane: 1
-  identities:
-    scope_id: null
-    workspace_root: null
-    runtime_home: null
-    target_path: .omo/plans/${slug}.md
-    target_sha256: null
-    target_bytes: null
-    target_byte_count: null
-    snapshot_id: null
-    phase_id: null
-    round_id: null
-    closure_id: null
-    reviewer_id: null
-    launch_id: null
-    expected_receipt_id: null
-  rounds: []
-  corrections: []
-  closures: []
-  lanes: []
-  attempts: []
-  raw_completions: []
-  semantic_receipts: []
-  findings: []
-  root_causes: []
-  repair_impacts: []
-  audit_events: []
+  phase: discovery_pending
+  recovery_used: false
   terminal: null`
 		: `review_required: false
 pending-action: write .omo/plans/${slug}.md`;
@@ -206,7 +175,7 @@ slug: ${slug}
 status: drafting
 intent: ${intent}
 ${reviewState}
-approach: <fill: the approach you intend to plan>
+approach: null
 ---
 
 # Draft: ${slug}
@@ -228,6 +197,9 @@ approach: <fill: the approach you intend to plan>
 ## Scope OUT (Must NOT have)
 
 ## Open questions
+
+## Review evidence (workflow only)
+<!-- Append protocol-defined pair blocks here. Frontmatter plan_sha256/review_round_id point to the active pair. Never copy workflow evidence into the formal plan. -->
 
 ## Approval gate
 status: drafting
