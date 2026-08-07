@@ -44,6 +44,7 @@ export type LocalMcpConfig = {
   command: string[]
   enabled: boolean
   environment?: Record<string, string>
+  cwd?: string
 }
 
 function getModuleDirectory(moduleUrl: string): string | null {
@@ -112,13 +113,15 @@ function resolveLspCommand(options: LspMcpConfigOptions = {}): AncestorCliCandid
 
 export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpConfig {
   const resolvedCommand = resolveLspCommand(options)
+  const cwd = resolve(options.cwd ?? process.cwd())
 
   return {
     type: "local",
     command: resolvedCommand.command,
+    cwd,
     enabled: resolvedCommand.exists,
     environment: {
-      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.join(delimiter),
+      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.map((configPath) => resolve(cwd, configPath)).join(delimiter),
     },
   }
 }

@@ -52,7 +52,7 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: BuiltinM
   }
 
   if (!disabledMcps.includes("lsp")) {
-    mcps.lsp = createLspMcpConfig({ resolveExecutable: options.resolveExecutable })
+    mcps.lsp = createLspMcpConfig({ resolveExecutable: options.resolveExecutable, cwd: options.cwd })
   }
 
   if (!disabledMcps.includes("codegraph") && config?.codegraph?.enabled !== false) {
