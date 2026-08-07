@@ -163,7 +163,6 @@ plan_sha256: null
 review_round_id: null
 pending-action: write and review .omo/plans/${slug}.md
 review_protocol:
-  protocol_version: bounded-review/v2
   coverage_matrix_version: D01-D10/v1
   phase: discovery_pending
   recovery_used: false

@@ -24,7 +24,6 @@ const SCAFFOLD_PLAN_URL = pathToFileURL(
 ).href;
 
 type ReviewProtocol = {
-	readonly protocol_version?: string;
 	readonly coverage_matrix_version?: string;
 	readonly phase?: string;
 	readonly recovery_used?: boolean;
@@ -71,7 +70,6 @@ describe("ulw-plan bounded review scaffold state", () => {
 		expect(state.approach).toBeNull();
 		expect(state.review_required).toBe(true);
 		expect(state.review_protocol).toEqual({
-			protocol_version: "bounded-review/v2",
 			coverage_matrix_version: "D01-D10/v1",
 			phase: "discovery_pending",
 			recovery_used: false,
