@@ -21,21 +21,32 @@ const CONDITIONS: Readonly<Record<string, AgentInvocationCondition>> = AGENT_INV
 
 export const PLAN_GATED_AGENT_NAMES: ReadonlySet<string> = new Set(Object.keys(AGENT_INVOCATION_CONDITIONS))
 
+// A single plan-artifact path touched in a session. lastTouchedAt is a monotonic per-tracker
+// sequence number, NOT a wall-clock timestamp, so ordering never depends on clock resolution.
+export type PlanArtifactReference = {
+  readonly path: string
+  readonly count: number
+  readonly lastTouchedAt: number
+}
+
 // hasInvoked observes every invocation channel (SKILL.md read, slash command) and feeds the
 // forbids check. hasUserRequested is strictly the user-input channel - a model cannot manufacture
 // it - and is the only channel that satisfies requiresSkills. hasPlanArtifact reports whether a
 // .omo/plans/*.md file (at ANY root - worktrees and external checkouts included) was touched in
-// this session.
+// this session. planArtifactReferences exposes the per-path counts behind it, sorted by count
+// desc then lastTouchedAt desc, so consumers can pick the session's most-referenced plan.
 export type SkillInvocationState = {
   readonly hasInvoked: (skill: string) => boolean
   readonly hasUserRequested: (skill: string) => boolean
   readonly hasPlanArtifact: () => boolean
+  readonly planArtifactReferences: () => readonly PlanArtifactReference[]
 }
 
 export const EMPTY_SKILL_INVOCATIONS: SkillInvocationState = {
   hasInvoked: () => false,
   hasUserRequested: () => false,
   hasPlanArtifact: () => false,
+  planArtifactReferences: () => [],
 }
 
 export type InvocationGuardVerdict =

@@ -19,11 +19,32 @@ function iso(offsetMs: number): string {
   return new Date(1_000_000 + offsetMs).toISOString()
 }
 
-function contextFor(store: TaskRecordStore, cap: number): LifecycleContext {
+function contextFor(store: TaskRecordStore, cap: number | "unlimited"): LifecycleContext {
   return resolveContext({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: cap }) })
 }
 
 describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
+  test("#given unlimited residency with existing residents #when suspended children resume #then every candidate is claimed", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_000000d0", status: "running", residency_state: "resident" })
+    seedRecord(store, { task_id: "st_000000d1", status: "completed", residency_state: "resident" })
+    seedRecord(store, { task_id: "st_000000d2", status: "running", residency_state: "persisted_only" })
+    seedRecord(store, { task_id: "st_000000d3", status: "completed", residency_state: "rpc_detached" })
+    seedRecord(store, { task_id: "st_000000d4", status: "error", residency_state: "persisted_only" })
+    const context = contextFor(store, "unlimited")
+
+    // when
+    const result = await admitSuspendedBatch(context, "parent-1")
+
+    // then
+    expect(result.outcomes).toHaveLength(3)
+    expect(result.outcomes.every((outcome) => outcome.kind === "claimed")).toBe(true)
+    expect(store.load("st_000000d2")?.residency_state).toBe("resident")
+    expect(store.load("st_000000d3")?.residency_state).toBe("resident")
+    expect(store.load("st_000000d4")?.residency_state).toBe("resident")
+  })
+
   test("#given 10 suspended (3 running, 7 completed) and 2 residents under cap 8 #when the batch admits #then 3 running + 3 MRU completed are claimed and 4 defer capacity", async () => {
     // given: 2 residents (one owned by a live foreign pid - it still consumes a slot)
     const store = tempStore()

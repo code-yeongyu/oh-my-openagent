@@ -13,14 +13,15 @@ import type { AdmissionResult } from "./types"
  */
 export async function admitResident(context: LifecycleContext, parentSessionId: string): Promise<AdmissionResult> {
   const residents = residentsFor(context, parentSessionId)
-  if (residents.length < context.config.residency_max_children) return { kind: "admitted" }
+  const maxChildren = context.config.residency_max_children
+  if (maxChildren === "unlimited" || residents.length < maxChildren) return { kind: "admitted" }
 
   const victim = lruEvictable(context, residents)
   if (victim === undefined) {
     return {
       kind: "rejected",
       error: new AgentLimitReached({
-        max_children: context.config.residency_max_children,
+        max_children: maxChildren,
         session_id: parentSessionId,
         residents: residents.map((record) => ({ task_id: record.task_id, name: record.name ?? record.task_id, status: record.status })),
       }),
@@ -140,7 +141,10 @@ export async function admitSuspendedBatch(
     const candidates = byRevivalPriority(revivalCandidates(context, parentSessionId, options.excludeTaskIds))
     // Residents include live foreign owners; when the configured cap sits below the current
     // resident count, available clamps to 0 - revive none, keep owned residents, evict nothing.
-    const available = Math.max(0, context.config.residency_max_children - residentsFor(context, parentSessionId).length)
+    const maxChildren = context.config.residency_max_children
+    const available = maxChildren === "unlimited"
+      ? candidates.length
+      : Math.max(0, maxChildren - residentsFor(context, parentSessionId).length)
     const selected = candidates.slice(0, available)
     for (const record of selected) {
       // Holder-side fencing: re-read the lease before EVERY mutation; a displaced holder aborts

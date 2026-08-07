@@ -128,7 +128,8 @@ describe("TaskManager claim characterization", () => {
         inner.save(record)
       },
     }
-    const clock = () => (Math.floor(Date.now() / 65_536) + 1_000_000) * 65_536
+    const nowSnapshot = Date.now()
+    const clock = () => (Math.floor(nowSnapshot / 65_536) + 10_000_000) * 65_536
     const firstTaskId = `st_${Math.floor(clock() / 65_536).toString(16).padStart(8, "0")}`
     const { manager } = managerWithStore(invariantStore, new FakeRunner(), new FakeRunner(), clock)
 
