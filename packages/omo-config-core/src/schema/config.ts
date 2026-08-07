@@ -45,7 +45,7 @@ export const OmoConfigSchema = z.object({
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
-  profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
+  profiles: z.record(z.string(), OmoConfigProfileSchema).default({}).optional(),
   _migrations: z.array(z.string()).optional(),
   legacy_migrations: z.record(z.string(), z.unknown()).optional(),
 }).strict()

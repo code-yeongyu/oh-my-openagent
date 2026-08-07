@@ -25,8 +25,14 @@ export function createOmoJsonSchema(): Record<string, unknown> {
   const profileProperties = requiredRecord(profile.properties, "properties.profiles.additionalProperties.properties")
   const openCodeSchema = createOhMyOpenCodeJsonSchema()
 
-  properties["[opencode]"] = openCodeSchema
-  profileProperties["[opencode]"] = openCodeSchema
+  // Strip $id from embedded schemas — they are inline copies, not standalone
+  // entry points. A shared $id in two locations causes Ajv 2020 compilation
+  // failure ("resolves to more than one schema") in both strict and
+  // non-strict modes.
+  const { $id: _unused, ...openCodeSchemaNoId } = openCodeSchema as { $id?: unknown; [key: string]: unknown }
+
+  properties["[opencode]"] = openCodeSchemaNoId
+  profileProperties["[opencode]"] = { ...openCodeSchemaNoId }
 
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
