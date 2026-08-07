@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { LspClient } from "./client.js";
+import { LspProcessSpawnError } from "./errors.js";
 import { LspManager } from "./manager.js";
 import type { ResolvedServer } from "./types.js";
 
@@ -34,6 +35,28 @@ describe("LspManager start timeout", () => {
 		} finally {
 			client.releaseInitialize();
 			await acquisition.catch(() => undefined);
+			await manager.stopAll();
+		}
+	});
+
+	it("#given a client whose start rejects asynchronously #when getClient runs #then it rejects with LspProcessSpawnError and cleans up", async () => {
+		// given
+		const client = new SpawnErrorLspClient(server);
+		const manager = new LspManager({
+			clientFactory: () => client,
+			reaperIntervalMs: 60_000,
+			startTimeoutMs: 500,
+		});
+
+		// when
+		const acquisition = manager.getClient("/workspace", server);
+
+		// then
+		try {
+			await expect(acquisition).rejects.toBeInstanceOf(LspProcessSpawnError);
+			expect(manager.clientCount()).toBe(0);
+			expect(client.stopCallCount).toBe(1);
+		} finally {
 			await manager.stopAll();
 		}
 	});
@@ -87,6 +110,29 @@ class HangingInitLspClient extends LspClient {
 
 	releaseInitialize(): void {
 		this.releaseInit?.();
+	}
+}
+
+class SpawnErrorLspClient extends LspClient {
+	stopCallCount = 0;
+
+	constructor(resolvedServer: ResolvedServer) {
+		super("/workspace", resolvedServer);
+	}
+
+	override async start(): Promise<void> {
+		await Promise.resolve();
+		throw new LspProcessSpawnError("spawn ENOENT");
+	}
+
+	override async initialize(): Promise<void> {}
+
+	override async stop(): Promise<void> {
+		this.stopCallCount += 1;
+	}
+
+	override isAlive(): boolean {
+		return false;
 	}
 }
 
