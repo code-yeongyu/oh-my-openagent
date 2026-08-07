@@ -188,6 +188,7 @@ describe("deprecated reasoning keys check", () => {
                 model: "openai/gpt-5.6-sol",
                 provider_options: {
                   textVerbosity: "high",
+                  thinking: { type: "enabled" },
                 },
               },
             },
@@ -196,6 +197,7 @@ describe("deprecated reasoning keys check", () => {
                 model: "openai/gpt-5.6-sol",
                 providerOptions: {
                   textVerbosity: "high",
+                  thinking: { type: "disabled" },
                 },
               },
             },
