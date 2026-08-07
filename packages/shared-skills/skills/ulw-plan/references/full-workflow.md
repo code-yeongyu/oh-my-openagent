@@ -40,10 +40,10 @@ If a draft/plan already exists and the user says a review modifier - even append
 
 Both paths record `intent`, `review_required`, and decisions to `.omo/drafts/<slug>.md` as they go - long sessions outlive your context, and plan generation reads the draft, not your memory.
 
-As soon as `<slug>`, intent, and classification are known, run the scaffold with `--draft-only`. Add `--review-required` when an explicit modifier requires review or intent is UNCLEAR and classification is non-Trivial, so the first durable write seeds `bounded-review/v2`, matrix `D01-D10/v1`, `phase: discovery_pending`, an unused recovery flag, and `terminal: null`. The scaffold creates no plan in draft-only mode, launches no reviewer, and performs no semantic transition. If review becomes required only after the draft exists, atomically replace stale action/review fields with the same compact seed. If a complete plan already exists, freeze its current bytes and initialize discovery without changing intent or approval state.
+As soon as `<slug>`, intent, and classification are known, run the scaffold with `--draft-only`. Add `--review-required` when an explicit modifier requires review or intent is UNCLEAR and classification is non-Trivial, so the first durable write seeds matrix `D01-D10/v1`, `phase: discovery_pending`, an unused recovery flag, and `terminal: null`. The scaffold creates no plan in draft-only mode, launches no reviewer, and performs no semantic transition. If review becomes required only after the draft exists, atomically replace stale action/review fields with the same compact seed. If a complete plan already exists, freeze its current bytes and initialize discovery without changing intent or approval state.
 
 Review state is durable and state-derived, never reconstructed from chat history. It contains:
-- protocol and coverage-matrix versions;
+- coverage-matrix version;
 - current phase;
 - whether the current phase consumed its only recovery;
 - one nullable terminal record.
