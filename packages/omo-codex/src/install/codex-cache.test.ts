@@ -5,10 +5,13 @@
 
 import { describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
+import { link as createHardLink, mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, join, relative, sep } from "node:path"
 import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
+
+const BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM = 'if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"'
+const win32Only = process.platform === "win32" ? test : test.skip
 
 describe("codex-cache", () => {
   test("rewrites cached mcp manifest relative args and cwd", async () => {
@@ -621,9 +624,43 @@ describe("codex-cache", () => {
     const commandShim = await readFile(join(binDir, "omo-hook.cmd"), "utf8")
     expect(commandShim).toContain("@echo off")
     expect(commandShim).toContain("NODE_REPL_NODE_PATH")
+    expect(commandShim).not.toContain(BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM)
     expect(commandShim).toContain('"%OMO_NODE_BINARY%" "')
     expect(commandShim).toContain(`"${join(pluginRoot, "dist", "cli.js")}" %*`)
     expect(commandShim).not.toContain(`node "${join(pluginRoot, "dist", "cli.js")}" %*`)
+  })
+
+  win32Only("#given quoted NODE_REPL_NODE_PATH #when running a cached component shim #then batch parsing reaches the node target", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-quoted-node-"))
+    const pluginRoot = join(root, "plugin")
+    const binDir = join(root, "bin")
+    await mkdir(join(pluginRoot, "dist"), { recursive: true })
+    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo", bin: { "omo-hook": "dist/cli.js" } }))
+    await writeFile(join(pluginRoot, "dist", "cli.js"), 'console.log("component target", process.argv.slice(2).join(" "))\n')
+    const [link] = await linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" })
+    if (link === undefined) throw new Error("expected cached component shim")
+    const spacedNodeDir = join(root, "node runtime")
+    const spacedNodePath = join(spacedNodeDir, "bun.exe")
+    await mkdir(spacedNodeDir, { recursive: true })
+    await createHardLink(process.execPath, spacedNodePath)
+
+    // when
+    const child = Bun.spawn(["cmd.exe", "/v:on", "/d", "/c", "call", link.path, "--probe"], {
+      env: { ...Bun.env, NODE_REPL_NODE_PATH: `"${spacedNodePath}"` },
+      stderr: "pipe",
+      stdout: "pipe",
+    })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stderr).not.toContain("The syntax of the command is incorrect")
+    expect(stdout.trim()).toBe("component target --probe")
   })
 
   test("rejects existing non-generated Windows command shims", async () => {

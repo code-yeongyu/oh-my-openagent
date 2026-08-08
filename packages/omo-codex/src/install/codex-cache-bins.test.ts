@@ -2,10 +2,12 @@
 
 import { describe, expect, it, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, link as createHardLink, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
+
+const BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM = 'if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"'
 
 async function createRepoFixture(): Promise<{ repoRoot: string; binDir: string; codexHome: string }> {
   const root = mkdtempSync(join(tmpdir(), "omo-codex-cache-bins-"))
@@ -74,7 +76,7 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(link).not.toBeNull()
     const wrapper = await readFile(link?.path ?? "", "utf8")
     expect(wrapper).toContain('for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (')
-    expect(wrapper).toContain('if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"')
+    expect(wrapper).not.toContain(BROKEN_WINDOWS_DOUBLE_QUOTE_TRIM)
     expect(wrapper).toContain(`if "!OMO_NODE_BINARY:~0,1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"`)
     expect(wrapper).toContain('if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "')
     expect(wrapper.indexOf("NODE_REPL_NODE_PATH")).toBeLessThan(wrapper.indexOf('if "%OMO_RUNTIME%"=="node"'))
@@ -83,6 +85,7 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
   })
 
   const posixOnly = process.platform === "win32" ? test.skip : test
+  const win32Only = process.platform === "win32" ? test : test.skip
   posixOnly("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
     // given
     const fixture = await createRepoFixture()
@@ -124,6 +127,39 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(exitCode).toBe(0)
     expect(stderr).toBe("")
     expect(stdout.trim()).toBe("ulw-loop help")
+  })
+
+  win32Only("#given quoted NODE_REPL_NODE_PATH #when running omo.cmd #then batch parsing reaches the node fallback", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(join(fixture.repoRoot, "dist", "cli-node"), { recursive: true })
+    await writeFile(
+      join(fixture.repoRoot, "dist", "cli-node", "index.js"),
+      'console.log("node fallback", process.argv.slice(2).join(" "))\n',
+    )
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+    if (link === null) throw new Error("expected runtime wrapper link")
+    const spacedNodeDir = join(fixture.repoRoot, "node runtime")
+    const spacedNodePath = join(spacedNodeDir, "bun.exe")
+    await mkdir(spacedNodeDir, { recursive: true })
+    await createHardLink(process.execPath, spacedNodePath)
+
+    // when
+    const child = Bun.spawn(["cmd.exe", "/v:on", "/d", "/c", "call", link.path, "--probe"], {
+      env: { ...Bun.env, NODE_REPL_NODE_PATH: `"${spacedNodePath}"`, OMO_RUNTIME: "node" },
+      stderr: "pipe",
+      stdout: "pipe",
+    })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stderr).not.toContain("The syntax of the command is incorrect")
+    expect(stdout.trim()).toBe("node fallback --probe")
   })
 
   it("#given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec", async () => {
