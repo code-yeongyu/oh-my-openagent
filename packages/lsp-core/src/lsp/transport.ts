@@ -90,7 +90,7 @@ export class LspClientTransport {
 		this.connection.onNotification("textDocument/publishDiagnostics", (params) => {
 			const diagnosticsParams = parseDiagnosticsParams(params);
 			if (diagnosticsParams?.uri) {
-				this.diagnosticsStore.set(diagnosticsParams.uri, diagnosticsParams.diagnostics);
+				this.diagnosticsStore.set(canonicalUri(diagnosticsParams.uri), diagnosticsParams.diagnostics);
 			}
 		});
 
@@ -275,8 +275,24 @@ export class LspClientTransport {
 	}
 
 	getStoredDiagnostics(uri: string): Diagnostic[] {
-		return this.diagnosticsStore.get(uri) ?? [];
+		return this.diagnosticsStore.get(canonicalUri(uri)) ?? [];
 	}
+}
+
+/**
+ * Normalizes a document URI so that push diagnostics (published by the server)
+ * and client-side lookups share the same key.
+ *
+ * Language servers commonly emit URIs with a lowercased Windows drive letter
+ * and percent-encoded colon (e.g. `file:///d%3A/project/...`), while the client
+ * generates `file:///D:/project/...`. On Windows these strings must match
+ * exactly for diagnostics to be found; on POSIX systems no drive letter or
+ * `%3A` exists, so the URI is returned unchanged.
+ */
+export function canonicalUri(uri: string): string {
+	return uri
+		.replace(/%3A/g, ":")
+		.replace(/^file:\/\/\/([a-zA-Z]):/, (_, drive: string) => `file:///${drive.toLowerCase()}:`);
 }
 
 export function createLspSpawnEnv(

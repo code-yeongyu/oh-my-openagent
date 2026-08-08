@@ -6,6 +6,7 @@ import { contextCwd } from "../request-context.js";
 import { LspClientConnection } from "./connection.js";
 import { effectiveExtension } from "./effective-extension.js";
 import { getLanguageId } from "./language-mappings.js";
+import { canonicalUri } from "./transport.js";
 import type {
 	Diagnostic,
 	DocumentSymbol,
@@ -20,6 +21,8 @@ import type {
 
 const POST_OPEN_DELAY_MS = 1000;
 const POST_DIAGNOSTICS_WAIT_MS = 500;
+const DIAGNOSTICS_PUSH_POLL_ATTEMPTS = 10;
+const DIAGNOSTICS_PUSH_POLL_INTERVAL_MS = 1000;
 
 export class LspClient extends LspClientConnection {
 	private readonly openedFiles = new Set<string>();
@@ -124,16 +127,28 @@ export class LspClient extends LspClientConnection {
 
 	async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
 		const absPath = resolve(contextCwd(), filePath);
-		const uri = pathToFileURL(absPath).href;
+		const uri = canonicalUri(pathToFileURL(absPath).href);
 		await this.openFile(absPath);
 		await new Promise((r) => setTimeout(r, POST_DIAGNOSTICS_WAIT_MS));
+
+		// Poll for pushed diagnostics: on first use the language server may still
+		// be loading the project (tsserver on large workspaces can take seconds),
+		// so a single short wait frequently returns nothing.
+		for (let attempt = 0; attempt < DIAGNOSTICS_PUSH_POLL_ATTEMPTS; attempt++) {
+			const pushed = this.getStoredDiagnostics(uri);
+			if (pushed.length > 0) {
+				return { items: pushed };
+			}
+			await new Promise((r) => setTimeout(r, DIAGNOSTICS_PUSH_POLL_INTERVAL_MS));
+		}
 
 		try {
 			const result = await this.sendRequest<{ items?: Diagnostic[] }>("textDocument/diagnostic", {
 				textDocument: { uri },
 			});
-			if (result.items) {
-				return { items: result.items };
+			const pulled = result.items;
+			if (pulled && pulled.length > 0) {
+				return { items: pulled };
 			}
 		} catch (error) {
 			if (!this.isUnsupportedDiagnosticPullError(error)) {
