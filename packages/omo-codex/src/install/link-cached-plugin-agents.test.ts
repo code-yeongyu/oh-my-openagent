@@ -1,14 +1,21 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
 
+const temporaryDirectories: string[] = []
+
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })))
+})
+
 async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-agents-"))
+  temporaryDirectories.push(root)
   const codexHome = join(root, "codex")
   const pluginRoot = join(root, "plugin")
   await mkdir(join(pluginRoot, "components", "ultrawork", "agents"), { recursive: true })
@@ -286,6 +293,7 @@ describe("linkCachedPluginAgents", () => {
   test("returns empty list when plugin has no bundled agents", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-agents-empty-"))
+    temporaryDirectories.push(root)
     const codexHome = join(root, "codex")
     const pluginRoot = join(root, "plugin")
     await mkdir(pluginRoot, { recursive: true })
@@ -317,5 +325,101 @@ describe("linkCachedPluginAgents", () => {
       const content = await readFile(entry.path, "utf8")
       expect(content).toContain(`name = "${entry.name.replace(/\.toml$/, "")}"`)
     }
+  })
+
+  test("applies configured overrides after preserved reasoning and service tier while leaving foreign agents untouched", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "bundled"\nmodel_reasoning_effort = "medium"\nservice_tier = "standard"\n',
+    )
+    await writeFile(
+      join(agentsDir, "planner.toml"),
+      'name = "planner"\nmodel = "installed"\nmodel_reasoning_effort = "low"\nservice_tier = "flex"\n',
+    )
+    const foreignContent = 'name = "foreign"\nmodel = "do-not-touch"\n'
+    await writeFile(join(agentsDir, "foreign.toml"), foreignContent)
+    const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+    const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({
+      codexHome,
+      pluginRoot,
+      platform: "linux",
+      preservedReasoning,
+      preservedServiceTier,
+      agentModelOverrides: new Map([
+        ["planner", { model: "openai/gpt-5.6-sol", modelReasoningEffort: "xhigh", serviceTier: "priority" }],
+      ]),
+    })
+
+    // then
+    const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
+    expect(content).toContain('model = "openai/gpt-5.6-sol"')
+    expect(content).toContain('model_reasoning_effort = "xhigh"')
+    expect(content).toContain('service_tier = "priority"')
+    expect(content).not.toContain('model_reasoning_effort = "low"')
+    expect(content).not.toContain('service_tier = "flex"')
+    expect(await readFile(join(agentsDir, "foreign.toml"), "utf8")).toBe(foreignContent)
+  })
+
+  test("supports independent model-only reasoning-only and tier-only configured overrides", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+
+    // when
+    await linkCachedPluginAgents({
+      codexHome,
+      pluginRoot,
+      platform: "linux",
+      agentModelOverrides: new Map([
+        ["explorer", { model: "openai/gpt-5.6-terra" }],
+        ["librarian", { modelReasoningEffort: "high" }],
+        ["planner", { serviceTier: "flex" }],
+      ]),
+    })
+
+    // then
+    expect(await readFile(join(codexHome, "agents", "explorer.toml"), "utf8")).toContain(
+      'model = "openai/gpt-5.6-terra"',
+    )
+    expect(await readFile(join(codexHome, "agents", "librarian.toml"), "utf8")).toContain(
+      'model_reasoning_effort = "high"',
+    )
+    expect(await readFile(join(codexHome, "agents", "planner.toml"), "utf8")).toContain(
+      'service_tier = "flex"',
+    )
+  })
+
+  test("replaces non-string duplicate top-level settings exactly once without changing nested same-name keys", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = 17\nmodel = false\nmodel_reasoning_effort = false\nservice_tier = ["fast"]\n\n[tools]\nmodel = 2\nmodel_reasoning_effort = true\nservice_tier = "nested"\n',
+    )
+
+    // when
+    await linkCachedPluginAgents({
+      codexHome,
+      pluginRoot,
+      platform: "linux",
+      agentModelOverrides: new Map([
+        ["planner", { model: "openai/gpt-5.6-sol", modelReasoningEffort: "xhigh", serviceTier: "priority" }],
+      ]),
+    })
+
+    // then
+    const content = await readFile(join(codexHome, "agents", "planner.toml"), "utf8")
+    const topLevel = content.slice(0, content.indexOf("[tools]"))
+    expect(topLevel.match(/^model\s*=/gm)).toHaveLength(1)
+    expect(topLevel.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
+    expect(topLevel.match(/^service_tier\s*=/gm)).toHaveLength(1)
+    expect(content).not.toContain("model = 17")
+    expect(content).toContain('[tools]\nmodel = 2\nmodel_reasoning_effort = true\nservice_tier = "nested"')
   })
 })

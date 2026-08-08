@@ -9,6 +9,10 @@ import {
 	capturePreservedAgentServiceTier,
 	linkCachedPluginAgents,
 } from "../../../../src/install/link-cached-plugin-agents.ts";
+import {
+	getCodexAgentModelOverrides,
+	unknownCodexAgentModelOverrideWarnings,
+} from "../../../../src/install/codex-agent-model-overrides.ts";
 import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../src/install/codex-cache-bins.ts";
 import { hasForeignAgentRegistration } from "../../../../src/install/codex-config-agents.ts";
 import { updateCodexConfig } from "../../../../src/install/codex-config-toml.ts";
@@ -94,12 +98,22 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		await stageBundledAgents(options.pluginRoot, stageRoot);
 		const preservedReasoning = await capturePreservedAgentReasoning({ codexHome: options.codexHome });
 		const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome: options.codexHome });
+		const agentModelOverrides = loadBootstrapAgentModelOverrides(options);
 		const linked = await linkCachedPluginAgents({
 			codexHome: options.codexHome,
 			pluginRoot: stageRoot,
 			preservedReasoning,
 			preservedServiceTier,
+			agentModelOverrides: agentModelOverrides.agents,
 		});
+		const managedAgentNames = new Set(linked.map((link) => agentNameFromToml(link.name)));
+		await logAgentModelOverrideWarnings(options, [
+			...agentModelOverrides.warnings,
+			...unknownCodexAgentModelOverrideWarnings({
+				configuredAgents: agentModelOverrides.agents.keys(),
+				managedAgentNames,
+			}),
+		]);
 		const agentConfigs = linked
 			.map((link) => ({ configFile: `./agents/${link.name}`, name: agentNameFromToml(link.name) }))
 			.sort((left, right) => left.name.localeCompare(right.name));
@@ -115,6 +129,30 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 				},
 			],
 		};
+	}
+}
+
+function loadBootstrapAgentModelOverrides(options: WorkerSetupOptions): ReturnType<typeof getCodexAgentModelOverrides> {
+	try {
+		return getCodexAgentModelOverrides({
+			cwd: process.cwd(),
+			env: options.env,
+			platform: options.platform,
+		});
+	} catch (error) {
+		return {
+			agents: new Map(),
+			warnings: [`failed to load Codex agent model overrides: ${errorMessage(error)}`],
+		};
+	}
+}
+
+async function logAgentModelOverrideWarnings(
+	options: WorkerSetupOptions,
+	warnings: readonly string[],
+): Promise<void> {
+	for (const warning of warnings) {
+		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "agent-model-override-warning", { warning });
 	}
 }
 

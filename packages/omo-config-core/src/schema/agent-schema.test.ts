@@ -3,6 +3,31 @@ import { describe, expect, test } from "bun:test"
 import { OmoAgentDefSchema } from "./agent"
 
 describe("agent model entries", () => {
+  test("#given canonical provider options at agent and model-entry scope #when parsed #then both records are preserved", () => {
+    // given
+    const definition = {
+      model: "openai/gpt-5.6-sol",
+      provider_options: { service_tier: "priority", custom_flag: true },
+      models: [
+        {
+          model: "openai/gpt-5.6-terra",
+          provider_options: { service_tier: "flex" },
+        },
+      ],
+    }
+
+    // when
+    const result = OmoAgentDefSchema.safeParse(definition)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error(result.error.message)
+    expect(result.data.provider_options).toEqual({ service_tier: "priority", custom_flag: true })
+    const entry = result.data.models?.[0]
+    if (typeof entry !== "object") throw new Error("Expected object model entry")
+    expect(entry.provider_options).toEqual({ service_tier: "flex" })
+  })
+
   test("#given an agent whose models carry per-entry reasoning effort #when parsed #then the effort becomes canonical reasoning", () => {
     // given
     const definition = {

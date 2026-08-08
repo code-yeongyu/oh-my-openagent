@@ -71,7 +71,7 @@ async function withSetupFixture(run) {
 function setupOptions(fixture, overrides = {}) {
 	return {
 		codexHome: fixture.codexHome,
-		env: {},
+		env: { HOME: fixture.root },
 		platform: "darwin",
 		pluginData: fixture.pluginData,
 		pluginRoot: fixture.pluginRoot,
@@ -224,6 +224,66 @@ test("#given user-tuned reasoning and service tier on an installed agent #when a
 		const linked = await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8");
 		assert.match(linked, /model_reasoning_effort = "low"/);
 		assert.match(linked, /service_tier = "flex"/);
+	});
+});
+
+test("#given canonical Codex agent overrides and foreign state #when bootstrap re-links twice #then explicit overrides win without changing foreign ownership", async () => {
+	await withSetupFixture(async (fixture) => {
+		await mkdir(join(fixture.root, ".omo"), { recursive: true });
+		await writeFile(
+			join(fixture.root, ".omo", "omo.jsonc"),
+			JSON.stringify({
+				"[codex]": {
+					agents: {
+						explorer: {
+							model: "openai/gpt-5.6-sol",
+							provider_options: { service_tier: "priority" },
+							reasoning: "xhigh",
+						},
+						missing_dynamic_role: { model: "openai/gpt-5.6-terra" },
+						malformed_role: { reasoning: "turbo", provider_options: { service_tier: 7 } },
+					},
+				},
+			}),
+		);
+		await mkdir(join(fixture.codexHome, "agents"), { recursive: true });
+		await writeFile(
+			join(fixture.codexHome, "agents", "explorer.toml"),
+			'description = "Explorer agent"\nmodel = "installed"\nmodel_reasoning_effort = "low"\nservice_tier = "flex"\n',
+		);
+		const foreignAgentContent = 'name = "foreign"\nmodel = "do-not-touch"\n';
+		await writeFile(join(fixture.codexHome, "agents", "foreign.toml"), foreignAgentContent);
+		const foreignConfigPath = "/orca-mirrored-home/.codex/agents/explorer.toml";
+		await writeFile(
+			join(fixture.codexHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "${foreignConfigPath}"\n`,
+		);
+
+		const first = await runWorkerSetup(setupOptions(fixture));
+		const firstLinked = await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8");
+		const firstConfig = await readConfig(fixture);
+		const second = await runWorkerSetup(setupOptions(fixture));
+
+		assert.deepEqual(first.degraded, []);
+		assert.deepEqual(second.degraded, []);
+		assert.match(firstLinked, /model = "openai\/gpt-5\.6-sol"/);
+		assert.match(firstLinked, /model_reasoning_effort = "xhigh"/);
+		assert.match(firstLinked, /service_tier = "priority"/);
+		assert.doesNotMatch(firstLinked, /model = "installed"|model_reasoning_effort = "low"|service_tier = "flex"/);
+		assert.equal(await readFile(join(fixture.codexHome, "agents", "foreign.toml"), "utf8"), foreignAgentContent);
+		assert.equal(firstConfig.match(/\[agents\.explorer\]/g)?.length, 1);
+		assert.ok(firstConfig.includes(`[agents.explorer]\nconfig_file = "${foreignConfigPath}"`));
+		assert.equal(await readConfig(fixture), firstConfig, "config remains idempotent");
+		assert.equal(await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8"), firstLinked);
+		await assert.rejects(() => stat(join(fixture.pluginRoot, ".installed-agents.json")));
+		const stagedManifest = JSON.parse(
+			await readFile(join(fixture.pluginData, "bootstrap", "agents-stage", ".installed-agents.json"), "utf8"),
+		);
+		assert.equal(stagedManifest.agents.length, 2);
+		const bootstrapLog = await readFile(join(fixture.pluginData, "bootstrap", "bootstrap.log"), "utf8");
+		assert.match(bootstrapLog, /agents\.missing_dynamic_role/);
+		assert.match(bootstrapLog, /agents\.malformed_role\.reasoning.*unsupported/);
+		assert.match(bootstrapLog, /agents\.malformed_role\.provider_options\.service_tier/);
 	});
 });
 
