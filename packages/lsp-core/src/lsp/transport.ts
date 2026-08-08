@@ -1,6 +1,6 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
 import { INIT_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STOP_HARD_KILL_TIMEOUT_MS, STOP_SIGKILL_GRACE_MS } from "./constants.js";
-import { LspConnectionClosedError, LspProcessExitedError, LspRequestTimeoutError } from "./errors.js";
+import { LspConnectionClosedError, LspProcessExitedError, LspProcessSpawnError, LspRequestTimeoutError } from "./errors.js";
 import { JsonRpcConnection } from "./json-rpc-connection.js";
 import { type SpawnedProcess, spawnProcess } from "./process.js";
 import { createLspSpawnEnv, parseConfigurationItems, parseDiagnosticsParams } from "./transport-protocol.js";
@@ -32,6 +32,7 @@ export class LspClientTransport {
 	protected connection: JsonRpcConnection | null = null;
 	protected readonly stderrBuffer: string[] = [];
 	protected processExited = false;
+	protected spawnError: Error | null = null;
 	protected readonly diagnosticsStore = new Map<string, Diagnostic[]>();
 	protected readonly requestTimeoutMs: number;
 	protected readonly initializeTimeoutMs: number;
@@ -90,6 +91,20 @@ export class LspClientTransport {
 			env,
 		});
 		this.startStderrReading();
+
+		// Spawn failures surface as an async "error" event, so this handler flags the
+		// process dead for the manager's start timeout to observe. onSpawnError also
+		// fires synchronously if the error already landed, covering the fast-ENOENT case.
+		this.proc.onSpawnError((error) => {
+			this.spawnError = error;
+			this.processExited = true;
+		});
+
+		if (this.spawnError) {
+			throw new LspProcessSpawnError(
+				`Failed to spawn LSP server "${this.server.id}": ${this.spawnError.message}`,
+			);
+		}
 
 		if (this.proc.exitCode !== null) {
 			const stderr = this.stderrBuffer.join("\n");
