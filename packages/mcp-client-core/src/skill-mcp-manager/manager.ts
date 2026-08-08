@@ -1,9 +1,13 @@
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/sdk/types.js"
-import type { ClaudeCodeMcpServer } from "@oh-my-opencode/claude-code-compat-core/claude-code-mcp-loader/types"
+import type {
+  ClaudeCodeMcpServer,
+  McpRequestTimeoutConfig,
+} from "@oh-my-opencode/claude-code-compat-core/claude-code-mcp-loader/types"
 import { McpOAuthProvider } from "../mcp-oauth/provider"
 import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
 import { handlePostRequestAuthError, handleStepUpIfNeeded } from "./oauth-handler"
+import { resolveMcpRequestOptions } from "./request-timeouts"
 import type {
   McpClient,
   OAuthProviderFactory,
@@ -14,6 +18,7 @@ import type {
 
 export interface SkillMcpClientOptions {
   cdpUrl?: string
+  timeouts?: McpRequestTimeoutConfig
 }
 
 export function buildSkillMcpClientKey(info: SkillMcpClientInfo, options?: SkillMcpClientOptions): string {
@@ -36,6 +41,10 @@ function withInjectedCdpEndpoint(
   const configWithCdpEndpoint = structuredClone(config)
   configWithCdpEndpoint.args = [...(configWithCdpEndpoint.args ?? []), "--cdp-endpoint", options.cdpUrl]
   return configWithCdpEndpoint
+}
+
+function buildRequestOptions(config: ClaudeCodeMcpServer, options?: SkillMcpClientOptions) {
+  return resolveMcpRequestOptions(config.timeouts, options?.timeouts)
 }
 
 export class SkillMcpManager {
@@ -87,19 +96,19 @@ export class SkillMcpManager {
 
   async listTools(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Tool[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listTools()
+    const result = await client.listTools(undefined, buildRequestOptions(context.config, options))
     return result.tools
   }
 
   async listResources(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Resource[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listResources()
+    const result = await client.listResources(undefined, buildRequestOptions(context.config, options))
     return result.resources
   }
 
   async listPrompts(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Prompt[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listPrompts()
+    const result = await client.listPrompts(undefined, buildRequestOptions(context.config, options))
     return result.prompts
   }
 
@@ -110,15 +119,17 @@ export class SkillMcpManager {
     args: Record<string, unknown>,
     options?: SkillMcpClientOptions
   ): Promise<unknown> {
+    const requestOptions = buildRequestOptions(context.config, options)
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.callTool({ name, arguments: args })
+      const result = await client.callTool({ name, arguments: args }, undefined, requestOptions)
       return result.content
     })
   }
 
   async readResource(info: SkillMcpClientInfo, context: SkillMcpServerContext, uri: string, options?: SkillMcpClientOptions): Promise<unknown> {
+    const requestOptions = buildRequestOptions(context.config, options)
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.readResource({ uri })
+      const result = await client.readResource({ uri }, requestOptions)
       return result.contents
     })
   }
@@ -130,8 +141,9 @@ export class SkillMcpManager {
     args: Record<string, string>,
     options?: SkillMcpClientOptions
   ): Promise<unknown> {
+    const requestOptions = buildRequestOptions(context.config, options)
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.getPrompt({ name, arguments: args })
+      const result = await client.getPrompt({ name, arguments: args }, requestOptions)
       return result.messages
     })
   }

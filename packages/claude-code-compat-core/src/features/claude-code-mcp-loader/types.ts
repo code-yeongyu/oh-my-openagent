@@ -5,6 +5,16 @@ export interface McpOAuthConfig {
   scopes?: string[]
 }
 
+/**
+ * Per-server request timeouts for skill-embedded (tier-3) MCP operations.
+ * Every field is optional; an unset field leaves the MCP SDK default in place.
+ */
+export interface McpRequestTimeoutConfig {
+  requestTimeoutMs?: number
+  resetTimeoutOnProgress?: boolean
+  maxTotalTimeoutMs?: number
+}
+
 export interface ClaudeCodeMcpServer {
   type?: "http" | "sse" | "stdio"
   url?: string
@@ -16,6 +26,7 @@ export interface ClaudeCodeMcpServer {
   scope?: McpScope
   projectPath?: string
   disabled?: boolean
+  timeouts?: McpRequestTimeoutConfig
 }
 
 export interface ClaudeCodeMcpConfig {

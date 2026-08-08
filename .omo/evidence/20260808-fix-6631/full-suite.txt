@@ -1,0 +1,15 @@
+Full root suite, unmodified dev (baseline):
+ 13295 pass
+ 28 fail
+Ran 13357 tests across 1725 files. [180.86s]
+
+Full root suite, with this change:
+ 13303 pass
+ 28 fail
+Ran 13365 tests across 1726 files. [203.85s]
+
+diff of the failing-test name sets (baseline vs change): empty
+The 28 failures are identical on both sides and are local-environment only:
+  - unbuilt senpi/codex runtime bundles (plugin/runtime/*, dist/cli)
+  - uninitialized frontend provenance submodules (ATTRIBUTION pins)
+This checkout ran 'bun install --frozen-lockfile --ignore-scripts' without submodules.

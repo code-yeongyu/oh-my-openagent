@@ -1,0 +1,2 @@
+[no-timeout-config] FAILED after 60.1s -> McpError: MCP error -32001: Request timed out
+[requestTimeoutMs=120000] OK after 65.1s -> [{"type":"text","text":"waited 65s"}]

@@ -1,0 +1,34 @@
+--- unit + manager tests with the threading reverted ---
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/Users/kumarprateek/projects/opensource-work/oh-my-openagent/packages/mcp-client-core/src/skill-mcp-manager/request-timeouts.test.ts:130:49)
+(fail) SkillMcpManager request option propagation > #given a server with configured timeouts #when driving every operation #then each SDK call receives the request options [3.63ms]
+149 | 
+150 |     // when
+151 |     await manager.callTool(info, context, "wait", { seconds: 65 }, { timeouts: { requestTimeoutMs: 300_000 } })
+152 | 
+153 |     // then
+154 |     expect(client.callTool.mock.calls[0]?.[2]).toEqual({ timeout: 300_000 })
+                                                     ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "timeout": 300000,
+- }
++ undefined
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/kumarprateek/projects/opensource-work/oh-my-openagent/packages/mcp-client-core/src/skill-mcp-manager/request-timeouts.test.ts:154:48)
+(fail) SkillMcpManager request option propagation > #given a per-call timeout override #when calling a tool #then the override reaches the SDK [0.20ms]
+
+ 6 pass
+ 2 fail
+ 8 expect() calls
+Ran 8 tests across 1 file. [284.00ms]
+--- live driver with the threading reverted ---
+[no-timeout-config] FAILED after 60.1s -> McpError: MCP error -32001: Request timed out
+[requestTimeoutMs=120000] FAILED after 60.1s -> McpError: MCP error -32001: Request timed out

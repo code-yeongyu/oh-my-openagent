@@ -1,0 +1,3 @@
+$ bun run typecheck
+(no diagnostics emitted)
+exit=0
