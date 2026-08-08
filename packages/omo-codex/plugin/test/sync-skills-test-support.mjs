@@ -13,6 +13,7 @@ export const expectedSkills = [
 	"frontend",
 	"git-master",
 	"init-deep",
+	"launch-long-task",
 	"lcx-contribute-bug-fix",
 	"lcx-doctor",
 	"lcx-report-bug",

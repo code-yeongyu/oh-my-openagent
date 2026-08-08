@@ -1,0 +1,4 @@
+interface:
+  display_name: "Launch Long Task"
+  short_description: "Assess and route a safe long-task handoff"
+  default_prompt: "Use $launch-long-task to assess readiness for the next safe handoff and route this substantial or resumable task without doing downstream planning or execution."

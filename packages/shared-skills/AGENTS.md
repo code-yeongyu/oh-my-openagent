@@ -6,13 +6,13 @@
 
 Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`. Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
 
-## SKILLS (16 under `skills/<name>/`)
+## SKILLS (17 under `skills/<name>/`)
 
-`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
+`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `git-master`, `refactor`, `review-work`, `launch-long-task`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
 
 The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
-Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (3 skills carry the Codex agent role declaration).
+Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (4 skills carry the Codex agent role declaration).
 
 ## PIPELINE
 
