@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createSystemTransformHandler } from "./system-transform"
 import { GPT_APPLY_PATCH_GUIDANCE } from "../agents/gpt-apply-patch-guard"
 import { createSisyphusAgent } from "../agents/sisyphus"
+import { mergeAgentConfig } from "../agents/builtin-agents/agent-overrides"
 import {
   clearSisyphusRuntimePromptContext,
   reconcileSisyphusRuntimePrompt,
@@ -43,7 +44,9 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
     expect(system[0]).not.toContain("based on GPT-5.5")
     expect(system[0]).not.toContain(GPT_APPLY_PATCH_GUIDANCE)
     // ...and the entry is exactly what registration would have baked for qwen.
-    expect(system[0]).toBe(createSisyphusAgent(NON_GPT_MODEL, [], [], [], []).prompt)
+    const expectedPrompt = createSisyphusAgent(NON_GPT_MODEL, [], [], [], []).prompt
+    if (typeof expectedPrompt !== "string") throw new Error("Expected Sisyphus prompt to be a string")
+    expect(system[0]).toBe(expectedPrompt)
   })
 
   test("#given the baked body concatenated with other system text #when run on a non-GPT model #then only the body portion is rebuilt", () => {
@@ -66,6 +69,30 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
     const swapped = reconcileSisyphusRuntimePrompt(system, GPT_MODEL)
     expect(swapped).toBe(false)
     expect(system[0]).toBe(baked)
+  })
+
+  test("#given model-filtered appends #when the runtime model changes within one family #then append selection is rebuilt", () => {
+    const buildPrompt = (model: string): string => mergeAgentConfig(
+      createSisyphusAgent(model, [], [], [], []),
+      {
+        prompt_append: "GPT_55_ONLY",
+        prompt_append_exclude_model_keywords: ["5.6"],
+        prompt_append_always: "ALWAYS_PRESENT",
+      },
+    ).prompt ?? ""
+    const baked = buildPrompt(GPT_MODEL)
+    setSisyphusRuntimePromptContext({
+      configuredModel: GPT_MODEL,
+      bakedPrompt: baked,
+      rebuildPromptForModel: buildPrompt,
+    })
+    const system = [baked]
+
+    const swapped = reconcileSisyphusRuntimePrompt(system, "openai/gpt-5.6-sol")
+
+    expect(swapped).toBe(true)
+    expect(system[0]).not.toContain("GPT_55_ONLY")
+    expect(system[0]).toContain("ALWAYS_PRESENT")
   })
 
   test("#given no registered Sisyphus context #when reconcile runs #then it is a no-op", () => {

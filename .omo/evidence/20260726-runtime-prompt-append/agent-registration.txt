@@ -1,0 +1,10 @@
+OpenCode 1.18.3 resolved the isolated agent as:
+
+name=meidocho
+mode=primary
+model.providerID=openai
+model.modelID=gpt-5.6-luna
+prompt=You are Meidocho for isolated QA.
+
+The sandbox used the repository build at:
+/home/celestia/dev/projects/oh-my-openagent-wt/feat/model-aware-prompt-append/dist/index.js

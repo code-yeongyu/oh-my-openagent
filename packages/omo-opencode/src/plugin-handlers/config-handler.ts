@@ -25,7 +25,9 @@ function collectTrustedVisionCapableModels(
 ): string[] {
   const trusted: string[] = []
   const multimodalLookerOverride = pluginConfig.agents?.["multimodal-looker"]
-  const configuredModel = multimodalLookerOverride?.model
+  const configuredModel = multimodalLookerOverride
+    ? Reflect.get(multimodalLookerOverride, "model")
+    : undefined
   if (typeof configuredModel === "string" && configuredModel.includes("/")) {
     trusted.push(configuredModel)
   }
@@ -37,6 +39,7 @@ export interface ConfigHandlerDeps {
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
   runtimeSkillSourceUrl?: string;
+  configureRuntimePromptAppends?: (agentConfigs: Record<string, unknown>) => void;
 }
 
 type AgentConfigSnapshot = {
@@ -137,6 +140,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             agents: cloneAgentConfig(agentResult),
           };
     }
+
+    deps.configureRuntimePromptAppends?.(agentResult)
 
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });

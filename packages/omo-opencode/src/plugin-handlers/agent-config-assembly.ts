@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
+import { mergeAgentConfig } from "../agents/builtin-agents/agent-overrides";
 import type { OhMyOpenCodeConfig } from "../config";
+import type { AgentOverrideConfig } from "../config/schema";
 import {
   getAgentConfigKey,
   getAgentDisplayName,
@@ -25,6 +27,7 @@ type AssembleAgentConfigParams = {
   currentModel: string | undefined;
   useTaskSystem: boolean;
   disabledAgentNames: ReadonlySet<string>;
+  directory?: string;
 };
 
 type AssemblyResult = {
@@ -116,11 +119,12 @@ async function createCoreAgentConfig(
     agentConfig.prometheus = await buildPrometheusAgentConfig({
       configAgentPlan: sources.configAgent?.plan,
       pluginPrometheusOverride: pluginConfig.agents?.prometheus as
-        | (Record<string, unknown> & { prompt_append?: string })
+        | (Record<string, unknown> & AgentOverrideConfig)
         | undefined,
       userCategories: pluginConfig.categories,
       currentModel,
       disabledTools: pluginConfig.disabled_tools,
+      directory: params.directory,
     });
   }
 
@@ -132,6 +136,7 @@ async function createCoreAgentConfig(
     pluginConfig.agents?.["sisyphus-junior"],
     (builtinAgents.atlas as { model?: string } | undefined)?.model,
     useTaskSystem,
+    params.directory,
   );
 
   return agentConfig;
@@ -170,7 +175,9 @@ async function assembleSisyphusEnabledConfig(params: AssembleAgentConfigParams):
       ...migratedBuildConfig,
       description: `${(configAgent?.build?.description as string) ?? "Build agent"} (OpenCode default)`,
     };
-    agentConfig["OpenCode-Builder"] = override ? { ...base, ...override } : base;
+    agentConfig["OpenCode-Builder"] = override
+      ? mergeAgentConfig(base as AgentConfig, override, params.directory)
+      : base;
   }
 
   const migratedBuild = configAgent?.build ? migrateAgentConfig(configAgent.build) : {};

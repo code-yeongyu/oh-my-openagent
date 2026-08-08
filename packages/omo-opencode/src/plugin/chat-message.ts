@@ -3,6 +3,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import { updateSessionAgent } from "../features/claude-code-session-state"
 import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-command/detector"
 import { isSyntheticOrInternalOnlyTextParts, log } from "../shared"
+import { isCompactionAgent } from "../shared/compaction-marker"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
@@ -76,6 +77,7 @@ export function createChatMessageHandler(args: {
   pluginConfig: OhMyOpenCodeConfig
   firstMessageVariantGate: FirstMessageVariantGate
   hooks: ChatMessageHooks
+  clearCompactionRequest?: (sessionID: string) => void
 }): (
   input: ChatMessageInput,
   output: ChatMessageHandlerOutput
@@ -95,9 +97,12 @@ export function createChatMessageHandler(args: {
       })
       return
     }
+    args.clearCompactionRequest?.(input.sessionID)
 
-    if (input.agent) {
-      updateSessionAgent(input.sessionID, input.agent)
+    const outputAgent = output.message["agent"]
+    const resolvedAgent = input.agent ?? (typeof outputAgent === "string" ? outputAgent : undefined)
+    if (resolvedAgent && !isCompactionAgent(resolvedAgent)) {
+      updateSessionAgent(input.sessionID, resolvedAgent)
     }
 
     const slashCommand = detectSlashCommand(extractPromptText(output.parts))

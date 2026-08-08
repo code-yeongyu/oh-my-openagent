@@ -19,8 +19,14 @@ export const AgentOverrideConfigSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
   prompt: z.string().optional(),
-  /** Text to append to agent prompt. Supports file:// URIs (file:///abs, file://./rel, file://~/home) */
-  prompt_append: z.string().optional(),
+  /** Text sources to append to the agent prompt. Supports file:// URIs. */
+  prompt_append: z.union([z.string(), z.array(z.string())]).optional(),
+  /** Only apply prompt_append when the resolved model ID contains a keyword. */
+  prompt_append_include_model_keywords: z.array(z.string()).optional(),
+  /** Skip prompt_append when the resolved model ID contains any keyword. */
+  prompt_append_exclude_model_keywords: z.array(z.string()).optional(),
+  /** Text sources appended after prompt_append regardless of the resolved model. */
+  prompt_append_always: z.union([z.string(), z.array(z.string())]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   disable: z.boolean().optional(),
   description: z.string().optional(),
