@@ -28,6 +28,7 @@ type HarnessOptions = {
   readonly outcomes?: ReconcileResult["outcomes"]
   readonly records?: Readonly<Record<string, TaskRecord>>
   readonly cleanupDeleted?: readonly string[]
+  readonly resumptionChannelCount?: number
 }
 
 function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -39,6 +40,7 @@ function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   const reconcileCalls: Array<string | undefined> = []
   const notifyCalls: Array<{ sessionId: string; parentState: unknown }> = []
   const livenessCalls: string[] = []
+  const resumptionCalls: number[] = []
 
   const engine = {
     runtime: {
@@ -130,6 +132,17 @@ function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         order.push("leadShutdown")
       },
     },
+    resumptionChannels: {
+      emitSessionStart: async () => {
+        const count = options.resumptionChannelCount ?? 0
+        resumptionCalls.push(count)
+        order.push(`resumptionStart:${count}`)
+      },
+      emitShutdown: async () => {
+        resumptionCalls.push(0)
+        order.push("resumptionShutdown:0")
+      },
+    },
   } as unknown as Parameters<typeof wireEventBridge>[5]
 
   const ctx = {
@@ -147,19 +160,20 @@ function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
 
   wireEventBridge(pi, ctx, engine, statusUi, transitions, state)
 
-  return { pi, calls, order, warnings, infos, reconcileCalls, notifyCalls, livenessCalls }
+  return { pi, calls, order, warnings, infos, reconcileCalls, notifyCalls, livenessCalls, resumptionCalls }
 }
 
 describe("event-bridge session_start recovery chain", () => {
   it("#given a resumed session with a revived record #when session_start fires #then the chain runs in the planned order with the session id threaded", async () => {
     // given
     const revived = { task_id: "task-revived" } as TaskRecord
-    const { pi, order, reconcileCalls, notifyCalls, livenessCalls } = wireHarness("parent-session", {
+    const { pi, order, reconcileCalls, notifyCalls, livenessCalls, resumptionCalls } = wireHarness("parent-session", {
       outcomes: [
         { task_id: "task-revived", kind: "resumed" },
         { task_id: "task-gone", kind: "resumed" },
       ],
       records: { "task-revived": revived },
+      resumptionChannelCount: 2,
     })
 
     // when
@@ -171,6 +185,7 @@ describe("event-bridge session_start recovery chain", () => {
       "onSessionStart",
       "reconcile",
       "liveness:task-revived",
+      "resumptionStart:2",
       "reclaim",
       "notify",
       "cleanup:start",
@@ -181,6 +196,7 @@ describe("event-bridge session_start recovery chain", () => {
     expect(reconcileCalls).toEqual(["parent-session"])
     expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" } }])
     expect(livenessCalls).toEqual(["task-revived"])
+    expect(resumptionCalls).toEqual([2])
   })
 
   it("#given no captured session id #when session_start fires #then the legacy sweep still runs with undefined while the scoped notification branch is skipped", async () => {
@@ -197,6 +213,7 @@ describe("event-bridge session_start recovery chain", () => {
       "capture",
       "onSessionStart",
       "reconcile",
+      "resumptionStart:0",
       "reclaim",
       "cleanup:start",
       "cleanup:end",
@@ -234,7 +251,15 @@ describe("event-bridge session_shutdown", () => {
     )
 
     // then
-    expect(order).toEqual(["capture", "transition", "clearUi", "dispose", "leadShutdown", "suspend"])
+    expect(order).toEqual([
+      "capture",
+      "transition",
+      "clearUi",
+      "dispose",
+      "leadShutdown",
+      "resumptionShutdown:0",
+      "suspend",
+    ])
     expect(calls).toEqual([{ parentSessionId: "parent-session", reason: "quit" }])
   })
 
@@ -250,7 +275,14 @@ describe("event-bridge session_shutdown", () => {
     )
 
     // then
-    expect(order).toEqual(["capture", "transition", "clearUi", "dispose", "leadShutdown"])
+    expect(order).toEqual([
+      "capture",
+      "transition",
+      "clearUi",
+      "dispose",
+      "leadShutdown",
+      "resumptionShutdown:0",
+    ])
     expect(calls).toHaveLength(0)
     expect(warnings).toHaveLength(1)
     expect(warnings[0]?.message).toContain("session id")

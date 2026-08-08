@@ -90,6 +90,10 @@ function fakeUi(): CapturedUi {
 }
 
 const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
+const noopResumptionChannels = {
+  emitSessionStart: () => Promise.resolve(),
+  emitShutdown: () => Promise.resolve(),
+}
 
 // Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
 // registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
@@ -118,6 +122,7 @@ function wiredBridge(): {
       },
       shutdown: () => { leadCalls.shutdowns += 1 },
     },
+    resumptionChannels: noopResumptionChannels,
   })
   return { pi, engine, reconcileCalls, leadCalls }
 }
@@ -305,6 +310,7 @@ describe("omo-senpi task component wiring", () => {
         },
         shutdown: () => undefined,
       },
+      resumptionChannels: noopResumptionChannels,
     })
 
     // when
@@ -338,6 +344,7 @@ describe("omo-senpi task component wiring", () => {
     wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
       reconcileTeamMailbox: () => Promise.resolve(),
       leadPollers: { tick: () => Promise.resolve(), shutdown: () => undefined },
+      resumptionChannels: noopResumptionChannels,
     })
 
     await pi.dispatch("session_start", {}, {
@@ -392,6 +399,7 @@ describe("omo-senpi task component wiring", () => {
     wireEventBridge(replayPi, ctxFor(replayPi, logger), engine, noopStatusUi, transitions, {
       reconcileTeamMailbox: () => Promise.resolve(),
       leadPollers: { tick: () => Promise.resolve(), shutdown: () => undefined },
+      resumptionChannels: noopResumptionChannels,
     })
     const sessionFile = join(cwd, "lead-session.jsonl")
     const liveContext = {
