@@ -209,6 +209,75 @@ packages/openclaw-core                              67 pass / 0 fail
 the new backslash guard. `bunx tsgo --noEmit` exits 0 for both `packages/tmux-core` and
 `packages/omo-opencode`.
 
+## Review round 2 — removing the `cmuxterm` branch
+
+Round 1 fixed one false positive (backslash as a separator) but left a larger one in the same
+function untouched, which was inconsistent. `isCmuxCompatEnvironment` opened with:
+
+```ts
+if (tmuxEnvironment?.includes("cmuxterm") === true) return true
+```
+
+That branch returned true *before* the `CMUX_SOCKET_PATH` precondition, so any tmux session whose
+name contained `cmuxterm` was reported as cmux. Unlike the backslash case, a user picks session
+names freely, so this is reachable in ordinary use.
+
+### Why the branch was safe to delete rather than merely guard
+
+The branch was introduced in `8236d7d6b` (2026-05-07) as the second half of
+`Boolean(CMUX_SOCKET_PATH) || TMUX?.includes("cmuxterm")` — a backup heuristic for the case where
+`CMUX_SOCKET_PATH` is absent. It rests on the assumption that cmux writes its own name into
+`TMUX`. Reading the shipped binary shows that it does not.
+
+`strings /Applications/cmux.app/Contents/Resources/bin/cmux`:
+
+| Purpose | Observed strings |
+| --- | --- |
+| socket paths (all channels) | `/tmp/cmux-ssh-`, `/tmp/cmux-cli-shims`, `/tmp/cmux-debug-`, `/tmp/cmux-nightly-`, `/tmp/cmux-staging-`, `/tmp/cmux-debug.sock`, `/tmp/cmux-nightly.sock` |
+| where `cmuxterm` actually appears | `com.cmuxterm.app` (bundle id), `~/.cmuxterm/…` (config dir), `CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC` (env name), `_TtC12CmuxTerminal…` (Swift symbols), `CMUXTERMINFO` (heredoc marker) |
+
+Every socket path is `cmux-` prefixed and `cmuxterm` never appears in one. The live host confirms
+it: `TMUX=/tmp/cmux-omo/EE5868C2-…`. So the branch never matched a real cmux session — there is no
+"build that does use it" to stay compatible with — while it did mislabel real tmux sessions.
+
+`CMUX_SOCKET_PATH` is now the single precondition and the socket path shape the only
+discriminator, which is the rule this PR already stated in its own doc comment.
+
+### RED
+
+```
+(fail) #given TMUX contains cmuxterm without CMUX_SOCKET_PATH … #then returns false
+(fail) #given a real tmux socket whose session name contains cmuxterm … #then returns false
+ 8 pass / 2 fail
+```
+
+`red-4-cmuxterm-branch.log`. Only the two new guards fail. The release-channel test
+(`cmux-omo`, `cmux-nightly`, `cmux-staging`, `cmux-debug`, `cmux-cli-shims`) already passed before
+the removal, which is what proves the socket pattern `/^cmux([-.]|$)/` covers every channel on its
+own and the branch was redundant.
+
+### Tests that used `cmuxterm` to simulate cmux
+
+Four call sites set `TMUX=/tmp/cmuxterm-test.sock` purely to enter the cmux path, not to assert
+anything about the string. They now use the shape a real cmux session has
+(`/tmp/cmux-omo/workspace,surface,pane` with `CMUX_SOCKET_PATH` set), so they exercise the real
+contract: `pane-auth-cmux.test.ts` (2), `manager-cmux-eligibility.test.ts` (1),
+`manager.test.ts` (1, which additionally had to stop deleting `CMUX_SOCKET_PATH`).
+
+### GREEN and live verification
+
+```
+packages/tmux-core                                 110 pass / 0 fail
+packages/omo-opencode/src/shared/tmux               89 pass / 0 fail
+packages/omo-opencode/src/tools/interactive-bash     3 pass / 0 fail
+packages/omo-opencode/src/features/tmux-subagent   166 pass / 0 fail
+packages/openclaw-core                              67 pass / 0 fail
+```
+
+`review-round-2-green.log` — 435 pass / 0 fail. `bunx tsgo --noEmit` exits 0 for both packages.
+On the live cmux host the patched detector still returns `true`, and the nested-real-tmux,
+backslash, `cmuxterm`-named-session, and `TMUX`-not-injected cases all resolve correctly.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`
