@@ -1,10 +1,23 @@
 import type { OhMyOpenCodeConfig } from "../../config"
-import type { FallbackModelObject } from "../../config/schema/fallback-models"
+import type { FallbackModelObject, FallbackModels } from "../../config/schema/fallback-models"
 import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+
+type ModelChainConfig = {
+  models?: (string | FallbackModelObject)[]
+  fallback_models?: FallbackModels
+}
+
+function getConfiguredFallbackModels(
+  config: ModelChainConfig | undefined,
+): (string | FallbackModelObject)[] | undefined {
+  if (config?.models !== undefined) return normalizeFallbackModels(config.models.slice(1))
+  if (config?.fallback_models !== undefined) return normalizeFallbackModels(config.fallback_models)
+  return undefined
+}
 
 /**
  * Returns fallback model strings for the runtime-fallback system.
@@ -44,25 +57,22 @@ function getRawFallbackModelsForSession(
   const sessionCategory = SessionCategoryRegistry.get(sessionID)
   if (sessionCategory && pluginConfig.categories?.[sessionCategory]) {
     const categoryConfig = pluginConfig.categories[sessionCategory]
-    if (categoryConfig?.fallback_models) {
-      return normalizeFallbackModels(categoryConfig.fallback_models)
-    }
+    const fallbackModels = getConfiguredFallbackModels(categoryConfig)
+    if (fallbackModels !== undefined) return fallbackModels
   }
 
   const tryGetFallbackFromAgent = (agentName: string): (string | FallbackModelObject)[] | undefined => {
     const agentConfig = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]
     if (!agentConfig) return undefined
 
-    if (agentConfig?.fallback_models) {
-      return normalizeFallbackModels(agentConfig.fallback_models)
-    }
+    const agentFallbackModels = getConfiguredFallbackModels(agentConfig)
+    if (agentFallbackModels !== undefined) return agentFallbackModels
 
     const agentCategory = agentConfig?.category
     if (agentCategory && pluginConfig.categories?.[agentCategory]) {
       const categoryConfig = pluginConfig.categories[agentCategory]
-      if (categoryConfig?.fallback_models) {
-        return normalizeFallbackModels(categoryConfig.fallback_models)
-      }
+      const categoryFallbackModels = getConfiguredFallbackModels(categoryConfig)
+      if (categoryFallbackModels !== undefined) return categoryFallbackModels
     }
 
     return undefined

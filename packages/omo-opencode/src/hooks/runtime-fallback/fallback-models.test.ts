@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { getFallbackModelsForSession } from "./fallback-models"
+import { getFallbackModelsForSession, getRawFallbackModels } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -28,6 +28,33 @@ describe("runtime-fallback fallback-models", () => {
     expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
   })
 
+  test("uses entries after the primary model in a category model chain", () => {
+    //#given
+    const sessionID = "ses_runtime_fallback_category_models"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          models: [
+            "openai/gpt-5.6",
+            { model: "openai/gpt-5.5", reasoning: "high" },
+            "anthropic/claude-opus-4-7",
+          ],
+          fallback_models: ["google/gemini-3-pro"],
+        },
+      },
+    })
+
+    //#when
+    const result = getRawFallbackModels(sessionID, undefined, pluginConfig)
+
+    //#then
+    expect(result).toEqual([
+      { model: "openai/gpt-5.5", reasoning: "high" },
+      "anthropic/claude-opus-4-7",
+    ])
+  })
+
   test("uses agent-specific fallback_models when agent is resolved", () => {
     //#given
     const pluginConfig = unsafeTestValue({
@@ -43,6 +70,63 @@ describe("runtime-fallback fallback-models", () => {
 
     //#then
     expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+  })
+
+  test("uses entries after the primary model in an agent model chain", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: ["openai/gpt-5.6", "openai/gpt-5.5"],
+          fallback_models: ["anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_agent_models", "oracle", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.5"])
+  })
+
+  test("uses the canonical model chain from an agent category", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: { category: "deep" },
+      },
+      categories: {
+        deep: {
+          models: ["openai/gpt-5.6", "anthropic/claude-opus-4-7"],
+          fallback_models: ["google/gemini-3-pro"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_agent_category", "oracle", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["anthropic/claude-opus-4-7"])
+  })
+
+  test("a single-entry canonical model chain suppresses legacy fallback_models", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: ["openai/gpt-5.6"],
+          fallback_models: ["anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_single_model", "oracle", pluginConfig)
+
+    //#then
+    expect(result).toEqual([])
   })
 
   test("inherits prometheus fallback_models for a replaced plan agent by default", () => {
@@ -61,6 +145,25 @@ describe("runtime-fallback fallback-models", () => {
 
     //#then
     expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+  })
+
+  test("inherits the prometheus canonical model chain for a replaced plan agent", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        plan: {},
+        prometheus: {
+          models: ["anthropic/claude-fable-5", "opencode-go/kimi-k3"],
+          fallback_models: ["openai/gpt-5.6-sol"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_plan_models", "plan", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["opencode-go/kimi-k3"])
   })
 
   test("uses explicit plan fallback_models before prometheus inheritance", () => {
