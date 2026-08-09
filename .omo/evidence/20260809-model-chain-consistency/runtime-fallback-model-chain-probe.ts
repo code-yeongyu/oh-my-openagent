@@ -1,5 +1,6 @@
 import { createRuntimeFallbackHook } from "../../../packages/omo-opencode/src/hooks/runtime-fallback"
 import { SessionCategoryRegistry } from "../../../packages/omo-opencode/src/shared/session-category-registry"
+import { getSessionPromptParams } from "../../../packages/omo-opencode/src/shared/session-prompt-params-state"
 
 const sessionID = "qa-runtime-fallback-canonical-model-chain"
 const abortCalls: unknown[] = []
@@ -49,7 +50,12 @@ const hook = createRuntimeFallbackHook(
         "qa-model-chain": {
           models: [
             "opencode/primary-model",
-            { model: "openai/canonical-fallback", reasoning: "high" },
+            {
+              model: "openai/canonical-fallback",
+              reasoning: "high",
+              temperature: 0.3,
+              maxTokens: 2048,
+            },
           ],
           fallback_models: ["google/legacy-fallback"],
         },
@@ -84,6 +90,7 @@ await hook.event({
   },
 })
 
+const promptParams = getSessionPromptParams(sessionID)
 hook.dispose()
 SessionCategoryRegistry.clear()
 
@@ -96,9 +103,16 @@ if (!serializedPrompt.includes("canonical-fallback")) {
 if (serializedPrompt.includes("legacy-fallback")) {
   throw new Error(`legacy fallback unexpectedly won precedence: ${serializedPrompt}`)
 }
+if (promptParams?.temperature !== 0.3 || promptParams.maxOutputTokens !== 2048) {
+  throw new Error(`fallback settings missing from chat.params state: ${JSON.stringify(promptParams)}`)
+}
+if (promptParams.options?.reasoningEffort !== "high") {
+  throw new Error(`fallback reasoning missing from chat.params state: ${JSON.stringify(promptParams)}`)
+}
 
 console.log(JSON.stringify({
   abortCount: abortCalls.length,
   promptDispatchCount: promptCalls.length,
   promptCall: promptCalls[0],
+  promptParams,
 }, null, 2))
