@@ -3,6 +3,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { createFallbackState, isModelInCooldown } from "./fallback-state"
 import { restorePromptParams } from "./fallback-prompt-params"
+import { normalizeModelToCanonicalString } from "./normalize-model"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -20,9 +21,7 @@ export function createChatMessageHandler(deps: HookDeps) {
 
     sessionLastAccess.set(sessionID, Date.now())
 
-    const requestedModel = input.model
-      ? `${input.model.providerID}/${input.model.modelID}`
-      : undefined
+    const requestedModel = normalizeModelToCanonicalString(input.model)
 
     if (requestedModel && state.pendingFallbackModel === requestedModel) {
       state.pendingFallbackModel = undefined

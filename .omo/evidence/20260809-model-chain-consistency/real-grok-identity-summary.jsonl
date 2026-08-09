@@ -1,0 +1,8 @@
+{"source":"negative-control","tests":"normalize-model + chat-message-handler","result":"10 passed, 3 failed before the fix"}
+{"source":"focused-tests","tests":"normalize-model + chat-message-handler","result":"13 passed, 0 failed after the fix"}
+{"source":"runtime-tests","tests":"runtime-fallback","result":"278 passed, 0 failed after the fix"}
+{"source":"qa-context","openCode":"1.18.15","surface":"isolated server + local fake provider","purpose":"smoke-test the exact local hook source after runtime model identity normalization"}
+{"source":"session","sessionID":"ses_018cd547effe30xcIuo6KJZTlq","primaryModel":"gpt-5.6-sol-primary","primaryVariant":"high","primaryMaxOutputTokens":1024,"primaryServiceTier":"priority","primaryProviderReasoningEffort":"medium","primaryResult":429}
+{"source":"session","sessionID":"ses_018cd547effe30xcIuo6KJZTlq","fallbackModel":"gpt-5.6-sol","fallbackVariant":"low","fallbackMaxOutputTokens":2048,"fallbackServiceTier":"flex","fallbackProviderReasoningEffort":"low","finish":"stop","text":"REAL_OPENCODE_FALLBACK_OK"}
+{"source":"isolation","isolatedSessionRowsAfterDelete":0,"liveSessionMatches":0,"portsStopped":[49422,49423]}
+{"source":"scope","whyEnough":"failing regressions cover suffixed colon and parenthesized runtime identities; the isolated real OpenCode flow verifies the same exact local hook still performs primary 429 to configured fallback success","omitted":"raw prompts, environment dumps, auth headers, provider bodies, observer logs, and sandbox database"}

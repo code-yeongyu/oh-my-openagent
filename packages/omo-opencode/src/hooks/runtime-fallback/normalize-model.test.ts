@@ -15,6 +15,12 @@ describe("normalizeModelToCanonicalString", () => {
       expect(result).toBe("anthropic/claude-opus-4-7")
     })
 
+    test("#when the model includes an inline variant #then it returns the base identity", () => {
+      const result = normalizeModelToCanonicalString("openai/gpt-5.5:high")
+
+      expect(result).toBe("openai/gpt-5.5")
+    })
+
     test("#when the string is empty #then it returns undefined", () => {
       // given
       const model = "   "

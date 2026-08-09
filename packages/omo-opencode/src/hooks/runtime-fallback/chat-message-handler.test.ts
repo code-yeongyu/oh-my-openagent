@@ -43,8 +43,13 @@ function createDeps(): HookDeps {
 describe("createChatMessageHandler runtime fallback model override", () => {
   afterEach(() => clearAllSessionPromptParams())
 
-  for (const fallbackModel of ["openai/gpt-5.5:high", "openai/gpt-5.5(high)"]) {
-    test(`keeps fallback state when OpenCode reports the base identity for ${fallbackModel}`, async () => {
+  for (const [fallbackModel, reportedModelID] of [
+    ["openai/gpt-5.5:high", "gpt-5.5"],
+    ["openai/gpt-5.5(high)", "gpt-5.5"],
+    ["openai/gpt-5.5:high", "gpt-5.5:high"],
+    ["openai/gpt-5.5(high)", "gpt-5.5(high)"],
+  ]) {
+    test(`keeps fallback state when OpenCode reports ${reportedModelID} for ${fallbackModel}`, async () => {
       const deps = createDeps()
       const sessionID = `session-variant-fallback-${fallbackModel}`
       const state = createFallbackState("openai/gpt-5.4")
@@ -55,7 +60,7 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       const handler = createChatMessageHandler(deps)
 
       await handler(
-        { sessionID, model: { providerID: "openai", modelID: "gpt-5.5" } },
+        { sessionID, model: { providerID: "openai", modelID: reportedModelID } },
         { message: {} },
       )
 

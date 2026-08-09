@@ -6,10 +6,10 @@ Issue: #6644
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
 - Exact-head focused suite: 280 passed, 0 failed.
-- Exact-head affected-surface suite: 1,979 passed, 1 skipped, 0 failed.
+- Exact-head affected-surface suite: 1,982 passed, 1 skipped, 0 failed.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,498 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,501 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
@@ -105,6 +105,12 @@ The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
   focused regression covers the suffixed identity. All nine fixture and proof
   sessions were deleted; the live DB had zero matching IDs. See
   `real-codex-p2-round2-summary.jsonl`.
+- Grok identity QA first reproduced the suffixed runtime-model mismatch in
+  focused tests, then verified the fix against real OpenCode 1.18.15. The
+  isolated primary retained `1024/priority/high`, returned 429, and completed
+  on the configured `2048/flex/low` fallback. The session was deleted, both QA
+  ports stopped, and the live DB had zero matching IDs. See
+  `real-grok-identity-summary.jsonl`.
 
 Run the focused proof:
 

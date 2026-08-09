@@ -1,3 +1,4 @@
+import { getRuntimeFallbackModelIdentity } from "@oh-my-opencode/model-core"
 import { isRecord } from "../../shared/record-type-guard"
 
 /**
@@ -14,7 +15,7 @@ import { isRecord } from "../../shared/record-type-guard"
 export function normalizeModelToCanonicalString(model: unknown): string | undefined {
   if (typeof model === "string") {
     const trimmed = model.trim()
-    return trimmed ? trimmed : undefined
+    return trimmed ? getRuntimeFallbackModelIdentity(trimmed) : undefined
   }
 
   if (isRecord(model)) {
@@ -26,7 +27,7 @@ export function normalizeModelToCanonicalString(model: unknown): string | undefi
         : undefined
     const modelID = rawModelID?.trim()
     if (providerID && modelID) {
-      return `${providerID}/${modelID}`
+      return getRuntimeFallbackModelIdentity(`${providerID}/${modelID}`)
     }
   }
 
