@@ -246,7 +246,10 @@ describe("runTmuxCommand", () => {
 		const argsFilePath = path.join(temporaryDirectory, "cmux.args")
 		const cmuxPath = await createFakeCmux(temporaryDirectory, argsFilePath)
 		process.env.CMUX_SOCKET_PATH = path.join(temporaryDirectory, "cmux.sock")
-		process.env.TMUX = `${path.join(temporaryDirectory, "cmux-omo", "workspace")},surface,pane`
+		// Literal POSIX path on purpose: cmux runs only on macOS and always injects a `/`-separated
+		// socket path. Building this with `path.join` would emit `\` separators on Windows, which is
+		// a shape no cmux build produces and which the Unix-only detector correctly rejects.
+		process.env.TMUX = "/tmp/cmux-omo/workspace,surface,pane"
 		process.env.CMUX_OMO_CMUX_BIN = cmuxPath
 
 		// when
