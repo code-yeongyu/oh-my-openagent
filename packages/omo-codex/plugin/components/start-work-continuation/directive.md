@@ -45,7 +45,8 @@ Before completion, satisfy all five `review-work` lanes and a `debugging` runtim
 # Stop conditions for THIS turn
 
 - A top-level checkbox flipped to `- [x]` after the 5-phase QA gate (Phase 1 read, Phase 2 automated, Phase 3 channel scenario, Phase 4 adversarial-class probing, Phase 5 gate decision). Then the Stop hook will re-evaluate; if more checkboxes remain you will be continued again.
-- 3 same-failure cycles on one sub-task → escalate via `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. DELIVERABLE: diagnose the repeated sub-task failure and recommend the next safe action. VERIFY: cite the failing evidence.","fork_context":false})` and stop dispatch.
+- A conclusive external blocker only the user or external state can clear (missing hardware, credential, authorization, or an unavailable service) → after ONE authoritative check, stop retrying and stop reviewer dispatch. Write `<start-work-blocked-external>` as the entire first line of your answer, then state the exact blocker and the observable condition that resumes the work. If ultrawork requires `ULTRAWORK MODE ENABLED!` as the first line, put the blocker marker alone on the second line instead. The Stop hook recognizes both forms and lets this turn end.
+- 3 same-failure cycles on one agent-controllable sub-task → escalate via `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. DELIVERABLE: diagnose the repeated sub-task failure and recommend the next safe action. VERIFY: cite the failing evidence.","fork_context":false})` and stop dispatch.
 - Safety boundary (destructive command, secret exfiltration, production write) → stop and surface a safe substitute.
 - All top-level checkboxes `- [x]` AND the Global Review and Debugging Gate passed → print the ORCHESTRATION COMPLETE block and end.
 

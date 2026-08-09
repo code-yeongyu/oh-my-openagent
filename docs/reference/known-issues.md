@@ -16,12 +16,11 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: If a native `plan_exit` prompt appears inside a delegated `ulw` planner, do not switch that nested child to build mode. Interrupt back to the parent, then ask the parent to recover the plan output or rerun planning through Prometheus/OMO planning explicitly.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5850.
 
-## #5839 - Ultrawork verification can miss prose-only Oracle approvals
+## #5839 - Ralph Loop prose-only Oracle approval detection (resolved)
 
-- **Affects**: Ultrawork/Ralph-loop verification flows that rely on Oracle returning the exact `<promise>VERIFIED</promise>` token.
-- **Symptom**: Oracle can approve the work in normal prose, but the detector treats the verification as failed because the success token was never requested or emitted. The loop may then spend extra iterations re-fixing already-correct work.
-- **Workaround**: When manually asking Oracle to verify completion, explicitly instruct it to end with `<promise>VERIFIED</promise>` only if the work is genuinely complete and correct. If a verification failure follows a clear prose approval, inspect the Oracle transcript before assuming the implementation regressed.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
+- **Historical behavior**: The former Ralph Loop required Oracle to return the exact `<promise>VERIFIED</promise>` token and could reject a prose-only approval.
+- **Resolution**: Ralph Loop is no longer wired into current session hooks. The Goal subsystem replaced its user-facing continuation path and does not use the Ralph Loop Oracle verification detector.
+- **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
 
 ## #5746 - tmux subagent panes attach only after focus by default
 
@@ -51,19 +50,18 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: Add an explicit instruction such as "verify with visual-qa before claiming done" to frontend prompts, and require screenshot/evidence output before accepting UI work as complete. If no rendered surface is available, ask the agent to state that limitation directly.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5838.
 
-## #5529 - GPT-5.5 reasoning effort can conflict with some OpenAI-compatible chat providers
+## #5529 - Manual GPT-5.5 custom-provider reasoning effort can conflict with chat providers
 
-- **Affects**: Third-party OpenAI-compatible providers that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Native OpenAI supports tools and reasoning effort for GPT-5.5.
-- **Symptom**: Tool requests can fail because OMO agent configs and OpenCode's GPT model transforms may supply reasoning effort based on the model ID, even when the compatible provider's chat-completions implementation does not support that combination.
-- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a model/provider configuration that does not emit the unsupported reasoning setting for tool-heavy agents.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
+- **Affects**: Manual custom-provider configurations that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Current built-in OMO agent chains use GPT-5.6 Sol rather than GPT-5.5.
+- **Symptom**: Upstream OpenCode model transforms may supply reasoning effort based on a manually configured GPT-5.5 model ID even when the compatible provider's chat-completions implementation does not support that combination.
+- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a custom model/provider configuration that does not emit the unsupported reasoning setting.
+- **Status**: Open as a manual custom-provider/upstream OpenCode caveat. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
 
-## #5604 - Required-model delegation can fail before the child stream starts
+## #5604 - Required-model delegation availability gate (resolved)
 
-- **Affects**: OpenCode delegation when provider connectivity is known and none of the connected providers can serve a required-model subagent's fallback chain.
-- **Symptom**: Model resolution can return success without pinning a provider/model. The harness may then create a child session that fails before producing assistant or tool output, which can look like a hidden, stuck, or skipped subagent.
-- **Workaround**: Connect a provider supported by the target agent, or reroute through a category or subagent whose fallback chain has an available provider. If a child produces no assistant/tool output, treat the dispatch as failed and retry through a supported route.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
+- **Historical behavior**: A required-model subagent could be registered without an available model and then fail before producing child output.
+- **Resolution**: Required agents are now skipped during registration when their availability gates find no model in the built-in fallback chain. An explicit user configuration still counts as an intentional override.
+- **Status**: Resolved. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
 
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
@@ -116,7 +114,7 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Affects**: v4.2.3+ after the LSP to MCP migration.
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
-- **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
+- **Workaround**: Configure the server in `.opencode/lsp.json`, `.omo/lsp.json`, `.omo/lsp-client.json`, or the user-level OpenCode config directory's `lsp.json`.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
 
 ## #4990 — Team-mode lead can stall after full quiescence
@@ -189,29 +187,17 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: For one-off trivial prompts, run `opencode --pure` or temporarily disable the plugin for that session.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5120.
 
-## #5105: Ralph Loop can flood logs while child subagents are active
+## #5105: Ralph Loop log flooding while child subagents were active (resolved)
 
-- **Affects**: Sessions with an active Ralph Loop and background child subagents.
-- **Symptom**: `/tmp/oh-my-opencode.log` repeats `promptAsync reservation release skipped for different source` while child subagents emit message events.
-- **Workaround**: Ralph Loop was replaced by the Goal subsystem (PR #6184), and the `ralph-loop` hook is no longer wired at HEAD, so the original flooding only affects releases before that migration. On those older releases, the historical controls were `"disabled_hooks": ["ralph-loop"]` in `oh-my-openagent.jsonc` and `/cancel-ralph`. On current releases, Goal is opt-in (`goal.enabled` defaults to `false`); if you see the same log pattern while a Goal continuation is active, disable the hook with `"disabled_hooks": ["goal"]` and run `/goal clear` (or `/stop-continuation`) to stop the active continuation before disabling it.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
+- **Historical behavior**: Sessions with an active Ralph Loop and background child subagents could repeatedly log `promptAsync reservation release skipped for different source`.
+- **Resolution**: Ralph Loop was replaced by the Goal subsystem (PR #6184), and the `ralph-loop` hook is no longer wired in current session hooks. The original flooding affects only releases before that migration.
+- **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
 
-## #5025 — OpenCode Desktop loads the plugin but only shows native modes
+## #5025 - Windows runtime skill source server required Bun.serve (resolved)
 
-- **Affects**: OpenCode Desktop on Windows with `oh-my-openagent@4.7.5`.
-- **Symptom**: The Desktop plugin list shows `oh-my-openagent` as loaded, but the UI only exposes the native `build` and `plan` modes. The OpenCode log may include `Runtime skill source server requires Bun.serve failed to load plugin`.
-- **Workaround**: Disable the runtime security skills that start the Bun-backed skill source server, then restart OpenCode Desktop:
-
-  ```json
-  {
-    "disabled_skills": [
-      "security-research",
-      "security-review"
-    ]
-  }
-  ```
-
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5025.
+- **Historical behavior**: OpenCode Desktop on Windows with `oh-my-openagent@4.7.5` could fail to load the plugin when the runtime skill source server could not use `Bun.serve`.
+- **Resolution**: The runtime skill source server now falls back to a Node HTTP server when `Bun.serve` is unavailable. Disabling `security-research` and `security-review` is no longer required for this failure mode.
+- **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5025.
 
 ## #5021 — Codex planner or reviewer subagents can appear stuck
 

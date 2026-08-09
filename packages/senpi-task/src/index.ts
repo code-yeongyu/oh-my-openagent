@@ -78,6 +78,7 @@ export {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
+  resolveAvailableCategoryNames,
   resolveCategory,
 } from "./category"
 export type {

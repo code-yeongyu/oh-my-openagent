@@ -1,0 +1,18 @@
+PR #6500 component typecheck - 2026-07-31
+
+COMMAND
+
+npm --prefix packages/omo-codex/plugin/components/start-work-continuation exec tsc -- --noEmit
+
+OBSERVED
+
+The command exited 0 with no diagnostic output.
+
+WHY IT IS ENOUGH
+
+This invokes the component's strict TypeScript project after the external
+blocker and ultrawork-marker changes.
+
+OMITTED
+
+No credentials, tokens, auth headers, or environment dumps were captured.

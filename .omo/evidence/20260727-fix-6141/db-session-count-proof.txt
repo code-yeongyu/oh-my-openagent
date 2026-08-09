@@ -1,0 +1,25 @@
+### MANDATED DB-UNTOUCHED PROOF - issue #6141 - 2026-07-27T09:15:48Z
+### AGENTS.md requires: SELECT count(*) FROM session on the REAL database,
+### before and after any QA that spawns opencode.
+
+real database: C:\Users\pss\.local\share\opencode\opencode.db
+
+  SELECT count(*) FROM session   BEFORE driver          = 2722
+  SELECT count(*) FROM session   AFTER  driver (202s)     = 2722
+  SELECT count(*) FROM session   AFTER  equal idle gap (202s) = 2722
+
+  sessions added BY THE DRIVER            = 0
+  sessions added BY AMBIENT IDLE (control) = 0
+
+RESULT: the driver added ZERO sessions to the real database.
+
+Why a control gap is included: this QA is executed from inside a live opencode
+session that writes to the same database, so a raw before/after pair cannot
+distinguish driver writes from ambient writes. The equal-length idle gap
+measures the ambient rate so the driver's own contribution is isolated.
+
+Corroborating evidence that no real state was reachable at all:
+  - opencode debug paths inside the sandbox (see live-driver-before.txt /
+    live-driver-after.txt) resolves data/config/cache/state under the mktemp dir.
+  - the driver exports HOME/USERPROFILE/APPDATA/LOCALAPPDATA and every XDG_* into
+    that sandbox, which is removed on exit.

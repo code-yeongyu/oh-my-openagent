@@ -1,0 +1,11 @@
+== back up my changes ==
+== revert ALL my changes to pristine dev ==
+  diff vs HEAD: []
+== BASELINE: same install suite on pristine dev ==
+ 255 pass
+ 7 skip
+ 2 fail
+
+== restore my changes ==
+  restored diff vs HEAD: [ 3 files changed, 103 insertions(+), 1 deletion(-)]
+

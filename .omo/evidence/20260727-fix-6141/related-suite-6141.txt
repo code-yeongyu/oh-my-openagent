@@ -1,0 +1,34 @@
+### CONSUMER REGRESSION SWEEP with this PR applied
+### captured 2026-07-27T06:28:20Z  base upstream/dev @ da2d4a916
+### agent.ts diff vs base at capture time:
+ packages/omo-opencode/src/agents/hephaestus/agent.ts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+### ---
+
+=== bun test packages/omo-opencode/src/agents ===
+bun test v1.3.14 (0d9b296a)
+
+ 374 pass
+ 0 fail
+ 1045 expect() calls
+Ran 374 tests across 30 files. [1254.00ms]
+EXIT=0 for packages/omo-opencode/src/agents
+
+=== bun test packages/model-core ===
+bun test v1.3.14 (0d9b296a)
+
+ 312 pass
+ 0 fail
+ 1350 expect() calls
+Ran 312 tests across 27 files. [716.00ms]
+EXIT=0 for packages/model-core
+
+=== bun test packages/prompts-core ===
+bun test v1.3.14 (0d9b296a)
+
+ 26 pass
+ 0 fail
+ 40 expect() calls
+Ran 26 tests across 5 files. [403.00ms]
+EXIT=0 for packages/prompts-core
+

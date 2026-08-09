@@ -341,12 +341,12 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 `task(category="...")` supports these category names in user-facing orchestration:
 
-`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, `quick-rust`, `quick-zig`, `git`
+`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`
 
 Notes:
 
-- Built-in defaults are defined in `packages/omo-opencode/src/tools/delegate-task/*-categories.ts` and `packages/omo-opencode/src/shared/model-requirements.ts`
-- Projects/users can extend categories via config; additional category names may appear in your session prompt
+- Authoritative built-in fallback chains are defined in `packages/model-core/src/category-model-requirements.ts`; `packages/omo-opencode/src/shared/model-requirements.ts` is only a re-export shim
+- Projects/users can define additional categories via config; names such as `quick-rust`, `quick-zig`, or `git` are user-defined rather than built in
 - Regardless of category name, category dispatch goes through Sisyphus-Junior
 
 ### Skills: Domain-Specific Instructions
@@ -579,14 +579,14 @@ Use Hephaestus when you deliberately want autonomous deep implementation or arch
 
 ## Configuration
 
-You can control related features in the `[opencode]` block of `~/.omo/omo.jsonc`:
+The `[opencode]` block of `~/.omo/omo.jsonc` exposes optional legacy Sisyphus/planner compatibility toggles: `disabled`, `default_builder_enabled`, `planner_enabled`, `replace_plan`, and `tdd`. These fields do not enable Atlas orchestration; omit them unless you need the legacy behavior they control.
 
 ```jsonc
 {
   "sisyphus_agent": {
-    "disabled": false, // Enable Atlas orchestration (default: false)
-    "planner_enabled": true, // Enable Prometheus (default: true)
-    "replace_plan": true, // Replace default plan agent with Prometheus (default: true)
+    "planner_enabled": true,
+    "replace_plan": true,
+    "tdd": true,
   },
 
   // Hook settings (add to disable)

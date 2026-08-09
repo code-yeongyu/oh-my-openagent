@@ -1,0 +1,7 @@
+$ git show upstream/dev:packages/shared-skills/index.mjs > packages/shared-skills/index.mjs   # revert the probe
+$ bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm
+$ bun run script/sync-lazycodex-marketplace.ts "$REPO" <dest> --previous-payload   # CONTROL bundle
+exit=0
+
+$ grep -c '"\.\./\.\./skills/"' <dest>/plugins/omo/dist/cli/index.js
+0

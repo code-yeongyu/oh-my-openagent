@@ -15,6 +15,7 @@ import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import { reapLspDaemons } from "./lsp-daemon-reaper"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
+import { writeInstalledCodexBinDir } from "./codex-installed-bin-dir"
 import { removeGitBashHooksOffWindows } from "./codex-git-bash-hooks"
 import { seedAndMigrateOmoSot } from "./omo-sot-migration"
 import { installAstGrepForCodex } from "./install-ast-grep-sg"
@@ -88,6 +89,9 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version })
       await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest })
+      // `CODEX_LOCAL_BIN_DIR` is often a one-shot override, so uninstall cannot recompute this
+      // location from the environment later; record it while it is known.
+      await writeInstalledCodexBinDir({ pluginRoot: plugin.path, binDir })
       await removeGitBashHooksOffWindows({ platform, pluginRoot: plugin.path })
     }
 

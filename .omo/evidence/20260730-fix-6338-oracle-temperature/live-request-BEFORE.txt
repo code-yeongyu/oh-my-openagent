@@ -1,0 +1,41 @@
+### PR #6485 live request proof
+### label: BEFORE (model-core reverted to dev)
+### surface: real `opencode run` -> local mock model endpoint (records request body)
+### opencode: 1.18.11
+### node: v24.18.0
+### repo: C:/Users/pss/.omo-contrib/work/omo
+### mock endpoint: http://127.0.0.1:57409/v1
+### agent config: azure-anthropic/claude-opus-4-8 with temperature 0.1
+
+=== $ git -C repo diff --stat upstream/dev -- packages/model-core (product under test) ===
+
+=== $ bun build packages/omo-opencode/src/index.ts --outdir dist ===
+Bundled 1977 modules in 788ms
+
+  index.js  5.74 MB  (entry point)
+
+build EXIT=0
+
+=== $ opencode run 'ping' (default primary agent already pinned to the model) ===
+[0m
+> Sisyphus - ultraworker · claude-opus-4-8
+[0m
+OK
+
+=== recorded outgoing request body ===
+requests_captured=2 chat_requests=2
+  url=/v1/chat/completions
+  model=claude-opus-4-8
+  body_keys=max_tokens,model,stream,stream_options
+  temperature=undefined
+  top_p=undefined
+  url=/v1/chat/completions
+  model=claude-opus-4-8
+  body_keys=max_tokens,model,stream,stream_options,tool_choice,tools
+  temperature=undefined
+  top_p=undefined
+TEMPERATURE_IN_REQUEST=false
+
+=== isolation proof: real opencode DB untouched ===
+sandbox HOME=/tmp/omo-6338-live-3wVzv4/home
+sandbox db exists=yes

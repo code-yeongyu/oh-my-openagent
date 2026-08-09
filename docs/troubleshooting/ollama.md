@@ -1,127 +1,42 @@
 # Ollama Troubleshooting
 
-## Streaming Issue: JSON Parse Error
+## Tool-call streaming failures
 
-### Problem
-
-When using Ollama as a provider with oh-my-openagent agents, you may encounter:
+Historical Ollama reports include tool-using agent requests failing with an error such as:
 
 ```
 JSON Parse error: Unexpected EOF
 ```
 
-This occurs when agents attempt tool calls (e.g., `explore` agent using `mcp_grep_search`).
+A current reproduction should exercise the registered `grep` and `task` surfaces.
 
-### Root Cause
+## Current status
 
-Ollama returns **NDJSON** (newline-delimited JSON) when `stream: true` is used in API requests:
+The OpenCode adapter currently uses `@opencode-ai/plugin` and `@opencode-ai/sdk`. The previous SDK-specific root-cause diagnosis does not describe this integration.
 
-```ndjson
-{"message":{"tool_calls":[{"function":{"name":"read","arguments":{"filePath":"README.md"}}}]}, "done":false}
-{"message":{"content":""}, "done":true}
-```
+OMO agent overrides do not expose a supported `stream` setting. Disabling streaming there is not a current product workaround. A direct Ollama HTTP request can test the Ollama API, but it does not exercise OpenCode, OMO hooks, agent routing, or tool calls.
 
-Claude Code SDK expects a single JSON object, not multiple NDJSON lines, causing the parse error.
+A fresh reproduction against the current OpenCode, OMO, and Ollama versions is required before the failing layer or a product workaround can be identified.
 
-**Why this happens:**
-- **Ollama API**: Returns streaming responses as NDJSON by design
-- **Claude Code SDK**: Doesn't properly handle NDJSON responses for tool calls
-- **oh-my-openagent**: Passes through the SDK's behavior (can't fix at this layer)
+## Capture a current reproduction
 
-## Solutions
+1. Record the OpenCode, OMO, and Ollama versions and the exact Ollama model tag.
+2. Start a clean session with the Ollama-backed model selected through your current OpenCode provider configuration.
+3. Use a minimal prompt that requires a repository search through `grep`, then ask the agent to delegate a small follow-up through `task`.
+4. Record whether ordinary text generation succeeds and which tool call first fails.
+5. Save the complete error and relevant OpenCode/Ollama logs. Remove credentials before sharing them.
 
-### Option 1: Disable Streaming (Recommended)
+Do not treat a raw `curl` response as proof that the OMO agent path works or fails. The reproduction must pass through OpenCode and the registered OMO tool surface.
 
-Configure your Ollama provider to use `stream: false`:
+## Reporting the issue
 
-```json
-{
-  "provider": "ollama",
-  "model": "qwen3-coder",
-  "stream": false
-}
-```
+Include:
 
-**Pros:**
-- Works immediately
-- No code changes needed
-- Simple configuration
+- OpenCode, OMO, and Ollama versions
+- Operating system and Ollama model tag
+- The minimal prompt and the first failing tool name
+- Redacted provider and agent configuration
+- Full error text and relevant logs
+- Whether the same model completes a no-tool prompt
 
-**Cons:**
-- Slightly slower response time (no streaming)
-- Less interactive feedback
-
-### Option 2: Use Non-Tool Agents Only
-
-If you need streaming, avoid agents that use tools:
-
-- **Safe**: Simple text generation, non-tool tasks
-- **Problematic**: Any agent with tool calls (explore, librarian, etc.)
-
-### Option 3: Wait for SDK Fix
-
-The proper fix requires Claude Code SDK to:
-
-1. Detect NDJSON responses
-2. Parse each line separately
-3. Merge `tool_calls` from multiple lines
-4. Return a single merged response
-
-**Tracking**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124 (closed - documented workaround)
-
-## Workaround Implementation
-
-Until the SDK is fixed, here's how to implement NDJSON parsing (for SDK maintainers):
-
-```typescript
-async function parseOllamaStreamResponse(response: string): Promise<object> {
-  const lines = response.split('\n').filter(line => line.trim());
-  const mergedMessage = { tool_calls: [] };
-
-  for (const line of lines) {
-    try {
-      const json = JSON.parse(line);
-      if (json.message?.tool_calls) {
-        mergedMessage.tool_calls.push(...json.message.tool_calls);
-      }
-      if (json.message?.content) {
-        mergedMessage.content = json.message.content;
-      }
-    } catch (e) {
-      // Skip malformed lines
-      console.warn('Skipping malformed NDJSON line:', line);
-    }
-  }
-
-  return mergedMessage;
-}
-```
-
-## Testing
-
-To verify the fix works:
-
-```bash
-# Test with curl (should work with stream: false)
-curl -s http://localhost:11434/api/chat \
-  -d '{
-    "model": "qwen3-coder",
-    "messages": [{"role": "user", "content": "Read file README.md"}],
-    "stream": false,
-    "tools": [{"type": "function", "function": {"name": "read", "description": "Read a file", "parameters": {"type": "object", "properties": {"filePath": {"type": "string"}}, "required": ["filePath"]}}}]
-  }'
-```
-
-## Related Issues
-
-- **oh-my-openagent**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124 (closed - workaround documented)
-- **Ollama API Docs**: https://github.com/ollama/ollama/blob/main/docs/api.md
-
-## Getting Help
-
-If you encounter this issue:
-
-1. Check your Ollama provider configuration
-2. Set `stream: false` as a workaround
-3. Report any additional errors to the issue tracker
-4. Provide your configuration (without secrets) for debugging
+These details are needed to determine whether the problem is in Ollama's response, the OpenCode provider integration, or OMO's tool-call path before documenting a supported workaround.

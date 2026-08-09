@@ -21,10 +21,11 @@ const PRIMARY = "omo-mock/claude-fable-5";
 const FALLBACK = "omo-mock/mock-weak";
 
 const SCENARIOS = [
-	{ name: "A-classifier-refusal", primaryOutcome: "refusal", architect: true, expectDirective: true },
-	{ name: "B-policy-rejection", primaryOutcome: "policy_error", architect: true, expectDirective: true },
-	{ name: "C-transient-fallback", primaryOutcome: "transient", architect: true, expectDirective: false },
-	{ name: "D-architect-absent", primaryOutcome: "refusal", architect: false, expectDirective: false },
+	{ name: "A-classifier-refusal", primaryOutcome: "refusal", categories: "declared", expectDirective: true },
+	{ name: "B-policy-rejection", primaryOutcome: "policy_error", categories: "declared", expectDirective: true },
+	{ name: "C-transient-fallback", primaryOutcome: "transient", categories: "declared", expectDirective: false },
+	{ name: "D-architect-disabled", primaryOutcome: "refusal", categories: "disabled", expectDirective: false },
+	{ name: "E-builtin-default", primaryOutcome: "refusal", categories: "builtin", expectDirective: true },
 ];
 
 function seedScenario(scenario) {
@@ -48,10 +49,15 @@ function seedScenario(scenario) {
 	writeFileSync(join(sandbox.agentDir, "settings.json"), `${JSON.stringify(settings, null, 2)}\n`);
 
 	mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true });
-	const categories = scenario.architect
-		? { architect: { model: "anthropic/claude-fable-5", variant: "xhigh" } }
-		: { quick: { model: "anthropic/claude-opus-5" } };
-	writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify({ categories }, null, 2)}\n`);
+	const categoriesByShape = {
+		declared: { architect: { model: "anthropic/claude-fable-5", variant: "xhigh" } },
+		disabled: { architect: { disable: true } },
+		builtin: {},
+	};
+	writeFileSync(
+		join(sandbox.cwd, ".omo", "omo.json"),
+		`${JSON.stringify({ categories: categoriesByShape[scenario.categories] }, null, 2)}\n`,
+	);
 	writeFileSync(
 		join(sandbox.cwd, "mock-script.json"),
 		`${JSON.stringify({ primaryOutcome: scenario.primaryOutcome }, null, 2)}\n`,
@@ -267,7 +273,7 @@ function runSelfTest() {
 	if (collectDirectives([{ type: "user", content: "hello" }]).length !== 0) throw new Error("self-test: false positive");
 	const duplicated = [...entries, entries[0]];
 	if (collectDirectives(duplicated).length !== 2) throw new Error("self-test: duplicate directives must be counted, not collapsed");
-	if (SCENARIOS.filter((s) => s.expectDirective).length !== 2) throw new Error("self-test: expected two positive scenarios");
+	if (SCENARIOS.filter((s) => s.expectDirective).length !== 3) throw new Error("self-test: expected three positive scenarios");
 	const noticeEntry = {
 		type: "custom_message",
 		customType: NOTICE_TYPE,

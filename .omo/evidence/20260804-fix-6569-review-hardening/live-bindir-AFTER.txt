@@ -1,0 +1,33 @@
+### #6569 live bin-dir proof
+### label: AFTER (fix applied)
+### surface: real installer (packages/omo-codex/scripts/install-local.mjs) install + uninstall
+### codex: codex-cli 0.146.0
+### repo: /c/Users/pss/.omo-contrib/work/omo
+### isolated CODEX_HOME: /tmp/cqa-home.A4uixK/codex
+### custom bin dir:      /tmp/omo-6569-custombin-jTGy45
+
+=== step 1: install with a ONE-SHOT CODEX_LOCAL_BIN_DIR ===
+install: OK
+
+=== step 2: wrappers landed in the custom dir, and the location was recorded ===
+bins in custom dir: lazycodex-executor-verify.cmd omo.cmd omo-codegraph.cmd omo-comment-checker.cmd omo-git-bash-hook.cmd omo-lsp.cmd omo-rules.cmd omo-start-work-continuation.cmd omo-telemetry.cmd omo-ultrawork.cmd omo-ulw-loop.cmd ulw.cmd ulw-loop.cmd 
+recorded bin dir manifest: /tmp/cqa-home.A4uixK/codex/plugins/cache/sisyphuslabs/omo/4.19.4/.installed-bin-dir.json
+  contents: {"binDir":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-6569-custombin-jTGy45"}
+
+=== step 3: uninstall WITHOUT CODEX_LOCAL_BIN_DIR (the reported scenario) ===
+uninstall exit: 0
+- Removed managed agent link C:\Users\pss\AppData\Local\Temp\cqa-home.A4uixK\codex\agents\momus.toml
+- Removed managed agent link C:\Users\pss\AppData\Local\Temp\cqa-home.A4uixK\codex\agents\plan.toml
+- Skipped agent path outside managed scope C:\Users\pss\AppData\Local\Temp\cqa-home.A4uixK\codex\agents\lazycodex-clone-fidelity-reviewer.toml
+- Skipped agent path outside managed scope C:\Users\pss\AppData\Local\Temp\cqa-home.A4uixK\codex\agents\lazycodex-code-reviewer.toml
+- Skipped agent path outside managed scope C:\Users\pss\AppData\Local\Temp\cqa-home.A4uixK\codex\agents\lazycodex-gate-reviewer.toml
+- Skipped agent path outside managed scope C:\Users\pss\AppData\Local\Temp\cqa-home.A4uixK\codex\agents\lazycodex-qa-executor.toml
+- Left project-local artifact in place C:\Users\pss\.codex\agents
+- Left project-local artifact in place C:\Users\pss\.codex\skills
+
+=== step 4: did the wrappers in the custom dir get removed? ===
+PASS: custom bin dir is empty after uninstall
+
+PASS: real ~/.codex/config.toml unchanged (05cb7d5a3b6147a929bff1781ba258237c7744e0)
+
+RESULT(AFTER (fix applied)): fails=0

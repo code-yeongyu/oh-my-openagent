@@ -3,7 +3,7 @@
 oh-my-openagent ships in **two editions** of the same product:
 
 - **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
-- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. No agent orchestration and no `team_*` tools — Codex CLI's native surface does that work.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `codegraph`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `start-work-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
 
 Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
 
@@ -13,7 +13,7 @@ Most users want **Ultimate**. Pick **Light** if you are already invested in Code
 | Light (Codex CLI) | `npx lazycodex-ai install` | `~/.codex/plugins/cache/sisyphuslabs/omo/`, stable Codex marketplace snapshot, `~/.codex/config.toml` marketplace/plugin/agent blocks, optional autonomous Codex permissions, component CLIs in `~/.local/bin` |
 | Both | `bunx oh-my-openagent install --platform=both` | Both of the above |
 
-`lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo` CLI still defaults to `opencode` (Ultimate). `lazycodex-ai` is the npm/bin alias; `lazycodex` is the GitHub repository that hosts the marketplace bundle. Neither is the Codex marketplace name.
+Both `lazycodex-ai` and `lazycodex` are shipped bin aliases that default to the Codex Light installer and run through Node/npm. `--platform` on the shared `omo` CLI still defaults to `opencode` (Ultimate). `lazycodex` is also the repository identity that hosts the marketplace bundle. Neither alias is the Codex marketplace name.
 
 ## For Humans
 
@@ -225,9 +225,21 @@ Map their answer to:
    - **yes** → `--kimi-for-coding=yes`
    - **no** → `--kimi-for-coding=no` (default)
 
-9. **Do you use Vercel AI Gateway?**
-   - **yes** → `--vercel-ai-gateway=yes`
-   - **no** → `--vercel-ai-gateway=no` (default)
+9. **Do you have a Bailian Coding Plan subscription?**
+   - **yes** -> `--bailian-coding-plan=yes`
+   - **no** -> `--bailian-coding-plan=no` (default)
+
+10. **Do you have a MiniMax CN Coding Plan subscription (`minimaxi.com`)?**
+   - **yes** -> `--minimax-cn-coding-plan=yes`
+   - **no** -> `--minimax-cn-coding-plan=no` (default)
+
+11. **Do you have a MiniMax Coding Plan subscription (`minimax.io`)?**
+   - **yes** -> `--minimax-coding-plan=yes`
+   - **no** -> `--minimax-coding-plan=no` (default)
+
+12. **Do you use Vercel AI Gateway?**
+   - **yes** -> `--vercel-ai-gateway=yes`
+   - **no** -> `--vercel-ai-gateway=no` (default)
 
 **Provider selection is agent-specific.** There is no single global provider priority — each of the 11 agents has its own fallback chain.
 
@@ -300,6 +312,9 @@ bunx oh-my-openagent install \
   [--zai-coding-plan=<yes|no>] \
   [--opencode-go=<yes|no>] \
   [--kimi-for-coding=<yes|no>] \
+  [--bailian-coding-plan=<yes|no>] \
+  [--minimax-cn-coding-plan=<yes|no>] \
+  [--minimax-coding-plan=<yes|no>] \
   [--vercel-ai-gateway=<yes|no>] \
   [--codex-autonomous|--no-codex-autonomous] \
   [--skip-auth]
@@ -330,7 +345,7 @@ bunx oh-my-openagent install \
   bunx oh-my-openagent install --no-tui --platform=opencode --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes
   ```
 
-**About the `lazycodex-ai` bin name.** `lazycodex-ai` is the npm package and bin alias for the Codex Light Node installer. `lazycodex` (without the `-ai` suffix) is the GitHub repository that hosts the marketplace bundle. `lazycodex-ai install` does not require Bun. The Codex marketplace name is `sisyphuslabs`, and the plugin name is `omo`.
+**About the Codex bin names.** Both `lazycodex-ai` and `lazycodex` are shipped bin aliases for the Codex Light Node installer; `lazycodex` is also the GitHub repository identity that hosts the marketplace bundle. Neither invocation requires Bun. The Codex marketplace name is `sisyphuslabs`, and the plugin name is `omo`.
 
 **What the installer does:**
 
@@ -352,7 +367,7 @@ cat ~/.config/opencode/opencode.json
 bunx oh-my-openagent doctor
 ```
 
-`doctor` runs six categories of checks: **System** (binary version, plugin registration), **Config** (JSONC + Zod schema), **TUI Plugin**, **Tools** (AST-grep, LSP, GitHub CLI, comment-checker), **Models** (cache, per-agent resolution, fallback chain availability), and **Team Mode** (if enabled). Exit code: `0` = ok, `1` = errors, `2` = warnings only.
+For the OpenCode target, `doctor` runs eight registered checks: **System**, **Config**, **TUI Plugin**, **Deprecated Reasoning Keys**, **Tools**, **Models**, **Telemetry**, and **Team Mode**. The Codex target runs its own **Codex**, **Codex Components**, and **Codex Runtime Wrapper** checks. Exit code `0` means no check failed; exit code `1` means at least one check failed. Warnings alone still return `0`.
 
 #### Verify Codex CLI Light edition (skip if platform=opencode)
 
@@ -662,7 +677,7 @@ Just type one of these words in your message and the system injects the correspo
 | `ultrawork` or `ulw` | Both | Full orchestration mode — every agent (Ultimate) or the Codex `ultrawork` component (Light) activates, doesn't stop until done |
 | `search` | Ultimate | Web/doc search focus |
 | `analyze` | Ultimate | Deep analysis mode |
-| `team` | Ultimate | Forces `team_*` tools orchestration (requires `team_mode.enabled`) |
+| `team mode`, `team-mode`, `team_mode`, or `teammode` | Ultimate | Forces `team_*` tools orchestration (requires `team_mode.enabled`); bare `team` does not trigger it |
 | `hyperplan` | Ultimate | Adversarial planning via 5 hostile critics |
 | `hyperplan ultrawork` (combo) | Ultimate | Both at once |
 
@@ -683,7 +698,7 @@ All built-in slash commands are **Ultimate-only** — Codex CLI does not have a 
 
 #### Agents (11) — Ultimate only
 
-All 11 discipline agents are part of the Ultimate edition. The Light edition does not ship agent orchestration — Codex CLI's own model selection takes that role. Sisyphus delegates to these; you don't usually call them directly, but knowing the cast helps:
+All 11 OpenCode discipline agents are part of the Ultimate edition. The Light edition does not ship this OpenCode agent registry; it ships separate Codex-native agent roles and the `teammode` component instead. Sisyphus delegates to the Ultimate agents below; you don't usually call them directly, but knowing the cast helps:
 
 - **Sisyphus** — main orchestrator. Plans, delegates, drives to completion.
 - **Hephaestus** — "Codex on steroids." Deep autonomous worker, GPT-native.
@@ -699,7 +714,7 @@ All 11 discipline agents are part of the Ultimate edition. The Light edition doe
 
 #### Skills
 
-Built-in skills load automatically when their description matches your task. The user does not need to invoke them by name. The OpenCode skill system is **Ultimate-only**; the Light edition does not have a skill loader.
+Built-in OpenCode skills load automatically when their description matches your task. The user does not need to invoke them by name. This OpenCode skill system is **Ultimate-only**; Light uses Codex-native plugin skills, including the script-driven `teammode` skill, rather than the OpenCode skill loader.
 
 | Skill | Editions | When it triggers |
 |-------|:--------:|------------------|
@@ -731,7 +746,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 - **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
 - **Codex marketplace snapshot:** `~/.codex/.tmp/marketplaces/sisyphuslabs/` (local marketplace metadata and bundled source snapshot)
-- **Component binaries:** `lazycodex-executor-verify`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-start-work-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). The top-level `omo` command belongs to the shared oh-my-openagent launcher, not a Codex component.
+- **User-linked component binaries:** `lazycodex-executor-verify`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-start-work-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). Other components, including `codegraph` and `teammode`, run through plugin MCP, hook, skill, or script surfaces rather than user-linked executables. The top-level `omo` command belongs to the shared oh-my-openagent launcher, not a Codex component.
 - **Codex agent roles:** `~/.codex/agents/{lazycodex-clone-fidelity-reviewer,lazycodex-code-reviewer,lazycodex-executor,lazycodex-gate-reviewer,lazycodex-qa-executor,lazycodex-worker-low,lazycodex-worker-medium,lazycodex-worker-high,explorer,librarian,metis,momus,plan}.toml` copied from the bundled plugin snapshot, so they keep resolving when Codex prunes old plugin-cache versions or temporary marketplace state
 - **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 1000`, `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled.
 
@@ -742,7 +757,10 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 | `rules` | TypeScript | `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact` | Injects `AGENTS.md`, `CLAUDE.md`, and `.omo/rules/**` into Codex's context |
 | `comment-checker` | TypeScript | `PostToolUse` (`apply_patch`, `edit`, `write`) | Blocks AI-slop comment patterns in generated code |
 | `git-bash` | TypeScript + MCP | `PreToolUse` (`Bash`), `PostCompact`, MCP server | On Windows, exposes `git_bash`; reminds Codex before the first shell-like call and again after compaction |
+| `codegraph` | TypeScript + MCP | `SessionStart`, `PostToolUse`, MCP server | Provisions and wraps CodeGraph, initializes project indexes, and exposes its MCP tools |
+| `lazycodex-executor-verify` | TypeScript | `SubagentStop` | Requires evidence receipts from LazyCodex implementation workers before accepting completion |
 | `lsp` | TypeScript + MCP | MCP server + post-edit hooks | Exposes LSP diagnostics, navigation, symbols, rename via MCP |
+| `teammode` | TypeScript + skill | `PostToolUse` plus script-driven skill | Coordinates Codex-native agents or app threads with durable team state and thread-title guidance |
 | `ultrawork` | TypeScript | `UserPromptSubmit` keyword detector | Detects `ulw`/`ultrawork` keyword; the installer links bundled Codex agent TOMLs into `$CODEX_HOME/agents` |
 | `ulw-loop` | TypeScript | `UserPromptSubmit`, `PreToolUse`, `Stop` | Multi-goal orchestration with evidence audit trail, spawn guards, and Stop-hook auto-resume via `.omo/ulw-loop/` |
 | `start-work-continuation` | TypeScript | `Stop`, `SubagentStop` | Continues `.omo/boulder.json` start-work plans when Codex pauses at a stop boundary |
@@ -750,7 +768,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 #### Coexistence with OpenCode
 
-The Codex CLI Light edition is fully independent of the OpenCode plugin. You can install both side-by-side. They share no runtime state, no config files, and no model selection. Each emits its own daily telemetry event.
+The Codex CLI Light edition and the OpenCode plugin can run side-by-side. All harnesses read the unified `omo.jsonc` surface through harness-specific `[opencode]`, `[senpi]`, and `[codex]` views, while runtime state and model selection remain harness-specific. Each emits its own daily telemetry event.
 
 Compatibility note: LazyCodex is the Codex-platform OmO install path for `oh-my-openagent`. The bundled Codex-native subagents in `~/.codex/agents` are expected. Do not enable duplicate Codex-layer OmO/LazyCodex installs in a single `CODEX_HOME`; keep one `omo@sisyphuslabs` Codex plugin source active there. If the setup looks confused, run `npx lazycodex-ai doctor` before deleting cache or config state.
 
@@ -835,7 +853,7 @@ Merge rules:
 Schema autocomplete in your editor:
 
 ```json
-"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
 ```
 
 #### Turning features off
@@ -883,11 +901,12 @@ OpenClaw is a bidirectional external integration: outbound dispatchers fire on s
 
 | Command | Purpose |
 |---------|---------|
-| `bunx oh-my-openagent doctor` | 6-category health check (System / Config / TUI Plugin / Tools / Models / Team Mode) |
+| `bunx oh-my-openagent doctor` | Run 8 OpenCode checks (System / Config / TUI Plugin / Deprecated Reasoning Keys / Tools / Models / Telemetry / Team Mode), or the separate Codex target checks |
 | `bunx oh-my-openagent boulder` | Inspect boulder work-state and per-task stats from `.omo/boulder-state/` |
 | `bunx oh-my-openagent refresh-model-capabilities` | Refresh `models.json` cache from models.dev |
-| `bunx oh-my-openagent mcp-oauth login <server-url>` | Tier-3 MCP OAuth login (PKCE + DCR) |
-| `bunx oh-my-openagent mcp-oauth status` | Show OAuth token status |
+| `bunx oh-my-openagent mcp oauth login <server-name>` | Authenticate with an MCP server using OAuth |
+| `bunx oh-my-openagent mcp oauth logout <server-name>` | Remove stored OAuth tokens for an MCP server |
+| `bunx oh-my-openagent mcp oauth status [server-name]` | Show OAuth token status for one or all servers |
 | `bunx oh-my-openagent get-local-version` | Show installed version vs npm latest |
 | `bunx oh-my-openagent version` | Print the CLI version |
 | `bunx oh-my-openagent run <message>` | Non-interactive session; waits until todos clear and background tasks idle |

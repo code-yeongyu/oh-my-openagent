@@ -1,0 +1,163 @@
+﻿=== INVOCATION ===
+CODEX_BIN=<native-codex.exe> bash .agents/skills/codex-qa/scripts/app-server-drive.sh --plugin --expect stop
+=== OUTPUT ===
+installing local omo build into <ISOLATED_CODEX_HOME> (this builds the plugin)...
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "019fc516-5df5-7570-a31e-cf36c7c6ac52",
+  "turnId": "019fc516-6013-76f0-be85-dba540eb6cc7",
+  "expectHook": [
+    "stop"
+  ],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:0:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:1:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:2:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:3:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:4:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-checking-codegraph-bootstrap.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:0:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:1:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:2:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:3:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:4:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\session-start-checking-codegraph-bootstrap.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:7:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:7:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:19:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\stop-checking-start-work-continuation.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:20:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\stop-checking-ulw-loop-resume.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:19:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\stop-checking-start-work-continuation.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:20:<ISOLATED_CODEX_HOME>\\plugins\\cache\\sisyphuslabs\\omo\\4.19.4\\hooks\\stop-checking-ulw-loop-resume.json"
+    }
+  ],
+  "stderrTail": "<redacted: two benign notices only - (1) codex declined to create PATH aliases under the temp CODEX_HOME, (2) project-local config/hooks are untrusted in the sandbox so only plugin-cache hooks load, which is exactly what this case asserts>"
+}
+PASS: real ~/.codex/config.toml unchanged ()
+PASS: app-server turn completed; assistant text: Hello from the codex-qa mock model.
+PASS: hooks fired: sessionStart, stop, userPromptSubmit
+EXIT_STATUS=0

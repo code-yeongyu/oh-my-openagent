@@ -6,6 +6,7 @@ import type { ReadonlyFileSystem, StopHookEventName, StopHookOutput, StopInput }
 export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
 	if (!isStopInput(input)) return "";
 	if (input.stop_hook_active) return "";
+	if (hasAllowedExternalBlockerMarker(input.last_assistant_message)) return "";
 	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
 	const state = readContinuationState(input.cwd, input.session_id);
 	if (state === null) return "";
@@ -37,6 +38,26 @@ function renderDirective(state: ContinuationState, sessionId: string): string {
 		rendered = rendered.replaceAll(`{{${placeholder}}}`, value);
 	}
 	return rendered;
+}
+
+const EXTERNAL_BLOCKER_MARKER = "<start-work-blocked-external>";
+const ULTRAWORK_OPENER = "ULTRAWORK MODE ENABLED!";
+
+// The marker alone is not enough to end the turn. `directive.md` requires the exact blocker and
+// the condition that resumes the work on the following lines, so at least one is required here
+// too. That keeps a bare echo of the marker, whether quoted back from a prompt or produced by
+// untrusted text the agent read, from skipping the continuation guard.
+function hasAllowedExternalBlockerMarker(lastAssistantMessage: string | undefined): boolean {
+	if (lastAssistantMessage === undefined) return false;
+	const lines = lastAssistantMessage.split(String.fromCharCode(10));
+	const [firstLine = "", secondLine = ""] = lines;
+
+	let markerLineIndex = -1;
+	if (firstLine.trim() === EXTERNAL_BLOCKER_MARKER) markerLineIndex = 0;
+	else if (firstLine.trim() === ULTRAWORK_OPENER && secondLine.trim() === EXTERNAL_BLOCKER_MARKER) markerLineIndex = 1;
+	if (markerLineIndex === -1) return false;
+
+	return lines.slice(markerLineIndex + 1).some((line) => line.trim() !== "");
 }
 
 const CONTEXT_PRESSURE_MARKERS = [

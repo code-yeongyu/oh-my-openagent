@@ -8,7 +8,11 @@ It reads `.omo/boulder.json` in the hook payload `cwd`, resolves the active work
 {"decision":"block","reason":"<directive>"}
 ```
 
-The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when the plan has no readable top-level checklist. An active plan whose checklist is fully checked still blocks Stop until the final gate runs and Boulder is marked completed.
+The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when `last_assistant_message` starts with `<start-work-blocked-external>` (or places it immediately after the mandatory `ULTRAWORK MODE ENABLED!` opener), when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when the plan has no readable top-level checklist. An active plan whose checklist is fully checked still blocks Stop until the final gate runs and Boulder is marked completed.
+
+## External blocker escape hatch
+
+A plan can stall on something no amount of retrying fixes: a missing credential, missing hardware, a revoked authorization, an unavailable third-party service. `directive.md` instructs the agent to write `<start-work-blocked-external>` as the entire first line of its answer in that case, or as the entire second line when ultrawork's mandatory opener occupies the first. The hook recognizes those structural forms and lets the turn end so the user can act, instead of continuing the same unchanged external-state check forever. Merely discussing the marker later in an answer still continues the plan.
 
 This pairs with the `start-work` skill at `plugin/skills/start-work/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session.
 

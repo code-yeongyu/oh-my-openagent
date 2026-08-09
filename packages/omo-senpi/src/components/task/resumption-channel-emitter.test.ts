@@ -1,7 +1,20 @@
-import { describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import type { ListScope, ListedTask, TaskRecord } from "@oh-my-opencode/senpi-task"
+import { afterEach, describe, expect, it } from "bun:test"
+
+import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import { saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+import type { RuntimeState } from "@oh-my-opencode/team-core/types"
+import {
+  resolveTeamRuntimeDirs,
+  teamStorageBaseDir,
+  toTeamCoreConfig,
+  type ListScope,
+  type ListedTask,
+  type TaskRecord,
+} from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import {
@@ -10,6 +23,33 @@ import {
 } from "./resumption-channel-emitter"
 
 const SESSION_ID = "parent-session"
+const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
+const tempRoots: string[] = []
+
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+function ownedTeamRuntime(): RuntimeState {
+  return {
+    version: 1,
+    teamRunId: TEAM_RUN_ID,
+    teamName: "squad",
+    specSource: "project",
+    createdAt: 1_000,
+    status: "active",
+    leadSessionId: SESSION_ID,
+    members: [{ name: "reviewer", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [] }],
+    shutdownRequests: [],
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10_000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
+  }
+}
 
 function taskRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
@@ -112,6 +152,57 @@ describe("createResumptionChannelEmitter", () => {
 
     // then
     expect(harness.emitted).toEqual([{
+      name: "resumption_channel_state",
+      data: {
+        source: "senpi-task",
+        activeCount: 1,
+        channels: [{
+          id: member.task_id,
+          description: "Review the implementation",
+          startedAtMs: Date.parse(member.created_at),
+        }],
+      },
+    }])
+  })
+
+  it("#given a foreground owned team member resolved through the real ownership helper #when the session snapshot is emitted #then the member counts as active", async () => {
+    // given a durable team runtime owned by this session and no injected ownership resolver
+    const project = mkdtempSync(join(tmpdir(), "omo-resumption-channel-binding-"))
+    tempRoots.push(project)
+    const settings = OmoTaskSettingsSchema.parse({})
+    const stateDir = { project_dir: project }
+    mkdirSync(resolveTeamRuntimeDirs(stateDir, TEAM_RUN_ID).runtimeDir, { recursive: true })
+    await saveRuntimeState(ownedTeamRuntime(), toTeamCoreConfig(settings, teamStorageBaseDir(stateDir)))
+    const member = taskRecord({
+      task_id: "st_00000003",
+      name: `team:${TEAM_RUN_ID}:reviewer`,
+      task_summary: undefined,
+      description: "Review the implementation",
+      notify_on_terminal: false,
+    })
+    const emitted: Array<{ name: string; data: unknown }> = []
+    const pi = new FakeExtensionAPI()
+    pi.events = {
+      emit: (name, data) => emitted.push({ name, data }),
+      on: () => () => {},
+    }
+    const manager = {
+      list: (_scope: ListScope): readonly ListedTask[] => [{ record: member }],
+      wasBackground: () => false,
+    }
+    const emitter = createResumptionChannelEmitter({
+      pi,
+      manager,
+      sessionId: () => SESSION_ID,
+      stateDir,
+      settings,
+    })
+
+    // when
+    await emitter.emitSessionStart()
+
+    // then
+    expect(emitted).toEqual([{
       name: "resumption_channel_state",
       data: {
         source: "senpi-task",

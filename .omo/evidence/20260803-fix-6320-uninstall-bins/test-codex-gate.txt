@@ -1,0 +1,56 @@
+== toolchain ==
+  uname=Linux node=v24.18.0 bun=1.3.12
+
+== fetch the branch from the Windows working copy ==
+From /mnt/c/Users/pss/.omo-contrib/work/omo
+ * branch                fix/6320-uninstall-bin-links -> FETCH_HEAD
+  FETCH_HEAD=07a5e5d4b4e4567a5f087c26614978eb5170949d
+  HEAD=07a5e5d4b fix(omo-codex): scope uninstall bin removal to installer bin names
+
+== install (CI-equivalent) ==
+  install exit=0
+
+== bun run test:codex ==
+EXIT=1
+
+-- failures --
+(fail) #given unreadable existing config #when updating config #then rejects and preserves content [2.57ms]
+(fail) #given unreadable existing config #when updating config #then rejects and preserves content [2.57ms]
+error: script "test:codex" exited with code 1
+
+-- per-suite summary lines --
+ 78 pass
+ 0 fail
+ 399 pass
+ 1 fail
+
+-- bin/cleanup specific --
+(pass) managed Codex bin coverage > #given every plugin component package bin #when uninstall coverage is checked #then each name is a managed bin name [20.75ms]
+(pass) codex cleanup safety > #given filesystem root as Codex home #when managed removal runs #then refuses even shaped managed paths [0.22ms]
+(pass) codex-cache > #given non-managed bin points at deleted omo cache payload #when linking cached plugin bins #then preserves the user symlink [5.02ms]
+(pass) codex-cache > #given user-owned codex-prefixed symlink #when linking cached plugin bins #then preserves the user symlink [2.80ms]
+(pass) codex-cache > #given user-owned codex symlink with component-like target #when linking cached plugin bins #then preserves the user symlink [3.12ms]
+(pass) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files [4.48ms]
+(pass) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones [3.22ms]
+(pass) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw [2.38ms]
+(pass) codex cleanup > #given a codex home resolving to a filesystem root #when cleanup runs #then no bin link is scanned or removed [2.17ms]
+(pass) codex cleanup > #given a user copy of a generated wrapper #when cleanup runs #then only installer bin names are removed [5.38ms]
+(pass) codex cleanup > #given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept [3.33ms]
+
+-- tail --
+(pass) runCliInstaller platform branching > does not prompt for GitHub stars in noninteractive installs even when stdout is a TTY [2.10ms]
+
+1 tests skipped:
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+
+
+1 tests failed:
+(fail) #given unreadable existing config #when updating config #then rejects and preserves content [2.57ms]
+
+ 399 pass
+ 1 skip
+ 1 fail
+ 1246 expect() calls
+Ran 401 tests across 66 files. [24.18s]
+error: script "test:codex" exited with code 1
+

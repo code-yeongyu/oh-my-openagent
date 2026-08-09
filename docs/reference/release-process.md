@@ -6,7 +6,7 @@ This reference records release gates that are not covered by CI alone.
 
 Before publishing a release, maintainers verify:
 
-- Version bump and package metadata are present on the release branch.
+- The workflow calculates the release version, stamps package metadata on a release-state branch, opens and merges the release-state PR, then republishes from the prepared SHA.
 - Targeted tests for changed code pass.
 - `bun run typecheck` passes.
 - User-facing documentation covers new public behavior.

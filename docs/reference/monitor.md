@@ -117,8 +117,8 @@ Monitor supports two output injection modes.
 
 | Mode | Default | Behavior |
 |------|---------|----------|
-| `idle` | yes | Buffers output and flushes only when the parent session is idle, at safe turn boundaries. It does not interrupt an active turn. |
-| `live_safe` | no | Requires `monitor.live_mode_enabled: true`. Flushes on the next tick after each batch, but still defers while the session is active. In the current implementation this matches `idle` behavior. |
+| `idle` | yes | Buffers output and normally flushes when the parent session is idle, at safe turn boundaries. A terminal batch from a process exit can be force-dispatched while the session is active after the 60-second active-defer ceiling. |
+| `live_safe` | no | Requires `monitor.live_mode_enabled: true`. Currently follows the same active-session deferral as `idle`, including the terminal-batch 60-second defer-ceiling exception. |
 
 Use `idle` unless the agent needs quicker feedback and you accept more frequent internal output injections.
 
