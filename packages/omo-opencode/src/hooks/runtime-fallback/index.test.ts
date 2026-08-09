@@ -558,6 +558,7 @@ describe("runtime-fallback", () => {
                     temperature: 0.3,
                     top_p: 0.8,
                     maxTokens: 2048,
+                    provider_options: { service_tier: "priority", textVerbosity: "low" },
                     thinking: { type: "enabled", budgetTokens: 1024 },
                   },
                 ],
@@ -590,6 +591,8 @@ describe("runtime-fallback", () => {
         maxOutputTokens: 2048,
         options: {
           reasoningEffort: "high",
+          service_tier: "priority",
+          textVerbosity: "low",
           thinking: { type: "enabled", budgetTokens: 1024 },
         },
       })

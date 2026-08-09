@@ -14,6 +14,7 @@ export type ChatParamsInput = {
 
 type ChatParamsHookInput = ChatParamsInput & {
   rawMessage?: Record<string, unknown>
+  rawModel?: Record<string, unknown>
 }
 
 export type ChatParamsOutput = {
@@ -68,6 +69,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     model: { providerID, modelID },
     provider: { id: providerId },
     message,
+    rawModel: model,
     rawMessage: message,
   }
 }
@@ -90,6 +92,16 @@ export function createChatParamsHandler(_args: {
 
     const storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
     if (storedPromptParams) {
+      if (storedPromptParams.variant !== undefined) {
+        normalizedInput.message.variant = storedPromptParams.variant
+        const variants = isRecord(normalizedInput.rawModel?.variants)
+          ? normalizedInput.rawModel.variants
+          : undefined
+        const variantOptions = variants?.[storedPromptParams.variant]
+        if (isRecord(variantOptions)) {
+          output.options = { ...output.options, ...variantOptions }
+        }
+      }
       if (storedPromptParams.temperature !== undefined) {
         output.temperature = storedPromptParams.temperature
       }

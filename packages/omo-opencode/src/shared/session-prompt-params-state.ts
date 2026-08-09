@@ -1,4 +1,5 @@
 export type SessionPromptParams = {
+  variant?: string
   temperature?: number
   topP?: number
   maxOutputTokens?: number
@@ -9,6 +10,7 @@ const sessionPromptParams = new Map<string, SessionPromptParams>()
 
 export function setSessionPromptParams(sessionID: string, params: SessionPromptParams): void {
   sessionPromptParams.set(sessionID, {
+    ...(params.variant !== undefined ? { variant: params.variant } : {}),
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
     ...(params.topP !== undefined ? { topP: params.topP } : {}),
     ...(params.maxOutputTokens !== undefined ? { maxOutputTokens: params.maxOutputTokens } : {}),
@@ -21,6 +23,7 @@ export function getSessionPromptParams(sessionID: string): SessionPromptParams |
   if (!params) return undefined
 
   return {
+    ...(params.variant !== undefined ? { variant: params.variant } : {}),
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
     ...(params.topP !== undefined ? { topP: params.topP } : {}),
     ...(params.maxOutputTokens !== undefined ? { maxOutputTokens: params.maxOutputTokens } : {}),

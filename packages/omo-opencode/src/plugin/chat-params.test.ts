@@ -56,6 +56,7 @@ describe("createChatParamsHandler", () => {
     })
 
     setSessionPromptParams("ses_chat_params_temperature", {
+      variant: "high",
       temperature: 0.4,
       topP: 0.7,
       maxOutputTokens: 4096,
@@ -72,7 +73,7 @@ describe("createChatParamsHandler", () => {
       agent: { name: "oracle" },
       model: { providerID: "openai", modelID: "gpt-5.4" },
       provider: { id: "openai" },
-      message: {},
+      message: { variant: "medium" },
     }
 
     const output: ChatParamsOutput = {
@@ -97,7 +98,9 @@ describe("createChatParamsHandler", () => {
         thinking: { type: "disabled" },
       },
     })
+    expect(input.message.variant).toBe("high")
     expect(getSessionPromptParams("ses_chat_params_temperature")).toEqual({
+      variant: "high",
       temperature: 0.4,
       topP: 0.7,
       maxOutputTokens: 4096,
@@ -142,6 +145,30 @@ describe("createChatParamsHandler", () => {
       maxOutputTokens: 128_000,
       options: {},
     })
+  })
+
+  test("applies stored fallback variant options over the original agent variant", async () => {
+    setSessionPromptParams("ses_chat_params", { variant: "high" })
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "sisyphus" },
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.4",
+        variants: {
+          medium: { reasoningEffort: "medium" },
+          high: { reasoningEffort: "high" },
+        },
+      },
+      provider: { id: "openai" },
+      message: { variant: "medium" },
+    }
+    const output: ChatParamsOutput = { options: { reasoningEffort: "medium" } }
+
+    await createChatParamsHandler()(input, output)
+
+    expect(input.message.variant).toBe("high")
+    expect(output.options.reasoningEffort).toBe("high")
   })
 
   test("drops unsupported reasoning settings from bundled model capabilities", async () => {

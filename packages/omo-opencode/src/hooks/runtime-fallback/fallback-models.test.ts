@@ -88,6 +88,54 @@ describe("runtime-fallback fallback-models", () => {
     expect(result?.reasoning).toBeUndefined()
   })
 
+  test("inherits canonical category max_tokens for a fallback rung", () => {
+    //#given
+    const sessionID = "ses_runtime_fallback_category_max_tokens"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          models: ["openai/gpt-5.6", "openai/gpt-5.5"],
+          max_tokens: 2048,
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelSettingsForSession(
+      sessionID,
+      undefined,
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    //#then
+    expect(result?.maxTokens).toBe(2048)
+  })
+
+  test("inherits legacy agent providerOptions for a fallback rung", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: ["openai/gpt-5.6", "openai/gpt-5.5"],
+          providerOptions: { serviceTier: "priority" },
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelSettingsForSession(
+      "ses_runtime_fallback_agent_provider_options",
+      "oracle",
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    //#then
+    expect(result?.provider_options).toEqual({ serviceTier: "priority" })
+  })
+
   test("uses agent-specific fallback_models when agent is resolved", () => {
     //#given
     const pluginConfig = unsafeTestValue({

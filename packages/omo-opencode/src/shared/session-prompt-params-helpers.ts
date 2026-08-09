@@ -8,6 +8,8 @@ type PromptParamModel = {
   runtimeModel?: Record<string, unknown>
   temperature?: number
   top_p?: number
+  provider_options?: Record<string, unknown>
+  providerOptions?: Record<string, unknown>
   reasoning?: string
   reasoningEffort?: string
   maxTokens?: number
@@ -34,11 +36,13 @@ export function applySessionPromptParams(
     ? loweredReasoning?.reasoningEffort
     : model.reasoningEffort
   const promptOptions: Record<string, unknown> = {
+    ...(model.provider_options ?? model.providerOptions),
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(model.thinking ? { thinking: model.thinking } : {}),
   }
 
   setSessionPromptParams(sessionID, {
+    ...(loweredReasoning?.variant !== undefined ? { variant: loweredReasoning.variant } : {}),
     ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
     ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
     ...(model.maxTokens !== undefined ? { maxOutputTokens: model.maxTokens } : {}),

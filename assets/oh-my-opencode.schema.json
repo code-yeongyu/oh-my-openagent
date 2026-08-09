@@ -163,6 +163,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -258,6 +270,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -344,6 +368,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -715,6 +751,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -810,6 +858,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -896,6 +956,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -1267,6 +1339,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -1362,6 +1446,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -1448,6 +1544,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -1819,6 +1927,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -1914,6 +2034,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -2000,6 +2132,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -2374,6 +2518,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -2469,6 +2625,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -2555,6 +2723,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -2926,6 +3106,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -3021,6 +3213,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -3107,6 +3311,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -3478,6 +3694,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -3573,6 +3801,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -3659,6 +3899,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -4030,6 +4282,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -4125,6 +4389,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -4211,6 +4487,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -4582,6 +4870,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -4677,6 +4977,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -4763,6 +5075,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -5134,6 +5458,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -5229,6 +5565,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -5315,6 +5663,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -5686,6 +6046,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -5781,6 +6153,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -5867,6 +6251,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -6238,6 +6634,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -6333,6 +6741,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -6419,6 +6839,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -6790,6 +7222,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -6885,6 +7329,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -6971,6 +7427,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -7342,6 +7810,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -7437,6 +7917,18 @@
                         "minimum": 0,
                         "maximum": 1
                       },
+                      "provider_options": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "maxTokens": {
                         "type": "number"
                       },
@@ -7523,6 +8015,18 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "maxTokens": {
                             "type": "number"
@@ -7895,6 +8399,18 @@
                       "minimum": 0,
                       "maximum": 1
                     },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "max_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "maxTokens": {
                       "type": "number"
                     },
@@ -7990,6 +8506,18 @@
                       "minimum": 0,
                       "maximum": 1
                     },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "max_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "maxTokens": {
                       "type": "number"
                     },
@@ -8076,6 +8604,18 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
+                        },
+                        "provider_options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "max_tokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
                         },
                         "maxTokens": {
                           "type": "number"
@@ -8456,6 +8996,18 @@
                       "minimum": 0,
                       "maximum": 1
                     },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "max_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "maxTokens": {
                       "type": "number"
                     },
@@ -8551,6 +9103,18 @@
                       "minimum": 0,
                       "maximum": 1
                     },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "max_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "maxTokens": {
                       "type": "number"
                     },
@@ -8637,6 +9201,18 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
+                        },
+                        "provider_options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "max_tokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
                         },
                         "maxTokens": {
                           "type": "number"

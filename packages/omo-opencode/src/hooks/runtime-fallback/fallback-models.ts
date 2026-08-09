@@ -15,6 +15,9 @@ type ModelChainConfig = {
   reasoningEffort?: FallbackModelObject["reasoningEffort"]
   temperature?: number
   top_p?: number
+  provider_options?: Record<string, unknown>
+  providerOptions?: Record<string, unknown>
+  max_tokens?: number
   maxTokens?: number
   thinking?: FallbackModelObject["thinking"]
 }
@@ -66,7 +69,8 @@ export function getFallbackModelSettingsForSession(
     reasoningEffort: selected.reasoningEffort ?? (hasSelectedReasoning ? undefined : config.reasoningEffort),
     temperature: selected.temperature ?? config.temperature,
     top_p: selected.top_p ?? config.top_p,
-    maxTokens: selected.maxTokens ?? config.maxTokens,
+    provider_options: selected.provider_options ?? config.provider_options ?? config.providerOptions,
+    maxTokens: selected.max_tokens ?? selected.maxTokens ?? config.max_tokens ?? config.maxTokens,
     thinking: selected.thinking ?? config.thinking,
   }
 }

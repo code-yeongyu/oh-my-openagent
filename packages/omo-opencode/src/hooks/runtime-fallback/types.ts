@@ -1,5 +1,5 @@
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
-import type { SessionPromptParams } from "../../shared/session-prompt-params-state"
+import type { SessionPromptParams } from "../../shared"
 
 export interface RuntimeFallbackInterval {
   unref: () => void

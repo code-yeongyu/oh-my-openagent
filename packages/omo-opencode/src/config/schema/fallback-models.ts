@@ -10,6 +10,9 @@ export const FallbackModelObjectSchema = z.object({
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
+  provider_options: z.record(z.string(), z.unknown()).optional(),
+  max_tokens: z.number().int().positive().optional(),
+  /** @deprecated Use `max_tokens` instead. */
   maxTokens: z.number().optional(),
   thinking: z
     .object({

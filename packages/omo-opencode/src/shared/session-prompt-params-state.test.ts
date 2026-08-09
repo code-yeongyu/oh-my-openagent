@@ -16,6 +16,7 @@ describe("session-prompt-params-state", () => {
     //#given
     const sessionID = "ses_prompt_params"
     const params = {
+      variant: "high",
       temperature: 0.4,
       topP: 0.7,
       maxOutputTokens: 4096,

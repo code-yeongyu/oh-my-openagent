@@ -258,7 +258,14 @@ describe("validatePluginConfig", () => {
         },
         "[opencode]": {
           categories: {
-            quick: { models: [{ model: "primary", reasoning: "off", maxTokens: 1024 }, "fallback"] },
+            quick: {
+              models: [{
+                model: "primary",
+                reasoning: "off",
+                maxTokens: 1024,
+                provider_options: { service_tier: "priority" },
+              }, "fallback"],
+            },
           },
         },
       })
@@ -266,7 +273,13 @@ describe("validatePluginConfig", () => {
       const result = validatePluginConfig(fixture.project)
 
       expect(result.config.categories?.quick?.models).toEqual([
-        { model: "provider/primary", reasoning: "off", maxTokens: 1024 },
+        {
+          model: "provider/primary",
+          reasoning: "off",
+          maxTokens: 1024,
+          max_tokens: 1024,
+          provider_options: { service_tier: "priority" },
+        },
         { model: "provider/fallback", reasoning: "high" },
       ])
     })
@@ -280,7 +293,7 @@ describe("validatePluginConfig", () => {
             explore: {
               models: [
                 { model: "provider/primary", reasoning: "low" },
-                { model: "provider/fallback", reasoning: "medium" },
+                { model: "provider/fallback", reasoning: "medium", max_tokens: 2048 },
               ],
             },
           },
@@ -294,7 +307,7 @@ describe("validatePluginConfig", () => {
       expect(result.config.agents?.explore?.model).toBe("provider/primary")
       expect(result.config.agents?.explore?.reasoning).toBe("low")
       expect(result.config.agents?.explore?.fallback_models).toEqual([
-        { model: "provider/fallback", reasoning: "medium" },
+        { model: "provider/fallback", reasoning: "medium", max_tokens: 2048, maxTokens: 2048 },
       ])
     })
   })

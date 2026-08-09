@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import { getSessionPromptParams, setSessionPromptParams } from "../../shared/session-prompt-params-state"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -53,6 +54,7 @@ function createDeps(promptCalls: { count: number }): HookDeps {
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    sessionPromptParamsBeforeFallback: new Map(),
   }
 }
 
@@ -202,5 +204,20 @@ describe("createAutoRetryHelpers", () => {
     expect(deps.sessionStates.has(sessionID)).toBe(false)
     expect(deps.sessionLastAccess.has(sessionID)).toBe(false)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("restores prompt settings while cleaning stale fallback state", () => {
+    const deps = createDeps({ count: 0 })
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-stale-fallback-prompt-params"
+    deps.sessionStates.set(sessionID, createFallbackState("custom/fallback"))
+    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, { temperature: 0.1 })
+    setSessionPromptParams(sessionID, { temperature: 0.3 })
+
+    helpers.cleanupStaleSessions()
+
+    expect(getSessionPromptParams(sessionID)).toEqual({ temperature: 0.1 })
+    expect(deps.sessionPromptParamsBeforeFallback?.has(sessionID)).toBe(false)
   })
 })

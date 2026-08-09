@@ -59,4 +59,16 @@ describe("applySessionPromptParams", () => {
       options: { reasoningEffort: "medium" },
     })
   })
+
+  test("preserves canonical provider options", () => {
+    const sessionID = "ses_provider_options"
+
+    applySessionPromptParams(sessionID, {
+      provider_options: { service_tier: "priority", textVerbosity: "low" },
+    })
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      options: { service_tier: "priority", textVerbosity: "low" },
+    })
+  })
 })

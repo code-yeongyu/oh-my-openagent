@@ -13,12 +13,12 @@ import {
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
 import { getFallbackModelSettingsForSession } from "./fallback-models"
-import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import {
+  applySessionPromptParams,
   clearSessionPromptParams,
   getSessionPromptParams,
   setSessionPromptParams,
-} from "../../shared/session-prompt-params-state"
+} from "../../shared"
 import { capturePromptParams, discardPromptParamsSnapshot } from "./fallback-prompt-params"
 
 export function createAutoRetryDispatcher(

@@ -3,6 +3,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
+import { restorePromptParams } from "./fallback-prompt-params"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -33,6 +34,7 @@ export function createStaleSessionCleanup(
         clearDelegatedChildSessionBootstrap(sessionID)
         SessionCategoryRegistry.remove(sessionID)
         sessionStatusRetryKeys.delete(sessionID)
+        restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
         cleanedCount++
       }
     }
