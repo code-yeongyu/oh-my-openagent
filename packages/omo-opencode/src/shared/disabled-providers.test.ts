@@ -199,4 +199,26 @@ describe("applyDisabledProviders", () => {
     expect(cats.deep.model).toBe("openai/gpt-5.5")
     expect(cats.deep.fallback_models).toEqual(["openai/gpt-5.5"])
   })
+
+  test("filters canonical model chains and promotes the first allowed rung", () => {
+    const config = {
+      disabled_providers: ["github-copilot"],
+      categories: {
+        deep: {
+          models: [
+            { model: "github-copilot/gpt-5.5", reasoning: "high" },
+            { model: "openai/gpt-5.5", reasoning: "medium" },
+            "github-copilot/claude-sonnet-4.6",
+          ],
+          fallback_models: ["legacy/ignored"],
+        },
+      },
+    } as unknown as OhMyOpenCodeConfig
+
+    applyDisabledProviders(config)
+
+    const cats = config.categories as Record<string, { models?: unknown; fallback_models?: unknown }>
+    expect(cats.deep.models).toEqual([{ model: "openai/gpt-5.5", reasoning: "medium" }])
+    expect(cats.deep.fallback_models).toEqual(["legacy/ignored"])
+  })
 })

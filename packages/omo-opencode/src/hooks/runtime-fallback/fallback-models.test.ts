@@ -140,8 +140,9 @@ describe("runtime-fallback fallback-models", () => {
     const pluginConfig = unsafeTestValue({
       agents: {
         oracle: {
-          models: ["openai/gpt-5.6", "openai/gpt-5.5"],
+          fallback_models: ["openai/gpt-5.5"],
           providerOptions: { serviceTier: "priority" },
+          textVerbosity: "low",
         },
       },
     })
@@ -155,7 +156,90 @@ describe("runtime-fallback fallback-models", () => {
     )
 
     //#then
-    expect(result?.provider_options).toEqual({ serviceTier: "priority" })
+    expect(result?.provider_options).toEqual({ serviceTier: "priority", textVerbosity: "low" })
+  })
+
+  test("does not inherit promoted primary settings into a materialized agent fallback", () => {
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: [
+            { model: "openai/gpt-5.6", reasoning: "high", temperature: 0.2 },
+            "openai/gpt-5.5",
+          ],
+          fallback_models: ["openai/gpt-5.5"],
+          reasoning: "high",
+          temperature: 0.2,
+        },
+      },
+    })
+
+    const result = getFallbackModelSettingsForSession(
+      "ses_materialized_agent_primary_settings",
+      "oracle",
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    expect(result?.reasoning).toBeUndefined()
+    expect(result?.temperature).toBeUndefined()
+  })
+
+  test("merges fallback provider options over category defaults", () => {
+    const sessionID = "ses_runtime_fallback_provider_options_merge"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          models: [
+            "openai/gpt-5.6",
+            { model: "openai/gpt-5.5", provider_options: { thinking: { type: "disabled" } } },
+          ],
+          provider_options: { serviceTier: "priority", textVerbosity: "low" },
+        },
+      },
+    })
+
+    const result = getFallbackModelSettingsForSession(
+      sessionID,
+      undefined,
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    expect(result?.provider_options).toEqual({
+      serviceTier: "priority",
+      textVerbosity: "low",
+      thinking: { type: "disabled" },
+    })
+  })
+
+  test("merges legacy and canonical provider options with canonical precedence", () => {
+    const sessionID = "ses_runtime_fallback_provider_options_precedence"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          models: ["openai/gpt-5.6", "openai/gpt-5.5"],
+          providerOptions: { serviceTier: "flex", legacyOnly: true },
+          textVerbosity: "low",
+          provider_options: { serviceTier: "priority", textVerbosity: "high" },
+        },
+      },
+    })
+
+    const result = getFallbackModelSettingsForSession(
+      sessionID,
+      undefined,
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    expect(result?.provider_options).toEqual({
+      serviceTier: "priority",
+      legacyOnly: true,
+      textVerbosity: "high",
+    })
   })
 
   test("uses the fallback index for repeated models with distinct settings", () => {

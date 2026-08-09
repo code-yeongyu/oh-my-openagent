@@ -7,6 +7,10 @@ export function applyFallbackEntrySettings(input: {
   variantOverride?: string
 }): DelegatedModelConfig {
   const { categoryModel, effectiveEntry, variantOverride } = input
+  const providerOptions = {
+    ...categoryModel.providerOptions,
+    ...effectiveEntry.providerOptions,
+  }
 
   return {
     ...categoryModel,
@@ -18,7 +22,7 @@ export function applyFallbackEntrySettings(input: {
     temperature: effectiveEntry.temperature ?? categoryModel.temperature,
     top_p: effectiveEntry.top_p ?? categoryModel.top_p,
     maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
-    providerOptions: effectiveEntry.providerOptions ?? categoryModel.providerOptions,
+    providerOptions: Object.keys(providerOptions).length > 0 ? providerOptions : undefined,
     thinking: effectiveEntry.thinking ?? categoryModel.thinking,
   }
 }

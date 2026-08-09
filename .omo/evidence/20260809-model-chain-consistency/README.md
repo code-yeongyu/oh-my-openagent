@@ -5,13 +5,13 @@ Issue: #6644
 ## Behavioral proof
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
-- Patched focused suite: 288 passed, 0 failed.
-- Related config and Doctor suites: 21 passed, 0 failed.
+- Exact-head focused suite: 141 passed, 0 failed.
+- Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,473 passed, 5 skipped, 2 unrelated failures.
+- Full suite: 13,489 passed, 5 skipped, 1 unrelated failure.
 
-The provisioned ast-grep 0.43.0 pin is absent. The unrelated Senpi status-UI
-test failed in the full parallel run and passed immediately in isolation.
+The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
+`origin/dev`, and the same single assertion fails when run in isolation.
 
 ## Isolated OpenCode QA
 
@@ -73,6 +73,17 @@ test failed in the full parallel run and passed immediately in isolation.
   request settings (`1024`, `priority`, and `low`) in `chat.params` and the
   provider request, then deleted the isolated session. See
   `real-agent-primary-summary.jsonl`.
+- Agent-scope QA configured `1024/priority` only on an agent primary rung. The
+  primary request retained both values; its plain fallback retained neither and
+  completed successfully. See `real-agent-scope-summary.jsonl`.
+- Provider-options merge QA configured `serviceTier` at category level and
+  `textVerbosity` only on the fallback rung. Real `chat.params` and the provider
+  request contained both values. See `real-provider-options-merge-summary.jsonl`.
+- Exact-head staff QA removed a disabled canonical primary, resolved the
+  `Sisyphus - ultraworker` display name, sent distinct `1024/priority/high/max`
+  settings on the allowed primary, then completed on the plain fallback without
+  those primary-only settings. The isolated session was deleted and had zero
+  matches in the live database. See `real-staff-final-summary.jsonl`.
 
 Run the focused proof:
 

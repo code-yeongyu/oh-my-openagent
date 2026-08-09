@@ -1,0 +1,4 @@
+{"source":"chat.params","rung":"primary","model":"primary","maxOutputTokens":1024,"serviceTier":"priority"}
+{"source":"chat.params","rung":"fallback","model":"gpt-5.6-sol","maxOutputTokens":null,"serviceTier":null}
+{"source":"session-message","sessionID":"ses_01969f324ffefWp9HlnmGNTTba","model":"gpt-5.6-sol","text":"REAL_OPENCODE_FALLBACK_OK"}
+{"source":"isolation","liveDatabaseMatches":0,"isolatedSessionDeleted":true}

@@ -137,6 +137,7 @@ describe("resolveCategoryExecution", () => {
 				fallback_models: ["legacy/fallback"],
 				reasoning: "medium",
 				reasoningEffort: "low",
+				provider_options: { textVerbosity: "low" },
 				models: [
 					{
 						model: "openai/gpt-5.4",
@@ -158,7 +159,10 @@ describe("resolveCategoryExecution", () => {
 		expect(result.actualModel).toBe("openai/gpt-5.4")
 		expect(result.categoryModel?.reasoning).toBe("high")
 		expect(result.categoryModel?.maxTokens).toBe(2048)
-		expect(result.categoryModel?.providerOptions).toEqual({ serviceTier: "priority" })
+		expect(result.categoryModel?.providerOptions).toEqual({
+			textVerbosity: "low",
+			serviceTier: "priority",
+		})
 		expect(result.fallbackChain).toEqual([
 			{
 				providers: ["test-provider"],

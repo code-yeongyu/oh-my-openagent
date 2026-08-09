@@ -1,0 +1,4 @@
+{"source":"chat.params","model":"gpt-5.6-sol","serviceTier":"priority","textVerbosity":"low"}
+{"source":"provider-request","model":"gpt-5.6-sol","service_tier":"priority","text_verbosity":"low"}
+{"source":"session-message","sessionID":"ses_01968eedbffe0seNagKBWmdt69","model":"gpt-5.6-sol","text":"REAL_OPENCODE_FALLBACK_OK"}
+{"source":"isolation","isolatedSessionDeleted":true}

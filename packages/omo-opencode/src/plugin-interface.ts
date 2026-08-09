@@ -3,7 +3,7 @@ import type { OhMyOpenCodeConfig } from "./config"
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 
 import { applyAgentVariant } from "./shared/agent-variant"
-import { stripInvisibleAgentCharacters } from "./shared/agent-display-names"
+import { getAgentConfigKey, getSessionPromptParams } from "./shared"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -40,9 +40,10 @@ export function createPluginInterface(args: {
 
     "chat.params": async (input: unknown, output: unknown) => {
       const chatParamsInput = input as {
+        sessionID?: unknown
         agent?: string | { name?: string }
         model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
-        message?: { variant?: string }
+        message?: { variant?: string; reasoningEffort?: string }
       }
       const agentName =
         typeof chatParamsInput.agent === "string"
@@ -51,25 +52,42 @@ export function createPluginInterface(args: {
       const providerID = chatParamsInput.model?.providerID
       const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
       const modelID = typeof rawModelID === "string" ? rawModelID : undefined
-      const strippedAgentName = typeof agentName === "string"
-        ? stripInvisibleAgentCharacters(agentName)
+      const agentConfigKey = typeof agentName === "string"
+        ? getAgentConfigKey(agentName, pluginConfig.agents)
         : undefined
-      const agentOverride = strippedAgentName === undefined
+      const agentOverride = agentConfigKey === undefined
         ? undefined
-        : pluginConfig.agents?.[strippedAgentName as keyof typeof pluginConfig.agents]
-          ?? Object.entries(pluginConfig.agents ?? {}).find(([key]) => (
-            key.toLowerCase() === strippedAgentName.toLowerCase()
-          ))?.[1]
-      if (isRecord(output) && isRecord(output.options) && agentOverride) {
-        if (agentOverride.providerOptions) {
-          output.options = { ...output.options, ...agentOverride.providerOptions }
-        }
+        : pluginConfig.agents?.[agentConfigKey as keyof typeof pluginConfig.agents]
+      const hasSessionPromptParams = typeof chatParamsInput.sessionID === "string"
+        && getSessionPromptParams(chatParamsInput.sessionID) !== undefined
+      if (!hasSessionPromptParams && chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
+        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+      }
+      if (isRecord(output) && isRecord(output.options) && agentOverride && !hasSessionPromptParams) {
+        const options = { ...output.options, ...agentOverride.providerOptions }
         if (typeof agentOverride.maxTokens === "number") {
           output.maxOutputTokens = agentOverride.maxTokens
         }
-      }
-      if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
-        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+        if (agentOverride.models !== undefined) {
+          if (typeof agentOverride.temperature === "number") {
+            output.temperature = agentOverride.temperature
+          }
+          if (typeof agentOverride.top_p === "number") {
+            output.topP = agentOverride.top_p
+          }
+          if (chatParamsInput.message?.reasoningEffort) {
+            options.reasoningEffort = chatParamsInput.message.reasoningEffort
+          } else if (agentOverride.reasoning === undefined && agentOverride.reasoningEffort) {
+            options.reasoningEffort = agentOverride.reasoningEffort
+          }
+          if (agentOverride.thinking) {
+            options.thinking = agentOverride.thinking
+          }
+          if (agentOverride.textVerbosity) {
+            options.textVerbosity = agentOverride.textVerbosity
+          }
+        }
+        output.options = options
       }
       const handler = createChatParamsHandler({
         client: ctx.client,

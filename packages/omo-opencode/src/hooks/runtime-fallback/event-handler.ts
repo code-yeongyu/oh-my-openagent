@@ -13,7 +13,7 @@ import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { discardPromptParamsSnapshot, restorePromptParams } from "./fallback-prompt-params"
-import { clearSessionPromptParams } from "../../shared"
+import { clearSessionPromptParams, getAgentConfigKey } from "../../shared"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -40,7 +40,7 @@ function resolvePreferredSessionModel(
   pluginConfig: HookDeps["pluginConfig"],
 ): string | undefined {
   const agentConfig = agent && pluginConfig?.agents
-    ? pluginConfig.agents[agent]
+    ? pluginConfig.agents[getAgentConfigKey(agent, pluginConfig.agents)]
     : undefined
   const agentModel = getConfiguredPrimaryModel(agentConfig)
   if (agentModel) return agentModel

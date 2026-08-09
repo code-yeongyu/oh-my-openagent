@@ -119,9 +119,16 @@ function resolveKnownAgentConfigKey(agentName: string): string | undefined {
  * Resolve an agent name (display name or config key) to its lowercase config key.
  * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
  */
-export function getAgentConfigKey(agentName: string): string {
+export function getAgentConfigKey(
+  agentName: string,
+  overrides?: Record<string, { displayName?: string } | undefined>,
+): string {
   const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
-  return resolveKnownAgentConfigKey(agentName) ?? lower
+  const knownKey = resolveKnownAgentConfigKey(agentName) ?? lower
+  return Object.entries(overrides ?? {}).find(([key, override]) => (
+    key.toLowerCase() === knownKey
+    || override?.displayName?.trim().toLowerCase() === lower
+  ))?.[0] ?? knownKey
 }
 
 /**

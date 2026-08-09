@@ -36,7 +36,8 @@ export function applySessionPromptParams(
     ? loweredReasoning?.reasoningEffort
     : model.reasoningEffort
   const promptOptions: Record<string, unknown> = {
-    ...(model.provider_options ?? model.providerOptions),
+    ...model.providerOptions,
+    ...model.provider_options,
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(model.thinking ? { thinking: model.thinking } : {}),
   }

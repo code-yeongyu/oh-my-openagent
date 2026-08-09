@@ -1,7 +1,7 @@
 import { normalizeReasoning } from "@oh-my-opencode/model-core"
 import type { GetModelCapabilitiesInput } from "@oh-my-opencode/model-core"
 import type { OhMyOpenCodeConfig } from "../config"
-import { stripInvisibleAgentCharacters } from "./agent-display-names"
+import { getAgentConfigKey } from "./agent-display-names"
 import { getModelCapabilities } from "./model-capabilities"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
@@ -9,6 +9,7 @@ type ReasoningConfig = {
   reasoning?: string
   variant?: string
   category?: string
+  displayName?: string
 }
 
 type ChainEntry = {
@@ -52,12 +53,8 @@ function findAgentOverride(
   config: OhMyOpenCodeConfig,
   agentName: string,
 ): ReasoningConfig | undefined {
-  const stripped = stripInvisibleAgentCharacters(agentName)
-  const agentOverrides = config.agents as Record<string, ReasoningConfig> | undefined
-  return agentOverrides
-    ? agentOverrides[stripped]
-      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
-    : undefined
+  const agentOverrides = config.agents as Record<string, ReasoningConfig | undefined> | undefined
+  return agentOverrides?.[getAgentConfigKey(agentName, agentOverrides)]
 }
 
 function getCategoryConfig(
@@ -88,11 +85,11 @@ export function resolveVariantForModel(
   agentName: string,
   currentModel: { providerID: string; modelID: string },
 ): string | undefined {
-  const stripped = stripInvisibleAgentCharacters(agentName)
+  const configKey = getAgentConfigKey(agentName, config.agents).toLowerCase()
   const agentOverride = findAgentOverride(config, agentName)
   const categoryName = agentOverride?.category
   const categoryConfig = getCategoryConfig(config, categoryName)
-  const agentChain = AGENT_MODEL_REQUIREMENTS[stripped]?.fallbackChain as ChainEntry[] | undefined
+  const agentChain = AGENT_MODEL_REQUIREMENTS[configKey]?.fallbackChain as ChainEntry[] | undefined
   const categoryChain = categoryName
     ? CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain as ChainEntry[] | undefined
     : undefined

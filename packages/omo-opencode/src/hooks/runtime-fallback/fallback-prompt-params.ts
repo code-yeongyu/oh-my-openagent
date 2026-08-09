@@ -1,9 +1,9 @@
-import type { SessionPromptParams } from "../../shared/session-prompt-params-state"
 import {
   clearSessionPromptParams,
   getSessionPromptParams,
   setSessionPromptParams,
-} from "../../shared/session-prompt-params-state"
+  type SessionPromptParams,
+} from "../../shared"
 
 type PromptParamSnapshots = Map<string, SessionPromptParams | undefined>
 

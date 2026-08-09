@@ -1,0 +1,4 @@
+{"source":"provider-request","rung":"primary","model":"gpt-5.6-sol-primary","maxOutputTokens":1024,"serviceTier":"priority","textVerbosity":"high","reasoningEffort":"max"}
+{"source":"provider-request","rung":"fallback","model":"gpt-5.6-sol","maxOutputTokens":null,"serviceTier":null,"textVerbosity":"low","reasoningEffort":"medium"}
+{"source":"session-message","sessionID":"ses_0194be909ffeQHJ9lK69xOURZa","agent":"Sisyphus - ultraworker","models":["gpt-5.6-sol-primary","gpt-5.6-sol"],"text":"REAL_OPENCODE_FALLBACK_OK"}
+{"source":"isolation","disabledProviderRequests":0,"liveDatabaseMatches":0,"isolatedSessionDeleted":true}

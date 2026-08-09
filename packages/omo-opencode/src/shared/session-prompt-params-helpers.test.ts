@@ -71,4 +71,17 @@ describe("applySessionPromptParams", () => {
       options: { service_tier: "priority", textVerbosity: "low" },
     })
   })
+
+  test("merges legacy provider options before canonical provider options", () => {
+    const sessionID = "ses_provider_options_merge"
+
+    applySessionPromptParams(sessionID, {
+      providerOptions: { serviceTier: "flex", legacyOnly: true },
+      provider_options: { serviceTier: "priority" },
+    })
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      options: { serviceTier: "priority", legacyOnly: true },
+    })
+  })
 })

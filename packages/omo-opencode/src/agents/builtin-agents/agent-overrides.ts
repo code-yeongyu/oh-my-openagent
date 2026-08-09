@@ -42,14 +42,27 @@ export function mergeAgentConfig(
   directory?: string
 ): AgentConfig {
   const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
-  const { prompt_append, reasoning, ...rest } = migratedOverride
-  const merged = deepMerge(base, rest as Partial<AgentConfig>)
+  const { prompt_append, reasoning, models, fallback_models, ...rest } = migratedOverride
+  const canonicalPrimarySettings = models !== undefined
+  const runtimeOverride = canonicalPrimarySettings
+    ? Object.fromEntries(Object.entries(rest).filter(([key]) => ![
+        "variant",
+        "temperature",
+        "top_p",
+        "maxTokens",
+        "thinking",
+        "reasoningEffort",
+        "textVerbosity",
+        "providerOptions",
+        "provider_options",
+        "max_tokens",
+      ].includes(key)))
+    : rest
+  const merged = deepMerge(base, runtimeOverride as Partial<AgentConfig>)
 
-  // Lower canonical `reasoning` to OpenCode's `variant` at build time so that
-  // the TUI status bar and OpenCode's pre-hook provider-option construction
-  // see the correct value. `reasoning` takes precedence over the deprecated
-  // `variant` and `reasoningEffort`, matching resolveAgentVariant precedence.
-  if (reasoning !== undefined) {
+  // Single-model overrides can be lowered at build time. Model-chain primary
+  // settings are applied per request so they cannot leak into fallback rungs.
+  if (reasoning !== undefined && !canonicalPrimarySettings) {
     merged.variant = reasoning
   }
 

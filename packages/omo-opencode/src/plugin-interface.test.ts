@@ -13,6 +13,7 @@ import {
   registerAgentName,
   updateSessionAgent,
 } from "./features/claude-code-session-state"
+import { clearSessionPromptParams, setSessionPromptParams } from "./shared"
 
 
 describe("createPluginInterface - command.execute.before", () => {
@@ -337,6 +338,127 @@ describe("createPluginInterface - chat.params variant injection", () => {
 
     expect(output.options).toMatchObject({ serviceTier: "priority", textVerbosity: "low" })
     expect(output.maxOutputTokens).toBe(1024)
+  })
+
+  test.each([
+    ["Prometheus - Plan Builder", "prometheus", undefined],
+    ["計畫師", "prometheus", "計畫師"],
+  ])("resolves agent display name %s to primary settings", async (agent, key, displayName) => {
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          [key]: {
+            displayName,
+            models: ["openai/gpt-5.6-sol"],
+            reasoning: "high",
+            providerOptions: { serviceTier: "priority" },
+            maxTokens: 1024,
+          },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const output = { options: {} as Record<string, unknown>, maxOutputTokens: undefined }
+
+    const input = {
+      sessionID: `ses-${key}`,
+      agent,
+      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+      provider: { id: "openai" },
+      message: {} as { variant?: string },
+    }
+
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    expect(output.options.serviceTier).toBe("priority")
+    expect(output.maxOutputTokens).toBe(1024)
+    expect(input.message.variant).toBe("high")
+  })
+
+  test("injects primary reasoningEffort when canonical reasoning is absent", async () => {
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          explore: {
+            models: ["openai/gpt-5.6-sol"],
+            reasoningEffort: "high",
+            top_p: 0.8,
+            thinking: { type: "enabled", budgetTokens: 1024 },
+            textVerbosity: "low",
+          },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const output = { options: {} as Record<string, unknown>, topP: undefined }
+
+    await pluginInterface["chat.params"]?.({
+      sessionID: "ses-agent-primary-reasoning",
+      agent: "explore",
+      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+      provider: { id: "openai" },
+      message: {},
+    } as never, output as never)
+
+    expect(output.options.reasoningEffort).toBe("high")
+    expect(output.options.thinking).toEqual({ type: "enabled", budgetTokens: 1024 })
+    expect(output.options.textVerbosity).toBe("low")
+    expect(output.topP).toBe(0.8)
+  })
+
+  test("does not leak primary agent settings into a session-scoped fallback rung", async () => {
+    const sessionID = "ses-agent-fallback-options"
+    setSessionPromptParams(sessionID, {})
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: { explore: { providerOptions: { serviceTier: "priority" }, maxTokens: 1024 } },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID,
+      agent: "explore",
+      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+      provider: { id: "openai" },
+      message: {},
+    }
+    const output = { options: {} as Record<string, unknown> } as {
+      options: Record<string, unknown>
+      maxOutputTokens?: number
+    }
+
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+    clearSessionPromptParams(sessionID)
+
+    expect(output.options.serviceTier).toBeUndefined()
+    expect(output.maxOutputTokens).toBeUndefined()
   })
 
   test("injects variant from agent config into chat.params message", async () => {

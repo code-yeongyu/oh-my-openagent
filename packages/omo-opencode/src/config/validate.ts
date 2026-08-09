@@ -114,14 +114,47 @@ function materializeAgentModelChains(config: OhMyOpenCodeConfig): OhMyOpenCodeCo
       top_p: _topP,
       maxTokens: _maxTokens,
       thinking: _thinking,
+      providerOptions: _providerOptions,
+      textVerbosity: _textVerbosity,
       ...rest
     } = agent
-    const primarySettings = primary === undefined
+    const defaultProviderOptions = {
+      ..._providerOptions,
+      ...(_textVerbosity === undefined ? {} : { textVerbosity: _textVerbosity }),
+    }
+    const defaults = {
+      ...(_reasoning === undefined ? {} : { reasoning: _reasoning }),
+      ...(_variant === undefined ? {} : { variant: _variant }),
+      ...(_reasoningEffort === undefined ? {} : { reasoningEffort: _reasoningEffort }),
+      ...(_temperature === undefined ? {} : { temperature: _temperature }),
+      ...(_topP === undefined ? {} : { top_p: _topP }),
+      ...(_maxTokens === undefined ? {} : { maxTokens: _maxTokens }),
+      ...(_thinking === undefined ? {} : { thinking: _thinking }),
+      ...(Object.keys(defaultProviderOptions).length === 0
+        ? {}
+        : { provider_options: defaultProviderOptions }),
+    }
+    const materializeEntry = (entry: typeof primary) => entry === undefined
+      ? undefined
+      : typeof entry === "string"
+        ? Object.keys(defaults).length === 0 ? entry : { ...defaults, model: entry }
+        : {
+          ...defaults,
+          ...entry,
+          ...(defaults.provider_options === undefined && entry.provider_options === undefined
+            ? {}
+            : { provider_options: { ...defaults.provider_options, ...entry.provider_options } }),
+        }
+    const materializedPrimary = materializeEntry(primary)
+    const materializedFallbacks = fallbacks.map(materializeEntry)
+    const primarySettings = materializedPrimary === undefined
       ? {}
-      : typeof primary === "string"
-        ? { model: primary }
-        : primary
-    const providerOptions = typeof primary === "object" ? primary.provider_options : undefined
+      : typeof materializedPrimary === "string"
+        ? { ...defaults, model: materializedPrimary }
+        : materializedPrimary
+    const providerOptions = typeof materializedPrimary === "object"
+      ? materializedPrimary.provider_options
+      : defaults.provider_options
     const textVerbosity = providerOptions?.textVerbosity
     changed = true
     return [name, {
@@ -131,7 +164,10 @@ function materializeAgentModelChains(config: OhMyOpenCodeConfig): OhMyOpenCodeCo
       ...(textVerbosity === "low" || textVerbosity === "medium" || textVerbosity === "high"
         ? { textVerbosity }
         : {}),
-      fallback_models: fallbacks,
+      models: materializedPrimary === undefined
+        ? materializedFallbacks
+        : [materializedPrimary, ...materializedFallbacks],
+      fallback_models: materializedFallbacks,
     }]
   })) as typeof config.agents
 
@@ -169,7 +205,7 @@ export function validatePluginConfig(
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]
   const userConfig = parseConfig(chain.protectedUserView)
-  const config = applyDisabledProviders(materializeAgentModelChains(
+  const config = materializeAgentModelChains(applyDisabledProviders(
     protectUserFields(mergeViews(views), userConfig),
   ))
 

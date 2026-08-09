@@ -295,13 +295,15 @@ describe("validatePluginConfig", () => {
         "[opencode]": {
           agents: {
             explore: {
+              providerOptions: { serviceTier: "priority" },
+              maxTokens: 2048,
               models: [
                 {
                   model: "provider/primary",
                   reasoning: "low",
                   provider_options: { service_tier: "priority", textVerbosity: "low" },
                 },
-                { model: "provider/fallback", reasoning: "medium", max_tokens: 2048 },
+                "provider/fallback",
               ],
             },
           },
@@ -315,13 +317,52 @@ describe("validatePluginConfig", () => {
       expect(result.config.agents?.explore?.model).toBe("provider/primary")
       expect(result.config.agents?.explore?.reasoning).toBe("low")
       expect(result.config.agents?.explore?.providerOptions).toEqual({
+        serviceTier: "priority",
         service_tier: "priority",
         textVerbosity: "low",
       })
       expect(result.config.agents?.explore?.textVerbosity).toBe("low")
-      expect(result.config.agents?.explore?.fallback_models).toEqual([
-        { model: "provider/fallback", reasoning: "medium", max_tokens: 2048, maxTokens: 2048 },
-      ])
+      expect(result.config.agents?.explore?.fallback_models).toEqual([{
+        model: "provider/fallback",
+        maxTokens: 2048,
+        provider_options: { serviceTier: "priority" },
+      }])
+      expect(result.config.agents?.explore?.models?.[1]).toEqual({
+        model: "provider/fallback",
+        maxTokens: 2048,
+        provider_options: { serviceTier: "priority" },
+      })
+    })
+  })
+
+  it("#given a disabled canonical agent primary #when validating #then promotes the first allowed rung with its settings", () => {
+    withOmoConfig("canonical-agent-disabled-provider", (fixture) => {
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          disabled_providers: ["blocked"],
+          agents: {
+            explore: {
+              models: [
+                { model: "blocked/primary", reasoning: "high" },
+                { model: "openai/fallback", reasoning: "low", max_tokens: 1024 },
+              ],
+            },
+          },
+        },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.agents?.explore?.model).toBe("openai/fallback")
+      expect(result.config.agents?.explore?.reasoning).toBe("low")
+      expect(result.config.agents?.explore?.maxTokens).toBe(1024)
+      expect(result.config.agents?.explore?.models).toEqual([{
+        model: "openai/fallback",
+        reasoning: "low",
+        max_tokens: 1024,
+        maxTokens: 1024,
+      }])
+      expect(result.config.agents?.explore?.fallback_models).toEqual([])
     })
   })
 })

@@ -37,6 +37,7 @@ export function filterDisabledProviderModels<T extends string | FallbackModelObj
 
 type ModelHolder = {
   model?: string | unknown
+  models?: (string | FallbackModelObject)[]
   fallback_models?: string | (string | FallbackModelObject)[]
 }
 
@@ -53,6 +54,24 @@ function findFirstAllowedReplacement(
 }
 
 function applyToHolder(label: string, holder: ModelHolder, disabled: readonly string[]): void {
+  if (holder.models !== undefined) {
+    const filteredModels = filterDisabledProviderModels(holder.models, disabled)
+    if (filteredModels.length !== holder.models.length) {
+      log(`[${HOOK_NAME}] Filtered disabled-provider entries from canonical model chain`, {
+        label,
+        removed: holder.models.length - filteredModels.length,
+        remaining: filteredModels.length,
+      })
+    }
+    if (holder.models.length > 0 && filteredModels.length === 0) {
+      const message = `${label} models contains only disabled providers. Either remove a provider from disabled_providers or add an allowed model.`
+      addConfigLoadError({ path: `disabled_providers:${label}`, error: message })
+      log(`[${HOOK_NAME}] ${message}`, { label })
+    }
+    holder.models = filteredModels
+    return
+  }
+
   const normalizedChain = normalizeFallbackModels(holder.fallback_models)
   if (normalizedChain) {
     const filteredChain = filterDisabledProviderModels(normalizedChain, disabled)
@@ -93,9 +112,9 @@ function applyToHolder(label: string, holder: ModelHolder, disabled: readonly st
 }
 
 /**
- * Filters `disabled_providers`-listed entries out of every agent/category
- * fallback chain and substitutes any primary `model` referencing a disabled
- * provider with the first allowed entry from the same chain.
+ * Filters `disabled_providers`-listed entries out of every canonical or legacy
+ * agent/category chain and promotes the first allowed canonical rung or legacy
+ * fallback when the configured primary uses a disabled provider.
  *
  * Returns the same config reference (mutated in place). Safe to call when
  * `disabled_providers` is unset or empty - it becomes a no-op.

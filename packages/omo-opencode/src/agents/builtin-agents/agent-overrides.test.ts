@@ -120,6 +120,30 @@ describe("mergeAgentConfig", () => {
       // then
       expect(result.variant).toBe("low")
     })
+
+    test("keeps canonical primary tuning out of the OpenCode agent defaults", () => {
+      const base = makeBase({ temperature: 0.1 })
+      const override: AgentOverrideConfig = {
+        model: "openai/primary",
+        models: [
+          { model: "openai/primary", reasoning: "high", temperature: 0.2 },
+          "openai/fallback",
+        ],
+        fallback_models: ["openai/fallback"],
+        reasoning: "high",
+        temperature: 0.2,
+        maxTokens: 1024,
+        providerOptions: { serviceTier: "priority" },
+      }
+
+      const result = mergeAgentConfig(base, override)
+
+      expect(result.model).toBe("openai/primary")
+      expect(result.variant).toBeUndefined()
+      expect(result.temperature).toBe(0.1)
+      expect((result as AgentConfig & { maxTokens?: number }).maxTokens).toBeUndefined()
+      expect((result as AgentConfig & { providerOptions?: unknown }).providerOptions).toBeUndefined()
+    })
   })
 })
 

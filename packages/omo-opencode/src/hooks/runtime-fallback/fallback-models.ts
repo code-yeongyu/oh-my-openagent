@@ -18,9 +18,15 @@ type ModelChainConfig = {
   top_p?: number
   provider_options?: Record<string, unknown>
   providerOptions?: Record<string, unknown>
+  textVerbosity?: "low" | "medium" | "high"
   max_tokens?: number
   maxTokens?: number
   thinking?: FallbackModelObject["thinking"]
+}
+
+type ResolvedFallbackConfig = {
+  config: ModelChainConfig
+  inheritDefaults: boolean
 }
 
 function getConfiguredFallbackModels(
@@ -55,7 +61,8 @@ export function getFallbackModelSettingsForSession(
   fallbackIndex?: number,
 ): FallbackModelObject | undefined {
   if (!pluginConfig) return undefined
-  const config = resolveFallbackConfigForSession(sessionID, agent, pluginConfig)
+  const resolved = resolveFallbackConfigForSession(sessionID, agent, pluginConfig)
+  const config = resolved?.config
   const raw = getConfiguredFallbackModels(config)
   const flattened = flattenToFallbackModelStrings(raw)
   const indexedFallback = fallbackIndex ?? -1
@@ -70,19 +77,26 @@ export function getFallbackModelSettingsForSession(
   const entry = raw?.[index]
   if (entry === undefined || config === undefined) return undefined
   const selected = typeof entry === "string" ? { model: entry } : entry
+  const defaults = resolved?.inheritDefaults ? config : {}
+  const providerOptions = {
+    ...defaults.providerOptions,
+    ...(defaults.textVerbosity === undefined ? {} : { textVerbosity: defaults.textVerbosity }),
+    ...defaults.provider_options,
+    ...selected.provider_options,
+  }
   const hasSelectedReasoning = selected.reasoning !== undefined
     || selected.variant !== undefined
     || selected.reasoningEffort !== undefined
   return {
     model: selected.model,
-    reasoning: selected.reasoning ?? (hasSelectedReasoning ? undefined : config.reasoning),
-    variant: selected.variant ?? (hasSelectedReasoning ? undefined : config.variant),
-    reasoningEffort: selected.reasoningEffort ?? (hasSelectedReasoning ? undefined : config.reasoningEffort),
-    temperature: selected.temperature ?? config.temperature,
-    top_p: selected.top_p ?? config.top_p,
-    provider_options: selected.provider_options ?? config.provider_options ?? config.providerOptions,
-    maxTokens: selected.max_tokens ?? selected.maxTokens ?? config.max_tokens ?? config.maxTokens,
-    thinking: selected.thinking ?? config.thinking,
+    reasoning: selected.reasoning ?? (hasSelectedReasoning ? undefined : defaults.reasoning),
+    variant: selected.variant ?? (hasSelectedReasoning ? undefined : defaults.variant),
+    reasoningEffort: selected.reasoningEffort ?? (hasSelectedReasoning ? undefined : defaults.reasoningEffort),
+    temperature: selected.temperature ?? defaults.temperature,
+    top_p: selected.top_p ?? defaults.top_p,
+    provider_options: Object.keys(providerOptions).length > 0 ? providerOptions : undefined,
+    maxTokens: selected.max_tokens ?? selected.maxTokens ?? defaults.max_tokens ?? defaults.maxTokens,
+    thinking: selected.thinking ?? defaults.thinking,
   }
 }
 
@@ -112,33 +126,35 @@ function getRawFallbackModelsForSession(
   agent: string | undefined,
   pluginConfig: OhMyOpenCodeConfig,
 ): (string | FallbackModelObject)[] | undefined {
-  return getConfiguredFallbackModels(resolveFallbackConfigForSession(sessionID, agent, pluginConfig))
+  return getConfiguredFallbackModels(resolveFallbackConfigForSession(sessionID, agent, pluginConfig)?.config)
 }
 
 function resolveFallbackConfigForSession(
   sessionID: string,
   agent: string | undefined,
   pluginConfig: OhMyOpenCodeConfig,
-): ModelChainConfig | undefined {
+): ResolvedFallbackConfig | undefined {
   const sessionCategory = SessionCategoryRegistry.get(sessionID)
   if (sessionCategory && pluginConfig.categories?.[sessionCategory]) {
     const categoryConfig = pluginConfig.categories[sessionCategory]
     const fallbackModels = getConfiguredFallbackModels(categoryConfig)
-    if (fallbackModels !== undefined) return categoryConfig
+    if (fallbackModels !== undefined) return { config: categoryConfig, inheritDefaults: true }
   }
 
-  const tryGetFallbackFromAgent = (agentName: string): ModelChainConfig | undefined => {
+  const tryGetFallbackFromAgent = (agentName: string): ResolvedFallbackConfig | undefined => {
     const agentConfig = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]
     if (!agentConfig) return undefined
 
     const agentFallbackModels = getConfiguredFallbackModels(agentConfig)
-    if (agentFallbackModels !== undefined) return agentConfig
+    if (agentFallbackModels !== undefined) {
+      return { config: agentConfig, inheritDefaults: agentConfig.models === undefined }
+    }
 
     const agentCategory = agentConfig?.category
     if (agentCategory && pluginConfig.categories?.[agentCategory]) {
       const categoryConfig = pluginConfig.categories[agentCategory]
       const categoryFallbackModels = getConfiguredFallbackModels(categoryConfig)
-      if (categoryFallbackModels !== undefined) return categoryConfig
+      if (categoryFallbackModels !== undefined) return { config: categoryConfig, inheritDefaults: true }
     }
 
     return undefined

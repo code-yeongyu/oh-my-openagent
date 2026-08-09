@@ -9,6 +9,11 @@ export function applyCategoryParams(
     return base
   }
 
+  const providerOptions = {
+    ...(config.textVerbosity === undefined ? {} : { textVerbosity: config.textVerbosity }),
+    ...config.provider_options,
+  }
+
   return {
     ...base,
     ...(config.reasoning !== undefined
@@ -21,7 +26,7 @@ export function applyCategoryParams(
     ...(config.max_tokens !== undefined || config.maxTokens !== undefined
       ? { maxTokens: config.max_tokens ?? config.maxTokens }
       : {}),
-    ...(config.provider_options !== undefined ? { providerOptions: config.provider_options } : {}),
+    ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
     ...(config.tools !== undefined ? { tools: config.tools } : {}),
   }

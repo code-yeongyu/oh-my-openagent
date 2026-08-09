@@ -52,6 +52,14 @@ describe("runtime-fallback fallback state", () => {
     expect(nextModel).toBe("openai/gpt-5.5")
   })
 
+  test("allows the first fallback rung to reuse the primary model with different settings", () => {
+    const state = createFallbackState("openai/gpt-5.5")
+
+    const nextModel = findNextAvailableFallback(state, ["openai/gpt-5.5"], 60)
+
+    expect(nextModel).toBe("openai/gpt-5.5")
+  })
+
   test("advances the index for repeated model rungs", () => {
     const state = createFallbackState("openai/primary")
     const models = ["openai/repeated", "openai/repeated"]
