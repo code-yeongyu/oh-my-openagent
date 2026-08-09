@@ -1,5 +1,12 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
+import { getRuntimeFallbackModelIdentity } from "@oh-my-opencode/model-core"
+import {
+  clearSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+  type SessionPromptParams,
+} from "../../shared"
 import { applyFallbackToChatMessage } from "./chat-message-fallback-handler"
 import {
   createModelFallbackStateController,
@@ -146,6 +153,12 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
   const pendingModelFallbacks = new Map<string, ModelFallbackState>()
   const lastToastKey = new Map<string, string>()
   const sessionFallbackChains = new Map<string, FallbackEntry[]>()
+  const promptParamsBeforeFallback = new Map<string, SessionPromptParams | undefined>()
+  const appliedFallbacks = new Map<string, {
+    model: string
+    originalModel: string
+    variant?: string
+  }>()
   const controller = createModelFallbackStateController({
     pendingModelFallbacks,
     lastToastKey,
@@ -164,10 +177,18 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     clearSessionFallbackChain: controller.clearSessionFallbackChain,
     setPendingModelFallback: controller.setPendingModelFallback,
     getNextFallback: controller.getNextFallback,
-    clearPendingModelFallback: controller.clearPendingModelFallback,
+    clearPendingModelFallback: (sessionID) => {
+      controller.clearPendingModelFallback(sessionID)
+      promptParamsBeforeFallback.delete(sessionID)
+      appliedFallbacks.delete(sessionID)
+    },
     hasPendingModelFallback: controller.hasPendingModelFallback,
     getFallbackState: controller.getFallbackState,
-    reset: controller.reset,
+    reset: () => {
+      controller.reset()
+      promptParamsBeforeFallback.clear()
+      appliedFallbacks.clear()
+    },
     "chat.message": async (
       input: ChatMessageInput,
       output: ChatMessageHandlerOutput,
@@ -175,8 +196,43 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
       const { sessionID } = input
       if (!sessionID) return
 
+      const appliedFallback = appliedFallbacks.get(sessionID)
+      const requestedModel = input.model
+        ? getRuntimeFallbackModelIdentity(`${input.model.providerID}/${input.model.modelID}`)
+        : undefined
+      const requestedVariant = typeof output.message["variant"] === "string"
+        ? output.message["variant"]
+        : undefined
+      const changedVariant = appliedFallback !== undefined
+        && requestedModel === appliedFallback.model
+        && requestedVariant !== undefined
+        && requestedVariant !== appliedFallback.variant
+      if (
+        appliedFallback
+        && !controller.hasPendingModelFallback(sessionID)
+        && requestedModel
+        && (requestedModel !== appliedFallback.model || changedVariant)
+      ) {
+        const original = promptParamsBeforeFallback.get(sessionID)
+        if (requestedModel === appliedFallback.originalModel && !changedVariant && original) {
+          setSessionPromptParams(sessionID, original)
+        } else {
+          clearSessionPromptParams(sessionID)
+        }
+        promptParamsBeforeFallback.delete(sessionID)
+        appliedFallbacks.delete(sessionID)
+      }
+
+      const fallbackState = controller.getFallbackState(sessionID)
       const fallback = getNextFallback(controller, sessionID)
       if (!fallback) return
+
+      if (!promptParamsBeforeFallback.has(sessionID)) {
+        promptParamsBeforeFallback.set(sessionID, getSessionPromptParams(sessionID))
+      }
+      const originalModel = appliedFallback?.originalModel ?? (fallbackState
+        ? getRuntimeFallbackModelIdentity(`${fallbackState.providerID}/${fallbackState.modelID}`)
+        : getRuntimeFallbackModelIdentity(`${fallback.providerID}/${fallback.modelID}`))
 
       await applyFallbackToChatMessage({
         input,
@@ -185,6 +241,11 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
         toast,
         onApplied,
         lastToastKey: controller.lastToastKey,
+      })
+      appliedFallbacks.set(sessionID, {
+        model: getRuntimeFallbackModelIdentity(`${fallback.providerID}/${fallback.modelID}`),
+        originalModel,
+        variant: getSessionPromptParams(sessionID)?.variant,
       })
     },
   }

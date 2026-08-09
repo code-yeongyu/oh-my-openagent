@@ -5,7 +5,8 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
-import { getRuntimeFallbackModelIdentity } from "@oh-my-opencode/model-core"
+import { getRuntimeFallbackModelIdentity, parseModelString } from "@oh-my-opencode/model-core"
+import { getAgentConfigKey } from "../../shared"
 
 type ModelChainConfig = {
   model?: string
@@ -76,7 +77,9 @@ export function getFallbackModelSettingsForSession(
       : flattened?.findIndex((candidate) => getRuntimeFallbackModelIdentity(candidate) === modelIdentity) ?? -1
   const entry = raw?.[index]
   if (entry === undefined || config === undefined) return undefined
-  const selected = typeof entry === "string" ? { model: entry } : entry
+  const selected = typeof entry === "string"
+    ? { model: entry, variant: parseModelString(entry)?.variant }
+    : entry
   const defaults = resolved?.inheritDefaults ? config : {}
   const providerOptions = {
     ...defaults.providerOptions,
@@ -142,7 +145,8 @@ function resolveFallbackConfigForSession(
   }
 
   const tryGetFallbackFromAgent = (agentName: string): ResolvedFallbackConfig | undefined => {
-    const agentConfig = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]
+    const agentKey = getAgentConfigKey(agentName, pluginConfig.agents)
+    const agentConfig = pluginConfig.agents?.[agentKey as keyof typeof pluginConfig.agents]
     if (!agentConfig) return undefined
 
     const agentFallbackModels = getConfiguredFallbackModels(agentConfig)

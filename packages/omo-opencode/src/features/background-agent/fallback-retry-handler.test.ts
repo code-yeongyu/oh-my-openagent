@@ -158,6 +158,39 @@ describe("tryFallbackRetry", () => {
       expect(args.task.model?.providerID).toBe("provider-a")
     })
 
+    test("preserves fallback rung generation settings in the queued retry", async () => {
+      const args = createDefaultArgs({
+        fallbackChain: [{
+          model: "fallback-model-1",
+          providers: ["provider-a"],
+          reasoning: "low",
+          reasoningEffort: "medium",
+          temperature: 0.2,
+          top_p: 0.8,
+          maxTokens: 2048,
+          providerOptions: { serviceTier: "flex" },
+          thinking: { type: "enabled", budgetTokens: 1024 },
+        }],
+      })
+
+      await tryFallbackRetry(args)
+
+      const expectedModel = {
+        providerID: "provider-a",
+        modelID: "fallback-model-1",
+        variant: undefined,
+        reasoning: "low",
+        reasoningEffort: "medium",
+        temperature: 0.2,
+        top_p: 0.8,
+        maxTokens: 2048,
+        providerOptions: { serviceTier: "flex" },
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      }
+      expect(args.task.model).toEqual(expectedModel)
+      expect(args.queuesByKey.get("provider-a/fallback-model-1")?.[0]?.input.model).toEqual(expectedModel)
+    })
+
     test("clears sessionID and startedAt", async () => {
       const args = createDefaultArgs({
         sessionId: "old-session",

@@ -4,6 +4,7 @@ import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { stringifyRuntimeModel } from "./fallback-state"
 import { getConfiguredPrimaryModel } from "./fallback-models"
+import { getAgentConfigKey } from "../../shared"
 
 type ResolveFallbackBootstrapModelOptions = {
   sessionID: string
@@ -23,7 +24,7 @@ export function resolveFallbackBootstrapModel(
 
   const agentConfigs = options.pluginConfig?.agents
   const agentConfig = options.resolvedAgent && agentConfigs
-    ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs]
+    ? agentConfigs[getAgentConfigKey(options.resolvedAgent, agentConfigs) as keyof typeof agentConfigs]
     : undefined
   const agentModel = getConfiguredPrimaryModel(agentConfig)
   if (agentModel) {

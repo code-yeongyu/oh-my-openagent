@@ -1,0 +1,4 @@
+{"opencode":"1.18.15","session":"ses_018a87dabffeJ0Os5JmRKrhHQE","hook":"model_fallback","runtime_fallback":false,"qa_db_before_delete":1,"live_db_matches":0,"qa_db_after_delete":0}
+{"turn":"primary","model":"openai/gpt-5.6-sol-primary","result":429,"reasoning_effort":"medium","max_output_tokens":1024,"service_tier":"priority"}
+{"turn":"fallback","model":"openai/gpt-5.6-sol","result":"REAL_OPENCODE_FALLBACK_OK","reasoning_effort":"low","max_output_tokens":2048,"service_tier":"flex"}
+{"turn":"manual-switch","model":"openai/gpt-5.6-terra-manual","result":"REAL_OPENCODE_FALLBACK_OK","reasoning_effort":"medium","max_output_tokens":null,"service_tier":null,"stale_fallback_settings_cleared":true}

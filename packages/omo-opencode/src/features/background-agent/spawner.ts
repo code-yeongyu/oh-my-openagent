@@ -74,7 +74,7 @@ export async function startTask(
 
   const sessionID = createResult.data.id
   const normalizedAgent = stripAgentListSortPrefix(input.agent)
-  await input.onSessionCreated?.(sessionID)
+  await input.onSessionCreated?.(sessionID, input.model)
   subagentSessions.add(sessionID)
   setSessionAgent(sessionID, normalizedAgent)
 

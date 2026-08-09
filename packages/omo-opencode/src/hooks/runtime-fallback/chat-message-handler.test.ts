@@ -108,7 +108,7 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     expect(deps.sessionPromptParamsBeforeFallback?.has(sessionID)).toBe(true)
   })
 
-  test("restores prompt settings when the user manually changes models", async () => {
+  test("clears fallback prompt settings when the user manually selects another model", async () => {
     // given
     const deps = createDeps()
     const sessionID = "session-manual-model-change"
@@ -127,7 +127,44 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     )
 
     // then
+    expect(getSessionPromptParams(sessionID)).toBeUndefined()
+    expect(deps.sessionPromptParamsBeforeFallback?.size).toBe(0)
+  })
+
+  test("restores primary prompt settings when the user manually returns to the original model", async () => {
+    const deps = createDeps()
+    const sessionID = "session-manual-primary-return"
+    const original = { options: { serviceTier: "priority" } }
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, original)
+    setSessionPromptParams(sessionID, { options: { serviceTier: "flex" } })
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "custom/fallback"
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)(
+      { sessionID, model: { providerID: "openai", modelID: "gpt-5.4" } },
+      { message: {} },
+    )
+
     expect(getSessionPromptParams(sessionID)).toEqual(original)
     expect(deps.sessionPromptParamsBeforeFallback?.size).toBe(0)
+  })
+
+  test("honors a manual variant change on the active fallback model", async () => {
+    const deps = createDeps()
+    const sessionID = "session-manual-fallback-variant"
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, { variant: "medium" })
+    setSessionPromptParams(sessionID, { variant: "high" })
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "openai/gpt-5.5"
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)(
+      { sessionID, model: { providerID: "openai", modelID: "gpt-5.5" } },
+      { message: { variant: "low" } },
+    )
+
+    expect(getSessionPromptParams(sessionID)).toBeUndefined()
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("openai/gpt-5.5")
   })
 })

@@ -13,6 +13,7 @@ function toDelegatedModelConfig(fallback: NonNullable<ReturnType<typeof getNextR
     temperature: fallback.temperature,
     top_p: fallback.top_p,
     maxTokens: fallback.maxTokens,
+    providerOptions: fallback.providerOptions,
     thinking: fallback.thinking,
   }
 }

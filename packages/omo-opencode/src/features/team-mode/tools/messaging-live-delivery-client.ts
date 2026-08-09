@@ -7,6 +7,10 @@ export type LiveDeliveryClient = {
         agent?: string
         model?: { providerID: string; modelID: string }
         variant?: string
+        temperature?: number
+        topP?: number
+        maxOutputTokens?: number
+        options?: Record<string, unknown>
       }
       query?: { directory: string }
     }): Promise<unknown>

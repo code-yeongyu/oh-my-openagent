@@ -8473,7 +8473,14 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
       agent: "sisyphus-junior",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
-      model: { providerID: "anthropic", modelID: "claude-haiku-4.5", variant: "max" },
+      model: {
+        providerID: "anthropic",
+        modelID: "claude-haiku-4.5",
+        variant: "max",
+        reasoning: "high",
+        maxTokens: 2048,
+        providerOptions: { serviceTier: "priority" },
+      },
       attempts: [
         {
           attemptId: "attempt-1",
@@ -8521,6 +8528,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
     expect(task.currentAttemptID).toBe("attempt-2")
     expect(task.sessionId).toBe("session-attempt-2")
     expect(task.status).toBe("running")
+    expect(task.model).toEqual(input.model)
     expect(task.attempts?.[0]).toMatchObject({
       attemptId: "attempt-1",
       sessionId: "session-attempt-1",

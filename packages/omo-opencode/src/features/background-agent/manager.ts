@@ -794,7 +794,7 @@ export class BackgroundManager {
       return
     }
 
-    await input.onSessionCreated?.(sessionID)
+    await input.onSessionCreated?.(sessionID, input.model)
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
     setSessionAgent(sessionID, input.agent)

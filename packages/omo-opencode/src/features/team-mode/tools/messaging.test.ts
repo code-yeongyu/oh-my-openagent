@@ -630,11 +630,11 @@ describe("createTeamSendMessageTool", () => {
     memberTwo.model = {
       providerID: "openai",
       modelID: "gpt-5.4",
-      variant: "medium",
-      reasoningEffort: "high",
+      reasoning: "high",
       temperature: 0.2,
       top_p: 0.8,
       maxTokens: 4096,
+      providerOptions: { serviceTier: "priority" },
       thinking: { type: "enabled", budgetTokens: 2048 },
     }
     await saveState(state, fixture.config)
@@ -653,15 +653,15 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0].agent).toBe("Sisyphus-Junior")
     expect(calls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
-    expect(calls[0].variant).toBe("medium")
+    expect(calls[0].variant).toBeUndefined()
     expect(SessionCategoryRegistry.get(fixture.memberTwoSessionId)).toBe("quick")
     expect(getSessionPromptParams(fixture.memberTwoSessionId)).toEqual({
-      variant: "medium",
+      variant: "high",
       temperature: 0.2,
       topP: 0.8,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        serviceTier: "priority",
         thinking: { type: "enabled", budgetTokens: 2048 },
       },
     })

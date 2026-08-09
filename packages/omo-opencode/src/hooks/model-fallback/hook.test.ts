@@ -3,6 +3,7 @@
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { beforeEach, describe, expect, test } from "bun:test"
 import { _resetMemCacheForTesting, updateConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import { clearAllSessionPromptParams, getSessionPromptParams, setSessionPromptParams } from "../../shared"
 
 type ChatMessageOutput = {
   message: Record<string, unknown>
@@ -30,6 +31,7 @@ describe("model fallback hook", () => {
   beforeEach(() => {
     modelFallback = createModelFallbackHook()
     _resetMemCacheForTesting()
+    clearAllSessionPromptParams()
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
@@ -66,6 +68,76 @@ describe("model fallback hook", () => {
       providerID: "anthropic",
       modelID: "claude-opus-5",
     })
+  })
+
+  test("applies fallback rung generation settings to chat.params state", async () => {
+    const sessionID = "ses_model_fallback_generation_settings"
+    setSessionFallbackChain(modelFallback, sessionID, [{
+      providers: ["openai"],
+      model: "gpt-5.5",
+      reasoning: "high",
+      temperature: 0.2,
+      top_p: 0.8,
+      maxTokens: 2048,
+      providerOptions: { serviceTier: "flex" },
+      thinking: { type: "enabled", budgetTokens: 1024 },
+    }])
+    expect(setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "oracle",
+      "anthropic",
+      "claude-opus-4-8",
+    )).toBe(true)
+    const output: ChatMessageOutput = {
+      message: { model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    await modelFallback["chat.message"]({ sessionID }, output)
+
+    expect(output.message["variant"]).toBe("high")
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      variant: "high",
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 2048,
+      options: {
+        serviceTier: "flex",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
+  test("clears fallback rung settings when the user manually selects another model", async () => {
+    const sessionID = "ses_model_fallback_manual_change"
+    setSessionPromptParams(sessionID, { options: { serviceTier: "priority" } })
+    setSessionFallbackChain(modelFallback, sessionID, [{
+      providers: ["openai"],
+      model: "gpt-5.5",
+      providerOptions: { serviceTier: "flex" },
+    }])
+    expect(setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "oracle",
+      "anthropic",
+      "claude-opus-4-8",
+    )).toBe(true)
+
+    await modelFallback["chat.message"]({ sessionID }, {
+      message: { model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+      parts: [{ type: "text", text: "continue" }],
+    })
+    await modelFallback["chat.message"]({
+      sessionID,
+      model: { providerID: "google", modelID: "gemini-3-pro" },
+    }, {
+      message: { model: { providerID: "google", modelID: "gemini-3-pro" } },
+      parts: [{ type: "text", text: "manual change" }],
+    })
+
+    expect(getSessionPromptParams(sessionID)).toBeUndefined()
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {

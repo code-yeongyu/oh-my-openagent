@@ -207,6 +207,51 @@ describe("createTeamRun", () => {
     ])
   })
 
+  test("keeps fallback settings when an immediate retry wins the session-id race", async () => {
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-provider-options-"))
+    temporaryDirectories.push(baseDir)
+    resolveMemberMock.mockImplementationOnce(async (member: TeamSpec["members"][number]) => ({
+      agentToUse: `${member.name}-agent`,
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.6-luna-fast",
+        reasoning: "high",
+        providerOptions: { serviceTier: "priority" },
+      },
+      fallbackChain: undefined,
+      systemContent: `system:${member.name}`,
+    }))
+    const { manager } = createManager(baseDir, async (input) => {
+      await input.onSessionCreated?.("session-fallback", {
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
+        reasoning: "medium",
+        providerOptions: { serviceTier: "flex" },
+      })
+      return {
+        id: "task-provider-options",
+        sessionId: "session-fallback",
+        status: "running",
+      } as BackgroundTask
+    })
+
+    const runtimeState = await createTeamRun(
+      createSpec(1),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
+
+    expect(runtimeState.members[0]?.sessionId).toBe("session-fallback")
+    expect(runtimeState.members[0]?.model).toMatchObject({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+      reasoning: "medium",
+      providerOptions: { serviceTier: "flex" },
+    })
+  })
+
   test("member prompt only documents member-safe communication tools", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-member-prompt-"))

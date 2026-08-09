@@ -9,6 +9,7 @@ type PromptGenerationModel = {
   temperature?: number
   top_p?: number
   maxTokens?: number
+  providerOptions?: Record<string, unknown>
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
 }
 
@@ -29,6 +30,7 @@ function buildPromptGenerationParams(model: PromptGenerationModel | undefined): 
   }
 
   const promptOptions: Record<string, unknown> = {
+    ...model.providerOptions,
     ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
     ...(model.thinking ? { thinking: model.thinking } : {}),
   }

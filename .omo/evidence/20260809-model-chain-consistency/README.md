@@ -5,11 +5,11 @@ Issue: #6644
 ## Behavioral proof
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
-- Exact-head focused suite: 280 passed, 0 failed.
-- Exact-head affected-surface suite: 1,982 passed, 1 skipped, 0 failed.
+- Exact-head focused suites: 296 passed, 0 failed.
+- Exact-head affected-surface suites: 2,012 passed, 2 skipped, 0 failed.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,501 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,511 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
@@ -111,6 +111,12 @@ The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
   on the configured `2048/flex/low` fallback. The session was deleted, both QA
   ports stopped, and the live DB had zero matching IDs. See
   `real-grok-identity-summary.jsonl`.
+- Final legacy-hook QA used real OpenCode 1.18.15 with `model_fallback` enabled
+  and `runtime_fallback` disabled. After the primary 429, the next turn used the
+  configured fallback with `low/2048/flex`; a manual switch to a third model
+  cleared the fallback token cap and service tier. The isolated session was
+  deleted and had zero matches in the live database. See
+  `real-model-fallback-round3-summary.jsonl`.
 
 Run the focused proof:
 

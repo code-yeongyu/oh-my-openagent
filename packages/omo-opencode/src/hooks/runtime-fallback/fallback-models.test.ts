@@ -110,6 +110,46 @@ describe("runtime-fallback fallback-models", () => {
     expect(result).toMatchObject({ model: "openai/gpt-5.5", variant: "high", temperature: 0.3 })
   })
 
+  test("persists the inline variant from a string fallback rung", () => {
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: ["openai/gpt-5.6", "openai/gpt-5.5:xhigh"],
+        },
+      },
+    })
+
+    const result = getFallbackModelSettingsForSession(
+      "ses_runtime_fallback_string_variant",
+      "oracle",
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    expect(result).toMatchObject({ model: "openai/gpt-5.5:xhigh", variant: "xhigh" })
+  })
+
+  test("resolves fallback settings from a custom agent display name", () => {
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        prometheus: {
+          displayName: "計畫師",
+          models: ["openai/gpt-5.6", { model: "openai/gpt-5.5", max_tokens: 2048 }],
+        },
+      },
+    })
+
+    expect(getFallbackModelsForSession("ses_custom_display", "計畫師", pluginConfig)).toEqual([
+      "openai/gpt-5.5",
+    ])
+    expect(getFallbackModelSettingsForSession(
+      "ses_custom_display",
+      "計畫師",
+      pluginConfig,
+      "openai/gpt-5.5",
+    )?.maxTokens).toBe(2048)
+  })
+
   test("inherits canonical category max_tokens for a fallback rung", () => {
     //#given
     const sessionID = "ses_runtime_fallback_category_max_tokens"

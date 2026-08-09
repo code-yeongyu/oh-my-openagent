@@ -545,6 +545,34 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(sendPrompt).toHaveBeenCalledTimes(1)
   })
 
+  test("preserves provider options on a sync fallback retry", async () => {
+    const { retrySyncPromptWithFallbacks } = require("./sync-task-fallback")
+    const sendPrompt = mock(async () => null)
+
+    const result = await retrySyncPromptWithFallbacks({
+      sessionID: "ses_sync_provider_options",
+      initialError: "rate limited",
+      categoryModel: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      fallbackChain: [{
+        providers: ["openai"],
+        model: "gpt-5.4",
+        reasoning: "low",
+        maxTokens: 2048,
+        providerOptions: { serviceTier: "flex" },
+      }],
+      sendPrompt,
+    })
+
+    expect(result.categoryModel).toMatchObject({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      reasoning: "low",
+      maxTokens: 2048,
+      providerOptions: { serviceTier: "flex" },
+    })
+    expect(sendPrompt).toHaveBeenCalledWith(result.categoryModel)
+  })
+
   test("cleans up toast and subagentSessions on successful completion", async () => {
     const mockClient = {
       session: {

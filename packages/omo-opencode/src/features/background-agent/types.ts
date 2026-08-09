@@ -79,7 +79,7 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
-  onSessionCreated?: (sessionId: string) => void | Promise<void>
+  onSessionCreated?: (sessionId: string, model?: DelegatedModelConfig) => void | Promise<void>
   /** Pending retry notification details for the next spawned retry session */
   retryNotification?: {
     previousSessionID?: string
@@ -128,7 +128,7 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
-  onSessionCreated?: (sessionId: string) => void | Promise<void>
+  onSessionCreated?: (sessionId: string, model?: DelegatedModelConfig) => void | Promise<void>
   /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
   userPermission?: Record<string, "ask" | "allow" | "deny">
 }

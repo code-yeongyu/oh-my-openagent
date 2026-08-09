@@ -3,13 +3,14 @@ import { normalizeAgentName, resolveAgentForSession } from "./agent-resolver"
 import { extractSessionMessages } from "./session-messages"
 
 export function createAgentContextResolver(deps: HookDeps) {
-  const { ctx } = deps
+  const { ctx, pluginConfig } = deps
+  const agentOverrides = pluginConfig?.agents
 
   return async (
     sessionID: string,
     eventAgent?: string,
   ): Promise<string | undefined> => {
-    const resolved = resolveAgentForSession(sessionID, eventAgent)
+    const resolved = resolveAgentForSession(sessionID, eventAgent, agentOverrides)
     if (resolved) return resolved
 
     try {
@@ -23,7 +24,7 @@ export function createAgentContextResolver(deps: HookDeps) {
       for (let i = msgs.length - 1; i >= 0; i--) {
         const info = msgs[i]?.info
         const infoAgent = typeof info?.agent === "string" ? info.agent : undefined
-        const normalized = normalizeAgentName(infoAgent)
+        const normalized = normalizeAgentName(infoAgent, agentOverrides)
         if (normalized) {
           return normalized
         }

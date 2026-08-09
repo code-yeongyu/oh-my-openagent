@@ -1,4 +1,7 @@
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { getAgentConfigKey } from "../../shared"
+
+type AgentOverrides = Record<string, { displayName?: string } | undefined>
 
 export const AGENT_NAMES = [
   "sisyphus",
@@ -32,8 +35,15 @@ export function detectAgentFromSession(sessionID: string): string | undefined {
   return undefined
 }
 
-export function normalizeAgentName(agent: string | undefined): string | undefined {
+export function normalizeAgentName(
+  agent: string | undefined,
+  overrides?: AgentOverrides,
+): string | undefined {
   if (!agent) return undefined
+  const configuredKey = getAgentConfigKey(agent, overrides)
+  if (overrides && Object.prototype.hasOwnProperty.call(overrides, configuredKey)) {
+    return configuredKey
+  }
   const normalized = agent.toLowerCase().trim()
   if (AGENT_NAMES.includes(normalized)) {
     return normalized
@@ -45,10 +55,14 @@ export function normalizeAgentName(agent: string | undefined): string | undefine
   return undefined
 }
 
-export function resolveAgentForSession(sessionID: string, eventAgent?: string): string | undefined {
+export function resolveAgentForSession(
+  sessionID: string,
+  eventAgent?: string,
+  overrides?: AgentOverrides,
+): string | undefined {
   return (
-    normalizeAgentName(eventAgent) ??
-    normalizeAgentName(getSessionAgent(sessionID)) ??
+    normalizeAgentName(eventAgent, overrides) ??
+    normalizeAgentName(getSessionAgent(sessionID), overrides) ??
     detectAgentFromSession(sessionID)
   )
 }

@@ -80,7 +80,8 @@ export function projectTaskFromCurrentAttempt(task: BackgroundTask): BackgroundT
   task.startedAt = currentAttempt.startedAt
   task.completedAt = currentAttempt.completedAt
   task.error = currentAttempt.error
-  task.model = toTaskModel(currentAttempt)
+  const currentModel = toTaskModel(currentAttempt)
+  task.model = currentModel ? { ...task.model, ...currentModel } : undefined
 
   return task
 }

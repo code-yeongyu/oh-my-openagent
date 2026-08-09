@@ -2,15 +2,16 @@ import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { createFallbackState, isModelInCooldown } from "./fallback-state"
-import { restorePromptParams } from "./fallback-prompt-params"
+import { discardPromptParamsSnapshot, restorePromptParams } from "./fallback-prompt-params"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { clearSessionPromptParams, getSessionPromptParams } from "../../shared"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
 
   return async (
     input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
-    output: { message: { model?: { providerID: string; modelID: string } }; parts?: Array<{ type: string; text?: string }> }
+    output: { message: { model?: { providerID: string; modelID: string }; variant?: string }; parts?: Array<{ type: string; text?: string }> }
   ) => {
     if (!config.enabled) return
 
@@ -22,6 +23,13 @@ export function createChatMessageHandler(deps: HookDeps) {
     sessionLastAccess.set(sessionID, Date.now())
 
     const requestedModel = normalizeModelToCanonicalString(input.model)
+    const requestedVariant = typeof output.message.variant === "string"
+      ? output.message.variant
+      : undefined
+    const expectedVariant = requestedModel === state.originalModel
+      ? deps.sessionPromptParamsBeforeFallback?.get(sessionID)?.variant
+      : getSessionPromptParams(sessionID)?.variant
+    const changedVariant = requestedVariant !== undefined && requestedVariant !== expectedVariant
 
     if (requestedModel && state.pendingFallbackModel === requestedModel) {
       state.pendingFallbackModel = undefined
@@ -29,13 +37,18 @@ export function createChatMessageHandler(deps: HookDeps) {
       return
     }
 
-    if (requestedModel && requestedModel !== state.currentModel) {
+    if (requestedModel && (requestedModel !== state.currentModel || changedVariant)) {
       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
         sessionID,
         from: state.currentModel,
         to: requestedModel,
       })
-      restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
+      if (requestedModel === state.originalModel && !changedVariant) {
+        restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
+      } else {
+        discardPromptParamsSnapshot(deps.sessionPromptParamsBeforeFallback, sessionID)
+        clearSessionPromptParams(sessionID)
+      }
       state = createFallbackState(requestedModel)
       sessionStates.set(sessionID, state)
       return

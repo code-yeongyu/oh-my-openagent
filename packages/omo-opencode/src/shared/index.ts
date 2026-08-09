@@ -45,6 +45,7 @@ export { normalizeModel, normalizeModelID } from "./model-normalization"
 export { normalizeFallbackModels, flattenToFallbackModelStrings } from "./model-resolver"
 export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
+  DelegatedModelConfig,
   ModelResolutionRequest,
   ModelResolutionProvenance,
   ModelResolutionResult,
