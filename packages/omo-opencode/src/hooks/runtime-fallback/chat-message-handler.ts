@@ -29,7 +29,7 @@ export function createChatMessageHandler(deps: HookDeps) {
     const expectedVariant = requestedModel === state.originalModel
       ? deps.sessionPromptParamsBeforeFallback?.get(sessionID)?.variant
       : getSessionPromptParams(sessionID)?.variant
-    const changedVariant = requestedVariant !== undefined && requestedVariant !== expectedVariant
+    const changedVariant = requestedVariant !== expectedVariant
 
     if (requestedModel && state.pendingFallbackModel === requestedModel) {
       state.pendingFallbackModel = undefined

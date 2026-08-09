@@ -167,4 +167,22 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     expect(getSessionPromptParams(sessionID)).toBeUndefined()
     expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("openai/gpt-5.5")
   })
+
+  test("honors clearing the active fallback variant", async () => {
+    const deps = createDeps()
+    const sessionID = "session-clear-fallback-variant"
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, { variant: "medium" })
+    setSessionPromptParams(sessionID, { variant: "high" })
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "openai/gpt-5.5"
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)(
+      { sessionID, model: { providerID: "openai", modelID: "gpt-5.5" } },
+      { message: {} },
+    )
+
+    expect(getSessionPromptParams(sessionID)).toBeUndefined()
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("openai/gpt-5.5")
+  })
 })

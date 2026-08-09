@@ -5,11 +5,11 @@ Issue: #6644
 ## Behavioral proof
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
-- Exact-head focused suites: 297 passed, 0 failed.
-- Exact-head affected-surface suites: 2,013 passed, 2 skipped, 0 failed.
+- Exact-head focused suites: 298 passed, 0 failed.
+- Exact-head affected-surface suites: 2,014 passed, 2 skipped, 0 failed.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,512 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,513 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
