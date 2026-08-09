@@ -13,6 +13,9 @@ export default {
       event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
         if (event.type === "session.error") record({ type: "event", event })
       },
+      "chat.message": async (input: unknown, output: unknown) => {
+        record({ type: "chat.message", input, output })
+      },
       "chat.params": async (input: unknown, output: unknown) => {
         record({ type: "chat.params", input, output })
       },

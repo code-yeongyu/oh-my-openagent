@@ -205,7 +205,6 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
         : undefined
       const changedVariant = appliedFallback !== undefined
         && requestedModel === appliedFallback.model
-        && requestedVariant !== undefined
         && requestedVariant !== appliedFallback.variant
       if (
         appliedFallback

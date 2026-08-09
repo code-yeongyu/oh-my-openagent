@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
+import { createChatMessageHandler } from "./chat-message-handler"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
 import {
@@ -102,6 +103,30 @@ describe("createEventHandler", () => {
     expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
     expect(clearCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([sessionID])
+  })
+
+  it("#given a cooldown-restored primary changes agent and falls back again #when session.stop precedes an omitted-model prompt #then the latest fallback stays corrected", async () => {
+    const sessionID = "session-stop-after-primary-restore"
+    const deps = createDeps()
+    const state = createFallbackState("openai/gpt-5.4")
+    state.restoredPrimary = { staleModel: "openai/gpt-5.5", agent: "oracle" }
+    deps.sessionStates.set(sessionID, state)
+    setSessionPromptParams(sessionID, { variant: "medium" })
+    const chatHandler = createChatMessageHandler(deps)
+
+    await chatHandler(
+      { sessionID, agent: "explore", model: { providerID: "openai", modelID: "gpt-5.4" } },
+      { message: { agent: "explore", model: { providerID: "openai", modelID: "gpt-5.4" }, variant: "medium" } },
+    )
+    deps.sessionStates.get(sessionID)!.currentModel = "openai/gpt-5.6"
+
+    await createEventHandler(deps, createHelpers(deps, [], []))({
+      event: { type: "session.stop", properties: { sessionID } },
+    })
+    const output = { message: { agent: "explore", model: { providerID: "openai", modelID: "gpt-5.6" } } }
+    await chatHandler({ sessionID }, output)
+
+    expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
   })
 
   it("#given a session retry dedupe key without a pending fallback result #when session.idle fires #then the retry dedupe key is cleared", async () => {

@@ -63,7 +63,16 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const resetRetryState = (sessionID: string) => {
     const state = sessionStates.get(sessionID)
     if (state) {
-      sessionStates.set(sessionID, createFallbackState(state.originalModel))
+      const resetState = createFallbackState(state.originalModel)
+      if (state.restoredPrimary) {
+        resetState.restoredPrimary = {
+          ...state.restoredPrimary,
+          staleModel: state.currentModel === state.originalModel
+            ? state.restoredPrimary.staleModel
+            : state.currentModel,
+        }
+      }
+      sessionStates.set(sessionID, resetState)
     }
 
     sessionRetryInFlight.delete(sessionID)

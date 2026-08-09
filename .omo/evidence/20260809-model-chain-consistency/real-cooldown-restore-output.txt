@@ -1,0 +1,15 @@
+OpenCode: 1.18.15
+session: ses_01861937affemzyiSXVNN74gIB
+provider models: ["fallback","primary","fallback","primary","primary"]
+persisted model after cooldown restore: fallback
+persisted model before omitted-model prompt: fallback
+turn 2 output model: qa/primary
+turn 3 output model: qa/primary
+watching http://127.0.0.1:59619/event?directory=/var/folders/6h/gkfdh2zd3jv3w655c3s1gxh40000gn/T/oqa-xdg.XXXXXX.kDscEv4kbJ/proj for 'session.status' (<=60s)
+first matching event: {"type":"session.status"}
+PASS: observed 'session.status' on http://127.0.0.1:59619
+isolated session count after delete: 0
+live session ID matches: 0
+live session count: 7245 -> 7245
+ports stopped: 59618, 59619
+PASS: real cooldown restoration survived stale persisted fallback

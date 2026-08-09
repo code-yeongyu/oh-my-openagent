@@ -5,11 +5,11 @@ Issue: #6644
 ## Behavioral proof
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
-- Exact-head focused suites: 298 passed, 0 failed.
-- Exact-head affected-surface suites: 2,014 passed, 2 skipped, 0 failed.
+- Exact-head focused suites: 302 passed, 0 failed.
+- Exact-head affected-surface suites: 2,018 passed, 2 skipped, 0 failed.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,513 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,517 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
@@ -123,6 +123,30 @@ The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
   with `high/3072/priority`; it did not select the same failed rung again. All
   isolated sessions were deleted and had zero live-database matches. See the
   final two records in `real-model-fallback-round3-summary.jsonl`.
+- Cooldown-restoration QA reproduced OpenCode's pre-hook persistence ordering:
+  the session row remained on `qa/fallback` after automatic restoration, while
+  the second request used `qa/primary`. A third same-agent prompt omitted its
+  model and still used `qa/primary`, proving stale persistence cannot revive the
+  fallback or pair it with restored primary params. The real server emitted
+  `session.status`; the isolated session was deleted, both ports stopped, and
+  the live database had zero matching IDs. See
+  `real-cooldown-restore-summary.jsonl` and
+  `real-cooldown-restore-output.txt`. Reproduce it with:
+
+  ```sh
+  ./.omo/evidence/20260809-model-chain-consistency/runtime-fallback-cooldown-real-qa.sh
+  ```
+- Proactive model-fallback QA applied `high` reasoning after the primary 429,
+  then selected the same fallback model without a variant. Real `chat.params`
+  and the provider request both returned to the model's default `medium`
+  reasoning instead of retaining `high`. The server emitted `session.status`;
+  the isolated session was deleted, both ports stopped, and the live database
+  remained unchanged. See `real-model-fallback-variant-clear-summary.jsonl`
+  and `real-model-fallback-variant-clear-output.txt`. Reproduce it with:
+
+  ```sh
+  ./.omo/evidence/20260809-model-chain-consistency/model-fallback-variant-clear-real-qa.sh
+  ```
 
 Run the focused proof:
 

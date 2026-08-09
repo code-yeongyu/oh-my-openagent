@@ -1,0 +1,6 @@
+{"source":"environment","opencode":"1.18.15","plugin":"exact local source","sandbox":"isolated HOME and XDG paths","command":"./.omo/evidence/20260809-model-chain-consistency/model-fallback-variant-clear-real-qa.sh"}
+{"source":"model-fallback","sessionID":"ses_0184d2fbeffe1d1r2yz72zkm4e","requests":["title","primary:429","fallback:high","same-fallback:default-medium"]}
+{"source":"chat.params","sessionID":"ses_0184d2fbeffe1d1r2yz72zkm4e","fallbackReasoning":"high","sameModelReasoning":"medium","fallbackVariantCleared":true}
+{"source":"provider","sessionID":"ses_0184d2fbeffe1d1r2yz72zkm4e","fallbackReasoning":"high","sameModelReasoning":"medium","fallbackVariantCleared":true}
+{"source":"hook","sessionID":"ses_0184d2fbeffe1d1r2yz72zkm4e","event":"session.status","observed":true}
+{"source":"cleanup","isolatedSessionCount":0,"liveSessionIDMatches":0,"liveCountBefore":7251,"liveCountAfter":7251,"portsStopped":[53132,53133],"rawOutput":"real-model-fallback-variant-clear-output.txt"}

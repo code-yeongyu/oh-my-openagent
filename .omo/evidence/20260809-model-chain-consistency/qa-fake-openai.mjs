@@ -5,9 +5,11 @@ import { sendSse, textEvents, toolCallEvents } from "../../../.agents/skills/ope
 const port = Number(process.env.QA_FAKE_PORT)
 const logPath = process.env.QA_FAKE_LOG
 const failReasoning = process.env.QA_FAIL_REASONING
+const failPrimaryOnce = process.env.QA_FAIL_PRIMARY_ONCE === "1"
 const taskProbe = process.env.QA_TASK_PROBE === "1"
 const callOmoProbe = process.env.QA_CALL_OMO_PROBE === "1"
 let callCount = 0
+let primaryFailures = 0
 
 const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && request.url === "/health") {
@@ -61,7 +63,9 @@ const server = http.createServer(async (request, response) => {
     return
   }
 
-  if (body.model === "primary" || body.model === "gpt-5.6-sol-primary" || (failReasoning && body.reasoning?.effort === failReasoning)) {
+  const shouldFailPrimary = body.model === "primary"
+    && (!failPrimaryOnce || primaryFailures++ === 0)
+  if (shouldFailPrimary || body.model === "gpt-5.6-sol-primary" || (failReasoning && body.reasoning?.effort === failReasoning)) {
     response.writeHead(429, { "content-type": "application/json" })
     response.end(JSON.stringify({ error: { message: "Rate limit exceeded", type: "rate_limit_error" } }))
     return

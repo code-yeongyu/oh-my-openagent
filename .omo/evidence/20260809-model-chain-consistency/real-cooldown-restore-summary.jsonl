@@ -1,0 +1,6 @@
+{"source":"environment","opencode":"1.18.15","plugin":"exact local source","sandbox":"isolated HOME and XDG paths","command":"./.omo/evidence/20260809-model-chain-consistency/runtime-fallback-cooldown-real-qa.sh"}
+{"source":"provider","sessionID":"ses_01861937affemzyiSXVNN74gIB","requests":["title:fallback","turn1:primary:429","turn1-retry:fallback:success","turn2-cooldown-restore:primary:success","turn3-omitted-model:primary:success"]}
+{"source":"chat.message","sessionID":"ses_01861937affemzyiSXVNN74gIB","turn":2,"agent":"build","inputModel":"qa/fallback","persistedSessionModel":"qa/fallback","outputModel":"qa/primary"}
+{"source":"chat.message","sessionID":"ses_01861937affemzyiSXVNN74gIB","turn":3,"agent":"build","inputModel":null,"persistedSessionModel":"qa/fallback","outputModel":"qa/primary"}
+{"source":"hook","sessionID":"ses_01861937affemzyiSXVNN74gIB","event":"session.status","observed":true}
+{"source":"cleanup","isolatedSessionCount":0,"liveSessionIDMatches":0,"liveCountBefore":7245,"liveCountAfter":7245,"portsStopped":[59618,59619],"rawOutput":"real-cooldown-restore-output.txt"}

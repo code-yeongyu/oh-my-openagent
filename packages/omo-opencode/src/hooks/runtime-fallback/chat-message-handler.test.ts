@@ -108,6 +108,50 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     expect(deps.sessionPromptParamsBeforeFallback?.has(sessionID)).toBe(true)
   })
 
+  test("keeps a cooldown-restored primary on the next omitted-model message", async () => {
+    const deps = createDeps()
+    deps.config.restore_primary_after_cooldown = true
+    const sessionID = "session-cooldown-primary"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "openai/gpt-5.5"
+    state.failedModels.set("openai/gpt-5.4", 0)
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, { variant: "medium" })
+    setSessionPromptParams(sessionID, { variant: "high" })
+    const handler = createChatMessageHandler(deps)
+
+    await handler(
+      { sessionID, agent: "oracle", model: { providerID: "openai", modelID: "gpt-5.5" } },
+      { message: { agent: "oracle", model: { providerID: "openai", modelID: "gpt-5.5" }, variant: "high" } },
+    )
+    const nextOutput = { message: { agent: "oracle", model: { providerID: "openai", modelID: "gpt-5.5" } } }
+    await handler({ sessionID }, nextOutput)
+
+    expect(nextOutput.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionPromptParams(sessionID)).toEqual({ variant: "medium" })
+    expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("openai/gpt-5.4")
+  })
+
+  test("does not override another agent's resolved model after cooldown restoration", async () => {
+    const deps = createDeps()
+    deps.config.restore_primary_after_cooldown = true
+    const sessionID = "session-cooldown-agent-switch"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "openai/gpt-5.5"
+    state.failedModels.set("openai/gpt-5.4", 0)
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+
+    await handler(
+      { sessionID, agent: "oracle", model: { providerID: "openai", modelID: "gpt-5.5" } },
+      { message: { agent: "oracle", model: { providerID: "openai", modelID: "gpt-5.5" } } },
+    )
+    const nextOutput = { message: { agent: "explore", model: { providerID: "openai", modelID: "gpt-5.5" } } }
+    await handler({ sessionID }, nextOutput)
+
+    expect(nextOutput.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+  })
+
   test("clears fallback prompt settings when the user manually selects another model", async () => {
     // given
     const deps = createDeps()

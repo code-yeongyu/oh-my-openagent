@@ -1,0 +1,13 @@
+OpenCode: 1.18.15
+session: ses_0184d2fbeffe1d1r2yz72zkm4e
+provider models: ["title","gpt-5.6-sol-primary","gpt-5.6-sol","gpt-5.6-sol"]
+fallback request reasoning: high
+same-model request reasoning: medium
+watching http://127.0.0.1:53133/event?directory=/var/folders/6h/gkfdh2zd3jv3w655c3s1gxh40000gn/T/oqa-xdg.XXXXXX.h23wKedQJo/proj for 'session.status' (<=60s)
+first matching event: {"type":"session.status"}
+PASS: observed 'session.status' on http://127.0.0.1:53133
+isolated session count after delete: 0
+live session ID matches: 0
+live session count: 7251 -> 7251
+ports stopped: 53132, 53133
+PASS: proactive fallback variant cleared on the same model

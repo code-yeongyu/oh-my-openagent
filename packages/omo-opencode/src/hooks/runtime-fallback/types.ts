@@ -47,6 +47,10 @@ export interface FallbackState {
   attemptCount: number
   pendingFallbackModel?: string
   pendingFallbackPromptMayHaveBeenAccepted?: boolean
+  restoredPrimary?: {
+    staleModel: string
+    agent?: string
+  }
 }
 
 export interface FallbackResult {
@@ -75,7 +79,7 @@ export interface RuntimeFallbackOptions {
 
 export interface RuntimeFallbackHook {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
-  "chat.message"?: (input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } }, output: { message: { model?: { providerID: string; modelID: string } }; parts?: Array<{ type: string; text?: string }> }) => Promise<void>
+  "chat.message"?: (input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } }, output: { message: { agent?: string; model?: { providerID: string; modelID: string } }; parts?: Array<{ type: string; text?: string }> }) => Promise<void>
   dispose?: () => void
 }
 

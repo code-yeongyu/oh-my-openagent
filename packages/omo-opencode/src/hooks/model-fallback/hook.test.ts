@@ -140,6 +140,36 @@ describe("model fallback hook", () => {
     expect(getSessionPromptParams(sessionID)).toBeUndefined()
   })
 
+  test("clears fallback variant when the user selects the same model without one", async () => {
+    const sessionID = "ses_model_fallback_clear_variant"
+    setSessionFallbackChain(modelFallback, sessionID, [{
+      providers: ["openai"],
+      model: "gpt-5.5",
+      reasoning: "high",
+    }])
+    expect(setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "oracle",
+      "anthropic",
+      "claude-opus-4-8",
+    )).toBe(true)
+
+    await modelFallback["chat.message"]({ sessionID }, {
+      message: { model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+      parts: [{ type: "text", text: "continue" }],
+    })
+    await modelFallback["chat.message"]({
+      sessionID,
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+    }, {
+      message: { model: { providerID: "openai", modelID: "gpt-5.5" } },
+      parts: [{ type: "text", text: "clear variant" }],
+    })
+
+    expect(getSessionPromptParams(sessionID)).toBeUndefined()
+  })
+
   test("preserves fallback progression across repeated session.error retries", async () => {
     const hook = unsafeTestValue<{
       "chat.message"?: (
