@@ -278,6 +278,50 @@ packages/openclaw-core                              67 pass / 0 fail
 On the live cmux host the patched detector still returns `true`, and the nested-real-tmux,
 backslash, `cmuxterm`-named-session, and `TMUX`-not-injected cases all resolve correctly.
 
+## Review round 3 — Windows CI regression caused by the round 1 fix
+
+`test (windows-latest)` failed on three consecutive pushes after the Unix-only split landed, on a
+single test:
+
+```
+(fail) runTmuxCommand > #given cmux fake TMUX and cmux CLI reachable only through
+       CMUX_OMO_CMUX_BIN #when run #then delegates through that binary
+ 13368 pass / 1 fail
+```
+
+`runner.test.ts` built the fake `TMUX` with `path.join`:
+
+```ts
+process.env.TMUX = `${path.join(temporaryDirectory, "cmux-omo", "workspace")},surface,pane`
+```
+
+On Windows that yields `D:\a\_temp\xyz\cmux-omo\workspace`. The old `split(/[\\/]/)` happened to
+split it and find the `cmux-omo` segment, so the test passed for the wrong reason — the backslash
+branch was not dead code after all, it was holding up this one test. Under the Unix-only split the
+path is a single segment and the detector correctly reports "not cmux".
+
+Reproduced both states directly:
+
+```
+before (path.join → backslash TMUX): false   <- the Windows CI failure
+after  (POSIX literal TMUX)        : true    <- passes
+```
+
+The fix belongs in the test, not the detector. cmux runs only on macOS and always injects a
+`/`-separated socket path, so a backslash `TMUX` is a shape no cmux build produces — the same
+"asserting against a fictional environment" problem as the `cmuxterm` test sites in round 2. The
+value is now a POSIX literal with a comment explaining why it must not be rebuilt with `path.join`.
+`CMUX_SOCKET_PATH` keeps using `path.join`, which is fine because only its presence is checked.
+
+A sweep of every `process.env.TMUX = …` assignment across the test suite confirms this was the
+only OS-dependent one; all others were already POSIX literals.
+
+`test (macos-latest)` failed once, on the newest push only, and in an unrelated suite
+(`prompt-async-route-audit.test.ts`, "production prompt injection routes") where the first case
+timed out at 5018 ms against a 5000 ms limit and the two dependent cases fell over with it. It
+passed on the two earlier pushes of this branch and passes on `dev`, so it is treated as a
+timing flake rather than an effect of this branch.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`
