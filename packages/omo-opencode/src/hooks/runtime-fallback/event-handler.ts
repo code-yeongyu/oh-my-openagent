@@ -3,7 +3,11 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
+import {
+  areRuntimeModelsEquivalent,
+  createFallbackState,
+  stringifyRuntimeModelWithVariant,
+} from "./fallback-state"
 import { getConfiguredPrimaryModel, getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
@@ -13,7 +17,7 @@ import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { discardPromptParamsSnapshot, restorePromptParams } from "./fallback-prompt-params"
-import { clearSessionPromptParams, getAgentConfigKey } from "../../shared"
+import { clearSessionPromptParams, getAgentConfigKey, parseModelString } from "../../shared"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -86,10 +90,23 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
       const preferredModel = resolvePreferredSessionModel(sessionID, agent, pluginConfig)
-      const fallbackIndex = preferredModel && preferredModel !== model
-        ? getFallbackModelsForSession(sessionID, agent, pluginConfig).indexOf(model)
+      const preferredModelIdentity = preferredModel
+        ? normalizeModelToCanonicalString(preferredModel)
+        : undefined
+      const modelVariant = typeof sessionModel === "string"
+        ? parseModelString(sessionModel)?.variant
+        : isRuntimeFallbackRecord(sessionModel)
+          ? sessionModel["variant"]
+          : undefined
+      const modelWithVariant = stringifyRuntimeModelWithVariant(model, modelVariant)
+      const fallbackIndex = preferredModelIdentity
+        && !areRuntimeModelsEquivalent(preferredModel, modelWithVariant)
+        ? getFallbackModelsForSession(sessionID, agent, pluginConfig)
+          .findIndex((candidate) => modelVariant
+            ? areRuntimeModelsEquivalent(candidate, modelWithVariant)
+            : normalizeModelToCanonicalString(candidate) === model)
         : -1
-      const state = createFallbackState(fallbackIndex >= 0 && preferredModel ? preferredModel : model)
+      const state = createFallbackState(fallbackIndex >= 0 ? preferredModelIdentity : model)
       if (fallbackIndex >= 0) {
         state.currentModel = model
         state.fallbackIndex = fallbackIndex

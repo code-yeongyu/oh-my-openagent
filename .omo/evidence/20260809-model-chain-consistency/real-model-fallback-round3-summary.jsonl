@@ -2,3 +2,5 @@
 {"turn":"primary","model":"openai/gpt-5.6-sol-primary","result":429,"reasoning_effort":"medium","max_output_tokens":1024,"service_tier":"priority"}
 {"turn":"fallback","model":"openai/gpt-5.6-sol","result":"REAL_OPENCODE_FALLBACK_OK","reasoning_effort":"low","max_output_tokens":2048,"service_tier":"flex"}
 {"turn":"manual-switch","model":"openai/gpt-5.6-terra-manual","result":"REAL_OPENCODE_FALLBACK_OK","reasoning_effort":"medium","max_output_tokens":null,"service_tier":null,"stale_fallback_settings_cleared":true}
+{"opencode":"1.18.15","session":"ses_01898582affeHHHfsQ5vlEuMJ1","hook":"runtime_fallback","created_model":"openai/gpt-5.6-sol-primary","created_variant":"high","created_agent":"Sisyphus - ultraworker","live_db_matches":0}
+{"turns":[{"model":"openai/gpt-5.6-sol-primary","result":429},{"model":"openai/gpt-5.6-sol","result":"REAL_OPENCODE_FALLBACK_OK","reasoning_effort":"high","max_output_tokens":3072,"service_tier":"priority"}],"same_failed_rung_retried":false,"isolated_sessions_remaining":0}

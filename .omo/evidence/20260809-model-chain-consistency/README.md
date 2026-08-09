@@ -5,11 +5,11 @@ Issue: #6644
 ## Behavioral proof
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
-- Exact-head focused suites: 296 passed, 0 failed.
-- Exact-head affected-surface suites: 2,012 passed, 2 skipped, 0 failed.
+- Exact-head focused suites: 297 passed, 0 failed.
+- Exact-head affected-surface suites: 2,013 passed, 2 skipped, 0 failed.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,511 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,512 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
@@ -117,6 +117,12 @@ The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
   cleared the fallback token cap and service tier. The isolated session was
   deleted and had zero matches in the live database. See
   `real-model-fallback-round3-summary.jsonl`.
+- Exact session-bootstrap QA created a real OpenCode session on a suffixed
+  fallback rung with an agent identity. That rung returned 429 and runtime
+  fallback advanced directly to the following configured rung, which completed
+  with `high/3072/priority`; it did not select the same failed rung again. All
+  isolated sessions were deleted and had zero live-database matches. See the
+  final two records in `real-model-fallback-round3-summary.jsonl`.
 
 Run the focused proof:
 

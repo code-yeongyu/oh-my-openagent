@@ -295,4 +295,41 @@ describe("createEventHandler", () => {
     expect(created?.currentModel).toBe("openai/gpt-5.5-codex")
     expect(typeof created?.currentModel).toBe("string")
   })
+
+  it("#given session.created on a suffixed fallback #when state initializes #then it resumes after that fallback rung", async () => {
+    const sessionID = "session-suffixed-fallback"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        oracle: {
+          models: [
+            "openai/gpt-5.6-sol",
+            "openai/gpt-5.5:xhigh",
+            "openai/gpt-5.5:low",
+            "google/gemini-3.1-pro",
+          ],
+        },
+      },
+    }
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            agent: "oracle",
+            model: { id: "gpt-5.5", providerID: "openai", variant: "low" },
+          },
+        },
+      },
+    })
+
+    expect(deps.sessionStates.get(sessionID)).toMatchObject({
+      originalModel: "openai/gpt-5.6-sol",
+      currentModel: "openai/gpt-5.5",
+      fallbackIndex: 1,
+    })
+  })
 })
