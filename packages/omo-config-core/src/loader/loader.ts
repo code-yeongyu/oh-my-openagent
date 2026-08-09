@@ -1,6 +1,6 @@
 import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
 
-import { OmoCodegraphSettingsSchema, OmoConfigLayerSchema, OmoConfigSchema, OmoTaskSettingsSchema, type OmoConfig } from "../schema"
+import { OmoCodegraphSettingsSchema, OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
 import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
@@ -39,7 +39,7 @@ const DEFAULT_RAW_CONFIG: Record<string, unknown> = {
   agents: {},
   categories: {},
   codegraph: OmoCodegraphSettingsSchema.parse({}),
-  task: OmoTaskSettingsSchema.parse({}),
+  task: resolveOmoTaskSettings({}),
   teams: {},
 }
 

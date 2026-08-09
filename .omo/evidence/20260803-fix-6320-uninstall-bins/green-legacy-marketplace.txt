@@ -1,0 +1,13 @@
+uname=Linux bun=1.3.12
+
+== GREEN: full cleanup suite + coverage guard on Linux ==
+(pass) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones [3.35ms]
+(pass) codex cleanup > #given a legacy install under another marketplace #when cleanup runs #then its legacy bins are still removed [3.36ms]
+(pass) codex cleanup > #given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept [2.99ms]
+ 20 pass
+ 0 fail
+
+== legacy-bins + cache regression (the matcher I reused) ==
+ 23 pass
+ 0 fail
+

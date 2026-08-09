@@ -6,13 +6,15 @@ This reference records release gates that are not covered by CI alone.
 
 Before publishing a release, maintainers verify:
 
-- Version bump and package metadata are present on the release branch.
+- The workflow calculates the release version, stamps package metadata on a release-state branch, opens and merges the release-state PR, then republishes from the prepared SHA.
 - Targeted tests for changed code pass.
 - `bun run typecheck` passes.
 - User-facing documentation covers new public behavior.
 - Known issues are documented before the release notes are finalized.
 
 CI green is required for release readiness, but CI does not replace manual verification for bugs whose reproducer depends on timing, providers, models, or external OpenCode behavior.
+
+For the `omo-ai` package (the senpi-native edition, beta channel only), see the [omo-ai publishing runbook](./omo-ai-publishing.md): bootstrap state, the beta-gate mechanism, the Trusted Publisher merge gate, and the first-beta-release checklist.
 
 ## Post-Fix Repro Verification
 

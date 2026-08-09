@@ -1,4 +1,8 @@
+import { availableParallelism } from "node:os"
+
 import * as z from "zod"
+
+const ResidencyMaxChildrenInputSchema = z.union([z.number().int().positive(), z.literal("unlimited")])
 
 export const OmoTaskWaitSchema = z.object({
   min_ms: z.number().int().positive().default(5000),
@@ -22,7 +26,7 @@ export const OmoTaskSettingsSchema = z.object({
   provider_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
   max_depth: z.number().int().nonnegative().default(1),
-  residency_max_children: z.number().int().positive().default(8),
+  residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
   ttl_ms: z.number().int().positive().default(86400000),
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
@@ -58,7 +62,7 @@ export const OmoTaskSettingsLayerSchema = z.object({
   provider_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
   max_depth: z.number().int().nonnegative().optional(),
-  residency_max_children: z.number().int().positive().optional(),
+  residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
   ttl_ms: z.number().int().positive().optional(),
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
@@ -70,3 +74,14 @@ export const OmoTaskSettingsLayerSchema = z.object({
 
 export type OmoTaskSettings = z.infer<typeof OmoTaskSettingsSchema>
 export type OmoTaskSettingsLayer = z.infer<typeof OmoTaskSettingsLayerSchema>
+
+export function resolveOmoTaskSettings(
+  input: unknown,
+  resolveParallelism: () => number = availableParallelism,
+): OmoTaskSettings {
+  const record = z.record(z.string(), z.unknown()).parse(input)
+  return OmoTaskSettingsSchema.parse({
+    ...record,
+    residency_max_children: record["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3),
+  })
+}

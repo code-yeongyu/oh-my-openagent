@@ -1,0 +1,87 @@
+TASK 6 - AGGREGATE PROOF: isolated install smokes on both editions + full gates
+Run by the LEAD on the final tree (post-rebase onto origin/dev, post-fix-wave), not by an implementing subagent.
+
+================================================================================
+WHAT WAS TESTED
+================================================================================
+The two real surfaces a user meets after this release - a global npm install and
+a codex install - plus the three repo gates, on the merged final tree.
+
+================================================================================
+(a) npm EDITION - lead-npm-qa.sh  -> transcripts: task-6-npm-lead.txt (pre-sync),
+    task-6-npm-lead-postsync.txt (post-sync). RESULT: 10 passed / 0 failed.
+================================================================================
+- npm pack produced a tarball; packed package.json bin map read directly from it.
+- packed bin map == exactly {lazycodex, lazycodex-ai, oh-my-openagent,
+  oh-my-opencode, omo-agent-toolkit}. NO `omo` entry.
+- fresh `npm install -g --prefix <disposable>` linked omo-agent-toolkit and did
+  NOT link omo.
+- postinstall rename notice: exactly 1 line observed under `--foreground-scripts`
+  (an ordinary install prints nothing - npm >=7 hides lifecycle output, which is
+  why the notice is documented as best-effort and the CHANGELOG/docs carry the
+  real migration story).
+- UPGRADE-IN-PLACE (the path existing users actually take), measured rather than
+  assumed: installing the PUBLISHED oh-my-opencode@latest into a disposable
+  prefix DOES link an `omo` bin; installing this build over it PRUNES `omo` and
+  links omo-agent-toolkit.
+- CLEANUP RECEIPT: `rm -rf` of the mktemp ROOT, verified absent.
+
+================================================================================
+(b) codex EDITION - lead-codex-qa.sh. RESULT: 13 passed / 0 failed.
+================================================================================
+Isolated: one disposable ROOT with HOME, CODEX_HOME and CODEX_LOCAL_BIN_DIR all
+derived from it; the real ~/.codex was never a write target.
+- canonical `omo-agent-toolkit` wrapper written, carrying RUNTIME_WRAPPER_MARKER
+  and BOTH `OMO_INVOCATION_NAME=omo-agent-toolkit` and `OMO_EDITION=codex`.
+- `omo` ABSENT after a clean install.
+- planted MARKER-BEARING `omo` -> DELETED by the installer.
+- planted UNMARKED user-owned `omo` -> byte-identical afterwards (sha256
+  compared) and the install still exited 0.
+- second install idempotent: bin-set hash and canonical wrapper hash unchanged.
+- codex hook-wiring files byte-identical across every install (plugin.json +
+  per-component hooks/hooks.json + plugin/hooks/*.json).
+- per-component bins and the ulw/ulw-loop compat aliases untouched.
+- CLEANUP RECEIPT: ROOT removed and verified absent.
+
+Adversarial extension (F3 lane, independent script F3-qa.sh):
+- symlinked marker-bearing legacy `omo` initially SURVIVED -> genuine gap, fixed
+  in this PR (removeGeneratedRuntimeWrapper now removes the LINK, never its
+  target; unmarked and dangling links are left alone). Regression tests added in
+  codex-cache-bins.test.ts.
+- concurrent codex installs: one process can exit 1 during shared
+  materialization. Pre-existing installer behavior, unrelated to the rename;
+  recorded as a residual risk rather than silently fixed under a rename PR.
+
+================================================================================
+(c) FULL GATES on the final tree
+================================================================================
+- `bun run typecheck`            -> exit 0 (all 29 projects)
+- `bun run test:codex`           -> 519 pass / 0 fail
+- `bun test`                     -> 13454 pass / 5 skip / 0 fail / 127912 expect()
+                                    across 1735 files
+Note on an earlier reading: a mid-run capture showed 2 failures in
+packages/omo-codex/src/install under full parallel load. Provenance was checked
+rather than assumed - a pristine origin/dev worktree sharing the same
+node_modules produced 14 failures in that same scope, while this branch produced
+0. That flakiness pre-dates this PR and this branch improves it.
+
+================================================================================
+(d) SCOPE FIDELITY
+================================================================================
+- `git diff origin/dev...HEAD --name-only | rg 'omo-native|omo_ai'` -> empty
+- no omo-ai publish steps, no senpi dependency pin bump, no npm package rename,
+  no marketplace rename, no OMO_* env renames, no per-component bin renames
+- no codex hook-wiring file touched
+- `jq -e '.bin.omo' package.json` -> exit 1 (removal proof)
+
+================================================================================
+WHY THIS IS ENOUGH / WHAT IS NOT COVERED HERE
+================================================================================
+Enough: both user-facing install paths are exercised end to end on the real
+artifacts (a packed tarball and the real installer), including the destructive
+edge - reclaiming the old name - proven both to fire on our own generated files
+and to spare files we did not write.
+NOT covered pre-merge: the publish workflow's own smoke runs inside GitHub
+Actions against a published tarball, so it is verified statically (actionlint +
+the workflow-shape pinning test) with these local isolated installs as the
+stand-in; the real run is the post-merge verification.

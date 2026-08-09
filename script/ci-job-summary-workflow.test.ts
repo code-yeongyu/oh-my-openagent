@@ -22,6 +22,7 @@ const workflowExpectations = [
       "senpi-compatibility",
       "lazycodex-published-smoke",
       "build",
+      "omo-ai-payload-check",
       "auto-commit-schema",
       "draft-release",
     ],

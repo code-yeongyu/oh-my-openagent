@@ -1,5 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
+import { interactionPolicyForAgent } from "../agents"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { messageability } from "../state"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
@@ -48,6 +49,11 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
     const denied = scopeDenied(record, input)
     if (denied !== undefined) return denied
+    // One-shot policy runs after ownership is established but BEFORE the pending enqueue and
+    // messageability: a one-shot agent refuses task_send in every state (running, pending,
+    // terminal, cross-session alike), and an unauthorized caller learns only the scope denial.
+    const oneShot = oneShotPolicyDenial(record)
+    if (oneShot !== undefined) return oneShot
 
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
@@ -223,6 +229,14 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   return { sendToTask, interruptTask, cancelTask, notifyStarted, dropPending }
+}
+
+function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined {
+  const agentType = record.agent_type
+  if (agentType === undefined) return undefined
+  const policy = interactionPolicyForAgent(agentType)
+  if (policy?.oneShot !== true) return undefined
+  return { kind: "one_shot_agent", task_id: record.task_id, agent: agentType, message: policy.sendDenialReminder }
 }
 
 function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {

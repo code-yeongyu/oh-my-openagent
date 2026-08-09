@@ -1,0 +1,4 @@
+npm error code ETARGET
+npm error notarget No matching version found for omo-ai@*.
+npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.
+npm error A complete log of this run can be found in: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-bare.XXXXXX.5cBSkTegd9/npm-cache/_logs/2026-08-09T15_45_03_213Z-debug-0.log

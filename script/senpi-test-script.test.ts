@@ -58,6 +58,7 @@ describe("Senpi compatibility test script", () => {
       "bun run build:materialize-frontend",
       "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
+      "node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs",
       "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
       "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
       "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
@@ -126,6 +127,13 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "package.json"), JSON.stringify({ version: "0.1.0" }))
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
+      await mkdir(join(pluginRoot, "runtime", "agent-toolkit", "ulw-loop"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "agent-toolkit", "cli.js"), "console.log('agent-toolkit')\n")
+      await writeFile(join(pluginRoot, "runtime", "agent-toolkit", "ulw-loop", "cli.js"), "console.log('ulw-loop')\n")
+      const toolkitShim = join(pluginRoot, "runtime", "agent-toolkit", "omo-agent-toolkit")
+      await writeFile(toolkitShim, "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n")
+      await chmod(toolkitShim, 0o755)
+      await writeFile(join(pluginRoot, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"), "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n")
       await mkdir(join(pluginRoot, "runtime", "ast-grep-mcp"), { recursive: true })
       const astGrepRuntime = join(pluginRoot, "runtime", "ast-grep-mcp", "cli.js")
       const astGrepRuntimeContent = "console.log('ast-grep mcp')\n"

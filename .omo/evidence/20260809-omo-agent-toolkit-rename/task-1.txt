@@ -1,0 +1,203 @@
+TASK 1 EVIDENCE - Root CLI: bin map gains omo-agent-toolkit, drops omo, plus OMO_EDITION edition routing
+Date: 2026-08-09 | Branch head: 8b33ac959 Merge pull request #6662 from code-yeongyu/feat/ub-surrogate-tier
+Worktree: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename
+
+===================================================================
+0. INVOCATION METHOD (explicit fallback disclosure)
+===================================================================
+The compiled platform binary is UNAVAILABLE in this worktree, so a direct
+'node bin/oh-my-opencode.js --version' run is impossible. Proof:
+
+$ OMO_INVOCATION_NAME=oh-my-opencode node bin/oh-my-opencode.js --version
+(exit code: 1 - 'Platform binary not installed')
+
+Per the task instructions, the CLI-level equivalent was used instead:
+  OMO_INVOCATION_NAME=<name> bun packages/omo-opencode/src/cli/index.ts <cmd>
+This exercises the real commander CLI (runCli in cli-program.ts) with the
+same OMO_INVOCATION_NAME routing the compiled binary would receive.
+
+===================================================================
+1. CHARACTERIZATION BASELINE (UNCHANGED code, captured BEFORE edits)
+===================================================================
+Directory: .omo/evidence/20260809-omo-agent-toolkit-rename/task-1-baseline/
+Command loop: for name in oh-my-opencode oh-my-openagent lazycodex lazycodex-ai; for cmd in "--version" "doctor --help":
+  OMO_INVOCATION_NAME=$name bun packages/omo-opencode/src/cli/index.ts $cmd >baseline/${name}_${cmd}.stdout 2>...stderr; echo exit=$? >...exit
+
+Exit codes captured (all 8 runs):
+  lazycodex_--version.exit: exit=0
+  lazycodex_doctor_--help.exit: exit=0
+  lazycodex-ai_--version.exit: exit=0
+  lazycodex-ai_doctor_--help.exit: exit=0
+  oh-my-openagent_--version.exit: exit=0
+  oh-my-openagent_doctor_--help.exit: exit=0
+  oh-my-opencode_--version.exit: exit=0
+  oh-my-opencode_doctor_--help.exit: exit=0
+
+Sample baseline stdout (oh-my-opencode --version):
+4.19.4
+Sample baseline stdout (lazycodex doctor --help, first 12 lines):
+Usage: oh-my-opencode doctor [options]
+
+Check oh-my-opencode installation health and diagnose issues
+
+Options:
+  --status               Show compact system dashboard
+  --verbose              Show detailed diagnostic information
+  --json                 Output results in JSON format
+  --platform <platform>  Doctor target platform: opencode, codex (choices:
+                         "opencode", "codex")
+  -h, --help             Display help for command
+
+
+===================================================================
+2. RED - failing-first tests on UNCHANGED production code
+===================================================================
+Command: bun test script/bin-map.test.ts packages/omo-opencode/src/cli/install-platform-resolution.test.ts packages/omo-opencode/src/cli/doctor/doctor-target.test.ts
+
+--- RED output (full tail) ---
+171 |     withEdition("codex", () => {
+172 |       // when
+173 |       const args = resolveInstallArgs({ tui: true }, "omo-agent-toolkit")
+174 | 
+175 |       // then
+176 |       expect(args.platform).toBe("codex")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "codex"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-opencode/src/cli/install-platform-resolution.test.ts:176:29)
+      at withEdition (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-opencode/src/cli/install-platform-resolution.test.ts:160:7)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-opencode/src/cli/install-platform-resolution.test.ts:171:5)
+(fail) OMO_EDITION install routing > OMO_EDITION=codex defaults a non-codex invocation name to the codex platform [0.15ms]
+(pass) OMO_EDITION install routing > OMO_EDITION=codex is checked before the lazycodex name checks [0.05ms]
+(pass) OMO_EDITION install routing > explicit --platform still wins over OMO_EDITION [0.06ms]
+(pass) OMO_EDITION install routing > a non-codex OMO_EDITION leaves name-based routing unchanged [0.06ms]
+(pass) OMO_EDITION install routing > unset OMO_EDITION keeps today's name-based routing exactly [0.05ms]
+(pass) cleanup platform resolution > defaults lazycodex cleanup to codex platform [0.06ms]
+(pass) cleanup platform resolution > leaves omo cleanup without --platform unresolved [0.04ms]
+
+packages/omo-opencode/src/cli/doctor/doctor-target.test.ts:
+(pass) resolveDoctorTarget > #given lazycodex invocation #when resolving doctor target #then selects Codex diagnostics [0.09ms]
+(pass) resolveDoctorTarget > #given lazycodex-ai invocation #when resolving doctor target #then selects Codex diagnostics [0.04ms]
+(pass) resolveDoctorTarget > #given opencode invocation #when resolving doctor target #then keeps OpenCode diagnostics [0.18ms]
+(pass) resolveDoctorTarget > #given explicit codex platform #when resolving doctor target #then selects Codex diagnostics [1.33ms]
+(pass) resolveDoctorTarget > #given explicit opencode platform from lazycodex invocation #when resolving doctor target #then explicit platform wins [0.11ms]
+76 |     withEdition("codex", () => {
+77 |       // when
+78 |       const target = resolveDoctorTarget("omo-agent-toolkit")
+79 | 
+80 |       // then
+81 |       expect(target).toBe("codex")
+                          ^
+error: expect(received).toBe(expected)
+
+Expected: "codex"
+Received: "opencode"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-opencode/src/cli/doctor/doctor-target.test.ts:81:22)
+      at withEdition (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-opencode/src/cli/doctor/doctor-target.test.ts:65:7)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-opencode/src/cli/doctor/doctor-target.test.ts:76:5)
+(fail) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a non-codex invocation name #then selects Codex diagnostics [0.22ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a lazycodex invocation #then the env check wins before the name checks [0.06ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex and an explicit opencode platform #when resolving doctor target #then explicit platform wins [0.05ms]
+(pass) OMO_EDITION doctor routing > #given a non-codex OMO_EDITION #when resolving doctor target #then name-based routing is unchanged [0.05ms]
+(pass) OMO_EDITION doctor routing > #given unset OMO_EDITION #when resolving doctor target #then today's name-based routing is kept exactly [0.06ms]
+
+4 tests failed:
+(fail) root package.json bin map > #given the renamed bin map #when inspecting entries #then the omo bin entry is absent [1.69ms]
+(fail) root package.json bin map > #given the renamed bin map #when inspecting entries #then omo-agent-toolkit points at the shared entry [0.10ms]
+(fail) OMO_EDITION install routing > OMO_EDITION=codex defaults a non-codex invocation name to the codex platform [0.15ms]
+(fail) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a non-codex invocation name #then selects Codex diagnostics [0.22ms]
+
+ 28 pass
+ 4 fail
+ 50 expect() calls
+Ran 32 tests across 3 files. [126.00ms]
+
+RED summary: 28 pass / 4 fail - the 4 failures are exactly the new-contract
+assertions (bin.omo absent, bin[omo-agent-toolkit] entry, OMO_EDITION=codex
+routing in resolveInstallArgs and resolveDoctorTarget). This RED doubles as
+the mutation probe: the pre-change state (omo key present, no OMO_EDITION
+read) is precisely the mutated state relative to the new contract.
+
+===================================================================
+3. PRODUCTION CHANGE
+===================================================================
+- package.json bin map: REMOVED '"omo": "bin/oh-my-opencode.js"', ADDED '"omo-agent-toolkit": "bin/oh-my-opencode.js"' (no new entry file, no deprecation branch)
+- packages/omo-opencode/src/cli/cli-program.ts resolveInstallArgs: defaultPlatform now 'process.env.OMO_EDITION === "codex" || invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined' (env checked FIRST)
+- packages/omo-opencode/src/cli/doctor/framework/doctor-target.ts resolveDoctorTarget: 'if (process.env.OMO_EDITION === "codex") return "codex"' inserted after the explicit-platform guard, BEFORE the lazycodex name checks
+- script/build-binaries.test.ts fixture: OMO_INVOCATION_NAME 'omo' -> 'omo-agent-toolkit'
+
+===================================================================
+4. GREEN - same test command after the production change
+===================================================================
+--- GREEN output (full tail) ---
+(pass) resolveDoctorTarget > #given explicit codex platform #when resolving doctor target #then selects Codex diagnostics [0.05ms]
+(pass) resolveDoctorTarget > #given explicit opencode platform from lazycodex invocation #when resolving doctor target #then explicit platform wins [0.04ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a non-codex invocation name #then selects Codex diagnostics [0.08ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a lazycodex invocation #then the env check wins before the name checks [0.07ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex and an explicit opencode platform #when resolving doctor target #then explicit platform wins [0.05ms]
+(pass) OMO_EDITION doctor routing > #given a non-codex OMO_EDITION #when resolving doctor target #then name-based routing is unchanged [0.05ms]
+(pass) OMO_EDITION doctor routing > #given unset OMO_EDITION #when resolving doctor target #then today's name-based routing is kept exactly [0.06ms]
+
+ 32 pass
+ 0 fail
+ 50 expect() calls
+Ran 32 tests across 3 files. [213.00ms]
+
+===================================================================
+5. FULL VERIFICATION COMMANDS
+===================================================================
+$ bun test bin script packages/omo-opencode/src/cli
+  1138 pass / 0 fail, 2797 expect() calls, 179 files (12.80s)
+$ bun run typecheck
+  exit=0 (tsgo --noEmit root + script + all packages)
+$ jq -e '.bin.omo' package.json
+  null
+  jq-omo-exit=1   (required: exit 1)
+$ jq -r '.bin["omo-agent-toolkit"]' package.json
+  bin/oh-my-opencode.js   (required value)
+
+===================================================================
+6. CHARACTERIZATION BASELINE COMPARISON (post-change vs baseline)
+===================================================================
+Post-change capture directory: .omo/evidence/20260809-omo-agent-toolkit-rename/task-1-after/ (identical command loop).
+The todo-4 rename map is a NO-OP at this stage: todo 1 changes no emitted
+help/usage strings (cli-program.ts help examples are owned by todo 4 and
+were NOT touched), so byte-identical (no normalization) is the correct
+expectation.
+
+diff -q over every (alias x command x {stdout,stderr,exit}) pair:
+  diff-failures=0   (24/24 files byte-identical)
+
+===================================================================
+7. QA SCENARIOS
+===================================================================
+happy (argv1-basename fixture, capture-env pattern from bin/oh-my-opencode.test.ts:213,266):
+  probe: temp root, wrapper copies named omo-agent-toolkit + oh-my-openagent,
+  fake platform packages capturing OMO_INVOCATION_NAME, node spawn with
+  OMO_INVOCATION_NAME scrubbed from env.
+  $ node /tmp/task1-qa-probe.mjs
+  omo-agent-toolkit: exit=0 capturedOMO_INVOCATION_NAME=omo-agent-toolkit stdout="fake-cli-stdout\n"
+  oh-my-openagent:   exit=0 capturedOMO_INVOCATION_NAME=oh-my-openagent   stdout="fake-cli-stdout\n"
+  captured name routed correctly: true
+  stdout byte-identical across aliases: true
+  probe-exit=0
+happy2: unit call resolveDoctorTarget(undefined-equivalent name) with OMO_EDITION=codex -> 'codex'
+  (GREEN: 'OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a non-codex invocation name')
+failure: jq -e .bin.omo package.json exits 1 (section 5); mutation probe = RED in section 2
+regression: four-alias byte-identical comparison vs baseline (section 6)
+
+===================================================================
+8. PLAN REFERENCE DRIFT (plan refs captured at 76b9aa8d3, branch at 8b33ac959)
+===================================================================
+- doctor-target.test.ts: plan says packages/omo-opencode/src/cli/doctor/framework/doctor-target.test.ts:2-32;
+  actual path is packages/omo-opencode/src/cli/doctor/doctor-target.test.ts (one level up, no framework/ dir).
+  Resolved: edited the real file; the import under test ('./framework/doctor-target') matches.
+- resolveInstallArgs: plan says cli-program.ts:56-60; actual signature starts at :53, body at :57-58. Resolved: edited actual lines.
+- script/package-layout.test.ts:190-210: does NOT enumerate bin names/files (grep for 'bin' finds nothing);
+  no update needed per the plan's conditional ('update IF it enumerates').
+- script/build-binaries.test.ts:157: exact match, fixture updated as specified.
+- bin/oh-my-opencode.js:111-123 (lazycodex routing) and :139-146 (getInvocationName): verified unchanged and untouched.

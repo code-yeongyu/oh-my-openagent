@@ -2,7 +2,7 @@
 
 [![ci](https://img.shields.io/badge/ci-pending-lightgrey.svg)](#) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Codex plugin component for durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit. State lives under `.omo/ulw-loop/` and is mutated through the `omo ulw-loop` CLI.
+Codex plugin component for durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit. State lives under `.omo/ulw-loop/` and is mutated through the `omo-agent-toolkit ulw-loop` CLI.
 
 ## CLI
 
@@ -10,16 +10,16 @@ Every subcommand below is implemented. Pass `--json` where supported for machine
 
 | Subcommand | Purpose |
 |------------|---------|
-| `omo ulw-loop help` | Print CLI usage. |
-| `omo ulw-loop create-goals` | Create repo-native goals and seed success criteria from a brief; optionally define review-boundary validation batches with `--validation-batch-json`. |
-| `omo ulw-loop status` | Report active goal, criteria, and evidence state. |
-| `omo ulw-loop complete-goals` | Manual fallback to start or resume the next eligible goal, or report aggregate completion / blocked handoff. |
-| `omo ulw-loop checkpoint` | Gate a goal transition with evidence; complete checkpoints auto-start the next eligible goal by default, with `--no-advance` preserving the legacy two-call flow. |
-| `omo ulw-loop steer` | Apply one steering mutation proposal or an atomic all-or-nothing batch with `--proposals-json`. |
-| `omo ulw-loop add-goal` | Append a goal to the active plan. |
-| `omo ulw-loop criteria` | Inspect one goal's success criteria. |
-| `omo ulw-loop record-evidence` | Record observable evidence for one criterion. |
-| `omo ulw-loop record-review-blockers` | Mark a goal as review-blocked and add follow-up work from final-review findings. |
+| `omo-agent-toolkit ulw-loop help` | Print CLI usage. |
+| `omo-agent-toolkit ulw-loop create-goals` | Create repo-native goals and seed success criteria from a brief; optionally define review-boundary validation batches with `--validation-batch-json`. |
+| `omo-agent-toolkit ulw-loop status` | Report active goal, criteria, and evidence state. |
+| `omo-agent-toolkit ulw-loop complete-goals` | Manual fallback to start or resume the next eligible goal, or report aggregate completion / blocked handoff. |
+| `omo-agent-toolkit ulw-loop checkpoint` | Gate a goal transition with evidence; complete checkpoints auto-start the next eligible goal by default, with `--no-advance` preserving the legacy two-call flow. |
+| `omo-agent-toolkit ulw-loop steer` | Apply one steering mutation proposal or an atomic all-or-nothing batch with `--proposals-json`. |
+| `omo-agent-toolkit ulw-loop add-goal` | Append a goal to the active plan. |
+| `omo-agent-toolkit ulw-loop criteria` | Inspect one goal's success criteria. |
+| `omo-agent-toolkit ulw-loop record-evidence` | Record observable evidence for one criterion. |
+| `omo-agent-toolkit ulw-loop record-review-blockers` | Mark a goal as review-blocked and add follow-up work from final-review findings. |
 
 The final quality gate parsed by `checkpoint` validates `codeReview`, `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`. `criteriaCoverage` records the original intent, desired outcome, user-facing outcome review, pass counts, and covered adversarial classes.
 

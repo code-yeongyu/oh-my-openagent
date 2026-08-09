@@ -176,7 +176,7 @@ function isProposal(value: unknown): value is UlwLoopSteeringProposal {
 }
 
 export function parseUlwLoopSteeringDirective(text: string): UlwLoopSteeringProposal | null {
-	const match = /(?:^|\s)(?:OMO_ULW_LOOP_STEER|omo\.ulw-loop\.steer|omo ulw-loop steer):\s*([\s\S]+)$/u.exec(text);
+	const match = /(?:^|\s)(?:OMO_ULW_LOOP_STEER|omo\.ulw-loop\.steer|omo ulw-loop steer|omo-agent-toolkit ulw-loop steer):\s*([\s\S]+)$/u.exec(text);
 	if (match?.[1] === undefined) return null;
 	try {
 		const parsed: unknown = JSON.parse(match[1].trim());

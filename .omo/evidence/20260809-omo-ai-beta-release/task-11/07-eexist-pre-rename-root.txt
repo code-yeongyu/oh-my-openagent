@@ -1,0 +1,39 @@
+# Scenario 07 - published pre-rename root package collides on bin omo
+root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo
+prefix=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/prefix
+npm_cache=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/npm-cache
+omo_ai_tarball=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6/omo-ai-0.0.0-dev.tgz
++ install published oh-my-openagent@4.19.4
+npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 228 packages in 6s
+npm warn allow-scripts 3 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   oh-my-openagent@4.19.4 (postinstall: node postinstall.mjs)
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts   msgpackr-extract@3.0.4 (install: node-gyp-build-optional-packages)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install -g --allow-scripts=oh-my-openagent,@code-yeongyu/comment-checker,msgpackr-extract` to allow these scripts once, or `npm config set allow-scripts=oh-my-openagent,@code-yeongyu/comment-checker,msgpackr-extract --location=user` to allow them for all global installs.
+npm notice
+npm notice New major version of npm available! 11.18.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+legacy_install_exit=0
+lrwxr-xr-x  1 yeongyu  staff  57 Aug 10 00:45 /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/prefix/bin/omo -> ../lib/node_modules/oh-my-openagent/bin/oh-my-opencode.js
++ install local omo-ai tarball; EEXIST naming omo is required
+omo_ai_install_exit=1
+--- stdout ---
+--- stderr ---
+npm error code EEXIST
+npm error path /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/prefix/bin/omo
+npm error EEXIST: file already exists
+npm error File exists: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/prefix/bin/omo
+npm error Remove the existing file and try again, or run npm
+npm error with --force to overwrite files recklessly.
+npm error A complete log of this run can be found in: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/npm-cache/_logs/2026-08-09T15_45_38_253Z-debug-0.log
+collision_install_failed=PASS
+collision_EEXIST=PASS
+collision_names_omo=PASS
+scenario_07=PASS
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo; prefix+cache absent

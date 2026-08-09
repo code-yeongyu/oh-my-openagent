@@ -1,0 +1,52 @@
+MUTATION: packages/omo-senpi/src/components/task/resumption-channel-emitter.ts
+  -const resolveOwnedTeamMember = deps.isOwnedTeamMember ?? isOwnedTeamMemberTask
+  +const resolveOwnedTeamMember = deps.isOwnedTeamMember ?? (async () => false)
+
+$ bun test packages/omo-senpi/src/components/task/resumption-channel-emitter.test.ts
+
+bun test v1.4.0-canary.1 (45eda514f)
+
+packages/omo-senpi/src/components/task/resumption-channel-emitter.test.ts:
+(pass) createResumptionChannelEmitter > #given a background child #when it spawns and then reaches a terminal state #then snapshots transition from one channel to zero [0.66ms]
+(pass) createResumptionChannelEmitter > #given a foreground owned team member #when the snapshot is emitted #then the member counts as active [0.11ms]
+200 | 
+201 |     // when
+202 |     await emitter.emitSessionStart()
+203 | 
+204 |     // then
+205 |     expect(emitted).toEqual([{
+                          ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+      "data": {
+-       "activeCount": 1,
+-       "channels": [
+-         {
+-           "description": "Review the implementation",
+-           "id": "st_00000003",
+-           "startedAtMs": 1786150923000,
+-         },
+-       ],
++       "activeCount": 0,
++       "channels": [],
+        "source": "senpi-task",
+      },
+      "name": "resumption_channel_state",
+    },
+  ]
+
+- Expected  - 8
++ Received  + 2
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt-team-binding/packages/omo-senpi/src/components/task/resumption-channel-emitter.test.ts:205:21)
+(fail) createResumptionChannelEmitter > #given a foreground owned team member resolved through the real ownership helper #when the session snapshot is emitted #then the member counts as active [5.04ms]
+(pass) createResumptionChannelEmitter > #given an active child count of one #when a store mutation preserves that count #then no duplicate snapshot is emitted [0.10ms]
+(pass) createResumptionChannelEmitter > #given an ExtensionAPI without events #when the emitter lifecycle is driven #then registration and emissions are harmless no-ops [0.09ms]
+(pass) createResumptionChannelEmitter > #given the local event contract #when the literal is inspected #then it exactly matches the harness event name [0.06ms]
+
+ 5 pass
+ 1 fail
+ 7 expect() calls
+Ran 6 tests across 1 file. [644.00ms]

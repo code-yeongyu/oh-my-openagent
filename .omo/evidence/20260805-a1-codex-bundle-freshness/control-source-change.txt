@@ -1,0 +1,40 @@
+$ printf '\n// control probe\n' >> packages/omo-codex/src/install/codex-installed-bin-dir.ts
+$ bun test script/codex-install-bundle-freshness.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script\codex-install-bundle-freshness.test.ts:
+38 | 
+39 |     // when
+40 |     const currentSourceDigest = await digestCodexInstallerSources()
+41 | 
+42 |     // then
+43 |     expect({ bundle: trackedBundlePath, sourceDigest: artifact?.sourceDigest }).toEqual({
+                                                                                     ^
+error: expect(received).toEqual(expected)
+
+@@ -2,3 +2,3 @@
+    "bundle": "packages/omo-codex/scripts/install-dist/install-local.mjs",
+-   "sourceDigest": "e6ffe0fb567e8ad0ebffd57572aa09258c071ade7eb20261305f8cd60a53d2ae",
++   "sourceDigest": "837f31a80cb49a0be547308babfd7266571dd1c53846dc2a2225006cc2da8bfa",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\script\codex-install-bundle-freshness.test.ts:43:81)
+(fail) committed Codex installer bundle > #given current installer sources #when compared with the tracked bundle marker #then the bundle is current [515.56ms]
+
+ 1 pass
+ 1 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [1202.00ms]
+exit=1
+$ git checkout -- packages/omo-codex/src/install/codex-installed-bin-dir.ts && bun run build:codex-install && git add packages/omo-codex/scripts/install-dist/install-local.mjs
+$ bun test script/codex-install-bundle-freshness.test.ts
+bun test v1.3.14 (0d9b296a)
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [1063.00ms]
+exit=0

@@ -1,0 +1,26 @@
+### WITH this run's changes applied
+$ bun test packages/omo-senpi/src/install/cli-local.test.ts
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.19s]
+exit=0
+
+### BASELINE: every change from this run stashed away
+$ git status --short   # clean HEAD
+$ git log -1 --format=%H
+76fa83ecc41f05d52205cc0f718bc53db8423afd
+$ bun test packages/omo-senpi/src/install/cli-local.test.ts
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.68s]
+exit=0
+
+$ git stash pop   # restore this run's changes
+	packages/omo-opencode/src/features/opencode-skill-loader/shared-skill-harness-scope.test.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (bbb240c2582daccc3d9764bf67991bf537efbaa9)
+
+Conclusion: this run touches packages/shared-skills/skills/start-work/SKILL.md and the
+Senpi sync script's sectionHeadingsToStrip set. Neither is imported by cli-local.test.ts,
+which exercises CLI positional-argument parsing.

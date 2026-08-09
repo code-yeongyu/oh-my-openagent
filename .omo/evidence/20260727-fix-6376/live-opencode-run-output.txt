@@ -1,0 +1,30 @@
+### opencode-qa Case A for #6376: shared-skill discovery inside real OpenCode
+### plugin loaded from: <REPO>/dist/index.js  (built from this branch)
+### isolation: HOME + XDG_* + TMPDIR -> sandbox; real DB read outside the sandbox
+  real sessions before: 2831
+
+=== shipped bundle literal (proves which resolver this run uses) ===
+  dist/index.js parent-fallback "../skills/" occurrences=1 (0 = unfixed base, 1 = fix present)
+
+=== real session: opencode run "reply with exactly OK" --format json ===
+  opencode run exit=0
+  stdout bytes=1035  stderr tail:
+
+=== what this session does and does not establish ===
+  Establishes: the plugin built from this branch loads in a real OpenCode session
+  under an isolated HOME/XDG sandbox, the session completes, and the real DB is
+  untouched.
+  Does NOT establish: a per-skill inventory from inside the session. A minimal
+  non-interactive run returns only the assistant message, so its JSON carries no
+  tool/skill listing, and the plugin log did not land in the redirected TMPDIR
+  (node's os.tmpdir() ignores the mutated variable on Windows).
+  The per-bundle skills-root resolution is proven separately and decisively by
+  live-driver.sh section 3, which executes the SHIPPED resolver at each bundle's
+  own directory against the real built assets.
+
+=== DB-UNTOUCHED PROOF (real DB, read outside the sandbox) ===
+  real sessions after : 2831
+  count unchanged     : true
+
+=== verdict ===
+  RESULT: PASS

@@ -188,6 +188,15 @@ describe("OMO Senpi scoped skill sync", () => {
     expect(content.includes("codex:<session_id>"), "start-work must not reference codex:<session_id>").toBe(false)
   })
 
+  test("#given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
+    const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+    const content = readFileSync(skillFile, "utf8")
+
+    expect(/\bmonitor\b/.test(content), "start-work must name the senpi tool that arms a lane watcher").toBe(true)
+    expect(/\bkill_bash\b/.test(content), "start-work must name the senpi tool that tears a watcher down").toBe(true)
+    expect(/\bwait_agent\b/.test(content), "start-work must not carry the codex wait_agent polling idiom").toBe(false)
+  })
+
   test("#given synced skill tree #when inspected #then no codex-only display metadata is packaged", () => {
     const openaiFiles = listFiles(skillsRoot).filter((file) => file.endsWith("agents/openai.yaml"))
     expect(openaiFiles.map((file) => relative(repoRoot, file))).toEqual([])

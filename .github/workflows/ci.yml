@@ -375,9 +375,53 @@ jobs:
           JOB_SUMMARY_NEXT: Fix the first failing build prerequisite before debugging downstream dist checks.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  omo-ai-payload-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build omo-native
+        run: bun run build:omo-native
+
+      - name: Verify omo-ai payload
+        run: node script/verify-omo-ai-payload.mjs
+
+      - name: Dry-run publish
+        run: npm publish --dry-run --ignore-scripts --tag beta
+        working-directory: packages/omo-native
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: omo-ai payload check
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the omo-native package.
+            - Verifies the omo-ai tarball payload whitelist.
+            - Runs `npm publish --dry-run` to confirm publishability without publishing.
+          JOB_SUMMARY_NEXT: Inspect the failing build, payload verifier, or dry-run publish step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   auto-commit-schema:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]
+    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -427,7 +471,7 @@ jobs:
 
   draft-release:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]
+    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     permissions:
       contents: write

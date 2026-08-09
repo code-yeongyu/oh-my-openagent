@@ -5,10 +5,88 @@ import {
   getHephaestusPromptSource,
   getHephaestusPrompt,
   createHephaestusAgent,
+  isHephaestusSupportedModel,
   UnsupportedHephaestusModelError,
 } from "./index";
 
+describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
+  test("#given Bedrock-hosted gpt-5 ids #when support is checked #then the vendor prefix is ignored", () => {
+    // given
+    const bedrockModels = [
+      "amazon-bedrock/openai.gpt-5.4",
+      "amazon-bedrock/openai.gpt-5-4",
+      "amazon-bedrock/openai.gpt-5.6",
+      "amazon-bedrock/openai.gpt-5.3-codex",
+    ];
+
+    // when
+    const supported = bedrockModels.map((model) => isHephaestusSupportedModel(model));
+
+    // then
+    expect(supported).toEqual([true, true, true, true]);
+  });
+
+  test("#given a region-qualified Bedrock id #when support is checked #then every vendor segment is ignored", () => {
+    // given
+    const model = "amazon-bedrock/us.openai.gpt-5.4";
+
+    // when
+    const supported = isHephaestusSupportedModel(model);
+
+    // then
+    expect(supported).toBe(true);
+  });
+
+  test("#given ids without a hosted vendor prefix #when support is checked #then existing classification is unchanged", () => {
+    // given
+    const unchanged: ReadonlyArray<readonly [string, boolean]> = [
+      ["openai/gpt-5.4", true],
+      ["github-copilot/gpt-5.4", true],
+      ["gpt-5.4", true],
+      ["gpt-5-4", true],
+      ["opencode/gpt-5.3-codex-spark", true],
+      ["openai/gpt-4o", false],
+      ["anthropic/claude-opus-4-7", false],
+      ["gpt-5.10", false],
+      ["some-gpt-5.4-tune", false],
+    ];
+
+    // when
+    const actual = unchanged.map(([model]) => isHephaestusSupportedModel(model));
+
+    // then
+    expect(actual).toEqual(unchanged.map(([, expected]) => expected));
+  });
+
+  test("#given a Bedrock id outside the gpt-5 family #when support is checked #then it stays unsupported", () => {
+    // given
+    const models = ["amazon-bedrock/openai.gpt-4o", "amazon-bedrock/anthropic.claude-3.5-sonnet"];
+
+    // when
+    const supported = models.map((model) => isHephaestusSupportedModel(model));
+
+    // then
+    expect(supported).toEqual([false, false]);
+  });
+});
+
 describe("getHephaestusPromptSource", () => {
+  test("#given Bedrock-hosted gpt-5 ids #when the prompt source is resolved #then the family-specific prompt is selected", () => {
+    // given
+    const bedrockModels = [
+      "amazon-bedrock/openai.gpt-5.4",
+      "amazon-bedrock/openai.gpt-5-4",
+      "amazon-bedrock/openai.gpt-5.6",
+      "amazon-bedrock/openai.gpt-5.3-codex",
+    ];
+
+    // when
+    const sources = bedrockModels.map((model) => getHephaestusPromptSource(model));
+
+    // then
+    expect(sources).toEqual(["gpt-5-4", "gpt-5-4", "gpt-5-6", "gpt"]);
+  });
+
   test("returns 'gpt-5-4' for gpt-5.4 models", () => {
     // given
     const model1 = "openai/gpt-5.4";

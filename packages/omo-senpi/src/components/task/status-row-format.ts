@@ -135,11 +135,15 @@ function formatLiveBackgroundRow(
   return excerptRendererText(`${frame} ${identity} · ${contextText}`, maxWidth)
 }
 
-function liveTaskIdentity(record: TaskRecord): string {
+export function taskStatusDescription(record: TaskRecord): string {
   return optionalRendererText(record.task_summary)
     ?? optionalRendererText(record.description)
     ?? optionalRendererText(record.name)
     ?? normalizeRendererText(record.task_id)
+}
+
+function liveTaskIdentity(record: TaskRecord): string {
+  return taskStatusDescription(record)
 }
 
 function formatElapsed(createdAt: string, now: number): string {

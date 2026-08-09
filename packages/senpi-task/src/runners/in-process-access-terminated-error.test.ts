@@ -23,7 +23,7 @@ describe("in-process access_terminated_error fallback", () => {
         from: "runtime-fallback-test/dead-primary",
         to: "runtime-fallback-test/healthy-fallback",
         chainKey: "runtime-fallback-test/dead-primary",
-        reason: "hard-error",
+        reason: "billing",
       })
     } finally {
       harness.dispose()

@@ -25,6 +25,7 @@ const DESCRIPTION = [
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
+  "One-shot agents (momus) always refuse task_send in every state; spawn a new momus instead.",
 ].join(" ")
 
 const MEMBER_SCOPED_DESCRIPTION = [

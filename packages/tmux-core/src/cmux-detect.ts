@@ -1,5 +1,5 @@
 /**
- * Detect whether we are running inside cmux (cmux omo).
+ * Detect whether we are running inside cmux (cmux omo-agent-toolkit).
  * When cmux-omo sets up the environment it injects a tmux shim and sets
  * CMUX_SOCKET_PATH / TMUX. If detected, redirect tmux commands to
  * `cmux __tmux-compat` so they become native cmux splits instead of

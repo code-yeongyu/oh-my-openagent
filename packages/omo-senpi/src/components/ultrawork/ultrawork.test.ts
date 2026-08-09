@@ -179,7 +179,7 @@ describe("omo-senpi ultrawork component", () => {
     const prompts = [
       "/skill:ulw-plan 네 plan 을 작성해주세요",
       "ulw-plan 스킬 좀 검토해줘",
-      "omo ulw-loop status --json 확인",
+      "omo-agent-toolkit ulw-loop status --json 확인",
     ] as const
 
     for (const prompt of prompts) {

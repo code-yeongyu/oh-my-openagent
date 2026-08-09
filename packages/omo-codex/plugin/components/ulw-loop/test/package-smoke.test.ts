@@ -142,7 +142,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it.skipIf(process.platform === "win32")(
-		"#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI",
+		"#given PATH omo-agent-toolkit lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI",
 		async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		const bootstrap = bootstrapScriptFrom(text);
@@ -154,8 +154,8 @@ describe("skills/ulw-loop/SKILL.md", () => {
 			const cachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js");
 			await mkdir(badBin, { recursive: true });
 			await mkdir(dirname(cachedCli), { recursive: true });
-			await writeFile(join(badBin, "omo"), "#!/bin/sh\nprintf '%s\\n' \"error: unknown command 'ulw-loop'\" >&2\nexit 1\n");
-			await chmod(join(badBin, "omo"), 0o755);
+			await writeFile(join(badBin, "omo-agent-toolkit"), "#!/bin/sh\nprintf '%s\\n' \"error: unknown command 'ulw-loop'\" >&2\nexit 1\n");
+			await chmod(join(badBin, "omo-agent-toolkit"), 0o755);
 			await writeFile(
 				cachedCli,
 				[
@@ -172,7 +172,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 				].join("\n"),
 			);
 
-			const result = await runShell(`${bootstrap}\nomo ulw-loop status --json`, {
+			const result = await runShell(`${bootstrap}\n\"$ULW_LOOP_NODE\" \"$ULW_LOOP_CLI\" ulw-loop status --json`, {
 				...process.env,
 				CODEX_HOME: codexHome,
 				HOME: home,
@@ -214,7 +214,7 @@ describe("README implementation contract", () => {
 		const readme = await readText("README.md");
 
 		for (const subcommand of ULW_LOOP_SUBCOMMANDS) {
-			expect(readme, `README documents \`omo ulw-loop ${subcommand}\``).toContain(`omo ulw-loop ${subcommand}`);
+			expect(readme, `README documents \`omo-agent-toolkit ulw-loop ${subcommand}\``).toContain(`omo-agent-toolkit ulw-loop ${subcommand}`);
 		}
 	});
 

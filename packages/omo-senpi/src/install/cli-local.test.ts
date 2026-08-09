@@ -55,6 +55,13 @@ async function makePackagedPlugin(): Promise<string> {
       stagedAtUtc: "2026-08-03T00:00:00.000Z",
     }, null, 2)}\n`,
   )
+  const toolkitDispatcher = join(pluginPath, "runtime", "agent-toolkit", "cli.js")
+  await writeFixtureFile(toolkitDispatcher, "console.log('agent-toolkit')\n")
+  await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "ulw-loop", "cli.js"), "console.log('ulw-loop')\n")
+  const toolkitShim = join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit")
+  await writeFixtureFile(toolkitShim, "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n")
+  await chmod(toolkitShim, 0o755)
+  await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"), "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")

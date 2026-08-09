@@ -1,0 +1,343 @@
+# Scenario 02 - isolated global install and packaged runtime command set (fresh cwd, no repo checkout)
+tarball=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6/omo-ai-0.0.0-dev.tgz
+prefix=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-prefix.XXXXXX.mi5NGI1J5z
+runtime_root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-runtime.XXXXXX.E2hznCQveA
+project=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-runtime.XXXXXX.E2hznCQveA/project
+agent_dir=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-runtime.XXXXXX.E2hznCQveA/agent
++ seed isolated ulw-loop plan
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "evidenceLayoutVersion": 2,
+    "createdAt": "2026-08-09T15:47:04.049Z",
+    "updatedAt": "2026-08-09T15:47:04.049Z",
+    "briefPath": ".omo/ulw-loop/task11-runtime/brief.md",
+    "goalsPath": ".omo/ulw-loop/task11-runtime/goals.json",
+    "ledgerPath": ".omo/ulw-loop/task11-runtime/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-task-11-runtime-command-smoke",
+        "title": "Task 11 runtime command smoke",
+        "objective": "Task 11 runtime command smoke",
+        "status": "pending",
+        "successCriteria": [
+          {
+            "id": "C001",
+            "scenario": "happy path for: Task 11 runtime command smoke",
+            "userModel": "happy",
+            "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 1.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C002",
+            "scenario": "edge case (boundary/empty/malformed)",
+            "userModel": "edge",
+            "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Task 11 runtime command smoke.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C003",
+            "scenario": "regression: adjacent surface still works",
+            "userModel": "regression",
+            "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Task 11 runtime command smoke.",
+            "essential": false,
+            "capturedEvidence": null,
+            "status": "pending"
+          }
+        ],
+        "attempt": 0,
+        "createdAt": "2026-08-09T15:47:04.049Z",
+        "updatedAt": "2026-08-09T15:47:04.049Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/task11-runtime/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/task11-runtime/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 1,
+    "pending": 1,
+    "in_progress": 0,
+    "complete": 0,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "needs_user_decision": 0,
+    "superseded": 0,
+    "criteria": {
+      "total": 3,
+      "pass": 0,
+      "pending": 3,
+      "fail": 0,
+      "blocked": 0
+    }
+  }
+}
+seed_exit=0
++ omo --version (pass 1)
+2026.8.9-2
+version_pass1_exit=0
++ omo doctor (pass 1)
+PASS plugin manifest: plugin/package.json
+PASS extension: plugin/extensions/omo.js
+PASS lsp-daemon runtime: plugin/runtime/lsp-daemon/dist/cli.js
+PASS agent-toolkit runtime: plugin/runtime/agent-toolkit/cli.js
+PASS senpi CLI: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-prefix.XXXXXX.mi5NGI1J5z/lib/node_modules/omo-ai/node_modules/@code-yeongyu/senpi/dist/cli.js
+PASS senpi version 2026.8.9-2
+doctor_pass1_exit=0
++ omo ulw-loop status --session-id task11-runtime --json (pass 1)
+ulw_pass1_exit=0
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "evidenceLayoutVersion": 2,
+    "createdAt": "2026-08-09T15:47:04.049Z",
+    "updatedAt": "2026-08-09T15:47:04.049Z",
+    "briefPath": ".omo/ulw-loop/task11-runtime/brief.md",
+    "goalsPath": ".omo/ulw-loop/task11-runtime/goals.json",
+    "ledgerPath": ".omo/ulw-loop/task11-runtime/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-task-11-runtime-command-smoke",
+        "title": "Task 11 runtime command smoke",
+        "objective": "Task 11 runtime command smoke",
+        "status": "pending",
+        "successCriteria": [
+          {
+            "id": "C001",
+            "scenario": "happy path for: Task 11 runtime command smoke",
+            "userModel": "happy",
+            "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 1.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C002",
+            "scenario": "edge case (boundary/empty/malformed)",
+            "userModel": "edge",
+            "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Task 11 runtime command smoke.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C003",
+            "scenario": "regression: adjacent surface still works",
+            "userModel": "regression",
+            "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Task 11 runtime command smoke.",
+            "essential": false,
+            "capturedEvidence": null,
+            "status": "pending"
+          }
+        ],
+        "attempt": 0,
+        "createdAt": "2026-08-09T15:47:04.049Z",
+        "updatedAt": "2026-08-09T15:47:04.049Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/task11-runtime/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/task11-runtime/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 1,
+    "pending": 1,
+    "in_progress": 0,
+    "complete": 0,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "needs_user_decision": 0,
+    "superseded": 0,
+    "criteria": {
+      "total": 3,
+      "pass": 0,
+      "pending": 3,
+      "fail": 0,
+      "blocked": 0
+    }
+  }
+}
+ulw_valid_json=PASS
++ direct plugin shim status from isolated cwd: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-prefix.XXXXXX.mi5NGI1J5z/lib/node_modules/omo-ai/plugin/runtime/agent-toolkit/omo-agent-toolkit
+direct_shim_exit=0
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "evidenceLayoutVersion": 2,
+    "createdAt": "2026-08-09T15:47:04.049Z",
+    "updatedAt": "2026-08-09T15:47:04.049Z",
+    "briefPath": ".omo/ulw-loop/task11-runtime/brief.md",
+    "goalsPath": ".omo/ulw-loop/task11-runtime/goals.json",
+    "ledgerPath": ".omo/ulw-loop/task11-runtime/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-task-11-runtime-command-smoke",
+        "title": "Task 11 runtime command smoke",
+        "objective": "Task 11 runtime command smoke",
+        "status": "pending",
+        "successCriteria": [
+          {
+            "id": "C001",
+            "scenario": "happy path for: Task 11 runtime command smoke",
+            "userModel": "happy",
+            "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 1.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C002",
+            "scenario": "edge case (boundary/empty/malformed)",
+            "userModel": "edge",
+            "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Task 11 runtime command smoke.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C003",
+            "scenario": "regression: adjacent surface still works",
+            "userModel": "regression",
+            "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Task 11 runtime command smoke.",
+            "essential": false,
+            "capturedEvidence": null,
+            "status": "pending"
+          }
+        ],
+        "attempt": 0,
+        "createdAt": "2026-08-09T15:47:04.049Z",
+        "updatedAt": "2026-08-09T15:47:04.049Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/task11-runtime/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/task11-runtime/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 1,
+    "pending": 1,
+    "in_progress": 0,
+    "complete": 0,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "needs_user_decision": 0,
+    "superseded": 0,
+    "criteria": {
+      "total": 3,
+      "pass": 0,
+      "pending": 3,
+      "fail": 0,
+      "blocked": 0
+    }
+  }
+}
+direct_shim_valid_json=PASS
++ omo --version (pass 2)
+2026.8.9-2
+version_pass2_exit=0
++ omo doctor (pass 2)
+PASS plugin manifest: plugin/package.json
+PASS extension: plugin/extensions/omo.js
+PASS lsp-daemon runtime: plugin/runtime/lsp-daemon/dist/cli.js
+PASS agent-toolkit runtime: plugin/runtime/agent-toolkit/cli.js
+PASS senpi CLI: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-prefix.XXXXXX.mi5NGI1J5z/lib/node_modules/omo-ai/node_modules/@code-yeongyu/senpi/dist/cli.js
+PASS senpi version 2026.8.9-2
+doctor_pass2_exit=0
++ omo ulw-loop status --session-id task11-runtime --json (pass 2)
+ulw_pass2_exit=0
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "evidenceLayoutVersion": 2,
+    "createdAt": "2026-08-09T15:47:04.049Z",
+    "updatedAt": "2026-08-09T15:47:04.049Z",
+    "briefPath": ".omo/ulw-loop/task11-runtime/brief.md",
+    "goalsPath": ".omo/ulw-loop/task11-runtime/goals.json",
+    "ledgerPath": ".omo/ulw-loop/task11-runtime/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-task-11-runtime-command-smoke",
+        "title": "Task 11 runtime command smoke",
+        "objective": "Task 11 runtime command smoke",
+        "status": "pending",
+        "successCriteria": [
+          {
+            "id": "C001",
+            "scenario": "happy path for: Task 11 runtime command smoke",
+            "userModel": "happy",
+            "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 1.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C002",
+            "scenario": "edge case (boundary/empty/malformed)",
+            "userModel": "edge",
+            "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Task 11 runtime command smoke.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C003",
+            "scenario": "regression: adjacent surface still works",
+            "userModel": "regression",
+            "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Task 11 runtime command smoke.",
+            "essential": false,
+            "capturedEvidence": null,
+            "status": "pending"
+          }
+        ],
+        "attempt": 0,
+        "createdAt": "2026-08-09T15:47:04.049Z",
+        "updatedAt": "2026-08-09T15:47:04.049Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/task11-runtime/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/task11-runtime/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 1,
+    "pending": 1,
+    "in_progress": 0,
+    "complete": 0,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "needs_user_decision": 0,
+    "superseded": 0,
+    "criteria": {
+      "total": 3,
+      "pass": 0,
+      "pending": 3,
+      "fail": 0,
+      "blocked": 0
+    }
+  }
+}
+ulw_valid_json=PASS
+command_outputs_identical=PASS
+settings_byte_identical_after_repeats=PASS
++ reinstall same tarball over existing prefix
+
+changed 16 packages in 9s
+npm notice
+npm notice New major version of npm available! 11.18.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+reinstall_exit=0
+2026.8.9-2
+post_reinstall_version_exit=0
+scenario_02=PASS
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-runtime.XXXXXX.E2hznCQveA
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-runtime.XXXXXX.E2hznCQveA; project+agent+home+xdg+cache absent

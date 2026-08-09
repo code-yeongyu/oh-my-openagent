@@ -1,0 +1,23 @@
+{
+  "name": "omo-ai",
+  "version": "0.0.0-dev",
+  "type": "module",
+  "description": "omo native edition - the senpi-based OMO harness. Beta channel only: npm i -g omo-ai@beta",
+  "bin": {
+    "omo": "bin/omo.js"
+  },
+  "files": [
+    "bin",
+    "plugin"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@code-yeongyu/senpi": "2026.8.9-2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-yeongyu/oh-my-openagent.git"
+  }
+}

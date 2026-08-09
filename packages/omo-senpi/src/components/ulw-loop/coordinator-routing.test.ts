@@ -26,7 +26,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
 
     // then the continuation was delivered through the coordinator exactly once, and NOT via sendUserMessage
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]).toContain("Continue the active omo ulw-loop run")
+    expect(delivered[0]).toContain("Continue the active omo-agent-toolkit ulw-loop run")
     expect(pi.userMessages).toEqual([])
   })
 
@@ -48,7 +48,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
 
     // then exactly one injection carries both, completion first
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]).toBe("task st_done completed\n\nContinue the active omo ulw-loop run.\nRun `omo ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.")
+    expect(delivered[0]).toBe("task st_done completed\n\nContinue the active omo-agent-toolkit ulw-loop run.\nRun `omo-agent-toolkit ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.")
   })
 
   it("#given active boulder start-work continuation #when ulw-loop agent_end fires #then it enqueues nothing", async () => {

@@ -1,0 +1,17 @@
+
+> @code-yeongyu/codex-start-work-continuation@4.19.3 test
+> npm run build --silent && vitest --run
+
+Bundled 5 modules in 190ms
+
+  cli.js  14.16 KB  (entry point)
+
+
+ RUN  v4.1.8 C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-144/packages/omo-codex/plugin/components/start-work-continuation
+
+
+ Test Files  3 passed (3)
+      Tests  39 passed (39)
+   Start at  13:18:24
+   Duration  1.75s (transform 172ms, setup 0ms, import 303ms, tests 2.32s, environment 0ms)
+

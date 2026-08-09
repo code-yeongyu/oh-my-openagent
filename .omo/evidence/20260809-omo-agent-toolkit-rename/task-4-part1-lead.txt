@@ -1,0 +1,27 @@
+TASK 4 (part 1 of 2) - lead-executed slice: source emit-strings in files no child owns
+WHAT WAS TESTED: the ulw-loop continuation instructions injected into agent sessions, and the CLI help examples, must name `omo-agent-toolkit` instead of the removed `omo` bin.
+
+TDD ORDER (expectations first, then sources):
+1. RED - updated test expectations only, sources untouched:
+   bun test packages/omo-senpi/src/components/ulw-loop packages/omo-senpi/src/extension/idle-injection-wiring.test.ts packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts
+   -> 65 pass / 5 FAIL / 206 expect() across 8 files. The 5 failures were exactly the migrated expectations:
+      - idle-injection wiring: one-injection-per-idle-edge continuation text
+      - ulw-loop continuation: steering reminder injected on queued user input
+      - ulw-loop continuation: exactly one hidden followUp on agent_end
+      - coordinator routing: continuation routes through the coordinator
+      - coordinator routing: task-completion + continuation collapse into one injection
+   NOTE: ultrawork.test.ts:182 did NOT fail - it is an INPUT fixture string, not an emitted value, so it passes either way. Migrated anyway for audit cleanliness.
+
+2. GREEN - after migrating the sources:
+   same command -> 70 pass / 0 fail / 208 expect() across 8 files
+   bun test packages/omo-opencode/src/cli -> 683 pass / 0 fail / 1505 expect() across 96 files (proves no help-text pin broke)
+
+FILES CHANGED (all unowned by the in-flight todo-3 / todo-5 lanes):
+- packages/omo-senpi/src/components/ulw-loop/index.ts:10,11,16,17 - the four continuation/steering strings
+- packages/omo-senpi/src/components/ulw-loop/omo-command.ts:50 - comment naming the polled command
+- packages/omo-opencode/src/cli/cli-program.ts:125,251 - help examples ($ omo install, $ omo doctor --platform=codex; :251 is the site momus round-4 flagged as colliding with the byte-identical baseline, now resolved by the rename-map normalization)
+- packages/omo-opencode/src/cli/cleanup-command.ts:30,32,33 - uninstall/cleanup help examples
+- test expectations: ulw-loop/index.test.ts:53,78; ulw-loop/coordinator-routing.test.ts:29,51; extension/idle-injection-wiring.test.ts:61; ultrawork/ultrawork.test.ts:182
+
+WHY IT IS ENOUGH: the continuation strings are what instruct agents which command to run; they are asserted by the real routing/injection tests, which failed before and pass after. The CLI-help changes are covered by the full 683-test CLI suite.
+WHAT REMAINS (part 2, blocked behind todo 3): skill/prompt/TOML sources under packages/omo-senpi/skills, packages/shared-skills/skills and the codex ulw-loop component, the two-regex audit test + allowlist, and the sync/regeneration runs - deferred because `build:plugin` chains sync-skills.mjs, which rm -rf's the skills tree that todo 3 is regenerating.

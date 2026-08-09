@@ -1,0 +1,19 @@
+{
+  "name": "Configuration",
+  "status": "warn",
+  "message": "1 deprecated config key(s) found",
+  "details": [
+    "Scanned: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc"
+  ],
+  "issues": [
+    {
+      "title": "Deprecated config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: categories.deep.variant",
+      "fix": "Replace variant with reasoning, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "categories.deep.variant"
+      ]
+    }
+  ]
+}

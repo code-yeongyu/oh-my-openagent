@@ -151,6 +151,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
     case "not_continuable":
       return { color: "warning", text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}` }
+    case "one_shot_agent":
+      return { color: "error", text: `task_send denied ${details.task_id} one-shot:${details.agent}` }
     case "scope_denied":
       return { color: "error", text: `task_send denied ${details.task_id} owner:${details.owning_session_id}` }
     case "not_found":

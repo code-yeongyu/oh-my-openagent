@@ -25,6 +25,7 @@ import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poll
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
+import { createResumptionChannelEmitter } from "./resumption-channel-emitter"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 import { createSkillInvocationTracker, type SkillInvocationTracker } from "./skill-invocation-tracker"
@@ -91,12 +92,30 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         runtime: engine.runtime,
         terminalWidth: () => process.stdout.columns,
       })
-      engine.onStoreMutation(() => statusUi.scheduleSync())
+      const resumptionChannels = createResumptionChannelEmitter({
+        pi,
+        manager: engine.manager,
+        sessionId: () => engine.runtime.sessionId(),
+        stateDir: {
+          project_dir: cwd,
+          ...(engine.settings.state_dir !== undefined ? { task: { state_dir: engine.settings.state_dir } } : {}),
+        },
+        settings: engine.settings,
+      })
+      engine.onStoreMutation(() => {
+        statusUi.scheduleSync()
+        void resumptionChannels.emitIfChanged().catch((error: unknown) => {
+          ctx.logger.warn("omo-senpi task resumption-channel emission failed", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
+      })
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
       wireEventBridge(pi, ctx, engine, statusUi, transitions, {
         reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
         leadPollers: teamTools.leadPollers,
+        resumptionChannels,
       })
     },
   }

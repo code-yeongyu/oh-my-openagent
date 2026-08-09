@@ -152,11 +152,11 @@ describe("applyUserPromptUlwLoopSteering - OMO directive patterns", () => {
 		expect(out).toContain("accepted");
 	});
 
-	it("processes omo ulw-loop steer: pattern", async () => {
+	it.each(["omo ulw-loop steer", "omo-agent-toolkit ulw-loop steer"])("processes %s: pattern", async (marker) => {
 		const repoRoot = await bootstrapPlanRepo();
 		const out = await applyUserPromptUlwLoopSteering(
 			payload(
-				'omo ulw-loop steer: {"kind":"annotate_ledger","source":"user_prompt_submit","evidence":"x","rationale":"y"}',
+				`${marker}: {"kind":"annotate_ledger","source":"user_prompt_submit","evidence":"x","rationale":"y"}`,
 				repoRoot,
 			),
 		);

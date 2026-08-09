@@ -5,6 +5,14 @@ export interface SkippedCleanupPath {
   readonly reason: "outside managed Codex cleanup scope" | "Codex home resolves to a filesystem root"
 }
 
+// A Codex home at the filesystem root would make every derived managed path resolve to a
+// shared system directory, so cleanup refuses to act on it. Exported so callers that derive
+// their own paths from codexHome (the installer bin directory) share this one invariant.
+export function codexHomeResolvesToFilesystemRoot(codexHome: string): boolean {
+  const resolved = resolve(codexHome)
+  return dirname(resolved) === resolved
+}
+
 export function validateManagedCleanupTarget(input: {
   readonly codexHome: string
   readonly path: string
@@ -12,7 +20,7 @@ export function validateManagedCleanupTarget(input: {
   if (!isAbsolute(input.path)) return skipped(input.path, "outside managed Codex cleanup scope")
 
   const codexHome = resolve(input.codexHome)
-  if (dirname(codexHome) === codexHome) return skipped(input.path, "Codex home resolves to a filesystem root")
+  if (codexHomeResolvesToFilesystemRoot(codexHome)) return skipped(input.path, "Codex home resolves to a filesystem root")
 
   const target = resolve(input.path)
   if (!isWithinDirectory(codexHome, target)) return skipped(input.path, "outside managed Codex cleanup scope")

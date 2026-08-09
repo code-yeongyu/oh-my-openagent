@@ -218,8 +218,9 @@ describe("test workflows", () => {
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
     const buildWaitsForChecks = buildJob.includes("needs:")
     const buildHasReadOnlyContentsPermission = buildJob.includes("permissions:\n      contents: read")
-    const writeGateNeedsAllChecks = autoCommitSchemaJob.includes("needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]")
-    const draftReleaseNeedsAllChecks = draftReleaseJob.includes("needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]")
+    const allRootChecks = "needs: [test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]"
+    const writeGateNeedsAllChecks = autoCommitSchemaJob.includes(allRootChecks)
+    const draftReleaseNeedsAllChecks = draftReleaseJob.includes(allRootChecks)
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)

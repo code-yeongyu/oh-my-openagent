@@ -1,0 +1,32 @@
+[TRIMMED] Tail of 'bun run test:codex'. It halts at the vendored lsp-tools-mcp step (pre-existing on this machine; see preexisting-lsp-tools-mcp-failure.txt).
+
+  {
+    "args": [
+      "/d",
+      "/s",
+      "/c",
+-     "typescript-language-server.cmd",
++     "C:\\Users\\pss\\AppData\\Roaming\\npm\\typescript-language-server.cmd",
+      "--stdio",
+    ],
+    "command": "cmd.exe",
+    "shell": false,
+  }
+
+ ❯ test/process.test.ts:89:20
+     87|
+     88|   // then
+     89|   expect(prepared).toEqual({
+       |                    ^
+     90|    command: "cmd.exe",
+     91|    args: ["/d", "/s", "/c", "typescript-language-server.cmd", "--stdio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 24 passed (25)
+      Tests  2 failed | 92 passed | 1 skipped (95)
+   Start at  13:24:28
+   Duration  5.26s (transform 4.09s, setup 0ms, import 6.26s, tests 9.07s, environment 3ms)
+
+error: script "test:codex" exited with code 1

@@ -119,6 +119,16 @@ Landing rules, regardless of topology:
 4. Classify the checkbox tier and record it in its ledger entry. Default is LIGHT — a narrow change inside existing layers. Take HEAVY only on a fact you can point to: a new module / abstraction / domain model; auth, security, or session; an external integration; a DB schema or migration; concurrency or transaction boundaries; a cross-domain refactor; or the plan or user signals care. When unsure, take HEAVY; upgrade and redo skipped gates the moment a HEAVY fact surfaces; never downgrade.
 5. Decompose that checkbox into atomic sub-tasks sized for ONE worker in ONE run — a sub-task that would need mid-flight steering is two sub-tasks. Collect every other unchecked checkbox in the same plan wave whose dependencies are met — their lanes execute concurrently. A wave that could split further but holds fewer than 3 independent sub-tasks is under-split.
 6. **DELEGATE EVERYTHING. YOU NEVER IMPLEMENT.** Route every sub-task through the delegation router below, then dispatch ALL independent sub-tasks across those checkboxes in one parallel worker-spawn burst (a single batched spawn call where the harness supports it); serialize only named dependencies. Verification and checkbox marking stay per-checkbox.
+7. Give every dispatched sub-task its completion condition and watch for it per the section below. A dispatch whose completion nobody watches is an unfinished dispatch.
+
+### Monitor every dispatched subagent to its completion condition
+
+A spawned worker is not fire-and-forget. For EACH subagent in the burst, name the observable state that ends its lane — the file written, the PR opened, the checkbox's gates green — and put a watcher on THAT state, never on a clock.
+
+- **Arm one watcher per lane, at spawn time.** The worker's own completion arrives on its own as an injected notification; arm an explicit `monitor` on top of it only when the lane's completion condition lives OUTSIDE the child's final message — CI turning green, a log line, a build artifact appearing, a branch landing. Watch the state itself (`monitor` with a command that exits or emits on that condition), and keep the burst's watchers distinct so one lane firing never reads as another's.
+- **NEVER poll and NEVER sleep.** No `sleep`, no timed retry loop, no re-reading the same status hoping it changed. Between waves, do independent root work or end the turn; an idle session is always woken. A single `task_output({ mode: "tail" })` peek is allowed only when a midpoint decision genuinely depends on it.
+- **Tear the watcher down the instant it resolves.** The moment a monitor fires, or you discover it was armed on the WRONG condition (it watches a path the lane never touches, a pattern that can never match, a lane you already cancelled), stop it with `kill_bash` and say so in the ledger. A stale watcher re-fires on unrelated output and corrupts the next wave's verdict.
+- **Then advance.** Fired watcher plus verified evidence means that lane's gates run and its checkbox closes; a mis-set watcher means re-arm it on the right condition or drop it, and continue. Never let a dead watcher hold the run open, and never treat watcher silence as a pass.
 
 ### Delegation router — recommended task executor category
 

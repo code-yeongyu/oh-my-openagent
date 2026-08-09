@@ -191,7 +191,7 @@ jobs:
           fi
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
-          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent omo-ai)
           if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
             ALL_PACKAGES+=(lazycodex-ai)
           fi
@@ -223,6 +223,7 @@ jobs:
             {
               echo
               echo "::error::Trusted publisher not configured for ${#FAILED[@]} required package(s)."
+              echo "::error::For omo-ai setup and verification, see docs/reference/omo-ai-publishing.md."
               echo "::error::Configure each below at the URL with these values:"
               echo "::error::  Provider: GitHub Actions"
               echo "::error::  Organization: code-yeongyu"
@@ -266,8 +267,19 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
+      omo_ai_version: ${{ steps.omo-ai.outputs.omo_ai_version }}
+      already_published: ${{ steps.omo-ai.outputs.already_published }}
       previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
+      - uses: actions/checkout@v5
+
+      - name: Assert omo bin ownership
+        run: |
+          if jq -e '.bin.omo' package.json >/dev/null; then
+            echo '::error::root package.json re-declares bin.omo - the omo name belongs to omo-ai (see docs/reference/omo-ai-publishing.md)'
+            exit 1
+          fi
+
       - name: Calculate version
         id: version
         env:
@@ -309,6 +321,27 @@ jobs:
           PREVIOUS_LAZYCODEX_VERSION=$(npm view "lazycodex-ai@${LAZYCODEX_COMPARE_TAG}" version 2>/dev/null || true)
           echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
+
+      - name: Calculate omo-ai metadata
+        id: omo-ai
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [[ "$VERSION" == *"-"* ]]; then
+            OMO_AI_VERSION="${VERSION/-/-0.}"
+          else
+            OMO_AI_VERSION="${VERSION}-1"
+          fi
+
+          echo "omo_ai_version=$OMO_AI_VERSION" >> "$GITHUB_OUTPUT"
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/omo-ai/${OMO_AI_VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "omo-ai version: $OMO_AI_VERSION (registry HTTP $STATUS)"
 
       - name: Write job summary
         if: always()
@@ -369,6 +402,7 @@ jobs:
         id: prepare
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
           RELEASE_REF: ${{ github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
@@ -415,6 +449,7 @@ jobs:
           fi
 
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "$OMO_AI_VERSION" '.version = $v' packages/omo-native/package.json > tmp.json && mv tmp.json packages/omo-native/package.json
 
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             package_dir="packages/oh-my-opencode-${platform}"
@@ -433,7 +468,7 @@ jobs:
 
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
           git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
 
@@ -658,8 +693,10 @@ jobs:
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "$OMO_AI_VERSION" '.version = $v' packages/omo-native/package.json > tmp.json && mv tmp.json packages/omo-native/package.json
 
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             package_dir="packages/oh-my-opencode-${platform}"
@@ -707,6 +744,14 @@ jobs:
           steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: node script/verify-npm-payload.mjs
+
+      - name: Build omo-ai payload
+        if: needs.release-metadata.outputs.already_published != 'true'
+        run: bun run build:omo-native
+
+      - name: Verify omo-ai payload
+        if: needs.release-metadata.outputs.already_published != 'true'
+        run: node script/verify-omo-ai-payload.mjs
 
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
@@ -790,6 +835,125 @@ jobs:
             npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
+      - name: Strip token auth before omo-ai publish
+        if: needs.release-metadata.outputs.already_published != 'true'
+        run: |
+          for f in .npmrc "$HOME/.npmrc"; do
+            if [ -f "$f" ]; then
+              sed -i.bak '/_authToken/d' "$f"
+              rm -f "$f.bak"
+              echo "Cleaned $f"
+            fi
+          done
+
+      - name: Publish omo-ai (beta only)
+        if: needs.release-metadata.outputs.already_published != 'true'
+        working-directory: packages/omo-native
+        run: npm publish --ignore-scripts --access public --provenance --tag beta
+
+      - name: Wait for omo-ai registry readiness
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 5); do
+            IMMUTABLE_VERSION=$(npm view omo-ai@$OMO_AI_VERSION version 2>/dev/null || true)
+            BETA_READY=true
+            if [ "$ALREADY_PUBLISHED" != "true" ]; then
+              BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
+              [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
+            fi
+
+            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
+              echo "omo-ai@$OMO_AI_VERSION is ready"
+              break
+            fi
+
+            if [ "$attempt" = "5" ]; then
+              echo "::error::omo-ai@$OMO_AI_VERSION was not ready after 5 attempts"
+              exit 1
+            fi
+            echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/5)"
+            sleep 15
+          done
+
+      - name: Guard omo-ai dist-tags
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+        run: |
+          set -euo pipefail
+
+          LATEST_VERSION=$(npm view omo-ai dist-tags.latest 2>/dev/null || true)
+          if [ "$LATEST_VERSION" != "0.0.0-beta.0" ]; then
+            echo "::error::omo-ai latest must remain pinned to 0.0.0-beta.0, got ${LATEST_VERSION:-missing}. Remediate with: npm dist-tag add omo-ai@0.0.0-beta.0 latest"
+            exit 1
+          fi
+
+          if [ "$ALREADY_PUBLISHED" != "true" ]; then
+            BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
+            if [ "$BETA_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, expected $OMO_AI_VERSION"
+              exit 1
+            fi
+          fi
+
+      - name: Verify omo-ai live install
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+        run: |
+          set -euo pipefail
+
+          EXACT_VERIFIED=false
+          for attempt in $(seq 1 5); do
+            EXACT_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-exact-${attempt}.XXXXXX")
+            if npm i -g "omo-ai@$OMO_AI_VERSION" --prefix "$EXACT_PREFIX" &&
+               [ "$(jq -r '.version' "$EXACT_PREFIX/lib/node_modules/omo-ai/package.json")" = "$OMO_AI_VERSION" ] &&
+               "$EXACT_PREFIX/bin/omo" --version; then
+              EXACT_VERIFIED=true
+              rm -rf "$EXACT_PREFIX"
+              break
+            fi
+            rm -rf "$EXACT_PREFIX"
+            if [ "$attempt" != "5" ]; then
+              echo "Waiting for omo-ai@$OMO_AI_VERSION install propagation (attempt ${attempt}/5)"
+              sleep 15
+            fi
+          done
+          if [ "$EXACT_VERIFIED" != "true" ]; then
+            echo "::error::Exact-version live install failed for omo-ai@$OMO_AI_VERSION"
+            exit 1
+          fi
+
+          if [ "$ALREADY_PUBLISHED" != "true" ]; then
+            BETA_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-beta.XXXXXX")
+            npm i -g omo-ai@beta --prefix "$BETA_PREFIX"
+            BETA_INSTALLED_VERSION=$(jq -r '.version' "$BETA_PREFIX/lib/node_modules/omo-ai/package.json")
+            rm -rf "$BETA_PREFIX"
+            if [ "$BETA_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::omo-ai@beta installed $BETA_INSTALLED_VERSION, expected $OMO_AI_VERSION"
+              exit 1
+            fi
+          fi
+
+          BARE_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-bare.XXXXXX")
+          BARE_ERROR="$RUNNER_TEMP/omoai-bare-error.txt"
+          if npm i -g omo-ai --prefix "$BARE_PREFIX" 2>"$BARE_ERROR"; then
+            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
+            echo "::error::Bare omo-ai install unexpectedly succeeded; the beta-only channel is broken"
+            exit 1
+          fi
+          if ! grep -q "ETARGET" "$BARE_ERROR"; then
+            cat "$BARE_ERROR" >&2
+            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
+            echo "::error::Bare omo-ai install failed without the required ETARGET beta gate"
+            exit 1
+          fi
+          rm -rf "$BARE_PREFIX" "$BARE_ERROR"
+
       - name: Smoke test published lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:
@@ -797,6 +961,45 @@ jobs:
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
         run: |
           set -euo pipefail
+
+          # Upgrade simulation: an existing install carries a legacy `omo` wrapper in the
+          # Codex bin dir. A marker-bearing wrapper is ours and must be reclaimed by the
+          # install; an unmarked file is user-owned and must survive byte-identical.
+          simulate_legacy_omo_upgrade() {
+            package_spec="$1"
+            scenario_root="$2"
+            seeded_kind="$3"
+            (
+              export HOME="$scenario_root/home"
+              export CODEX_HOME="$scenario_root/codex"
+              export CODEX_LOCAL_BIN_DIR="$scenario_root/bin"
+              mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$scenario_root/cwd"
+              cd "$scenario_root/cwd"
+
+              if [ "$seeded_kind" = "marked" ]; then
+                printf '#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\nexit 0\n' > "$CODEX_LOCAL_BIN_DIR/omo"
+              else
+                printf '#!/bin/sh\n# user-owned omo, never generated by this installer\nexit 0\n' > "$CODEX_LOCAL_BIN_DIR/omo"
+              fi
+              chmod +x "$CODEX_LOCAL_BIN_DIR/omo"
+              cp "$CODEX_LOCAL_BIN_DIR/omo" "$scenario_root/omo.seeded"
+
+              npx -y "$package_spec" install --no-tui --codex-autonomous >/dev/null 2>&1 || return 1
+              [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] || return 1
+
+              if [ "$seeded_kind" = "marked" ]; then
+                if [ -e "$CODEX_LOCAL_BIN_DIR/omo" ]; then
+                  echo "::error::marker-bearing legacy omo wrapper survived the install"
+                  return 1
+                fi
+              else
+                if ! cmp -s "$scenario_root/omo.seeded" "$CODEX_LOCAL_BIN_DIR/omo"; then
+                  echo "::error::user-owned omo file was modified by the install"
+                  return 1
+                fi
+              fi
+            )
+          }
 
           smoke_lazycodex_package() {
             package_spec="$1"
@@ -819,15 +1022,18 @@ jobs:
                  case "$npx_doctor_output" in *"$expected_doctor_hint"*) true ;; *) false ;; esac &&
                  case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac &&
                  npx -y "$package_spec" install --no-tui --codex-autonomous &&
-                 [ -x "$CODEX_LOCAL_BIN_DIR/omo" ] &&
-                 omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1) &&
-                 [ "$omo_version_output" = "$OMO_VERSION" ] &&
-                 ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help 2>&1) &&
-                 printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"; then
+                 [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] &&
+                 [ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ] &&
+                 omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1) &&
+                 [ "$omo_agent_toolkit_version_output" = "$OMO_VERSION" ] &&
+                 ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1) &&
+                 printf "%s" "$ulw_loop_output" | grep -q "ulw-loop" &&
+                 simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-marked" marked &&
+                 simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-unmarked" unmarked; then
                 echo "$npx_install_output"
                 echo "$npx_doctor_output"
-                echo "omo --version: $omo_version_output"
-                echo "omo ulw-loop: $ulw_loop_output"
+                echo "omo-agent-toolkit --version: $omo_agent_toolkit_version_output"
+                echo "omo-agent-toolkit ulw-loop: $ulw_loop_output"
                 cd "$GITHUB_WORKSPACE"
                 rm -rf "$SMOKE_DIR"
                 return 0
@@ -861,6 +1067,8 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Verifies platform packages exist before wrapper publish.
             - Publishes `oh-my-opencode`, `oh-my-openagent`, and optionally `lazycodex-ai`.
+            - omo-ai mapped version: `${{ needs.release-metadata.outputs.omo_ai_version }}` (already published before this run: `${{ needs.release-metadata.outputs.already_published }}`).
+            - omo-ai beta publish, registry readiness, dist-tag guard, and live-install gates: `${{ job.status }}`.
             - Smoke-tests the published LazyCodex package when it was published.
           JOB_SUMMARY_NEXT: Check package existence probes first, then npm publish logs and the LazyCodex smoke section.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

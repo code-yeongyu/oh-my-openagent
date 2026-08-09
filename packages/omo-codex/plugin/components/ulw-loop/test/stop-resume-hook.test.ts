@@ -84,7 +84,7 @@ describe("runStopResumeHook", () => {
 
 		const parsed = JSON.parse(output);
 		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("omo ulw-loop status");
+		expect(parsed.reason).toContain("omo-agent-toolkit ulw-loop status");
 	});
 
 	it("#given stop_hook_active #when the hook runs #then no-ops", () => {

@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 
 import {
   AGENT_INVOCATION_CONDITIONS,
+  EMPTY_SKILL_INVOCATIONS,
   PLAN_GATED_AGENT_NAMES,
   evaluateInvocationGuard,
   invocationConditionForAgent,
+  type PlanArtifactReference,
   type SkillInvocationState,
 } from "./invocation-guard"
 
@@ -12,11 +14,13 @@ function stateOf(opts: {
   readonly invoked?: readonly string[]
   readonly requested?: readonly string[]
   readonly artifact?: boolean
+  readonly references?: readonly PlanArtifactReference[]
 }): SkillInvocationState {
   return {
     hasInvoked: (name: string) => (opts.invoked ?? []).includes(name),
     hasUserRequested: (name: string) => (opts.requested ?? []).includes(name),
     hasPlanArtifact: () => opts.artifact ?? false,
+    planArtifactReferences: () => opts.references ?? [],
   }
 }
 
@@ -132,5 +136,27 @@ describe("evaluateInvocationGuard", () => {
     expect(verdict.kind).toBe("deny")
     if (verdict.kind !== "deny") throw new Error("expected deny")
     expect(verdict.message).toContain("start-work")
+  })
+})
+
+describe("SkillInvocationState planArtifactReferences", () => {
+  test("#given the empty skill-invocation state #when plan references are queried #then it reports none and no artifact", () => {
+    // given / when / then
+    expect(EMPTY_SKILL_INVOCATIONS.planArtifactReferences()).toEqual([])
+    expect(EMPTY_SKILL_INVOCATIONS.hasPlanArtifact()).toBe(false)
+  })
+
+  test("#given a state built with plan references #when queried #then the widened member returns them", () => {
+    // given
+    const references: readonly PlanArtifactReference[] = [
+      { path: "/repo/.omo/plans/alpha.md", count: 3, lastTouchedAt: 7 },
+      { path: "/repo/.omo/plans/beta.md", count: 1, lastTouchedAt: 9 },
+    ]
+
+    // when
+    const state = stateOf({ artifact: true, references })
+
+    // then
+    expect(state.planArtifactReferences()).toEqual(references)
   })
 })

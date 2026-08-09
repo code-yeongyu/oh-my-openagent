@@ -1,0 +1,90 @@
+=== task-2: senpi adapter toolkit-first resolveOmoBin chain with .js-target-aware spawn ===
+date: 2026-08-09
+branch: 8b33ac959 (plan refs captured at 76b9aa8d3)
+scope: packages/omo-senpi/src/components/ulw-loop/ only
+
+=== PLAN REFERENCE DRIFT (76b9aa8d3 -> 8b33ac959) ===
+- plan: 'resolveOmoBin() (lines 27-31)' -> VERIFIED EXACT at 8b33ac959 (omo-command.ts:27-31).
+- plan refs: 'omo-command.ts:17-31 (toSpawnTarget + resolveOmoBin)' -> toSpawnTarget actually starts at :16 (1-line drift, same content).
+- plan refs: ':36-60 (spawn contract)' -> runOmoCommand actually spans :33-65; stderr-discard comment at :41-44 (minor drift, same content, contract untouched).
+resolution: drift was line-number-only; no semantic change to the referenced code. Edits applied to the verified 8b33ac959 locations.
+
+=== RED (failing-first, production code UNCHANGED) ===
+command: bun test packages/omo-senpi/src/components/ulw-loop
+exit: 1
+--- full transcript tail ---
+
+packages/omo-senpi/src/components/ulw-loop/footer-status.test.ts:
+(pass) omo-senpi ulw-loop footer status > reads the project goal store and publishes all four animation frames [1.30ms]
+(pass) omo-senpi ulw-loop footer status > uses an encoded session id and clears when the project goal completes [0.76ms]
+(pass) omo-senpi ulw-loop footer status > publishes animated ultraworking status only when goal and ulw-loop are active [0.18ms]
+(pass) omo-senpi ulw-loop footer status > clears the indicator when either activation ends [0.13ms]
+(pass) omo-senpi ulw-loop footer status > keeps continuation and headless paths unchanged [0.12ms]
+
+11 tests failed:
+(fail) omo-senpi ulw-loop omo-command .js spawn target > #given a .js target on win32 #when building the spawn target #then it spawns via process.execPath with the target as argv1 [0.26ms]
+(fail) omo-senpi ulw-loop omo-command .js spawn target > #given a .js target on darwin #when building the spawn target #then it spawns via process.execPath [0.11ms]
+(fail) omo-senpi ulw-loop omo-command .js spawn target > #given a .js target with the default platform #when building the spawn target #then it spawns via process.execPath [0.09ms]
+(fail) omo-senpi ulw-loop omo-command .js spawn target > #given an uppercase .JS target on win32 #when building the spawn target #then it still spawns via process.execPath [0.09ms]
+(fail) omo-senpi ulw-loop runtime > #given a child flooding stderr beyond the 64KiB pipe buffer #when runOmoCommand executes a .js target #then it completes within the 30s budget via process.execPath [1.02ms]
+(fail) omo-senpi ulw-loop resolveOmoBin toolkit-first chain > #given only OMO_AGENT_TOOLKIT_BIN is set #when resolving #then it wins and PATH is ignored [0.17ms]
+(fail) omo-senpi ulw-loop resolveOmoBin toolkit-first chain > #given all three links are present #when resolving #then OMO_AGENT_TOOLKIT_BIN beats the PATH toolkit and OMO_BIN [0.47ms]
+(fail) omo-senpi ulw-loop resolveOmoBin toolkit-first chain > #given a PATH toolkit and OMO_BIN #when resolving #then the PATH omo-agent-toolkit wins over OMO_BIN [0.40ms]
+(fail) omo-senpi ulw-loop resolveOmoBin toolkit-first chain > #given PATH holds only a fake named omo #when resolving #then it returns null - the bare-omo PATH tail is deliberately dropped [0.44ms]
+(fail) omo-senpi ulw-loop default registration through the toolkit chain > #given a PATH omo-agent-toolkit and no envs #when the component registers with defaults #then the toolkit binary receives the status argv [0.51ms]
+(fail) omo-senpi ulw-loop default registration through the toolkit chain > #given PATH holds only a fake named omo and no envs #when the component registers with defaults #then it degrades without executing the stale binary [356.87ms]
+
+ 34 pass
+ 11 fail
+ 95 expect() calls
+Ran 45 tests across 6 files. [888.00ms]
+
+RED notes: 11 failures = the 4 new .js toSpawnTarget tests, the flood/.js execPath test,
+4 new resolution-chain tests, and the 2 default-registration tests through the new chain.
+Characterization tests GREEN during RED by design: pre-existing OMO_BIN test (runtime.test.ts
+'OMO_BIN is set ... PATH is ignored', untouched), new 'OMO_BIN-only ... exactly as before the
+rename', 'whitespace-only OMO_AGENT_TOOLKIT_BIN falls through', 'nothing set -> null', and the
+pre-existing runOmoCommand spawn characterization all passed before AND after the change.
+
+=== GREEN (after production change) ===
+command: bun test packages/omo-senpi/src/components/ulw-loop
+exit: 0
+--- full transcript tail ---
+
+packages/omo-senpi/src/components/ulw-loop/footer-status.test.ts:
+(pass) omo-senpi ulw-loop footer status > reads the project goal store and publishes all four animation frames [1.53ms]
+(pass) omo-senpi ulw-loop footer status > uses an encoded session id and clears when the project goal completes [1.14ms]
+(pass) omo-senpi ulw-loop footer status > publishes animated ultraworking status only when goal and ulw-loop are active [0.20ms]
+(pass) omo-senpi ulw-loop footer status > clears the indicator when either activation ends [0.14ms]
+(pass) omo-senpi ulw-loop footer status > keeps continuation and headless paths unchanged [0.13ms]
+
+ 45 pass
+ 0 fail
+ 102 expect() calls
+Ran 45 tests across 6 files. [895.00ms]
+
+=== TYPECHECK ===
+command: bun run typecheck
+exit: 0
+--- transcript tail ---
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+=== PIPE-WEDGE REGRESSION (30s budget / stderr-discard contract) ===
+test: runtime.test.ts 'child flooding stderr beyond the 64KiB pipe buffer'
+fixture: createTempStderrFloodScript(128 * 1024) - a .js child writing 128KiB (>64KiB pipe
+buffer) to stderr before answering on stdout, spawned via the new .js -> process.execPath branch.
+assertion: runOmoCommand resolves {code: 0, stdout: <status json>} AND elapsed < 30_000ms;
+bun-level timeout 20_000ms < 30s budget so a wedged pipe fails the test instead of passing
+via the production timeout-kill.
+result: PASS in 17.21ms (GREEN transcript above) - stderr discard (stdio ['ignore','pipe','ignore'])
+and the 30s SIGKILL contract at omo-command.ts are byte-untouched by this change.
+
+=== QA SCENARIOS (plan row) ===
+happy: 'default registration through the toolkit chain > PATH omo-agent-toolkit' - fake on PATH
+received argv ['ulw-loop','status','--json'] (argv.json capture; required adding "$@"/%* forwarding
+to the pre-existing fixture wrapper, which never forwarded args - fixture gap, not production).
+failure: 'PATH holds only a fake named omo' - resolver returns null, component degrades with the
+existing 'inactive' log, and the stale fake's argv.json is never written (never executed).
+regression: pipe-wedge guard above; OMO_BIN-only characterization identical to pre-change.

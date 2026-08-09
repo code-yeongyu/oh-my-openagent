@@ -96,7 +96,9 @@ describe("lazycodex install surface", () => {
     const installationGuide = await readFile(join(process.cwd(), "docs", "guide", "installation.md"), "utf8")
 
     // when
-    const componentBinNames = EXPECTED_OMO_COMPONENT_BINS.map((entry) => entry.name)
+    const componentBinNames = EXPECTED_OMO_COMPONENT_BINS.filter(
+      (entry) => !("kind" in entry && entry.kind === "runtime-wrapper"),
+    ).map((entry) => entry.name)
 
     // then
     for (const name of componentBinNames) {

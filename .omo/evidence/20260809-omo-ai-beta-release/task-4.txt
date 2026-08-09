@@ -1,0 +1,82 @@
+# Task 4 - Payload verifier (RED capture)
+
+Date: 2026-08-09
+Branch: feat/omo-ai-beta-release
+Plan: .omo/plans/omo-ai-beta-release.md (todo 4)
+Commit subject: ci(publish): omo-ai tarball payload whitelist verifier
+
+## Context
+
+`packages/omo-native` does NOT exist yet (expected pre-todo-1 state). The
+verifier was implemented per the plan row and run against this unstaged tree
+to capture the RED baseline. The GREEN run is deferred to todo 6 (integration
+after `bun run build:omo-native`).
+
+## Deliverable
+
+`script/verify-omo-ai-payload.mjs` - a sibling of `script/verify-npm-payload.mjs`
+using the same `npm pack --dry-run --json` technique (maxBuffer 64 MB,
+--ignore-scripts). Runs in `packages/omo-native` and enforces:
+
+- INCLUDES (whitelist): bin/omo.js, bin/omo-agent-toolkit.js,
+  plugin/package.json, plugin/extensions/omo.js, >=18 skill files
+  (plugin/skills/*/SKILL.md), plugin/runtime/lsp-daemon/dist/cli.js,
+  plugin/runtime/ast-grep-mcp/cli.js, plugin/runtime/agent-toolkit/cli.js,
+  plugin/runtime/agent-toolkit/ulw-loop/cli.js,
+  plugin/runtime/agent-toolkit/omo-agent-toolkit,
+  plugin/runtime/agent-toolkit/omo-agent-toolkit.cmd
+- EXCLUDES (blacklist): any path matching node_modules/, src/, test/, *.test.*
+- SIZE: total unpacked size < 30 MB
+- Exit 1 naming every offender/missing artifact
+
+## RED capture
+
+Command:
+
+  node script/verify-omo-ai-payload.mjs
+
+Exit code: 1
+
+Output (stderr):
+
+  omo-ai payload verification FAILED (12 issue(s)):
+    npm pack failed: package directory not found: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native
+    missing artifact: bin/omo.js
+    missing artifact: bin/omo-agent-toolkit.js
+    missing artifact: plugin/package.json
+    missing artifact: plugin/extensions/omo.js
+    missing artifact: plugin/runtime/lsp-daemon/dist/cli.js
+    missing artifact: plugin/runtime/ast-grep-mcp/cli.js
+    missing artifact: plugin/runtime/agent-toolkit/cli.js
+    missing artifact: plugin/runtime/agent-toolkit/ulw-loop/cli.js
+    missing artifact: plugin/runtime/agent-toolkit/omo-agent-toolkit
+    missing artifact: plugin/runtime/agent-toolkit/omo-agent-toolkit.cmd
+    missing: expected >= 18 skill files (plugin/skills/*/SKILL.md), found 0
+
+The verifier detects the absent package directory, reports the pack failure,
+and lists all 10 required artifacts plus the skill-count shortfall as missing.
+
+## Regression check
+
+Command:
+
+  node script/verify-npm-payload.mjs
+
+Exit code: 0
+
+Output (stdout):
+
+  npm payload containment OK (4126 packed paths, 0 offenders)
+
+The existing root payload verifier is byte-identical and unaffected.
+
+## Typecheck
+
+Command:
+
+  bun run typecheck
+
+Exit code: 0
+
+No new type errors. The verifier is a plain .mjs script (no TypeScript) and
+introduces no type surface.

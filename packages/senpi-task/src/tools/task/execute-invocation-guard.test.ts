@@ -14,6 +14,8 @@ function resolverFor(opts: {
     hasInvoked: (name: string) => (opts.invoked ?? []).includes(name),
     hasUserRequested: (name: string) => (opts.requested ?? []).includes(name),
     hasPlanArtifact: () => opts.artifact ?? false,
+    planArtifactReferences: () =>
+      opts.artifact === true ? [{ path: ".omo/plans/gate-plan.md", count: 1, lastTouchedAt: 1 }] : [],
   })
 }
 

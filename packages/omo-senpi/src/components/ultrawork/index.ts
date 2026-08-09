@@ -79,7 +79,7 @@ function isCurrentArmingSlot(value: unknown): value is SharedArmingSlot {
   return slot.directive === SENPI_ULTRAWORK_DIRECTIVE && typeof slot.arming === "object" && slot.arming !== null
 }
 
-function sharedSessionArming(): SessionArming {
+export function sharedSessionArming(): SessionArming {
   const registry = globalThis as unknown as Record<symbol, unknown>
   const existing = registry[ARMING_LEDGER_KEY]
   if (isCurrentArmingSlot(existing)) {

@@ -11,11 +11,11 @@ Use the `task` tool. Only `prompt` is required, and it must be written in Englis
 - `run_in_background: false` (default) waits and returns the child's final response inline.
 - `run_in_background: true` returns a task id (prefixed `st_`) immediately so you can keep working and check back later.
 - `name` gives the child a stable, human-friendly handle within the session so you can steer it by name instead of id.
-- `model` overrides the resolved model; `load_skills` prepends named SKILL.md content to the child prompt.
+- `model` is valid only with `subagent_type`; category-routed tasks reject it and resolve their model from category config. `load_skills` prepends named SKILL.md content to the child prompt.
 
 To continue an existing child with full context instead of spawning a new one, use `task_send` with `to` set to the child id or name.
 
-For fanout, pass `tasks:[...]` instead of the top-level `prompt`/target fields. Each item chooses its own `category` or `subagent_type` and may set `name`, `model`, and `load_skills`:
+For fanout, pass `tasks:[...]` instead of the top-level `prompt`/target fields. Each item chooses its own `category` or `subagent_type` and may set `name` and `load_skills`; `model` is available only to items routed by `subagent_type`:
 
 ```jsonc
 {
@@ -38,14 +38,14 @@ Two runners back a child (`packages/senpi-task/src/runners/`):
 
 The default comes from `task.default_execution_mode` in `omo.json`; a per-agent `execution_mode` can override it.
 
-Team members always use process mode. Their child process loads a small member extension that owns the member inbox poller and exposes only team-scoped `task_send` and `team_wait`.
+Team members always use process mode. Their child process loads a small member extension that owns the member inbox poller and exposes only team-scoped `task_send`.
 
 ## Steering, waiting, and stopping
 
 Every control/read tool targets a child by id or by name:
 
 - **`task_send`** always steers a plain-text message into a running child. `to` accepts a child id/name or a team member name. Sending to a finished resident child revives the same session. Structured shutdown messages also route through this tool for lead sessions.
-- **`task_output`** immediately returns a child snapshot (`mode:"status"`) or a transcript peek (`mode:"tail"` / `mode:"full"`). It never waits for completion; terminal results arrive through task-completion notifications. Committed `team_wait` recoveries appear as `[team message from <from>] <body>` lines.
+- **`task_output`** immediately returns a child snapshot (`mode:"status"`) or a transcript peek (`mode:"tail"` / `mode:"full"`). It never waits for completion; terminal results arrive through task-completion notifications. Delivered team messages appear as `[team message from <from>] <body>` lines.
 - **`task_cancel`** cancels a child terminally and stops its work.
 
 Parent-initiated cancel returns its result synchronously in the tool response and never fires a completion notification.
@@ -76,23 +76,15 @@ A live status widget below the editor tracks the session's tasks as they change;
 
 ## Teams
 
-For coordinated multi-agent work, the lead session gets 7 team tools (`packages/senpi-task/src/tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`, and `team_wait`. These are lead-only. Member sessions receive only team-scoped `task_send` and `team_wait`; they never receive team lifecycle or tasklist tools. Lead team messages and shutdown request/response payloads route through `task_send`.
+For coordinated multi-agent work, the lead session gets 6 team tools (`packages/senpi-task/src/tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, and `task_update`. These are lead-only. Member sessions receive only team-scoped `task_send`; they never receive team lifecycle or tasklist tools. Lead team messages and shutdown request/response payloads route through `task_send`.
 
 Teams are defined in the `teams` block of `omo.json`. Each team has 1-8 members; a multi-member team requires `leadAgentId`. A member is either `kind: "category"` (needs `category` + `prompt`) or `kind: "subagent_type"` (needs `subagent_type`). See the [teams schema](../reference/omo-json.md#teams).
 
-### Pull messaging and `team_wait`
+### Mailbox delivery
 
-Team sends are file-only: `task_send` appends a message to the recipient's durable inbox and returns immediately. It does not push into, steer, or revive the recipient. Each member process polls its own inbox; the lead adapter polls only teams whose persisted `leadSessionId` belongs to the current session. Lead polling runs on session start and every second while the parent is idle or streaming, and pauses during compaction, session switching, and shutdown.
+`task_send` appends each team message to the recipient's durable inbox and returns immediately. Inbox pollers reserve unread messages and inject them into the recipient session; member delivery uses `pi.sendMessage` with steer delivery, while the lead poller queues the same injection-driven notification path. Each member process polls its own inbox; the lead adapter polls only teams whose persisted `leadSessionId` belongs to the current session. Lead polling runs on session start and every second while the parent is idle or streaming, and pauses during compaction, session switching, and shutdown.
 
-Use `team_wait` when the next step depends on a reply:
-
-```jsonc
-{ "team_run_id": "<run-id>", "from": "reviewer", "timeout_ms": 30000 }
-```
-
-`from` is optional. A lead with exactly one owned team may omit `team_run_id`; a lead with multiple teams must provide it. Members omit `team_run_id` because their extension is already scoped to one team. The wait registers before polling, so an already-unread message and a newly arriving message follow the same path.
-
-Inbox delivery uses a reservation and a durable `processed/<messageId>.json` ledger. A message is committed only after its envelope is visible in the recipient session or a waiting tool claims it. If the process dies between injection and commit, restart reconciliation checks the persisted session before deciding whether to commit or redeliver, preventing duplicate envelopes. If the immediate `team_wait` result is lost after commit, read that member's `task_output`; the committed `team_message_waited` event preserves the sender and body.
+There is no `team_wait` tool. When the next step depends on a reply, send with `task_send`, end the turn, and let the steered team-message notification resume the conversation when the reply arrives. Durable reservation and processed-message state prevent an inbox message from being lost during delivery or restart reconciliation.
 
 ## Configuration
 
@@ -109,7 +101,7 @@ All defaults live in `omo.json` under `task` and `teams`. A minimal project conf
 }
 ```
 
-Full field reference, defaults, layer precedence, harness blocks, and profile resolution are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
+The schema default for `task.wait.default_ms` is 60,000 ms; the 90,000 ms value above is only a sample override. Full field reference, defaults, layer precedence, harness blocks, and profile resolution are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this Senpi guide.
 

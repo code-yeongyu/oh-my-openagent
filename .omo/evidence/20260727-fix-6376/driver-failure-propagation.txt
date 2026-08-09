@@ -1,0 +1,29 @@
+===== A. fixed branch: driver must PASS and exit 0 =====
+  driver exit=0
+  dist/skills/ast-grep/install.sh          : EXISTS
+  dist/cli/skills/ast-grep/install.sh      : MISSING
+  dist/cli-node/skills/ast-grep/install.sh : MISSING
+      ast-grep/install.sh   : FOUND
+      ast-grep/install.sh   : FOUND
+      ast-grep/install.sh   : FOUND
+  DRIVER_FAILED=0
+  RESULT: PASS
+
+===== B. failure propagation: revert the product, rebuild bundles, rerun =====
+  rebuilding bundles on the reverted source (omo bundles emit before the vendored step)
+  build exit=0 (non-zero is the known Windows lsp-tools-mcp rm -rf blocker)
+  parent-literal count in dist/cli/index.js: 0
+  driver exit=1  (was 0 before this fix; must now be non-zero)
+  dist/skills/ast-grep/install.sh          : EXISTS
+  dist/cli/skills/ast-grep/install.sh      : MISSING
+  dist/cli-node/skills/ast-grep/install.sh : MISSING
+      ast-grep/install.sh   : FOUND
+      ast-grep/install.sh   : MISSING
+      ast-grep/install.sh   : MISSING
+DRIVER-FAIL: a shipped bundle resolved a skills root without ast-grep/install.sh
+  RESULT: FAIL
+
+===== restore + rebuild =====
+  parent-literal count restored: 1
+  product diff vs dev: [ 1 file changed, 8 insertions(+), 1 deletion(-)]
+

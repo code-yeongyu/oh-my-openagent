@@ -2,6 +2,7 @@ import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
+import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
@@ -13,6 +14,7 @@ export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 type EventBridgeState = {
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
+  readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -44,6 +46,7 @@ export function wireEventBridge(
       // its persisted liveness epoch suppresses records already delivered in an earlier process.
       if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
     }
+    await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
     if (sessionId !== undefined) {
       engine.notifier.reconcileUnnotifiedNotifications({ sessionId, parentState: engine.runtime.parentState() })
@@ -79,6 +82,7 @@ export function wireEventBridge(
     engine.runtime.clearUi()
     statusUi.dispose()
     state.leadPollers.shutdown()
+    await state.resumptionChannels.emitShutdown()
     const shutdownEvent = payload as SessionShutdownEvent
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason

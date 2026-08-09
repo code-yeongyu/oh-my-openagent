@@ -144,6 +144,10 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join2("skills", "ulw-research", "SKILL.md"),
   join2("skills", "visual-qa", "SKILL.md"),
   join2("runtime", "ast-grep-mcp", "cli.js"),
+  join2("runtime", "agent-toolkit", "cli.js"),
+  join2("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
+  join2("runtime", "agent-toolkit", "omo-agent-toolkit"),
+  join2("runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
   join2("runtime", "lsp-daemon", "dist", "cli.js"),
   join2("runtime", "lsp-daemon", "dist", "index.js"),
   join2("runtime", "lsp-daemon", "dist", "index.d.ts"),
@@ -217,6 +221,7 @@ async function ensurePluginArtifacts(context) {
     await context.runCommand("node", [join2(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join2(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join2(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join2(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot });
   }
   if (await hasMissingPluginArtifact(context.pluginPath)) {
     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);

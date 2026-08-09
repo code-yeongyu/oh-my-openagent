@@ -99,9 +99,9 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: 
 	return [
 		`The ulw-loop run in this session still has unfinished goals (next: ${goal.id} — ${goal.title}).`,
 		"The turn ended before the loop completed. Resume it now:",
-		`1. Run \`omo ulw-loop status${option} --json\` to reload the plan, the active goal, and currentAttemptDir.`,
+		`1. Run \`omo-agent-toolkit ulw-loop status${option} --json\` to reload the plan, the active goal, and currentAttemptDir.`,
 		"2. Continue the active goal's remaining success criteria, recording evidence with record-evidence.",
-		`3. Checkpoint through \`omo ulw-loop checkpoint${option}\` when the goal's criteria are proven; a complete checkpoint prints the next goal instruction.`,
+		`3. Checkpoint through \`omo-agent-toolkit ulw-loop checkpoint${option}\` when the goal's criteria are proven; a complete checkpoint prints the next goal instruction.`,
 		"If the loop is genuinely blocked on the user, checkpoint the goal as blocked with the reason instead.",
 	].join("\n");
 }

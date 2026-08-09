@@ -1,0 +1,32 @@
+### PRE-EXISTING FAILURE BASELINE on clean upstream/dev (this PR's changes stashed)
+### captured 2026-07-27T06:28:13Z  base upstream/dev @ da2d4a916
+### agent.ts diff vs base at capture time:
+### ---
+
+=== bun test packages/omo-opencode/src/agents ===
+bun test v1.3.14 (0d9b296a)
+
+ 369 pass
+ 0 fail
+ 1040 expect() calls
+Ran 369 tests across 30 files. [1.50s]
+EXIT=0 for packages/omo-opencode/src/agents
+
+=== bun test packages/model-core ===
+bun test v1.3.14 (0d9b296a)
+
+ 312 pass
+ 0 fail
+ 1350 expect() calls
+Ran 312 tests across 27 files. [795.00ms]
+EXIT=0 for packages/model-core
+
+=== bun test packages/prompts-core ===
+bun test v1.3.14 (0d9b296a)
+
+ 26 pass
+ 0 fail
+ 40 expect() calls
+Ran 26 tests across 5 files. [385.00ms]
+EXIT=0 for packages/prompts-core
+

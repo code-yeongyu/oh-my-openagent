@@ -1,0 +1,10 @@
+=== ast-grep resolution observed through the INSTALLED marketplace wrapper ===
+
+FIXED  (../../skills/ probe present):
+  (no ast-grep skip message - provisioning was not skipped for a missing path)
+
+CONTROL (probe reverted):
+[33m[!][39m [33m[ast-grep] skipped sg provisioning: missing C:\Users\pss\AppData\Local\Temp\omo-6395-mkt-2o5YGp\control\plugins\omo\dist\cli\skills\ast-grep\install.ps1[39m
+
+=== real ~/.codex/config.toml untouched ===
+PASS: sha256 identical before and after

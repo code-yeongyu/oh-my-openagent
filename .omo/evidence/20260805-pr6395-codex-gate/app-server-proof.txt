@@ -1,0 +1,17 @@
+surface=real codex app-server with local PR plugin and local mock model
+command=bash .agents/skills/codex-qa/scripts/app-server-drive.sh --plugin
+cwd=/home/codexqa/oh-my-openagent-6376-gate
+user=codexqa
+codex=codex-cli 0.146.0
+exit_code=0
+ok=true
+turn_status=completed
+assistant_text=Hello from the codex-qa mock model.
+expected_hooks=sessionStart,userPromptSubmit
+missing_hooks=[]
+failed_hooks=[]
+observed_hook_methods=hook/started,hook/completed
+completed_hook_events=sessionStart,stop,userPromptSubmit
+real_config_before=ABSENT
+real_config_after=ABSENT
+result=PASS

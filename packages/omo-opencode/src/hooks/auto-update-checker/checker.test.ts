@@ -1,22 +1,25 @@
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { NPM_REGISTRY_URL } from "./constants"
 import { getLatestVersion } from "./checker"
 
 describe("auto-update-checker/checker", () => {
-  const originalFetch = globalThis.fetch
+  let fetchSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    fetchSpy = spyOn(globalThis, "fetch")
+  })
 
   afterEach(() => {
-    globalThis.fetch = originalFetch
     mock.restore()
   })
 
   function mockDistTags(distTags: Record<string, string>) {
-    globalThis.fetch = mock(async () =>
+    fetchSpy.mockImplementation(async () =>
       new Response(JSON.stringify(distTags), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })
-    ) as typeof fetch
+    )
   }
 
   describe("getLatestVersion", () => {
@@ -68,7 +71,7 @@ describe("auto-update-checker/checker", () => {
 
     test("returns null when the registry responds with an error status", async () => {
       // given
-      globalThis.fetch = mock(async () => new Response("upstream error", { status: 502 })) as typeof fetch
+      fetchSpy.mockImplementation(async () => new Response("upstream error", { status: 502 }))
 
       // when
       const result = await getLatestVersion()

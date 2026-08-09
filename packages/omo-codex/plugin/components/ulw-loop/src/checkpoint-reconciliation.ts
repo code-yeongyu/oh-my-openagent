@@ -87,7 +87,7 @@ export async function canReconcileActiveFinalTaskScopedAggregateSnapshot(
 function buildCompletedLegacyGoalRemediation(goal: UlwLoopItem): string {
 	return [
 		"If get_goal returns a different completed legacy/thread objective, do not repeat --status complete in this thread.",
-		`Record a non-terminal blocker with: omo ulw-loop checkpoint --goal-id ${goal.id} --status blocked --evidence "<completed legacy Codex goal blocks create_goal in this thread>" --codex-goal-json "<different completed get_goal JSON or path>".`,
+		`Record a non-terminal blocker with: omo-agent-toolkit ulw-loop checkpoint --goal-id ${goal.id} --status blocked --evidence "<completed legacy Codex goal blocks create_goal in this thread>" --codex-goal-json "<different completed get_goal JSON or path>".`,
 		"Then continue only from a Codex goal context with no active/completed conflicting goal, in the same repo/worktree, and create the intended goal there.",
 	].join(" ");
 }

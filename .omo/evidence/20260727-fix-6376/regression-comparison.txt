@@ -1,0 +1,46 @@
+### REGRESSION COMPARISON - issue #6376 - 2026-07-28T01:29:57Z
+
+--- CLEAN BASE totals ---
+=== bun test packages/shared-skills ===
+ 68 pass
+ 1 fail
+Ran 69 tests across 13 files. [5.57s]
+EXIT=1 for packages/shared-skills
+=== bun test packages/skills-loader-core ===
+ 235 pass
+ 0 fail
+Ran 235 tests across 38 files. [12.02s]
+EXIT=0 for packages/skills-loader-core
+=== bun test packages/omo-opencode/src/cli ===
+ 659 pass
+ 2 fail
+Ran 661 tests across 93 files. [12.39s]
+EXIT=1 for packages/omo-opencode/src/cli
+
+--- WITH THIS PR totals ---
+=== bun test packages/shared-skills ===
+ 69 pass
+ 0 fail
+Ran 69 tests across 13 files. [4.63s]
+EXIT=0 for packages/shared-skills
+=== bun test packages/skills-loader-core ===
+ 235 pass
+ 0 fail
+Ran 235 tests across 38 files. [8.22s]
+EXIT=0 for packages/skills-loader-core
+=== bun test packages/omo-opencode/src/cli ===
+ 659 pass
+ 2 fail
+Ran 661 tests across 93 files. [10.72s]
+EXIT=1 for packages/omo-opencode/src/cli
+
+--- failing on CLEAN BASE (3) ---
+(fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected
+(fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows
+(fail) sharedSkillsRootPath > #given a bundle one level below the skills directory #when the root is resolved #then the parent directory is used
+--- failing WITH PR (2) ---
+(fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected
+(fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows
+
+--- NEW failures introduced by this PR (must be empty) ---
+--- end ---
