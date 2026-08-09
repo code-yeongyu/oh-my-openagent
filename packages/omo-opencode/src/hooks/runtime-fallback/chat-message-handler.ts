@@ -24,13 +24,13 @@ export function createChatMessageHandler(deps: HookDeps) {
       ? `${input.model.providerID}/${input.model.modelID}`
       : undefined
 
-    if (requestedModel && requestedModel !== state.currentModel) {
-      if (state.pendingFallbackModel && state.pendingFallbackModel === requestedModel) {
-        state.pendingFallbackModel = undefined
-        state.pendingFallbackPromptMayHaveBeenAccepted = false
-        return
-      }
+    if (requestedModel && state.pendingFallbackModel === requestedModel) {
+      state.pendingFallbackModel = undefined
+      state.pendingFallbackPromptMayHaveBeenAccepted = false
+      return
+    }
 
+    if (requestedModel && requestedModel !== state.currentModel) {
       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
         sessionID,
         from: state.currentModel,

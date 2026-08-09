@@ -1,0 +1,13 @@
+OpenCode: 1.18.15
+Session: ses_019917f8bffefyK00Z0YkEfIzr
+Fallback config: model=openai/gpt-5.6-sol, variant=high
+Observed SSE: session.status
+First turn: primary 429, then fallback success
+Second turn input model identity: openai/gpt-5.6-sol (no variant suffix)
+Second turn result: fallback success without primary retry
+Both fallback chat.params calls: maxOutputTokens=2048,
+reasoningEffort=high, serviceTier=priority, textVerbosity=low
+DELETE response: true
+Live OpenCode DB sessions before QA: 7141
+Live OpenCode DB sessions after QA: 7141
+Isolation result: unchanged

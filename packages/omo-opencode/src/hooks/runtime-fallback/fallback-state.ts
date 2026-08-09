@@ -1,5 +1,6 @@
 import {
   areRuntimeFallbackModelsEquivalent,
+  getRuntimeFallbackModelIdentity,
   stringifyRuntimeFallbackModel,
   stringifyRuntimeFallbackModelWithVariant,
 } from "@oh-my-opencode/model-core"
@@ -90,8 +91,9 @@ export function prepareFallback(
   state.fallbackIndex = fallbackModels.indexOf(nextModel)
   state.failedModels.set(failedModel, now)
   state.attemptCount++
-  state.currentModel = nextModel
-  state.pendingFallbackModel = nextModel
+  const modelIdentity = getRuntimeFallbackModelIdentity(nextModel)
+  state.currentModel = modelIdentity
+  state.pendingFallbackModel = modelIdentity
 
   return { success: true, newModel: nextModel }
 }

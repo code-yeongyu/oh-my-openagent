@@ -1,0 +1,7 @@
+[
+  { "role": "user", "text": "Reply exactly FIRST_VARIANT_FALLBACK_OK" },
+  { "role": "assistant", "modelID": "primary", "text": "" },
+  { "role": "assistant", "modelID": "gpt-5.6-sol", "text": "REAL_OPENCODE_FALLBACK_OK" },
+  { "role": "user", "text": "Reply exactly SECOND_VARIANT_FALLBACK_OK" },
+  { "role": "assistant", "modelID": "gpt-5.6-sol", "text": "REAL_OPENCODE_FALLBACK_OK" }
+]

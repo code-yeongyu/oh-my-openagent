@@ -43,6 +43,11 @@ export function stringifyRuntimeFallbackModelWithVariant(model: unknown, variant
   return `${parsed.providerID}/${parsed.modelID}(${fallbackVariant})`
 }
 
+export function getRuntimeFallbackModelIdentity(model: string): string {
+  const parsed = parseModelString(model)
+  return parsed ? `${parsed.providerID}/${parsed.modelID}` : model
+}
+
 function canonicalizeRuntimeFallbackModelID(modelID: string): string {
   const loweredModelID = modelID.toLowerCase()
   const dottedModelID = loweredModelID.replace(/\./g, "-")

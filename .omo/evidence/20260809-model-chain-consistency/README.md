@@ -8,11 +8,10 @@ Issue: #6644
 - Patched focused suite: 288 passed, 0 failed.
 - Related config and Doctor suites: 21 passed, 0 failed.
 - Typecheck and build: passed.
-- Full suite: 13,469 passed, 5 skipped, 2 unrelated failures.
+- Full suite: 13,473 passed, 5 skipped, 2 unrelated failures.
 
-The unrelated failures are outside this PR's diff: the provisioned ast-grep
-0.43.0 pin is absent, and `packages/omo-senpi/plugin/skills/ulw-loop/SKILL.md`
-does not match its native source (`omo` versus `omo-agent-toolkit`).
+The provisioned ast-grep 0.43.0 pin is absent. The unrelated Senpi status-UI
+test failed in the full parallel run and passed immediately in isolation.
 
 ## Isolated OpenCode QA
 
@@ -53,6 +52,13 @@ does not match its native source (`omo` versus `omo-agent-toolkit`).
   `real-review-fix-summary.txt`, `real-review-fix-chat-params.json`,
   `real-review-fix-provider-request.json`, and
   `real-review-fix-session-messages.json`.
+- Variant-identity QA used an object fallback rung with legacy
+  `variant: high`. After the primary 429, OpenCode sent two consecutive turns
+  through the base model identity `openai/gpt-5.6-sol`; both retained the
+  variant and category prompt settings, proving the second turn did not reset
+  fallback state. See `real-variant-identity-summary.txt`,
+  `real-variant-identity-provider-requests.json`, and
+  `real-variant-identity-session-messages.json`.
 
 Run the focused proof:
 

@@ -1,0 +1,17 @@
+[
+  { "model": "primary" },
+  {
+    "model": "gpt-5.6-sol",
+    "max_output_tokens": 2048,
+    "service_tier": "priority",
+    "text": { "verbosity": "low" },
+    "reasoning": { "effort": "high", "summary": "auto" }
+  },
+  {
+    "model": "gpt-5.6-sol",
+    "max_output_tokens": 2048,
+    "service_tier": "priority",
+    "text": { "verbosity": "low" },
+    "reasoning": { "effort": "high", "summary": "auto" }
+  }
+]

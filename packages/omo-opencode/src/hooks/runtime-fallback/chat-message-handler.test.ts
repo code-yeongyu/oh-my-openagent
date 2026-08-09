@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message-handler"
-import { createFallbackState } from "./fallback-state"
+import { createFallbackState, prepareFallback } from "./fallback-state"
 import type { HookDeps } from "./types"
 import {
   clearAllSessionPromptParams,
@@ -42,6 +42,30 @@ function createDeps(): HookDeps {
 
 describe("createChatMessageHandler runtime fallback model override", () => {
   afterEach(() => clearAllSessionPromptParams())
+
+  for (const fallbackModel of ["openai/gpt-5.5:high", "openai/gpt-5.5(high)"]) {
+    test(`keeps fallback state when OpenCode reports the base identity for ${fallbackModel}`, async () => {
+      const deps = createDeps()
+      const sessionID = `session-variant-fallback-${fallbackModel}`
+      const state = createFallbackState("openai/gpt-5.4")
+      prepareFallback(sessionID, state, [fallbackModel], deps.config)
+      deps.sessionStates.set(sessionID, state)
+      deps.sessionPromptParamsBeforeFallback?.set(sessionID, { temperature: 0.1 })
+      setSessionPromptParams(sessionID, { temperature: 0.3 })
+      const handler = createChatMessageHandler(deps)
+
+      await handler(
+        { sessionID, model: { providerID: "openai", modelID: "gpt-5.5" } },
+        { message: {} },
+      )
+
+      expect(state.currentModel).toBe("openai/gpt-5.5")
+      expect(state.pendingFallbackModel).toBeUndefined()
+      expect(state.fallbackIndex).toBe(0)
+      expect(getSessionPromptParams(sessionID)).toEqual({ temperature: 0.3 })
+      expect(deps.sessionPromptParamsBeforeFallback?.has(sessionID)).toBe(true)
+    })
+  }
 
   test("#given session is on an accepted fallback #when a later user message is transformed after cooldown #then it stays on the fallback model", async () => {
     // given

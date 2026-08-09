@@ -88,6 +88,28 @@ describe("runtime-fallback fallback-models", () => {
     expect(result?.reasoning).toBeUndefined()
   })
 
+  test("finds variant rung settings from the base model identity", () => {
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: [
+            "openai/gpt-5.6",
+            { model: "openai/gpt-5.5", variant: "high", temperature: 0.3 },
+          ],
+        },
+      },
+    })
+
+    const result = getFallbackModelSettingsForSession(
+      "ses_runtime_fallback_variant_identity",
+      "oracle",
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    expect(result).toMatchObject({ model: "openai/gpt-5.5", variant: "high", temperature: 0.3 })
+  })
+
   test("inherits canonical category max_tokens for a fallback rung", () => {
     //#given
     const sessionID = "ses_runtime_fallback_category_max_tokens"

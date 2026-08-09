@@ -5,6 +5,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { getRuntimeFallbackModelIdentity } from "@oh-my-opencode/model-core"
 
 type ModelChainConfig = {
   model?: string
@@ -55,7 +56,12 @@ export function getFallbackModelSettingsForSession(
   if (!pluginConfig) return undefined
   const config = resolveFallbackConfigForSession(sessionID, agent, pluginConfig)
   const raw = getConfiguredFallbackModels(config)
-  const index = flattenToFallbackModelStrings(raw)?.indexOf(model) ?? -1
+  const flattened = flattenToFallbackModelStrings(raw)
+  const exactIndex = flattened?.indexOf(model) ?? -1
+  const modelIdentity = getRuntimeFallbackModelIdentity(model)
+  const index = exactIndex >= 0
+    ? exactIndex
+    : flattened?.findIndex((candidate) => getRuntimeFallbackModelIdentity(candidate) === modelIdentity) ?? -1
   const entry = raw?.[index]
   if (entry === undefined || config === undefined) return undefined
   const selected = typeof entry === "string" ? { model: entry } : entry
