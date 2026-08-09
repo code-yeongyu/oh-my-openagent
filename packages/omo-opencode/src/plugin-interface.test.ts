@@ -300,6 +300,45 @@ describe("createPluginInterface - backward compatibility", () => {
 })
 
 describe("createPluginInterface - chat.params variant injection", () => {
+  test("injects canonical agent primary provider options and max tokens", async () => {
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          explore: {
+            providerOptions: { serviceTier: "priority", textVerbosity: "low" },
+            maxTokens: 1024,
+          },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-agent-primary-options",
+      agent: "explore",
+      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+      provider: { id: "openai" },
+      message: {},
+    }
+    const output = { options: {} as Record<string, unknown> } as {
+      options: Record<string, unknown>
+      maxOutputTokens?: number
+    }
+
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    expect(output.options).toMatchObject({ serviceTier: "priority", textVerbosity: "low" })
+    expect(output.maxOutputTokens).toBe(1024)
+  })
+
   test("injects variant from agent config into chat.params message", async () => {
     // given
     const pluginInterface = createPluginInterface({

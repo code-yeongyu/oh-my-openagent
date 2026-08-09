@@ -68,6 +68,11 @@ test failed in the full parallel run and passed immediately in isolation.
   `max_tokens: 1536`, `serviceTier: priority`, and `textVerbosity: low` in both
   `chat.params` and the provider request. All QA sessions were isolated from the
   live database and deleted afterward. See `real-primary-rung-summary.jsonl`.
+- Agent-primary QA configured canonical `max_tokens` and `provider_options` on
+  the first `agents.explore.models` rung. Real OpenCode preserved all three
+  request settings (`1024`, `priority`, and `low`) in `chat.params` and the
+  provider request, then deleted the isolated session. See
+  `real-agent-primary-summary.jsonl`.
 
 Run the focused proof:
 

@@ -1,0 +1,3 @@
+{"source":"chat.params","agent":"explore","model":"gpt-5.6-sol","maxOutputTokens":1024,"serviceTier":"priority","textVerbosity":"low"}
+{"source":"provider-request","model":"gpt-5.6-sol","max_output_tokens":1024,"service_tier":"priority","text_verbosity":"low"}
+{"source":"isolation","sessionID":"ses_019718d0cffeFTBB2dKejph81L","liveDatabaseMatches":0,"isolatedSessionDeleted":true}

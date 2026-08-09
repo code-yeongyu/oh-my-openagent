@@ -121,10 +121,16 @@ function materializeAgentModelChains(config: OhMyOpenCodeConfig): OhMyOpenCodeCo
       : typeof primary === "string"
         ? { model: primary }
         : primary
+    const providerOptions = typeof primary === "object" ? primary.provider_options : undefined
+    const textVerbosity = providerOptions?.textVerbosity
     changed = true
     return [name, {
       ...rest,
       ...primarySettings,
+      ...(providerOptions === undefined ? {} : { providerOptions }),
+      ...(textVerbosity === "low" || textVerbosity === "medium" || textVerbosity === "high"
+        ? { textVerbosity }
+        : {}),
       fallback_models: fallbacks,
     }]
   })) as typeof config.agents

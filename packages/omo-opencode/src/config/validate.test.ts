@@ -296,7 +296,11 @@ describe("validatePluginConfig", () => {
           agents: {
             explore: {
               models: [
-                { model: "provider/primary", reasoning: "low" },
+                {
+                  model: "provider/primary",
+                  reasoning: "low",
+                  provider_options: { service_tier: "priority", textVerbosity: "low" },
+                },
                 { model: "provider/fallback", reasoning: "medium", max_tokens: 2048 },
               ],
             },
@@ -310,6 +314,11 @@ describe("validatePluginConfig", () => {
       expect(result.valid).toBe(true)
       expect(result.config.agents?.explore?.model).toBe("provider/primary")
       expect(result.config.agents?.explore?.reasoning).toBe("low")
+      expect(result.config.agents?.explore?.providerOptions).toEqual({
+        service_tier: "priority",
+        textVerbosity: "low",
+      })
+      expect(result.config.agents?.explore?.textVerbosity).toBe("low")
       expect(result.config.agents?.explore?.fallback_models).toEqual([
         { model: "provider/fallback", reasoning: "medium", max_tokens: 2048, maxTokens: 2048 },
       ])

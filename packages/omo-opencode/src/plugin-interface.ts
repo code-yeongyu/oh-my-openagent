@@ -1,7 +1,9 @@
-import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
+import { isRecord } from "@oh-my-opencode/utils"
 import type { OhMyOpenCodeConfig } from "./config"
+import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 
 import { applyAgentVariant } from "./shared/agent-variant"
+import { stripInvisibleAgentCharacters } from "./shared/agent-display-names"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -49,6 +51,23 @@ export function createPluginInterface(args: {
       const providerID = chatParamsInput.model?.providerID
       const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
       const modelID = typeof rawModelID === "string" ? rawModelID : undefined
+      const strippedAgentName = typeof agentName === "string"
+        ? stripInvisibleAgentCharacters(agentName)
+        : undefined
+      const agentOverride = strippedAgentName === undefined
+        ? undefined
+        : pluginConfig.agents?.[strippedAgentName as keyof typeof pluginConfig.agents]
+          ?? Object.entries(pluginConfig.agents ?? {}).find(([key]) => (
+            key.toLowerCase() === strippedAgentName.toLowerCase()
+          ))?.[1]
+      if (isRecord(output) && isRecord(output.options) && agentOverride) {
+        if (agentOverride.providerOptions) {
+          output.options = { ...output.options, ...agentOverride.providerOptions }
+        }
+        if (typeof agentOverride.maxTokens === "number") {
+          output.maxOutputTokens = agentOverride.maxTokens
+        }
+      }
       if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
         applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
       }
