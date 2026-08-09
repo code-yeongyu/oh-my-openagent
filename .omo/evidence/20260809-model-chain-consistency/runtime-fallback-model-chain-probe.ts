@@ -55,6 +55,7 @@ const hook = createRuntimeFallbackHook(
               reasoning: "high",
               temperature: 0.3,
               maxTokens: 2048,
+              provider_options: { serviceTier: "priority", textVerbosity: "low" },
             },
           ],
           fallback_models: ["google/legacy-fallback"],
@@ -108,6 +109,9 @@ if (promptParams?.temperature !== 0.3 || promptParams.maxOutputTokens !== 2048) 
 }
 if (promptParams.options?.reasoningEffort !== "high") {
   throw new Error(`fallback reasoning missing from chat.params state: ${JSON.stringify(promptParams)}`)
+}
+if (promptParams.options?.serviceTier !== "priority" || promptParams.options.textVerbosity !== "low") {
+  throw new Error(`fallback provider options missing from chat.params state: ${JSON.stringify(promptParams)}`)
 }
 
 console.log(JSON.stringify({

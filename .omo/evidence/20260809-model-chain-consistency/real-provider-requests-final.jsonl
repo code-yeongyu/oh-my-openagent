@@ -1,0 +1,2 @@
+{"model":"primary","max_output_tokens":null,"temperature":null,"service_tier":null,"text":null,"reasoning":null,"prompt_cache_key":"ses_019e9c3e5ffetFXjXu6XXD4Zu5"}
+{"model":"gpt-5.6-sol","max_output_tokens":2048,"temperature":null,"service_tier":"priority","text":{"verbosity":"low"},"reasoning":{"effort":"high","summary":"auto"},"prompt_cache_key":"ses_019e9c3e5ffetFXjXu6XXD4Zu5"}

@@ -1,0 +1,3 @@
+watching http://127.0.0.1:49322/event?directory=/private/tmp/oh-my-openagent-pr/doctor-model-chain-consistency for 'session.status' (<=45s)
+first matching event: {"type":"session.status"}
+PASS: observed 'session.status' on http://127.0.0.1:49322
