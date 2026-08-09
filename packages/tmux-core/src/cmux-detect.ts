@@ -23,13 +23,21 @@ function hasCmuxSocketPath(tmuxEnvironment: string): boolean {
  * CMUX_SOCKET_PATH / TMUX. If detected, redirect tmux commands to
  * `cmux __tmux-compat` so they become native cmux splits instead of
  * failing because there is no real tmux server running.
+ *
+ * `CMUX_SOCKET_PATH` is the single precondition and the socket path shape is
+ * the only discriminator. An earlier `TMUX.includes("cmuxterm")` branch also
+ * returned true, bypassing that precondition, but cmux writes `cmuxterm` only
+ * into its bundle id (`com.cmuxterm.app`), its config directory (`~/.cmuxterm`)
+ * and its own env names — never into a socket path, whose every release channel
+ * is `cmux-` prefixed (`cmux-omo`, `cmux-nightly`, `cmux-staging`, `cmux-debug`).
+ * The branch therefore never matched a real cmux session and only mislabelled
+ * real tmux sessions whose name happened to contain `cmuxterm`.
  */
 export function isCmuxCompatEnvironment(
 	environment: Record<string, string | undefined> = process.env,
 ): boolean {
-	const tmuxEnvironment = environment.TMUX
-	if (tmuxEnvironment?.includes("cmuxterm") === true) return true
 	if (!environment.CMUX_SOCKET_PATH) return false
+	const tmuxEnvironment = environment.TMUX
 	if (!tmuxEnvironment) return true
 	return hasCmuxSocketPath(tmuxEnvironment)
 }

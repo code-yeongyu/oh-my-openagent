@@ -27,7 +27,7 @@ describe("isCmuxCompatEnvironment", () => {
     }
   })
 
-  it("#given TMUX contains cmuxterm #when isCmuxCompatEnvironment called #then returns true", () => {
+  it("#given TMUX contains cmuxterm without CMUX_SOCKET_PATH #when isCmuxCompatEnvironment called #then returns false (cmux never writes cmuxterm into a socket path)", () => {
     // given
     process.env.TMUX = "/tmp/cmuxterm-12345.sock,1234,0"
 
@@ -35,7 +35,33 @@ describe("isCmuxCompatEnvironment", () => {
     const result = isCmuxCompatEnvironment()
 
     // then
-    expect(result).toBe(true)
+    expect(result).toBe(false)
+  })
+
+  it("#given a real tmux socket whose session name contains cmuxterm #when isCmuxCompatEnvironment called #then returns false", () => {
+    // given
+    process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
+    process.env.TMUX = "/private/tmp/tmux-501/cmuxterm-notes,123,0"
+
+    // when
+    const result = isCmuxCompatEnvironment()
+
+    // then
+    expect(result).toBe(false)
+  })
+
+  it("#given every cmux release-channel socket directory #when isCmuxCompatEnvironment called #then each is detected as cmux", () => {
+    // given
+    process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
+
+    for (const directory of ["cmux-omo", "cmux-nightly", "cmux-staging", "cmux-debug", "cmux-cli-shims"]) {
+      // when
+      process.env.TMUX = `/tmp/${directory}/workspace,surface,pane`
+      const result = isCmuxCompatEnvironment()
+
+      // then
+      expect(result).toBe(true)
+    }
   })
 
   it("#given standard tmux TMUX without cmuxterm #when isCmuxCompatEnvironment called #then returns false (regression guard)", () => {
