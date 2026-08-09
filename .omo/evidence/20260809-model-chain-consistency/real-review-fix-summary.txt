@@ -1,0 +1,11 @@
+OpenCode: 1.18.15
+Session: ses_019998997ffe1BO6TcNafdjkkM
+Config under test: category quick with max_tokens=2048,
+provider_options.serviceTier=priority, provider_options.textVerbosity=low,
+and fallback model openai/gpt-5.6-sol reasoning=high.
+Observed SSE: session.status
+Observed SSE after DELETE /session/<id>: session.deleted
+DELETE response: true
+Live OpenCode DB sessions before QA: 7141
+Live OpenCode DB sessions after QA: 7141
+Isolation result: unchanged

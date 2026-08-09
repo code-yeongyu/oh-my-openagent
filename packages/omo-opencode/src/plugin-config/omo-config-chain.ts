@@ -72,7 +72,7 @@ function modelInput(view: Readonly<Record<string, unknown>>): Record<string, unk
     : undefined
   const categories = isPlainRecord(view.categories)
     ? Object.fromEntries(Object.entries(view.categories).flatMap(([name, definition]) => {
-      const fields = recordFields(definition, ["description", "model", "models", "fallback_models", "reasoning", "variant", "temperature", "top_p", "maxTokens", "thinking", "reasoningEffort", "textVerbosity", "tools", "prompt_append", "max_prompt_tokens", "is_unstable_agent", "disable"])
+      const fields = recordFields(definition, ["description", "model", "models", "fallback_models", "reasoning", "variant", "temperature", "top_p", "max_tokens", "provider_options", "maxTokens", "thinking", "reasoningEffort", "textVerbosity", "tools", "prompt_append", "max_prompt_tokens", "is_unstable_agent", "disable"])
       return fields === undefined ? [] : [[name, fields]]
     }))
     : undefined

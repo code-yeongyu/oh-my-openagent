@@ -52,6 +52,8 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     state.fallbackIndex = 0
     state.failedModels.set("openai/gpt-5.4", Date.now() - 60_000)
     deps.sessionStates.set(sessionID, state)
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, { temperature: 0.1 })
+    setSessionPromptParams(sessionID, { temperature: 0.3, maxOutputTokens: 2048 })
     const handler = createChatMessageHandler(deps)
     const output: { message: { model?: { providerID: string; modelID: string } } } = { message: {} }
 
@@ -73,6 +75,8 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       modelID: "openai.eu.gpt-5.5",
     })
     expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("litellm/openai.eu.gpt-5.5")
+    expect(getSessionPromptParams(sessionID)).toEqual({ temperature: 0.3, maxOutputTokens: 2048 })
+    expect(deps.sessionPromptParamsBeforeFallback?.has(sessionID)).toBe(true)
   })
 
   test("restores prompt settings when the user manually changes models", async () => {

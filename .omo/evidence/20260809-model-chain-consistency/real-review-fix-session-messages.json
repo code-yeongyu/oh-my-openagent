@@ -1,0 +1,5 @@
+[
+  { "role": "user", "text": "Reply exactly REAL_OPENCODE_REVIEW_FIX_OK" },
+  { "role": "assistant", "providerID": "openai", "modelID": "primary", "text": "" },
+  { "role": "assistant", "providerID": "openai", "modelID": "gpt-5.6-sol", "text": "REAL_OPENCODE_FALLBACK_OK" }
+]

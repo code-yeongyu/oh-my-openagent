@@ -259,6 +259,8 @@ describe("validatePluginConfig", () => {
         "[opencode]": {
           categories: {
             quick: {
+              max_tokens: 4096,
+              provider_options: { service_tier: "flex" },
               models: [{
                 model: "primary",
                 reasoning: "off",
@@ -282,6 +284,8 @@ describe("validatePluginConfig", () => {
         },
         { model: "provider/fallback", reasoning: "high" },
       ])
+      expect(result.config.categories?.quick?.max_tokens).toBe(4096)
+      expect(result.config.categories?.quick?.provider_options).toEqual({ service_tier: "flex" })
     })
   })
 

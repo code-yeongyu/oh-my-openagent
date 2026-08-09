@@ -13,6 +13,7 @@ import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { discardPromptParamsSnapshot, restorePromptParams } from "./fallback-prompt-params"
+import { clearSessionPromptParams } from "../../shared"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -113,6 +114,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionStatusRetryKeys.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
       discardPromptParamsSnapshot(deps.sessionPromptParamsBeforeFallback, sessionID)
+      clearSessionPromptParams(sessionID)
     }
   }
 

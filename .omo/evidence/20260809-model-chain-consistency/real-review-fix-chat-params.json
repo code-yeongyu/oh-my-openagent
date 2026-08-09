@@ -1,0 +1,12 @@
+{
+  "agent": "Sisyphus - ultraworker",
+  "model": "gpt-5.6-sol",
+  "output": {
+    "maxOutputTokens": 2048,
+    "options": {
+      "reasoningEffort": "high",
+      "textVerbosity": "low",
+      "serviceTier": "priority"
+    }
+  }
+}

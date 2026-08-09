@@ -1,8 +1,13 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
+import {
+  clearAllSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../../shared"
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
@@ -41,6 +46,7 @@ function createDeps(): HookDeps {
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    sessionPromptParamsBeforeFallback: new Map(),
   }
 }
 
@@ -61,6 +67,21 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
 }
 
 describe("createEventHandler", () => {
+  afterEach(() => clearAllSessionPromptParams())
+
+  it("#given fallback prompt params #when the session is deleted #then applied params and their snapshot are removed", async () => {
+    const sessionID = "session-deleted"
+    const deps = createDeps()
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, { temperature: 0.1 })
+    setSessionPromptParams(sessionID, { temperature: 0.3 })
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+
+    await handler({ event: { type: "session.deleted", properties: { sessionID } } })
+
+    expect(getSessionPromptParams(sessionID)).toBeUndefined()
+    expect(deps.sessionPromptParamsBeforeFallback?.has(sessionID)).toBe(false)
+  })
+
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
     const sessionID = "session-stop"

@@ -45,6 +45,14 @@ does not match its native source (`omo` versus `omo-agent-toolkit`).
   `real-sse-postfix.txt`, `real-chat-params-postfix-summary.jsonl`,
   `real-provider-requests-postfix-summary.jsonl`, and
   `real-session-messages-postfix.json`.
+- Exact-head review-fix QA configured category-level `max_tokens: 2048` and
+  `provider_options` with a setting-free fallback rung. Real OpenCode preserved
+  those category defaults in `chat.params` and the provider request, completed
+  the fallback, then emitted `session.deleted` when the session was deleted.
+  The live database stayed at 7,141 sessions. See
+  `real-review-fix-summary.txt`, `real-review-fix-chat-params.json`,
+  `real-review-fix-provider-request.json`, and
+  `real-review-fix-session-messages.json`.
 
 Run the focused proof:
 
