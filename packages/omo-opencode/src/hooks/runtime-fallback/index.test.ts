@@ -21,6 +21,10 @@ import {
   restoreRuntimeFallbackTestClock,
 } from "./test-timeout-clock.test-support"
 import type { RuntimeFallbackPluginInput } from "./types"
+import {
+  clearAllSessionPromptParams,
+  getSessionPromptParams,
+} from "../../shared/session-prompt-params-state"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -37,6 +41,7 @@ describe("runtime-fallback", () => {
     resetClaudeCodeSessionState()
     clearAllDelegatedChildSessionBootstrap()
     releaseAllPromptAsyncReservationsForTesting()
+    clearAllSessionPromptParams()
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
@@ -57,6 +62,7 @@ describe("runtime-fallback", () => {
     resetClaudeCodeSessionState()
     clearAllDelegatedChildSessionBootstrap()
     releaseAllPromptAsyncReservationsForTesting()
+    clearAllSessionPromptParams()
     mock.restore()
   })
 
@@ -523,6 +529,110 @@ describe("runtime-fallback", () => {
         category: "quick",
         model: "anthropic/claude-haiku-4-5",
       })
+    })
+
+    test("should preserve canonical per-model settings when dispatching a category fallback", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "continue" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: unsafeTestValue({
+            categories: {
+              quick: {
+                models: [
+                  "anthropic/claude-haiku-4-5",
+                  {
+                    model: "custom/fallback",
+                    reasoning: "high",
+                    temperature: 0.3,
+                    top_p: 0.8,
+                    maxTokens: 2048,
+                    thinking: { type: "enabled", budgetTokens: 1024 },
+                  },
+                ],
+              },
+            },
+          }),
+        },
+      )
+      const sessionID = "test-session-category-model-settings"
+      SessionCategoryRegistry.register(sessionID, "quick")
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit exceeded" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      expect(promptCalls[0]?.body).toMatchObject({
+        model: { providerID: "custom", modelID: "fallback" },
+        reasoningEffort: "high",
+      })
+      expect(getSessionPromptParams(sessionID)).toEqual({
+        temperature: 0.3,
+        topP: 0.8,
+        maxOutputTokens: 2048,
+        options: {
+          reasoningEffort: "high",
+          thinking: { type: "enabled", budgetTokens: 1024 },
+        },
+      })
+    })
+
+    test("should reject an unresolved catalog alias without dispatching", async () => {
+      const promptCalls: unknown[] = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "continue" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: unsafeTestValue({
+            categories: {
+              quick: { models: ["anthropic/claude-haiku-4-5", "missing-alias"] },
+            },
+          }),
+        },
+      )
+      const sessionID = "test-session-unresolved-model-alias"
+      SessionCategoryRegistry.register(sessionID, "quick")
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit exceeded" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(0)
+      expect(logCalls.some((call) => call.msg.includes("Invalid model format"))).toBe(true)
     })
 
     test("should retry delegated child session from bootstrap when history has no user prompt", async () => {

@@ -2,6 +2,7 @@ import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { createFallbackState, isModelInCooldown } from "./fallback-state"
+import { restorePromptParams } from "./fallback-prompt-params"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -35,6 +36,7 @@ export function createChatMessageHandler(deps: HookDeps) {
         from: state.currentModel,
         to: requestedModel,
       })
+      restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
       state = createFallbackState(requestedModel)
       sessionStates.set(sessionID, state)
       return
@@ -53,6 +55,7 @@ export function createChatMessageHandler(deps: HookDeps) {
         to: activeModel,
       })
       sessionStates.set(sessionID, createFallbackState(activeModel))
+      restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
 
       const parts = activeModel.split("/")
       if (parts.length >= 2) {

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { getFallbackModelsForSession, getRawFallbackModels } from "./fallback-models"
+import {
+  getFallbackModelSettingsForSession,
+  getFallbackModelsForSession,
+  getRawFallbackModels,
+} from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -53,6 +57,35 @@ describe("runtime-fallback fallback-models", () => {
       { model: "openai/gpt-5.5", reasoning: "high" },
       "anthropic/claude-opus-4-7",
     ])
+  })
+
+  test("per-rung legacy reasoning overrides category canonical reasoning", () => {
+    //#given
+    const sessionID = "ses_runtime_fallback_rung_reasoning"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          reasoning: "low",
+          models: [
+            "openai/gpt-5.6",
+            { model: "openai/gpt-5.5", reasoningEffort: "high" },
+          ],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelSettingsForSession(
+      sessionID,
+      undefined,
+      pluginConfig,
+      "openai/gpt-5.5",
+    )
+
+    //#then
+    expect(result).toMatchObject({ model: "openai/gpt-5.5", reasoningEffort: "high" })
+    expect(result?.reasoning).toBeUndefined()
   })
 
   test("uses agent-specific fallback_models when agent is resolved", () => {

@@ -1,4 +1,5 @@
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import type { SessionPromptParams } from "../../shared/session-prompt-params-state"
 
 export interface RuntimeFallbackInterval {
   unref: () => void
@@ -16,6 +17,7 @@ export interface RuntimeFallbackPluginInput {
         body: {
           agent?: string
           model: { providerID: string; modelID: string }
+          variant?: string
           system?: string
           tools?: Record<string, boolean>
           parts: Array<{ type: "text"; text: string }>
@@ -96,4 +98,5 @@ export interface HookDeps {
    * loop (every cycle started over at attempt:1). See issue #4006.
    */
   internallyAbortedSessions: Set<string>
+  sessionPromptParamsBeforeFallback?: Map<string, SessionPromptParams | undefined>
 }

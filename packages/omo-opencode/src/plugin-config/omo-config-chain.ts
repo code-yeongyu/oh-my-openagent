@@ -66,13 +66,13 @@ function recordFields(value: unknown, fields: readonly string[]): Record<string,
 function modelInput(view: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const agents = isPlainRecord(view.agents)
     ? Object.fromEntries(Object.entries(view.agents).flatMap(([name, definition]) => {
-      const fields = recordFields(definition, ["description", "prompt", "model", "models", "variant", "reasoningEffort", "tools", "temperature", "disable"])
+      const fields = recordFields(definition, ["description", "prompt", "model", "models", "reasoning", "variant", "reasoningEffort", "tools", "temperature", "disable"])
       return fields === undefined ? [] : [[name, fields]]
     }))
     : undefined
   const categories = isPlainRecord(view.categories)
     ? Object.fromEntries(Object.entries(view.categories).flatMap(([name, definition]) => {
-      const fields = recordFields(definition, ["description", "model", "fallback_models", "variant", "temperature", "top_p", "maxTokens", "thinking", "reasoningEffort", "textVerbosity", "tools", "prompt_append", "max_prompt_tokens", "is_unstable_agent", "disable"])
+      const fields = recordFields(definition, ["description", "model", "models", "fallback_models", "reasoning", "variant", "temperature", "top_p", "maxTokens", "thinking", "reasoningEffort", "textVerbosity", "tools", "prompt_append", "max_prompt_tokens", "is_unstable_agent", "disable"])
       return fields === undefined ? [] : [[name, fields]]
     }))
     : undefined
@@ -82,6 +82,41 @@ function modelInput(view: Readonly<Record<string, unknown>>): Record<string, unk
     ...(agents === undefined ? {} : { agents }),
     ...(categories === undefined ? {} : { categories }),
   }
+}
+
+// omo-config-core normalizes these fields; the OpenCode runtime still consumes
+// their legacy names internally until its config types finish migrating.
+function pluginModelEntry(entry: unknown): unknown {
+  if (!isPlainRecord(entry)) return entry
+  const providerOptions = isPlainRecord(entry.provider_options) ? entry.provider_options : undefined
+  return {
+    ...entry,
+    ...(typeof entry.max_tokens === "number" ? { maxTokens: entry.max_tokens } : {}),
+    ...(isPlainRecord(providerOptions?.thinking) ? { thinking: providerOptions.thinking } : {}),
+  }
+}
+
+function pluginModelDefinition(definition: unknown): unknown {
+  if (!isPlainRecord(definition)) return definition
+  const fallbackModels = definition.fallback_models
+  return {
+    ...definition,
+    ...(Array.isArray(definition.models)
+      ? { models: definition.models.map(pluginModelEntry) }
+      : {}),
+    ...(Array.isArray(fallbackModels)
+      ? { fallback_models: fallbackModels.map(pluginModelEntry) }
+      : isPlainRecord(fallbackModels)
+        ? { fallback_models: pluginModelEntry(fallbackModels) }
+        : {}),
+  }
+}
+
+function pluginModelDefinitions(definitions: unknown): unknown {
+  if (!isPlainRecord(definitions)) return definitions
+  return Object.fromEntries(
+    Object.entries(definitions).map(([name, definition]) => [name, pluginModelDefinition(definition)]),
+  )
 }
 
 function modelView(view: Readonly<Record<string, unknown>>): {
@@ -94,8 +129,8 @@ function modelView(view: Readonly<Record<string, unknown>>): {
   const resolved = resolveModelReferences(parsed.data)
   return {
     config: {
-      ...(resolved.view.agents === undefined ? {} : { agents: resolved.view.agents }),
-      ...(resolved.view.categories === undefined ? {} : { categories: resolved.view.categories }),
+      ...(resolved.view.agents === undefined ? {} : { agents: pluginModelDefinitions(resolved.view.agents) }),
+      ...(resolved.view.categories === undefined ? {} : { categories: pluginModelDefinitions(resolved.view.categories) }),
     },
     diagnostics: resolved.diagnostics,
   }

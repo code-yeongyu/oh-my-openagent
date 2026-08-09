@@ -1,8 +1,13 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message-handler"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps } from "./types"
+import {
+  clearAllSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../../shared/session-prompt-params-state"
 
 function createDeps(): HookDeps {
   return {
@@ -31,10 +36,13 @@ function createDeps(): HookDeps {
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    sessionPromptParamsBeforeFallback: new Map(),
   }
 }
 
 describe("createChatMessageHandler runtime fallback model override", () => {
+  afterEach(() => clearAllSessionPromptParams())
+
   test("#given session is on an accepted fallback #when a later user message is transformed after cooldown #then it stays on the fallback model", async () => {
     // given
     const deps = createDeps()
@@ -65,5 +73,28 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       modelID: "openai.eu.gpt-5.5",
     })
     expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("litellm/openai.eu.gpt-5.5")
+  })
+
+  test("restores prompt settings when the user manually changes models", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-manual-model-change"
+    const original = { temperature: 0.1 }
+    deps.sessionPromptParamsBeforeFallback?.set(sessionID, original)
+    setSessionPromptParams(sessionID, { temperature: 0.3 })
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "custom/fallback"
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+
+    // when
+    await handler(
+      { sessionID, model: { providerID: "google", modelID: "gemini" } },
+      { message: {} },
+    )
+
+    // then
+    expect(getSessionPromptParams(sessionID)).toEqual(original)
+    expect(deps.sessionPromptParamsBeforeFallback?.size).toBe(0)
   })
 })

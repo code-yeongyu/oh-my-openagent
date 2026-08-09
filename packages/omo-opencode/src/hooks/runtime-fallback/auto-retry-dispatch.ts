@@ -12,6 +12,14 @@ import {
 } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
+import { getFallbackModelSettingsForSession } from "./fallback-models"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+import {
+  clearSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../../shared/session-prompt-params-state"
+import { capturePromptParams, discardPromptParamsSnapshot } from "./fallback-prompt-params"
 
 export function createAutoRetryDispatcher(
   deps: HookDeps,
@@ -41,10 +49,24 @@ export function createAutoRetryDispatcher(
     const agentSettings = resolvedAgent
       ? pluginConfig?.agents?.[resolvedAgent as keyof typeof pluginConfig.agents]
       : undefined
-    const retryModelPayload = buildRetryModelPayload(newModel, agentSettings ? {
-      variant: agentSettings.variant,
-      reasoningEffort: agentSettings.reasoningEffort,
-    } : undefined)
+    const fallbackSettings = getFallbackModelSettingsForSession(sessionID, resolvedAgent, pluginConfig, newModel)
+      ?? agentSettings
+    const parsedModel = buildRetryModelPayload(newModel)
+    const previousPromptParams = getSessionPromptParams(sessionID)
+    const capturedPromptParams = parsedModel && fallbackSettings
+      ? capturePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
+      : false
+    const loweredReasoning = parsedModel && fallbackSettings
+      ? applySessionPromptParams(sessionID, { ...fallbackSettings, ...parsedModel.model })
+      : undefined
+    const retryModelPayload = buildRetryModelPayload(newModel, {
+      variant: fallbackSettings?.reasoning === undefined
+        ? fallbackSettings?.variant
+        : loweredReasoning?.variant,
+      reasoningEffort: fallbackSettings?.reasoning === undefined
+        ? fallbackSettings?.reasoningEffort
+        : loweredReasoning?.reasoningEffort,
+    })
     if (!retryModelPayload) {
       log(`[${HOOK_NAME}] Invalid model format (missing provider prefix): ${newModel}`)
       const state = sessionStates.get(sessionID)
@@ -220,6 +242,13 @@ export function createAutoRetryDispatcher(
         }
       }
       if (!retryDispatched && !retryMayHaveBeenAccepted) {
+        if (fallbackSettings) {
+          if (previousPromptParams) setSessionPromptParams(sessionID, previousPromptParams)
+          else clearSessionPromptParams(sessionID)
+          if (capturedPromptParams) {
+            discardPromptParamsSnapshot(deps.sessionPromptParamsBeforeFallback, sessionID)
+          }
+        }
         if (hadAwaitingFallbackResult) {
           sessionAwaitingFallbackResult.add(sessionID)
         } else {

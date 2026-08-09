@@ -3,6 +3,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { stringifyRuntimeModel } from "./fallback-state"
+import { getConfiguredPrimaryModel } from "./fallback-models"
 
 type ResolveFallbackBootstrapModelOptions = {
   sessionID: string
@@ -24,9 +25,7 @@ export function resolveFallbackBootstrapModel(
   const agentConfig = options.resolvedAgent && agentConfigs
     ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs]
     : undefined
-  const agentConfigRecord = agentConfig as Record<string, unknown> | undefined
-  const agentModelCandidate = agentConfigRecord?.model
-  const agentModel = typeof agentModelCandidate === "string" ? agentModelCandidate : undefined
+  const agentModel = getConfiguredPrimaryModel(agentConfig)
   if (agentModel) {
     log(`[${HOOK_NAME}] Derived model from agent config for ${options.source}`, {
       sessionID: options.sessionID,
@@ -38,8 +37,8 @@ export function resolveFallbackBootstrapModel(
 
   const agentCategory = typeof agentConfig?.category === "string" ? agentConfig.category : undefined
   if (agentCategory) {
-    const agentCategoryModel = options.pluginConfig?.categories?.[agentCategory]?.model
-    if (typeof agentCategoryModel === "string" && agentCategoryModel.length > 0) {
+    const agentCategoryModel = getConfiguredPrimaryModel(options.pluginConfig?.categories?.[agentCategory])
+    if (agentCategoryModel) {
       log(`[${HOOK_NAME}] Derived model from agent category config for ${options.source}`, {
         sessionID: options.sessionID,
         agent: options.resolvedAgent,
@@ -52,9 +51,9 @@ export function resolveFallbackBootstrapModel(
 
   const sessionCategory = SessionCategoryRegistry.get(options.sessionID)
   const categoryModel = sessionCategory
-    ? options.pluginConfig?.categories?.[sessionCategory]?.model
+    ? getConfiguredPrimaryModel(options.pluginConfig?.categories?.[sessionCategory])
     : undefined
-  if (typeof categoryModel === "string" && categoryModel.length > 0) {
+  if (categoryModel) {
     log(`[${HOOK_NAME}] Derived model from session category config for ${options.source}`, {
       sessionID: options.sessionID,
       category: sessionCategory,

@@ -5,6 +5,7 @@ import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
+import { restorePromptParams } from "./fallback-prompt-params"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
@@ -57,6 +58,7 @@ export function createRuntimeFallbackHook(
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    sessionPromptParamsBeforeFallback: new Map(),
   }
 
   const helpers = factories.createAutoRetryHelpers(deps)
@@ -106,6 +108,10 @@ export function createRuntimeFallbackHook(
 
     firstPromptWatchdog.dispose()
 
+    for (const sessionID of deps.sessionPromptParamsBeforeFallback?.keys() ?? []) {
+      restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
+    }
+
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
     deps.sessionRetryInFlight.clear()
@@ -113,6 +119,7 @@ export function createRuntimeFallbackHook(
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
     deps.internallyAbortedSessions.clear()
+    deps.sessionPromptParamsBeforeFallback?.clear()
   }
 
   return {

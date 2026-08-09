@@ -238,13 +238,37 @@ describe("validatePluginConfig", () => {
   it("#given a model catalog reference in the opencode view #when validating #then resolves the model identifier", () => {
     withOmoConfig("model-catalog", (fixture) => {
       writeProjectConfig(fixture, {
-        models: { kimi: { model: "provider/kimi" } },
-        "[opencode]": { agents: { sisyphus: { model: "kimi" } } },
+        models: { kimi: { model: "provider/kimi", reasoning: "high" } },
+        "[opencode]": { agents: { sisyphus: { model: "kimi", reasoning: "low" } } },
       })
 
       const result = validatePluginConfig(fixture.project)
 
       expect(result.config.agents?.sisyphus?.model).toBe("provider/kimi")
+      expect(result.config.agents?.sisyphus?.reasoning).toBe("low")
+    })
+  })
+
+  it("#given catalog references in a category model chain #when validating #then resolves every chain entry", () => {
+    withOmoConfig("category-model-catalog", (fixture) => {
+      writeProjectConfig(fixture, {
+        models: {
+          primary: { model: "provider/primary", reasoning: "low" },
+          fallback: { model: "provider/fallback", reasoning: "high" },
+        },
+        "[opencode]": {
+          categories: {
+            quick: { models: [{ model: "primary", reasoning: "off", maxTokens: 1024 }, "fallback"] },
+          },
+        },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.categories?.quick?.models).toEqual([
+        { model: "provider/primary", reasoning: "off", maxTokens: 1024 },
+        { model: "provider/fallback", reasoning: "high" },
+      ])
     })
   })
 

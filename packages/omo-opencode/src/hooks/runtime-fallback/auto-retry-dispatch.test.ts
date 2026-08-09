@@ -6,6 +6,13 @@ import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import {
+  clearAllSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../../shared/session-prompt-params-state"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -56,6 +63,7 @@ function createDeps(promptCalls: { count: number }): HookDeps {
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    sessionPromptParamsBeforeFallback: new Map(),
   }
 }
 
@@ -79,6 +87,8 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
   afterEach(() => {
     releaseAllPromptAsyncReservationsForTesting()
     restoreRuntimeFallbackTestClock()
+    SessionCategoryRegistry.clear()
+    clearAllSessionPromptParams()
   })
 
   test("#given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned", async () => {
@@ -244,5 +254,58 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
 
     // then
     expect(promptCalls.count).toBe(0)
+  })
+
+  test("restores previous prompt settings when a configured fallback dispatch fails", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-fallback-settings-rollback"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    deps.pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          models: [
+            "anthropic/claude-haiku-4-5",
+            { model: "custom/fallback", reasoning: "high", temperature: 0.3 },
+          ],
+        },
+      },
+    })
+    deps.ctx.client.session.promptAsync = async () => {
+      throw new Error("hard failure")
+    }
+    setSessionPromptParams(sessionID, { temperature: 0.1 })
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("anthropic/claude-haiku-4-5")
+    state.pendingFallbackModel = "custom/fallback"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    const result = await helpers.autoRetryWithFallback(sessionID, "custom/fallback", undefined, "session.error")
+
+    // then
+    expect(result.accepted).toBe(false)
+    expect(getSessionPromptParams(sessionID)).toEqual({ temperature: 0.1 })
+    expect(deps.sessionPromptParamsBeforeFallback?.size).toBe(0)
+  })
+
+  test("preserves agent settings for an unconfigured default fallback", async () => {
+    const promptCalls: Array<Record<string, unknown>> = []
+    const deps = createDeps({ count: 0 })
+    deps.pluginConfig = unsafeTestValue({ agents: { sisyphus: { variant: "high" } } })
+    deps.ctx.client.session.promptAsync = async (input) => {
+      promptCalls.push(input as unknown as Record<string, unknown>)
+      return {}
+    }
+    const sessionID = "session-default-fallback-settings"
+    const state = createFallbackState("anthropic/claude-opus-4-8")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+
+    const helpers = createAutoRetryHelpers(deps)
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "sisyphus", "session.error")
+
+    expect(promptCalls[0]?.body).toMatchObject({ variant: "high" })
   })
 })

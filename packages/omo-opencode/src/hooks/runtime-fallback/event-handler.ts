@@ -4,7 +4,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
-import { getFallbackModelsForSession } from "./fallback-models"
+import { getConfiguredPrimaryModel, getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -12,6 +12,7 @@ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { discardPromptParamsSnapshot, restorePromptParams } from "./fallback-prompt-params"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -40,13 +41,13 @@ function resolvePreferredSessionModel(
   const agentConfig = agent && pluginConfig?.agents
     ? pluginConfig.agents[agent]
     : undefined
-  if (typeof agentConfig?.model === "string") return agentConfig.model
+  const agentModel = getConfiguredPrimaryModel(agentConfig)
+  if (agentModel) return agentModel
 
   const category = typeof agentConfig?.category === "string"
     ? agentConfig.category
     : SessionCategoryRegistry.get(sessionID)
-  const categoryModel = category ? pluginConfig?.categories?.[category]?.model : undefined
-  return typeof categoryModel === "string" ? categoryModel : undefined
+  return category ? getConfiguredPrimaryModel(pluginConfig?.categories?.[category]) : undefined
 }
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
@@ -65,6 +66,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     deps.internallyAbortedSessions.delete(sessionID)
     sessionStatusRetryKeys.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
+    restorePromptParams(deps.sessionPromptParamsBeforeFallback, sessionID)
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
@@ -110,6 +112,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
+      discardPromptParamsSnapshot(deps.sessionPromptParamsBeforeFallback, sessionID)
     }
   }
 
