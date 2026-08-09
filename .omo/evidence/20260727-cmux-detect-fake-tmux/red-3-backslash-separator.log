@@ -1,0 +1,22 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/tmux-core/src/cmux-detect.test.ts:
+92 | 
+93 |     // when
+94 |     const result = isCmuxCompatEnvironment()
+95 | 
+96 |     // then
+97 |     expect(result).toBe(false)
+                        ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/Yoonki/.local/src/omo-pr6390/packages/tmux-core/src/cmux-detect.test.ts:97:20)
+(fail) isCmuxCompatEnvironment > #given a tmux socket whose directory name contains a literal backslash #when isCmuxCompatEnvironment called #then returns false (backslash is not a Unix separator) [1.10ms]
+
+ 7 pass
+ 1 fail
+ 8 expect() calls
+Ran 8 tests across 1 file. [128.00ms]

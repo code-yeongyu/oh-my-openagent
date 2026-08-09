@@ -145,6 +145,70 @@ both of which reproduce on clean `dev`.
 A type error introduced by this branch would surface as `error TSxxxx` on all three platforms, so
 this is treated as runner-side instability in the pinned `tsgo` dev build.
 
+## Review round 1 — cubic P3 / P2 and the `CHANGES_REQUESTED` follow-up
+
+### P3 — `hasCmuxSocketPath` treated `\` as a path separator
+
+`socketPath.split(/[\\/]/)` split on backslash as well as slash. tmux and cmux both run only on
+Unix, where `\` is an ordinary filename character, so the extra separator could only ever widen
+detection: a real tmux socket whose directory name contains a backslash, such as
+`/private/tmp/tmux-501/weird\cmux-omo`, was split into `weird` + `cmux-omo` and matched the cmux
+segment pattern. That is a false positive in the direction this PR exists to prevent — it would
+route a genuine tmux session through `cmux __tmux-compat`.
+
+Split is now `/` only, and the doc comment records that this is deliberate rather than an
+oversight, which also answers the maintainer's question on the PR ("is the backslash case needed
+for Windows cmux, or is it defensive?"): it is neither needed nor defensive, because tmux does
+not run on Windows.
+
+RED — new guard against the pre-change detector:
+
+```
+(fail) isCmuxCompatEnvironment > #given a tmux socket whose directory name contains a literal
+       backslash #when isCmuxCompatEnvironment called #then returns false ...
+Expected: false
+Received: true
+ 7 pass / 1 fail
+```
+
+`red-3-backslash-separator.log`. Only the new guard fails; every pre-existing test — including
+`efb862ce9`'s nested-real-tmux guard and the cmux-injected-`TMUX` case — still passes, so the
+narrowing does not disturb either side of the discriminator.
+
+### P2 — the live QA driver could not fail
+
+`live-cmux-driver.ts` logged the three observations it was cited for (placeholder text, `opencode
+attach` in the process table, `closeTmuxPane`) and then exited 0 regardless of their values, so
+re-running it produced no red/green signal. The three are now collected into explicit failure
+conditions that exit non-zero, and the check runs *after* `closeTmuxPaneWithDependencies` so a
+failed expectation never leaks a live pane.
+
+### Nested-real-tmux behaviour (confirmation requested in review)
+
+Unchanged and still covered from both directions. `CMUX_SOCKET_PATH` remains a precondition, and
+the discriminator is the socket path shape:
+
+| `CMUX_SOCKET_PATH` | `TMUX` | Result |
+| --- | --- | --- |
+| `/tmp/cmux.sock` | `/private/tmp/tmux-501/default,123,0` | `false` — native tmux nested in cmux |
+| `/tmp/cmux.sock` | `/private/tmp/tmux-501/weird\cmux-omo,123,0` | `false` — backslash is not a separator |
+| `/Users/…/cmux-501.sock` | `/tmp/cmux-omo/<workspace>,<surface>,<pane>` | `true` — cmux |
+| unset | `/tmp/cmux-omo/workspace,surface,pane` | `false` — no cmux socket |
+
+GREEN — every package that imports `isCmuxCompatEnvironment` or the tmux runner:
+
+```
+packages/tmux-core                                 108 pass / 0 fail
+packages/omo-opencode/src/shared/tmux               89 pass / 0 fail
+packages/omo-opencode/src/tools/interactive-bash     3 pass / 0 fail
+packages/omo-opencode/src/features/tmux-subagent   166 pass / 0 fail
+packages/openclaw-core                              67 pass / 0 fail
+```
+
+`review-round-1-green.log`. 433 pass / 0 fail, one more than the 432 recorded above because of
+the new backslash guard. `bunx tsgo --noEmit` exits 0 for both `packages/tmux-core` and
+`packages/omo-opencode`.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`

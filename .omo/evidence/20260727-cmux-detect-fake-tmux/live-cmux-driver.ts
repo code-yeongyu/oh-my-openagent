@@ -43,9 +43,14 @@ await Bun.sleep(6000)
 const capture = await runTmuxCommand(tmuxShimPath, ["capture-pane", "-p", "-t", spawnResult.paneId])
 const paneProcesses = Bun.spawnSync(["sh", "-c", "ps -eo command | grep 'opencode attach' | grep -v grep"])
 
-console.log("\npane content contains placeholder text =", capture.stdout.includes("subagent pane ready") || capture.stdout.includes("Focus this pane to attach"))
-console.log("attach process observed                =", paneProcesses.stdout.toString().trim().length > 0)
-console.log("attach process                         =", paneProcesses.stdout.toString().trim().split("\n")[0] ?? "(none)")
+const paneShowsPlaceholder =
+	capture.stdout.includes("subagent pane ready") || capture.stdout.includes("Focus this pane to attach")
+const attachProcess = paneProcesses.stdout.toString().trim()
+const attachObserved = attachProcess.length > 0
+
+console.log("\npane content contains placeholder text =", paneShowsPlaceholder)
+console.log("attach process observed                =", attachObserved)
+console.log("attach process                         =", attachProcess.split("\n")[0] ?? "(none)")
 
 const closed = await closeTmuxPaneWithDependencies(spawnResult.paneId, {
 	isInsideTmux: () => true,
@@ -56,3 +61,20 @@ const closed = await closeTmuxPaneWithDependencies(spawnResult.paneId, {
 })
 
 console.log("\ncloseTmuxPane ->", closed)
+
+// The pane is closed first so a failed expectation never leaks a live pane.
+const failures = [
+	paneShowsPlaceholder ? "pane still shows the inert placeholder instead of an attached session" : undefined,
+	attachObserved ? undefined : "no `opencode attach` process was observed while the pane was open",
+	closed ? undefined : "closeTmuxPaneWithDependencies returned false",
+].filter((failure): failure is string => failure !== undefined)
+
+if (failures.length > 0) {
+	console.error("\nFAIL")
+	for (const failure of failures) {
+		console.error("  -", failure)
+	}
+	process.exit(1)
+}
+
+console.log("\nPASS: pane attached through the real cmux CLI and cleaned up")
