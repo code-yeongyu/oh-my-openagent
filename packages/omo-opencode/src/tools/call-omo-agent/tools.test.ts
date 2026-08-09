@@ -499,6 +499,59 @@ describe("createCallOmoAgent", () => {
     })
   })
 
+  test("forwards a canonical category model chain to the background executor", async () => {
+    const launch = mock((_input: { model?: unknown; fallbackChain?: unknown[] }) => Promise.resolve({
+      id: "task-category-chain",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const toolDef = createCallOmoAgent(
+      createMockCtx(DEFAULT_AGENTS),
+      { launch, getTask: mock(() => undefined) },
+      [],
+      { explore: { category: "research" } },
+      {
+        research: {
+          models: [
+            {
+              model: "openai/gpt-5.6-sol",
+              reasoning: "high",
+              max_tokens: 1024,
+              provider_options: { serviceTier: "priority" },
+            },
+            { model: "anthropic/claude-haiku-4-5", reasoning: "low" },
+          ],
+        },
+      },
+    )
+
+    await (toolDef.execute as Function)(
+      {
+        description: "Test category chain",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      toolCtx,
+    )
+
+    const [launchArgs] = launch.mock.calls[0] ?? []
+    expect(launchArgs?.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.6-sol",
+      reasoning: "high",
+      maxTokens: 1024,
+      providerOptions: { serviceTier: "priority" },
+    })
+    expect(launchArgs?.fallbackChain).toEqual([{
+      providers: ["anthropic"],
+      model: "claude-haiku-4-5",
+      reasoning: "low",
+    }])
+  })
+
   test("falls back to first entry in agent's fallbackChain when no override is configured (#5301)", async () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({

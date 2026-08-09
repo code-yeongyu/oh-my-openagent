@@ -10,11 +10,10 @@ import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
+import { applyCategoryParams, applyFallbackEntrySettings } from "../../shared"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 import type { DelegatedModelConfig } from "./types"
-import { applyCategoryParams } from "./delegated-model-config"
-import { applyFallbackEntrySettings } from "./fallback-entry-settings"
 
 function getConfiguredModel(entry: string | { model: string } | undefined): string | undefined {
   return typeof entry === "string" ? entry : entry?.model

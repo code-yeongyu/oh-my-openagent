@@ -1,5 +1,5 @@
-import type { DelegatedModelConfig } from "./types"
-import type { FallbackEntry } from "../../shared/model-requirements"
+import type { FallbackEntry } from "./model-requirements"
+import type { DelegatedModelConfig } from "./model-resolution-types"
 
 export function applyFallbackEntrySettings(input: {
   categoryModel: DelegatedModelConfig

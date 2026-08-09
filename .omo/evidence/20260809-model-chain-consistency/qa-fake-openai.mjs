@@ -6,6 +6,7 @@ const port = Number(process.env.QA_FAKE_PORT)
 const logPath = process.env.QA_FAKE_LOG
 const failReasoning = process.env.QA_FAIL_REASONING
 const taskProbe = process.env.QA_TASK_PROBE === "1"
+const callOmoProbe = process.env.QA_CALL_OMO_PROBE === "1"
 let callCount = 0
 
 const server = http.createServer(async (request, response) => {
@@ -42,8 +43,25 @@ const server = http.createServer(async (request, response) => {
     sendSse(response, textEvents(callCount, "PARENT_TASK_PROBE_OK"))
     return
   }
+  if (callOmoProbe && input.includes("CALL_OMO_AGENT_PROBE") && !hasToolResult) {
+    sendSse(response, toolCallEvents(callCount, "call_omo_agent", `call_omo_${callCount}`, {
+      description: "canonical category chain probe",
+      prompt: "CALL_OMO_CHILD: reply exactly CALL_OMO_CHILD_OK",
+      subagent_type: "explore",
+      run_in_background: false,
+    }))
+    return
+  }
+  if (callOmoProbe && input.includes("CALL_OMO_AGENT_PROBE") && hasToolResult) {
+    sendSse(response, textEvents(callCount, "PARENT_CALL_OMO_PROBE_OK"))
+    return
+  }
+  if (callOmoProbe && input.includes("CALL_OMO_CHILD") && body.model !== "gpt-5.6-sol-primary") {
+    sendSse(response, textEvents(callCount, "CALL_OMO_CHILD_OK"))
+    return
+  }
 
-  if (body.model === "primary" || (failReasoning && body.reasoning?.effort === failReasoning)) {
+  if (body.model === "primary" || body.model === "gpt-5.6-sol-primary" || (failReasoning && body.reasoning?.effort === failReasoning)) {
     response.writeHead(429, { "content-type": "application/json" })
     response.end(JSON.stringify({ error: { message: "Rate limit exceeded", type: "rate_limit_error" } }))
     return

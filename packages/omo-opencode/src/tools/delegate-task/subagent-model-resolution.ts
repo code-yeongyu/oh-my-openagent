@@ -1,6 +1,8 @@
 import type { AgentOverrides } from "../../config/schema"
 import {
   AGENT_MODEL_REQUIREMENTS,
+  applyCategoryParams,
+  applyFallbackEntrySettings,
   buildFallbackChainFromModels,
   findMostSpecificFallbackEntry,
   flattenToFallbackModelStrings,
@@ -11,9 +13,7 @@ import {
   normalizeModelFormat,
 } from "../../shared"
 import { getAvailableModelsForDelegateTask } from "./available-models"
-import { applyCategoryParams } from "./delegated-model-config"
 import type { ExecutorContext } from "./executor-types"
-import { applyFallbackEntrySettings } from "./fallback-entry-settings"
 import { resolveEffectiveFallbackEntry } from "./fallback-entry-resolution"
 import { resolveModelForDelegateTask } from "./model-selection"
 import type { AgentInfo } from "./subagent-discovery"

@@ -437,6 +437,38 @@ describe("createPluginInterface - chat.params variant injection", () => {
     expect(input.message.reasoningEffort).toBeUndefined()
   })
 
+  test.each(["gpt-5.6-sol", "gpt-5.6-sol:xhigh"])(
+    "preserves inline reasoning from a canonical primary string for active model %s",
+    async (modelID) => {
+      const pluginInterface = createPluginInterface({
+        ctx: { client: {} } as never,
+        pluginConfig: {
+          agents: { explore: { models: ["openai/gpt-5.6-sol:xhigh"] } },
+        } as never,
+        firstMessageVariantGate: {
+          shouldOverride: () => false,
+          markApplied: () => {},
+          markSessionCreated: () => {},
+          clear: () => {},
+        },
+        managers: {} as never,
+        hooks: {} as never,
+        tools: {},
+      })
+      const input = {
+        sessionID: `ses-inline-primary-${modelID}`,
+        agent: "explore",
+        model: { providerID: "openai", modelID },
+        provider: { id: "openai" },
+        message: {} as { variant?: string; reasoningEffort?: string },
+      }
+
+      await pluginInterface["chat.params"]?.(input as never, { options: {} } as never)
+
+      expect([input.message.variant, input.message.reasoningEffort]).toContain("xhigh")
+    },
+  )
+
   test.each([
     ["Prometheus - Plan Builder", "prometheus", undefined],
     ["計畫師", "prometheus", "計畫師"],

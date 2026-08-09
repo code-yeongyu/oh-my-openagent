@@ -1,7 +1,7 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 import { resolveCategoryExecution } from "./category-resolver"
-import { applyCategoryParams } from "./delegated-model-config"
+import { applyCategoryParams } from "../../shared"
 import type { DelegatedModelConfig } from "./types"
 import type { CategoryConfig } from "../../config/schema"
 import type { ExecutorContext } from "./executor-types"

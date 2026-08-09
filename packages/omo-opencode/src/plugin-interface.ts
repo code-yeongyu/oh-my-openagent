@@ -81,10 +81,13 @@ export function createPluginInterface(args: {
       const parsedCanonicalPrimary = canonicalPrimaryModel
         ? parseModelString(canonicalPrimaryModel)
         : undefined
+      const parsedActiveModel = typeof providerID === "string" && modelID !== undefined
+        ? parseModelString(`${providerID}/${modelID}`)
+        : undefined
       const hasCanonicalPrimary = parsedCanonicalPrimary !== undefined
       const isCanonicalPrimaryRequest = parsedCanonicalPrimary !== undefined
-        && providerID === parsedCanonicalPrimary.providerID
-        && modelID === parsedCanonicalPrimary.modelID
+        && parsedActiveModel?.providerID === parsedCanonicalPrimary.providerID
+        && parsedActiveModel.modelID === parsedCanonicalPrimary.modelID
       const primaryReasoning = agentPrimary?.reasoning
         ?? agentPrimary?.variant
         ?? agentOverride?.reasoning
@@ -93,6 +96,7 @@ export function createPluginInterface(args: {
         ?? categoryPrimary?.variant
         ?? categoryOverride?.reasoning
         ?? categoryOverride?.variant
+        ?? parsedCanonicalPrimary?.variant
       const primaryReasoningEffort = agentPrimary?.reasoningEffort
         ?? agentOverride?.reasoningEffort
         ?? categoryPrimary?.reasoningEffort

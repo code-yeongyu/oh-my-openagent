@@ -10,7 +10,12 @@ import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAgentConfigKey, stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
-import { log } from "../../shared"
+import {
+  applyCategoryParams,
+  applyFallbackEntrySettings,
+  findMostSpecificFallbackEntry,
+  log,
+} from "../../shared"
 import { parseModelString } from "../../shared"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
@@ -34,6 +39,10 @@ function createSyncExecutorDeps(modelFallbackControllerAccessor?: ModelFallbackC
   }
 }
 
+function getConfiguredModel(entry: string | { model: string } | undefined): string | undefined {
+  return typeof entry === "string" ? entry : entry?.model
+}
+
 function resolveModelAndFallbackChain(args: {
   subagentType: string
   agentOverrides?: AgentOverrides
@@ -47,34 +56,31 @@ function resolveModelAndFallbackChain(args: {
     ?? (agentOverrides
       ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
       : undefined)
-  const agentCategoryModel = agentOverride?.category
-    ? userCategories?.[agentOverride.category]?.model
+  const categoryConfig = agentOverride?.category
+    ? userCategories?.[agentOverride.category]
     : undefined
-  const agentCategoryVariant = agentOverride?.category
-    ? userCategories?.[agentOverride.category]?.variant
+  const agentPrimaryEntry = agentOverride?.models?.[0]
+  const categoryPrimaryEntry = agentOverride?.models === undefined && agentOverride?.model === undefined
+    ? categoryConfig?.models?.[0]
     : undefined
+  const canonicalModels = agentOverride?.models
+    ?? (agentOverride?.model === undefined ? categoryConfig?.models : undefined)
+  const configuredPrimaryModel = getConfiguredModel(agentPrimaryEntry)
+    ?? agentOverride?.model
+    ?? getConfiguredModel(categoryPrimaryEntry)
+    ?? categoryConfig?.model
 
   let model: DelegatedModelConfig | undefined
-  if (agentOverride?.model) {
-    const normalized = parseModelString(agentOverride.model)
+  if (configuredPrimaryModel) {
+    const normalized = parseModelString(configuredPrimaryModel)
     if (normalized) {
-      model = agentOverride.variant ? { ...normalized, variant: agentOverride.variant } : normalized
-      log("[call_omo_agent] Resolved model override from agent config", {
-        agent: subagentType,
-        model: agentOverride.model,
-        variant: agentOverride.variant,
-      })
-    }
-  } else if (agentCategoryModel) {
-    const normalized = parseModelString(agentCategoryModel)
-    if (normalized) {
-      const variantToUse = agentOverride?.variant ?? agentCategoryVariant
-      model = variantToUse ? { ...normalized, variant: variantToUse } : normalized
-      log("[call_omo_agent] Resolved model override from agent category", {
+      const variant = agentOverride?.variant ?? categoryConfig?.variant ?? normalized.variant
+      model = applyCategoryParams(variant ? { ...normalized, variant } : normalized, categoryConfig)
+      log("[call_omo_agent] Resolved configured primary model", {
         agent: subagentType,
         category: agentOverride?.category,
-        model: agentCategoryModel,
-        variant: variantToUse,
+        model: configuredPrimaryModel,
+        variant,
       })
     }
   } else {
@@ -93,17 +99,32 @@ function resolveModelAndFallbackChain(args: {
   }
 
   const normalizedFallbackModels = normalizeFallbackModels(
-    agentOverride?.fallback_models
-    ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined)
+    agentOverride?.models !== undefined
+      ? agentOverride.models.slice(1)
+      : agentOverride?.fallback_models
+        ?? (categoryConfig?.models !== undefined
+          ? categoryConfig.models.slice(1)
+          : categoryConfig?.fallback_models),
   )
   const defaultProviderID = model?.providerID
     ?? agentRequirement?.fallbackChain?.[0]?.providers?.[0]
     ?? "opencode"
   const configuredFallbackChain = buildFallbackChainFromModels(normalizedFallbackModels, defaultProviderID)
+  const canonicalModelChain = buildFallbackChainFromModels(canonicalModels, defaultProviderID)
+  const primaryEntry = model && canonicalModelChain
+    ? findMostSpecificFallbackEntry(model.providerID, model.modelID, canonicalModelChain)
+    : undefined
+  if (model && primaryEntry) {
+    model = applyFallbackEntrySettings({
+      categoryModel: model,
+      effectiveEntry: primaryEntry,
+      variantOverride: agentOverride?.variant ?? categoryConfig?.variant,
+    })
+  }
 
   return {
     model,
-    fallbackChain: configuredFallbackChain ?? agentRequirement?.fallbackChain,
+    fallbackChain: configuredFallbackChain ?? (canonicalModels === undefined ? agentRequirement?.fallbackChain : undefined),
   }
 }
 
@@ -221,4 +242,3 @@ export function createCallOmoAgent(
     },
   });
 }
-

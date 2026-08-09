@@ -1,13 +1,11 @@
-import type { CategoryConfig } from "../../config/schema"
-import type { DelegatedModelConfig } from "./types"
+import type { CategoryConfig } from "../config/schema"
+import type { DelegatedModelConfig } from "./model-resolution-types"
 
 export function applyCategoryParams(
   base: DelegatedModelConfig,
   config: CategoryConfig | undefined,
 ): DelegatedModelConfig {
-  if (!config) {
-    return base
-  }
+  if (!config) return base
 
   const providerOptions = {
     ...(config.textVerbosity === undefined ? {} : { textVerbosity: config.textVerbosity }),
