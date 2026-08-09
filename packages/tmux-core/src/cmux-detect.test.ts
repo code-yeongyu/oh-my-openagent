@@ -85,6 +85,18 @@ describe("isCmuxCompatEnvironment", () => {
     expect(result).toBe(false)
   })
 
+  it("#given a tmux socket whose directory name contains a literal backslash #when isCmuxCompatEnvironment called #then returns false (backslash is not a Unix separator)", () => {
+    // given
+    process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
+    process.env.TMUX = "/private/tmp/tmux-501/weird\\cmux-omo,123,0"
+
+    // when
+    const result = isCmuxCompatEnvironment()
+
+    // then
+    expect(result).toBe(false)
+  })
+
   it("#given cmux socket directory TMUX without CMUX_SOCKET_PATH #when isCmuxCompatEnvironment called #then returns false", () => {
     // given
     process.env.TMUX = "/tmp/cmux-omo/workspace,surface,pane"

@@ -5,10 +5,16 @@ const CMUX_SOCKET_SEGMENT_PATTERN = /^cmux([-.]|$)/
  * directory (`/tmp/cmux-omo/<workspace>,<surface>,<pane>`); a real tmux socket
  * lives under `tmux-<uid>` (`/private/tmp/tmux-501/default,123,0`). The socket
  * path, not the presence of `TMUX`, is what tells the two apart.
+ *
+ * Splitting is Unix-only on purpose: tmux and cmux both run only on Unix, where
+ * `/` is the sole path separator and `\` is an ordinary filename character.
+ * Treating `\` as a separator would let a real tmux socket such as
+ * `/private/tmp/tmux-501/weird\cmux-omo` be misread as cmux and route every
+ * tmux command through `cmux __tmux-compat`.
  */
 function hasCmuxSocketPath(tmuxEnvironment: string): boolean {
 	const socketPath = tmuxEnvironment.split(",")[0] ?? ""
-	return socketPath.split(/[\\/]/).some((segment) => CMUX_SOCKET_SEGMENT_PATTERN.test(segment))
+	return socketPath.split("/").some((segment) => CMUX_SOCKET_SEGMENT_PATTERN.test(segment))
 }
 
 /**
