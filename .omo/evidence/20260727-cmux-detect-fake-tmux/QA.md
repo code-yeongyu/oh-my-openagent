@@ -322,6 +322,44 @@ timed out at 5018 ms against a 5000 ms limit and the two dependent cases fell ov
 passed on the two earlier pushes of this branch and passes on `dev`, so it is treated as a
 timing flake rather than an effect of this branch.
 
+### Outcome of the fix
+
+| job | previous three pushes | after `f209aa6e8` |
+| --- | --- | --- |
+| `test (windows-latest)` | fail, fail, fail | **pass** (12m39s) |
+| `test (macos-latest)` | pass, pass, fail | **pass** (5m34s) |
+| `test (ubuntu-latest)` | pass, pass, pass | fail — see below |
+
+Windows is green, which closes the regression. macOS passed on unchanged code, confirming the
+timeout diagnosis.
+
+### The remaining `ubuntu-latest` failure is upstream, and it is not a timeout
+
+```
+(fail) acquireSessionAdmissionLease > #given one stale lease and two racing waiters #when both
+       attempt the takeover CAS #then exactly one wins and the loser never deletes the winner's lease
+Expected length: 1
+Received length: 2
+ 13403 pass / 1 fail
+```
+
+Not this branch: `packages/senpi-task/src/lifecycle/admission-lease.test.ts` does not exist on this
+branch at all (`git grep acquireSessionAdmissionLease HEAD` is empty). It lives on `origin/dev`,
+which this branch is 336 commits behind, and CI runs the PR merged into `dev`. There is no file
+overlap with anything this PR touches.
+
+Worth flagging rather than dismissing, though: the received length is **2**, not 0. Both waiters
+acquired the lease, so this is a mutual-exclusion failure rather than a slow-runner timeout — the
+test caught precisely what its name describes. `tryTakeover` re-validates
+`fresh.token !== observed.token` under the record mutex, so both attempts landing means that mutex
+did not serialize them. The lease body keys on `pid` while both waiters are two async tasks in the
+same process, which is a plausible reason, but that was not confirmed.
+
+The race did not reproduce locally: the test was run 20 times in a row on a clean `origin/dev`
+worktree (macOS arm64, Bun 1.3.13) and passed 20/20, so the window appears to need Linux runner
+timing. Re-running the job is expected to go green, and a rebase would not help because the defect
+travels with `dev`.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`
