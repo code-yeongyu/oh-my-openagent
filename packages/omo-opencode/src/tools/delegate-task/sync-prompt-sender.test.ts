@@ -307,6 +307,7 @@ bunDescribe("sendSyncPrompt", () => {
         temperature: 0.4,
         top_p: 0.7,
         maxTokens: 4096,
+        providerOptions: { serviceTier: "priority" },
         thinking: { type: "disabled" },
       },
       toastManager: null,
@@ -330,6 +331,7 @@ bunDescribe("sendSyncPrompt", () => {
     })
     bunExpect(promptArgs.body.variant).toBe("low")
     bunExpect(promptArgs.body.options).toEqual({
+      serviceTier: "priority",
       reasoningEffort: "high",
       thinking: { type: "disabled" },
     })
@@ -339,6 +341,7 @@ bunDescribe("sendSyncPrompt", () => {
       topP: 0.7,
       maxOutputTokens: 4096,
       options: {
+        serviceTier: "priority",
         reasoningEffort: "high",
         thinking: { type: "disabled" },
       },

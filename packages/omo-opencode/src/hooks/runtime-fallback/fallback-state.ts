@@ -43,7 +43,9 @@ export function findNextAvailableFallback(
 ): string | undefined {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
-    if (areRuntimeFallbackModelsEquivalent(candidate, state.currentModel)) {
+    const isLaterRungForCurrentModel = state.fallbackIndex >= 0
+      && getRuntimeFallbackModelIdentity(candidate) === state.currentModel
+    if (!isLaterRungForCurrentModel && areRuntimeFallbackModelsEquivalent(candidate, state.currentModel)) {
       log(`[${HOOK_NAME}] Skipping equivalent fallback model`, {
         model: candidate,
         currentModel: state.currentModel,
@@ -52,7 +54,7 @@ export function findNextAvailableFallback(
       continue
     }
 
-    if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
+    if (isLaterRungForCurrentModel || !isModelInCooldown(candidate, state, cooldownSeconds)) {
       return candidate
     }
     log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
@@ -88,7 +90,7 @@ export function prepareFallback(
   const failedModel = state.currentModel
   const now = Date.now()
 
-  state.fallbackIndex = fallbackModels.indexOf(nextModel)
+  state.fallbackIndex = fallbackModels.indexOf(nextModel, state.fallbackIndex + 1)
   state.failedModels.set(failedModel, now)
   state.attemptCount++
   const modelIdentity = getRuntimeFallbackModelIdentity(nextModel)

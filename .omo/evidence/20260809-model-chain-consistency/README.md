@@ -59,6 +59,15 @@ test failed in the full parallel run and passed immediately in isolation.
   fallback state. See `real-variant-identity-summary.txt`,
   `real-variant-identity-provider-requests.json`, and
   `real-variant-identity-session-messages.json`.
+- Repeated-rung QA configured the same base model twice with `high` then `low`
+  reasoning. After the `high` rung returned 429, real OpenCode advanced to the
+  `low` rung, retained category `max_tokens` and provider options, and completed
+  successfully. See `real-repeated-rung-summary.jsonl`.
+- Primary-rung delegation QA used a one-entry category model chain. The real
+  `task` tool launched Sisyphus-Junior with that primary rung and preserved its
+  `max_tokens: 1536`, `serviceTier: priority`, and `textVerbosity: low` in both
+  `chat.params` and the provider request. All QA sessions were isolated from the
+  live database and deleted afterward. See `real-primary-rung-summary.jsonl`.
 
 Run the focused proof:
 

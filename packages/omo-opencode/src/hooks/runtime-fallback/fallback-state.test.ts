@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { createFallbackState, findNextAvailableFallback, stringifyRuntimeModelWithVariant } from "./fallback-state"
+import { createFallbackState, findNextAvailableFallback, prepareFallback, stringifyRuntimeModelWithVariant } from "./fallback-state"
 
 describe("runtime-fallback fallback state", () => {
   test("#given object-shaped current model #when finding the next fallback #then equivalent models are skipped without crashing", () => {
@@ -36,5 +36,30 @@ describe("runtime-fallback fallback state", () => {
 
     // then
     expect(runtimeModel).toBe("github-copilot/claude-haiku-4.5(low)")
+  })
+
+  test("allows a later rung with the same model identity", () => {
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "openai/gpt-5.5"
+    state.fallbackIndex = 0
+
+    const nextModel = findNextAvailableFallback(
+      state,
+      ["openai/gpt-5.5", "openai/gpt-5.5"],
+      60,
+    )
+
+    expect(nextModel).toBe("openai/gpt-5.5")
+  })
+
+  test("advances the index for repeated model rungs", () => {
+    const state = createFallbackState("openai/primary")
+    const models = ["openai/repeated", "openai/repeated"]
+    const config = { max_fallback_attempts: 3, cooldown_seconds: 60 } as Parameters<typeof prepareFallback>[3]
+
+    expect(prepareFallback("session", state, models, config).success).toBe(true)
+    expect(state.fallbackIndex).toBe(0)
+    expect(prepareFallback("session", state, models, config).success).toBe(true)
+    expect(state.fallbackIndex).toBe(1)
   })
 })

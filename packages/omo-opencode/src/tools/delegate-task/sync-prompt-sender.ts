@@ -28,6 +28,7 @@ function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): R
   }
 
   const promptOptions: Record<string, unknown> = {
+    ...model.providerOptions,
     ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
     ...(model.thinking ? { thinking: model.thinking } : {}),
   }

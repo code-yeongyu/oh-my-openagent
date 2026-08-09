@@ -9,6 +9,7 @@ export interface DelegatedModelConfig {
   temperature?: number
   top_p?: number
   maxTokens?: number
+  providerOptions?: Record<string, unknown>
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
   tools?: Record<string, boolean>
 }

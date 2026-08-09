@@ -52,16 +52,21 @@ export function getFallbackModelSettingsForSession(
   agent: string | undefined,
   pluginConfig: OhMyOpenCodeConfig | undefined,
   model: string,
+  fallbackIndex?: number,
 ): FallbackModelObject | undefined {
   if (!pluginConfig) return undefined
   const config = resolveFallbackConfigForSession(sessionID, agent, pluginConfig)
   const raw = getConfiguredFallbackModels(config)
   const flattened = flattenToFallbackModelStrings(raw)
+  const indexedFallback = fallbackIndex ?? -1
+  const indexedEntry = indexedFallback >= 0 ? raw?.[indexedFallback] : undefined
   const exactIndex = flattened?.indexOf(model) ?? -1
   const modelIdentity = getRuntimeFallbackModelIdentity(model)
-  const index = exactIndex >= 0
-    ? exactIndex
-    : flattened?.findIndex((candidate) => getRuntimeFallbackModelIdentity(candidate) === modelIdentity) ?? -1
+  const index = indexedEntry !== undefined
+    ? indexedFallback
+    : exactIndex >= 0
+      ? exactIndex
+      : flattened?.findIndex((candidate) => getRuntimeFallbackModelIdentity(candidate) === modelIdentity) ?? -1
   const entry = raw?.[index]
   if (entry === undefined || config === undefined) return undefined
   const selected = typeof entry === "string" ? { model: entry } : entry

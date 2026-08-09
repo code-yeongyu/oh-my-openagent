@@ -7,6 +7,7 @@ export type FallbackEntry = {
   temperature?: number;
   top_p?: number;
   maxTokens?: number;
+  providerOptions?: Record<string, unknown>;
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number };
 };
 

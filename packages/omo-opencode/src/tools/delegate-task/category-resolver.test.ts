@@ -138,7 +138,13 @@ describe("resolveCategoryExecution", () => {
 				reasoning: "medium",
 				reasoningEffort: "low",
 				models: [
-					{ model: "openai/gpt-5.4", reasoning: "high", reasoningEffort: "minimal" },
+					{
+						model: "openai/gpt-5.4",
+						reasoning: "high",
+						reasoningEffort: "minimal",
+						max_tokens: 2048,
+						provider_options: { serviceTier: "priority" },
+					},
 					{ model: "test-provider/plain-model", reasoning: "low" },
 				],
 			},
@@ -151,6 +157,8 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4")
 		expect(result.categoryModel?.reasoning).toBe("high")
+		expect(result.categoryModel?.maxTokens).toBe(2048)
+		expect(result.categoryModel?.providerOptions).toEqual({ serviceTier: "priority" })
 		expect(result.fallbackChain).toEqual([
 			{
 				providers: ["test-provider"],

@@ -1,0 +1,4 @@
+{"source":"chat.params","agent":"Sisyphus-Junior","model":"gpt-5.6-sol","maxOutputTokens":1536,"reasoningEffort":"medium","serviceTier":"priority","textVerbosity":"low"}
+{"source":"provider-request","model":"gpt-5.6-sol","max_output_tokens":1536,"reasoning_effort":"medium","service_tier":"priority","text_verbosity":"low"}
+{"source":"task-output","parentSessionID":"ses_01978a642ffeFWS6dFxpttfs7W","childSessionID":"ses_019789b3fffe6PeHTCl58u6PJI","category":"quick","model":"openai/gpt-5.6-sol","text":"CHILD_PRIMARY_OPTIONS_OK"}
+{"source":"isolation","liveDatabaseSessionCount":7144,"liveDatabaseMatchingQaSessions":0,"isolatedDatabaseMatchingQaSessionsAfterDelete":0}

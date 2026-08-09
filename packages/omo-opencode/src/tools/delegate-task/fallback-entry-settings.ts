@@ -18,6 +18,7 @@ export function applyFallbackEntrySettings(input: {
     temperature: effectiveEntry.temperature ?? categoryModel.temperature,
     top_p: effectiveEntry.top_p ?? categoryModel.top_p,
     maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
+    providerOptions: effectiveEntry.providerOptions ?? categoryModel.providerOptions,
     thinking: effectiveEntry.thinking ?? categoryModel.thinking,
   }
 }

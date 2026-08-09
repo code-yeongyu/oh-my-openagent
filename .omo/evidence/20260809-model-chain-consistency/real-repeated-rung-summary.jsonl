@@ -1,0 +1,5 @@
+{"source":"chat.params","model":"primary","maxOutputTokens":null,"reasoningEffort":null,"serviceTier":null,"textVerbosity":null}
+{"source":"chat.params","model":"gpt-5.6-sol","maxOutputTokens":2048,"reasoningEffort":"high","serviceTier":"priority","textVerbosity":"low"}
+{"source":"chat.params","model":"gpt-5.6-sol","maxOutputTokens":2048,"reasoningEffort":"low","serviceTier":"priority","textVerbosity":"low"}
+{"source":"provider-request","model":"gpt-5.6-sol","max_output_tokens":2048,"reasoning_effort":"low","service_tier":"priority","text_verbosity":"low"}
+{"source":"session-message","sessionID":"ses_01976feabffes5zdD3EI1cqeRv","model":"gpt-5.6-sol","text":"REAL_OPENCODE_FALLBACK_OK"}

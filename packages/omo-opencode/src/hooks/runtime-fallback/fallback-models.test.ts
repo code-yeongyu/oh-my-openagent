@@ -158,6 +158,31 @@ describe("runtime-fallback fallback-models", () => {
     expect(result?.provider_options).toEqual({ serviceTier: "priority" })
   })
 
+  test("uses the fallback index for repeated models with distinct settings", () => {
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: [
+            "openai/gpt-5.6",
+            { model: "openai/gpt-5.5", reasoning: "high", temperature: 0.3 },
+            { model: "openai/gpt-5.5", reasoning: "low", temperature: 0.2 },
+          ],
+        },
+      },
+    })
+
+    const result = getFallbackModelSettingsForSession(
+      "ses_runtime_fallback_repeated_model",
+      "oracle",
+      pluginConfig,
+      "openai/gpt-5.5",
+      1,
+    )
+
+    expect(result?.reasoning).toBe("low")
+    expect(result?.temperature).toBe(0.2)
+  })
+
   test("uses agent-specific fallback_models when agent is resolved", () => {
     //#given
     const pluginConfig = unsafeTestValue({

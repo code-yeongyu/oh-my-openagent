@@ -18,7 +18,10 @@ export function applyCategoryParams(
         : {}),
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+    ...(config.max_tokens !== undefined || config.maxTokens !== undefined
+      ? { maxTokens: config.max_tokens ?? config.maxTokens }
+      : {}),
+    ...(config.provider_options !== undefined ? { providerOptions: config.provider_options } : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
     ...(config.tools !== undefined ? { tools: config.tools } : {}),
   }
