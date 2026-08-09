@@ -50,13 +50,26 @@ describe("isCmuxCompatEnvironment", () => {
     expect(result).toBe(false)
   })
 
-  it("#given every cmux release-channel socket directory #when isCmuxCompatEnvironment called #then each is detected as cmux", () => {
+  it("#given every cmux socket path shape observed in the shipped binary #when isCmuxCompatEnvironment called #then each is detected as cmux", () => {
     // given
     process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
 
-    for (const directory of ["cmux-omo", "cmux-nightly", "cmux-staging", "cmux-debug", "cmux-cli-shims"]) {
+    const socketPaths = [
+      "/tmp/cmux-omo/workspace",
+      "/tmp/cmux-nightly-501/default",
+      "/tmp/cmux-staging-501/default",
+      "/tmp/cmux-debug-501/default",
+      "/tmp/cmux-ssh-relay/default",
+      "/tmp/cmux-cli-shims/default",
+      "/tmp/cmux-wait-for-boot/default",
+      "/tmp/cmux-xctest-1/default",
+      "/tmp/cmux.sock",
+      "/tmp/cmux-cloud-cli.sock",
+    ]
+
+    for (const socketPath of socketPaths) {
       // when
-      process.env.TMUX = `/tmp/${directory}/workspace,surface,pane`
+      process.env.TMUX = `${socketPath},surface,pane`
       const result = isCmuxCompatEnvironment()
 
       // then
