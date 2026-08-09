@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// omo-codex-install:837f31a80cb49a0be547308babfd7266571dd1c53846dc2a2225006cc2da8bfa:4d76fe0ff01e90dd4738f72edf1ef3d8e3fcffd9fbb16dc119e9299ef723edcb
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -97,20 +96,20 @@ var init_atomic_write = __esm(() => {
 
 // packages/telemetry-core/src/activity-state.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { basename as basename7, join as join34 } from "node:path";
+import { basename as basename7, join as join33 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
   const dataDir = resolveXdgDataDir(product.cacheDirName, {
     env: options.env,
     osProvider: options.osProvider
   });
-  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join34(options.env.XDG_DATA_HOME, product.cacheDirName);
+  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join33(options.env.XDG_DATA_HOME, product.cacheDirName);
   if (dataDir === xdgStateDir || xdgStateDir === undefined && basename7(dataDir) === product.cacheDirName) {
     return dataDir;
   }
-  return join34(dataDir, product.cacheDirName);
+  return join33(dataDir, product.cacheDirName);
 }
 function getTelemetryActivityStateFilePath(stateDir) {
-  return join34(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
+  return join33(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
 }
 function getDailyActiveCaptureState(input) {
   const state = readPostHogActivityState(input.stateDir, input.diagnostics);
@@ -181,9 +180,9 @@ var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY =
 
 // packages/telemetry-core/src/diagnostics.ts
 import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
-import { join as join35 } from "node:path";
+import { join as join34 } from "node:path";
 function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
-  return join35(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
+  return join34(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
 }
 function writeTelemetryDiagnostic(input, options) {
   const now = options.now ?? new Date;
@@ -6123,8 +6122,8 @@ var init_telemetry = __esm(() => {
 });
 
 // packages/omo-codex/src/install/install-local-cli.ts
-import { readFile as readFile23 } from "node:fs/promises";
-import { dirname as dirname12, join as join40, resolve as resolve10 } from "node:path";
+import { readFile as readFile22 } from "node:fs/promises";
+import { dirname as dirname12, join as join39, resolve as resolve10 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -6457,7 +6456,7 @@ var defaultRunCommand = async (command, args, options) => {
 };
 
 // packages/omo-codex/src/install/install-codex.ts
-import { join as join36, resolve as resolve9 } from "node:path";
+import { join as join35, resolve as resolve9 } from "node:path";
 import { existsSync as existsSync7 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 
@@ -6628,7 +6627,6 @@ var LEGACY_CODEX_COMPONENT_BINS = [
   { name: "codex-telemetry", component: "telemetry" },
   { name: "codex-ultrawork", component: "ultrawork" }
 ];
-var LEGACY_CODEX_COMPONENT_BIN_NAMES = LEGACY_CODEX_COMPONENT_BINS.map((entry) => entry.name);
 async function removeLegacyCodexComponentBins(binDir, platform) {
   for (const entry of LEGACY_CODEX_COMPONENT_BINS) {
     const linkPath = join3(binDir, platform === "win32" ? `${entry.name}.cmd` : entry.name);
@@ -10684,18 +10682,9 @@ function resolveCodexInstallerBinDir(input) {
   return resolve8(homeDir, ".local", "bin");
 }
 
-// packages/omo-codex/src/install/codex-installed-bin-dir.ts
-import { readFile as readFile20, readdir as readdir11, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join29 } from "node:path";
-var INSTALLED_BIN_DIR_MANIFEST = ".installed-bin-dir.json";
-async function writeInstalledCodexBinDir(input) {
-  await writeFile11(join29(input.pluginRoot, INSTALLED_BIN_DIR_MANIFEST), `${JSON.stringify({ binDir: input.binDir }, null, 2)}
-`);
-}
-
 // packages/omo-codex/src/install/codex-git-bash-hooks.ts
-import { readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join30 } from "node:path";
+import { readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join29 } from "node:path";
 var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
   "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
   "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
@@ -10703,22 +10692,22 @@ var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
 async function removeGitBashHooksOffWindows(input) {
   if (input.platform === "win32")
     return;
-  const manifestPath = join30(input.pluginRoot, ".codex-plugin", "plugin.json");
-  const parsed = JSON.parse(await readFile21(manifestPath, "utf8"));
+  const manifestPath = join29(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
     return;
   const hooks = parsed.hooks.filter((hook) => typeof hook !== "string" || !WINDOWS_ONLY_GIT_BASH_HOOKS.has(hook));
   if (hooks.length === parsed.hooks.length)
     return;
-  await writeFile12(manifestPath, `${JSON.stringify({ ...parsed, hooks }, null, "\t")}
+  await writeFile11(manifestPath, `${JSON.stringify({ ...parsed, hooks }, null, "\t")}
 `);
 }
 
 // packages/omo-codex/src/install/omo-sot-migration.ts
-import { join as join31 } from "node:path";
+import { join as join30 } from "node:path";
 async function seedAndMigrateOmoSot(input) {
   const commandEnv = { ...input.env };
-  const scriptPath = join31(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
+  const scriptPath = join30(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
   try {
     await input.runCommand(process.execPath, [scriptPath, "--seed"], {
       cwd: input.repoRoot,
@@ -10732,7 +10721,12 @@ async function seedAndMigrateOmoSot(input) {
 }
 
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
-import { join as join33 } from "node:path";
+import { join as join32 } from "node:path";
+
+// packages/utils/src/ast-grep/install-script.ts
+import { spawn as spawn2 } from "node:child_process";
+import { existsSync as existsSync4 } from "node:fs";
+import { join as join31 } from "node:path";
 
 // packages/utils/src/ast-grep/sg-manifest.ts
 function normalizeRuntimePlatform(platform = process.platform) {
@@ -10750,13 +10744,10 @@ function runtimeSlug(platform = process.platform, arch = process.arch) {
 }
 
 // packages/utils/src/ast-grep/install-script.ts
-import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
-import { join as join32 } from "node:path";
 var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
 var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
 function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
-  return join32(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
+  return join31(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
 }
 function isMissingExecutable(error) {
   if (!("code" in error))
@@ -10794,7 +10785,7 @@ function defaultSpawnProcess(command, args, options) {
   };
 }
 function scriptPathForPlatform(skillDir, platform) {
-  return join32(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
+  return join31(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
 }
 function invocationsForPlatform(scriptPath, platform) {
   if (platform !== "win32")
@@ -10866,7 +10857,7 @@ async function installAstGrepForCodex(options) {
     return;
   const platform = options.platform ?? process.platform;
   const targetDir = astGrepRuntimeDir(options.codexHome, platform, options.arch ?? process.arch);
-  const skillDir = join33(plugin.path, "skills", "ast-grep");
+  const skillDir = join32(plugin.path, "skills", "ast-grep");
   const installer = options.installer ?? runAstGrepSkillInstall;
   try {
     const result = await installer({ platform, skillDir, targetDir });
@@ -10899,7 +10890,7 @@ async function runCodexInstaller(options = {}) {
   const env2 = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const repoRoot = resolve9(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env2 }));
-  const codexHome = resolve9(options.codexHome ?? env2.CODEX_HOME ?? join36(homedir2(), ".codex"));
+  const codexHome = resolve9(options.codexHome ?? env2.CODEX_HOME ?? join35(homedir2(), ".codex"));
   const projectDirectory = resolve9(options.projectDirectory ?? env2.OMO_CODEX_PROJECT ?? process.cwd());
   const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env2 });
   const runCommand = options.runCommand ?? defaultRunCommand;
@@ -10916,9 +10907,9 @@ async function runCodexInstaller(options = {}) {
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
   }
-  const codexPackageRoot = join36(repoRoot, "packages", "omo-codex");
+  const codexPackageRoot = join35(repoRoot, "packages", "omo-codex");
   const marketplace = await readMarketplace(repoRoot, {
-    marketplacePath: join36(codexPackageRoot, "marketplace.json")
+    marketplacePath: join35(codexPackageRoot, "marketplace.json")
   });
   const distributionManifest = await readDistributionManifest(repoRoot);
   const installed = [];
@@ -10952,7 +10943,6 @@ async function runCodexInstaller(options = {}) {
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version: version2 });
       await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest });
-      await writeInstalledCodexBinDir({ pluginRoot: plugin.path, binDir });
       await removeGitBashHooksOffWindows({ platform, pluginRoot: plugin.path });
     }
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
@@ -10964,7 +10954,7 @@ async function runCodexInstaller(options = {}) {
       if (runtimeLink !== null)
         log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log(`Warning: skipped the omo runtime wrapper because ${join36(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log(`Warning: skipped the omo runtime wrapper because ${join35(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
@@ -11027,13 +11017,13 @@ async function runCodexInstaller(options = {}) {
       continue;
     log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`);
   }
-  const marketplaceRoot = join36(codexHome, "plugins", "cache", marketplace.name);
+  const marketplaceRoot = join35(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
     marketplaceRoot,
     plugins: installed
   });
-  const configPath = join36(codexHome, "config.toml");
+  const configPath = join35(codexHome, "config.toml");
   await updateCodexConfig({
     configPath,
     repoRoot: codexPackageRoot,
@@ -11094,7 +11084,7 @@ function findRepoRootFromImporter(importerDir) {
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [join36(current, "node_modules", "oh-my-openagent"), join36(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [join35(current, "node_modules", "oh-my-openagent"), join35(current, "oh-my-openagent")]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
         return wrapperPackageRoot;
     }
@@ -11112,7 +11102,7 @@ function findRepoRoot(input) {
   return findRepoRootFromImporter(input.importerDir);
 }
 function isRepoRootWithCodexPlugin(repoRoot) {
-  return existsSync7(join36(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
+  return existsSync7(join35(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
 }
 function codexMarketplaceSource(marketplaceRoot) {
   return { sourceType: "local", source: marketplaceRoot };
@@ -11425,12 +11415,12 @@ function shellQuote(value) {
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn3, spawnSync as spawnSync3 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { dirname as dirname11, join as join38 } from "node:path";
+import { dirname as dirname11, join as join37 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 // packages/omo-codex/src/install/lazycodex-bun-global-paths.ts
-import { join as join37 } from "node:path";
+import { join as join36 } from "node:path";
 function isBunGlobalEntrypointPath(invokedPath, env2) {
   if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
     return false;
@@ -11441,8 +11431,8 @@ function resolveBunGlobalRoots(env2) {
   const bunInstallRoot = env2.BUN_INSTALL?.trim();
   const homeRoot = env2.HOME?.trim();
   return [
-    ...bunInstallRoot ? [join37(bunInstallRoot, "bin"), join37(bunInstallRoot, "install", "global", "node_modules")] : [],
-    ...homeRoot ? [join37(homeRoot, ".bun", "bin"), join37(homeRoot, ".bun", "install", "global", "node_modules")] : []
+    ...bunInstallRoot ? [join36(bunInstallRoot, "bin"), join36(bunInstallRoot, "install", "global", "node_modules")] : [],
+    ...homeRoot ? [join36(homeRoot, ".bun", "bin"), join36(homeRoot, ".bun", "install", "global", "node_modules")] : []
   ].map(normalizePathForPrefix);
 }
 function normalizePathForPrefix(path2) {
@@ -11535,7 +11525,7 @@ function resolveCurrentVersion(env2) {
   if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
     return env2.LAZYCODEX_CURRENT_VERSION.trim();
   const pluginRoot = dirname11(dirname11(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join38(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join38(pluginRoot, ".codex-plugin", "plugin.json"));
+  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join37(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join37(pluginRoot, ".codex-plugin", "plugin.json"));
 }
 function resolveLatestVersion(env2) {
   if (env2.LAZYCODEX_LATEST_VERSION?.trim())
@@ -11651,7 +11641,7 @@ function compareVersions(left, right) {
 function resolveInstalledVersionPath(env2, pluginRoot) {
   if (env2.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
     return env2.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
-  return join38(pluginRoot, INSTALLED_VERSION_FILE);
+  return join37(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path2) {
   try {
@@ -11667,15 +11657,15 @@ function readVersionManifest(path2) {
   }
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
-import { readFile as readFile22, writeFile as writeFile13 } from "node:fs/promises";
-import { join as join39 } from "node:path";
+import { readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join38 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 async function stampGitBashMcpEnv(input) {
-  const manifestPath = join39(input.pluginRoot, ".mcp.json");
+  const manifestPath = join38(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
-  const parsed = JSON.parse(await readFile22(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile21(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed["mcpServers"]))
     return false;
   let changed = stampCodegraphMcpPath(parsed["mcpServers"], input.pluginRoot);
@@ -11693,7 +11683,7 @@ async function stampGitBashMcpEnv(input) {
   }
   if (!changed)
     return false;
-  await writeFile13(manifestPath, `${JSON.stringify(parsed, null, "\t")}
+  await writeFile12(manifestPath, `${JSON.stringify(parsed, null, "\t")}
 `);
   return true;
 }
@@ -11705,7 +11695,7 @@ function stampCodegraphMcpPath(mcpServers, pluginRoot) {
   const entrypoint = args[0];
   if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS2.has(entrypoint))
     return false;
-  codegraphServer["args"] = [join39(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
+  codegraphServer["args"] = [join38(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
   return true;
 }
 
@@ -11730,7 +11720,7 @@ async function runLazyCodexInstallLocalCli(input) {
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile23(join40(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile22(join39(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;

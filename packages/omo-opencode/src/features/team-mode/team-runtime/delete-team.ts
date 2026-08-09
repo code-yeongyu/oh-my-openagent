@@ -2,8 +2,12 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { log } from "../../../shared/logger"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
+import { resolveTeamMultiplexer } from "@oh-my-opencode/team-core"
 import { canVisualize, removeTeamLayout } from "../team-layout-tmux/layout"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
+import { canVisualizeHerdr, removeHerdrTeamLayout } from "../team-layout-herdr/layout"
+import { sweepStaleHerdrPanes } from "../team-layout-herdr/sweep-stale-herdr-panes"
+import { resolveCallerHerdrWorkspaceId } from "./activate-team-layout"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeState } from "../team-state-store/store"
@@ -14,6 +18,8 @@ import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 export type DeleteTeamDeps = {
   canVisualize: typeof canVisualize
   removeTeamLayout: typeof removeTeamLayout
+  canVisualizeHerdr: typeof canVisualizeHerdr
+  removeHerdrTeamLayout: typeof removeHerdrTeamLayout
   log: typeof log
 }
 
@@ -22,6 +28,8 @@ export type DeleteTeamBackgroundManager = Pick<BackgroundManager, "getTasksByPar
 const defaultDeleteTeamDeps: DeleteTeamDeps = {
   canVisualize,
   removeTeamLayout,
+  canVisualizeHerdr,
+  removeHerdrTeamLayout,
   log,
 }
 
@@ -145,7 +153,9 @@ async function deleteTeamResources(
     }
   }
 
-  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && deps.canVisualize()
+  const multiplexer = resolveTeamMultiplexer(config)
+  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined
+    && (multiplexer === "herdr" ? deps.canVisualizeHerdr() : deps.canVisualize())
   if (removedLayout) {
     const memberPaneIds = runtimeState.members
       .flatMap((member) => (
@@ -163,7 +173,11 @@ async function deleteTeamResources(
 
     if (options?.force === true) {
       try {
-        await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        if (multiplexer === "herdr") {
+          await deps.removeHerdrTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        } else {
+          await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        }
       } catch (error) {
         deps.log("team delete layout cleanup failed", {
           teamRunId,
@@ -171,7 +185,11 @@ async function deleteTeamResources(
         })
       }
     } else {
-      await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      if (multiplexer === "herdr") {
+        await deps.removeHerdrTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      } else {
+        await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      }
     }
   }
 
@@ -191,7 +209,15 @@ async function deleteTeamResources(
   unregisterTeamRunForSessionCleanup(teamRunId)
 
   const activeTeams = await listActiveTeams(config)
-  sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch(ignoreStaleTeamSessionSweepFailure)
+  const activeRunIds = new Set(activeTeams.map((team) => team.teamRunId))
+  if (multiplexer === "herdr") {
+    const workspaceId = resolveCallerHerdrWorkspaceId()
+    if (workspaceId) {
+      sweepStaleHerdrPanes(workspaceId, activeRunIds).catch(ignoreStaleTeamSessionSweepFailure)
+    }
+  } else {
+    sweepStaleTeamSessions(activeRunIds).catch(ignoreStaleTeamSessionSweepFailure)
+  }
 
   return { removedWorktrees, removedLayout }
 }

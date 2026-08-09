@@ -50,7 +50,9 @@ function createRuntimeState() {
 }
 
 function createConfig(tmuxVisualization: boolean) {
-  return TeamModeConfigSchema.parse({ enabled: true, tmux_visualization: tmuxVisualization })
+  // Pin the multiplexer to tmux: this test process may inherit HERDR_ENV from the
+  // environment it runs in, which would route the dispatch to the herdr backend.
+  return TeamModeConfigSchema.parse({ enabled: true, tmux_visualization: tmuxVisualization, multiplexer: "tmux" })
 }
 
 describe("activateTeamLayout", () => {

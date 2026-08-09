@@ -13,6 +13,7 @@ export type TeamCoreSpecSource = Parameters<typeof createRuntimeState>[2]
 const TEAM_CORE_TRANSPORT_DEFAULTS = {
   enabled: true,
   tmux_visualization: false,
+  multiplexer: "auto",
   max_messages_per_run: 10000,
   max_member_turns: 500,
   message_payload_max_bytes: 32768,

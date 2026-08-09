@@ -1,6 +1,7 @@
 import { access, mkdir } from "node:fs/promises"
 import path from "node:path"
 
+import { resolveTeamMultiplexer } from "@oh-my-opencode/team-core"
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../../shared/question-denied-session-permission"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
@@ -17,6 +18,8 @@ import { buildTeammateCommunicationAddendum } from "../member-guidance"
 import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
+import { sweepStaleHerdrPanes } from "../team-layout-herdr/sweep-stale-herdr-panes"
+import { resolveCallerHerdrWorkspaceId } from "./activate-team-layout"
 import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
 import { assertNoUnresolvedTeamMembers, hasUnresolvedTeamMembers } from "./unresolved-team-members"
 
@@ -135,7 +138,14 @@ export async function createTeamRun(
 
   const activeTeams = await listActiveTeams(config)
   const activeRunIds = new Set(activeTeams.map((t) => t.teamRunId))
-  sweepStaleTeamSessions(activeRunIds).catch(() => {})
+  if (resolveTeamMultiplexer(config) === "herdr") {
+    const workspaceId = resolveCallerHerdrWorkspaceId()
+    if (workspaceId) {
+      sweepStaleHerdrPanes(workspaceId, activeRunIds).catch(() => {})
+    }
+  } else {
+    sweepStaleTeamSessions(activeRunIds).catch(() => {})
+  }
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)

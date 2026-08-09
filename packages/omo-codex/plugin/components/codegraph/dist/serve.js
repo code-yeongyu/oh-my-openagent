@@ -5832,6 +5832,8 @@ var OmoModelCatalogEntryLayerSchema = preprocess((value) => isRecord4(value) ? n
 var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSchema);
 
 // ../../../../omo-config-core/src/schema/task.ts
+import { availableParallelism } from "node:os";
+var ResidencyMaxChildrenInputSchema = union([number2().int().positive(), literal("unlimited")]);
 var OmoTaskWaitSchema = object({
   min_ms: number2().int().positive().default(5000),
   default_ms: number2().int().positive().default(60000),
@@ -5851,10 +5853,11 @@ var OmoTaskSettingsSchema = object({
   provider_concurrency: record(string2(), number2().int().positive()).optional(),
   model_concurrency: record(string2(), number2().int().positive()).optional(),
   max_depth: number2().int().nonnegative().default(1),
-  residency_max_children: number2().int().positive().default(8),
+  residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
   ttl_ms: number2().int().positive().default(86400000),
   state_dir: string2().optional(),
   reattach_on_reconcile: boolean2().optional(),
+  resume_children: boolean2().default(true),
   warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
   team: OmoTaskTeamSettingsSchema.default({
@@ -5882,14 +5885,22 @@ var OmoTaskSettingsLayerSchema = object({
   provider_concurrency: record(string2(), number2().int().positive()).optional(),
   model_concurrency: record(string2(), number2().int().positive()).optional(),
   max_depth: number2().int().nonnegative().optional(),
-  residency_max_children: number2().int().positive().optional(),
+  residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
   ttl_ms: number2().int().positive().optional(),
   state_dir: string2().optional(),
   reattach_on_reconcile: boolean2().optional(),
+  resume_children: boolean2().optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
   team: OmoTaskTeamSettingsLayerSchema.optional()
 }).strict();
+function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism) {
+  const record2 = record(string2(), unknown()).parse(input);
+  return OmoTaskSettingsSchema.parse({
+    ...record2,
+    residency_max_children: record2["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3)
+  });
+}
 
 // ../../../../omo-config-core/src/schema/team.ts
 var OmoTeamMemberBaseSchema = object({
@@ -7565,7 +7576,7 @@ var DEFAULT_RAW_CONFIG = {
   agents: {},
   categories: {},
   codegraph: OmoCodegraphSettingsSchema.parse({}),
-  task: OmoTaskSettingsSchema.parse({}),
+  task: resolveOmoTaskSettings({}),
   teams: {}
 };
 function stripResolutionControlKeys(config2) {
@@ -7904,6 +7915,21 @@ function isUnsafeObjectKey2(key) {
 }
 function isPlainObject3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
+}
+
+// ../../../../omo-config-core/src/migration/backup-move.ts
+function isCrossDeviceError(error) {
+  return error instanceof Error && Reflect.get(error, "code") === "EXDEV";
+}
+function moveMigrationBackup(fileSystem, sourcePath, backupPath) {
+  try {
+    fileSystem.renameSync(sourcePath, backupPath);
+  } catch (error) {
+    if (!isCrossDeviceError(error))
+      throw error;
+    fileSystem.copyFileSync(sourcePath, backupPath);
+    fileSystem.unlinkSync(sourcePath);
+  }
 }
 
 // ../../../../omo-config-core/src/migration/commit.ts
@@ -8418,7 +8444,7 @@ function resumeMigrationJournal(input) {
       if (input.fileSystem.existsSync(move.to)) {
         throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`);
       }
-      input.fileSystem.renameSync(move.from, move.to);
+      moveMigrationBackup(input.fileSystem, move.from, move.to);
     } else if (!input.fileSystem.existsSync(move.to)) {
       throw new MigrationTransactionError(`Migration source and backup are both missing: ${move.from}`);
     }
@@ -8540,7 +8566,7 @@ function executePlan(input) {
     input.renewLock();
     if (fileSystem.existsSync(move.to))
       throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`);
-    fileSystem.renameSync(move.from, move.to);
+    moveMigrationBackup(fileSystem, move.from, move.to);
     input.onBoundary?.("source-moved");
     Object.assign(targetRecorded, { completedMoves: [...targetRecorded.completedMoves, move.from] });
     writeMigrationJournal(targetRecorded, fileSystem, env, input.process, input.clock);

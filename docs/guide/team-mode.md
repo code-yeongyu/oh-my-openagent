@@ -31,12 +31,13 @@ After enabling, restart opencode. The 12 `team_*` tools become available.
 
 > Bug-fix note: v4.2.1 adds a fresh-install regression test for this minimal config and logs the resolved `team_mode` state plus team tool count during startup. If the tools still do not appear after restart, inspect `oh-my-opencode.log` for the loaded config path and `[tool-registry] Built tool registry` entry.
 
-## Config schema (11 fields)
+## Config schema (12 fields)
 
 All fields live under `team_mode`:
 
 - `enabled` (boolean, default `false`)
 - `tmux_visualization` (boolean, default `false`)
+- `multiplexer` (`"auto"` | `"tmux"` | `"herdr"`, default `"auto"`)
 - `max_parallel_members` (int, `1..8`, default `4`)
 - `max_members` (int, `1..8`, default `8`)
 - `max_messages_per_run` (int, `>=1`, default `10000`)
@@ -118,6 +119,17 @@ Set `tmux_visualization: true`. Requires running inside a tmux session and tmux 
 When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
 
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
+
+## herdr visualization (optional)
+
+herdr (herdr.dev) is supported as an alternative multiplexer backend. Set `tmux_visualization: true` and `multiplexer: "herdr"` (or leave `multiplexer: "auto"` — inside a herdr pane it resolves to herdr automatically). Requires:
+
+- running opencode inside a herdr-managed pane (herdr injects `HERDR_ENV` / `HERDR_SOCKET_PATH`)
+- `herdr` on PATH (or `HERDR_BIN_PATH`)
+
+Behavior mirrors the tmux backend: each member gets a dedicated herdr pane titled `omo-team-<run-id>-<member>` running `opencode attach` for that member's session, in the member worktree when configured. herdr pane ids use an alphanumeric workspace prefix (e.g. `wJ:p1`), which the backend parses natively.
+
+`team_delete` closes the panes. Stale `omo-team-*` panes of inactive runs are swept on team create. All failures are isolated — an unreachable herdr never blocks team creation, mirroring the tmux backend's fail-safe.
 
 ## What team mode does NOT do
 

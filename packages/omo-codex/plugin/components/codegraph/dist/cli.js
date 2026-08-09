@@ -5566,6 +5566,8 @@ var OmoModelCatalogEntryLayerSchema = preprocess((value) => isRecord4(value) ? n
 var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSchema);
 
 // ../../omo-config-core/src/schema/task.ts
+import { availableParallelism } from "node:os";
+var ResidencyMaxChildrenInputSchema = union([number2().int().positive(), literal("unlimited")]);
 var OmoTaskWaitSchema = object({
   min_ms: number2().int().positive().default(5000),
   default_ms: number2().int().positive().default(60000),
@@ -5585,10 +5587,11 @@ var OmoTaskSettingsSchema = object({
   provider_concurrency: record(string2(), number2().int().positive()).optional(),
   model_concurrency: record(string2(), number2().int().positive()).optional(),
   max_depth: number2().int().nonnegative().default(1),
-  residency_max_children: number2().int().positive().default(8),
+  residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
   ttl_ms: number2().int().positive().default(86400000),
   state_dir: string2().optional(),
   reattach_on_reconcile: boolean2().optional(),
+  resume_children: boolean2().default(true),
   warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
   team: OmoTaskTeamSettingsSchema.default({
@@ -5616,14 +5619,22 @@ var OmoTaskSettingsLayerSchema = object({
   provider_concurrency: record(string2(), number2().int().positive()).optional(),
   model_concurrency: record(string2(), number2().int().positive()).optional(),
   max_depth: number2().int().nonnegative().optional(),
-  residency_max_children: number2().int().positive().optional(),
+  residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
   ttl_ms: number2().int().positive().optional(),
   state_dir: string2().optional(),
   reattach_on_reconcile: boolean2().optional(),
+  resume_children: boolean2().optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
   team: OmoTaskTeamSettingsLayerSchema.optional()
 }).strict();
+function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism) {
+  const record2 = record(string2(), unknown()).parse(input);
+  return OmoTaskSettingsSchema.parse({
+    ...record2,
+    residency_max_children: record2["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3)
+  });
+}
 
 // ../../omo-config-core/src/schema/team.ts
 var OmoTeamMemberBaseSchema = object({
@@ -7299,7 +7310,7 @@ var DEFAULT_RAW_CONFIG = {
   agents: {},
   categories: {},
   codegraph: OmoCodegraphSettingsSchema.parse({}),
-  task: OmoTaskSettingsSchema.parse({}),
+  task: resolveOmoTaskSettings({}),
   teams: {}
 };
 function stripResolutionControlKeys(config2) {
@@ -7638,6 +7649,21 @@ function isUnsafeObjectKey2(key) {
 }
 function isPlainObject3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
+}
+
+// ../../omo-config-core/src/migration/backup-move.ts
+function isCrossDeviceError(error) {
+  return error instanceof Error && Reflect.get(error, "code") === "EXDEV";
+}
+function moveMigrationBackup(fileSystem, sourcePath, backupPath) {
+  try {
+    fileSystem.renameSync(sourcePath, backupPath);
+  } catch (error) {
+    if (!isCrossDeviceError(error))
+      throw error;
+    fileSystem.copyFileSync(sourcePath, backupPath);
+    fileSystem.unlinkSync(sourcePath);
+  }
 }
 
 // ../../omo-config-core/src/migration/commit.ts
@@ -8152,7 +8178,7 @@ function resumeMigrationJournal(input) {
       if (input.fileSystem.existsSync(move.to)) {
         throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`);
       }
-      input.fileSystem.renameSync(move.from, move.to);
+      moveMigrationBackup(input.fileSystem, move.from, move.to);
     } else if (!input.fileSystem.existsSync(move.to)) {
       throw new MigrationTransactionError(`Migration source and backup are both missing: ${move.from}`);
     }
@@ -8274,7 +8300,7 @@ function executePlan(input) {
     input.renewLock();
     if (fileSystem.existsSync(move.to))
       throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`);
-    fileSystem.renameSync(move.from, move.to);
+    moveMigrationBackup(fileSystem, move.from, move.to);
     input.onBoundary?.("source-moved");
     Object.assign(targetRecorded, { completedMoves: [...targetRecorded.completedMoves, move.from] });
     writeMigrationJournal(targetRecorded, fileSystem, env, input.process, input.clock);
@@ -8776,7 +8802,7 @@ async function runProcessFamilySweep(config2, options) {
   }
   try {
     const plan = await config2.collect();
-    const { failed, killed } = dryRun ? { failed: [], killed: [] } : await killTargets(plan.killList, options, config2.familyLabel);
+    const { failed, killed } = dryRun ? { failed: [], killed: [] } : await killTargets(plan.killList, options, config2);
     if (!dryRun)
       writeSweepStamp(config2.stampFile, nowMs);
     return {
@@ -8793,16 +8819,18 @@ async function runProcessFamilySweep(config2, options) {
     return { action: "failed", candidates: [], dryRun, failed: [], killed: [], spared: [], stampFile: config2.stampFile };
   }
 }
-async function killTargets(targets, options, familyLabel) {
+async function killTargets(targets, options, config2) {
   const failed = [];
   const killed = [];
   const context = {
     failed,
-    familyLabel,
+    familyLabel: config2.familyLabel,
     killer: options.killer ?? createDefaultProcessKiller(options.platform),
     log: options.log
   };
   for (const target of targets) {
+    if (!await passesSignalAttestation(target, config2.attestBeforeSignal, options.log, "SIGTERM"))
+      continue;
     const terminated = await safelyTerminate(target.pid, context);
     if (!terminated)
       continue;
@@ -8811,10 +8839,25 @@ async function killTargets(targets, options, familyLabel) {
       killed.push(target);
       continue;
     }
+    if (!await passesSignalAttestation(target, config2.attestBeforeSignal, options.log, "SIGKILL"))
+      continue;
     if (await safelyKill(target.pid, context))
       killed.push(target);
   }
   return { failed, killed };
+}
+async function passesSignalAttestation(target, attest, log, signal) {
+  if (attest === undefined)
+    return true;
+  try {
+    const attested = await attest(target);
+    if (!attested)
+      log?.(`process sweep sparing pid ${target.pid}: identity changed before ${signal}`);
+    return attested;
+  } catch (error) {
+    log?.(`process sweep sparing pid ${target.pid}: identity attestation failed before ${signal}: ${String(error)}`);
+    return false;
+  }
 }
 async function safelyTerminate(pid, context) {
   try {
@@ -10460,21 +10503,36 @@ function runProcessWithTreeTimeout(options) {
     };
     child.stdout.on("data", (chunk) => capture("stdout", chunk));
     child.stderr.on("data", (chunk) => capture("stderr", chunk));
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      startTermination().then(() => settle(124, child.signalCode));
-    }, options.timeoutMs);
-    timeout.unref();
+    let removeTimeoutSignal = () => {
+      return;
+    };
+    let timeout;
     const settle = async (exitCode, signal) => {
       if (settled)
         return;
       settled = true;
       clearTimeout(timeout);
+      removeTimeoutSignal();
       const termination = treeTermination === undefined ? null : await treeTermination;
       stderr += stderrDecoder.end();
       stdout += stdoutDecoder.end();
       resolvePromise({ exitCode, signal, stderr, stdout, termination, timedOut });
     };
+    const triggerTimeout = () => {
+      if (settled)
+        return;
+      timedOut = true;
+      startTermination().then(() => settle(124, child.signalCode));
+    };
+    timeout = setTimeout(triggerTimeout, options.timeoutMs);
+    timeout.unref();
+    if (options.timeoutSignal?.aborted === true) {
+      triggerTimeout();
+    } else if (options.timeoutSignal !== undefined) {
+      const timeoutSignal = options.timeoutSignal;
+      timeoutSignal.addEventListener("abort", triggerTimeout, { once: true });
+      removeTimeoutSignal = () => timeoutSignal.removeEventListener("abort", triggerTimeout);
+    }
     child.once("error", () => {
       resolveChildClosed();
       settle(1, null);
