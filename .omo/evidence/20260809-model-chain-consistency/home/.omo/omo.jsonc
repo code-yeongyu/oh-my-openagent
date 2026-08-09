@@ -1,0 +1,13 @@
+{
+  "[opencode]": {
+    "agents": {
+      "sisyphus": {
+        "models": [
+          "opencode/primary-model",
+          "openai/canonical-fallback"
+        ],
+        "reasoning": "medium"
+      }
+    }
+  }
+}
