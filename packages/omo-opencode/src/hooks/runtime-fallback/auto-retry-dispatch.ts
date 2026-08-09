@@ -49,14 +49,20 @@ export function createAutoRetryDispatcher(
     const agentSettings = resolvedAgent
       ? pluginConfig?.agents?.[resolvedAgent as keyof typeof pluginConfig.agents]
       : undefined
-    const fallbackSettings = getFallbackModelSettingsForSession(
+    const configuredFallbackSettings = getFallbackModelSettingsForSession(
       sessionID,
       resolvedAgent,
       pluginConfig,
       newModel,
       sessionStates.get(sessionID)?.fallbackIndex,
     )
-      ?? agentSettings
+    const fallbackSettings = configuredFallbackSettings ?? (agentSettings
+      ? {
+        reasoning: agentSettings.reasoning,
+        variant: agentSettings.variant,
+        reasoningEffort: agentSettings.reasoningEffort,
+      }
+      : undefined)
     const parsedModel = buildRetryModelPayload(newModel)
     const previousPromptParams = getSessionPromptParams(sessionID)
     const capturedPromptParams = parsedModel && fallbackSettings

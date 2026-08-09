@@ -5,10 +5,10 @@ Issue: #6644
 ## Behavioral proof
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
-- Exact-head focused suite: 141 passed, 0 failed.
+- Exact-head focused suite: 280 passed, 0 failed.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,489 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,490 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
@@ -84,6 +84,13 @@ The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
   settings on the allowed primary, then completed on the plain fallback without
   those primary-only settings. The isolated session was deleted and had zero
   matches in the live database. See `real-staff-final-summary.jsonl`.
+- Final compatibility QA drove the exact local source through an isolated real
+  OpenCode 1.18.15 server and SSE stream. The primary returned 429, the plain
+  fallback completed without primary-only token or provider settings, both QA
+  sessions were deleted, and the live database remained unchanged. The focused
+  regression also proves the unconfigured dispatcher branch preserves reasoning
+  without leaking temperature, max tokens, or provider options. See
+  `real-exact-head-compat-summary.jsonl`.
 
 Run the focused proof:
 

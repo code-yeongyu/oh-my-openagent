@@ -1,0 +1,8 @@
+{"source":"qa-context","openCode":"1.18.15","surface":"isolated server + SSE + local fake provider","purpose":"verify the exact-head runtime fallback lifecycle and prompt-setting scope"}
+{"source":"sse","event":"session.status","observed":true}
+{"source":"chat.params","rung":"primary","model":"gpt-5.6-sol-primary","maxOutputTokens":1024,"serviceTier":"priority","textVerbosity":"high","reasoningEffort":"max"}
+{"source":"chat.params","rung":"fallback","model":"gpt-5.6-sol","maxOutputTokens":null,"serviceTier":null,"textVerbosity":"low","reasoningEffort":"medium"}
+{"source":"session-message","sessionID":"ses_0192f8f5cffeh30BOkn55ZYvKE","agent":"Sisyphus - ultraworker","models":["gpt-5.6-sol-primary","gpt-5.6-sol"],"text":"REAL_OPENCODE_FALLBACK_OK"}
+{"source":"unit-compatibility","test":"preserves legacy reasoning for an unconfigured fallback without leaking primary prompt settings","observed":"legacy reasoning variant was preserved while primary temperature, maxTokens, and providerOptions were absent from fallback prompt params","focusedSuite":{"passed":280,"failed":0}}
+{"source":"isolation","liveDatabaseBefore":7163,"liveDatabaseAfter":7163,"liveSessionMatches":0,"isolatedDatabaseBefore":17,"isolatedDatabaseAfter":17,"deletedQaSessions":2}
+{"source":"scope","whyEnough":"the real OpenCode lifecycle proves the exact-head hook still performs and scopes a configured fallback; the focused regression test covers the otherwise unreachable dispatcher compatibility branch","omitted":"raw full prompts, environment dumps, auth headers, and server logs"}

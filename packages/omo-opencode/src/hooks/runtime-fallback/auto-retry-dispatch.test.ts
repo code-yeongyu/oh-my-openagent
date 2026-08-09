@@ -290,10 +290,19 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     expect(deps.sessionPromptParamsBeforeFallback?.size).toBe(0)
   })
 
-  test("preserves agent settings for an unconfigured default fallback", async () => {
+  test("preserves legacy reasoning for an unconfigured fallback without leaking primary prompt settings", async () => {
     const promptCalls: Array<Record<string, unknown>> = []
     const deps = createDeps({ count: 0 })
-    deps.pluginConfig = unsafeTestValue({ agents: { sisyphus: { variant: "high" } } })
+    deps.pluginConfig = unsafeTestValue({
+      agents: {
+        sisyphus: {
+          variant: "high",
+          temperature: 0.2,
+          maxTokens: 1024,
+          providerOptions: { serviceTier: "priority" },
+        },
+      },
+    })
     deps.ctx.client.session.promptAsync = async (input) => {
       promptCalls.push(input as unknown as Record<string, unknown>)
       return {}
@@ -307,5 +316,6 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "sisyphus", "session.error")
 
     expect(promptCalls[0]?.body).toMatchObject({ variant: "high" })
+    expect(getSessionPromptParams(sessionID)).toEqual({})
   })
 })
