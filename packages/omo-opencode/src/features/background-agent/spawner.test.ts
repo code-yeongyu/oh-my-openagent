@@ -488,6 +488,7 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(promptArgs.body.variant).toBe("low")
     expect(promptArgs.body.options).toBeUndefined()
     expect(getSessionPromptParams("session-123")).toEqual({
+      variant: "low",
       temperature: 0.4,
       topP: 0.7,
       maxOutputTokens: 4096,

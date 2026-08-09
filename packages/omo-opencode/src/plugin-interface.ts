@@ -2,8 +2,13 @@ import { isRecord } from "@oh-my-opencode/utils"
 import type { OhMyOpenCodeConfig } from "./config"
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 
-import { applyAgentVariant } from "./shared/agent-variant"
-import { getAgentConfigKey, getSessionPromptParams } from "./shared"
+import {
+  applyAgentVariant,
+  getAgentConfigKey,
+  getSessionPromptParams,
+  lowerReasoningForModel,
+  parseModelString,
+} from "./shared"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -58,33 +63,103 @@ export function createPluginInterface(args: {
       const agentOverride = agentConfigKey === undefined
         ? undefined
         : pluginConfig.agents?.[agentConfigKey as keyof typeof pluginConfig.agents]
+      const categoryOverride = agentOverride?.category
+        ? pluginConfig.categories?.[agentOverride.category]
+        : undefined
+      const agentPrimaryEntry = agentOverride?.models?.[0]
+      const agentPrimary = typeof agentPrimaryEntry === "object" ? agentPrimaryEntry : undefined
+      const categoryPrimaryEntry = agentOverride?.models === undefined && agentOverride?.model === undefined
+        ? categoryOverride?.models?.[0]
+        : undefined
+      const categoryPrimary = typeof categoryPrimaryEntry === "object" ? categoryPrimaryEntry : undefined
+      const canonicalPrimaryEntry = agentOverride?.models !== undefined
+        ? agentPrimaryEntry
+        : categoryPrimaryEntry
+      const canonicalPrimaryModel = typeof canonicalPrimaryEntry === "string"
+        ? canonicalPrimaryEntry
+        : canonicalPrimaryEntry?.model
+      const parsedCanonicalPrimary = canonicalPrimaryModel
+        ? parseModelString(canonicalPrimaryModel)
+        : undefined
+      const hasCanonicalPrimary = parsedCanonicalPrimary !== undefined
+      const isCanonicalPrimaryRequest = parsedCanonicalPrimary !== undefined
+        && providerID === parsedCanonicalPrimary.providerID
+        && modelID === parsedCanonicalPrimary.modelID
+      const primaryReasoning = agentPrimary?.reasoning
+        ?? agentPrimary?.variant
+        ?? agentOverride?.reasoning
+        ?? agentOverride?.variant
+        ?? categoryPrimary?.reasoning
+        ?? categoryPrimary?.variant
+        ?? categoryOverride?.reasoning
+        ?? categoryOverride?.variant
+      const primaryReasoningEffort = agentPrimary?.reasoningEffort
+        ?? agentOverride?.reasoningEffort
+        ?? categoryPrimary?.reasoningEffort
+        ?? categoryOverride?.reasoningEffort
+      const primaryProviderOptions = {
+        ...(categoryOverride?.textVerbosity === undefined ? {} : { textVerbosity: categoryOverride.textVerbosity }),
+        ...categoryOverride?.provider_options,
+        ...categoryPrimary?.provider_options,
+        ...(agentOverride?.textVerbosity === undefined ? {} : { textVerbosity: agentOverride.textVerbosity }),
+        ...agentOverride?.providerOptions,
+        ...agentPrimary?.provider_options,
+      }
+      const primaryTemperature = agentPrimary?.temperature
+        ?? agentOverride?.temperature
+        ?? categoryPrimary?.temperature
+        ?? categoryOverride?.temperature
+      const primaryTopP = agentPrimary?.top_p
+        ?? agentOverride?.top_p
+        ?? categoryPrimary?.top_p
+        ?? categoryOverride?.top_p
+      const primaryMaxTokens = agentPrimary?.max_tokens
+        ?? agentPrimary?.maxTokens
+        ?? agentOverride?.maxTokens
+        ?? categoryPrimary?.max_tokens
+        ?? categoryPrimary?.maxTokens
+        ?? categoryOverride?.max_tokens
+        ?? categoryOverride?.maxTokens
+      const primaryThinking = agentPrimary?.thinking
+        ?? agentOverride?.thinking
+        ?? categoryPrimary?.thinking
+        ?? categoryOverride?.thinking
       const hasSessionPromptParams = typeof chatParamsInput.sessionID === "string"
         && getSessionPromptParams(chatParamsInput.sessionID) !== undefined
       if (!hasSessionPromptParams && chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
-        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
-      }
-      if (isRecord(output) && isRecord(output.options) && agentOverride && !hasSessionPromptParams) {
-        const options = { ...output.options, ...agentOverride.providerOptions }
-        if (typeof agentOverride.maxTokens === "number") {
-          output.maxOutputTokens = agentOverride.maxTokens
-        }
-        if (agentOverride.models !== undefined) {
-          if (typeof agentOverride.temperature === "number") {
-            output.temperature = agentOverride.temperature
+        if (hasCanonicalPrimary) {
+          if (isCanonicalPrimaryRequest && primaryReasoning !== undefined && chatParamsInput.message.variant === undefined) {
+            Object.assign(chatParamsInput.message, lowerReasoningForModel(primaryReasoning, { providerID, modelID }))
           }
-          if (typeof agentOverride.top_p === "number") {
-            output.topP = agentOverride.top_p
+        } else {
+          applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+        }
+      }
+      if (
+        isRecord(output)
+        && isRecord(output.options)
+        && agentOverride
+        && !hasSessionPromptParams
+        && (!hasCanonicalPrimary || isCanonicalPrimaryRequest)
+      ) {
+        const options: Record<string, unknown> = { ...output.options, ...primaryProviderOptions }
+        if (typeof primaryMaxTokens === "number") {
+          output.maxOutputTokens = primaryMaxTokens
+        }
+        if (hasCanonicalPrimary) {
+          if (typeof primaryTemperature === "number") {
+            output.temperature = primaryTemperature
+          }
+          if (typeof primaryTopP === "number") {
+            output.topP = primaryTopP
           }
           if (chatParamsInput.message?.reasoningEffort) {
             options.reasoningEffort = chatParamsInput.message.reasoningEffort
-          } else if (agentOverride.reasoning === undefined && agentOverride.reasoningEffort) {
-            options.reasoningEffort = agentOverride.reasoningEffort
+          } else if (primaryReasoning === undefined && primaryReasoningEffort) {
+            options.reasoningEffort = primaryReasoningEffort
           }
-          if (agentOverride.thinking) {
-            options.thinking = agentOverride.thinking
-          }
-          if (agentOverride.textVerbosity) {
-            options.textVerbosity = agentOverride.textVerbosity
+          if (primaryThinking) {
+            options.thinking = primaryThinking
           }
         }
         output.options = options

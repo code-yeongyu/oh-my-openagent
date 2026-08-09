@@ -476,6 +476,7 @@ describe("createTeamIdleWakeHint", () => {
     })
     expect(SessionCategoryRegistry.get("member-session")).toBe("quick")
     expect(getSessionPromptParams("member-session")).toEqual({
+      variant: "medium",
       temperature: 0.2,
       topP: 0.8,
       maxOutputTokens: 4096,

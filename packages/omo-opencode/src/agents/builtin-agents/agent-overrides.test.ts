@@ -14,6 +14,29 @@ function makeBase(overrides: Partial<AgentConfig> = {}): AgentConfig {
 }
 
 describe("applyCategoryOverride", () => {
+  test("selects the canonical primary model without storing its request settings as agent defaults", () => {
+    const base = makeBase({ temperature: 0.1 })
+    const categories: Record<string, CategoryConfig> = {
+      research: {
+        models: [{
+          model: "openai/gpt-5.6-sol-primary",
+          reasoning: "high",
+          temperature: 0.2,
+          max_tokens: 1024,
+          provider_options: { serviceTier: "priority" },
+        }],
+      },
+    }
+
+    const result = applyCategoryOverride(base, "research", categories)
+
+    expect(result.model).toBe("openai/gpt-5.6-sol-primary")
+    expect(result.variant).toBeUndefined()
+    expect(result.temperature).toBe(0.1)
+    expect((result as AgentConfig & { maxTokens?: number }).maxTokens).toBeUndefined()
+    expect((result as AgentConfig & { providerOptions?: unknown }).providerOptions).toBeUndefined()
+  })
+
   describe("#given canonical reasoning on category", () => {
     test("lowers category reasoning to variant on the agent config", () => {
       // given

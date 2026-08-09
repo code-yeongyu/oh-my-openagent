@@ -656,6 +656,7 @@ describe("createTeamSendMessageTool", () => {
     expect(calls[0].variant).toBe("medium")
     expect(SessionCategoryRegistry.get(fixture.memberTwoSessionId)).toBe("quick")
     expect(getSessionPromptParams(fixture.memberTwoSessionId)).toEqual({
+      variant: "medium",
       temperature: 0.2,
       topP: 0.8,
       maxOutputTokens: 4096,

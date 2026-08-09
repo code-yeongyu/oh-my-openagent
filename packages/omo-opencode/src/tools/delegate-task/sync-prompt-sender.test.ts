@@ -337,6 +337,7 @@ bunDescribe("sendSyncPrompt", () => {
     })
     bunExpect(promptArgs.body.maxOutputTokens).toBe(4096)
     bunExpect(getSessionPromptParams("test-session")).toEqual({
+      variant: "low",
       temperature: 0.4,
       topP: 0.7,
       maxOutputTokens: 4096,

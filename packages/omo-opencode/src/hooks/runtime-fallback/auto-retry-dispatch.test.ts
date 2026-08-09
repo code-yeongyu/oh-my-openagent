@@ -316,6 +316,6 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "sisyphus", "session.error")
 
     expect(promptCalls[0]?.body).toMatchObject({ variant: "high" })
-    expect(getSessionPromptParams(sessionID)).toEqual({})
+    expect(getSessionPromptParams(sessionID)).toEqual({ variant: "high" })
   })
 })

@@ -3284,6 +3284,7 @@ describe("BackgroundManager.resume model persistence", () => {
     expect(promptCalls[0].body.variant).toBe("minimal")
     expect(promptCalls[0].body.options).toBeUndefined()
     expect(getSessionPromptParams("session-advanced")).toEqual({
+      variant: "minimal",
       temperature: 0.25,
       topP: 0.55,
       maxOutputTokens: 8192,

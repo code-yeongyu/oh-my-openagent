@@ -340,6 +340,103 @@ describe("createPluginInterface - chat.params variant injection", () => {
     expect(output.maxOutputTokens).toBe(1024)
   })
 
+  test("injects a canonical category primary rung for an agent category override", async () => {
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: { explore: { category: "research" } },
+        categories: {
+          research: {
+            reasoning: "low",
+            models: [{
+              model: "anthropic/claude-sonnet-4-6",
+              reasoning: "high",
+              temperature: 0.2,
+              maxTokens: 1024,
+              provider_options: { serviceTier: "priority" },
+            }],
+          },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-agent-category-primary",
+      agent: "explore",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      provider: { id: "anthropic" },
+      message: {} as { variant?: string; reasoningEffort?: string },
+    }
+    const output = { options: {} as Record<string, unknown> } as {
+      options: Record<string, unknown>
+      temperature?: number
+      maxOutputTokens?: number
+    }
+
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    expect(output).toMatchObject({
+      temperature: 0.2,
+      maxOutputTokens: 1024,
+      options: { serviceTier: "priority" },
+    })
+    expect([input.message.variant, input.message.reasoningEffort]).toContain("high")
+  })
+
+  test("does not inject category primary rung settings into another model", async () => {
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: { explore: { category: "research" } },
+        categories: {
+          research: {
+            models: [{
+              model: "openai/gpt-5.6-sol-primary",
+              reasoning: "high",
+              max_tokens: 1024,
+              provider_options: { serviceTier: "priority" },
+            }],
+          },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-agent-category-other-model",
+      agent: "explore",
+      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+      provider: { id: "openai" },
+      message: {} as { variant?: string; reasoningEffort?: string },
+    }
+    const output = { options: {} as Record<string, unknown> } as {
+      options: Record<string, unknown>
+      maxOutputTokens?: number
+    }
+
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    expect(output.maxOutputTokens).toBeUndefined()
+    expect(output.options.serviceTier).toBeUndefined()
+    expect(input.message.variant).toBeUndefined()
+    expect(input.message.reasoningEffort).toBeUndefined()
+  })
+
   test.each([
     ["Prometheus - Plan Builder", "prometheus", undefined],
     ["計畫師", "prometheus", "計畫師"],

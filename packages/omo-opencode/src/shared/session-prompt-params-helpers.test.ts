@@ -17,6 +17,7 @@ describe("applySessionPromptParams", () => {
       providerID: "test-provider",
       modelID: "test-model",
       reasoning: "high",
+      variant: "low",
     }
 
     // when
@@ -58,6 +59,14 @@ describe("applySessionPromptParams", () => {
     expect(getSessionPromptParams(sessionID)).toEqual({
       options: { reasoningEffort: "medium" },
     })
+  })
+
+  test("keeps a legacy variant in session prompt params", () => {
+    const sessionID = "ses_legacy_variant"
+
+    applySessionPromptParams(sessionID, { variant: "high" })
+
+    expect(getSessionPromptParams(sessionID)).toEqual({ variant: "high" })
   })
 
   test("preserves canonical provider options", () => {

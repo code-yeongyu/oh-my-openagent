@@ -285,6 +285,7 @@ describe("team-mode integration", () => {
     expect(recorded[0]?.directory).toBe(baseDir)
     expect(SessionCategoryRegistry.get(workerMember.sessionId)).toBe("quick")
     expect(getSessionPromptParams(workerMember.sessionId)).toEqual({
+      variant: "medium",
       temperature: 0.1,
       topP: 0.9,
       maxOutputTokens: 2048,

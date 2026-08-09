@@ -19,15 +19,19 @@ export function applyCategoryOverride(
   if (!categoryConfig) return config
 
   const result = { ...config } as AgentConfig & Record<string, unknown>
-  if (categoryConfig.model) result.model = categoryConfig.model
-  if (categoryConfig.variant !== undefined) result.variant = categoryConfig.variant
-  if (categoryConfig.reasoning !== undefined) result.variant = categoryConfig.reasoning
-  if (categoryConfig.temperature !== undefined) result.temperature = categoryConfig.temperature
-  if (categoryConfig.reasoningEffort !== undefined) result.reasoningEffort = categoryConfig.reasoningEffort
-  if (categoryConfig.textVerbosity !== undefined) result.textVerbosity = categoryConfig.textVerbosity
-  if (categoryConfig.thinking !== undefined) result.thinking = categoryConfig.thinking
-  if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
-  if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
+  const primary = categoryConfig.models?.[0]
+  const primaryModel = typeof primary === "string" ? primary : primary?.model
+  if (primaryModel ?? categoryConfig.model) result.model = primaryModel ?? categoryConfig.model
+  if (categoryConfig.models === undefined) {
+    if (categoryConfig.variant !== undefined) result.variant = categoryConfig.variant
+    if (categoryConfig.reasoning !== undefined) result.variant = categoryConfig.reasoning
+    if (categoryConfig.temperature !== undefined) result.temperature = categoryConfig.temperature
+    if (categoryConfig.reasoningEffort !== undefined) result.reasoningEffort = categoryConfig.reasoningEffort
+    if (categoryConfig.textVerbosity !== undefined) result.textVerbosity = categoryConfig.textVerbosity
+    if (categoryConfig.thinking !== undefined) result.thinking = categoryConfig.thinking
+    if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
+    if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
+  }
 
   if (categoryConfig.prompt_append && typeof result.prompt === "string") {
     result.prompt = result.prompt + "\n" + resolvePromptAppend(categoryConfig.prompt_append)

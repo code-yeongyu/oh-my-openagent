@@ -6,9 +6,10 @@ Issue: #6644
 
 - Negative control (legacy-only implementation): 5 new tests failed, 9 passed.
 - Exact-head focused suite: 280 passed, 0 failed.
+- Exact-head affected-surface suite: 823 passed, 0 failed, plus 5 route regressions.
 - Isolated `doctor --verbose`: 5 passed, 0 failed, 1 warning, 2 skipped.
 - Typecheck and build: passed.
-- Full suite: 13,490 passed, 5 skipped, 1 unrelated failure.
+- Full suite: 13,495 passed, 5 skipped, 1 unrelated failure.
 
 The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
 `origin/dev`, and the same single assertion fails when run in isolation.
@@ -91,6 +92,12 @@ The provisioned ast-grep 0.43.0 pin is absent. Its test file is unchanged from
   regression also proves the unconfigured dispatcher branch preserves reasoning
   without leaking temperature, max tokens, or provider options. See
   `real-exact-head-compat-summary.jsonl`.
+- Final Codex P2 QA drove the exact local source through real OpenCode 1.18.15.
+  A category canonical primary retained `1024/priority/high/max`, its plain
+  fallback retained none of those primary-only settings, and a named `explore`
+  child retained `1536/priority/high`. A separate two-turn fallback retained
+  legacy `variant: high` on both turns. All four QA sessions were isolated and
+  deleted afterward. See `real-codex-p2-summary.jsonl`.
 
 Run the focused proof:
 
