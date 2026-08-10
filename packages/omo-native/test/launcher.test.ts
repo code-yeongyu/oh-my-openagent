@@ -21,21 +21,23 @@ function writeFile(path: string, content: string, mode?: number): void {
   writeFileSync(path, content, mode === undefined ? undefined : { mode })
 }
 
-function canonicalFixturePath(path: string): string {
-  return process.platform === "win32" ? path : realpathSync(path)
+function expandShortPath(path: string): string {
+  if (process.platform !== "win32") return path
+  try {
+    return realpathSync.native(path)
+  } catch {
+    return path
+  }
 }
 
 function createFixture(options: { hoisted?: boolean; shim?: boolean } = {}): Fixture {
-  // The launcher derives paths from file URLs. On Windows, `realpathSync()` may instead
-  // return an 8.3 spelling (for example `RUNNER~1`), making the fixture expect a path
-  // that the spawned launcher will never emit. Retain the original long spelling.
-  const root = canonicalFixturePath(mkdtempSync(join(tmpdir(), "omo-launcher-")))
+  const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
   roots.push(root)
   const packagePath = options.hoisted
     ? join(root, "node_modules", "omo-ai")
     : join(root, "app")
   mkdirSync(packagePath, { recursive: true })
-  const packageRoot = canonicalFixturePath(packagePath)
+  const packageRoot = expandShortPath(realpathSync(packagePath))
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
   writeFile(join(packageRoot, "package.json"), JSON.stringify({
     name: "omo-ai",
@@ -65,7 +67,7 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   if (options.shim !== false) {
     shimPath = join(modulesRoot, ".bin", process.platform === "win32" ? "senpi.cmd" : "senpi")
     writeFile(shimPath, "fixture shim\n", 0o755)
-    shimPath = canonicalFixturePath(shimPath)
+    shimPath = expandShortPath(realpathSync(shimPath))
   }
   const toolkitRuntime = join(packageRoot, "plugin", "runtime", "agent-toolkit")
   writeFile(join(toolkitRuntime, "cli.js"), `
