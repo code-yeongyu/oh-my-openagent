@@ -264,7 +264,7 @@ describe("createAutoRetryHelpers", () => {
   test("#given a stale session provider failure #when stale session cleanup runs #then provider failure state is cleared", () => {
     const deps = createDeps({ count: 0 })
     const sessionID = "session-stale-provider-failure"
-    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    deps.sessionLastAccess.set(sessionID, Date.now() - 13 * 60 * 60 * 1000)
     markProviderFailed(sessionID, "google")
     const cleanupStaleSessions = createStaleSessionCleanup(deps, () => {})
 
