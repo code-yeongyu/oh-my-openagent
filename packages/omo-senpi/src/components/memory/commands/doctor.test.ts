@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
@@ -17,6 +17,8 @@ import {
 import { registerDoctorCommand } from "./doctor"
 
 const tempDirs: string[] = []
+
+setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))

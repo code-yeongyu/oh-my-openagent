@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -6,6 +6,8 @@ import { join } from "node:path"
 import { handleMemoryMcpRequest } from "./memory-server"
 
 const roots: string[] = []
+
+setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "omo-memory-mcp-"))
