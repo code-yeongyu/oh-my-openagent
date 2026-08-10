@@ -142,7 +142,7 @@ function runLauncher(launcher: string, fixture: Fixture, args: string[], tty = f
     XDG_DATA_HOME: fixture.xdg,
   }
   if (!tty) return spawnSync(process.execPath, [launcher, ...args], { encoding: "utf8", env })
-  return spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, launcher, ...args], { encoding: "utf8", env })
+  return spawnSync(process.platform === "win32" ? "python" : "python3", [TTY_DRIVER, "", "", process.execPath, launcher, ...args], { encoding: "utf8", env })
 }
 
 afterEach(() => {

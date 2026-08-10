@@ -68,7 +68,7 @@ describe("build:omo-native staged payload", () => {
         () => {
           const outputDir = join(makeTempDir(), "plugin")
           const result = runBuild(["--output", outputDir])
-          expect(result.exitCode).toBe(0)
+          expect(result.exitCode, result.output).toBe(0)
 
           const required = [
             join("extensions", "omo.js"),

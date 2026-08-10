@@ -84,7 +84,7 @@ function parseArgs(argv: readonly string[]): BuildOptions {
 }
 
 function runSenpiPluginBuild(): void {
-  const result = spawnSync("bun", ["run", "build:senpi-plugin"], {
+  const result = spawnSync(process.execPath, ["run", "build:senpi-plugin"], {
     cwd: repoRoot,
     stdio: "inherit",
   })

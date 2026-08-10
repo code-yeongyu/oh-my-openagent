@@ -125,8 +125,8 @@ describe("omo launcher", () => {
         expect(result.status).toBe(0)
         expect(environment.SENPI_BIN).toBe(fixture.shimPath)
         expect(existsSync(environment.SENPI_BIN ?? "")).toBe(true)
-        expect(environment.PATH?.split(process.platform === "win32" ? ";" : ":")[0]).toBe(dirname(fixture.shimPath ?? ""))
-        expect(existsSync(environment.PATH?.split(process.platform === "win32" ? ";" : ":")[0] ?? "")).toBe(true)
+        expect(environment[Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "PATH"]?.split(process.platform === "win32" ? ";" : ":")[0]).toBe(dirname(fixture.shimPath ?? ""))
+        expect(existsSync(environment[Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "PATH"]?.split(process.platform === "win32" ? ";" : ":")[0] ?? "")).toBe(true)
         expect(environment.OMO_AGENT_TOOLKIT_BIN).toBe(join(fixture.packageRoot, "bin", "omo-agent-toolkit.js"))
         // An inherited value must never survive; it is replaced by this launcher's own entry so
         // anything resolving the product by name re-enters here instead of the bare engine.
@@ -144,7 +144,7 @@ describe("omo launcher", () => {
         const systemRootKey = Object.keys(process.env).find((key) => key.toLowerCase() === "systemroot") ?? "SystemRoot"
         const systemRoot = process.env[systemRootKey] ?? "C:\\Windows"
         const inputPath = join(fixture.root, "path-without-system32")
-        const result = run(fixture, ["--version"], {
+        const result = run(fixture, ["say", "hi"], {
           [pathKey]: inputPath,
         }, ["path"])
         const environment = capture(fixture).env
@@ -163,7 +163,7 @@ describe("omo launcher", () => {
         const pathKey = "Path"
         const shimDirectory = dirname(fixture.shimPath ?? "")
         const inputPath = [join(fixture.root, "other-path-entry"), shimDirectory].join(";")
-        const result = run(fixture, ["--version"], {
+        const result = run(fixture, ["say", "hi"], {
           [pathKey]: inputPath,
         }, ["path"])
         const pathEntries = (capture(fixture).env[pathKey] ?? "").split(";")

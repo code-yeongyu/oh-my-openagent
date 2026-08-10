@@ -82,7 +82,7 @@ function run(item: Fixture, args: string[], ttyInput?: string) {
   }
   const result = ttyInput === undefined
     ? spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
-    : spawnSync("python3", [TTY_DRIVER, ttyInput, "[y/N]", process.execPath, item.launcher, ...args], { encoding: "utf8", env })
+    : spawnSync(process.platform === "win32" ? "python" : "python3", [TTY_DRIVER, ttyInput, "[y/N]", process.execPath, item.launcher, ...args], { encoding: "utf8", env })
   transcripts.push(`${result.stdout}${result.stderr}`)
   expectSourcesUntouched(before)
   return result
