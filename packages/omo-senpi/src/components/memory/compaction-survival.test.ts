@@ -1,15 +1,5 @@
-// Compaction survival + trigger integration (plan todo 34).
-//
-// WIRING GAP (reported, not patched): createMemoryComponent (todo 18) registers only the
-// entry renderer, the config-reload watcher, and the session binding/shutdown handlers. It
-// does NOT compose the landed prompt handler (todo 20), journal wiring (todo 21), or trigger
-// wiring (todo 22), and MemoryComponentOptions has no onLaunch injection point. These tests
-// therefore compose the real factories on one FakeExtensionAPI exactly the way the extension
-// registration (todo 36) must, injecting the launch spy through trigger-wiring's documented
-// onLaunch option ("Todo 23's detached worker plugs in here"). Session state the component
-// keeps private (identity context, pending ledger) is rebuilt over the SAME on-disk identity
-// in a temp OMO_MEMORY_HOME, so every byte below flows through the real production modules:
-// real component binding, real sentinel-block prompt audit, real reservation state machine.
+// Compaction survival + trigger integration. The launch spy is injected into the component's
+// single real identity runtime so the test cannot race a second reservation store.
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
@@ -20,19 +10,13 @@ import { join } from "node:path"
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
 import {
   GitMemoryRepo,
-  ReflectionReservationStore,
-  TranscriptJournal,
   resolveMemoryIdentity,
   type MemoryIdentity,
   type ReflectionRequest,
 } from "@oh-my-opencode/memory-core"
 
-import { createMemoryBinding } from "./binding"
-import {
-  createMemoryIdentityContext,
-  ensureIdentityRuntimeDirs,
-  type MemoryPendingLedger,
-} from "./context"
+import { ensureIdentityRuntimeDirs } from "./context"
+import { createIdentityRuntime } from "./identity-runtime"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent } from "./index"
 import {
   MemoryFakeExtensionAPI,
@@ -40,12 +24,6 @@ import {
   loadedMemoryConfig,
   memorySettings,
 } from "./memory.test-support"
-import { createMemoryPromptHandler } from "./prompt"
-import {
-  createReflectionTriggerWiring,
-  resolveReflectionTriggerConfig,
-  type ReflectionTriggerSession,
-} from "./trigger-wiring"
 
 const SESSION_ID = "session-compaction-survival"
 const BASE_SYSTEM_PROMPT = "You are senpi, a coding agent."
@@ -64,9 +42,7 @@ afterEach(async () => {
 interface CompactionFixture {
   readonly pi: MemoryFakeExtensionAPI
   readonly identity: MemoryIdentity
-  readonly ledger: MemoryPendingLedger
   readonly launches: ReflectionRequest[]
-  readonly logs: Array<{ level: string; message: string; details?: unknown }>
 }
 
 async function compactionFixture(): Promise<CompactionFixture> {
@@ -86,66 +62,30 @@ async function compactionFixture(): Promise<CompactionFixture> {
   })
   await ensureIdentityRuntimeDirs(identity.paths)
 
-  // Real component factory (todo 18): binds the session to the identity above.
   const pi = new MemoryFakeExtensionAPI()
+  const launches: ReflectionRequest[] = []
   createMemoryComponent({
+    clock: FIXED_CLOCK,
     env,
     loadConfig: () => loadedMemoryConfig(settings),
     resolveCwd: () => cwd,
+    createRuntime: (context, deps) => {
+      const runtime = createIdentityRuntime(context, deps)
+      return {
+        ...runtime,
+        launch: (run) => {
+          launches.push(run.request)
+        },
+      }
+    },
   }).register(pi, componentContext())
   await pi.dispatch("session_start", { type: "session_start" }, sessionEventContext())
-
-  // Real prompt audit (todo 20) over the same on-disk identity, clock pinned so the compiled
-  // block is byte-stable across dispatches.
-  const memoryContext = createMemoryIdentityContext({
-    identity: identity.id,
-    identityPaths: identity.paths,
-    binding: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 0 }),
-  })
-  pi.on(
-    "before_agent_start",
-    createMemoryPromptHandler({
-      resolveContext: (sessionId) => (sessionId === SESSION_ID ? memoryContext : undefined),
-      clock: FIXED_CLOCK,
-    }),
-  )
-
-  // Real trigger wiring (todo 22) with a real reservation store; the launch spy plugs into
-  // the documented onLaunch option.
-  const ledger: MemoryPendingLedger = { pendingCompaction: false, configRestartNotified: false }
-  const journals = new Map<string, TranscriptJournal>()
-  let nextRunId = 0
-  const store = new ReflectionReservationStore({
-    identity,
-    config: resolveReflectionTriggerConfig(settings),
-    getJournal: async (conversationId) => {
-      const cached = journals.get(conversationId)
-      if (cached !== undefined) return cached
-      const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, conversationId) })
-      journals.set(conversationId, journal)
-      return journal
-    },
-    createRunId: () => `reflection-run-${++nextRunId}`,
-  })
-  const session: ReflectionTriggerSession = { conversationId: SESSION_ID, ledger, engine: store }
-  const launches: ReflectionRequest[] = []
-  const logs: Array<{ level: string; message: string; details?: unknown }> = []
-  createReflectionTriggerWiring({
-    resolveSession: (eventCtx) => (readSessionId(eventCtx) === SESSION_ID ? session : undefined),
-    onLaunch: (request) => {
-      launches.push(request)
-    },
-    logger: {
-      info: (message, details) => logs.push({ level: "info", message, details }),
-      warn: (message, details) => logs.push({ level: "warn", message, details }),
-      error: (message, details) => logs.push({ level: "error", message, details }),
-    },
-  }).register(pi)
+  expect(pi.handlers.filter(({ event }) => event === "session_compact")).toHaveLength(1)
 
   cleanups.push(async () => {
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, sessionEventContext())
   })
-  return { pi, identity, ledger, launches, logs }
+  return { pi, identity, launches }
 }
 
 function sessionEventContext(): unknown {
@@ -157,14 +97,6 @@ function sessionEventContext(): unknown {
     },
     ui: { notify: () => {} },
   }
-}
-
-function readSessionId(eventCtx: unknown): string | undefined {
-  if (!isRecord(eventCtx) || !isRecord(eventCtx.sessionManager)) return undefined
-  const getSessionId = eventCtx.sessionManager.getSessionId
-  if (typeof getSessionId !== "function") return undefined
-  const id: unknown = Reflect.apply(getSessionId, eventCtx.sessionManager, [])
-  return typeof id === "string" && id.length > 0 ? id : undefined
 }
 
 async function compact(pi: MemoryFakeExtensionAPI, accepted: boolean): Promise<void> {
@@ -209,13 +141,9 @@ function memoryBlock(systemPrompt: string, identity: string): string {
   return systemPrompt.slice(start, stop + end.length)
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
 describe("compaction survival + trigger integration", () => {
   test("#given a bound session with committed memory #when an accepted compaction settles successfully #then exactly one reflection launches and the sentinel block survives byte-identical", async () => {
-    const { pi, identity, ledger, launches } = await compactionFixture()
+    const { pi, identity, launches } = await compactionFixture()
 
     // The real component bound this session to the same identity the repo was seeded under.
     expect(pi.entries).toHaveLength(1)
@@ -229,7 +157,6 @@ describe("compaction survival + trigger integration", () => {
     expect(baseline).toContain(PERSONA_BODY)
 
     await compact(pi, true)
-    expect(ledger.pendingCompaction).toBe(true)
 
     await endRun(pi)
     await settle(pi)
@@ -237,7 +164,6 @@ describe("compaction survival + trigger integration", () => {
     expect(launches).toHaveLength(1)
     expect(launches[0]?.trigger).toBe("compaction")
     expect(launches[0]?.conversationIds).toEqual([SESSION_ID])
-    expect(ledger.pendingCompaction).toBe(false)
 
     // Memory content is independent of compaction: the next run's audit injects the same block.
     const after = memoryBlock(await beforeAgentStart(pi), identity.id)
@@ -246,30 +172,26 @@ describe("compaction survival + trigger integration", () => {
   })
 
   test("#given a bound session #when compaction is rejected #then no flag is recorded and settle launches nothing", async () => {
-    const { pi, ledger, launches } = await compactionFixture()
+    const { pi, launches } = await compactionFixture()
 
     await compact(pi, false)
-    expect(ledger.pendingCompaction).toBe(false)
 
     await endRun(pi)
     await settle(pi)
 
     expect(launches).toHaveLength(0)
-    expect(ledger.pendingCompaction).toBe(false)
   })
 
   test("#given compaction accepted mid-run #when the retried turn chain settles #then exactly one launch fires across all settles", async () => {
-    const { pi, ledger, launches } = await compactionFixture()
+    const { pi, launches } = await compactionFixture()
 
     await pi.dispatch("turn_start", { type: "turn_start", turnIndex: 0 }, sessionEventContext())
     await compact(pi, true)
-    expect(ledger.pendingCompaction).toBe(true)
 
     // The compacted turn ends in a retry: the settle must not consume the flag or launch.
     await endRun(pi, { willRetry: true })
     await settle(pi)
     expect(launches).toHaveLength(0)
-    expect(ledger.pendingCompaction).toBe(true)
 
     await pi.dispatch("turn_start", { type: "turn_start", turnIndex: 1 }, sessionEventContext())
     await endRun(pi)
@@ -277,22 +199,19 @@ describe("compaction survival + trigger integration", () => {
 
     expect(launches).toHaveLength(1)
     expect(launches[0]?.trigger).toBe("compaction")
-    expect(ledger.pendingCompaction).toBe(false)
   })
 
   test("#given two consecutive accepted compactions #when the run settles #then the flag is consumed once with exactly one launch", async () => {
-    const { pi, ledger, launches } = await compactionFixture()
+    const { pi, launches } = await compactionFixture()
 
     await compact(pi, true)
     await compact(pi, true)
-    expect(ledger.pendingCompaction).toBe(true)
 
     await endRun(pi)
     await settle(pi)
 
     expect(launches).toHaveLength(1)
     expect(launches[0]?.trigger).toBe("compaction")
-    expect(ledger.pendingCompaction).toBe(false)
 
     // Consumed: a later clean settle without a new compaction launches nothing more.
     await endRun(pi)
