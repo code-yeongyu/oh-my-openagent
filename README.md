@@ -127,6 +127,8 @@ Pick the edition(s) you want.
 | **Both** | `bunx oh-my-openagent install --platform=both` | Both of the above |
 | **Senpi edition** (beta) | `npm i -g omo-ai@beta`, then `omo` | The `omo` command: pinned senpi release with the OMO extension built in. Beta channel only; a bare `npm i -g omo-ai` fails by design. See the [install guide](docs/guide/installation.md#senpi-edition-beta-omo-via-npm-omo-ai). |
 
+Migrating from legacy OMO? If `omo` still prints `Usage: oh-my-opencode`, put the current npm global bin first with `export PATH="$(npm prefix -g)/bin:$PATH"`, run `hash -r`, then confirm with `omo --version`. Your shell may otherwise cache or prefer the legacy `~/.local/bin/omo`; see the [install guide](docs/guide/installation.md#senpi-edition-beta-omo-via-npm-omo-ai) for the permanent fix.
+
 `lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo-agent-toolkit` CLI still defaults to `opencode` (Ultimate).
 
 ### For Humans

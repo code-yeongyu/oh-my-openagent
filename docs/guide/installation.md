@@ -163,6 +163,19 @@ A bare `npm i -g omo-ai` fails with ETARGET on purpose; every published version 
 
 **Upgrade order on older machines.** If the machine still has oh-my-openagent/oh-my-opencode 4.19.4 or earlier installed globally, that package owns a global `omo` bin and the install above fails with EEXIST. Upgrade or uninstall the old package first, then install `omo-ai@beta`.
 
+**Replace a cached or higher-priority legacy command.** A shell may keep executing the old `~/.local/bin/omo` after npm successfully installs the new binary. This is the cause when `omo` still prints `Usage: oh-my-opencode`. Check the selected path, put the current npm global bin first, clear the command cache, and verify the result:
+
+```bash
+command -v omo
+export PATH="$(npm prefix -g)/bin:$PATH"
+hash -r
+command -v omo
+omo --version
+omo
+```
+
+The second `command -v omo` should point inside the prefix printed by `npm prefix -g`, and `omo --version` should report the bundled senpi version instead of legacy OMO 4.19.4. Make the same PATH order permanent in your shell startup file if a new shell selects `~/.local/bin/omo` again. `rehash` is an equivalent zsh cache command, but it cannot fix PATH order by itself.
+
 ### First run: `omo setup`
 
 `omo setup` is the onboarding command for the senpi edition. It replaces the old manual "configure OmO/senpi" guidance; there's nothing to hand-edit anymore. It runs in three stages:
