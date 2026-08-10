@@ -1,10 +1,13 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
+import { spawnSync } from "node:child_process"
 import { describe, expect, test } from "bun:test"
 
 import { buildChildArgs, buildRpcSpawn, detectBunBinary, resolveChildSessionDir, resolveSenpiExecutable } from "./spawn"
 
+const require = createRequire(import.meta.url)
 const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 
 const baseSpec = {
@@ -15,7 +18,7 @@ const baseSpec = {
 } as const
 
 // A runtime that never finds a real executable, isolating the fallback path deterministically.
-const noExecutable = { resolveSenpiExecutable: () => null }
+const noExecutable = { resolveSenpiExecutable: () => null, resolveSenpiPackageCli: () => null }
 // A runtime that always resolves a fixed executable, isolating the executable-preferred path.
 const withExecutable = (path: string) => ({ resolveSenpiExecutable: () => path })
 
@@ -234,6 +237,120 @@ describe("buildRpcSpawn spawn strategy", () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  test("#given an installed Senpi package outside PATH #when building a Windows RPC child #then Node launches its package CLI", () => {
+    // given
+    const packageRoot = dirname(require.resolve("@code-yeongyu/senpi/package.json"))
+    const cli = join(packageRoot, "dist", "cli.js")
+
+    // when
+    const descriptor = buildRpcSpawn(
+      { ...baseSpec, model: "omo-mock/mock-1" },
+      {
+        resolveSenpiExecutable: () => null,
+        isBunBinary: false,
+        execPath: "C:\\Program Files\\nodejs\\node.exe",
+        platform: "win32",
+        parentEnv: { PATH: "" },
+        resolveRpcEntry: () => {
+          throw new Error("loader alias hijacked")
+        },
+      },
+    )
+
+    // then
+    expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
+    expect(descriptor.args[0]).toBe(cli)
+    expect(descriptor.args).not.toContain("loader alias hijacked")
+  })
+
+  test("#given a PATH without Senpi shims #when the RPC child actually launches #then the installed package CLI boots and exits cleanly", () => {
+    // given: a home and state dir of its own, so the child reads no developer or CI configuration
+    const root = mkdtempSync(join(tmpdir(), "senpi-rpc-launch-"))
+    const home = join(root, "home")
+    const cwd = join(root, "work")
+    mkdirSync(home, { recursive: true })
+    mkdirSync(cwd, { recursive: true })
+    const packageCli = join(dirname(require.resolve("@code-yeongyu/senpi/package.json")), "dist", "cli.js")
+    try {
+      // when: PATH holds no senpi shim at all, so only the installed package can answer
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, cwd, state_dir: join(root, "state") },
+        {
+          resolveSenpiExecutable: () => null,
+          isBunBinary: false,
+          execPath: process.execPath,
+          platform: "win32",
+          parentEnv: { PATH: "", HOME: home, USERPROFILE: home, SENPI_CODING_AGENT_DIR: join(home, "agent") },
+          resolveRpcEntry: () => {
+            throw new Error("rpc-entry must never be reached when the package CLI resolves")
+          },
+        },
+      )
+      expect(descriptor.args[0]).toBe(packageCli)
+
+      const child = spawnSync(descriptor.command, [...descriptor.args], {
+        cwd: descriptor.cwd,
+        env: descriptor.env,
+        encoding: "utf8",
+        // Closing stdin is the child's shutdown signal, so this is a kill deadline, never a wait.
+        input: "",
+        timeout: 180_000,
+      })
+
+      // then: the child booted its rpc protocol and shut down on stdin EOF
+      expect(child.error).toBeUndefined()
+      expect(child.stderr).toBe("")
+      expect(child.status).toBe(0)
+      expect(child.stdout.length).toBeGreaterThan(0)
+      for (const line of child.stdout.split("\n").filter((entry) => entry.length > 0)) {
+        expect(() => JSON.parse(line)).not.toThrow()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given the installed Senpi package cannot be resolved #when building a Windows RPC child #then it falls back to the documented rpc-entry", () => {
+    // when
+    const descriptor = buildRpcSpawn(
+      { ...baseSpec, model: "omo-mock/mock-1" },
+      {
+        resolveSenpiExecutable: () => null,
+        resolveSenpiPackageCli: () => null,
+        isBunBinary: false,
+        execPath: "C:\\Program Files\\nodejs\\node.exe",
+        platform: "win32",
+        parentEnv: { PATH: "" },
+        resolveRpcEntry: () => "C:\\rpc-entry.js",
+      },
+    )
+
+    // then
+    expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
+    expect(descriptor.args[0]).toBe("C:\\rpc-entry.js")
+    expect(descriptor.args).not.toContain("--mode")
+  })
+
+  test("#given neither the package CLI nor an rpc entry resolves #when building #then the resolution error surfaces unchanged", () => {
+    // given / when / then
+    expect(() =>
+      buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1" },
+        {
+          resolveSenpiExecutable: () => null,
+          resolveSenpiPackageCli: () => null,
+          isBunBinary: false,
+          execPath: "C:\\Program Files\\nodejs\\node.exe",
+          platform: "win32",
+          parentEnv: { PATH: "" },
+          resolveRpcEntry: () => {
+            throw new Error("Cannot find module '@code-yeongyu/senpi/rpc-entry'")
+          },
+        },
+      )
+    ).toThrow("Cannot find module '@code-yeongyu/senpi/rpc-entry'")
   })
 
   test("#given a resolvable senpi executable #when building #then it spawns the EXECUTABLE in rpc mode (not the loader-hijacked rpc-entry)", () => {
