@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -21,30 +21,17 @@ function writeFile(path: string, content: string, mode?: number): void {
   writeFileSync(path, content, mode === undefined ? undefined : { mode })
 }
 
-/**
- * Windows hands back the 8.3 short form (RUNNER~1) for a temp directory, and realpathSync does not
- * expand it, while the launcher reports the long form it derives from its own module URL. Resolving
- * through a file URL yields the same long spelling both sides use.
- */
-function expandShortPath(path: string): string {
-  if (process.platform !== "win32") return path
-  try {
-    return realpathSync.native(path)
-  } catch {
-    return path
-  }
-}
-
 function createFixture(options: { hoisted?: boolean; shim?: boolean } = {}): Fixture {
-  // Windows hands back the 8.3 short form (RUNNER~1) here while the launcher reports the long path, so
-  // the fixture root is canonicalized once and every derived path inherits the same spelling.
-  const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
+  // The launcher derives paths from file URLs. On Windows, `realpathSync()` may instead
+  // return an 8.3 spelling (for example `RUNNER~1`), making the fixture expect a path
+  // that the spawned launcher will never emit. Retain the original long spelling.
+  const root = mkdtempSync(join(tmpdir(), "omo-launcher-"))
   roots.push(root)
   const packagePath = options.hoisted
     ? join(root, "node_modules", "omo-ai")
     : join(root, "app")
   mkdirSync(packagePath, { recursive: true })
-  const packageRoot = expandShortPath(realpathSync(packagePath))
+  const packageRoot = packagePath
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
   writeFile(join(packageRoot, "package.json"), JSON.stringify({
     name: "omo-ai",
@@ -74,7 +61,6 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   if (options.shim !== false) {
     shimPath = join(modulesRoot, ".bin", process.platform === "win32" ? "senpi.cmd" : "senpi")
     writeFile(shimPath, "fixture shim\n", 0o755)
-    shimPath = expandShortPath(realpathSync(shimPath))
   }
   const toolkitRuntime = join(packageRoot, "plugin", "runtime", "agent-toolkit")
   writeFile(join(toolkitRuntime, "cli.js"), `
