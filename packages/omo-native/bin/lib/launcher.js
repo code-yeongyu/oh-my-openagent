@@ -54,14 +54,17 @@ function environmentKey(environment, name) {
   return Object.keys(environment).find((key) => key.toLowerCase() === name.toLowerCase())
 }
 
-function prependPath(environment, directory) {
+function prependPath(environment, directory, prioritize = false) {
   const pathKey = environmentKey(environment, "PATH") ?? "PATH"
   const currentPath = environment[pathKey]
+  const pathEntries = currentPath ? currentPath.split(delimiter) : []
   const normalizedDirectory = directory.replace(/[\\/]+$/, "").toLowerCase()
-  const hasDirectory = currentPath?.split(delimiter).some((entry) => (
-    entry.replace(/[\\/]+$/, "").toLowerCase() === normalizedDirectory
-  )) ?? false
-  if (!hasDirectory) environment[pathKey] = currentPath ? `${directory}${delimiter}${currentPath}` : directory
+  const isDirectory = (entry) => entry.replace(/[\\/]+$/, "").toLowerCase() === normalizedDirectory
+  if (prioritize) {
+    environment[pathKey] = [directory, ...pathEntries.filter((entry) => !isDirectory(entry))].join(delimiter)
+    return
+  }
+  if (!pathEntries.some(isDirectory)) environment[pathKey] = currentPath ? `${directory}${delimiter}${currentPath}` : directory
 }
 
 function restoreWindowsSystem32(environment) {
@@ -84,7 +87,7 @@ function senpiEnvironment(senpiRoot) {
   restoreWindowsSystem32(env)
   const binDir = nearestNodeBin(senpiRoot)
   if (binDir) {
-    prependPath(env, binDir)
+    prependPath(env, binDir, true)
     const shim = join(binDir, process.platform === "win32" ? "senpi.cmd" : "senpi")
     if (existsSync(shim)) env.SENPI_BIN = shim
   }
