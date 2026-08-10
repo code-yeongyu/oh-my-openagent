@@ -1,0 +1,128 @@
+WHAT WAS TESTED
+
+Current integration base:
+- blocker branch merged `origin/dev` at `8a49796f3`
+- intended final fixes were tested with Bun 1.3.12 (`700fc117`), matching CI
+
+Agent-toolkit idempotence RED:
+- command: `node --test packages/omo-senpi/plugin/scripts/stage-agent-toolkit.test.mjs`
+- observed: 3 pass, 1 fail
+- the new identity assertion observed a changed target inode after a byte-identical second staging run
+
+Agent-toolkit idempotence GREEN:
+- same command after the fix
+- observed: 4 pass, 0 fail
+- exact Windows Bun 1.3.12 payload test: 4 pass, 0 fail, 23 assertions, 12.04s
+- the Windows CI-mode child build returned status 0 instead of failing while renaming the open target directory
+
+Malformed target RED:
+- added `#given a malformed staged toolkit #when staged again #then replaces the stale directory shape`
+- observed: `ENOTDIR` from `readdir(.../agent-toolkit/ulw-loop)`
+
+Malformed target GREEN:
+- same Node test command after classifying filesystem shape errors as stale-target mismatches
+- observed: 5 pass, 0 fail
+- the malformed `ulw-loop` file was replaced with the expected directory and bundle
+
+Shared install race RED:
+- PR run: https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31371474003
+- Ubuntu payload job failed during root dependency installation with `npm EEXIST` on the Codex plugin workspace symlink
+- Windows root job showed two concurrent `npm ci` processes mutating `packages/omo-codex/plugin/node_modules`, producing `ENOTEMPTY`, `EPERM`, and missing extraction entries
+- build-graph regression initially failed because the Senpi node depended only on `ast-grep-mcp` and `lsp-daemon`
+
+Shared install race GREEN:
+- build graph now requires `codex-plugin` before `senpi-plugin`
+- command: `bun test script/build-dependency-graph.test.ts`
+- observed: 1 pass, 0 fail
+- command: `OMO_SKIP_MATERIALIZE=1 bun run script/build.ts`
+- runtime: Bun 1.3.12
+- observed ordering: `build:codex-plugin` completed before `build:senpi-plugin`
+- observed result: `build: all steps completed`, exit 0
+
+Windows Codex installer timing:
+- command: `bun test packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts`
+- exact Windows Bun 1.3.12 observed: 2 pass, 0 fail, 6 assertions, 8.99s
+- focused current-base macOS observed: 2 pass, 0 fail
+
+Focused current-base regression:
+- command covered launcher, setup, memory tool, package registration, and legacy purge files
+- observed: 63 pass, 6 platform skips, 0 fail, 254 assertions
+
+Stale dependency tree RED:
+- supporting PR #6708 proved the root `bun install` can leave workspace links that make a later `npm ci` fail with `EEXIST`
+- the new `stage-agent-toolkit install` regression initially failed both assertions because no plugin `node_modules` removal preceded `npm ci`
+
+Stale dependency tree GREEN:
+- command: `bun test script/stage-agent-toolkit-install.test.ts script/build-dependency-graph.test.ts`
+- observed: 3 pass, 0 fail, 5 assertions
+- manual action: moved the installed `tsc` shim aside so staging had to reinstall the Codex plugin dependencies, then ran the real staging script with Bun 1.3.12 on PATH
+- observed: existing `node_modules` was removed, `npm ci` completed, ulw-loop rebuilt, staging succeeded, and the compiler shim was restored
+- complementary Windows proof: PR #6708's Windows root run passed the formerly slow memory commands but still failed the launcher PATH assertion and agent-toolkit rename; those are the two independent fixes already present in PR #6700
+
+Static and type checks:
+- `bun run typecheck:script`: exit 0
+- TypeScript no-excuse audit: no violations in the three build-graph/install test files
+- pure LOC: build.ts 138; build dependency test 9; staging script 211; staging test 73
+
+Final-head CI integration corrections:
+- GitHub run: https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31373658888
+- Linux and macOS root failures were the stale static Senpi graph assertion; the focused test passed after its expected dependency list included `codex-plugin`
+- Windows Senpi failure was `/memory-repository status` completing just beyond Bun's default five-second budget; the same real Git-backed test now uses the existing 20-second Git integration budget
+- Linux Senpi failure was reproducible nondeterminism in `compaction-survival.test.ts`: 50-process stress failed on iteration 12 before the fix
+- root cause: the integration fixture registered a second reflection trigger over the same identity after the real memory component already composed one; the production reservation could win the active slot before the test spy
+- fix: inject the reservation store and launch capture through the real component's narrow runtime seam, leaving one prompt/journal/trigger composition
+- exact Bun 1.3.12 stress after the fix: 50 consecutive process runs passed
+- full memory component suite: 240 pass, 0 fail, 807 assertions
+- focused reproduced failures after the fix: 19 pass, 0 fail
+- omo-senpi typecheck and script typecheck: exit 0
+- TypeScript no-excuse audit: no violations in seven changed files
+- `wiring.ts` was split back below the size ceiling by moving untrusted model-registry parsing into `model-registry-resolver.ts`; pure LOC is 246
+- the full hermetic `test:senpi` gate initially exposed host `OMO_AGENT_TOOLKIT_BIN` leaking into a legacy `OMO_BIN` precedence test
+- that test now explicitly unsets the higher-priority variable; focused runtime result: 13 pass, 0 fail
+- final full Senpi gate with Bun 1.3.12: 894 pass, 0 fail, 2578 assertions
+
+Post-PR-#6708 dev merge:
+- resolved four overlapping files by preserving #6700's case-insensitive PATH-key lookup, split Windows setup contracts, byte-identical staging skip, malformed-target repair, and rollback
+- adopted upstream's stale-install rationale, Windows dependency-path fixes, Git integration budgets, and fsync timing correction
+- stale toolkit replacement now uses copy-backup plus target removal on Windows, avoiding the observed live-directory rename `EPERM` while retaining rollback
+- resolved focused suite: 36 pass, 1 platform skip, 0 fail
+- resolved staging suite: 5 pass, 0 fail
+- final full Senpi gate: 894 pass, 0 fail
+- final omo-native suite with existing materialized sources: 71 pass, 6 platform skips, 0 fail
+- plain local omo-native payload validation cannot initialize the manually restored worktree submodule metadata; the same test passes with `OMO_SKIP_MATERIALIZE=1`, and clean GitHub checkouts remain the authoritative materialization proof
+- regenerated all committed Senpi extension bundles with Bun 1.3.12 after the final memory/runtime source changes
+- `build-extension.mjs --check`: current, exit 0
+- code review found a failed Windows `fs.cp` could leave partial `agent-toolkit.backup-*` debris
+- failing-first injected-copy regression initially completed staging instead of rejecting
+- staging now removes partial backup copies before rethrowing; the original target remains byte-identical and no backup sibling survives
+- final staging suite: 6 pass, 0 fail
+- final Windows root run reached four unrelated integration tests that each exceeded Bun's five-second default at 5015-5016 ms
+- only those tests now use a 20-second budget on Windows: Bash summary rendering, two marketplace fixture syncs, and a Git-backed memory cache refresh
+- non-Windows timeout remains 5 seconds
+- focused exact Bun 1.3.12 result: 21 pass, 0 fail, 116 assertions
+- script and memory-core typechecks: exit 0
+
+Isolated Codex installer QA:
+- `OMO_SKIP_MATERIALIZE=1 bash .agents/skills/codex-qa/scripts/install-verify.sh --self-test`
+- plugin cache, config enablement, component bins, and agent TOMLs all passed
+- real `~/.codex/config.toml` checksum remained unchanged: `da855b32f60792a2fb171174a70751d1b954e7dc`
+
+WHAT WAS OBSERVED
+
+- Byte-identical staging now avoids replacement, which removes the Windows open-directory rename surface.
+- Corrupted directory shapes still self-heal through the existing backup-and-replace path.
+- The root build no longer schedules two package managers against the same Codex plugin dependency tree.
+- The focused Windows installer tests finish well below the Windows-only 60-second budget.
+
+WHY THIS IS ENOUGH
+
+- Each discovered defect has a failing-first regression at its owning seam.
+- The exact CI Bun version exercised the focused tests and the complete build graph.
+- Native Windows Bun 1.3.12 exercised the previously failing payload and installer paths.
+- GitHub Actions remains the authoritative full Linux, macOS, and Windows matrix gate before merge.
+
+WHAT WAS OMITTED
+
+- Raw GitHub runner logs were summarized because they contain large environment and package-install dumps.
+- No credentials, auth headers, tokens, or private environment values were copied.
+- A local full Codex gate under Bun 1.4 canary hit unrelated CodeGraph test incompatibilities; the Bun 1.3.12 GitHub Codex matrix is the authoritative gate.

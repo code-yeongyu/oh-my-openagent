@@ -1,0 +1,19 @@
+Final exact-head code review RED
+
+Command:
+`bun test packages/omo-senpi/src/components/memory/index.test.ts packages/omo-senpi/src/components/memory/status.test.ts packages/omo-senpi/src/components/memory/wiring.test.ts`
+
+Observed failures:
+1. Shutdown did not clear the persistent `memory` status.
+2. Disabled and identity-conflicted session starts returned without clearing a stale footer.
+3. A failed first `memory` result rendered the footer and consumed the one-shot gate.
+
+Deterministic bind-order RED:
+`bun test packages/omo-senpi/src/components/memory/wiring.test.ts --test-name-pattern "status clears before asynchronous work"`
+
+Observed:
+- Expected synchronous `{ key: "memory", text: undefined }`.
+- Received no status call before reconciliation suspended.
+- 0 pass, 1 fail.
+
+The tests were added before the lifecycle production edits. The bind-order test was then renamed to its final behavior-oriented title, `#given bind reconciliation is pending #when a footer publishes #then bind completion does not erase it`, without changing the regression it covers.

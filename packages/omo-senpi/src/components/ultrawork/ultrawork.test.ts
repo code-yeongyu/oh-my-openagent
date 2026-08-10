@@ -6,6 +6,7 @@ import { resolve } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { FORBIDDEN_DIRECTIVE_TOKENS, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { classifyUltraworkInput, isUltraworkInput } from "./index"
 import {
   dispatchInput,
   expectAtomicQueuedInjection,
@@ -18,6 +19,125 @@ import {
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
 
 describe("omo-senpi ultrawork component", () => {
+  it("#given a fixed prompt corpus #when pure classification runs #then keyword matching stays in parity with the shipped detector", () => {
+    const corpus = [
+      "",
+      "ulw",
+      "ULW",
+      "ultrawork",
+      "ULTRAWORK",
+      "ulw-plan",
+      "ulw-loop",
+      "ulw-research",
+      "ulwultrawork",
+      "ULW ulw Ultrawork",
+      "plan only",
+      "하이ulw",
+      "ulw_helper.ts",
+      "before ultrawork after",
+      "/skill:ultrawork",
+      "/skill:frontend ulw polish",
+      "/skill:myulw run it",
+      "(ulw) [ultrawork] {ulw}",
+      ".*+?^${}()|[]\\ ulw",
+      "울트라워크",
+      "nulw-plan",
+      "ulw--plan",
+      "ulw\nultrawork",
+      "x".repeat(100_000),
+    ] as const
+
+    for (const text of corpus) {
+      const classification = classifyUltraworkInput(
+        { text, source: "interactive" },
+        { wasArmed: false, compactRearmPending: false },
+      )
+      expect({ text, classified: classification.matchedUlw || classification.matchedUltrawork }).toEqual({
+        text,
+        classified: isUltraworkInput(text),
+      })
+    }
+  })
+
+  it("#given overlapping and repeated variants #when classified #then one shipped global pattern determines variants and occurrence count", () => {
+    const cases = [
+      { text: "ulwultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 2 },
+      { text: "ULW ulw Ultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 3 },
+      { text: "ulw-plan", matchedUlw: false, matchedUltrawork: false, occurrenceCount: 0 },
+    ] as const
+
+    for (const { text, ...expected } of cases) {
+      expect(
+        classifyUltraworkInput(
+          { text, source: "interactive" },
+          { wasArmed: false, compactRearmPending: false },
+        ),
+      ).toMatchObject(expected)
+    }
+  })
+
+  it("#given direct, skill, block, and extension inputs #when classified #then effectiveness and suppression mirror handler routes", () => {
+    const cases = [
+      {
+        input: { text: "ulw ship it", source: "interactive" as const },
+        effective: true,
+        route: "direct",
+        suppressionReason: "none",
+        stage: "first_arm",
+      },
+      {
+        input: { text: "/skill:frontend ulw polish", source: "interactive" as const },
+        effective: true,
+        route: "skill_args",
+        suppressionReason: "none",
+        stage: "first_arm",
+      },
+      {
+        input: { text: "/skill:myulw run it", source: "interactive" as const },
+        effective: false,
+        route: "none",
+        suppressionReason: "skill_name_only",
+        stage: "none",
+      },
+      {
+        input: { text: "/skill:ultrawork fix it", source: "interactive" as const },
+        effective: false,
+        route: "skill_expansion",
+        suppressionReason: "skill_expansion",
+        stage: "none",
+      },
+      {
+        input: { text: "<ultrawork-mode>rules</ultrawork-mode> ulw", source: "interactive" as const },
+        effective: false,
+        route: "embedded_directive",
+        suppressionReason: "embedded_directive",
+        stage: "none",
+      },
+      {
+        input: { text: "ulw from extension", source: "extension" as const },
+        effective: false,
+        route: "none",
+        suppressionReason: "extension_source",
+        stage: "none",
+      },
+    ] as const
+
+    for (const { input, ...expected } of cases) {
+      expect(classifyUltraworkInput(input, { wasArmed: false, compactRearmPending: false })).toMatchObject(expected)
+    }
+  })
+
+  it("#given identical stale snapshots #when pure classification runs twice #then results are identical without hidden module state", () => {
+    const input = { text: "ULW ulw Ultrawork", source: "interactive" as const }
+    const snapshot = { wasArmed: true, compactRearmPending: false }
+
+    const first = classifyUltraworkInput(input, snapshot)
+    const second = classifyUltraworkInput(input, snapshot)
+
+    expect(first).toEqual(second)
+    expect(first.stage).toBe("remention")
+  })
+
   it("#given trigger words #when user input dispatches #then arms via one hidden custom message", async () => {
     // given
     const prompts = ["please ultrawork this", "하이ulw", "refactor ulw_helper.ts"] as const

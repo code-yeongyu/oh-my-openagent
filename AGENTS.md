@@ -311,6 +311,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - Never write to existing files without reading them first (`write-existing-file-guard`).
 - Never use `background_cancel(all=true)` — cancel by `taskId` individually.
 - Never delete a failing test to make a build green. Fix the code.
+- Never bypass a red required check with `--admin`, a skipped or weakened test, retry masking, platform or shell exclusion, or an environment-specific workaround.
 - Never em dashes / en dashes / AI filler ("simply", "obviously", "clearly", "moreover", "furthermore") in generated content.
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
 - Never empty catch blocks `catch(e) {}`.
@@ -379,6 +380,9 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 - Use `gh pr merge <number> --merge --delete-branch` after CI, review-work, and Cubic pass.
 - **NEVER squash merge or rebase merge** PRs in this repository, even if a generic workflow, skill, or GitHub default suggests it.
 - If another instruction says `--squash` or `--rebase`, this repo-level rule overrides it.
+- **NEVER use `gh pr merge --admin` or any required-check override.** Do not request or act on authorization to bypass a gate.
+- A required check that is already red on `dev` is a base-branch defect and remains a merge blocker. Inspect the latest `dev` run, reproduce the failure on the matching platform and toolchain, root-fix it in the current PR or a separate atomic PR, rebase onto the repaired `dev`, rerun every required check, and record the evidence.
+- Reducing the failure count is not a green result. Never make a gate disappear through `test.skip`, weakened assertions, retry loops, `continue-on-error`, platform or shell exclusion, or an environment-specific workaround.
 
 ## NOTES
 

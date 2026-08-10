@@ -20,10 +20,23 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // feature commits (scoped revival, batch admission, suspension shutdown, respawn specs) grew the
 // minified bundle from 678,227 to a measured 706,927 bytes (pinned bun 1.3.12). This is plan-scoped
 // feature code, not dependency bloat - no new third-party dependency was inlined.
-const BUDGET_BYTES = 710_000
+// Raised 710,000 -> 880,000 for plan letta-memory-parity-port: the new `memory` component ports the
+// full Letta-Code local memory engine (git-backed MemFS, memory/memory_apply_patch tools, prompt
+// compiler, reflection/dreaming worker + state machine, palace viewer, transcript search, git sync
+// mirror) plus the harness-neutral `@oh-my-opencode/memory-core` package. It is a single self-contained
+// user feature wired into the extension entry; the imports span the whole engine (nothing accidental
+// inlined, no new third-party dependency added). Measured 863,893 bytes after minification. Headroom to
+// 880,000 leaves margin for follow-up memory polish without inviting unrelated bloat.
+// Raised 880,000 -> 900,000 for plan omo-native-telemetry: the plan-scoped first-party feature code
+// is wired into the extension entry and grew the freshly rebuilt bundle to a measured 891,384 bytes.
+// No new third-party dependency was inlined; posthog-node was already present, and
+// bundle-purity.test.ts passes on the new build. A trim was attempted and rejected because reclaiming
+// the bytes would require a secondary chunk and loader-topology change. The round 900,000 ceiling
+// preserves explicit headroom instead of raising the budget to the failing value.
+const BUDGET_BYTES = 900_000
 
 describe("omo-senpi bundle size budget", () => {
-  it("#given the built extension #when its byte size is measured #then it stays within the 700,000-byte plan budget", () => {
+  it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
     expect(existsSync(builtExtensionPath), `missing built extension at ${builtExtensionPath}`).toBe(true)
     const bytes = statSync(builtExtensionPath).size
     // A trip here means the bundle grew past budget: split, lazy-load, or trim a dependency.

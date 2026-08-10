@@ -32,7 +32,7 @@
     "packages/omo-senpi/plugin/README.md:46: omo install",
     "packages/utils/src/codegraph-workspace.test.ts:209: =omo",
     "script/install-codex-dev.ts:45: omo get-local-version",
-    "script/omo-ai-publish-shape.test.ts:161: /bin/omo",
+    "script/omo-ai-publish-shape.test.ts:163: /bin/omo",
     "script/qa/codex-marketplace-e2e.sh:33: =omo"
   ]
 }

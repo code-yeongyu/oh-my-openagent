@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { dirname, join, parse } from "node:path"
+import { basename, dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
 
 export const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
@@ -28,7 +28,12 @@ export function resolveSenpi() {
 }
 
 export function nearestNodeBin(startPath) {
-  let current = startPath
+  // Hoisted layouts place the engine package inside a shared node_modules (…/node_modules/senpi),
+  // whose .bin is a sibling, not a child - starting the climb inside node_modules would walk to the
+  // filesystem root and never find it. Begin at the package's parent so that sibling .bin is seen.
+  let current = basename(startPath) === "node_modules" ? dirname(startPath)
+    : basename(dirname(startPath)) === "node_modules" ? dirname(dirname(startPath))
+    : startPath
   const root = parse(current).root
   while (true) {
     const candidate = join(current, "node_modules", ".bin")

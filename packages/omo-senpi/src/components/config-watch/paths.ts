@@ -1,4 +1,5 @@
 import { lstatSync, statSync } from "node:fs"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import {
@@ -64,7 +65,7 @@ function containsPath(parent: string, child: string): boolean {
  * are unaffected).
  */
 function resolveSenpiProtectedPaths(env: OmoConfigEnv): readonly string[] {
-  const agentDir = resolve(env[SENPI_AGENT_DIR_ENV] ?? join(resolveHomeDir(env), ".senpi", "agent"))
+  const agentDir = resolveAgentHome({ env, homeDir: resolveHomeDir(env) })
   return [join(agentDir, "auth.json"), join(agentDir, "sessions"), join(agentDir, "logs")]
 }
 

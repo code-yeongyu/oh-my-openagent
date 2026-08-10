@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { createRequire } from "node:module"
 import { delimiter, dirname, isAbsolute, join, sep } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import type { RpcRunnerSpec } from "../types"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
@@ -141,8 +142,12 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
 }
 
 function resolveRpcEntrySpecifier(): string {
+  for (const modulesDir of require.resolve.paths(RPC_ENTRY_SPECIFIER) ?? []) {
+    const candidate = join(modulesDir, "@code-yeongyu", "senpi", "dist", "rpc-entry.js")
+    if (existsSync(candidate)) return candidate
+  }
   if (typeof Bun !== "undefined") {
-    return Bun.resolveSync(RPC_ENTRY_SPECIFIER, import.meta.dir)
+    return Bun.resolveSync(RPC_ENTRY_SPECIFIER, dirname(fileURLToPath(import.meta.url)))
   }
   return require.resolve(RPC_ENTRY_SPECIFIER)
 }

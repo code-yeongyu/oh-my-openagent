@@ -1,0 +1,29 @@
+Failing check:
+CI/senpi-compatibility (macos-latest)
+Job: https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31354850349/job/93352534421
+
+Observed failure:
+The session-reset lifecycle test expected the real git-backed footer age to be exactly `1m ago`; the macOS runner observed `2m ago`.
+
+Root cause:
+The wiring integration test coupled its once-per-session lifecycle assertion to exact wall-clock/git date formatting. Exact minute/hour/day buckets are already covered deterministically in `status.test.ts` with an injected repository adapter and clock. The lifecycle test should assert one footer per session, the correct identity, and absence of SHA syntax.
+
+Change:
+- keep exact age buckets in deterministic formatter tests
+- make wiring tests assert count, identity prefix, and no `@` SHA/sentinel
+
+Verification:
+- `bun test --rerun-each 10 packages/omo-senpi/src/components/memory/wiring.test.ts`
+  - 20 pass
+  - 0 fail
+  - 110 assertions
+  - 12.75s
+- `bun run --cwd packages/omo-senpi typecheck`
+  - exit 0
+- `bun test packages/omo-senpi/src/components/memory`
+  - 244 pass
+  - 0 fail
+  - 819 assertions
+  - 36.79s
+
+Production code and final TUI evidence were unchanged by this test-only correction.

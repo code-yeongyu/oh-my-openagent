@@ -30,7 +30,7 @@
 
 ## OVERVIEW
 
-`@oh-my-opencode/omo-codex` (private, v4.18.2): the Codex harness adapter = the **Light Edition** (omo for the OpenAI Codex CLI). Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the live `lazycodex-ai` npm package/bin alias. `lazycodex` remains a root bin alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) repository identity, but is not an npm package. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`). Full identity + the publish/deploy pipeline live in the root [`AGENTS.md`](../../AGENTS.md) "CODEX LIGHT EDITION" section.
+`@oh-my-opencode/omo-codex` (private, v4.19.4): the Codex harness adapter = the **Light Edition** (omo for the OpenAI Codex CLI). Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the live `lazycodex-ai` npm package/bin alias. `lazycodex` remains a root bin alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) repository identity, but is not an npm package. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`). Full identity + the publish/deploy pipeline live in the root [`AGENTS.md`](../../AGENTS.md) "CODEX LIGHT EDITION" section.
 
 ## LAYOUT
 
@@ -40,7 +40,7 @@
 | `marketplace.json` | Codex marketplace manifest. Declares marketplace `sisyphuslabs`, single installable plugin `omo`. |
 | `MARKETPLACE.md` | Native Codex marketplace notes for `sisyphuslabs` / `omo`. |
 | `index.d.ts` | Type barrel re-exporting `src/`. |
-| `plugin/` | Vendored Codex plugin namespace `omo`; pkg `@sisyphuslabs/omo-codex-plugin` (dep `@oh-my-opencode/shared-skills`). Holds `.codex-plugin/plugin.json` (brandColor `#7C3AED`), `hooks/hooks.json` (aggregate event wiring), `components/` (11 workspaces + bootstrap + test-support + lcx), generated aggregate `skills/` (gitignored, built by sync-skills), `.mcp.json`. |
+| `plugin/` | Vendored Codex plugin namespace `omo`; pkg `@sisyphuslabs/omo-codex-plugin` (dep `@oh-my-opencode/shared-skills`). Holds `.codex-plugin/plugin.json` (brandColor `#7C3AED`), the `.codex-plugin/plugin.json` `hooks` array wiring 23 individual hook JSON files in `hooks/` (each component's own `hooks/hooks.json` is assembled into those files by the build), `components/` (11 workspaces + bootstrap + test-support + lcx), generated aggregate `skills/` (gitignored, built by sync-skills), `.mcp.json`. |
 | `scripts/` | Generated/bundled Node ESM install entrypoints and parity tests. Published paths such as `scripts/install-local.mjs` stay stable while source lives in `src/install/`. |
 | `src/` | TypeScript runtime consumed by the CLI: `install/` (Codex cache install, config mutation, agent links, local marketplace snapshot, cleanup, routing) + `telemetry/`. |
 | `tsconfig.json` | Bun-targeted strict config; included in root `typecheck:packages`. |
@@ -55,7 +55,7 @@ Per `plugin/package.json` `workspaces[]`: `codegraph`, `comment-checker`, `git-b
 
 ## INSTALL (mechanics)
 
-Source entry: `src/install/install-codex.ts` plus `src/install/install-local-cli.ts`; generated Node entrypoints live at `packages/omo-codex/scripts/install*.mjs` for stable published paths. Targets: plugin cache `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`; local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`; durable agent TOML copies under `~/.codex/agents/`; enables `omo@sisyphuslabs` in `~/.codex/config.toml`; component CLIs into `~/.local/bin`. Windows: Git Bash preflight discovers `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations, then PATH; if missing, it prints manual install guidance and stops without running `winget`. Non-Windows keeps the `git_bash` MCP manifest bundled but writes `enabled = false`.
+Source entry: `src/install/install-codex.ts` plus `src/install/install-local-cli.ts`; generated Node entrypoints live at `packages/omo-codex/scripts/install*.mjs` for stable published paths. Targets: plugin cache `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`; local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`; durable agent TOML copies under `~/.codex/agents/`; enables `omo@sisyphuslabs` in `~/.codex/config.toml`; component CLIs into the resolved bin dir: explicit `CODEX_LOCAL_BIN_DIR` / `binDir` option, else `<codexHome>/bin` when `CODEX_HOME` is non-default, else `~/.local/bin` (`codex-installer-bin-dir.ts`). The installer records that directory in `.installed-bin-dir.json` beside the plugin cache (`codex-installed-bin-dir.ts`), because `CODEX_LOCAL_BIN_DIR` is typically a one-shot override a later uninstall cannot recompute; `codex-cleanup.ts` reads the manifest BEFORE removing managed state, since the manifest lives inside the trees being deleted. Windows: Git Bash preflight discovers `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations, then PATH; if missing, it prints manual install guidance and stops without running `winget`. Non-Windows keeps the `git_bash` MCP manifest bundled but writes `enabled = false`.
 
 ## UNIFIED CONFIG (omo.jsonc)
 

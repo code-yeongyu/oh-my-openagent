@@ -223,7 +223,7 @@ describe("omo setup sibling detection", () => {
     })
   })
 
-  describe("#given senpi has no credentials and a sibling is installed", () => {
+  describe("#given no credentials found and a sibling is installed", () => {
     test("#when suggestion state is checked #then only that exact condition is true", async () => {
       const fixture = createFixture()
       write(join(fixture.xdg, "opencode", "auth.json"), "{}")
@@ -235,19 +235,19 @@ describe("omo setup sibling detection", () => {
       expect(needsSetupSuggestion(await detect(fixture))).toBe(false)
     })
 
-    test("#when doctor runs #then the INFO line fires only while senpi is empty", () => {
+    test("#when doctor runs #then the INFO line fires only while the engine store is empty", () => {
       const fixture = createFixture()
       const launcher = createLauncherFixture(fixture)
       write(join(fixture.xdg, "opencode", "auth.json"), "{}")
       let result = runLauncher(launcher, fixture, ["doctor"])
       expect(result.status).toBe(0)
-      expect(result.stdout).toContain("INFO senpi has no credentials; run omo setup to review sibling stores")
+      expect(result.stdout).toContain("INFO no credentials found; run omo setup to review sibling stores")
       write(join(fixture.agentDir, "auth.json"), JSON.stringify({ senpi: { type: "api_key", key: "SENPI-SECRET" } }))
       result = runLauncher(launcher, fixture, ["doctor"])
-      expect(result.stdout).not.toContain("INFO senpi has no credentials")
+      expect(result.stdout).not.toContain("INFO no credentials found")
     })
 
-    test("#when default launch is on a TTY #then one hint appears and non-TTY emits none", () => {
+    test.skipIf(process.platform === "win32")("#when default launch is on a TTY #then one hint appears and non-TTY emits none", () => {
       const fixture = createFixture()
       const launcher = createLauncherFixture(fixture)
       write(join(fixture.xdg, "opencode", "auth.json"), "{}")

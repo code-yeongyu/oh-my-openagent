@@ -1,0 +1,25 @@
+Latest dev sync verification
+
+Sync:
+- Merged current `origin/dev`, including PR #6718's Omo Native telemetry work and PR #6713's Windows root repairs.
+- Source conflicts: none.
+- Generated conflicts: `omo.js` and `omo-memory-mcp.js`, both regenerated from the merged TypeScript tree.
+
+Verification on the merged tree:
+- Cleanup plus focused memory tests: 25 pass, 0 fail, 80 assertions.
+- Full memory component: 251 pass, 0 fail, 835 assertions.
+- Script typecheck: exit 0.
+- Omo-senpi typecheck: exit 0.
+- `actionlint .github/workflows/ci.yml`: exit 0.
+- Senpi plugin build: exit 0.
+- Generated extension freshness check: exit 0.
+
+Real xterm:
+- Before first memory use: footer count 0.
+- After real `memory create`: footer count 1 with `just now`.
+- `@uncommitted`: count 0.
+- PTYs 10435 and 10434 killed.
+- QA runtime removed and no matching process remained.
+
+Remaining proof:
+- The replacement GitHub Actions matrix on the merged branch must pass before merge.

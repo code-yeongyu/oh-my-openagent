@@ -12,7 +12,10 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 |------|---------|
 | `build-binaries.ts` | Writes 12 generated Node launcher packages for darwin/linux/windows (AVX2 + baseline) |
 | `build-cli-node.ts` | Node-runtime CLI bundle (`dist/cli-node`) for environments without Bun |
-| `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/` |
+| `build.ts` | Main build entry (`bun run build`) |
+| `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/`. Also embeds a source-freshness marker (`// omo-codex-install:<sourceDigest>:<bodyDigest>`) as line 2 of the generated bundle and exports `buildCodexInstaller()` / `digestCodexInstallerSources()` / `parseCodexInstallerArtifact()` for non-destructive freshness checks; guarded by `import.meta.main` |
+| `build-omo-schema.ts` + `build-omo-schema-document.ts` | Generate the unified OMO config schema + companion document |
+| `verify-npm-payload.mjs` | npm payload verification |
 | `build-help-schemas.ts` | Generate CLI help schemas |
 | `build-schema.ts` + `build-schema-document.ts` | Zod schema to JSON Schema for `assets/oh-my-opencode.schema.json` |
 | `build-model-capabilities.ts` | Refresh the generated model-capabilities artifact consumed by `packages/model-core/` |
@@ -40,6 +43,7 @@ Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycode
 | `package-registration-audit.test.ts` | Workspaces registered, devDeps aligned, ROADMAP reverse-dependency edges stay zero, shim inventory complete |
 | `shared-core-extraction-guard.test.ts` | `packages/*-core` stay harness-neutral (no harness-adapter imports/deps) |
 | `agent-env.test.ts` / `agent-harness-wiring.test.ts` / `agents-md-dev-env.test.ts` | Dev-env scripts, harness wiring files, and the root AGENTS.md DEVELOPMENT ENVIRONMENT section stay in sync |
+| `codex-install-bundle-freshness.test.ts` | The COMMITTED Codex installer bundle matches its sources: reads the bundle from the git index (`git show :packages/omo-codex/scripts/install-dist/install-local.mjs`), checks the build marker is present and self-consistent, and asserts the current source digest matches it |
 
 ## TSCONFIG
 

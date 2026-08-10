@@ -64,6 +64,29 @@ The first real omo-ai release is not automated into any merge. The user dispatch
 - [ ] The dist-tag guard passed: `beta` points at the new version and `latest` is still `0.0.0-beta.0`.
 - [ ] Live verification passed: a fresh-prefix `npm i -g omo-ai@beta` installed the stamped version, `omo --version` exited 0, and the bare-channel `npm i -g omo-ai` probe failed with ETARGET.
 
+## Brand contract (what makes the product read as omo)
+
+The launcher hands the pinned engine a single `SENPI_BRAND` JSON profile before spawning it. The
+engine resolves it once and then scrubs it, so a senpi the agent itself spawns keeps the engine
+identity instead of impersonating the product.
+
+| field | value | effect |
+| --- | --- | --- |
+| `name` | `omo` | welcome header, terminal titles, help, tips, first-run, system-prompt identity |
+| `displayVersion` | the omo-ai version | `omo --version` and the TUI header; the engine version stays internal for update comparisons |
+| `configDir` + `flatLayout` | `.omo`, flat | agent state lives directly under `~/.omo` |
+| `envPrefix` | `OMO` | `OMO_*` variables are read first, then the legacy `SENPI_*` and `PI_*` names |
+| `userAgent` / `originator` | `omo` | outgoing request identity |
+| `update` | `omo-ai`, `beta`, `npm i -g omo-ai@beta` | the update banner checks the beta dist-tag of omo-ai and prints the product's own command |
+
+The update channel matters: omo-ai's `latest` tag is pinned to the deprecated bootstrap
+placeholder forever, so a `latest` lookup would never see a release. The engine therefore reads
+the dist-tag named in the profile. `omo update`, `omo update --self` and the engine's own
+self-update path all answer with the npm command instead of replacing the pinned engine.
+
+Requires an engine release that understands `SENPI_BRAND`; the pin in `packages/omo-native/package.json`
+must point at that release or newer.
+
 ## Install and upgrade order (EEXIST)
 
 Machines that still carry a pre-rename root package (oh-my-openagent or oh-my-opencode at 4.19.4 or earlier) have a global `omo` bin shim from that package. Installing omo-ai on top of it fails with EEXIST because npm refuses to overwrite a bin link owned by another package.

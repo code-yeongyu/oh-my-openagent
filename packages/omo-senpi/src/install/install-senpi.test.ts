@@ -29,6 +29,7 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
   tempDirs.push(pluginPath)
   await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
   await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
   const requiredSkillNames = [
     "ast-grep",
     "coding-agent-sessions",

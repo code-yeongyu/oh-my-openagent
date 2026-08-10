@@ -139,7 +139,8 @@ function createTransport(input: CreateTelemetryClientInput): TelemetryTransport 
       flushAt: 1,
       flushInterval: 0,
       host: getTelemetryHost(env, input.product.defaultHost),
-      disableGeoip: false,
+      disableGeoip: input.product.disableGeoip ?? false,
+      ...input.product.transportOptions,
     })
   } catch (error) {
     input.diagnostics?.({

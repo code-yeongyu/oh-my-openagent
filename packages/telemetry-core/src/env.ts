@@ -32,6 +32,10 @@ export function shouldDisableTelemetry(input: ShouldDisableTelemetryInput): bool
   const globalPrefix = input.globalEnvPrefix ?? "OMO"
   const prefixes = Array.from(new Set([globalPrefix, input.productEnvPrefix]))
 
+  if (isDisableFlag(env["DO_NOT_TRACK"])) {
+    return true
+  }
+
   for (const prefix of prefixes) {
     if (isDisableFlag(env[`${prefix}_DISABLE_POSTHOG`])) {
       return true

@@ -1,14 +1,16 @@
 # shared-skills — Cross-Harness SKILL.md Bundle (Skills)
 
-**Generated:** 2026-07-17 (7d664b96b)
+**Generated:** 2026-08-10 (38d268995)
 
 ## OVERVIEW
 
-Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`. Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
+Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`; it probes `SKILLS_PROBE_SPECIFIERS` (`./skills/`, `../skills/`, `../../skills/`) nearest-first and returns the first that exists, falling back to the sibling path. The three levels cover `dist/index.js` (sibling), `dist/cli/index.js` (parent), and the Codex marketplace layout `plugins/omo/dist/cli/` (grandparent). Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
 
-## SKILLS (16 under `skills/<name>/`)
+## SKILLS (17 under `skills/<name>/`)
 
-`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
+`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
+
+`ultimate-browsing` is the one skill carrying a real sub-project: `skills/ultimate-browsing/engine/` is a 17-module Python package with its own CLI, config schemas, and test suite. See [`skills/ultimate-browsing/engine/AGENTS.md`](skills/ultimate-browsing/engine/AGENTS.md).
 
 The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
@@ -61,6 +63,6 @@ upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submod
 - **Test files, caches, and source metadata are excluded** when Codex copies skills.
 - **`lcx-` prefix = Codex-only** (no OpenCode counterpart). Frontmatter has NO `location:` field (unlike `.agents/skills/`).
 - **Packaging is pinned** by `omo-opencode/src/shared-skills-package.test.ts` (workspace inclusion + `files` entries + every skill parses).
-- **Skill CONTENT is PROSE — do NOT pin its wording with a test.** A skill body is instructions the model reads; asserting what it *says* (`toContain` a sentence, `not.toContain` old wording, word/char counts) guards a diff, not behavior, and blocks every legitimate edit — see `.omo/rules/test-discipline.md` §PROMPT TESTS. Guard only what a MACHINE consumes: packaging (`omo-opencode/src/shared-skills-package.test.ts`, above), personal-token scrubbing (`depersonalization-gate.test.ts` — a security exclusion), the third-party manifest (`frontend-thirdparty-manifest.test.ts`), and `upstreams.test.ts`. A pure-prose skill edit ships on review with NO new test; the prose-pinning contract tests that used to sit here were removed as pretend-coverage.
+- **Skill CONTENT is PROSE — do NOT pin its wording with a test.** A skill body is instructions the model reads; asserting what it *says* (`toContain` a sentence, `not.toContain` old wording, word/char counts) guards a diff, not behavior, and blocks every legitimate edit — see `.omo/rules/test-discipline.md` §PROMPT TESTS. Guard only what a MACHINE consumes: packaging (`omo-opencode/src/shared-skills-package.test.ts`, above), personal-token scrubbing (`depersonalization-gate.test.ts` — a security exclusion), the third-party manifest (`frontend-thirdparty-manifest.test.ts`), the root-path probe (`shared-skills-root-path.test.ts`), and `upstreams.test.ts`. A pure-prose skill edit ships on review with NO new test; the prose-pinning contract tests that used to sit here were removed as pretend-coverage.
 - **ulw-plan is dual-maintained by hand** (here AND `omo-codex/plugin/components/ultrawork/skills/ulw-plan/`) — sync-skills does NOT copy the shared version to Codex; keep both in step.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).

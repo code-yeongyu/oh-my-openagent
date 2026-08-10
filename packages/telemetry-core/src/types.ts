@@ -8,6 +8,9 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"
   | "telemetry_cpu_info_unavailable"
+  | "telemetry_event_property_dropped"
+  | "telemetry_event_property_rejected"
+  | "telemetry_event_rejected"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
   | "telemetry_shutdown_failed"
@@ -33,6 +36,8 @@ export type TelemetryProductConfig = {
   readonly productEnvPrefix: string
   readonly productName: string
   readonly additionalProperties?: TelemetryCaptureProperties
+  readonly disableGeoip?: boolean
+  readonly transportOptions?: Partial<TelemetryTransportOptions>
 }
 
 export type TelemetryOsProvider = {

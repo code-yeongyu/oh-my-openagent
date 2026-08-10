@@ -4,7 +4,9 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
 const workflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
-const workflowText = readFileSync(workflowPath, "utf8")
+// Windows checks YAML out with CRLF, and the byte-pinned markers below are written with LF, so
+// the text is normalized once instead of every marker carrying both spellings.
+const workflowText = readFileSync(workflowPath, "utf8").replace(/\r\n/g, "\n")
 const workflow = Bun.YAML.parse(workflowText) as Workflow
 
 interface Step {

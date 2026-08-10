@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
+import { BUILTIN_SKILL_NAMES } from "./components/telemetry/product-identity"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
 const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
@@ -94,6 +95,13 @@ function extractFrontmatterField(frontmatter: string, field: string): string | u
 }
 
 describe("OMO Senpi scoped skill sync", () => {
+  test("#given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen", () => {
+    const telemetrySkillNames: readonly string[] = BUILTIN_SKILL_NAMES
+    expect(Object.isFrozen(BUILTIN_SKILL_NAMES)).toBe(true)
+    expect(BUILTIN_SKILL_NAMES.length).toBeGreaterThan(0)
+    expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
+  })
+
   test("#given synced skill output #when inspected #then exactly 20 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
