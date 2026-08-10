@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rm } from "node:fs/promises"
 
-import { CONFIG_KEY } from "@oh-my-opencode/memory-core"
+import {
+  CONFIG_KEY,
+  createNodeGitExec,
+  type GitExec,
+} from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import {
@@ -17,8 +21,20 @@ const tempDirs: string[] = []
 
 // Port 1 on loopback refuses immediately, so mirror pushes fail fast and offline.
 const CREDENTIALED_URL = "https://user:s3cr3t-token@127.0.0.1:1/memory.git"
+const localGit = createNodeGitExec()
+const mirrorCalls: string[][] = []
+const mirrorExec: GitExec = {
+  run: (argv, options) => {
+    mirrorCalls.push([...argv])
+    if (argv[0] === "push" || argv[0] === "ls-remote") {
+      return Promise.resolve({ code: 1, stdout: "", stderr: `unable to reach ${CREDENTIALED_URL}` })
+    }
+    return localGit.run(argv, options)
+  },
+}
 
 afterEach(async () => {
+  mirrorCalls.length = 0
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
@@ -31,7 +47,7 @@ async function harness(options: { readonly seeded?: boolean } = {}) {
   tempDirs.push(root)
   const repo = options.seeded === false ? undefined : await seededRepo(identity, SEEDS)
   const pi = new MemoryFakeExtensionAPI()
-  registerMemoryRepositoryCommand(pi, fakeDeps(identity))
+  registerMemoryRepositoryCommand(pi, fakeDeps(identity, { exec: mirrorExec }))
   return { identity, repo, pi, ctx: fakeCommandContext() }
 }
 
@@ -48,6 +64,7 @@ describe("/memory-repository", () => {
     expect(text).toContain("127.0.0.1")
     expect(text).not.toContain("s3cr3t-token")
     expect(ctx.ui.notifications.every((entry) => !entry.message.includes("s3cr3t-token"))).toBe(true)
+    expect(mirrorCalls.some(([command]) => command === "push")).toBe(true)
   }, 20_000)
 
   test("#given a configured mirror #when status runs #then the redacted url and ahead count render", async () => {
