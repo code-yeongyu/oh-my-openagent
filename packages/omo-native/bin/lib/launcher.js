@@ -8,6 +8,27 @@ import { printSetupReport } from "./setup-report.js"
 
 const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server"])
 
+function environmentKey(environment, name) {
+  return Object.keys(environment).find((key) => key.toLowerCase() === name.toLowerCase())
+}
+
+function prependPath(environment, directory) {
+  const pathKey = environmentKey(environment, "PATH") ?? "PATH"
+  const currentPath = environment[pathKey]
+  const normalizedDirectory = directory.replace(/[\\/]+$/, "").toLowerCase()
+  const hasDirectory = currentPath?.split(delimiter).some((entry) => (
+    entry.replace(/[\\/]+$/, "").toLowerCase() === normalizedDirectory
+  )) ?? false
+  if (!hasDirectory) environment[pathKey] = currentPath ? `${directory}${delimiter}${currentPath}` : directory
+}
+
+function restoreWindowsSystem32(environment) {
+  if (process.platform !== "win32") return
+  const systemRootKey = environmentKey(environment, "SystemRoot") ?? environmentKey(environment, "windir")
+  const systemRoot = systemRootKey === undefined ? undefined : environment[systemRootKey]
+  if (systemRoot) prependPath(environment, join(systemRoot, "System32"))
+}
+
 function senpiEnvironment(senpiRoot) {
   const env = { ...process.env }
   delete env.OMO_BIN
@@ -17,9 +38,10 @@ function senpiEnvironment(senpiRoot) {
   // the plugin via --extension and therefore never match the settings-packages detection gates.
   env.OMO_NATIVE = "1"
 
+  restoreWindowsSystem32(env)
   const binDir = nearestNodeBin(senpiRoot)
   if (binDir) {
-    env.PATH = env.PATH ? `${binDir}${delimiter}${env.PATH}` : binDir
+    prependPath(env, binDir)
     const shim = join(binDir, process.platform === "win32" ? "senpi.cmd" : "senpi")
     if (existsSync(shim)) env.SENPI_BIN = shim
   }
