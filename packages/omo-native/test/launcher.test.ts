@@ -91,10 +91,16 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   return { root, packageRoot, launcher: join(packageRoot, "bin", "omo.js"), captureFile, shimPath }
 }
 
-function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}) {
+function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}, omittedEnvironmentKeys: string[] = []) {
+  const childEnvironment = { ...process.env }
+  for (const omittedKey of omittedEnvironmentKeys) {
+    for (const key of Object.keys(childEnvironment)) {
+      if (key.toLowerCase() === omittedKey.toLowerCase()) delete childEnvironment[key]
+    }
+  }
   return spawnSync(process.execPath, [fixture.launcher, ...args], {
     encoding: "utf8",
-    env: { ...process.env, CAPTURE_FILE: fixture.captureFile, ...env },
+    env: { ...childEnvironment, CAPTURE_FILE: fixture.captureFile, ...env },
   })
 }
 
@@ -136,6 +142,26 @@ describe("omo launcher", () => {
         expect(existsSync(environment.OMO_BIN ?? "")).toBe(true)
         expect((environment.OMO_BIN ?? "").replace(/\\/g, "/")).toMatch(/\/bin\/omo\.js$/)
         expect(environment.OMO_BIN).not.toBe(environment.SENPI_BIN)
+      })
+
+      test.skipIf(process.platform !== "win32")("#then the launcher restores System32 without displacing its shim", () => {
+        const fixture = createFixture({ hoisted: true })
+        mkdirSync(join(fixture.packageRoot, "node_modules"), { recursive: true })
+        const pathKey = "Path"
+        const systemRootKey = Object.keys(process.env).find((key) => key.toLowerCase() === "systemroot") ?? "SystemRoot"
+        const systemRoot = process.env[systemRootKey] ?? "C:\\Windows"
+        const inputPath = join(fixture.root, "path-without-system32")
+        const result = run(fixture, ["--version"], {
+          [pathKey]: inputPath,
+        }, ["path"])
+        const environment = capture(fixture).env
+        const pathEntries = (environment[pathKey] ?? "").split(";")
+
+        expect(result.status).toBe(0)
+        expect(Object.keys(environment).filter((key) => key.toLowerCase() === "path")).toEqual([pathKey])
+        expect(pathEntries[0]).toBe(dirname(fixture.shimPath ?? ""))
+        expect(pathEntries).toContain(join(systemRoot, "System32"))
+        expect(pathEntries).toContain(inputPath)
       })
 
       test("#then SENPI_BIN stays absent when no shim exists", () => {
