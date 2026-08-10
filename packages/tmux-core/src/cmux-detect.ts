@@ -9,6 +9,5 @@ export function isCmuxCompatEnvironment(
 	environment: Record<string, string | undefined> = process.env,
 ): boolean {
 	const tmuxEnvironment = environment.TMUX
-	return tmuxEnvironment?.includes("cmuxterm") === true ||
-		(Boolean(environment.CMUX_SOCKET_PATH) && !tmuxEnvironment)
+	return tmuxEnvironment?.includes("cmuxterm") === true || Boolean(environment.CMUX_SOCKET_PATH)
 }
