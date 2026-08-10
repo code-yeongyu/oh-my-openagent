@@ -197,7 +197,7 @@ describe("omo setup credential inheritance", () => {
     const files = readdirSync(item.agentDir)
     const backup = files.find((name) => /^auth\.json\.bak-\d{8}T\d{6}\.\d{3}Z$/.test(name))
     expect(first.status).toBe(0)
-    expect(statSync(join(item.agentDir, "auth.json")).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32") expect(statSync(join(item.agentDir, "auth.json")).mode & 0o777).toBe(0o600)
     expect(backup).toBeDefined()
     expect(readFileSync(join(item.agentDir, backup!), "utf8")).toBe(original)
     const afterFirst = readFileSync(join(item.agentDir, "auth.json"), "utf8")
