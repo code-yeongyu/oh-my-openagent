@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -120,6 +130,9 @@ function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}) {
   delete inherited.OMO_CODING_AGENT_DIR
   delete inherited.SENPI_CODING_AGENT_DIR
   delete inherited.PI_CODING_AGENT_DIR
+  // A developer machine that already points SENPI_BIN at its own engine would answer the
+  // unconfigured cases for them, so the variable is only ever set by the case that tests it.
+  delete inherited.SENPI_BIN
   return spawnSync(process.execPath, [fixture.launcher, ...args], {
     encoding: "utf8",
     env: { ...inherited, ...env },
@@ -128,6 +141,24 @@ function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}) {
 
 function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; target?: string } {
   return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
+}
+
+/**
+ * An engine binary the user chose themselves: a real file outside the package, so the launcher's
+ * answer for it can only come from the explicit request and never from the packaged shim.
+ */
+function writeAlternateSenpi(fixture: Fixture): string {
+  const path = join(fixture.root, process.platform === "win32" ? "custom-senpi.cmd" : "custom-senpi")
+  writeFile(path, "fixture custom senpi\n", 0o755)
+  return expandShortPath(realpathSync(path))
+}
+
+function canonicalOrUndefined(value: string): string | undefined {
+  try {
+    return realpathSync(value)
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -200,6 +231,92 @@ describe("omo launcher", () => {
         const result = run(fixture, ["say", "hi"], { SENPI_BIN: "/stale/senpi" })
         expect(result.status).toBe(0)
         expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      test("#then an existing explicit SENPI_BIN is preserved", () => {
+        const fixture = createFixture({ shim: false })
+        const explicitBin = writeAlternateSenpi(fixture)
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: explicitBin })
+
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBe(explicitBin)
+      })
+
+      test("#then an explicit SENPI_BIN outranks the packaged shim", () => {
+        const fixture = createFixture()
+        const explicitBin = writeAlternateSenpi(fixture)
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: explicitBin })
+
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBe(explicitBin)
+        expect(capture(fixture).env.SENPI_BIN).not.toBe(fixture.shimPath)
+      })
+
+      test("#then a self-referential SENPI_BIN is removed", () => {
+        const fixture = createFixture({ shim: false })
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: fixture.launcher })
+
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      // Path strings are not identity: these three spellings all name the launcher itself, and any
+      // one of them surviving the scrub would make the engine spawn re-enter this launcher forever.
+      test("#then a symlinked self-referential SENPI_BIN is removed", () => {
+        const fixture = createFixture({ shim: false })
+        const link = join(fixture.root, "senpi-link")
+        try {
+          symlinkSync(fixture.launcher, link)
+        } catch {
+          // Windows refuses symlink creation without the privilege; the alias case below covers it.
+          return
+        }
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: link })
+
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      test("#then a case-aliased self-referential SENPI_BIN is removed", () => {
+        const fixture = createFixture({ shim: false })
+        // A case-insensitive filesystem (Windows, default macOS) opens the launcher through this
+        // spelling; a case-sensitive one resolves nothing, and both must end with no SENPI_BIN.
+        const alias = join(dirname(fixture.launcher), "OMO.JS")
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: alias })
+
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      test("#then a SENPI_BIN that is not a file is rejected", () => {
+        const fixture = createFixture({ shim: false })
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: dirname(fixture.launcher) })
+
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      test("#then an alternate engine binary reaches the engine with no launcher self-reference", () => {
+        const fixture = createFixture()
+        const explicitBin = writeAlternateSenpi(fixture)
+
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: explicitBin })
+
+        const environment = capture(fixture).env
+        expect(result.status).toBe(0)
+        expect(environment.SENPI_BIN).toBe(explicitBin)
+        expect(existsSync(environment.SENPI_BIN ?? "")).toBe(true)
+        const launcherIdentity = realpathSync(fixture.launcher)
+        for (const [key, value] of Object.entries(environment)) {
+          if (key === "OMO_BIN" || value === undefined) continue
+          expect(canonicalOrUndefined(value)).not.toBe(launcherIdentity)
+        }
       })
     })
 
