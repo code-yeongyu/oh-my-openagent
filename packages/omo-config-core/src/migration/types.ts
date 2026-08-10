@@ -62,6 +62,7 @@ export type MigrationPlan = {
 
 export type RunMigrationOptions = {
   readonly clock?: MigrationClock
+  readonly dryRun?: boolean
   readonly env?: MigrationEnvironment
   readonly fileSystem?: MigrationFileSystem
   readonly id: string
@@ -95,7 +96,6 @@ export type RunMigrationsOptions = Omit<
 > & {
   readonly afterMigrations?: (results: readonly MigrationRunResult[]) => void
   readonly discover: () => readonly MigrationPlan[]
-  readonly dryRun?: boolean
 }
 
 export type MigrationBatchRunResult = {

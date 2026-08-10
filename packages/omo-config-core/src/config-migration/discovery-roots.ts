@@ -1,4 +1,4 @@
-import { canonicalPath, hostPathOperations, isWindowsPathOperations, pathKey, usesWindowsPathSemantics } from "./discovery-paths"
+import { canonicalPath, hostPathOperations, pathKey, usesWindowsPathSemantics } from "./discovery-paths"
 import type { ConfigMigrationDiscoveryOptions } from "./types"
 
 const TAURI_IDENTIFIERS = ["ai.opencode.desktop", "ai.opencode.desktop.dev"] as const

@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-06-13. Total shim exports found: 316.
+Snapshot date: 2026-08-10. Total shim exports found: 316.
 
 ## Aggregate By Target Package
 
@@ -24,13 +24,14 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `@oh-my-opencode/mcp-client-core` | 21 |
 | `@oh-my-opencode/model-core` | 7 |
 | `@oh-my-opencode/omo-codex` | 41 |
+| `@oh-my-opencode/omo-config-core` | 3 |
 | `@oh-my-opencode/omo-senpi` | 1 |
 | `@oh-my-opencode/openclaw-core` | 30 |
 | `@oh-my-opencode/rules-engine` | 4 |
 | `@oh-my-opencode/skills-loader-core` | 65 |
 | `@oh-my-opencode/team-core` | 45 |
 | `@oh-my-opencode/tmux-core` | 3 |
-| `@oh-my-opencode/utils` | 53 |
+| `@oh-my-opencode/utils` | 50 |
 
 ## Exhaustive Shim Paths
 
@@ -307,10 +308,10 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/shared/git-worktree/parse-status-porcelain.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/types.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/internal-initiator-marker.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/migration/agent-names.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/migration/hook-names.ts` | `@oh-my-opencode/utils` |
+| `packages/omo-opencode/src/shared/migration/agent-names.ts` | `@oh-my-opencode/omo-config-core` |
+| `packages/omo-opencode/src/shared/migration/hook-names.ts` | `@oh-my-opencode/omo-config-core` |
 | `packages/omo-opencode/src/shared/migration/migrations-sidecar.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/migration/model-versions.ts` | `@oh-my-opencode/utils` |
+| `packages/omo-opencode/src/shared/migration/model-versions.ts` | `@oh-my-opencode/omo-config-core` |
 | `packages/omo-opencode/src/shared/model-format-normalizer.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/model-normalization.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/model-sanitizer.ts` | `@oh-my-opencode/model-core` |

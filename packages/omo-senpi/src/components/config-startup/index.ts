@@ -1,18 +1,16 @@
 import { posix, win32 } from "node:path"
 
 import {
+  createLegacyConfigMigrationPlans,
   runMigrations,
+  type ConfigMigrationDiscoveryFileSystem,
+  type ConfigMigrationPathOperations,
   type MigrationBoundary,
   type MigrationClock,
   type MigrationEnvironment,
   type MigrationFileSystem,
   type MigrationRunResult,
 } from "@oh-my-opencode/omo-config-core"
-import {
-  createLegacyConfigMigrationPlans,
-  type ConfigMigrationDiscoveryFileSystem,
-  type ConfigMigrationPathOperations,
-} from "@oh-my-opencode/omo-opencode/config-migration"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"

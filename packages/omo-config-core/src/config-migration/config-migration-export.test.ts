@@ -3,15 +3,17 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs"
 import { dirname, join, resolve, sep } from "node:path"
 
 const PACKAGE_PATH = join(import.meta.dir, "..", "..", "package.json")
-const ENTRY_POINT = join(import.meta.dir, "index.ts")
+const ROOT_ENTRY_POINT = join(import.meta.dir, "..", "index.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
-const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
-const UTILS_MIGRATION_MODULES = [
-  join(PACKAGES_PATH, "utils", "src", "migration", "agent-names.ts"),
-  join(PACKAGES_PATH, "utils", "src", "migration", "hook-names.ts"),
-  join(PACKAGES_PATH, "utils", "src", "migration", "model-versions.ts"),
+const CONFIG_CORE_MIGRATION_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "migration", "index.ts")
+const CONFIG_MIGRATION_ENTRY_POINT = join(import.meta.dir, "index.ts")
+const CORE_MIGRATION_MODULES = [
+  join(import.meta.dir, "agent-names.ts"),
+  join(import.meta.dir, "hook-names.ts"),
+  join(import.meta.dir, "model-versions.ts"),
 ]
-const NEGATIVE_FIXTURE_ENTRY_POINT = join(import.meta.dir, "..", "..", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
+const UTILS_SOURCE_PATH = join(PACKAGES_PATH, "utils", "src", sep)
+const NEGATIVE_FIXTURE_ENTRY_POINT = join(PACKAGES_PATH, "omo-opencode", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
 const OPENCODE_IMPORT = /^@opencode-ai\//
 const PLUGIN_RUNTIME_DIRECTORY = `${sep}plugin${sep}`
 const PLUGIN_CONFIG_DIRECTORY = `${sep}plugin-config${sep}`
@@ -85,8 +87,8 @@ function moduleGraph(entryPoint: string): readonly string[] {
   return [...visited]
 }
 
-describe("config-migration public subpath", () => {
-  test("#given the package manifest #when resolving config-migration #then its dedicated public subpath points only at the dependency-clean module", () => {
+describe("config-migration core boundary", () => {
+  test("#given the core package manifest #when resolving its public root #then config migration is exported through the harness-neutral entry point", () => {
     // given
     const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, "utf-8")) as Record<string, unknown>
 
@@ -94,17 +96,19 @@ describe("config-migration public subpath", () => {
     const exports = packageJson.exports
 
     // then
-    expect(exports).toEqual({
-      "./config-migration": {
-        import: "./src/config-migration/index.ts",
-        types: "./src/config-migration/index.ts",
+    expect(exports).toMatchObject({
+      ".": {
+        import: "./src/index.ts",
       },
+    })
+    expect(packageJson.dependencies).not.toMatchObject({
+      "@oh-my-opencode/utils": expect.anything(),
     })
   })
 
-  test("#given the config-migration entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {
+  test("#given the core public entry point #when its module graph is audited #then config migration is reachable without adapter or utils coupling", () => {
     // given
-    const modules = moduleGraph(ENTRY_POINT)
+    const modules = moduleGraph(ROOT_ENTRY_POINT)
     const offenders: string[] = []
 
     // when
@@ -120,9 +124,11 @@ describe("config-migration public subpath", () => {
 
     // then
     expect(modules).toEqual(expect.arrayContaining([
-      CONFIG_CORE_ENTRY_POINT,
-      ...UTILS_MIGRATION_MODULES,
+      CONFIG_MIGRATION_ENTRY_POINT,
+      CONFIG_CORE_MIGRATION_ENTRY_POINT,
+      ...CORE_MIGRATION_MODULES,
     ]))
+    expect(modules.some((modulePath) => modulePath.startsWith(UTILS_SOURCE_PATH))).toBe(false)
     expect(offenders).toEqual([])
   })
 

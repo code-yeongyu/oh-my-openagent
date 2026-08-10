@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tree, a walked multi-layer loader with VSCode-style view resolution (shared base -> `[harness]` block -> `profiles.<P>` -> `profiles.<P>.[harness]`), a shared model catalog resolver, a comment-preserving atomic writer, and a lock+journal legacy-config migration engine. Pure logic with all IO injected through filesystem ports. No OpenCode, Codex, Senpi, Pi, or adapter imports (guarded by `script/shared-core-extraction-guard.test.ts`). Package: `@oh-my-opencode/omo-config-core` (private, `sideEffects: false`). This is THE config surface for every omo harness: `packages/omo-opencode` resolves its plugin config through it, `packages/omo-senpi` loads task/codegraph/config-watch settings plus startup migration through it, and `packages/omo-codex`'s codegraph loader reads through it.
+Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tree, a walked multi-layer loader with VSCode-style view resolution (shared base -> `[harness]` block -> `profiles.<P>` -> `profiles.<P>.[harness]`), a shared model catalog resolver, a comment-preserving atomic writer, and legacy-config discovery/transforms backed by a lock+journal migration engine. Pure logic with all IO injected through filesystem ports. No OpenCode, Codex, Senpi, Pi, or adapter imports (guarded by `script/shared-core-extraction-guard.test.ts`). Package: `@oh-my-opencode/omo-config-core` (private, `sideEffects: false`). This is THE config surface for every omo harness: `packages/omo-opencode`, `packages/omo-senpi`, and `packages/omo-codex` consume its loader and migration APIs directly.
 
 ## ANATOMY
 
@@ -27,6 +27,7 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/loader/types.ts` | `LoadOmoConfigOptions/Result`, `OmoConfigDiagnostic`, `OmoConfigSource`, the injectable `OmoConfigReadFileSystem` port, and `DEFAULT_READ_FILE_SYSTEM`. |
 | `src/models/model-reference-resolution.ts` | `resolveModelReferences` - expands `models` catalog keys referenced by agent/category `model` strings, fills unset tuning (site tuning wins), and reports `model_catalog_cycle` diagnostics. |
 | `src/migration/` | Lock+journal transaction engine (`batch.ts`, `engine.ts`): owner-aware lease lock (`lock.ts`), journal recovery before predicates (`recovery.ts`, `predicate.ts`), per-(target, migration-id) `_migrations` markers, no-clobber merge with `skipped:` diagnostics (`merge.ts`), comment-preserving atomic target writes (`commit.ts`), and journaled resumable backups. |
+| `src/config-migration/` | Harness-neutral legacy config discovery, transforms, stable migration IDs, and plan construction shared by all adapters. |
 | `src/writer/writer.ts` | `updateOmoConfig(options)` - jsonc-parser `modify`/`applyEdits`, timestamped backup, atomic temp-then-rename write. |
 | `src/writer/types.ts` | `OmoConfigEdit`, `UpdateOmoConfigOptions/Result`, the injectable `OmoConfigWriteFileSystem` port, and the typed `OmoConfigWriteError`. |
 
@@ -60,8 +61,8 @@ Recursively deep-merges plain objects; scalars and arrays replace. `__proto__`, 
 
 ## DEPENDENCIES & CONSUMERS
 
-- **Depends on:** `@oh-my-opencode/utils` (`parseJsoncSafe`, `isPlainObject`, `isUnsafeObjectKey`), `jsonc-parser`, `zod`.
-- **Consumed by:** `packages/senpi-task` (schema types re-used by the task/team config surface), `packages/omo-senpi` (`components/config-resolution` wraps `loadOmoConfig` + `resolveModelReferences`; `components/config-startup` runs the migration engine at startup; `components/task` and `components/codegraph` consume the resolved config), `packages/omo-opencode` (`plugin-config/omo-config-chain.ts` builds the per-layer OpenCode views and the user-only protected view; `startup-migration.ts` drives the engine; `config-migration/` supplies OpenCode-side discovery + transform), and `packages/omo-codex` (`plugin/shared/src/config-loader.ts` + `config-migration.ts` for the `config.jsonc` group).
+- **Depends on:** `jsonc-parser`, `zod`. It must not depend on `utils`; `utils` consumes this package, so the reverse edge would create a core cycle.
+- **Consumed by:** `packages/utils` (config aliases and legacy helper re-exports), `packages/senpi-task` (schema types), `packages/omo-senpi` (config resolution and startup migration), `packages/omo-opencode` (config views and startup migration), and `packages/omo-codex` (shared config loader and migration).
 
 ## QA
 

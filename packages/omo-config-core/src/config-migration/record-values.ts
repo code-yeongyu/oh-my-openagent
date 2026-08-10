@@ -39,6 +39,6 @@ export function withoutLegacyMetadata(value: Readonly<Record<string, unknown>>):
   const copy = copyRecord(value)
   delete copy["$schema"]
   delete copy["_migrations"]
-  delete copy.appliedMigrations
+  delete copy["appliedMigrations"]
   return copy
 }

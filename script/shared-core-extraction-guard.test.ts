@@ -44,6 +44,17 @@ const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
   },
   { pattern: /\bsession\.prompt(?:Async)?\s*\(/ },
 ] as const
+const forbiddenCoreManifestPatterns = [
+  "@opencode-ai/",
+  "@code-yeongyu/senpi",
+  "@earendil-works/pi-",
+  "@mariozechner/pi-",
+  "@oh-my-opencode/omo-opencode",
+  "@oh-my-opencode/omo-codex",
+  "@oh-my-opencode/omo-senpi",
+] as const
+
+const forbiddenSenpiAdapterDependency = "@oh-my-opencode/omo-opencode"
 
 const requiredPlanKeys = ["F", "1", "2", "3", "4", "5", "6", "7"] as const
 
@@ -108,7 +119,28 @@ describe("shared core extraction guardrails", () => {
     const offenders: string[] = []
     for (const file of packageJsonFiles) {
       const manifest = await readFile(file, "utf8")
-      if (manifest.includes("@opencode-ai/") || manifest.includes("@oh-my-opencode/omo-codex")) {
+      if (forbiddenCoreManifestPatterns.some((pattern) => manifest.includes(pattern))) {
+        offenders.push(toPosixPath(relative(process.cwd(), file)))
+      }
+    }
+
+    // then
+    expect(offenders).toEqual([])
+  })
+
+  test("#given the Senpi adapter #when source and manifest dependencies are scanned #then it does not depend on the OpenCode adapter", async () => {
+    // given
+    const sourceFiles = await collectFiles(
+      "packages/omo-senpi/src",
+      (path) => path.endsWith(".ts") && !path.endsWith(".test.ts"),
+    )
+    const files = [...sourceFiles, "packages/omo-senpi/package.json"]
+
+    // when
+    const offenders: string[] = []
+    for (const file of files) {
+      const contents = await readFile(file, "utf8")
+      if (contents.includes(forbiddenSenpiAdapterDependency)) {
         offenders.push(toPosixPath(relative(process.cwd(), file)))
       }
     }

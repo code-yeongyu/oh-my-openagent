@@ -41,11 +41,11 @@ The refactor splits packages into strict layers by runtime boundary:
 
 **Current extraction status:**
 
-- 19 Core packages are now extracted under `packages/`, including `omo-config-core`: `utils`, `model-core`, `prompts-core`, `rules-engine`, `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core`, and `omo-config-core`.
+- 20 Core packages are now extracted under `packages/`, including `omo-config-core`: `utils`, `model-core`, `prompts-core`, `rules-engine`, `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `memory-core`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core`, and `omo-config-core`.
 - `omo` consumes these packages via workspace dependencies, with adapter shims left at original `packages/omo-opencode/src/` locations where OpenCode-facing import paths or runtime wiring still need stable anchors.
 - The `lsp-tools-mcp` and `lsp-daemon` packages are vendored in-tree and now consume `lsp-core` plus `mcp-stdio-core` instead of deep-importing each other's source internals.
 
-Current layering: Core (19 pure-TS packages, including `omo-config-core`) -> MCP packages -> Adapters (OpenCode, Codex, Senpi, standalone Pi goal/webfetch) -> generated platform launcher packages, with the intentional same-layer Senpi adapter-support edge and transitional OpenCode-to-Codex adapter edge documented above. The adapter boundaries keep future harnesses able to consume the same Core layer.
+Current layering: Core (20 pure-TS packages, including `omo-config-core`) -> MCP packages -> Adapters (OpenCode, Codex, Senpi, standalone Pi goal/webfetch) -> generated platform launcher packages, with the intentional same-layer Senpi adapter-support edge and transitional OpenCode-to-Codex adapter edge documented above. The adapter boundaries keep future harnesses able to consume the same Core layer.
 
 The Pi Engine DI abstraction was deferred. It can be revisited once the adapter migration is complete.
 
@@ -76,7 +76,7 @@ We express what each component does in markdown documentation, not in interface 
 
 ### Status: omo.json config core (landed senpi-first)
 
-The first concrete step toward a harness-neutral config layer has landed: `omo-config-core` provides an `omo.json` schema, a walked multi-layer loader, and a comment-preserving atomic writer as pure, harness-neutral code, and the Senpi adapter's `task` component reads it in production. This was delivered senpi-first on purpose - Senpi had no existing config surface to preserve, so it was the safe place to prove the schema. The OpenCode edition still reads its own `oh-my-openagent.json` chain, and the two files have zero interaction today. Adopting `omo.json` in the OpenCode edition, and any migration path from `oh-my-openagent.json`, is the next phase. See [`docs/reference/omo-json.md`](docs/reference/omo-json.md).
+The harness-neutral config layer is now shared end to end: `omo-config-core` provides the `omo.json` schema, walked loader, comment-preserving atomic writer, migration transaction engine, and legacy config discovery/transforms. OpenCode, Senpi, and Codex consume that core API directly; no harness adapter imports another adapter for configuration migration. See [`docs/reference/omo-json.md`](docs/reference/omo-json.md).
 
 ## Why Not OpenCode-Native
 

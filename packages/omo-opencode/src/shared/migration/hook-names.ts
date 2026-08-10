@@ -1,1 +1,1 @@
-export * from "@oh-my-opencode/utils/migration/hook-names"
+export { HOOK_NAME_MAP, migrateHookNames } from "@oh-my-opencode/omo-config-core"

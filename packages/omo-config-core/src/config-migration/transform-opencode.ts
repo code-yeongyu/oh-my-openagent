@@ -1,6 +1,6 @@
-import { AGENT_NAME_MAP, migrateAgentNames } from "@oh-my-opencode/utils/migration/agent-names"
-import { HOOK_NAME_MAP } from "@oh-my-opencode/utils/migration/hook-names"
-import { migrateModelVersions } from "@oh-my-opencode/utils/migration/model-versions"
+import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
+import { HOOK_NAME_MAP } from "./hook-names"
+import { migrateModelVersions } from "./model-versions"
 
 import { deepDifference } from "./deep-diff"
 import { legacyMigrationHistory } from "./legacy-history"
@@ -34,27 +34,32 @@ function replaceDisabledHooks(value: unknown): unknown {
 function transformLegacyKeys(value: Readonly<Record<string, unknown>>, history: readonly string[]): Record<string, unknown> {
   const config = withoutLegacyMetadata(value)
   const appliedMigrations = new Set(history)
-  const agents = config.agents
+  const agents = config["agents"]
   if (isPlainRecord(agents)) {
     const namedAgents = migrateAgentNames(agents).migrated
-    config.agents = migrateModelVersions(namedAgents, appliedMigrations).migrated
+    config["agents"] = migrateModelVersions(namedAgents, appliedMigrations).migrated
   }
-  const categories = config.categories
+  const categories = config["categories"]
   if (isPlainRecord(categories)) {
-    config.categories = migrateModelVersions(categories, appliedMigrations).migrated
+    config["categories"] = migrateModelVersions(categories, appliedMigrations).migrated
   }
-  if (config.omo_agent !== undefined) {
-    config.sisyphus_agent = config.omo_agent
-    delete config.omo_agent
+  if (config["omo_agent"] !== undefined) {
+    config["sisyphus_agent"] = config["omo_agent"]
+    delete config["omo_agent"]
   }
-  delete config.lsp
-  if (isPlainRecord(config.experimental) && Object.hasOwn(config.experimental, "hashline_edit")) {
-    if (config.hashline_edit === undefined) config.hashline_edit = config.experimental.hashline_edit
-    delete config.experimental.hashline_edit
-    if (Object.keys(config.experimental).length === 0) delete config.experimental
+  delete config["lsp"]
+  const experimental = config["experimental"]
+  if (isPlainRecord(experimental) && Object.hasOwn(experimental, "hashline_edit")) {
+    if (config["hashline_edit"] === undefined) config["hashline_edit"] = experimental["hashline_edit"]
+    delete experimental["hashline_edit"]
+    if (Object.keys(experimental).length === 0) delete config["experimental"]
   }
-  if (config.disabled_agents !== undefined) config.disabled_agents = replaceDisabledAgents(config.disabled_agents)
-  if (config.disabled_hooks !== undefined) config.disabled_hooks = replaceDisabledHooks(config.disabled_hooks)
+  if (config["disabled_agents"] !== undefined) {
+    config["disabled_agents"] = replaceDisabledAgents(config["disabled_agents"])
+  }
+  if (config["disabled_hooks"] !== undefined) {
+    config["disabled_hooks"] = replaceDisabledHooks(config["disabled_hooks"])
+  }
   return config
 }
 

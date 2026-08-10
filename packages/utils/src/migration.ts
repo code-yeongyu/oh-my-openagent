@@ -1,5 +1,11 @@
-export { AGENT_NAME_MAP, BUILTIN_AGENT_NAMES, migrateAgentNames } from "./migration/agent-names"
-export { HOOK_NAME_MAP, migrateHookNames } from "./migration/hook-names"
-export { MODEL_VERSION_MAP, migrateModelVersions } from "./migration/model-versions"
+export {
+  AGENT_NAME_MAP,
+  BUILTIN_AGENT_NAMES,
+  HOOK_NAME_MAP,
+  MODEL_VERSION_MAP,
+  migrateAgentNames,
+  migrateHookNames,
+  migrateModelVersions,
+} from "@oh-my-opencode/omo-config-core"
 export { MODEL_TO_CATEGORY_MAP, migrateAgentConfigToCategory, shouldDeleteAgentConfig } from "./migration/agent-category"
 export { migrateConfigFile } from "./migration/config-migration"

@@ -33,7 +33,7 @@ describe("2026-08 reasoning unification migration", () => {
     const result = transformReasoningUnification(input)
 
     // then the migrated value is the canonical winner, and the journal does not claim the legacy key won
-    expect(result.document.categories?.odd).toMatchObject({ reasoning: "low" })
+    expect(result.document).toMatchObject({ categories: { odd: { reasoning: "low" } } })
     const journal = result.diagnostics.find((entry) => entry.includes("conflict")) ?? ""
     expect(journal).not.toContain('kept reasoningEffort="xhigh"')
   })
