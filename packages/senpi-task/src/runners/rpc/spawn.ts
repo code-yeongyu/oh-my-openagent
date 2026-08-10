@@ -142,6 +142,10 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
 }
 
 function resolveRpcEntrySpecifier(): string {
+  for (const modulesDir of require.resolve.paths(RPC_ENTRY_SPECIFIER) ?? []) {
+    const candidate = join(modulesDir, "@code-yeongyu", "senpi", "dist", "rpc-entry.js")
+    if (existsSync(candidate)) return candidate
+  }
   if (typeof Bun !== "undefined") {
     return Bun.resolveSync(RPC_ENTRY_SPECIFIER, dirname(fileURLToPath(import.meta.url)))
   }
