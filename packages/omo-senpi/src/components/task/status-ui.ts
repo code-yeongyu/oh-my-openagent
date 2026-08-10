@@ -172,12 +172,19 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
 
   function scheduleLiveRefresh(): void {
     if (liveRefresh !== undefined) return
+    let firedSynchronously = false
     const handle = timers.set(() => {
-      timers.clear(handle)
-      if (liveRefresh !== handle) return
+      firedSynchronously = true
+      const scheduled = liveRefresh
+      if (scheduled === undefined) return
+      timers.clear(scheduled)
       liveRefresh = undefined
       renderCachedRecords()
     }, LIVE_STATUS_REFRESH_MS)
+    if (firedSynchronously) {
+      timers.clear(handle)
+      return
+    }
     liveRefresh = handle
   }
 
