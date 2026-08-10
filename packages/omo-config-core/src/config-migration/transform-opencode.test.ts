@@ -94,12 +94,12 @@ describe("OpenCode config migration transform", () => {
       })
 
       // when
-      const userDocument = {
+      const userDocument: Record<string, unknown> = {
         ...configJsoncDocument.document,
         ...opencode.document,
         "[opencode]": {
-          ...configJsoncDocument.document["[opencode]"],
-          ...opencode.document["[opencode]"],
+          ...(configJsoncDocument.document["[opencode]"] as Readonly<Record<string, unknown>>),
+          ...(opencode.document["[opencode]"] as Readonly<Record<string, unknown>>),
         },
       }
       const userResult = OmoConfigSchema.safeParse(userDocument)

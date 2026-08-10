@@ -1,4 +1,4 @@
-import type { MigrationSourceDescriptor, MigrationTransform } from "@oh-my-opencode/omo-config-core"
+import type { MigrationSourceDescriptor, MigrationTransform } from "../migration"
 
 import { discoverLegacyConfigGroups, CONFIG_JSONC_MIGRATION_ID, OPENCODE_CONFIG_MIGRATION_ID } from "./discovery"
 import { canonicalPath, discoveryFileSystem, hostPathOperations, pathKey, projectDirectories } from "./discovery-paths"

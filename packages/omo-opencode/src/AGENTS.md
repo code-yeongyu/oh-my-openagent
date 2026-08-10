@@ -121,7 +121,6 @@ Total: 53 base, 60 with team-mode. Each tier produces an object whose values are
 | `__tests__/` | Plugin-level integration tests + perf fixtures | yes |
 | `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + codegraph) | yes |
 | `testing/` | Test utilities + `create-plugin-module.ts` | yes |
-| `config-migration/` | Legacy config discovery + transform plans (consumed by senpi config-startup + codex startup) | yes |
 | `types/` | Ambient `.d.ts` declarations (markdown modules) | no |
 | `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | no |
 | `locales/` | i18n strings (en, zh): toasts + model-fallback labels | no |

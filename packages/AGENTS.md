@@ -56,7 +56,7 @@ Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`sc
 | [`openclaw-core/`](openclaw-core/AGENTS.md) | `src/`, `tsconfig.json` | OpenClaw gateway, reply-listener daemon, session registry, and tmux injection primitives. |
 | [`team-core/`](team-core/AGENTS.md) | `src/`, `tsconfig.json` | Team-mode registry, mailbox, tasklist, state, worktree, and tmux layout domain primitives. |
 | [`delegate-core/`](delegate-core/AGENTS.md) | `src/`, `tsconfig.json` | Delegate task selection and retry primitives. |
-| [`omo-config-core/`](omo-config-core/AGENTS.md) | `src/`, `tsconfig.json` | Harness-neutral `omo.json` schema, walked loader, and comment-preserving atomic writer. |
+| [`omo-config-core/`](omo-config-core/AGENTS.md) | `src/`, `tsconfig.json` | Harness-neutral `omo.json` schema, walked loader, legacy migration discovery/transforms, transaction engine, and atomic writer. |
 
 ## ADAPTERS
 

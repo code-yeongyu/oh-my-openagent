@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tree, a walked multi-layer loader with VSCode-style view resolution (shared base -> `[harness]` block -> `profiles.<P>` -> `profiles.<P>.[harness]`), a shared model catalog resolver, a comment-preserving atomic writer, and a lock+journal legacy-config migration engine. Pure logic with all IO injected through filesystem ports. No OpenCode, Codex, Senpi, Pi, or adapter imports (guarded by `script/shared-core-extraction-guard.test.ts`). Package: `@oh-my-opencode/omo-config-core` (private, `sideEffects: false`). This is THE config surface for every omo harness: `packages/omo-opencode` resolves its plugin config through it, `packages/omo-senpi` loads task/codegraph/config-watch settings plus startup migration through it, and `packages/omo-codex`'s codegraph loader reads through it.
+Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tree, a walked multi-layer loader with VSCode-style view resolution (shared base -> `[harness]` block -> `profiles.<P>` -> `profiles.<P>.[harness]`), a shared model catalog resolver, a comment-preserving atomic writer, and legacy-config discovery/transforms backed by a lock+journal migration engine. Pure logic with all IO injected through filesystem ports. No OpenCode, Codex, Senpi, Pi, or adapter imports (guarded by `script/shared-core-extraction-guard.test.ts`). Package: `@oh-my-opencode/omo-config-core` (private, `sideEffects: false`). This is THE config surface for every omo harness: `packages/omo-opencode`, `packages/omo-senpi`, and `packages/omo-codex` consume its loader and migration APIs directly.
 
 ## ANATOMY
 
@@ -27,6 +27,7 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/loader/types.ts` | `LoadOmoConfigOptions/Result`, `OmoConfigDiagnostic`, `OmoConfigSource`, the injectable `OmoConfigReadFileSystem` port, and `DEFAULT_READ_FILE_SYSTEM`. |
 | `src/models/model-reference-resolution.ts` | `resolveModelReferences` - expands `models` catalog keys referenced by agent/category `model` strings, fills unset tuning (site tuning wins), and reports `model_catalog_cycle` diagnostics. |
 | `src/migration/` | Lock+journal transaction engine (`batch.ts`, `engine.ts`): owner-aware lease lock (`lock.ts`), journal recovery before predicates (`recovery.ts`, `predicate.ts`), per-(target, migration-id) `_migrations` markers, no-clobber merge with `skipped:` diagnostics (`merge.ts`), comment-preserving atomic target writes (`commit.ts`), and journaled resumable backups. |
+| `src/config-migration/` | Harness-neutral legacy config discovery, transforms, stable migration IDs, and plan construction shared by all adapters. |
 | `src/writer/writer.ts` | `updateOmoConfig(options)` - jsonc-parser `modify`/`applyEdits`, timestamped backup, atomic temp-then-rename write. |
 | `src/writer/types.ts` | `OmoConfigEdit`, `UpdateOmoConfigOptions/Result`, the injectable `OmoConfigWriteFileSystem` port, and the typed `OmoConfigWriteError`. |
 

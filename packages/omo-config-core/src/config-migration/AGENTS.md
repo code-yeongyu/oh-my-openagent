@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Discovers legacy config files (oh-my-opencode/oh-my-openagent JSON[C], `~/.omo/config.jsonc`) and builds migration plans that transform them into the unified `omo.json[c]` chain. The migration *engine* (lock, journal, no-clobber merge, atomic commit) lives in `packages/omo-config-core/src/migration/`; this directory owns the OpenCode-side discovery and content transforms. Consumed at plugin startup (opencode + senpi config-startup) and codex startup.
+Discovers legacy config files (oh-my-opencode/oh-my-openagent JSON[C], `~/.omo/config.jsonc`) and builds migration plans that transform them into the unified `omo.json[c]` chain. The migration engine (lock, journal, no-clobber merge, atomic commit) lives in the sibling `../migration/` module. This directory owns harness-neutral discovery and content transforms consumed by OpenCode, Senpi, and Codex startup paths.
 
 ## WHERE TO LOOK
 

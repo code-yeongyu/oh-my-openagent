@@ -1,7 +1,9 @@
 import { posix, win32 } from "node:path"
 
-import { createLegacyConfigMigrationPlans } from "../../../config-migration"
-import type { ConfigMigrationPathOperations } from "../../../config-migration"
+import {
+  createLegacyConfigMigrationPlans,
+  type ConfigMigrationPathOperations,
+} from "@oh-my-opencode/omo-config-core"
 import type { DoctorIssue } from "../framework/types"
 
 export type LegacyConfigLeftoverOptions = {

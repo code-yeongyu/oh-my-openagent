@@ -47,7 +47,7 @@ Rules are intentionally not a Senpi component. Senpi has builtin rules, so this 
 
 ### Dependencies
 
-The adapter depends on `@oh-my-opencode/senpi-task` (task engine + tool factories), `@oh-my-opencode/omo-config-core` (`loadOmoConfig` + `resolveModelReferences` + the migration engine), `@oh-my-opencode/omo-opencode/config-migration` (dependency-clean legacy discovery + transform consumed by `config-startup`), `@oh-my-opencode/delegate-core`, `@oh-my-opencode/team-core`, `@oh-my-opencode/boulder-state` (Boulder work-plan state for `start-work-continuation`), `@oh-my-opencode/comment-checker-core`, `@oh-my-opencode/telemetry-core`, `@oh-my-opencode/prompts-core`, `@oh-my-opencode/lsp-core`, `@code-yeongyu/lsp-daemon`, and `@oh-my-opencode/utils`, with `@code-yeongyu/senpi` as an optional peer (`package.json`).
+The adapter depends on `@oh-my-opencode/senpi-task` (task engine + tool factories), `@oh-my-opencode/omo-config-core` (config loading, legacy migration discovery/transforms, and the migration engine), `@oh-my-opencode/delegate-core`, `@oh-my-opencode/team-core`, `@oh-my-opencode/boulder-state` (Boulder work-plan state for `start-work-continuation`), `@oh-my-opencode/comment-checker-core`, `@oh-my-opencode/telemetry-core`, `@oh-my-opencode/prompts-core`, `@oh-my-opencode/lsp-core`, `@code-yeongyu/lsp-daemon`, and `@oh-my-opencode/utils`, with `@code-yeongyu/senpi` as an optional peer (`package.json`). It must not depend on another harness adapter.
 
 ## Build And Packaging
 

@@ -196,6 +196,7 @@
       "name": "@oh-my-opencode/omo-config-core",
       "version": "0.1.0",
       "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
         "jsonc-parser": "^3.3.1",
         "zod": "^4.4.3",
       },
@@ -257,7 +258,6 @@
         "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/lsp-core": "workspace:*",
         "@oh-my-opencode/omo-config-core": "workspace:*",
-        "@oh-my-opencode/omo-opencode": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/senpi-task": "workspace:*",
         "@oh-my-opencode/team-core": "workspace:*",

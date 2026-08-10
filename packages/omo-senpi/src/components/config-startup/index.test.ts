@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { posix } from "node:path"
 
 import {
+  createLegacyConfigMigrationPlans,
   runMigrations,
   type MigrationBatchRunResult,
   type MigrationFileSystem,
 } from "@oh-my-opencode/omo-config-core"
-import { createLegacyConfigMigrationPlans } from "@oh-my-opencode/omo-opencode/config-migration"
 import { parse } from "jsonc-parser"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"

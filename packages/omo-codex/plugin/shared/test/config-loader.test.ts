@@ -5,8 +5,11 @@ import { join, posix } from "node:path"
 
 import { parse } from "jsonc-parser"
 
-import { runMigrations, type MigrationBoundary } from "../../../../omo-config-core/src/index.ts"
-import { createLegacyConfigMigrationPlans } from "../../../../omo-opencode/src/config-migration/index.ts"
+import {
+	createLegacyConfigMigrationPlans,
+	runMigrations,
+	type MigrationBoundary,
+} from "../../../../omo-config-core/src/index.ts"
 
 import { getCodexOmoConfig, runCodexStartupMigration } from "../src/config-loader.ts"
 
