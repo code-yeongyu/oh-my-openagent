@@ -95,12 +95,12 @@ afterEach(() => {
 describe("omo launcher", () => {
   describe("#given a fake senpi package", () => {
     describe("#when the default command is launched", () => {
-      test("#then the packaged extension precedes user extension arguments", () => {
+      test("#then the packaged extension is isolated from configured packages and precedes user extension arguments", () => {
         const fixture = createFixture()
         const result = run(fixture, ["say", "hi", "-e", "/user/plugin"])
         expect(result.status).toBe(0)
         expect(capture(fixture).argv).toEqual([
-          "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
+          "--no-extensions", "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
         ])
       })
 

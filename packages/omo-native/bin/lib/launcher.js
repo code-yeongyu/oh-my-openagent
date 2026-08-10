@@ -29,7 +29,7 @@ function senpiEnvironment(senpiRoot) {
 function spawnSenpi(args, withExtension) {
   const senpi = resolveSenpi()
   const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
+    ? ["--no-extensions", "--extension", join(packageRoot, "plugin"), ...args]
     : args
   spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
 }
