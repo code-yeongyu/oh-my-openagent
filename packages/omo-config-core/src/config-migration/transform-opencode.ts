@@ -1,6 +1,6 @@
-import { AGENT_NAME_MAP, migrateAgentNames } from "@oh-my-opencode/utils/migration/agent-names"
-import { HOOK_NAME_MAP } from "@oh-my-opencode/utils/migration/hook-names"
-import { migrateModelVersions } from "@oh-my-opencode/utils/migration/model-versions"
+import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
+import { HOOK_NAME_MAP } from "./hook-names"
+import { migrateModelVersions } from "./model-versions"
 
 import { deepDifference } from "./deep-diff"
 import { legacyMigrationHistory } from "./legacy-history"

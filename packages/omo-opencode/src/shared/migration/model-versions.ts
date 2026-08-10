@@ -1,1 +1,1 @@
-export * from "@oh-my-opencode/utils/migration/model-versions"
+export { MODEL_VERSION_MAP, migrateModelVersions } from "@oh-my-opencode/omo-config-core"

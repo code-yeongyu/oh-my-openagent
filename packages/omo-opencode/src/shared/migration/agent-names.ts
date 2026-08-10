@@ -1,1 +1,1 @@
-export * from "@oh-my-opencode/utils/migration/agent-names"
+export { AGENT_NAME_MAP, BUILTIN_AGENT_NAMES, migrateAgentNames } from "@oh-my-opencode/omo-config-core"

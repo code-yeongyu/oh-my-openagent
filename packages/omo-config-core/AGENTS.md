@@ -61,8 +61,8 @@ Recursively deep-merges plain objects; scalars and arrays replace. `__proto__`, 
 
 ## DEPENDENCIES & CONSUMERS
 
-- **Depends on:** `@oh-my-opencode/utils` (`parseJsoncSafe`, `isPlainObject`, `isUnsafeObjectKey`), `jsonc-parser`, `zod`.
-- **Consumed by:** `packages/senpi-task` (schema types re-used by the task/team config surface), `packages/omo-senpi` (`components/config-resolution` wraps `loadOmoConfig` + `resolveModelReferences`; `components/config-startup` runs the migration engine at startup; `components/task` and `components/codegraph` consume the resolved config), `packages/omo-opencode` (`plugin-config/omo-config-chain.ts` builds the per-layer OpenCode views and the user-only protected view; `startup-migration.ts` drives the engine; `config-migration/` supplies OpenCode-side discovery + transform), and `packages/omo-codex` (`plugin/shared/src/config-loader.ts` + `config-migration.ts` for the `config.jsonc` group).
+- **Depends on:** `jsonc-parser`, `zod`. It must not depend on `utils`; `utils` consumes this package, so the reverse edge would create a core cycle.
+- **Consumed by:** `packages/utils` (config aliases and legacy helper re-exports), `packages/senpi-task` (schema types), `packages/omo-senpi` (config resolution and startup migration), `packages/omo-opencode` (config views and startup migration), and `packages/omo-codex` (shared config loader and migration).
 
 ## QA
 

@@ -13,6 +13,9 @@ export {
   REASONING_UNIFICATION_MIGRATION_ID,
   transformReasoningUnification,
 } from "./reasoning-unification"
+export { AGENT_NAME_MAP, BUILTIN_AGENT_NAMES, migrateAgentNames } from "./agent-names"
+export { HOOK_NAME_MAP, migrateHookNames } from "./hook-names"
+export { MODEL_VERSION_MAP, migrateModelVersions } from "./model-versions"
 export type { ExecuteLegacyConfigMigrationPlanOptions } from "./migration-executor"
 export type {
   CreateLegacyConfigMigrationPlansOptions,

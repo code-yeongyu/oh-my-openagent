@@ -1,9 +1,12 @@
 import * as fs from "node:fs"
 import { log } from "../logger"
 import { writeFileAtomically } from "../write-file-atomically"
-import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
-import { migrateHookNames } from "./hook-names"
-import { migrateModelVersions } from "./model-versions"
+import {
+  AGENT_NAME_MAP,
+  migrateAgentNames,
+  migrateHookNames,
+  migrateModelVersions,
+} from "@oh-my-opencode/omo-config-core"
 import { readAppliedMigrations, writeAppliedMigrations } from "./migrations-sidecar"
 
 export function migrateConfigFile(

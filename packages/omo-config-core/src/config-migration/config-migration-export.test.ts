@@ -6,11 +6,12 @@ const PACKAGE_PATH = join(import.meta.dir, "..", "..", "package.json")
 const ENTRY_POINT = join(import.meta.dir, "index.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_MIGRATION_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "migration", "index.ts")
-const UTILS_MIGRATION_MODULES = [
-  join(PACKAGES_PATH, "utils", "src", "migration", "agent-names.ts"),
-  join(PACKAGES_PATH, "utils", "src", "migration", "hook-names.ts"),
-  join(PACKAGES_PATH, "utils", "src", "migration", "model-versions.ts"),
+const CORE_MIGRATION_MODULES = [
+  join(import.meta.dir, "agent-names.ts"),
+  join(import.meta.dir, "hook-names.ts"),
+  join(import.meta.dir, "model-versions.ts"),
 ]
+const UTILS_SOURCE_PATH = join(PACKAGES_PATH, "utils", "src", sep)
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(PACKAGES_PATH, "omo-opencode", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
 const OPENCODE_IMPORT = /^@opencode-ai\//
 const PLUGIN_RUNTIME_DIRECTORY = `${sep}plugin${sep}`
@@ -99,6 +100,9 @@ describe("config-migration core boundary", () => {
         import: "./src/index.ts",
       },
     })
+    expect(packageJson.dependencies).not.toMatchObject({
+      "@oh-my-opencode/utils": expect.anything(),
+    })
   })
 
   test("#given the config-migration entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {
@@ -120,8 +124,9 @@ describe("config-migration core boundary", () => {
     // then
     expect(modules).toEqual(expect.arrayContaining([
       CONFIG_CORE_MIGRATION_ENTRY_POINT,
-      ...UTILS_MIGRATION_MODULES,
+      ...CORE_MIGRATION_MODULES,
     ]))
+    expect(modules.some((modulePath) => modulePath.startsWith(UTILS_SOURCE_PATH))).toBe(false)
     expect(offenders).toEqual([])
   })
 
