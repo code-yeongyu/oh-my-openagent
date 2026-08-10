@@ -144,6 +144,23 @@ describe("omo launcher", () => {
         expect(pathEntries).toContain(inputPath)
       })
 
+      test.skipIf(process.platform !== "win32")("#then the launcher promotes an existing shim back to the first PATH entry", () => {
+        const fixture = createFixture({ hoisted: true })
+        mkdirSync(join(fixture.packageRoot, "node_modules"), { recursive: true })
+        const pathKey = "Path"
+        const shimDirectory = dirname(fixture.shimPath ?? "")
+        const inputPath = [join(fixture.root, "other-path-entry"), shimDirectory].join(";")
+        const result = run(fixture, ["--version"], {
+          [pathKey]: inputPath,
+        }, ["path"])
+        const pathEntries = (capture(fixture).env[pathKey] ?? "").split(";")
+
+        expect(result.status).toBe(0)
+        expect(pathEntries[0]).toBe(shimDirectory)
+        expect(pathEntries.filter((entry) => entry.toLowerCase() === shimDirectory.toLowerCase())).toHaveLength(1)
+        expect(pathEntries).toContain(join(fixture.root, "other-path-entry"))
+      })
+
       test("#then SENPI_BIN stays absent when no shim exists", () => {
         const fixture = createFixture({ shim: false })
         const result = run(fixture, ["--version"], { SENPI_BIN: "/stale/senpi" })
