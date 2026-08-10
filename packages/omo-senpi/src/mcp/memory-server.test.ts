@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -12,6 +12,7 @@ function fixture() {
   roots.push(root)
   return {
     cwd: join(root, "project"),
+    engineSession: { installHooks: () => undefined },
     env: { ...process.env, OMO_MEMORY_HOME: join(root, "memory-home") },
   }
 }
@@ -41,13 +42,13 @@ describe("omo-memory MCP server", () => {
   })
 
   test("#given a fresh project #when create then str_replace run through tools/call #then the memory repo records them", async () => {
-    const { cwd, env } = fixture()
+    const options = fixture()
     const created = await handleMemoryMcpRequest(
       { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "memory", arguments: {
         command: "create", reason: "Record preference", file_path: "system/human/preferences.md",
         description: "User preferences", file_text: "theme: dark",
       } } },
-      { cwd, env },
+      options,
     )
     expect(body(created?.result as { content?: unknown })).toContain("Memory create committed locally")
 
@@ -56,11 +57,11 @@ describe("omo-memory MCP server", () => {
         command: "str_replace", reason: "Switch theme", file_path: "system/human/preferences.md",
         old_string: "theme: dark", new_string: "theme: light",
       } } },
-      { cwd, env },
+      options,
     )
     expect(body(replaced?.result as { content?: unknown })).toContain("Memory str_replace committed locally")
 
-    const agentsDir = join(String(env.OMO_MEMORY_HOME), "agents")
+    const agentsDir = join(String(options.env.OMO_MEMORY_HOME), "agents")
     const identityDir = readdirSync(agentsDir)[0]
     expect(identityDir).toBeDefined()
     const profile = readFileSync(
@@ -68,13 +69,14 @@ describe("omo-memory MCP server", () => {
       "utf8",
     )
     expect(profile).toContain("theme: light")
+    expect(existsSync(join(agentsDir, String(identityDir), "repo", ".git", "hooks", "post-commit"))).toBe(false)
   })
 
   test("#given an unknown tool name #when called #then an error result is returned", async () => {
-    const { cwd, env } = fixture()
+    const options = fixture()
     const result = await handleMemoryMcpRequest(
       { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "nope", arguments: {} } },
-      { cwd, env },
+      options,
     )
     expect((result?.result as { isError?: boolean } | undefined)?.isError).toBe(true)
   })

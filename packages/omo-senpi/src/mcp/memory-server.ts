@@ -27,7 +27,10 @@ import {
   type MemoryToolParams,
 } from "@oh-my-opencode/memory-core"
 
-import { prepareMemoryEngineSession } from "../components/memory/engine-session"
+import {
+  prepareMemoryEngineSession,
+  type MemoryEngineSessionOptions,
+} from "../components/memory/engine-session"
 import {
   MEMORY_APPLY_PATCH_DESCRIPTION,
   MEMORY_APPLY_PATCH_TOOL_NAME,
@@ -78,7 +81,7 @@ const TOOLS = [
 
 export async function handleMemoryMcpRequest(
   input: unknown,
-  options: { cwd?: string; env?: Record<string, string | undefined> } = {},
+  options: MemoryMcpRequestOptions = {},
 ): Promise<JsonRpcResponse | undefined> {
   if (!isPlainRecord(input)) return errorResponse(null, -32600, "Invalid Request")
   const id = jsonRpcId(input["id"])
@@ -108,7 +111,7 @@ async function callMemoryTool(
   id: string | number | null,
   name: string,
   args: Record<string, unknown>,
-  options: { cwd?: string; env?: Record<string, string | undefined> },
+  options: MemoryMcpRequestOptions,
 ): Promise<JsonRpcResponse> {
   if (name !== MEMORY_TOOL_NAME && name !== MEMORY_APPLY_PATCH_TOOL_NAME) {
     return toolText(id, `Unknown ${SERVER_NAME} tool: ${name}`, true)
@@ -116,7 +119,7 @@ async function callMemoryTool(
   try {
     const cwd = options.cwd ?? process.cwd()
     const identity = resolveMemoryIdentity(undefined, cwd, options.env ?? process.env)
-    const session = await prepareMemoryEngineSession(identity.id, identity.paths)
+    const session = await prepareMemoryEngineSession(identity.id, identity.paths, options.engineSession)
     if (name === MEMORY_TOOL_NAME) {
       // Field-level validation lives in runMemoryTool's required() guards, so the MCP argument record
       // is asserted straight into the core param shape rather than re-validated here.
@@ -145,6 +148,12 @@ async function callMemoryTool(
     }
     throw error
   }
+}
+
+interface MemoryMcpRequestOptions {
+  readonly cwd?: string
+  readonly engineSession?: MemoryEngineSessionOptions
+  readonly env?: Record<string, string | undefined>
 }
 
 function toolText(id: string | number | null, text: string, isError = false): JsonRpcResponse {

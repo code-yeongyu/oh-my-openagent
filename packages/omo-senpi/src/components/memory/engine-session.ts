@@ -26,6 +26,7 @@ export interface MemoryEngineSession {
 }
 
 export interface MemoryEngineSessionOptions {
+  readonly installHooks?: (dir: string) => void | Promise<void>
   readonly lockWaitTimeoutMs?: number
   readonly lockRetryDelayMs?: number
 }
@@ -38,12 +39,13 @@ export async function prepareMemoryEngineSession(
   // First-write seam: runtime dirs (including the locks directory) must exist before the writer
   // lock publishes into them; reads never create identity storage.
   await ensureIdentityRuntimeDirs(identityPaths)
-  const repo = new GitMemoryRepo({ dir: identityPaths.repo, agentId: identity })
+  const hookInstaller = options.installHooks ?? ((dir: string) => { installHooks(dir) })
+  const repo = new GitMemoryRepo({ dir: identityPaths.repo, agentId: identity, installHooks: hookInstaller })
   const lock = createMemoryWriterLock(identity, identityPaths, options)
   if (!existsSync(join(identityPaths.repo, ".git"))) {
     await lock("memory-write", async () => {
       if (!existsSync(join(identityPaths.repo, ".git"))) {
-        await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir) } })
+        await repo.init({ seedFiles: buildDefaultSeedFiles() })
       }
     })
   }
