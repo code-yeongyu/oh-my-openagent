@@ -50,7 +50,9 @@ function primaryModelRef(record: Readonly<Record<string, unknown>>, opencode: bo
 function conflictDiagnostic(record: Readonly<Record<string, unknown>>, path: readonly string[]): string | undefined {
   const present = (["reasoning", "reasoningEffort", "variant"] as const).filter((key) => record[key] !== undefined)
   if (present.length < 2) return undefined
-  const [keptKey, ...droppedKeys] = present
+  const keptKey = present[0]
+  if (keptKey === undefined) return undefined
+  const droppedKeys = present.slice(1)
   const keptValue = record[keptKey]
   const dropped = droppedKeys.map((key) => [key, record[key]] as const)
   const droppedText = dropped.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(" ")

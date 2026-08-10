@@ -133,7 +133,12 @@ export function createLegacyConfigMigrationPlans(
   options: CreateLegacyConfigMigrationPlansOptions,
 ): readonly LegacyConfigMigrationPlan[] {
   const timestamp = backupTimestamp(options.backupTimestamp)
-  const [openCodeGroup, configJsoncGroup] = discoverLegacyConfigGroups(options)
+  const groups = discoverLegacyConfigGroups(options)
+  const openCodeGroup = groups.find((group) => group.id === OPENCODE_CONFIG_MIGRATION_ID)
+  const configJsoncGroup = groups.find((group) => group.id === CONFIG_JSONC_MIGRATION_ID)
+  if (openCodeGroup === undefined || configJsoncGroup === undefined) {
+    throw new Error("Legacy config discovery did not return both required migration groups")
+  }
   const pathOperations = hostPathOperations(options)
   const userTargetPath = pathOperations.join(options.homeDir, ".omo", "omo.jsonc")
   const userSources = openCodeGroup.sources.filter((source) => source.projectRoot === undefined)

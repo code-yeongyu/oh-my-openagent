@@ -39,14 +39,14 @@ export function migrateModelVersions(
   for (const [key, value] of Object.entries(configs)) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const config = value as Record<string, unknown>
+      const model = config["model"]
+      const newModel = typeof model === "string" ? MODEL_VERSION_MAP[model] : undefined
       if (
-        typeof config.model === "string" &&
-        !CURRENT_USER_SELECTABLE_MODELS.has(config.model) &&
-        MODEL_VERSION_MAP[config.model]
+        typeof model === "string" &&
+        !CURRENT_USER_SELECTABLE_MODELS.has(model) &&
+        newModel !== undefined
       ) {
-        const oldModel = config.model
-        const newModel = MODEL_VERSION_MAP[oldModel]
-        const mKey = migrationKey(oldModel, newModel)
+        const mKey = migrationKey(model, newModel)
 
         // Skip if this migration was already applied (user may have reverted)
         if (appliedMigrations?.has(mKey)) {
