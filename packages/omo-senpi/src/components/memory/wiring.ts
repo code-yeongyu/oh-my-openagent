@@ -35,6 +35,7 @@ export interface MemorySessionStateLike {
 
 export interface MemoryWiringOptions {
   readonly sessions: Map<string, MemorySessionStateLike>
+  readonly clock?: () => Date
   readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd: () => string
   readonly env: Record<string, string | undefined>
@@ -175,6 +176,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         resolveContext,
         cache: promptCache,
         searchExposure: () => toolExposure === "search",
+        ...(options.clock === undefined ? {} : { clock: options.clock }),
       })
       pi.on("before_agent_start", (payload, eventCtx) => {
         lastEventCtx.current = eventCtx
