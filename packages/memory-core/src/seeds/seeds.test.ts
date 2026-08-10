@@ -39,17 +39,18 @@ describe("default memory seeds", () => {
   })
 
   describe("#given buildDefaultSeedFiles", () => {
-    it("#then it produces two files with system/ paths and frontmatter", () => {
+    it("#then it produces persona/human memory files plus skills/.gitkeep", () => {
       const files = buildDefaultSeedFiles()
 
-      expect(files).toHaveLength(2)
+      expect(files).toHaveLength(3)
       const paths = files.map((f) => f.relativePath)
       expect(paths).toContain("system/persona.md")
       expect(paths).toContain("system/human.md")
+      expect(paths).toContain("skills/.gitkeep")
     })
 
-    it("#then every seed file has valid frontmatter with a description", () => {
-      const files = buildDefaultSeedFiles()
+    it("#then every memory seed file has valid frontmatter with a description", () => {
+      const files = buildDefaultSeedFiles().filter((file) => file.relativePath.endsWith(".md"))
 
       for (const file of files) {
         const parsed = parseMemoryFile(file.content)
@@ -113,7 +114,7 @@ describe("default memory seeds", () => {
     })
   })
 
-  describe("#given a fresh repository #when initMemoryWithSeeds runs #then it commits two seeded files in one initial commit", async () => {
+  describe("#given a fresh repository #when initMemoryWithSeeds runs #then it commits seeded files in one initial commit", async () => {
     // given
     const { dir, repo } = await createRepo()
 
@@ -126,7 +127,8 @@ describe("default memory seeds", () => {
     const tree = await repo.lsTree()
     expect(tree).toContain("system/persona.md")
     expect(tree).toContain("system/human.md")
-    expect(tree).toHaveLength(2)
+    expect(tree).toContain("skills/.gitkeep")
+    expect(tree).toHaveLength(3)
 
     const commitSubject = await gitLog(dir, "%s")
     expect(commitSubject).toBe("chore: initialize local memory")

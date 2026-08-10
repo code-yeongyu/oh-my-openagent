@@ -2,12 +2,13 @@
  * Default memory seeding — letta parity port (plan todo 33).
  *
  * Seeds a fresh memory repo with system/persona.md + system/human.md
- * rendered with frontmatter, then delegates to GitMemoryRepo.init which
- * writes, stages, and commits them as a single initial commit
- * ("chore: initialize local memory"). If the repo already has a HEAD
- * commit, GitMemoryRepo.init returns the existing HEAD unchanged — the
- * no-overwrite guarantee lives there (P4, letta memory-git.ts:1431-1492),
- * so this module never duplicates that guard.
+ * rendered with frontmatter, plus an empty skills/.gitkeep so the agent
+ * skills directory exists for resources_discover without warning noise,
+ * then delegates to GitMemoryRepo.init which writes, stages, and commits
+ * them as a single initial commit ("chore: initialize local memory"). If
+ * the repo already has a HEAD commit, GitMemoryRepo.init returns the
+ * existing HEAD unchanged — the no-overwrite guarantee lives there
+ * (P4, letta memory-git.ts:1431-1492), so this module never duplicates that guard.
  *
  * Alignment with P4 (GitMemoryRepo.init):
  * - P4's InitializeGitRepoOptions.seedFiles already accepts GitSeedFile[].
@@ -30,6 +31,7 @@ export { DEFAULT_MEMORY_BLOCK_LABELS } from "./default-memory"
 
 const PERSONA_PATH = "system/persona.md"
 const HUMAN_PATH = "system/human.md"
+const SKILLS_GITKEEP_PATH = "skills/.gitkeep"
 
 const PERSONA_DESCRIPTION = "Persona - who I am"
 const HUMAN_DESCRIPTION = "Human - what I know about the user"
@@ -41,8 +43,8 @@ export interface InitMemorySeedsOptions {
 }
 
 /**
- * Build the two default seed files (system/persona.md + system/human.md)
- * with frontmatter rendered from the content constants.
+ * Build the default seed files (system/persona.md + system/human.md + skills/.gitkeep)
+ * with frontmatter rendered from the content constants for memory blocks.
  *
  * Pure — no filesystem access. Safe to call repeatedly.
  */
@@ -55,6 +57,11 @@ export function buildDefaultSeedFiles(): readonly DefaultSeedFile[] {
     {
       relativePath: HUMAN_PATH,
       content: renderMemoryFile({ description: HUMAN_DESCRIPTION }, DEFAULT_HUMAN_BODY),
+    },
+    {
+      relativePath: SKILLS_GITKEEP_PATH,
+      // Keep the agent skills directory present for discovery; real skills land later.
+      content: "\n",
     },
   ]
 }

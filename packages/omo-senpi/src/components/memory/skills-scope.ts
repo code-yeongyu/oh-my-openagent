@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -29,11 +30,12 @@ export interface MemorySkillsDiscoverResult {
  * discovery set. Memory skills therefore load additively and yield on name collision rather
  * than displacing any existing skill.
  *
- * Create-free contract: the skills dir is returned even when absent on disk. senpi's loader
- * tolerates missing skill paths with a warning diagnostic (no throw), so first-run identities
- * with no skills yet are safe. Reflection-authored skills committed under skills/<name>/SKILL.md
- * are picked up on the next session_start (reason "startup") or /reload (reason "reload");
- * dir shape is enforced by the memory repo pre-commit hooks, not by this component.
+ * Ensure-on-discover contract: first-run identities historically advertised repo/skills before
+ * the directory existed, which surfaced senpi's "skill path does not exist" warning on every
+ * new project. This handler now creates an empty skills directory when missing (no git commit)
+ * and then returns it, so discovery stays additive without warning noise. Reflection-authored
+ * skills under skills/<name>/SKILL.md are still picked up on the next session_start ("startup")
+ * or /reload ("reload"); dir shape remains enforced by memory repo pre-commit hooks.
  */
 
 export const MEMORY_SKILLS_DIRNAME = "skills"
@@ -51,6 +53,14 @@ export function memorySkillsDir(context: MemoryIdentityContext): string {
  * unreadable sessions return undefined so the handler chain passes through untouched and no
  * path is contributed.
  */
+export function ensureMemorySkillsDir(context: MemoryIdentityContext): string {
+  const dir = memorySkillsDir(context)
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true })
+  }
+  return dir
+}
+
 export function createMemorySkillsScopeHandler(
   options: MemorySkillsScopeOptions,
 ): (payload: unknown, eventCtx?: unknown) => MemorySkillsDiscoverResult | undefined {
@@ -60,7 +70,7 @@ export function createMemorySkillsScopeHandler(
     if (sessionId === undefined) return undefined
     const context = options.resolveContext(sessionId)
     if (context === undefined) return undefined
-    return { skillPaths: [memorySkillsDir(context)] }
+    return { skillPaths: [ensureMemorySkillsDir(context)] }
   }
 }
 
