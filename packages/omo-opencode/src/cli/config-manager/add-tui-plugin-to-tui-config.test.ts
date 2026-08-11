@@ -66,6 +66,21 @@ describe("ensureTuiPluginEntry", () => {
     expect(readTuiPlugins(dir)).toEqual([`${PLUGIN_NAME}@4.9.2`])
   })
 
+  it("#given array-form plugin entries #when ensuring TUI config #then it preserves them", () => {
+    // given
+    const dir = tempConfigDir()
+    const arrayEntry = ["opencode-copy-message", { editor: "nvim" }]
+    writeConfig(dir, "opencode.json", { plugin: [PLUGIN_NAME] })
+    writeConfig(dir, "tui.json", { plugin: [arrayEntry, "some-other/tui"] })
+
+    // when
+    const result = ensureTuiPluginEntry({ configDir: dir })
+
+    // then
+    expect(result).toEqual({ changed: true, reason: "added" })
+    expect(readTuiPlugins(dir)).toEqual([arrayEntry, "some-other/tui", PLUGIN_NAME])
+  })
+
   it("#given file server entry and stale named TUI entry #when ensuring #then it adds the matching file entry", () => {
     // given
     const dir = tempConfigDir()

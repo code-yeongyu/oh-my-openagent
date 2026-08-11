@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, statSync } from "fs"
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, lstatSync, statSync, symlinkSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { writeFileAtomically } from "./write-file-atomically"
@@ -108,5 +108,21 @@ describe("writeFileAtomically", () => {
         },
       }),
     ).toThrow("EIO")
+  })
+
+  it("#given target is a symlink #when writeFileAtomically called #then writes through and keeps the symlink", () => {
+    // given
+    const targetPath = join(testDir, "real-target.txt")
+    writeFileSync(targetPath, "original", "utf-8")
+    const linkPath = join(testDir, "managed-link.json")
+    symlinkSync(targetPath, linkPath)
+
+    // when
+    writeFileAtomically(linkPath, "updated content")
+
+    // then
+    expect(lstatSync(linkPath).isSymbolicLink()).toBe(true)
+    expect(readFileSync(targetPath, "utf-8")).toBe("updated content")
+    expect(existsSync(`${linkPath}.tmp`)).toBe(false)
   })
 })
