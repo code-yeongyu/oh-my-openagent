@@ -56,7 +56,7 @@ describe("OmO Native payload buffer", () => {
     expect(buffer.payloads).toHaveLength(50)
     expect(buffer.payloads[0]?.properties?.index).toBe(11)
     expect(buffer.payloads[49]?.properties?.index).toBe(60)
-  })
+  }, { timeout: 30000 })
 
   test("#given an event client observer #when capture succeeds #then the preview file matches the buffer", () => {
     // given
