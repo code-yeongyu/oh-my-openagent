@@ -180,6 +180,20 @@ still read when the `OMO_*` one is unset.
 2. **Import (consent-gated).** Only after you confirm (interactively, or with `--yes`; `--dry-run` previews without writing), compatible API-key credentials are imported into senpi's auth store. Existing senpi entries are never overwritten, and only providers senpi actually knows are imported. OAuth entries are reported but never imported. Source stores are never written; imports go to senpi's `auth.json` only, atomically and with a timestamped backup.
 3. **Model report.** Prints a provider/model availability summary pointing at the [agent-model matching guide](./agent-model-matching.md), plus a ready-to-paste config snippet for any custom-endpoint providers it found. Report only; setup never writes model config for you.
 
+### OMP edition: oh-my-pi plugin
+
+The OMP edition packages OMO as a single [oh-my-pi](https://github.com/can1357/oh-my-pi) plugin under `packages/omo-omp/plugin`. Install it with the omp plugin CLI:
+
+```bash
+omp plugin install <path-to>/packages/omo-omp/plugin
+```
+
+The plugin loads one generated extension entry (`extensions/omo.js`) plus generated skills (`skills/`), so task/team orchestration, the ultrawork loop, the command palette actions, and the rest of the OMO component surface are available in your omp sessions. On Windows, where omp plugin install links via symlink (EPERM without developer mode), copy the `plugin` directory to `~/.omp/plugins/node_modules/@code-yeongyu/omo-omp` instead, then run `omp plugin enable @code-yeongyu/omo-omp`.
+
+**Build from source** (when developing the adapter): `bun run build:omp-plugin` builds the extension bundles, stages the LSP/ast-grep/agent-toolkit runtimes, and syncs the skills into the plugin directory.
+
+**Known capability gaps.** omp's extension API does not yet expose `registerMcpServer` or `registerEntryRenderer`; the ast-grep and memory components detect this at load and skip cleanly with a logged notice. Everything else loads and runs.
+
 ## For LLM Agents
 
 > **IMPORTANT: Use `curl` to fetch this file, NOT WebFetch.** WebFetch summarizes content and loses critical flags like `--platform`, subscription questions, and Codex verification details. Always use:

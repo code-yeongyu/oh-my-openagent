@@ -4,7 +4,7 @@ export const HARNESS_IDS = ["codex", "opencode", "omo"] as const
 
 export type HarnessId = (typeof HARNESS_IDS)[number]
 
-export const OMO_CONFIG_HARNESS_IDS = ["opencode", "senpi", "codex"] as const
+export const OMO_CONFIG_HARNESS_IDS = ["opencode", "senpi", "codex", "omp"] as const
 
 export const OmoHarnessIdSchema = z.enum(OMO_CONFIG_HARNESS_IDS)
 

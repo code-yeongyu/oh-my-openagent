@@ -126,6 +126,7 @@ Pick the edition(s) you want.
 | **Light** (Codex CLI) | `npx lazycodex-ai install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + local Codex marketplace cache + `~/.codex/config.toml` marketplace/plugin/agent blocks + optional autonomous permissions + component CLIs in `~/.local/bin` |
 | **Both** | `bunx oh-my-openagent install --platform=both` | Both of the above |
 | **Senpi edition** (beta) | `npm i -g omo-ai@beta`, then `omo` | The `omo` command: pinned senpi release with the OMO extension built in. Beta channel only; a bare `npm i -g omo-ai` fails by design. See the [install guide](docs/guide/installation.md#senpi-edition-beta-omo-via-npm-omo-ai). |
+| **OMP edition** | `omp plugin install <omo-omp/plugin>` | Pi plugin for [oh-my-pi](https://github.com/can1357/oh-my-pi): generated extension entry + skills installed under `~/.omp/plugins`. See the [install guide](docs/guide/installation.md#omp-edition-oh-my-pi-plugin). |
 
 `lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo-agent-toolkit` CLI still defaults to `opencode` (Ultimate).
 

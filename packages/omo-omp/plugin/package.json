@@ -1,0 +1,31 @@
+{
+  "name": "@code-yeongyu/omo-omp",
+  "version": "5.0.0-beta.6",
+  "private": true,
+  "description": "OMO OMP adapter packaged as one local-path OMP plugin package.",
+  "type": "module",
+  "keywords": [
+    "omp",
+    "oh-my-pi",
+    "pi",
+    "omo",
+    "oh-my-openagent"
+  ],
+  "omp": {
+    "extensions": [
+      "./extensions/omo.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "files": [
+    "extensions",
+    "skills",
+    "runtime",
+    "scripts/install.mjs",
+    "README.md",
+    "NOTICE",
+    "LICENSE"
+  ]
+}

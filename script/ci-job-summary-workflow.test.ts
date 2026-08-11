@@ -21,6 +21,7 @@ const workflowExpectations = [
       "typecheck",
       "codex-compatibility",
       "senpi-compatibility",
+      "omo-omp-compatibility",
       "lazycodex-published-smoke",
       "build",
       "omo-ai-payload-check",

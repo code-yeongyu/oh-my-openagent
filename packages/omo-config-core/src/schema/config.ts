@@ -37,6 +37,7 @@ export const OmoConfigProfileSchema = z.object({
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+  "[omp]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
 }).strict()
 
@@ -52,6 +53,7 @@ export const OmoConfigSchema = z.object({
   telemetry: OmoTelemetrySettingsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+  "[omp]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
   profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
   _migrations: z.array(z.string()).optional(),
@@ -70,6 +72,7 @@ export const OmoConfigLayerSchema = z.object({
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+  "[omp]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
   profiles: z.record(z.string(), OmoConfigProfileSchema).optional(),
   _migrations: z.array(z.string()).optional(),
