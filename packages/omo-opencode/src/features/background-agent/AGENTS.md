@@ -66,3 +66,9 @@ Both must agree before marking a task complete. Prevents premature completion on
 ```
 task completed → result-handler → parent-session-notifier → inject system message into parent session
 ```
+
+## SHUTDOWN FLUSH
+
+When the host process exits (e.g. `opencode run` goes idle after `reason=stop`), pending parent-wake notifications scheduled via unref'd timers would be lost. `ParentWakeNotifier.flushForShutdown()` dispatches all pending wakes with `noReply=true` before the queue is cleared, persisting notification text in the parent session for later re-attachment.
+
+`BackgroundManager.shutdown()` conditionally waits for running tasks to complete before aborting (controlled by `OMO_BACKGROUND_SHUTDOWN_WAIT_MS` env var; default 0 = no wait). When set, the polling timer stays referenced to keep the event loop alive. This is a no-op without the env var, so TUI and test usage are unaffected.

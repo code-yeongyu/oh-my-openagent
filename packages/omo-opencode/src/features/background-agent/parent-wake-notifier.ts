@@ -4,9 +4,10 @@ import type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-d
 import { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import { ParentWakeFlushRunner } from "./parent-wake-flush-runner"
 import { ParentWakePendingQueue } from "./parent-wake-pending-queue"
+import { sendParentWakePrompt } from "./parent-wake-prompt-dispatch"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 import { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
-import type { ParentWakeNotifierDeps, ParentWakeNotifierOptions } from "./parent-wake-notifier-types"
+import type { ParentWakeNotifierClient, ParentWakeNotifierDeps, ParentWakeNotifierOptions } from "./parent-wake-notifier-types"
 import {
   handleDispatchedParentWakeWindowElapsed,
   logParentWakeWindowRecoveryError,
@@ -16,6 +17,8 @@ import {
 export type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
 
 export class ParentWakeNotifier {
+  private readonly client: ParentWakeNotifierClient
+  private readonly directory: string
   private readonly pendingQueue: ParentWakePendingQueue
   private readonly dispatchedTracker: ParentWakeDispatchedTracker
   private readonly sessionInspector: ParentWakeSessionInspector
@@ -26,6 +29,8 @@ export class ParentWakeNotifier {
     deps: ParentWakeNotifierDeps,
     options: ParentWakeNotifierOptions,
   ) {
+    this.client = deps.client
+    this.directory = deps.directory
     this.onPendingWakeRequeued = deps.onPendingWakeRequeued
     this.pendingQueue = new ParentWakePendingQueue({
       pendingRetryMs: options.pendingRetryMs,
@@ -171,6 +176,66 @@ export class ParentWakeNotifier {
 
   clearPendingParentWakeTimer(sessionID: string): void {
     this.flushRunner.clearPendingParentWakeTimer(sessionID)
+  }
+
+  /**
+   * Flush all pending parent wake notifications before the process exits.
+   *
+   * In headless `opencode run` mode, when the model stops with reason=stop the
+   * parent session goes idle and run.ts breaks its event loop. The pending
+   * wake notifications (scheduled via unref'd timers in
+   * ParentWakePendingQueue.scheduleFlush) would be lost when the process
+   * exits because unref'd timers do not keep the event loop alive.
+   *
+   * This method dispatches each pending wake directly via sendParentWakePrompt
+   * with forceNoReply=true, which persists the notification text in the parent
+   * session without re-triggering the model. The user can then re-attach
+   * (e.g. `opencode run --continue`) and the model will see the notification.
+   */
+  async flushForShutdown(): Promise<void> {
+    const wakes = this.pendingQueue.getWakes()
+    if (wakes.size === 0) return
+
+    log("[background-agent] Flushing pending parent wake notifications before shutdown:", {
+      count: wakes.size,
+      sessionIDs: [...wakes.keys()],
+    })
+
+    const noOpToolWaitDecision: ToolWaitDeferralDecision = {
+      defer: false,
+      skipPromptGateToolStateCheck: true,
+    }
+
+    const flushPromises: Promise<void>[] = []
+    for (const [sessionID, wake] of wakes) {
+      flushPromises.push(
+        sendParentWakePrompt({
+          client: this.client,
+          directory: this.directory,
+          sessionID,
+          latestWake: wake,
+          forceNoReply: true,
+          emptyAssistantTurnRetry: false,
+          toolWaitDecision: noOpToolWaitDecision,
+          getDispatchedWake: () => undefined,
+          hasRecordedPromptAfterDispatch: async () => false,
+          trackDispatchedWake: () => {},
+          requeueWake: () => {},
+          scheduleFlush: () => {},
+        }).catch((error) => {
+          log("[background-agent] Failed to flush parent wake for shutdown:", {
+            sessionID,
+            error,
+          })
+        }),
+      )
+    }
+
+    // Wait with a 3-second timeout so we don't hang the process during shutdown
+    await Promise.race([
+      Promise.allSettled(flushPromises),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ])
   }
 
   shutdown(): void {

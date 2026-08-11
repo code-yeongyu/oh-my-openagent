@@ -2476,7 +2476,14 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pollingInterval = setInterval(() => {
       this.pollRunningTasks()
     }, POLLING_INTERVAL_MS)
-    this.pollingInterval.unref()
+    // Keep the polling timer referenced when headless shutdown wait is enabled.
+    // Without this, the unref'd timer doesn't keep the event loop alive, so
+    // `opencode run` exits before background tasks can complete and deliver
+    // their results to the parent session. When OMO_BACKGROUND_SHUTDOWN_WAIT_MS
+    // is set, we need the timer to keep the process alive.
+    if (!process.env.OMO_BACKGROUND_SHUTDOWN_WAIT_MS) {
+      this.pollingInterval.unref()
+    }
   }
 
   private stopPolling(): void {
@@ -3118,6 +3125,40 @@ The task was re-queued on a fallback model after a retryable failure.
     const trackedSessionIDs = new Set<string>()
     const abortRequests: Array<{ sessionID: string; promise: Promise<unknown> }> = []
 
+    // Wait for running background tasks to complete before aborting.
+    // In headless `opencode run` mode, the parent session goes idle and the
+    // process exits. Running background tasks are children in the same process.
+    // Without this wait, they are aborted before they can finish and enqueue
+    // parent-wake notifications, so the parent never sees their results.
+    // Controlled by OMO_BACKGROUND_SHUTDOWN_WAIT_MS (default: 0 = no wait in
+    // tests; set to 5000 in production via process-cleanup or config).
+    const shutdownWaitMs = (() => {
+      const raw = process.env.OMO_BACKGROUND_SHUTDOWN_WAIT_MS
+      if (!raw) return 0
+      const n = Number(raw)
+      return Number.isFinite(n) && n > 0 ? n : 0
+    })()
+    if (shutdownWaitMs > 0) {
+      const runningTasks = Array.from(this.tasks.values()).filter(
+        (t) => t.status === "running" && t.sessionId,
+      )
+      if (runningTasks.length > 0) {
+        log("[background-agent] Waiting for running tasks to complete before shutdown:", {
+          count: runningTasks.length,
+          taskIds: runningTasks.map((t) => t.id),
+          timeoutMs: shutdownWaitMs,
+        })
+        const completionDeadline = Date.now() + shutdownWaitMs
+        while (Date.now() < completionDeadline) {
+          const stillRunning = Array.from(this.tasks.values()).some(
+            (t) => t.status === "running" && t.sessionId,
+          )
+          if (!stillRunning) break
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+      }
+    }
+
     // Abort all running sessions to prevent zombie processes (#1240)
     for (const task of this.tasks.values()) {
       if (task.sessionId) {
@@ -3176,6 +3217,20 @@ The task was re-queued on a fallback model after a retryable failure.
       clearTimeout(timer)
     }
     this.idleDeferralTimers.clear()
+
+    // Flush pending parent wake notifications before shutting down the notifier.
+    // In headless `opencode run` mode, when the model stops with reason=stop
+    // the parent session goes idle and run.ts exits. Pending wake notifications
+    // (scheduled via unref'd timers) would be lost. Flush them here so the
+    // notifications are persisted in the parent session and the user can
+    // re-attach to continue. See flushForShutdown() for details.
+    //
+    // Only await when there are actually pending wakes — the common case (no
+    // pending wakes) stays synchronous so existing callers that don't await
+    // shutdown() are unaffected.
+    if (this.parentWakeNotifier.getPendingParentWakes().size > 0) {
+      await this.parentWakeNotifier.flushForShutdown()
+    }
 
     this.parentWakeNotifier.shutdown()
 
