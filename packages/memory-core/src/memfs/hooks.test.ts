@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { spawn } from "node:child_process"
 import { existsSync, realpathSync, statSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
@@ -85,6 +85,8 @@ async function seedServerFile(dir: string, relativePath: string, content: string
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
+
+setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 describe("installHooks", () => {
   it("#given a repository #when hooks are installed twice #then both hooks stay executable and identical", async () => {

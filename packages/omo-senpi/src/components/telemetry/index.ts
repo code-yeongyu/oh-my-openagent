@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -99,7 +100,7 @@ function createRecordDailyActiveInput(options: SenpiTelemetryOptions): RecordDai
 }
 
 function getSenpiAgentDir(env: TelemetryEnv): string {
-  return env[SENPI_AGENT_DIR_ENV]?.trim() || join(homedir(), ".senpi", "agent")
+  return resolveAgentHome({ env })
 }
 
 function withTimeout(operation: Promise<void>, timeoutMs: number): Promise<void> {
@@ -144,3 +145,12 @@ function logDebug(logger: ComponentLogger, message: string, details: unknown): v
     Reflect.apply(debug, logger, [message, details])
   }
 }
+
+export * from "./omo-native-buffer"
+export * from "./omo-native-component"
+export * from "./omo-native-notice"
+export * from "./omo-native-prompt"
+export * from "./omo-native-session"
+export * from "./omo-native-tools"
+export * from "./omo-native-turns"
+export * from "./product-identity"

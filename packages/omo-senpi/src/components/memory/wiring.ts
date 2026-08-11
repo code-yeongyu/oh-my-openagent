@@ -13,16 +13,21 @@ import {
   type MemoryIdentityRuntimeDeps,
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
+import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { registerPalaceCommand } from "./palace/command"
 import { createMemoryPromptHandler } from "./prompt"
 import { registerMemoryCommands } from "./commands/register"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
 import { registerMemoryGuard } from "./guard"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
-import { refreshMemoryStatus } from "./status"
+import { MEMORY_STATUS_KEY, refreshMemoryStatus } from "./status"
 import { registerMemorySkillsScope } from "./skills-scope"
 import { createReflectionTriggerWiring, type ReflectionTriggerSession } from "./trigger-wiring"
-import { registerMemoryToolSurface } from "./tools"
+import {
+  MEMORY_APPLY_PATCH_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  registerMemoryToolSurface,
+} from "./tools"
 import {
   consumePendingReflectionCompletions,
   registerReflectionCompletionRenderer,
@@ -31,6 +36,7 @@ import {
 
 export interface MemorySessionStateLike {
   readonly context?: MemoryIdentityContext
+  memoryStatusAttempted: boolean
 }
 
 export interface MemoryWiringOptions {
@@ -38,14 +44,20 @@ export interface MemoryWiringOptions {
   readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd: () => string
   readonly env: Record<string, string | undefined>
+  readonly now?: () => number
   readonly logger?: ComponentLogger
-  readonly createRuntime?: (identity: MemoryIdentityContext, deps: MemoryIdentityRuntimeDeps) => MemoryIdentityRuntime
+  readonly refreshStatus?: typeof refreshMemoryStatus
+  readonly createRuntime?: (
+    identity: MemoryIdentityContext,
+    deps: MemoryIdentityRuntimeDeps,
+  ) => Pick<MemoryIdentityRuntime, "store" | "launch">
   /** Boot-snapshot tool exposure; registration must not re-read config (latch order is observable). */
   readonly toolExposure?: "direct" | "search"
 }
 
 export interface MemoryWiring {
   registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void
+  clearStatus(eventCtx: unknown): void
   afterBind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void>
 }
 
@@ -56,7 +68,8 @@ type StatusUi = {
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const promptCache = new MemoryBlockCache()
-  const runtimes = new Map<string, MemoryIdentityRuntime>()
+  const refreshStatus = options.refreshStatus ?? refreshMemoryStatus
+  const runtimes = new Map<string, Pick<MemoryIdentityRuntime, "store" | "launch">>()
   const journals = new Map<string, MemoryJournalWiring>()
   const lastEventCtx: { current?: unknown } = {}
   let activeSessionId: string | undefined
@@ -81,14 +94,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     }
   }
 
-  function resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]> {
-    if (!isRecord(lastEventCtx.current)) return undefined
-    const registry = lastEventCtx.current.modelRegistry
-    return isRecord(registry)
-      ? (registry as unknown as ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>)
-      : undefined
-  }
-
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
     const cached = journals.get(identity.identity)
     if (cached !== undefined) return cached
@@ -97,14 +102,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     return wiring
   }
 
-  function runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime {
+  function runtimeFor(identity: MemoryIdentityContext): Pick<MemoryIdentityRuntime, "store" | "launch"> {
     const cached = runtimes.get(identity.identity)
     if (cached !== undefined) return cached
     const create = options.createRuntime ?? createIdentityRuntime
     const runtime = create(identity, {
       loadConfig: options.loadConfig,
       cwd: options.cwd,
-      resolveModelRegistry,
+      resolveModelRegistry: () => resolveMemoryModelRegistry(lastEventCtx.current),
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
     runtimes.set(identity.identity, runtime)
@@ -193,6 +198,31 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         if (branchEntryCount(eventCtx) === 0) return undefined
         return journalWiringFor(identity).reconcileSession(eventCtx)
       })
+      pi.on("tool_result", async (payload, eventCtx) => {
+        if (!isMemoryToolResult(payload)) return
+        const sessionId = sessionIdFrom(eventCtx)
+        if (sessionId === undefined) return
+        const state = options.sessions.get(sessionId)
+        if (state?.context === undefined || state.memoryStatusAttempted) return
+        const ui = readUi(eventCtx)
+        if (ui === undefined) return
+        state.memoryStatusAttempted = true
+        const settings = options.loadConfig({ cwd: options.cwd() }).config.memory
+        try {
+          const result = await refreshStatus({
+            context: state.context,
+            ui,
+            compileWarnTokens: settings?.compile_warn_tokens ?? 30_000,
+            alreadyNotified: false,
+            checkAdvisory: false,
+            ...(options.now === undefined ? {} : { now: options.now }),
+          })
+          state.memoryStatusAttempted = result.footerShown
+        } catch (error) {
+          state.memoryStatusAttempted = false
+          throw error
+        }
+      })
       registerMemoryToolSurface(pi, () => (activeSessionId === undefined ? undefined : resolveContext(activeSessionId)), {
         exposure: toolExposure,
       })
@@ -237,6 +267,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       triggerWiring.register(pi)
     },
 
+    clearStatus(eventCtx: unknown): void {
+      readUi(eventCtx)?.setStatus(MEMORY_STATUS_KEY, undefined)
+    },
+
     async afterBind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void> {
       activeSessionId = sessionId
       lastEventCtx.current = eventCtx
@@ -247,11 +281,12 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       const ui = readUi(eventCtx)
       if (ui !== undefined) {
         const settings = options.loadConfig({ cwd: options.cwd() }).config.memory
-        void refreshMemoryStatus({
+        void refreshStatus({
           context: identity,
           ui,
           compileWarnTokens: settings?.compile_warn_tokens ?? 30_000,
           alreadyNotified: false,
+          showFooter: false,
         }).catch(() => {})
       }
       const api = completionApi(pi)
@@ -267,4 +302,24 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function isMemoryToolResult(value: unknown): boolean {
+  if (
+    !isRecord(value)
+    || value.type !== "tool_result"
+    || value.isError === true
+    || typeof value.toolName !== "string"
+  ) return false
+  return matchesToolName(value.toolName, MEMORY_TOOL_NAME)
+    || matchesToolName(value.toolName, MEMORY_APPLY_PATCH_TOOL_NAME)
+}
+
+function matchesToolName(toolName: string, expected: string): boolean {
+  const normalized = toolName.trim().toLowerCase().replaceAll("-", "_")
+  const suffix = expected.trim().toLowerCase().replaceAll("-", "_")
+  return normalized === suffix
+    || normalized.endsWith(`_${suffix}`)
+    || normalized.endsWith(`:${suffix}`)
+    || normalized.endsWith(`/${suffix}`)
 }

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { readFile, stat } from "node:fs/promises"
 import { dirname } from "node:path"
 
@@ -11,6 +11,10 @@ import {
 } from "./palace.test-support"
 
 afterAll(cleanupPalaceFixtures)
+
+// Every case commits into a real git fixture repository; the 5s default is not a budget those
+// subprocesses fit on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 function inlineJson(html: string): Record<string, unknown> {
   const match = html.match(

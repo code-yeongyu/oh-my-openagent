@@ -1,10 +1,15 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, mkdtempSync } from "node:fs"
 import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import * as ts from "typescript/unstable/ast"
 import { TypeScriptSourceParser } from "./typescript-native-source-parser"
+
+// This audit parses the whole production source set through the TypeScript native API, which needs
+// more than the 5s default on a loaded CI runner. setDefaultTimeout is per-file in Bun, so this
+// budget applies here only.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 30_000)
 
 function __repoRootFrom(start: string): string {
   let dir = start

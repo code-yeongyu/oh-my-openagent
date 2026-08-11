@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, mock } from "bun:test"
+import { afterEach, beforeEach, mock, setDefaultTimeout } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -37,6 +37,13 @@ function ensureVendoredLspDaemonBuilt(): void {
   }
 }
 ensureVendoredLspDaemonBuilt()
+
+// setDefaultTimeout is per-file when a TEST file calls it, but the preload runs before every file and
+// its value becomes the default each file starts from. CI runners need multiples of the local time for
+// the same git/npm/installer subprocesses, so raise the floor here once rather than rediscovering the
+// class one flaking suite at a time. A file that needs more still sets its own budget, and a file that
+// wants the strict default can lower it locally.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
 
 // Skill/agent/command discovery reads the developer's real HOME (~/.agents/skills,
 // ~/.claude, ~/.config/opencode). A machine with real user skills installed then makes

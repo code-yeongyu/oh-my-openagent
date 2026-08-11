@@ -42,6 +42,16 @@ function warnForSettings() {
   }
 }
 
+// A malformed or unreadable engine manifest must not abort the diagnostics run.
+function engineVersionOrUnresolved(senpi) {
+  if (!senpi) return "unresolved"
+  try {
+    return readJson(join(senpi.packageRoot, "package.json")).version
+  } catch {
+    return "unresolved"
+  }
+}
+
 export function runDoctor(inventory) {
   let failed = false
   for (const [label, artifact] of artifacts) {
@@ -79,9 +89,10 @@ export function runDoctor(inventory) {
     }
   }
 
+  console.log(`INFO omo ${packageManifest().version} (engine: senpi ${engineVersionOrUnresolved(senpi)})`)
   warnForSettings()
   if (needsSetupSuggestion(inventory)) {
-    console.log("INFO senpi has no credentials; run omo setup to review sibling stores")
+    console.log("INFO no credentials found; run omo setup to review sibling stores")
   }
   process.exitCode = failed ? 1 : 0
 }

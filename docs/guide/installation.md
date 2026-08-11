@@ -161,6 +161,15 @@ omo
 
 A bare `npm i -g omo-ai` fails with ETARGET on purpose; every published version is a prerelease, so the default channel never resolves. See the [omo-ai publishing runbook](../reference/omo-ai-publishing.md) for the mechanism.
 
+**Where omo keeps its state.** The senpi edition stores everything flat under `~/.omo`
+(`settings.json`, `auth.json`, `models.json`, `sessions/`, `themes/`, `prompts/`), alongside the
+files the other omo harnesses already keep there. On first run, an existing `~/.senpi/agent` is
+copied forward once: caches and logs are skipped, a `.migrated-from-senpi` marker is written, and
+the original directory is left untouched. That copy is a snapshot, not a link, so a standalone
+senpi install keeps working and the two products hold independent state from then on. Set
+`OMO_CODING_AGENT_DIR` to override the location; the legacy `SENPI_*` and `PI_*` variables are
+still read when the `OMO_*` one is unset.
+
 **Upgrade order on older machines.** If the machine still has oh-my-openagent/oh-my-opencode 4.19.4 or earlier installed globally, that package owns a global `omo` bin and the install above fails with EEXIST. Upgrade or uninstall the old package first, then install `omo-ai@beta`.
 
 ### First run: `omo setup`

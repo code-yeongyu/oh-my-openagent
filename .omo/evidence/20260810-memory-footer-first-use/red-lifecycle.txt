@@ -1,0 +1,25 @@
+Command:
+bun test packages/memory-core/src/git/repo.test.ts packages/omo-senpi/src/components/memory/status.test.ts packages/omo-senpi/src/components/memory/wiring.test.ts
+
+RED lifecycle failures before production edits:
+
+FAIL memory footer wiring > committed memory bound without a visible footer; first memory tool result should show one relative-age footer.
+Expected:
+  [{ "key": "memory", "text": "mem:project-<id> 1m ago" }]
+Received:
+  []
+
+FAIL memory footer wiring > completed first-use attempt should reset for a new session.
+Expected:
+  two once-per-session relative-age status calls
+Received:
+  []
+
+Binary conclusion:
+The unchanged wiring has no memory-tool `tool_result` hook, so the first memory tool result cannot display the footer.
+
+Suite summary:
+12 pass
+7 fail
+39 expect() calls
+Ran 19 tests across 3 files. [4.60s]

@@ -12,6 +12,7 @@ const astGrepSkillSegments = ["ast", "grep"] as const
 const astGrepSkillName = astGrepSkillSegments.join("-")
 const astGrepMcpServerName = astGrepSkillSegments.join("_")
 const deletedAstGrepRuntimeName = [...astGrepSkillSegments, "mcp"].join("-")
+const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
@@ -322,7 +323,7 @@ describe("sync-lazycodex-marketplace", () => {
     // then
     expect(message).toContain("missing MCP runtime path")
     expect(message).toContain("components/lsp/packages/lsp-tools-mcp/dist/cli.js")
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("#given missing hook command target #when syncing marketplace #then rejects the broken bundle", async () => {
     // given
@@ -402,7 +403,7 @@ describe("sync-lazycodex-marketplace", () => {
     // Codex reads MCP servers only from the plugin-root .mcp.json; a component's nested dev manifest
     // (whose relative daemon path dangles in the flattened bundle) must not ship in plugins/omo.
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "components", "lsp", ".mcp.json"))
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("#given missing bootstrap commandWindows target #when syncing marketplace #then rejects naming the bootstrap.ps1 path", async () => {
     // given

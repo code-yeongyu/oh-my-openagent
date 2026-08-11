@@ -134,6 +134,13 @@ export class GitMemoryRepo {
     return result.stdout.trim() || null
   }
 
+  async headCommitTimestamp(): Promise<number | null> {
+    const result = await this.gitResult(["show", "-s", "--format=%ct", "HEAD"])
+    if (result.code !== 0) return null
+    const timestamp = Number.parseInt(result.stdout.trim(), 10)
+    return Number.isSafeInteger(timestamp) && timestamp >= 0 ? timestamp : null
+  }
+
   async lsTree(revision = "HEAD", path?: string): Promise<string[]> {
     const suffix = path ? ["--", path] : []
     const result = await this.git(["ls-tree", "-r", "--name-only", "-z", revision, ...suffix])

@@ -1,0 +1,9 @@
+RED
+Command: bun test packages/omo-native/test/launcher.test.ts --test-name-pattern 'restores System32|promotes an existing shim'
+Result: 0 pass, 2 fail
+Failure 1: expected C:\WINDOWS\System32 in PATH; received only shim and path-without-system32.
+Failure 2: expected one normalized shim entry; received two.
+
+GREEN
+Command: bun test packages/omo-native/test/launcher.test.ts --test-name-pattern 'restores System32|promotes an existing shim'
+Result: 2 pass, 0 fail

@@ -13,6 +13,9 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"
   | "telemetry_cpu_info_unavailable"
+  | "telemetry_event_property_dropped"
+  | "telemetry_event_property_rejected"
+  | "telemetry_event_rejected"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
   | "telemetry_shutdown_failed";
@@ -38,6 +41,8 @@ export type TelemetryProductConfig = {
   readonly productEnvPrefix: string;
   readonly productName: string;
   readonly additionalProperties?: TelemetryCaptureProperties;
+  readonly disableGeoip?: boolean;
+  readonly transportOptions?: Partial<TelemetryTransportOptions>;
 };
 
 export type TelemetryOsProvider = {
@@ -81,6 +86,30 @@ export type TelemetryClient = {
     readonly distinctId: string;
     readonly reason: string;
   }) => void;
+  readonly flush: () => Promise<void>;
+  readonly shutdown: () => Promise<void>;
+};
+
+export type EventPropertyAllowlist = Readonly<Record<string, readonly string[]>>;
+export type EventTelemetryProperties = Readonly<Record<string, unknown>>;
+export type EventTelemetrySetTimeout = (callback: () => void, delay: number) => unknown;
+
+export type CreateEventTelemetryClientInput = {
+  readonly diagnostics?: (input: TelemetryDiagnosticInput) => void;
+  readonly distinctId: string;
+  readonly env?: TelemetryEnv;
+  readonly onCapture?: (payload: TelemetryCaptureMessage) => void;
+  readonly product: TelemetryProductConfig;
+  readonly propertyAllowlist: EventPropertyAllowlist;
+  readonly schemaVersion: number;
+  readonly setTimeoutFn?: EventTelemetrySetTimeout;
+  readonly source: string;
+  readonly transportFactory?: TelemetryTransportFactory;
+};
+
+export type EventTelemetryClient = {
+  readonly enabled: boolean;
+  readonly captureEvent: (name: string, properties: EventTelemetryProperties) => void;
   readonly flush: () => Promise<void>;
   readonly shutdown: () => Promise<void>;
 };
@@ -130,6 +159,9 @@ export type TelemetryClientEnabledInput = {
   readonly product: Pick<TelemetryProductConfig, "defaultApiKey" | "productEnvPrefix">;
 };
 
+export declare function createEventTelemetryClient(
+  input: CreateEventTelemetryClientInput,
+): EventTelemetryClient;
 export declare function createDefaultPostHogTransport(
   apiKey: string,
   options: TelemetryTransportOptions,

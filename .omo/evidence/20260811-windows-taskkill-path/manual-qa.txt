@@ -1,0 +1,3 @@
+{"label":"happy","status":0,"argv":["--extension","<fixture>\\node_modules\\omo-ai\\plugin","say","hi"],"pathKey":"Path","shimFirst":true,"system32Present":true,"stdout":""}
+{"label":"bad-input","status":2,"argv":["--extension","<fixture>\\node_modules\\omo-ai\\plugin","--bad-input"],"pathKey":"Path","shimFirst":true,"system32Present":true,"stdout":""}
+{"label":"help","status":0,"argv":["--extension","<fixture>\\node_modules\\omo-ai\\plugin","--help"],"pathKey":"Path","shimFirst":true,"system32Present":true,"stdout":"fake senpi help"}

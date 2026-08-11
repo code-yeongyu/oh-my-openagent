@@ -1,7 +1,7 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -11,6 +11,10 @@ import { createRepoWithGitBashHooksFixture, EXPECTED_GIT_BASH_HOOKS } from "./in
 const [GIT_BASH_PRE_TOOL_USE_HOOK, GIT_BASH_POST_COMPACT_HOOK] = EXPECTED_GIT_BASH_HOOKS
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
+// Each case runs the real installer against a fresh repository fixture; the 5s default is not a budget
+// that filesystem work fits on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 describe("install-codex Git Bash hooks", () => {
   test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {

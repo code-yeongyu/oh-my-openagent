@@ -18,7 +18,7 @@ import {
 
 describe("omo-senpi ulw-loop runtime", () => {
   it("#given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored", () => {
-    withEnv({ OMO_BIN: "/custom/omo", PATH: "" }, () => {
+    withEnv({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: "/custom/omo", PATH: "" }, () => {
       expect(__testInternals.resolveOmoBin()).toBe("/custom/omo")
     })
   })

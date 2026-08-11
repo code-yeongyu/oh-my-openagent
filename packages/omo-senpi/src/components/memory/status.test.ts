@@ -40,7 +40,6 @@ function recordingUi(): RecordingUi {
 interface FixtureRepo {
   readonly repoPath: string
   readonly repo: GitMemoryRepo
-  readonly headSha: string
 }
 
 async function createFixtureRepo(
@@ -50,11 +49,11 @@ async function createFixtureRepo(
   roots.push(root)
   const paths = buildIdentityPaths(root, "agent-test-id")
   const repo = new GitMemoryRepo({ dir: paths.repo, agentId: "agent-test" })
-  const headSha = await repo.init({
+  await repo.init({
     authorName: "Test Agent",
     seedFiles: [...seedFiles],
   })
-  return { repoPath: paths.repo, repo, headSha }
+  return { repoPath: paths.repo, repo }
 }
 
 function contextFor(repoPath: string, identity = "agent-test-id") {
@@ -70,11 +69,18 @@ function contextFor(repoPath: string, identity = "agent-test-id") {
 }
 
 describe("refreshMemoryStatus", () => {
-  test("#given a bound identity with a committed HEAD #when refresh runs #then footer shows mem:<identity> @<short-sha>", async () => {
-    const { repoPath, headSha } = await createFixtureRepo([
-      { relativePath: "system/persona.md", content: "I am the agent.\n" },
-    ])
-    const context = contextFor(repoPath)
+  test("#given a committed HEAD ninety seconds old #when refresh runs #then footer shows system-clock-relative age", async () => {
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => Date.parse("2026-08-10T00:00:00.000Z") / 1000,
+      lsTree: async () => [],
+      show: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "fake-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "fake-agent"),
+      binding: { identity: "fake-agent", repoPathHash: "hash", boundAt: 1 },
+    })
     const recorder = recordingUi()
 
     await refreshMemoryStatus({
@@ -82,11 +88,48 @@ describe("refreshMemoryStatus", () => {
       ui: recorder.ui,
       compileWarnTokens: 30000,
       alreadyNotified: false,
+      gitRepo: fakeRepo,
+      now: () => Date.parse("2026-08-10T00:01:30.000Z"),
     })
 
     expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: `mem:agent-test-id @${headSha.slice(0, 7)}` },
+      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
     ])
+  })
+
+  test("#given committed HEAD ages across display buckets #when refresh runs #then compact labels follow the system clock", async () => {
+    const now = Date.parse("2026-08-10T12:00:00.000Z")
+    for (const [ageMs, expected] of [
+      [30_000, "just now"],
+      [2 * 60 * 60_000, "2h ago"],
+      [3 * 24 * 60 * 60_000, "3d ago"],
+    ] as const) {
+      const fakeRepo: GitRepoForStatus = {
+        head: async () => "abcdef1234567890",
+        headCommitTimestamp: async () => (now - ageMs) / 1000,
+        lsTree: async () => [],
+        show: async () => "",
+      }
+      const context = createMemoryIdentityContext({
+        identity: "fake-agent",
+        identityPaths: buildIdentityPaths("/tmp/nonexistent", "fake-agent"),
+        binding: { identity: "fake-agent", repoPathHash: "hash", boundAt: 1 },
+      })
+      const recorder = recordingUi()
+
+      await refreshMemoryStatus({
+        context,
+        ui: recorder.ui,
+        compileWarnTokens: 30_000,
+        alreadyNotified: false,
+        gitRepo: fakeRepo,
+        now: () => now,
+      })
+
+      expect(recorder.statusCalls).toEqual([
+        { key: MEMORY_STATUS_KEY, text: `mem:fake-agent ${expected}` },
+      ])
+    }
   })
 
   test("#given system markdown under the advisory threshold #when refresh runs #then no advisory notify fires", async () => {
@@ -133,6 +176,64 @@ describe("refreshMemoryStatus", () => {
     expect(result.notified).toBe(true)
   })
 
+  test("#given footer rendering disabled at session bind #when memory is oversized #then advisory fires without a footer", async () => {
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => Date.parse("2026-08-10T00:00:00.000Z") / 1000,
+      lsTree: async () => ["system/persona.md"],
+      show: async () => "oversized memory body",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "fake-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "fake-agent"),
+      binding: { identity: "fake-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 1,
+      alreadyNotified: false,
+      gitRepo: fakeRepo,
+      now: () => Date.parse("2026-08-10T00:01:30.000Z"),
+      showFooter: false,
+    })
+
+    expect(recorder.statusCalls).toEqual([])
+    expect(recorder.notifications).toHaveLength(1)
+  })
+
+  test("#given advisory checking disabled after first memory use #when memory is oversized #then footer renders without another warning", async () => {
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => Date.parse("2026-08-10T00:00:00.000Z") / 1000,
+      lsTree: async () => ["system/persona.md"],
+      show: async () => "oversized memory body",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "fake-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "fake-agent"),
+      binding: { identity: "fake-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 1,
+      alreadyNotified: false,
+      gitRepo: fakeRepo,
+      now: () => Date.parse("2026-08-10T00:01:30.000Z"),
+      checkAdvisory: false,
+    })
+
+    expect(recorder.statusCalls).toEqual([
+      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
+    ])
+    expect(recorder.notifications).toEqual([])
+  })
+
   test("#given an already-notified session #when refresh runs again over threshold #then no second notify fires", async () => {
     const bigContent = "B".repeat(120_000)
     const { repoPath } = await createFixtureRepo([
@@ -152,12 +253,10 @@ describe("refreshMemoryStatus", () => {
     expect(result.notified).toBe(false)
   })
 
-  test("#given a repo with no HEAD (uninitialized) #when refresh runs #then status shows uncommitted sentinel and no notify fires", async () => {
+  test("#given a repo with no HEAD #when refresh runs #then no footer or advisory appears", async () => {
     const root = mkdtempSync(join(tmpdir(), "omo-memory-status-empty-"))
     roots.push(root)
     const paths = buildIdentityPaths(root, "agent-empty")
-    const repo = new GitMemoryRepo({ dir: paths.repo, agentId: "agent-empty" })
-    await repo.init({ authorName: "Empty Agent" })
     const context = createMemoryIdentityContext({
       identity: "agent-empty",
       identityPaths: paths,
@@ -172,16 +271,15 @@ describe("refreshMemoryStatus", () => {
       alreadyNotified: false,
     })
 
-    expect(recorder.statusCalls).toHaveLength(1)
-    expect(recorder.statusCalls[0]?.key).toBe(MEMORY_STATUS_KEY)
-    expect(recorder.statusCalls[0]?.text).toContain("mem:agent-empty")
+    expect(recorder.statusCalls).toEqual([])
     expect(recorder.notifications).toEqual([])
     expect(result.notified).toBe(false)
   })
 
-  test("#given a custom git repo adapter #when refresh runs #then it uses the adapter instead of spawning git", async () => {
+  test("#given a committed HEAD without a readable commit timestamp #when refresh runs #then no footer appears", async () => {
     const fakeRepo: GitRepoForStatus = {
       head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => null,
       lsTree: async () => ["system/persona.md"],
       show: async () => "persona body",
     }
@@ -200,10 +298,34 @@ describe("refreshMemoryStatus", () => {
       gitRepo: fakeRepo,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent @abcdef1" },
-    ])
+    expect(recorder.statusCalls).toEqual([])
     expect(result.notified).toBe(false)
+  })
+
+  test("#given a commit timestamp later than the system clock #when refresh runs #then no footer appears", async () => {
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => Date.parse("2026-08-10T00:02:00.000Z") / 1000,
+      lsTree: async () => [],
+      show: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "fake-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "fake-agent"),
+      binding: { identity: "fake-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      gitRepo: fakeRepo,
+      now: () => Date.parse("2026-08-10T00:01:30.000Z"),
+    })
+
+    expect(recorder.statusCalls).toEqual([])
   })
 
   test("#given system files with non-system markdown excluded #when refresh estimates tokens #then only system/**/*.md counts", async () => {

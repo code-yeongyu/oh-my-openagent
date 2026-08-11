@@ -23,6 +23,29 @@ afterEach(async () => {
 })
 
 describe("GitMemoryRepo", () => {
+  it("#given a committed HEAD with a fixed committer date #when timestamp is read #then epoch seconds are returned", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "initial\n" }] })
+    const committedAt = "2026-08-10T00:00:00.000Z"
+    const exec = createNodeGitExec()
+    await exec.run(["commit", "--amend", "--no-edit"], {
+      cwd: dir,
+      timeoutMs: 30_000,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: committedAt,
+        GIT_COMMITTER_DATE: committedAt,
+      },
+    })
+
+    // when
+    const timestamp = await repo.headCommitTimestamp()
+
+    // then
+    expect(timestamp).toBe(Date.parse(committedAt) / 1000)
+  })
+
   it("#given a new repository #when it is initialized and a write is committed #then HEAD advances to the committed content", async () => {
     // given
     const { dir, repo } = await createRepo()

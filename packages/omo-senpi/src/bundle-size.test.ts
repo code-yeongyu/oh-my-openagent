@@ -27,7 +27,13 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // user feature wired into the extension entry; the imports span the whole engine (nothing accidental
 // inlined, no new third-party dependency added). Measured 863,893 bytes after minification. Headroom to
 // 880,000 leaves margin for follow-up memory polish without inviting unrelated bloat.
-const BUDGET_BYTES = 880_000
+// Raised 880,000 -> 900,000 for plan omo-native-telemetry: the plan-scoped first-party feature code
+// is wired into the extension entry and grew the freshly rebuilt bundle to a measured 891,384 bytes.
+// No new third-party dependency was inlined; posthog-node was already present, and
+// bundle-purity.test.ts passes on the new build. A trim was attempted and rejected because reclaiming
+// the bytes would require a secondary chunk and loader-topology change. The round 900,000 ceiling
+// preserves explicit headroom instead of raising the budget to the failing value.
+const BUDGET_BYTES = 900_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

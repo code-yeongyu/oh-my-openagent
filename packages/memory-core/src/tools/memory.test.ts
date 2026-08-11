@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { execFile } from "node:child_process"
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -66,6 +66,8 @@ async function git(repo: GitMemoryRepo, args: string[]): Promise<string> {
   const result = await exec("git", args, { cwd: repo.dir })
   return String(result.stdout).trim()
 }
+
+setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 describe("runMemoryTool", () => {
   it("#given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local", async () => {
@@ -196,9 +198,9 @@ describe("runMemoryTool", () => {
       { command: "rename", reason: "rename", old_path: "locked", new_path: "moved" },
     ]
 
+    const setup = await fixture()
+    await seed(setup, "locked.md", "body", "true")
     for (const params of cases) {
-      const setup = await fixture()
-      await seed(setup, "locked.md", "body", "true")
       await expect(run(setup, params)).rejects.toThrow(/memory: locked is read_only/)
     }
   })
@@ -212,8 +214,8 @@ describe("runMemoryTool", () => {
       { params: { command: "rename", reason: "x", old_path: "", new_path: "x" }, message: /^memory: rename: 'old_path'/ },
     ]
 
+    const setup = await fixture()
     for (const row of rows) {
-      const setup = await fixture()
       const error = await run(setup, row.params).then(() => null, (cause: unknown) => cause)
       expect(error).toBeInstanceOf(MemoryToolError)
       expect(error instanceof Error ? error.message : String(error)).toMatch(row.message)

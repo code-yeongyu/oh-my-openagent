@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -11,6 +11,10 @@ import {
 } from "./memory-apply-patch"
 
 const tempDirs: string[] = []
+
+// Each case drives a real git repository through commit and patch application; the 5s default is not
+// a budget those subprocesses fit on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 const author = { agentId: "patch-agent", authorName: "Patch Agent", authorEmail: "patch@example.test" }
 
 async function fixture(seedFiles: Record<string, string> = {}) {

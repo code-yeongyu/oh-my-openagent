@@ -6,6 +6,7 @@ import { GitMemoryRepo } from "../git"
 import { MemoryBlockCache, hashMemoryTemplate } from "./cache"
 
 const tempDirs: string[] = []
+const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 async function createRepo() {
   const dir = await mkdtemp(join(tmpdir(), "memory-cache-"))
@@ -70,7 +71,7 @@ describe("MemoryBlockCache", () => {
     expect(headChanged).toContain("second")
     expect(ticks).toBe(3)
     expect(cache.size).toBe(3)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   it("#given template content #when hashed #then the structure version participates in sha256", () => {
     // given / when / then

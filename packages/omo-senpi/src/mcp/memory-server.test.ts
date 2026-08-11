@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -23,8 +23,14 @@ function body(result: { content?: unknown } | undefined): string {
 }
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  // Windows keeps git's handles open briefly after the child exits, so a bare recursive remove
+  // throws EBUSY and fails the test that already passed. Retry the unlink instead.
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 })
+
+// Each case drives real git subprocesses through a fresh repository; the 5s default is not a
+// budget these operations fit on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 describe("omo-memory MCP server", () => {
   test("#given initialize #then server info and tool capabilities are returned", async () => {

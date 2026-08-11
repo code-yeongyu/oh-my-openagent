@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
+import { installLocalLauncher, uninstallLocalLauncher } from "./local-launcher"
 import {
   dedupePackages,
   isRecord,
@@ -95,6 +96,12 @@ export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Prom
   if (!packages.includes(context.pluginPath)) packages.push(context.pluginPath)
   settings.packages = packages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
+  // The local route runs the user's own engine checkout, so it needs the same launcher the
+  // published package ships; without it this install would boot unbranded.
+  installLocalLauncher({
+    pluginPath: context.pluginPath,
+    senpiCliPath: join(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
+  })
 
   return {
     ok: true,
@@ -115,6 +122,7 @@ export async function runSenpiUninstaller(options: SenpiInstallOptions = {}): Pr
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath)
   settings.packages = nextPackages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
+  uninstallLocalLauncher()
 
   return {
     ok: true,

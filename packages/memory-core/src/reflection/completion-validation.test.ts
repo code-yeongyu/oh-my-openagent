@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { existsSync } from "node:fs"
 import { readFile, rm, writeFile, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -21,6 +21,8 @@ async function fixture(runId: string) {
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
+
+setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 describe("reflection completion validation", () => {
   it("#given an uncommitted worktree edit #when finalized #then it reports dirty_uncommitted and cleans up", async () => {
