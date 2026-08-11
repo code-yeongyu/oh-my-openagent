@@ -3,7 +3,7 @@ import { basename, dirname, join, sep } from "node:path"
 import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
 import { removeCachedManagedNpmBinShims } from "./codex-cache-bins"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
-import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
+import { removeCachedPackageWorkspaces, rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
 import { assertHookCommandTargets } from "./codex-hook-targets"
 import type { InstalledPlugin, RunCommand } from "./types"
@@ -34,13 +34,15 @@ export async function installCachedPlugin(input: {
   try {
     await copyDirectory(input.sourcePath, tempPath)
     const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
+    const removedCachedWorkspaces = input.buildSource === false ? await removeCachedPackageWorkspaces(tempPath) : false
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
-    // Rewriting local file: dependencies desyncs package.json from package-lock.json, and npm ci
-    // aborts with EUSAGE on that drift (lazycodex#137; approach credited to the community fix in
-    // oh-my-openagent#6202). The temp cache dir is throwaway, so let npm install reconcile the lock
-    // when the rewrite changed package.json; keep the deterministic npm ci fast path otherwise.
-    const installArgs = rewroteLocalFileDependencies
+    // Rewriting local file: dependencies or removing source-only workspace metadata desyncs
+    // package.json from package-lock.json, and npm ci aborts with EUSAGE on that drift
+    // (lazycodex#137; approach credited to the community fix in oh-my-openagent#6202). The temp
+    // cache dir is throwaway, so let npm install reconcile the lock when either rewrite occurs;
+    // keep the deterministic npm ci fast path otherwise.
+    const installArgs = rewroteLocalFileDependencies || removedCachedWorkspaces
       ? ["install", "--omit=dev", "--no-audit", "--no-fund"]
       : ["ci", "--omit=dev"]
     await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs)
