@@ -76,7 +76,7 @@ describe("wireSessionStartProcessSweep()", () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
-    const homeDir = mkdtempSync(join(tmpdir(), "omo-senpi-daemon-override-"))
+    const homeDir = mkdtempSync(join(tmpdir(), "omo-omp-daemon-override-"))
     const runtimeDir = join(homeDir, ".omo", "lsp-daemon")
     const overrideCli = join(homeDir, "override-cli.js")
     writeFileSync(overrideCli, "export {}\n")
@@ -227,7 +227,7 @@ describe("wireSessionStartProcessSweep()", () => {
     expect(sweepCalls).toBe(0)
     expect(logger.entries).toContainEqual({
       level: "info",
-      message: "omo-senpi process sweep skipped: running inside a senpi-task RPC child",
+      message: "omo-omp process sweep skipped: running inside a senpi-task RPC child",
     })
   })
 
@@ -264,7 +264,7 @@ describe("wireSessionStartProcessSweep()", () => {
 
     // then
     const failures = logger.entries.filter(
-      (entry) => entry.level === "warn" && entry.message === "omo-senpi process sweep failed",
+      (entry) => entry.level === "warn" && entry.message === "omo-omp process sweep failed",
     )
     expect(failures).toHaveLength(1)
   })
@@ -286,7 +286,7 @@ describe("wireSessionStartProcessSweep()", () => {
 
     // then
     const failures = logger.entries.filter(
-      (entry) => entry.level === "warn" && entry.message.startsWith("omo-senpi process sweep failed"),
+      (entry) => entry.level === "warn" && entry.message.startsWith("omo-omp process sweep failed"),
     )
     expect(failures).toHaveLength(1)
   })

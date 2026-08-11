@@ -7,7 +7,7 @@ import type { ComponentContext, ComponentLogger } from "../../types"
 import { createSessionArming, type SessionArming } from "../ultrawork/index"
 import { createTodoFanoutReminderComponent } from "./index"
 
-const DISABLED_FLAG = "omo-senpi-todo-fanout-reminder-disabled"
+const DISABLED_FLAG = "omo-omp-todo-fanout-reminder-disabled"
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
   const logger: ComponentLogger = {
@@ -66,7 +66,7 @@ async function registerComponent(
   await createTodoFanoutReminderComponent(arming).register(pi, createTestContext(pi))
 }
 
-describe("omo-senpi todo-fanout-reminder component", () => {
+describe("omo-omp todo-fanout-reminder component", () => {
   it("#given an ultrawork-armed session #when the first todo init result arrives #then exactly one system-reminder is appended with the fan-out decision and todo-freshness directives", async () => {
     // given
     const pi = new FakeExtensionAPI()

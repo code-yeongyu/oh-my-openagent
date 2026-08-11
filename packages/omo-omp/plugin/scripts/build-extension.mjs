@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process"
+import { build } from "bun"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { builtinModules } from "node:module"
 import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -11,8 +11,11 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 // The omo-omp adapter source imports ZERO @oh-my-pi/* modules at runtime (the harness
 // hands the extension its live API object as the factory argument), so the only
 // externalized peers are the typebox family the omp host injects.
+// @code-yeongyu/senpi is NOT externalized: it is ALIASED to the local tool shim
+// (src/extension/shims/senpi-tool-shim.ts) so senpi-task's defineTool-based tool
+// builders bundle against a record identity instead of dragging the ~15 MB senpi engine
+// into every omp boot (see the shim file for the contract).
 export const OMP_LOADER_ALIASES = [
-  "@code-yeongyu/senpi",
   "typebox",
   "typebox/compile",
   "typebox/value",
@@ -20,6 +23,8 @@ export const OMP_LOADER_ALIASES = [
   "@sinclair/typebox/compile",
   "@sinclair/typebox/value",
 ]
+
+export const SENPI_TOOL_SHIM = "@code-yeongyu/senpi=./shims/senpi-tool-shim.ts"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = dirname(scriptDir)
@@ -73,18 +78,44 @@ export async function buildExtension(options = {}) {
 
 async function buildEntry(entry, output, buildDefines) {
   await mkdir(dirname(output), { recursive: true })
-  const metafile = `${output}.meta.json`
+  const scratchDir = await mkdtemp(join(dirname(output), ".omo-omp-build-"))
+  const metafile = join(scratchDir, "build.meta.json")
   try {
-    run("bun", [
-      "build", entry, "--target", "node", "--format", "esm", "--outfile", output,
-      "--minify", `--metafile=${metafile}`,
-      ...Object.entries(buildDefines).flatMap(([name, value]) => ["--define", `${name}=${JSON.stringify(value)}`]),
-      ...externalSpecifiers.flatMap((specifier) => ["--external", specifier]),
-    ])
+    // The senpi engine is a different harness's runtime (~15 MB); the omo-omp bundle must never
+    // resolve it. bun 1.3.14's --alias/alias options are unreliable on Windows, so the rewrite
+    // happens in a resolve plugin (the documented bundler extension point).
+    const senpiShimPlugin = {
+      name: "senpi-shim",
+      setup(build) {
+        build.onResolve({ filter: /^@code-yeongyu\/senpi(\/.*)?$/ }, () => ({
+          path: join(packageRoot, "src", "extension", "shims", "senpi-tool-shim.ts"),
+        }))
+      },
+    }
+    const result = await build({
+      entrypoints: [entry],
+      target: "node",
+      format: "esm",
+      minify: true,
+      outdir: scratchDir,
+      metafile: true,
+      plugins: [senpiShimPlugin],
+      define: buildDefines,
+      external: externalSpecifiers,
+    })
+    const builtPath = result.outputs?.find((output) => output.kind === "entry-point")?.path
+    if (typeof builtPath !== "string") throw new Error(`bun build produced no entry-point output for ${entry}`)
+    // bun returns the metafile as an in-memory object (no outdir file); materialize it for the marker
+    // and alongside the artifact (the freshness suite inspects the input list).
+    const actualMetafile = join(scratchDir, "meta.json")
+    const metafileBody = JSON.stringify(result.metafile ?? {})
+    await writeFile(actualMetafile, metafileBody)
+    await rename(builtPath, output)
+    await writeFile(`${output}.meta.json`, metafileBody)
     await normalizeBuiltinImports(output)
-    return await attachBuildMarker(output, entry, metafile, buildDefines)
+    return await attachBuildMarker(output, entry, actualMetafile, buildDefines)
   } finally {
-    await rm(metafile, { force: true })
+    await rm(scratchDir, { recursive: true, force: true })
   }
 }
 
@@ -129,6 +160,7 @@ function run(command, args) {
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
+
 
 async function normalizeBuiltinImports(output) {
   const bundled = await readFile(output, "utf8")
@@ -207,13 +239,28 @@ async function readBuiltEntry(output) {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.includes("--check")) {
-    const result = await checkExtensionCurrent()
+    const outputIndex = process.argv.indexOf("--output")
+    const options = outputIndex >= 0 && typeof process.argv[outputIndex + 1] === "string"
+      ? { outputPath: process.argv[outputIndex + 1] }
+      : {}
+    const result = await checkExtensionCurrent(options)
     if (!result.ok) {
       console.error(`omo-omp extension build is not current: ${result.reason}`)
       console.error(`output=${result.output}`)
       process.exit(1)
     }
     console.log(`omo-omp extension build is current: ${result.output}`)
+  } else if (process.argv.includes("--build-out") && typeof process.argv[process.argv.indexOf("--build-out") + 1] === "string") {
+    // Subprocess build mode (used by the bun-test suite, which intercepts in-process file reads):
+    // emit the three extension bundles into the given directory and print their paths.
+    const root = process.argv[process.argv.indexOf("--build-out") + 1]
+    const outputs = await buildExtension({
+      outputPath: join(root, "omo.js"),
+      memberOutputPath: join(root, "omo-member.js"),
+      memoryMcpOutputPath: join(root, "omo-memory-mcp.js"),
+    })
+    console.log(`omo.js=${outputs.mainInputs.length > 0 ? join(root, "omo.js") : ""}`)
+    console.log(`omo-member.js=${outputs.memberInputs.length > 0 ? join(root, "omo-member.js") : ""}`)
   } else {
     await buildExtension()
     console.log(`Built omo-omp extensions: ${outputPath}`)

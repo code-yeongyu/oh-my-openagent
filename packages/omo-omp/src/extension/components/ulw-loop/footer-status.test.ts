@@ -75,7 +75,7 @@ function visibleFrame(text: string | undefined): string | undefined {
 }
 
 async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(), activeStatus()]) {
-  const root = mkdtempSync(join(tmpdir(), "omo-senpi-footer-"))
+  const root = mkdtempSync(join(tmpdir(), "omo-omp-footer-"))
   const cwd = join(root, "project")
   const sessionDir = join(root, "session")
   const goalDir = join(cwd, ".omo", "goal")
@@ -114,7 +114,7 @@ function writeGoal(path: string, status: "active" | "complete"): void {
   writeFileSync(path, `${JSON.stringify({ version: 1, goal: { status } })}\n`)
 }
 
-describe("omo-senpi ulw-loop footer status", () => {
+describe("omo-omp ulw-loop footer status", () => {
   it("reads the project goal store and publishes all four animation frames", async () => {
     const scenario = await defaultFooterScenario("session-project-store")
     try {
@@ -219,7 +219,7 @@ describe("omo-senpi ulw-loop footer status", () => {
 
     await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo", ui })
     expect(pi.messages).toHaveLength(1)
-    expect(pi.messages[0]?.message["customType"]).toBe("omo-senpi:ulw-continuation")
+    expect(pi.messages[0]?.message["customType"]).toBe("omo-omp:ulw-continuation")
     expect(ui.calls.some((call) => call.key === "ulw-loop" && visibleFrame(call.text) === "⚡ ultraworking")).toBe(true)
 
     const headlessTimers = fakeTimers()

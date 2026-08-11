@@ -17,7 +17,7 @@ describe("createSkillInvocationTracker", () => {
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    await pi.dispatch("tool_result", readResult("/repo/packages/omo-senpi/plugin/skills/ulw-plan/SKILL.md"), CTX_A)
+    await pi.dispatch("tool_result", readResult("/repo/packages/omo-omp/plugin/skills/ulw-plan/SKILL.md"), CTX_A)
 
     // then
     expect(tracker.stateFor("sess-a").hasInvoked("ulw-plan")).toBe(true)

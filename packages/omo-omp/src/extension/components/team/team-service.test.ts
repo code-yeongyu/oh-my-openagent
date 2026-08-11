@@ -32,7 +32,7 @@ afterEach(() => {
 })
 
 async function activeTeamHarness(sessionId?: string) {
-  const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-service-"))
+  const cwd = mkdtempSync(join(tmpdir(), "omo-omp-team-service-"))
   tempRoots.push(cwd)
   const pi = new FakeExtensionAPI()
   const omoConfig = loadOmoConfig({ cwd }).config
@@ -73,7 +73,7 @@ async function activeTeamHarness(sessionId?: string) {
 }
 
 function extensionOrderHarness() {
-  const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-service-extensions-"))
+  const cwd = mkdtempSync(join(tmpdir(), "omo-omp-team-service-extensions-"))
   tempRoots.push(cwd)
   mkdirSync(join(cwd, ".omo"), { recursive: true })
   writeFileSync(join(cwd, ".omo", "omo.json"), `${JSON.stringify({
@@ -129,7 +129,7 @@ function fakeManagedHandle(spec: ManagedStartSpec): ManagedChildHandle {
 describe("createTeamService curated agent gating", () => {
   test("#given a team member spec naming a curated read-only agent #when team_create validates members #then the curated rejection message surfaces", async () => {
     // given the real engine whose agent registry now carries the builtin curated agents
-    const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-curated-"))
+    const cwd = mkdtempSync(join(tmpdir(), "omo-omp-team-curated-"))
     tempRoots.push(cwd)
     const pi = new FakeExtensionAPI()
     const omoConfig = loadOmoConfig({ cwd }).config
@@ -227,7 +227,7 @@ describe("createTeamService lead messaging", () => {
 describe("createTeamService named-team lookup", () => {
   test("#given an unknown team_name with declared teams #when createTeam runs #then the error lists the declared teams", async () => {
     // given
-    const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-named-"))
+    const cwd = mkdtempSync(join(tmpdir(), "omo-omp-team-named-"))
     tempRoots.push(cwd)
     mkdirSync(join(cwd, ".omo"), { recursive: true })
     writeFileSync(join(cwd, ".omo", "omo.json"), `${JSON.stringify({

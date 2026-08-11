@@ -63,7 +63,7 @@ function createFakeSession(sessionId = "child-session-1"): { readonly session: C
 }
 
 function baseSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
-  const sessionDir = mkdtempSync(join(tmpdir(), "omo-senpi-engine-runners-"))
+  const sessionDir = mkdtempSync(join(tmpdir(), "omo-omp-engine-runners-"))
   tempDirs.push(sessionDir)
   return {
     taskId: "task-1",
@@ -114,7 +114,7 @@ describe("task child memory tool exclusion", () => {
 
   test("#given the default runner factories #when the in-process runner is built #then construction succeeds with the ui-only names wired", () => {
     // given
-    const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-engine-runners-factory-"))
+    const cwd = mkdtempSync(join(tmpdir(), "omo-omp-engine-runners-factory-"))
     tempDirs.push(cwd)
 
     // when

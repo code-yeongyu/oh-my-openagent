@@ -56,13 +56,13 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoOmpC
 
       registerTaskFlags(pi)
       if (pi.getFlag(TASK_ENABLED_FLAG) === false) {
-        ctx.logger.info("omo-senpi task component disabled by flag")
+        ctx.logger.info("omo-omp task component disabled by flag")
         return
       }
 
       const missing = missingTaskCapabilities(pi)
       if (missing.length > 0) {
-        ctx.logger.warn("omo-senpi task component skipped: missing ExtensionAPI capabilities", { missing })
+        ctx.logger.warn("omo-omp task component skipped: missing ExtensionAPI capabilities", { missing })
         return
       }
 
@@ -105,7 +105,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoOmpC
       engine.onStoreMutation(() => {
         statusUi.scheduleSync()
         void resumptionChannels.emitIfChanged().catch((error: unknown) => {
-          ctx.logger.warn("omo-senpi task resumption-channel emission failed", {
+          ctx.logger.warn("omo-omp task resumption-channel emission failed", {
             error: error instanceof Error ? error.message : String(error),
           })
         })
@@ -132,12 +132,12 @@ function registerTaskFlags(pi: OmpExtensionAPI): void {
   pi.registerFlag(TASK_ENABLED_FLAG, {
     type: "boolean",
     default: true,
-    description: "Enable the omo-senpi task engine (use --no-omo-task to disable).",
+    description: "Enable the omo-omp task engine (use --no-omo-task to disable).",
   })
   pi.registerFlag(TASK_USAGE_HINT_FLAG, {
     type: "boolean",
     default: true,
-    description: "Inject once-per-session omo-senpi task usage guidance.",
+    description: "Inject once-per-session omo-omp task usage guidance.",
   })
 }
 

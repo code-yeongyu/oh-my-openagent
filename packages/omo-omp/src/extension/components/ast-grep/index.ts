@@ -24,7 +24,7 @@ export function createAstGrepComponent(options: AstGrepComponentOptions = {}): O
     name: AST_GREP_COMPONENT_NAME,
     register(pi: OmpExtensionAPI, ctx: ComponentContext): void {
       if (typeof pi.registerMcpServer !== "function") {
-        ctx.logger.info("omo-senpi ast-grep skipped: senpi ExtensionAPI does not expose registerMcpServer", {
+        ctx.logger.info("omo-omp ast-grep skipped: senpi ExtensionAPI does not expose registerMcpServer", {
           component: AST_GREP_COMPONENT_NAME,
         })
         return
@@ -33,7 +33,7 @@ export function createAstGrepComponent(options: AstGrepComponentOptions = {}): O
       const entry = resolveEntry()
       const entryStat = statSync(entry, { throwIfNoEntry: false })
       if (entryStat === undefined || !entryStat.isFile()) {
-        ctx.logger.warn("omo-senpi ast-grep skipped: staged MCP runtime is missing", {
+        ctx.logger.warn("omo-omp ast-grep skipped: staged MCP runtime is missing", {
           component: AST_GREP_COMPONENT_NAME,
           entry,
         })

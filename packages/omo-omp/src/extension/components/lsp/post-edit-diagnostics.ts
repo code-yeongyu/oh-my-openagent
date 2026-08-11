@@ -10,7 +10,7 @@ export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnostic
 
 const MUTATION_TOOL_NAMES = new Set(["write", "edit", "apply_patch"]);
 const POST_EDIT_DIAGNOSTICS_CONCURRENCY = 4;
-export const POST_EDIT_DIAGNOSTICS_WIDGET_KEY = "omo-senpi-lsp";
+export const POST_EDIT_DIAGNOSTICS_WIDGET_KEY = "omo-omp-lsp";
 
 type WidgetPlacement = "aboveEditor" | "belowEditor";
 type WidgetSetter = (

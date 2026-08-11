@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 async function deletionHarness(sessionId: string) {
-  const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-delete-service-"))
+  const cwd = mkdtempSync(join(tmpdir(), "omo-omp-team-delete-service-"))
   tempRoots.push(cwd)
   const omoConfig = loadOmoConfig({ cwd }).config
   const engine = composeTaskEngine({ pi: new FakeExtensionAPI(), omoConfig, cwd, sharedParentTools: () => [] })

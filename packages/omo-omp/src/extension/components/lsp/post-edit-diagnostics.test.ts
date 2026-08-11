@@ -73,7 +73,7 @@ describe("omo-omp lsp post-edit diagnostics", () => {
       type: "text",
       text: "\n\nLSP errors detected in src/broken.ts, please fix:\nerror[typescript] (2322) at 1:13: broken",
     })
-    expect(widgetCalls).toEqual([{ key: "omo-senpi-lsp", content: undefined, placement: "belowEditor" }])
+    expect(widgetCalls).toEqual([{ key: "omo-omp-lsp", content: undefined, placement: "belowEditor" }])
   })
 
   it("#given many mutated files #when post-edit diagnostics run #then shared orchestration dedupes, bounds concurrency, preserves order, and isolates failures", async () => {

@@ -238,7 +238,7 @@ describe("omo-omp lsp project config trust", () => {
       // then
       expect(logger.warnings).toEqual([
         {
-          message: "omo-senpi ignored project-local LSP commands; move custom commands to the user .pi config",
+          message: "omo-omp ignored project-local LSP commands; move custom commands to the user .pi config",
           details: {
             kind: "untrusted_project_lsp_command",
             serverIds: ["alpha", "beta"],

@@ -88,7 +88,7 @@ export function wireEventBridge(
     const reason = shutdownEvent.reason
     if (parentSessionId === undefined || typeof reason !== "string") {
       ctx.logger.warn(
-        "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
+        "omo-omp task session_shutdown skipped: no captured session id or malformed reason",
         { parentSessionId, reason },
       )
       return
@@ -128,7 +128,7 @@ async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: Even
   try {
     await state.reconcileTeamMailbox()
   } catch (error) {
-    ctx.logger.warn("omo-senpi task session-start team mailbox reclaim failed", {
+    ctx.logger.warn("omo-omp task session-start team mailbox reclaim failed", {
       error: error instanceof Error ? error.message : String(error),
     })
   }
@@ -138,7 +138,7 @@ async function tickLeadPollersBestEffort(ctx: ComponentContext, state: EventBrid
   try {
     await state.leadPollers.tick()
   } catch (error) {
-    ctx.logger.warn("omo-senpi task session-start lead poll failed", {
+    ctx.logger.warn("omo-omp task session-start lead poll failed", {
       error: error instanceof Error ? error.message : String(error),
     })
   }

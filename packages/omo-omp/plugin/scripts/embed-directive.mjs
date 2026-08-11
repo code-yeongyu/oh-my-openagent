@@ -8,7 +8,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "../..")
 const repoRoot = resolve(packageRoot, "../..")
 const sourcePath = resolve(repoRoot, "packages/omo-omp/skills/ultrawork/SKILL.md")
-const targetPath = resolve(packageRoot, "src/components/ultrawork/generated-directive.ts")
+const targetPath = resolve(packageRoot, "src/extension/components/ultrawork/generated-directive.ts")
 
 // The directive is authored omp-native (skills/ultrawork/SKILL.md) and omp HAS
 // goal/todo/task/team tools, so the source speaks them directly. These tokens name

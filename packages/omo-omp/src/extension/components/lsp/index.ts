@@ -22,8 +22,8 @@ import {
 	type ToolResultLike,
 } from "./post-edit-diagnostics.js";
 
-const LSP_TOOLS_ENABLED_FLAG = "omo-senpi-lsp-tools-enabled";
-const LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG = "omo-senpi-lsp-post-edit-diagnostics-enabled";
+const LSP_TOOLS_ENABLED_FLAG = "omo-omp-lsp-tools-enabled";
+const LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG = "omo-omp-lsp-post-edit-diagnostics-enabled";
 
 type WidgetPlacement = "aboveEditor" | "belowEditor";
 
@@ -59,7 +59,7 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoOmpCom
 
 			for (const notice of getConfigNotices()) {
 				ctx.logger.warn(
-					"omo-senpi ignored project-local LSP commands; move custom commands to the user .pi config",
+					"omo-omp ignored project-local LSP commands; move custom commands to the user .pi config",
 					notice,
 				);
 			}
@@ -90,12 +90,12 @@ function registerLspFlags(pi: OmpExtensionAPI): void {
 	pi.registerFlag(LSP_TOOLS_ENABLED_FLAG, {
 		type: "boolean",
 		default: true,
-		description: "Enable omo-senpi LSP tools.",
+		description: "Enable omo-omp LSP tools.",
 	});
 	pi.registerFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG, {
 		type: "boolean",
 		default: true,
-		description: "Enable omo-senpi post-edit LSP diagnostics.",
+		description: "Enable omo-omp post-edit LSP diagnostics.",
 	});
 }
 

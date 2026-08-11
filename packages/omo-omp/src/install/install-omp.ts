@@ -86,7 +86,7 @@ export function resolveInstallContext(options: {
 
 export async function ensurePluginArtifacts(context: InstallOmpContext): Promise<void> {
   if (context.allowBuild) {
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("bun", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })

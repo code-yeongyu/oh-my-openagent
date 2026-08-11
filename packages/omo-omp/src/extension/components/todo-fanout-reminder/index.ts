@@ -2,7 +2,7 @@ import type { ComponentContext, OmoOmpComponent, OmpExtensionAPI } from "../../t
 import { sharedSessionArming, type SessionArming } from "../ultrawork/index"
 import { TODO_FANOUT_REMINDER } from "./reminder"
 
-const DISABLED_FLAG = "omo-senpi-todo-fanout-reminder-disabled"
+const DISABLED_FLAG = "omo-omp-todo-fanout-reminder-disabled"
 const TASK_ADDING_OPS: ReadonlySet<string> = new Set(["init", "append"])
 
 interface TodoResultEvent {
@@ -45,7 +45,7 @@ export function createTodoFanoutReminderComponent(
         if (!arming.isArmed(sessionId)) return undefined
         if (isReminded(sessionId)) return undefined
         markReminded(sessionId)
-        ctx.logger.info("omo-senpi todo-fanout-reminder injected", { sessionId, op: event.op })
+        ctx.logger.info("omo-omp todo-fanout-reminder injected", { sessionId, op: event.op })
         return { content: [...event.content, { type: "text", text: TODO_FANOUT_REMINDER }] }
       })
 

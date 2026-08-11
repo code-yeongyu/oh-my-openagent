@@ -51,7 +51,7 @@ export function wireSessionStartProcessSweep(
 
   pi.on("session_start", () => {
     if (env[SENPI_RPC_CHILD_MARKER_ENV] !== undefined) {
-      ctx.logger.info("omo-senpi process sweep skipped: running inside a senpi-task RPC child")
+      ctx.logger.info("omo-omp process sweep skipped: running inside a senpi-task RPC child")
       return undefined
     }
     runSweepBestEffort(sweep, ctx)
@@ -65,12 +65,12 @@ function runSweepBestEffort(sweep: OmoFamilySweep, ctx: ComponentContext): void 
     void Promise.resolve()
       .then(() => sweep())
       .catch((error: unknown) => {
-        ctx.logger.warn("omo-senpi process sweep failed", {
+        ctx.logger.warn("omo-omp process sweep failed", {
           error: error instanceof Error ? error.message : String(error),
         })
       })
   } catch (error) {
-    ctx.logger.warn("omo-senpi process sweep failed to start", {
+    ctx.logger.warn("omo-omp process sweep failed to start", {
       error: error instanceof Error ? error.message : String(error),
     })
   }

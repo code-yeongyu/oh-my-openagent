@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 function tempProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omo-senpi-engine-routing-"))
+  const dir = mkdtempSync(join(tmpdir(), "omo-omp-engine-routing-"))
   tempRoots.push(dir)
   return dir
 }

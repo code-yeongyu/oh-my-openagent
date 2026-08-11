@@ -25,7 +25,7 @@ import {
   withTempAgentDir,
 } from "./telemetry.test-support"
 
-describe("omo-senpi telemetry payloads", () => {
+describe("omo-omp telemetry payloads", () => {
   it("#given telemetry component and telemetry-core builder #when session_start captures through injected transport #then payload equivalence holds", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
@@ -66,10 +66,10 @@ describe("omo-senpi telemetry payloads", () => {
         defaultHost: DEFAULT_POSTHOG_HOST,
         eventName: SENPI_TELEMETRY_EVENT_NAME,
         machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
-        packageName: "@oh-my-opencode/omo-senpi",
-        platform: "omo-senpi",
+        packageName: "@oh-my-opencode/omo-omp",
+        platform: "omo-omp",
         productEnvPrefix: "OMO_SENPI",
-        productName: "omo-senpi",
+        productName: "omo-omp",
       })
       expect(componentTransport.messages).toEqual(coreTransport.messages)
     })

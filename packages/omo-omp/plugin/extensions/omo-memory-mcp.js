@@ -1,4 +1,4 @@
-// omo-omp-build:8f979a6f0c6cf2287fd629cb13855a983b0d1dca90798444807032fccdd967c3:f389e1e1149d73977585c8322a94025115546782898baa1668f9f34ab297bc6f
+// omo-omp-build:0fd1b81270ae915780fb178e26fe57f10d9c345188f5d7aed0c3f8cadb22aef2:f389e1e1149d73977585c8322a94025115546782898baa1668f9f34ab297bc6f
 #!/usr/bin/env node
 import{resolve as so}from"node:path";import{pathToFileURL as ao}from"node:url";function _(e){return typeof e==="object"&&e!==null&&!Array.isArray(e)}function A(e,t){return{jsonrpc:"2.0",id:e,result:t}}function P(e,t,n,r){return{jsonrpc:"2.0",id:e,error:r===void 0?{code:t,message:n}:{code:t,message:n,data:r}}}function j(e){return typeof e==="string"||typeof e==="number"||e===null?e:null}function ke(e){return e instanceof Error?e.message:String(e)}var Ee=Buffer.from(`\r
 \r

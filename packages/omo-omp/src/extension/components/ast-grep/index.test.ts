@@ -12,7 +12,7 @@ import { createAstGrepComponent } from "./index"
 const tempDirs: string[] = []
 
 async function makeStagedEntry(): Promise<string> {
-  const runtimeDir = await mkdtemp(join(tmpdir(), "omo-senpi-ast-grep-runtime-"))
+  const runtimeDir = await mkdtemp(join(tmpdir(), "omo-omp-ast-grep-runtime-"))
   tempDirs.push(runtimeDir)
   const entry = join(runtimeDir, "cli.js")
   await writeFile(entry, "#!/usr/bin/env node\n", "utf8")
@@ -104,7 +104,7 @@ describe("createAstGrepComponent", () => {
     expect(logger.entries).toEqual([
       {
         level: "warn",
-        message: "omo-senpi ast-grep skipped: staged MCP runtime is missing",
+        message: "omo-omp ast-grep skipped: staged MCP runtime is missing",
         details: { component: "ast-grep", entry: missingEntry },
       },
     ])

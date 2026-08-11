@@ -19,7 +19,7 @@ import {
   withTempAgentDir,
 } from "./telemetry.test-support"
 
-describe("omo-senpi telemetry daily activity", () => {
+describe("omo-omp telemetry daily activity", () => {
   it("#given no daily stamp #when session_start fires #then first session emits daily-active telemetry", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given

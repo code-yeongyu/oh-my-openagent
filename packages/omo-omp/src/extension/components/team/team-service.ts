@@ -78,7 +78,7 @@ function createTaskEventAppender(stateDir: StateDirConfig): (taskId: string, eve
     try {
       store.appendEvent(taskId, event)
     } catch (error) {
-      log("omo-senpi task event append failed", {
+      log("omo-omp task event append failed", {
         taskId,
         eventType: event.type,
         error: error instanceof Error ? error.message : String(error),

@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 function tempProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omo-senpi-engine-agents-"))
+  const dir = mkdtempSync(join(tmpdir(), "omo-omp-engine-agents-"))
   tempRoots.push(dir)
   return dir
 }

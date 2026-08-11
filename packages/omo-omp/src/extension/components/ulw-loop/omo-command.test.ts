@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { toSpawnTarget } from "./omo-command"
 
-describe("omo-senpi ulw-loop omo-command spawn target", () => {
+describe("omo-omp ulw-loop omo-command spawn target", () => {
   it("#given a .cmd bin on win32 #when building the spawn target #then it wraps with cmd.exe /d /s /c", () => {
     const target = toSpawnTarget(
       "C:\\Users\\u\\.local\\bin\\omo.cmd",
@@ -53,7 +53,7 @@ describe("omo-senpi ulw-loop omo-command spawn target", () => {
   })
 })
 
-describe("omo-senpi ulw-loop omo-command .js spawn target", () => {
+describe("omo-omp ulw-loop omo-command .js spawn target", () => {
   it("#given a .js target on win32 #when building the spawn target #then it spawns via process.execPath with the target as argv1", () => {
     const target = toSpawnTarget(
       "C:\\tools\\omo-agent-toolkit.js",

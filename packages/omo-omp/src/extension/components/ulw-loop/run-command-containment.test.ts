@@ -4,7 +4,7 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
 import { createLogger } from "./ulw-loop.test-support"
 
-describe("omo-senpi ulw-loop run-command failure containment", () => {
+describe("omo-omp ulw-loop run-command failure containment", () => {
   it("#given runCommand rejects synchronously with EINVAL #when input dispatches #then the handler resolves continue and never rejects", async () => {
     const einval = Object.assign(new Error("spawn EINVAL"), { code: "EINVAL" })
     const pi = new FakeExtensionAPI()
@@ -25,7 +25,7 @@ describe("omo-senpi ulw-loop run-command failure containment", () => {
     expect(results).toEqual([{ action: "continue" }])
     expect(logger.entries).toContainEqual({
       level: "warn",
-      message: "omo-senpi ulw-loop status ignored",
+      message: "omo-omp ulw-loop status ignored",
       details: { reason: "run-command-failed", error: "spawn EINVAL" },
     })
   })

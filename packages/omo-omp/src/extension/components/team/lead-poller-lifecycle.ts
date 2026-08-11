@@ -157,7 +157,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
 
   const disposeInterval = (deps.scheduleInterval ?? scheduleInterval)(() => {
     void tick().catch((error: unknown) => {
-      deps.logger.warn("omo-senpi lead poller tick failed", {
+      deps.logger.warn("omo-omp lead poller tick failed", {
         error: error instanceof Error ? error.message : String(error),
       })
     })

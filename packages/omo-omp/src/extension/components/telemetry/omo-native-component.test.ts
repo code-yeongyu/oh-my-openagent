@@ -115,7 +115,7 @@ describe("OmO Native telemetry component integration", () => {
         isConfigEnabled: () => true,
         now: FIXED_NOW,
         osProvider: createOsProvider("integration-host"),
-        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        stateDir: join(agentDir, "omo-omp", "omo-native"),
         transportFactory: recorder.factory,
       })
       component.register(pi, { config: pi, logger: createSilentLogger() })
@@ -169,7 +169,7 @@ describe("OmO Native telemetry component integration", () => {
           isConfigEnabled: () => true,
           now: FIXED_NOW,
           osProvider: createOsProvider("disabled-host"),
-          stateDir: join(agentDir, "omo-senpi", "omo-native"),
+          stateDir: join(agentDir, "omo-omp", "omo-native"),
           transportFactory: recorder.factory,
         }),
       ], { logger: createSilentLogger() })(pi)
@@ -190,7 +190,7 @@ describe("OmO Native telemetry component integration", () => {
         isConfigEnabled: () => true,
         now: FIXED_NOW,
         osProvider: createOsProvider("restart-host"),
-        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        stateDir: join(agentDir, "omo-omp", "omo-native"),
         transportFactory: recorder.factory,
       }).register(pi, { config: pi, logger: createSilentLogger() })
 

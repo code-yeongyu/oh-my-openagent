@@ -16,7 +16,7 @@ import { createOmoNativeProductConfig, getOmoNativeStateDir } from "./product-id
 const SOURCE = "omo-native-notice"
 const MARKER_FILE_NAME = "notice-shown"
 const DOCS_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/senpi-telemetry.md"
-const NOTICE = `omo-senpi sends anonymous usage telemetry (no prompts, no paths). Docs: ${DOCS_URL} - opt out: DO_NOT_TRACK=1`
+const NOTICE = `omo-omp sends anonymous usage telemetry (no prompts, no paths). Docs: ${DOCS_URL} - opt out: DO_NOT_TRACK=1`
 const ENV_KEYS = [
   "OMO_SENPI_DISABLE_POSTHOG",
   "OMO_DISABLE_POSTHOG",

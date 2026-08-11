@@ -16,7 +16,7 @@ import {
 import type { ComponentLogger } from "../../types"
 
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
-export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
+export const SENPI_MACHINE_ID_PREFIX = "omo-omp:"
 
 const SENPI_AGENT_DIR_ENV = "SENPI_CODING_AGENT_DIR"
 const SENPI_TELEMETRY_SOURCE = "senpi-extension"
@@ -35,21 +35,21 @@ export type SenpiTelemetryOptions = {
 
 export function createSenpiTelemetryProductConfig(): TelemetryProductConfig {
   return {
-    cacheDirName: "omo-senpi",
+    cacheDirName: "omo-omp",
     defaultApiKey: DEFAULT_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: SENPI_TELEMETRY_EVENT_NAME,
     machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
-    packageName: "@oh-my-opencode/omo-senpi",
+    packageName: "@oh-my-opencode/omo-omp",
     packageVersion: PACKAGE_VERSION,
-    platform: "omo-senpi",
+    platform: "omo-omp",
     productEnvPrefix: "OMO_SENPI",
-    productName: "omo-senpi",
+    productName: "omo-omp",
   }
 }
 
 export function getSenpiTelemetryStateDir(env: TelemetryEnv = process.env): string {
-  return join(getSenpiAgentDir(env), "omo-senpi", "posthog")
+  return join(getSenpiAgentDir(env), "omo-omp", "posthog")
 }
 
 export async function recordSenpiDailyActive(options: SenpiTelemetryOptions = {}): Promise<void> {
@@ -73,7 +73,7 @@ export function createSenpiTelemetryComponent(options: SenpiTelemetryOptions = {
     register(pi, ctx) {
       pi.on("session_start", () => {
         void recordSenpiDailyActive(options).catch((error: unknown) => {
-          logDebug(ctx.logger, "omo-senpi telemetry failed", error)
+          logDebug(ctx.logger, "omo-omp telemetry failed", error)
         })
       })
     },

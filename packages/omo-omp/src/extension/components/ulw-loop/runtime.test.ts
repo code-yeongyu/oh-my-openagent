@@ -16,7 +16,7 @@ import {
   withEnvAsync,
 } from "./ulw-loop.test-support"
 
-describe("omo-senpi ulw-loop runtime", () => {
+describe("omo-omp ulw-loop runtime", () => {
   it("#given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored", () => {
     withEnv({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: "/custom/omo", PATH: "" }, () => {
       expect(__testInternals.resolveOmoBin()).toBe("/custom/omo")
@@ -58,7 +58,7 @@ describe("omo-senpi ulw-loop runtime", () => {
   })
 })
 
-describe("omo-senpi ulw-loop resolveOmoBin toolkit-first chain", () => {
+describe("omo-omp ulw-loop resolveOmoBin toolkit-first chain", () => {
   it("#given only OMO_AGENT_TOOLKIT_BIN is set #when resolving #then it wins and PATH is ignored", () => {
     withEnv({ OMO_AGENT_TOOLKIT_BIN: "/custom/omo-agent-toolkit", OMO_BIN: undefined, PATH: "" }, () => {
       expect(__testInternals.resolveOmoBin()).toBe("/custom/omo-agent-toolkit")
@@ -117,7 +117,7 @@ describe("omo-senpi ulw-loop resolveOmoBin toolkit-first chain", () => {
   })
 })
 
-describe("omo-senpi ulw-loop default registration through the toolkit chain", () => {
+describe("omo-omp ulw-loop default registration through the toolkit chain", () => {
   it("#given a PATH omo-agent-toolkit and no envs #when the component registers with defaults #then the toolkit binary receives the status argv", async () => {
     const fake = createTempOmoBin(activeStatus("DEFAULT-REGISTRATION"), "omo-agent-toolkit")
     try {
@@ -163,7 +163,7 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
         expect(results).toEqual([{ action: "continue" }])
         expect(logger.entries).toContainEqual({
           level: "info",
-          message: "omo-senpi ulw-loop inactive; omo binary not found",
+          message: "omo-omp ulw-loop inactive; omo binary not found",
         })
         expect(existsSync(join(fake.dir, "argv.json"))).toBe(false)
       })

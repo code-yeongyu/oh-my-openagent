@@ -41,18 +41,18 @@ describe("OmO Native product identity", () => {
     const config = createOmoNativeProductConfig()
 
     expect(OMO_NATIVE_POSTHOG_API_KEY).toBe("phc_REPLACE_ME_OMO_NATIVE")
-    expect(config.platform).toBe("omo-senpi")
-    expect(config.machineIdPrefix).toBe("omo-senpi:")
+    expect(config.platform).toBe("omo-omp")
+    expect(config.machineIdPrefix).toBe("omo-omp:")
     expect(config.packageVersion).toBe("5.0.0-beta.5")
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip).toBe(true)
     expect(getTelemetryApiKey({ POSTHOG_API_KEY: "env-project-key" }, config.defaultApiKey)).toBe("env-project-key")
   })
 
-  test("#given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi", () => {
+  test("#given an explicit agent directory #when the native state path is resolved #then it is nested under omo-omp", () => {
     const agentDir = useTemporaryAgentDir()
 
-    expect(getOmoNativeStateDir()).toBe(join(agentDir, "omo-senpi", "omo-native"))
+    expect(getOmoNativeStateDir()).toBe(join(agentDir, "omo-omp", "omo-native"))
   })
 
   test("#given a machine state directory #when session ids are hashed #then the persisted salt is stable and raw ids stay distinct", () => {

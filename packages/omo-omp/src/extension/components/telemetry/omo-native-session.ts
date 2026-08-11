@@ -119,7 +119,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           stateDir: getSenpiTelemetryStateDir(env),
           transportFactory: options.transportFactory,
         }).catch((error: unknown) => {
-          ctx.logger.warn("omo-senpi legacy telemetry failed", error)
+          ctx.logger.warn("omo-omp legacy telemetry failed", error)
         })
       })
 

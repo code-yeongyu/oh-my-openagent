@@ -158,17 +158,17 @@ export function createOmoNativeProductConfig(): TelemetryProductConfig & { reado
     defaultHost: DEFAULT_POSTHOG_HOST,
     disableGeoip: true,
     eventName: "daily_active",
-    machineIdPrefix: "omo-senpi:",
-    packageName: "@oh-my-opencode/omo-senpi",
+    machineIdPrefix: "omo-omp:",
+    packageName: "@oh-my-opencode/omo-omp",
     packageVersion: PACKAGE_VERSION,
-    platform: "omo-senpi",
+    platform: "omo-omp",
     productEnvPrefix: "OMO_SENPI",
     productName: "omo-native",
   }
 }
 
 export function getOmoNativeStateDir(env: TelemetryEnv = process.env): string {
-  return join(resolveAgentHome({ env }), "omo-senpi", "omo-native")
+  return join(resolveAgentHome({ env }), "omo-omp", "omo-native")
 }
 
 export function getBuiltinSkillsRoot(): string {

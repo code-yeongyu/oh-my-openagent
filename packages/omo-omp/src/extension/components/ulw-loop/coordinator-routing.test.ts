@@ -8,7 +8,7 @@ import { IdleInjectionCoordinator } from "../../idle-injection-coordinator"
 import { createUlwLoopComponent } from "./index"
 import { activeStatus, createLogger } from "./ulw-loop.test-support"
 
-describe("omo-senpi ulw-loop continuation routing through the idle coordinator", () => {
+describe("omo-omp ulw-loop continuation routing through the idle coordinator", () => {
   it("#given a coordinator in ctx #when a continuation fires #then it routes through the coordinator, not a direct user message", async () => {
     // given
     const pi = new FakeExtensionAPI()

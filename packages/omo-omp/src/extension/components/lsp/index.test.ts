@@ -114,7 +114,7 @@ describe("omo-omp lsp component", () => {
   it("#given renamed omo-omp lsp flags #when diagnostics are disabled #then no LSP tools register", () => {
     // given
     const test = setup()
-    test.pi.setFlag("omo-senpi-lsp-tools-enabled", false)
+    test.pi.setFlag("omo-omp-lsp-tools-enabled", false)
 
     // when
     createLspComponent().register(test.pi, test.ctx)
@@ -122,8 +122,8 @@ describe("omo-omp lsp component", () => {
     // then
     expect(toolNames(test.pi)).toEqual([])
     expect(test.pi.flags.map((flag) => flag.name).sort()).toEqual([
-      "omo-senpi-lsp-post-edit-diagnostics-enabled",
-      "omo-senpi-lsp-tools-enabled",
+      "omo-omp-lsp-post-edit-diagnostics-enabled",
+      "omo-omp-lsp-tools-enabled",
     ])
   })
 

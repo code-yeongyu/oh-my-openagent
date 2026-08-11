@@ -94,7 +94,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
         const fresh = baseStore.load(record.task_id) ?? record
         return (fresh.notification.liveness_notified_epoch ?? -1) >= record.notification.run_epoch
       } catch (error) {
-        log("omo-senpi team liveness marker read failed", {
+        log("omo-omp team liveness marker read failed", {
           taskId: record.task_id,
           error: error instanceof Error ? error.message : String(error),
         })
@@ -113,14 +113,14 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
           }
         })
       } catch (error) {
-        log("omo-senpi team liveness marker write failed", {
+        log("omo-omp team liveness marker write failed", {
           taskId: record.task_id,
           error: error instanceof Error ? error.message : String(error),
         })
       }
     },
     onError: (error) => {
-      log("omo-senpi team liveness delivery failed", {
+      log("omo-omp team liveness delivery failed", {
         error: error instanceof Error ? error.message : String(error),
       })
     },
@@ -131,7 +131,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     runtime,
     notifier: memberLiveness,
     onError: (error, record) => {
-      log("omo-senpi team liveness ownership check failed", {
+      log("omo-omp team liveness ownership check failed", {
         taskId: record.task_id,
         error: error instanceof Error ? error.message : String(error),
       })
@@ -152,7 +152,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     try {
       baseStore.appendEvent(taskId, event)
     } catch (error) {
-      log("omo-senpi task event append failed", {
+      log("omo-omp task event append failed", {
         taskId,
         eventType: event.type,
         error: error instanceof Error ? error.message : String(error),

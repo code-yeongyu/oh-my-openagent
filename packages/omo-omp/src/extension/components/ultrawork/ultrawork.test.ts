@@ -404,7 +404,7 @@ describe("omo-omp ultrawork component", () => {
   it.skip("#given synced omo-omp skill artifact #when description is read #then documents hidden injection instead of inviting a re-read", () => {
     // given: the omo-omp plugin pipeline (skill sync + embed-directive) is parallel work; the
     // senpi skill artifact this test read lives in another package and must not be read from here.
-    const skillPath = resolve("packages/omo-senpi/plugin/skills/ultrawork/SKILL.md")
+    const skillPath = resolve("packages/omo-omp/plugin/skills/ultrawork/SKILL.md")
     const skillContent = readFileSync(skillPath, "utf8")
     const description = skillContent.match(/^description: (.*)$/m)?.[1] ?? ""
 
@@ -445,7 +445,7 @@ describe("omo-omp ultrawork component", () => {
   it.skip("#given generated directive #when embed script runs check #then passes without drift", () => {
     // given: the omo-omp plugin pipeline has no embed-directive.mjs yet (parallel work); the senpi
     // build script this test invoked is not part of the omo-omp package.
-    const command = ["node", "packages/omo-senpi/plugin/scripts/embed-directive.mjs", "--check"]
+    const command = ["node", "packages/omo-omp/plugin/scripts/embed-directive.mjs", "--check"]
 
     // when
     const result = Bun.spawnSync({
@@ -467,7 +467,7 @@ describe("omo-omp ultrawork component", () => {
     try {
       // when
       const result = Bun.spawnSync({
-        cmd: ["node", "packages/omo-senpi/plugin/scripts/embed-directive.mjs", "--check"],
+        cmd: ["node", "packages/omo-omp/plugin/scripts/embed-directive.mjs", "--check"],
         stdout: "pipe",
         stderr: "pipe",
       })

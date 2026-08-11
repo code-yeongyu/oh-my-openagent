@@ -56,7 +56,7 @@ afterEach(() => {
 })
 
 function tempProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omo-senpi-task-"))
+  const dir = mkdtempSync(join(tmpdir(), "omo-omp-task-"))
   tempRoots.push(dir)
   return dir
 }
@@ -166,7 +166,7 @@ function toolNames(pi: FakeExtensionAPI): string[] {
     .sort()
 }
 
-describe("omo-senpi task component wiring", () => {
+describe("omo-omp task component wiring", () => {
   it("#given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired", () => {
     // given
     const pi = new FakeExtensionAPI()
@@ -238,7 +238,7 @@ describe("omo-senpi task component wiring", () => {
     expect(pi.tools).toEqual([])
     expect(pi.handlers.map((handler) => handler.event)).toEqual(["session_start"])
     expect(pi.messageRenderers).toEqual([])
-    expect(logger.entries).toContainEqual({ level: "info", message: "omo-senpi task component disabled by flag" })
+    expect(logger.entries).toContainEqual({ level: "info", message: "omo-omp task component disabled by flag" })
   })
 
   it("#given a malformed omo.json #when the component registers #then it boots with defaults and still wires the tools", () => {

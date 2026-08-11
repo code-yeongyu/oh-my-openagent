@@ -6,11 +6,11 @@ import { resolveOmoBin, runOmoCommand } from "./omo-command"
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
 const CONTINUATION_LIMIT = 8
 const STEERING_REMINDER = [
-  "<omo-senpi-ulw-loop>",
+  "<omo-omp-ulw-loop>",
   "An active omo-agent-toolkit ulw-loop run is present in this working directory.",
   "Before continuing, inspect `omo-agent-toolkit ulw-loop status --json` and use the existing .omo/ulw-loop ledger as the source of truth.",
   "Continue the current ulw-loop story with evidence-bound execution; do not start unrelated work until the active run is complete or checkpointed.",
-  "</omo-senpi-ulw-loop>",
+  "</omo-omp-ulw-loop>",
 ].join("\n")
 const CONTINUATION_PROMPT = [
   "Continue the active omo-agent-toolkit ulw-loop run.",
@@ -43,7 +43,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
     register(pi: OmpExtensionAPI, ctx: ComponentContext): void {
       const omoBin = (options.resolveOmoBin ?? resolveOmoBin)()
       if (omoBin === null) {
-        ctx.logger.info("omo-senpi ulw-loop inactive; omo binary not found")
+        ctx.logger.info("omo-omp ulw-loop inactive; omo binary not found")
         pi.on("input", () => ({ action: "continue" }))
         pi.on("agent_end", () => undefined)
         return
@@ -80,7 +80,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
       pi.on("agent_end", async (_payload, eventCtx) => {
         if (state.consecutiveContinuations >= CONTINUATION_LIMIT) {
-          ctx.logger.info("omo-senpi ulw-loop continuation skipped", {
+          ctx.logger.info("omo-omp ulw-loop continuation skipped", {
             reason: "continuation-cap-reached",
             count: state.consecutiveContinuations,
           })
@@ -90,7 +90,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         const cwd = cwdFromContext(eventCtx)
         const sessionId = extractSessionId(eventCtx)
         if (sessionId && findContinuableBoulderWork(cwd, sessionId) !== null) {
-          ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "boulder-continuation-active" })
+          ctx.logger.info("omo-omp ulw-loop continuation skipped", { reason: "boulder-continuation-active" })
           return
         }
 
@@ -101,11 +101,11 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         }
         if (!status.active) {
           state.previousStatusRaw = undefined
-          ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "inactive" })
+          ctx.logger.info("omo-omp ulw-loop continuation skipped", { reason: "inactive" })
           return
         }
         if (state.previousStatusRaw === status.raw) {
-          ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "stale-status" })
+          ctx.logger.info("omo-omp ulw-loop continuation skipped", { reason: "stale-status" })
           return
         }
 
@@ -126,7 +126,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
   }
 }
 
-const ULW_CONTINUATION_INJECTION_KEY = "omo-senpi-ulw-loop-continuation"
+const ULW_CONTINUATION_INJECTION_KEY = "omo-omp-ulw-loop-continuation"
 
 // Route the continuation through the idle-injection coordinator when the composition provides one, so
 // a task completion and this continuation on the same idle edge collapse to a single wake. The
@@ -138,7 +138,7 @@ function deliverContinuation(pi: OmpExtensionAPI, ctx: ComponentContext): void {
     ctx.idleCoordinator.enqueue({
       key: ULW_CONTINUATION_INJECTION_KEY,
       source: "ulw-continuation",
-      customType: "omo-senpi:ulw-continuation",
+      customType: "omo-omp:ulw-continuation",
       content: CONTINUATION_PROMPT,
       display: false,
     })
@@ -147,7 +147,7 @@ function deliverContinuation(pi: OmpExtensionAPI, ctx: ComponentContext): void {
   }
   pi.sendMessage(
     {
-      customType: "omo-senpi:ulw-continuation",
+      customType: "omo-omp:ulw-continuation",
       content: CONTINUATION_PROMPT,
       display: false,
     },
@@ -165,14 +165,14 @@ async function readActiveStatus(
   try {
     result = await runCommand(omoBin, STATUS_ARGS, { cwd })
   } catch (error) {
-    ctx.logger.warn("omo-senpi ulw-loop status ignored", {
+    ctx.logger.warn("omo-omp ulw-loop status ignored", {
       reason: "run-command-failed",
       error: error instanceof Error ? error.message : String(error),
     })
     return null
   }
   if (result.code !== 0) {
-    ctx.logger.warn("omo-senpi ulw-loop status ignored", { reason: "non-zero-exit", code: result.code })
+    ctx.logger.warn("omo-omp ulw-loop status ignored", { reason: "non-zero-exit", code: result.code })
     return { raw: result.stdout, active: false }
   }
 
@@ -180,7 +180,7 @@ async function readActiveStatus(
   try {
     parsed = JSON.parse(result.stdout)
   } catch {
-    ctx.logger.warn("omo-senpi ulw-loop status ignored", { reason: "malformed-json" })
+    ctx.logger.warn("omo-omp ulw-loop status ignored", { reason: "malformed-json" })
     return { raw: result.stdout, active: false }
   }
 

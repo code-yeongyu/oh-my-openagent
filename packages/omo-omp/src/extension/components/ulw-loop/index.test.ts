@@ -12,7 +12,7 @@ import {
   registerWithRunner,
 } from "./ulw-loop.test-support"
 
-describe("omo-senpi ulw-loop continuation", () => {
+describe("omo-omp ulw-loop continuation", () => {
   it("#given no omo binary #when input and agent_end fire #then the component stays inert for the session", async () => {
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
@@ -29,7 +29,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     expect(logger.entries).toEqual([
       {
         level: "info",
-        message: "omo-senpi ulw-loop inactive; omo binary not found",
+        message: "omo-omp ulw-loop inactive; omo binary not found",
       },
     ])
   })
@@ -49,7 +49,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     const transformed = results[0]
     if (!isTransformResult(transformed)) throw new Error("expected transform result")
     expect(transformed.text).toContain("continue")
-    expect(transformed.text).toContain("<omo-senpi-ulw-loop>")
+    expect(transformed.text).toContain("<omo-omp-ulw-loop>")
     expect(transformed.text).toContain("omo-agent-toolkit ulw-loop status --json")
   })
 
@@ -74,7 +74,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     expect(pi.messages).toEqual([
       {
         message: {
-          customType: "omo-senpi:ulw-continuation",
+          customType: "omo-omp:ulw-continuation",
           content: expect.stringContaining("Continue the active omo-agent-toolkit ulw-loop run"),
           display: false,
         },
@@ -94,7 +94,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     expect(pi.messages.every((call) => call.options?.deliverAs === "followUp")).toBe(true)
     expect(logger.entries).toContainEqual({
       level: "info",
-      message: "omo-senpi ulw-loop continuation skipped",
+      message: "omo-omp ulw-loop continuation skipped",
       details: { reason: "continuation-cap-reached", count: 8 },
     })
   })
@@ -134,7 +134,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     expect(pi.messages).toHaveLength(1)
     expect(logger.entries).toContainEqual({
       level: "info",
-      message: "omo-senpi ulw-loop continuation skipped",
+      message: "omo-omp ulw-loop continuation skipped",
       details: { reason: "stale-status" },
     })
   })
@@ -152,7 +152,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     expect(pi.userMessages).toEqual([])
     expect(logger.entries).toContainEqual({
       level: "warn",
-      message: "omo-senpi ulw-loop status ignored",
+      message: "omo-omp ulw-loop status ignored",
       details: { reason: "malformed-json" },
     })
   })

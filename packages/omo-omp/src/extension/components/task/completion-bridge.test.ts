@@ -19,7 +19,7 @@ import { createCompletionObservingStore } from "./completion-bridge"
 const projects: string[] = []
 
 function tempProject(): string {
-  const project = mkdtempSync(join(tmpdir(), "omo-senpi-completion-bridge-"))
+  const project = mkdtempSync(join(tmpdir(), "omo-omp-completion-bridge-"))
   projects.push(project)
   return project
 }
