@@ -11,7 +11,7 @@ import {
 } from "./comment-checker.test-support"
 import { COMMENT_CHECKER_FEEDBACK_HEADER } from "./index"
 
-describe("omo-senpi comment-checker feedback", () => {
+describe("omo-omp comment-checker feedback", () => {
   it("#given checker violation #when edit completes #then feedback includes the header and offending file", async () => {
     // given
     const cwd = createTempCwd()
@@ -68,7 +68,7 @@ describe("omo-senpi comment-checker feedback", () => {
     expect(logger.entries).toEqual([
       {
         level: "warn",
-        message: "omo-senpi comment-checker binary unavailable; component disabled for this session",
+        message: "omo-omp comment-checker binary unavailable; component disabled for this session",
       },
     ])
   })

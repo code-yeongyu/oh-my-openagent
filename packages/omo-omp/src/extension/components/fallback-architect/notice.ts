@@ -1,4 +1,4 @@
-import type { MessageRenderer } from "@code-yeongyu/senpi"
+import type { OmpMessageRenderer } from "./renderer-types"
 import { linesComponent } from "@oh-my-opencode/senpi-task"
 
 /**
@@ -45,7 +45,7 @@ export function buildFallbackArchitectNotice(input: FallbackArchitectNoticeDetai
   ].join("\n")
 }
 
-export const renderFallbackArchitectNotice: MessageRenderer<FallbackArchitectNoticeDetails> = (message) => {
+export const renderFallbackArchitectNotice: OmpMessageRenderer<FallbackArchitectNoticeDetails> = (message) => {
   const details = message.details
   if (details === undefined) return linesComponent(["(model fallback upgrade notice)"])
   const from = friendlyModelName(details.from)

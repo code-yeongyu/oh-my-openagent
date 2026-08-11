@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -25,9 +26,10 @@ function makeFakePlugin(repoRoot: string): string {
   }
   const runtimeDir = join(pluginPath, "runtime", "ast-grep-mcp")
   mkdirSync(runtimeDir, { recursive: true })
-  writeFileSync(join(runtimeDir, "cli.js"), "#!/usr/bin/env node\n// stub runtime")
+  const runtimeBody = "#!/usr/bin/env node\n// stub runtime"
+  writeFileSync(join(runtimeDir, "cli.js"), runtimeBody)
   writeFileSync(join(runtimeDir, "manifest.json"), JSON.stringify({
-    sha256: "dummy".repeat(16),
+    sha256: createHash("sha256").update(runtimeBody).digest("hex"),
     mode: 0o755,
     stagedAtUtc: "2026-08-11T00:00:00.000Z",
   }))
@@ -39,7 +41,7 @@ function makeContext(overrides: Record<string, unknown> = {}): ReturnType<typeof
 } {
   const repoRoot = overrides.repoRoot as string
   const recorded: Array<{ command: string; args: readonly string[] }> = []
-  return resolveInstallContext({
+  const context = resolveInstallContext({
     repoRoot,
     pluginPath: join(repoRoot, "packages", "omo-omp", "plugin"),
     agentDir: join(repoRoot, "agent"),
@@ -47,7 +49,10 @@ function makeContext(overrides: Record<string, unknown> = {}): ReturnType<typeof
     runCommand: async (command, args) => {
       recorded.push({ command, args })
     },
-  }) as ReturnType<typeof resolveInstallContext> & { recorded: Array<{ command: string; args: readonly string[] }> }
+  })
+  return Object.assign(context, { recorded }) as ReturnType<typeof resolveInstallContext> & {
+    recorded: Array<{ command: string; args: readonly string[] }>
+  }
 }
 
 async function withFakeRepo(fn: (repoRoot: string) => Promise<void>): Promise<void> {
@@ -82,7 +87,7 @@ describe("omo-omp installer", () => {
         agentDir: context.agentDir,
         ompBin: "omp",
         runCommand: context.runCommand,
-        platform: "linux",
+        platform: "win32",
       })
       expect(result.ok).toBe(true)
       expect(result.registration).toBe("omp-cli")
@@ -100,14 +105,14 @@ describe("omo-omp installer", () => {
         agentDir: context.agentDir,
         ompBin: "__no_such_omp_bin__",
         runCommand: context.runCommand,
-        platform: "linux",
+        platform: "win32",
       })
       expect(result.ok).toBe(true)
       expect(result.registration).toBe("config-yml")
       const configPath = join(context.agentDir, "config.yml")
       const config = await readFile(configPath, "utf8")
       expect(config).toContain("extensions:")
-      expect(config).toContain(context.pluginPath)
+      expect(config).toContain(context.pluginPath.replaceAll("\\", "/"))
     })
   })
 
@@ -125,7 +130,7 @@ describe("omo-omp installer", () => {
         agentDir: context.agentDir,
         ompBin: "__no_such_omp_bin__",
         runCommand: context.runCommand,
-        platform: "linux",
+        platform: "win32",
       })
       expect(result.ok).toBe(true)
       const config = await readFile(configPath, "utf8")
@@ -143,7 +148,7 @@ describe("omo-omp installer", () => {
         agentDir: context.agentDir,
         ompBin: "omp",
         runCommand: context.runCommand,
-        platform: "linux",
+        platform: "win32",
         allowBuild: false,
       })
       expect(result.ok).toBe(false)
@@ -166,7 +171,7 @@ describe("omo-omp installer", () => {
         agentDir: context.agentDir,
         ompBin: "omp",
         runCommand: context.runCommand,
-        platform: "linux",
+        platform: "win32",
         allowBuild: false,
       })
       expect(result.ok).toBe(false)

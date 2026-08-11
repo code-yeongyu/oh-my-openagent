@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext } from "../../extension/types"
+import type { ComponentContext } from "../../types"
 import { createStartWorkContinuationComponent } from "./index"
 
 const roots: string[] = []

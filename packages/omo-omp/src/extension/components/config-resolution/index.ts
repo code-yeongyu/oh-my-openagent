@@ -31,3 +31,8 @@ export function loadOmpOmoConfig(options: LoadOmoConfigOptions = {}): OmpOmoConf
     diagnostics: [...loaded.diagnostics, ...resolvedModels.diagnostics],
   }
 }
+
+// Verbatim ports of sibling components (e.g. fallback-architect) still import the senpi-spelled
+// names; alias them so both spellings resolve to the same OMP loader.
+export const loadSenpiOmoConfig = loadOmpOmoConfig
+export type SenpiOmoConfigResult = OmpOmoConfigResult

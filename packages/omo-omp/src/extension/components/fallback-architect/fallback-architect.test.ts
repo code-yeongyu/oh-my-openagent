@@ -3,7 +3,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext, ComponentLogger } from "../../extension/types"
+import type { ComponentContext, ComponentLogger } from "../../types"
 import { FALLBACK_ARCHITECT_DIRECTIVE_TYPE, FALLBACK_ARCHITECT_REMINDER_TYPE } from "./directive"
 import { createFallbackArchitectComponent } from "./index"
 import { FALLBACK_ARCHITECT_NOTICE_TYPE } from "./notice"
@@ -11,7 +11,7 @@ import { FALLBACK_ARCHITECT_NOTICE_TYPE } from "./notice"
 const FABLE = { provider: "anthropic", id: "claude-fable-5" }
 const OPUS = { provider: "anthropic", id: "claude-opus-5" }
 const KIMI = { provider: "kimi-coding", id: "kimi-k3-unlocked" }
-const DISABLED_FLAG = "omo-senpi-fallback-architect-disabled"
+const DISABLED_FLAG = "omo-omp-fallback-architect-disabled"
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
   const logger: ComponentLogger = { info() {}, warn() {}, error() {} }

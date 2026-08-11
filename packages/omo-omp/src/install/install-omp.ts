@@ -55,11 +55,17 @@ export function resolveInstallContext(options: {
   runCommand?: InstallOmpContext["runCommand"]
 }): InstallOmpContext {
   const env = options.env ?? process.env
-  const allowBuild = options.pluginPath === undefined
-  const repoRoot = resolve(
-    options.repoRoot
-      ?? (allowBuild ? findRepoRoot(dirname(fileURLToPath(import.meta.url))) : dirname(dirname(resolve(options.pluginPath)))),
-  )
+  const allowBuild = options.allowBuild ?? options.pluginPath === undefined
+  const explicitRepoRoot = options.repoRoot
+  const explicitPluginPath = options.pluginPath
+  let repoRoot: string
+  if (explicitRepoRoot !== undefined) {
+    repoRoot = resolve(explicitRepoRoot)
+  } else if (explicitPluginPath !== undefined) {
+    repoRoot = dirname(dirname(resolve(explicitPluginPath)))
+  } else {
+    repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
+  }
   const agentDir = resolve(options.agentDir ?? env.OMP_CODING_AGENT_DIR ?? join(homedir(), ".omp", "agent"))
   const pluginPath = resolve(options.pluginPath ?? join(repoRoot, "packages", "omo-omp", "plugin"))
   return {
@@ -111,6 +117,7 @@ export async function runOmpInstaller(options: {
   pluginPath?: string
   ompBin?: string
   platform?: NodeJS.Platform
+  allowBuild?: boolean
   runCommand?: InstallOmpContext["runCommand"]
 } = {}): Promise<InstallOmpResult> {
   const context = resolveInstallContext(options)
@@ -145,6 +152,7 @@ export async function runOmpUninstaller(options: {
   pluginPath?: string
   ompBin?: string
   platform?: NodeJS.Platform
+  allowBuild?: boolean
   runCommand?: InstallOmpContext["runCommand"]
 } = {}): Promise<InstallOmpResult> {
   const context = resolveInstallContext(options)

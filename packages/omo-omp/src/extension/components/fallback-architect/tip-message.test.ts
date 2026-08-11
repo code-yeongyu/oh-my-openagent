@@ -7,7 +7,7 @@ import {
   FALLBACK_ARCHITECT_TIP_TYPE,
   renderFallbackTip,
 } from "./tip-message"
-import { Theme } from "../../senpi-test-runtime"
+import { Theme } from "./test-theme"
 
 const ANSI_ESCAPE_PATTERN = /\[/
 

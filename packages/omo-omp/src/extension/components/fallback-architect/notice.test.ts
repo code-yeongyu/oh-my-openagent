@@ -3,7 +3,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext, ComponentLogger } from "../../extension/types"
+import type { ComponentContext, ComponentLogger } from "../../types"
 import { createFallbackArchitectComponent } from "./index"
 import { friendlyModelName } from "./notice"
 

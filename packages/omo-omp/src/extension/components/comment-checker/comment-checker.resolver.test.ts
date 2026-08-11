@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test"
 import { join } from "node:path"
 
 import { createTempCwd } from "./comment-checker.test-support"
-import { resolveSenpiCommentCheckerBinary } from "./index"
+import { resolveOmpCommentCheckerBinary } from "./index"
 
-describe("omo-senpi comment-checker binary resolver", () => {
+describe("omo-omp comment-checker binary resolver", () => {
   it("#given OMO_COMMENT_CHECKER_BIN and other candidates #when resolving binary #then env var wins first", () => {
     // given
     const cwd = createTempCwd()
@@ -16,7 +16,7 @@ describe("omo-senpi comment-checker binary resolver", () => {
     let pathCalls = 0
 
     // when
-    const resolved = resolveSenpiCommentCheckerBinary({
+    const resolved = resolveOmpCommentCheckerBinary({
       env: { OMO_COMMENT_CHECKER_BIN: envBinary },
       existsSync: (path: string) => path === envBinary || path === packageBinary || path === pathBinary,
       importMetaUrl: import.meta.url,
@@ -44,7 +44,7 @@ describe("omo-senpi comment-checker binary resolver", () => {
     let pathCalls = 0
 
     // when
-    const resolved = resolveSenpiCommentCheckerBinary({
+    const resolved = resolveOmpCommentCheckerBinary({
       env: {},
       existsSync: (path: string) => path === packageBinary || path === pathBinary,
       importMetaUrl: import.meta.url,
@@ -70,7 +70,7 @@ describe("omo-senpi comment-checker binary resolver", () => {
     const resolutionOrder: string[] = []
 
     // when
-    const resolved = resolveSenpiCommentCheckerBinary({
+    const resolved = resolveOmpCommentCheckerBinary({
       env: {},
       existsSync: () => false,
       importMetaUrl: import.meta.url,

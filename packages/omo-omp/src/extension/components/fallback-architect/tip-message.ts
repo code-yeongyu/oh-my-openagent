@@ -6,7 +6,7 @@
  * it as a dim `Tip:`-styled block so it reads as product chrome instead of conversation.
  */
 
-import type { MessageRenderer } from "@code-yeongyu/senpi"
+import type { OmpMessageRenderer } from "./renderer-types"
 import { linesComponent, normalizeRendererText } from "@oh-my-opencode/senpi-task"
 
 export const FALLBACK_ARCHITECT_TIP_TYPE = "omo-fallback-architect:tip"
@@ -19,7 +19,7 @@ export function buildFallbackTipText(input: { from: string; to: string }): strin
   ].join("\n")
 }
 
-export const renderFallbackTip: MessageRenderer = (message, _options, theme) => {
+export const renderFallbackTip: OmpMessageRenderer = (message, _options, theme) => {
   const text = typeof message.content === "string" ? message.content : ""
   const lines = text
     .split("\n")

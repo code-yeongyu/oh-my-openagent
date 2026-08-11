@@ -1,4 +1,4 @@
-import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import { createToolkitPathProvisioning } from "./toolkit-path-provisioning"
 import type { ComponentContext, ComponentLogger, OmoOmpComponent, OmpExtensionAPI } from "./types"

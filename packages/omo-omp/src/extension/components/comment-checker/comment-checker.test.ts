@@ -10,9 +10,9 @@ import {
   createToolResultEvent,
   registerWithFakeRunner,
 } from "./comment-checker.test-support"
-import { resolveSenpiCommentCheckerBinary } from "./index"
+import { resolveOmpCommentCheckerBinary } from "./index"
 
-describe("omo-senpi comment-checker component", () => {
+describe("omo-omp comment-checker component", () => {
   it("#given built Senpi runs under Node #when inspecting runtime sources #then comment-checker has no Bun global dependency", () => {
     // given
     const runnerSource = readFileSync(new URL("./runner.ts", import.meta.url), "utf8")
@@ -30,7 +30,7 @@ describe("omo-senpi comment-checker component", () => {
     let pathCalls = 0
     const { pi, calls } = await registerWithFakeRunner({
       resolveBinary: () =>
-        resolveSenpiCommentCheckerBinary({
+        resolveOmpCommentCheckerBinary({
           env: {},
           existsSync: () => false,
           importMetaUrl: import.meta.url,
@@ -57,7 +57,7 @@ describe("omo-senpi comment-checker component", () => {
     expect(logger.entries).toEqual([
       {
         level: "warn",
-        message: "omo-senpi comment-checker binary unavailable; component disabled for this session",
+        message: "omo-omp comment-checker binary unavailable; component disabled for this session",
       },
     ])
   })

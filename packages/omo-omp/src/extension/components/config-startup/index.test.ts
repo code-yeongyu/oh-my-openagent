@@ -10,7 +10,7 @@ import { createLegacyConfigMigrationPlans } from "@oh-my-opencode/omo-opencode/c
 import { parse } from "jsonc-parser"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext } from "../../extension/types"
+import type { ComponentContext } from "../../types"
 import type { OmpOmoConfigResult } from "../config-resolution"
 import { createConfigStartupComponent, runOmpStartupMigration, type OmpStartupMigrationResult } from "./index"
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { IdleInjectionCoordinator } from "../../../extension/idle-injection-coordinator"
-import type { ComponentContext } from "../../extension/types"
+import type { ComponentContext } from "../../types"
 import { createStartWorkContinuationComponent } from "./index"
 
 const cleanupRoots: string[] = []

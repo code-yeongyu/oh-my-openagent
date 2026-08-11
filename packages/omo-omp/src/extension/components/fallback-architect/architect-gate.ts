@@ -1,6 +1,6 @@
 import { resolveAvailableCategoryNames, type SenpiModelPort, type SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
-import { loadSenpiOmoConfig } from "../config-resolution"
+import { loadOmpOmoConfig } from "../config-resolution"
 
 export type GateRegistry = SenpiModelRegistryPort<SenpiModelPort>
 
@@ -27,7 +27,7 @@ export interface ArchitectGateOptions {
 export function hasActiveArchitectCategory(cwd: string, options: ArchitectGateOptions = {}): boolean {
   try {
     const loadOptions = options.env === undefined ? { cwd } : { cwd, env: options.env }
-    const { config } = loadSenpiOmoConfig(loadOptions)
+    const { config } = loadOmpOmoConfig(loadOptions)
     const architect = config.categories?.["architect"]
     if (architect !== undefined) return architect.disable !== true
     if (options.registry === undefined) return false

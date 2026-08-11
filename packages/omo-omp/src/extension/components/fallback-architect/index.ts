@@ -1,4 +1,4 @@
-import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, OmoOmpComponent, OmpExtensionAPI } from "../../types"
 import { hasActiveArchitectCategory, type GateRegistry } from "./architect-gate"
 import {
   formatModelSelector,
@@ -19,7 +19,7 @@ import {
   renderFallbackArchitectNotice,
 } from "./notice"
 
-const FALLBACK_ARCHITECT_DISABLED_FLAG = "omo-senpi-fallback-architect-disabled"
+const FALLBACK_ARCHITECT_DISABLED_FLAG = "omo-omp-fallback-architect-disabled"
 
 type FallbackArchitectInputResult = { action: "continue" }
 
@@ -40,13 +40,13 @@ interface FallbackArchitectState {
 
 export function createFallbackArchitectComponent(
   options: FallbackArchitectComponentOptions = {},
-): OmoSenpiComponent {
+): OmoOmpComponent {
   const hasArchitectCategory =
     options.hasArchitectCategory ?? ((cwd: string, registry?: GateRegistry) => hasActiveArchitectCategory(cwd, { registry }))
 
   return {
     name: "fallback-architect",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    register(pi: OmpExtensionAPI, ctx: ComponentContext): void {
       const state: FallbackArchitectState = { refusalPending: false, active: undefined }
       const isDisabled = (): boolean => ctx.config.getFlag(FALLBACK_ARCHITECT_DISABLED_FLAG) === true
 
@@ -74,7 +74,7 @@ export function createFallbackArchitectComponent(
 
         const cwd = extractCwd(eventCtx) ?? process.cwd()
         if (!hasArchitectCategory(cwd, extractRegistry(eventCtx))) {
-          ctx.logger.info("omo-senpi fallback-architect skipped", { reason: "architect-category-inactive" })
+          ctx.logger.info("omo-omp fallback-architect skipped", { reason: "architect-category-inactive" })
           state.refusalPending = false
           return
         }
@@ -96,7 +96,7 @@ export function createFallbackArchitectComponent(
         })
         state.active = { from, to }
         state.refusalPending = false
-        ctx.logger.info("omo-senpi fallback-architect directive injected", { from, to })
+        ctx.logger.info("omo-omp fallback-architect directive injected", { from, to })
       })
 
       pi.on("input", (payload: unknown): FallbackArchitectInputResult => {
