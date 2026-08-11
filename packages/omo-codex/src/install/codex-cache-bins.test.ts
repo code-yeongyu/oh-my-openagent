@@ -142,7 +142,7 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(link).not.toBeNull()
     const wrapper = await readFile(link?.path ?? "", "utf8")
     expect(wrapper).toContain('for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (')
-    expect(wrapper).toContain('if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"')
+    expect(wrapper).toContain('set "OMO_NODE_BINARY=!OMO_NODE_BINARY:"=!"')
     expect(wrapper).toContain(`if "!OMO_NODE_BINARY:~0,1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"`)
     expect(wrapper).toContain('if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "')
     expect(wrapper.indexOf("NODE_REPL_NODE_PATH")).toBeLessThan(wrapper.indexOf('if "%OMO_RUNTIME%"=="node"'))
@@ -211,16 +211,68 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
   })
 
   it("#given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token", async () => {
-    // given
     const fixture = await createRepoFixture()
-
-    // when
     const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
-
-    // then
     if (link === null) throw new Error("expected runtime wrapper link")
     const wrapper = await readFile(link.path, "utf8")
-    expect(wrapper).toMatch(/"[^"\r\n]*omo-ulw-loop\.cmd" ulw-loop %\*/)
+    expect(wrapper).toMatch(/call "[^"]*omo-ulw-loop\.cmd" %\*/)
+    expect(wrapper).not.toContain("shift /1")
+    expect(wrapper).not.toMatch(/omo-ulw-loop\.cmd" ulw-loop %\*/)
+  })
+
+  const win32Only = process.platform === "win32" ? test : test.skip
+  win32Only("#given generated Windows runtime branches #when child runtimes exit #then each exact status propagates", async () => {
+    const fixture = await createRepoFixture()
+    const nodeCliPath = join(fixture.repoRoot, "dist", "cli-node", "index.js")
+    await mkdir(join(fixture.repoRoot, "dist", "cli-node"), { recursive: true })
+    await writeFile(nodeCliPath, "")
+    await mkdir(fixture.codexHome, { recursive: true })
+    await mkdir(fixture.binDir, { recursive: true })
+    const fakeNode = join(fixture.binDir, "fake-node.cmd")
+    const fakeBun = join(fixture.binDir, "fake-bun.cmd")
+    await writeFile(fakeNode, ["@echo off", 'if "%OMO_RUNTIME%"=="node" exit /b 38', "exit /b 39", ""].join(String.fromCharCode(13, 10)))
+    await writeFile(fakeBun, ["@echo off", "exit /b 40", ""].join(String.fromCharCode(13, 10)))
+    await writeFile(join(fixture.codexHome, "config.toml"), `NODE_REPL_NODE_PATH = '${fakeNode}'\n`)
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+    if (link === null) throw new Error("expected runtime wrapper link")
+
+    const run = async (env: Record<string, string | undefined>): Promise<number> => {
+      const child = Bun.spawn(["cmd.exe", "/d", "/c", link.path, "status"], {
+        env: { SYSTEMROOT: process.env.SYSTEMROOT, ...env },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+      return child.exited
+    }
+
+    expect(await run({ OMO_RUNTIME: "node" })).toBe(38)
+    // Bun.spawn merges the parent environment on Windows, so USERPROFILE still points at the
+    // developer machine's real home where ~/.bun/bin/bun.exe exists; pin it to an isolated dir
+    // to exercise the no-bun-anywhere node fallback deterministically.
+    expect(await run({ PATH: `${process.env.SYSTEMROOT}\\System32`, USERPROFILE: fixture.codexHome })).toBe(39)
+    expect(await run({ BUN_BINARY: fakeBun })).toBe(40)
+  })
+
+  win32Only("#given a generated Windows alias #when invoked #then forwards argv once and propagates exit status", async () => {
+    const fixture = await createRepoFixture()
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+    if (link === null) throw new Error("expected runtime wrapper link")
+    await mkdir(fixture.binDir, { recursive: true })
+    await writeFile(join(fixture.binDir, "omo-ulw-loop.cmd"), ["@echo off", "echo %*", "exit /b 37", ""].join(String.fromCharCode(13, 10)))
+
+    const child = Bun.spawn(["cmd.exe", "/d", "/c", link.path, "ulw-loop", "status", "--json"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    expect(exitCode).toBe(37)
+    expect(stderr).toBe("")
+    expect(stdout.trim()).toBe("ulw-loop status --json")
   })
 })
 

@@ -1,7 +1,10 @@
-import { closeSync, openSync, rmSync, statSync, utimesSync, writeSync } from "node:fs"
+import { closeSync, openSync, rmSync, statSync, unlinkSync, utimesSync, writeSync } from "node:fs"
+
+import { log } from "@oh-my-opencode/utils"
 
 const LOCK_RETRY_MS = 10
 const LOCK_WAIT_TIMEOUT_MS = 1_000
+const LOCK_RELEASE_RETRIES = 3
 // The lock guards a sub-10ms record read-modify-write. Any lock file older than this window was
 // left behind by a crashed or wedged holder; age (file mtime) is the staleness authority because a
 // pid probe can false-alive after pid reuse and a partially written lock file has no parseable
@@ -15,7 +18,24 @@ export function withTaskRecordLock<T>(recordPath: string, operation: () => T): T
   try {
     return operation()
   } finally {
-    rmSync(lockPath, { force: true })
+    releaseLockBestEffort(lockPath)
+  }
+}
+
+function releaseLockBestEffort(lockPath: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      unlinkSync(lockPath)
+      return
+    } catch (error) {
+      if (hasCode(error, "ENOENT")) return
+      if (attempt < LOCK_RELEASE_RETRIES && isRetryableReleaseError(error)) {
+        Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
+        continue
+      }
+      log("senpi-task record lock cleanup failed", { lockPath, error: String(error) })
+      return
+    }
   }
 }
 
@@ -46,7 +66,11 @@ function acquireLock(lockPath: string): void {
     } catch (error) {
       if (!hasCode(error, "EEXIST")) throw error
       if (isStaleLock(lockPath)) {
-        rmSync(lockPath, { force: true })
+        try {
+          unlinkSync(lockPath)
+        } catch (unlinkError) {
+          if (!hasCode(unlinkError, "ENOENT")) throw unlinkError
+        }
         continue
       }
       if (Date.now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) {
@@ -103,4 +127,8 @@ function isStaleLock(lockPath: string): boolean {
 
 function hasCode(error: unknown, expected: string): boolean {
   return error instanceof Error && "code" in error && error.code === expected
+}
+
+function isRetryableReleaseError(error: unknown): boolean {
+  return hasCode(error, "EBUSY") || hasCode(error, "EPERM")
 }

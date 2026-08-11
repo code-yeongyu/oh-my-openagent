@@ -44,6 +44,8 @@ describe("omo-senpi extension entry", () => {
         "omo-senpi-ultrawork-disabled",
         "omo-senpi-ulw-loop-disabled",
         "omo-senpi-fallback-architect-disabled",
+        "omo-senpi-self-kill-guard-disabled",
+        "omo-senpi-result-size-cap-disabled",
         "omo-senpi-comment-checker-disabled",
         "omo-senpi-telemetry-disabled",
         "omo-senpi-lsp-disabled",

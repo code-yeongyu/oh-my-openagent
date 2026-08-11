@@ -72,21 +72,27 @@ export function windowsRuntimeWrapper(
     'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
     `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
-    "  shift /1",
-    `  "${ulwLoopBin}" ulw-loop %*`,
-    "  exit /b %ERRORLEVEL%",
+    // Batch %* always expands to the original argv (shift does not rewrite it), and invoking
+    // another .cmd without call abandons this wrapper, so neither shift+reinsert nor a bare
+    // invocation can forward argv once or propagate the child exit status. call does both.
+    `  call "${ulwLoopBin}" %*`,
+    // Inside a parenthesized block %ERRORLEVEL% expands at parse time (before call runs);
+    // delayed expansion reads the child status after call returns.
+    "  exit /b !ERRORLEVEL!",
     ")",
     `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
-    "  exit /b %ERRORLEVEL%",
+    `  call "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    "  exit /b !ERRORLEVEL!",
     ")",
     'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
     'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
+    // Nested parenthesized blocks mis-expand !ERRORLEVEL! when the outer block has trailing
+    // lines (cmd quirk), so the node fallback and the guidance branch stay single-level.
+    `if not defined BUN_BINARY if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
+    `  call "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    "  exit /b !ERRORLEVEL!",
+    ")",
     "if not defined BUN_BINARY (",
-    `  if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
-    "    exit /b %ERRORLEVEL%",
-    "  )",
     `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
@@ -94,8 +100,8 @@ export function windowsRuntimeWrapper(
     `  echo ${binName}: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
     "  exit /b 1",
     ")",
-    `"%BUN_BINARY%" "${cliPath}" %*`,
-    "",
+    `call "%BUN_BINARY%" "${cliPath}" %*`,
+    "exit /b %ERRORLEVEL%",
   ].join("\r\n")
 }
 

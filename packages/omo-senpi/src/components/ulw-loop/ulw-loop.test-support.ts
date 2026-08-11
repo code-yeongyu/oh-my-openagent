@@ -84,6 +84,48 @@ export function changingActiveStatuses(count: number): string[] {
   )
 }
 
+export function staleAllPassStatus(): string {
+  return JSON.stringify({
+    ok: true,
+    plan: {
+      activeGoalId: "G001-execute-the-separately-approved-omo",
+      goals: [
+        {
+          id: "G001-execute-the-separately-approved-omo",
+          status: "in_progress",
+          title: "Execute approved UIUX regression recovery successor",
+          successCriteria: [
+            { id: "C001", status: "pass" },
+            { id: "C002", status: "pass" },
+            { id: "C003", status: "pass" },
+          ],
+        },
+      ],
+    },
+  })
+}
+
+export function staleAllPassWithPendingStatus(): string {
+  return JSON.stringify({
+    ok: true,
+    plan: {
+      activeGoalId: "G001-execute-the-separately-approved-omo",
+      goals: [
+        {
+          id: "G001-execute-the-separately-approved-omo",
+          status: "in_progress",
+          title: "Execute approved UIUX regression recovery successor",
+          successCriteria: [
+            { id: "C001", status: "pass" },
+            { id: "C002", status: "pass" },
+            { id: "C003", status: "pending" },
+          ],
+        },
+      ],
+    },
+  })
+}
+
 export function completeStatus(): string {
   return JSON.stringify({
     ok: true,

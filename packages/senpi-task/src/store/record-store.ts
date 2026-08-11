@@ -6,6 +6,7 @@ import {
   rmSync,
   statSync,
   type Stats,
+  unlinkSync,
   writeFileSync,
 } from "node:fs"
 import { join } from "node:path"
@@ -160,11 +161,13 @@ function removeRecord(
   rmSync(join(stateDir, "completion-results", `${taskId}.txt`), { force: true })
   // (3) task event log
   const logPath = join(stateDir, "logs", `${taskId}.jsonl`)
-  rmSync(logPath, { force: true })
+  // Windows does not permit deleting a file while this process still owns an append handle.
+  // Close first, then use the single-file unlink primitive instead of recursive rm machinery.
   closeAppendFd(logPath, appendFds)
+  unlinkIfExists(logPath)
   // (4) record LAST
   const recordPath = taskPath(stateDir, taskId)
-  rmSync(recordPath, { force: true })
+  unlinkIfExists(recordPath)
   cache.delete(recordPath)
 }
 
@@ -280,4 +283,12 @@ function isParseableTaskId(value: string): boolean {
 
 function isEnoent(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
+}
+
+function unlinkIfExists(path: string): void {
+  try {
+    unlinkSync(path)
+  } catch (error) {
+    if (!isEnoent(error)) throw error
+  }
 }

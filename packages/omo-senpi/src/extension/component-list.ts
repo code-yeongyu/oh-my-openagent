@@ -9,6 +9,8 @@ import { createLspComponent } from "../components/lsp"
 import { createMemoryComponent } from "../components/memory"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent } from "../components/onboarding"
+import { createResultSizeCapComponent } from "../components/result-size-cap"
+import { createSelfKillGuardComponent } from "../components/self-kill-guard"
 import { createSkillPointersComponent } from "../components/skill-pointers"
 import { createStartWorkContinuationComponent } from "../components/start-work-continuation"
 import { createOmoNativeTelemetryComponent } from "../components/telemetry"
@@ -31,11 +33,13 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createTodoFanoutReminderComponent(),
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
+    createSelfKillGuardComponent(),
     createCommentCheckerComponent(),
     createAstGrepComponent(),
     createLspComponent(),
     taskComponent,
     createMemoryComponent(),
     createConfigWatchComponent(),
+    createResultSizeCapComponent(),
   ]
 }

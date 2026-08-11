@@ -14,6 +14,8 @@ import {
   isTransformResult,
   registerWithRunner,
   sessionEventCtx,
+  staleAllPassStatus,
+  staleAllPassWithPendingStatus,
   statusArgsFor,
 } from "./ulw-loop.test-support"
 
@@ -216,6 +218,38 @@ describe("omo-senpi ulw-loop continuation", () => {
     await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
 
     expect(pi.userMessages).toEqual([])
+  })
+
+  it("#given copied stale all-pass status #when continuation fires #then no followUp is sent and inactivity is logged", async () => {
+    const { pi, logger } = await registerWithRunner([staleAllPassStatus()])
+
+    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+
+    expect(pi.userMessages).toEqual([])
+    expect(pi.messages).toEqual([])
+    expect(logger.entries).toContainEqual({
+      level: "info",
+      message: "omo-senpi ulw-loop continuation skipped",
+      details: { reason: "inactive" },
+    })
+  })
+
+  it("#given copied all-pass status with one pending criterion #when continuation fires #then exactly one followUp is sent", async () => {
+    const { pi } = await registerWithRunner([staleAllPassWithPendingStatus()])
+
+    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+
+    expect(pi.userMessages).toEqual([])
+    expect(pi.messages).toEqual([
+      {
+        message: {
+          customType: "omo-senpi:ulw-continuation",
+          content: expect.stringContaining("Continue the active omo-agent-toolkit ulw-loop run"),
+          display: false,
+        },
+        options: { triggerTurn: true, deliverAs: "followUp" },
+      },
+    ])
   })
 
   it("#given goal active before ulw-loop #when a shell tool result activates the run #then the footer starts immediately", async () => {
