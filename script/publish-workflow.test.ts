@@ -218,7 +218,7 @@ describe("test workflows", () => {
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
     const buildWaitsForChecks = buildJob.includes("needs:")
     const buildHasReadOnlyContentsPermission = buildJob.includes("permissions:\n      contents: read")
-    const allRootChecks = "needs: [test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]"
+    const allRootChecks = "needs: [test, typecheck, codex-compatibility, senpi-compatibility, omo-omp-compatibility, build, omo-ai-payload-check]"
     const writeGateNeedsAllChecks = autoCommitSchemaJob.includes(allRootChecks)
     const draftReleaseNeedsAllChecks = draftReleaseJob.includes(allRootChecks)
 

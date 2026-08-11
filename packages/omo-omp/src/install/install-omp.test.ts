@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -28,6 +28,9 @@ function makeFakePlugin(repoRoot: string): string {
   mkdirSync(runtimeDir, { recursive: true })
   const runtimeBody = "#!/usr/bin/env node\n// stub runtime"
   writeFileSync(join(runtimeDir, "cli.js"), runtimeBody)
+  // The staged runtime carries the executable bit on POSIX (the integrity check enforces X_OK);
+  // mirror that so the fixture behaves identically on Linux CI and Windows.
+  if (process.platform !== "win32") chmodSync(join(runtimeDir, "cli.js"), 0o755)
   writeFileSync(join(runtimeDir, "manifest.json"), JSON.stringify({
     sha256: createHash("sha256").update(runtimeBody).digest("hex"),
     mode: 0o755,

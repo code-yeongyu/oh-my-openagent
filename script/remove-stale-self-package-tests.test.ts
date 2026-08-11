@@ -50,6 +50,10 @@ describe("removeStaleSelfPackageTests", () => {
     const senpiInstallIndex = workflow.indexOf("      - name: Install dependencies", senpiJobIndex)
     const senpiCleanupIndex = workflow.indexOf("      - name: Remove stale self-package test copies", senpiJobIndex)
     const senpiTestIndex = workflow.indexOf("      - name: Run Senpi compatibility tests", senpiJobIndex)
+    const ompJobIndex = workflow.indexOf("  omo-omp-compatibility:")
+    const ompInstallIndex = workflow.indexOf("      - name: Install dependencies", ompJobIndex)
+    const ompCleanupIndex = workflow.indexOf("      - name: Remove stale self-package test copies", ompJobIndex)
+    const ompTestIndex = workflow.indexOf("      - name: Run OMP compatibility tests", ompJobIndex)
     const cleanupCount = workflow.match(/      - name: Remove stale self-package test copies/g)?.length ?? 0
 
     // then
@@ -59,8 +63,11 @@ describe("removeStaleSelfPackageTests", () => {
     expect(senpiInstallIndex).toBeGreaterThan(senpiJobIndex)
     expect(senpiCleanupIndex).toBeGreaterThan(senpiInstallIndex)
     expect(senpiTestIndex).toBeGreaterThan(senpiCleanupIndex)
-    expect(cleanupCount).toBe(2)
-    expect(workflow.match(/run: bun run script\/remove-stale-self-package-tests\.ts/g)).toHaveLength(2)
+    expect(ompInstallIndex).toBeGreaterThan(ompJobIndex)
+    expect(ompCleanupIndex).toBeGreaterThan(ompInstallIndex)
+    expect(ompTestIndex).toBeGreaterThan(ompCleanupIndex)
+    expect(cleanupCount).toBe(3)
+    expect(workflow.match(/run: bun run script\/remove-stale-self-package-tests\.ts/g)).toHaveLength(3)
   })
 })
 
