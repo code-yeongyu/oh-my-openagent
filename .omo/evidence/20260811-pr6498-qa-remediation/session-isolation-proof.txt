@@ -1,0 +1,4 @@
+real_db=/Users/sungsoopark/.local/share/opencode/opencode.db
+sessions_before=7426
+sessions_after=7426
+unchanged=true

@@ -1,0 +1,4 @@
+Command:
+git diff --name-status 4ca872b57e45281a9a81190bb73637729288ffc3..97e9a3f64ad8bfe8367f0410e885ffc54947ba64 -- packages/omo-opencode/src/cli/doctor/framework/spawn-with-timeout.ts
+
+Observed: no output. The PR does not modify spawn-with-timeout.ts.

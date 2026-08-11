@@ -1,0 +1,178 @@
+{
+  "results": [
+    {
+      "name": "System",
+      "status": "pass",
+      "message": "System checks passed",
+      "details": [
+        "OpenCode: 1.18.16",
+        "Plugin expected: 4.19.4",
+        "Plugin loaded: 4.19.4",
+        "Bun: 1.3.14"
+      ],
+      "issues": [],
+      "duration": 1868
+    },
+    {
+      "name": "Configuration",
+      "status": "pass",
+      "message": "No custom config found; defaults are used",
+      "issues": [],
+      "duration": 75
+    },
+    {
+      "name": "TUI Plugin",
+      "status": "skip",
+      "message": "Plugin not registered (server or TUI)",
+      "details": [
+        "opencode.json: /private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/config/opencode/opencode.json",
+        "tui.json: /private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/config/opencode/tui.json"
+      ],
+      "issues": [],
+      "duration": 69
+    },
+    {
+      "name": "Configuration",
+      "status": "pass",
+      "message": "No deprecated reasoning keys found",
+      "issues": [],
+      "duration": 67
+    },
+    {
+      "name": "Tools",
+      "status": "warn",
+      "message": "1 tools issue(s) detected",
+      "details": [
+        "AST-Grep CLI: yes",
+        "Comment checker: yes",
+        "LSP: 1 server(s)",
+        "GH CLI: installed",
+        "MCP: builtin=4, user=0"
+      ],
+      "issues": [
+        {
+          "title": "GitHub CLI not authenticated",
+          "description": "gh CLI is installed but not logged in.",
+          "fix": "Run: gh auth login",
+          "severity": "warning",
+          "affects": [
+            "GitHub automation"
+          ]
+        }
+      ],
+      "duration": 240
+    },
+    {
+      "name": "Models",
+      "status": "warn",
+      "message": "11 agents, 8 categories, 0 overrides",
+      "details": [
+        "═══ Available Models (from cache) ═══",
+        "",
+        "  ⚠ Cache not found. Run 'opencode' to populate.",
+        "",
+        "═══ Configured Models ═══",
+        "",
+        "Agents:",
+        "  ○ sisyphus: anthropic/claude-opus-5 (max) [capabilities: snapshot-backed]",
+        "  ○ hephaestus: openai/gpt-5.6-sol (medium) [capabilities: snapshot-backed]",
+        "  ○ oracle: openai/gpt-5.6-sol (xhigh) [capabilities: snapshot-backed]",
+        "  ○ librarian: openai/gpt-5.6-luna-fast (low) [capabilities: alias-backed]",
+        "  ○ explore: openai/gpt-5.6-luna-fast (low) [capabilities: alias-backed]",
+        "  ○ multimodal-looker: openai/gpt-5.6-sol (low) [capabilities: snapshot-backed]",
+        "  ○ prometheus: anthropic/claude-fable-5 (xhigh) [capabilities: snapshot-backed]",
+        "  ○ metis: anthropic/claude-opus-5 (high) [capabilities: snapshot-backed]",
+        "  ○ momus: openai/gpt-5.6-terra (high) [capabilities: snapshot-backed]",
+        "  ○ atlas: anthropic/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "  ○ sisyphus-junior: anthropic/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "",
+        "Categories:",
+        "  ○ visual-engineering: anthropic/claude-opus-5 (max) [capabilities: snapshot-backed]",
+        "  ○ ultrabrain: openai/gpt-5.6-sol (max) [capabilities: snapshot-backed]",
+        "  ○ deep: openai/gpt-5.6-sol (medium) [capabilities: snapshot-backed]",
+        "  ○ artistry: anthropic/claude-fable-5 (xhigh) [capabilities: snapshot-backed]",
+        "  ○ quick: kimi-for-coding/kimi-for-coding-highspeed [capabilities: snapshot-backed]",
+        "  ○ unspecified-low: openai/gpt-5.6-terra (high) [capabilities: snapshot-backed]",
+        "  ○ unspecified-high: kimi-for-coding/kimi-k3 (max) [capabilities: snapshot-backed]",
+        "  ○ writing: kimi-for-coding/kimi-k3 (low) [capabilities: snapshot-backed]",
+        "",
+        "● = user override, ○ = provider fallback"
+      ],
+      "issues": [
+        {
+          "title": "Model cache not found",
+          "description": "OpenCode model cache is missing at /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/cache/opencode/models.json, so model availability cannot be validated.",
+          "fix": "Run: opencode models --refresh, then verify /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/cache/opencode/models.json. If it is still missing, update or report OpenCode because OpenCode core writes this cache.",
+          "severity": "warning",
+          "affects": [
+            "model resolution"
+          ]
+        }
+      ],
+      "duration": 50
+    },
+    {
+      "name": "Telemetry",
+      "status": "pass",
+      "message": "Telemetry: enabled",
+      "details": [
+        "PostHog host: https://us.i.posthog.com",
+        "Last daily active date: never",
+        "State file: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/data/oh-my-opencode/posthog-activity.json"
+      ],
+      "issues": [],
+      "duration": 45
+    },
+    {
+      "name": "Team Mode",
+      "status": "skip",
+      "message": "team_mode: disabled",
+      "issues": [],
+      "duration": 44
+    }
+  ],
+  "systemInfo": {
+    "opencodeVersion": "1.18.16",
+    "opencodePath": "/Users/sungsoopark/.opencode/bin/opencode",
+    "pluginVersion": "4.19.4",
+    "loadedVersion": "4.19.4",
+    "bunVersion": "1.3.14",
+    "configPath": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/config/opencode/opencode.json",
+    "configValid": true,
+    "isLocalDev": true
+  },
+  "tools": {
+    "lspServers": [
+      {
+        "id": "lsp-tools-mcp",
+        "extensions": [
+          "*"
+        ]
+      }
+    ],
+    "astGrepCli": true,
+    "commentChecker": true,
+    "ghCli": {
+      "installed": true,
+      "authenticated": false,
+      "username": null
+    },
+    "mcpBuiltin": [
+      "websearch",
+      "context7",
+      "grep_app",
+      "lsp"
+    ],
+    "mcpUser": []
+  },
+  "summary": {
+    "total": 8,
+    "passed": 4,
+    "failed": 0,
+    "warnings": 2,
+    "skipped": 2,
+    "duration": 1868
+  },
+  "exitCode": 0,
+  "target": "opencode"
+}

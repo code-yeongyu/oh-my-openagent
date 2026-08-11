@@ -1,0 +1,17 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/doctor/spawn-with-timeout.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+(pass) spawnWithTimeout > #given a command that completes quickly > returns stdout and exit code [7.87ms]
+(pass) spawnWithTimeout > #given a command that writes to stderr > captures stderr output [17.96ms]
+(pass) spawnWithTimeout > #given a command that fails > returns non-zero exit code without timing out [4.73ms]
+(pass) spawnWithTimeout > #given a command that exceeds timeout > returns timedOut true and kills the process [203.99ms]
+(pass) spawnWithTimeout > #given a nonexistent command > handles gracefully without hanging [0.76ms]
+(pass) spawnWithTimeout > #given a nonexistent command > does not consume process streams more than once [2.45ms]
+(pass) spawnWithTimeout > #given spawn throws a non-Error value > rethrows the unknown value [0.59ms]
+(pass) spawnWithTimeout > #given a spawned process exposes an already-used pipe > treats the pipe as empty output [0.27ms]
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [4.48s]

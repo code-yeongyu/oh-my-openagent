@@ -1,0 +1,2 @@
+"OpenCode model cache is missing at /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/cache/opencode/models.json, so model availability cannot be validated."
+"Run: opencode models --refresh, then verify /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.IGtlW8VB7R/cache/opencode/models.json. If it is still missing, update or report OpenCode because OpenCode core writes this cache."

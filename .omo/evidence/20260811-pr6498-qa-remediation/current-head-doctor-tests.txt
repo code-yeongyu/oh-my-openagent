@@ -1,0 +1,20 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/doctor/spawn-with-timeout.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+(pass) spawnWithTimeout > #given a command that completes quickly > returns stdout and exit code [75.68ms]
+(pass) spawnWithTimeout > #given a command that writes to stderr > captures stderr output [65.82ms]
+(pass) spawnWithTimeout > #given a command that fails > returns non-zero exit code without timing out [4.24ms]
+(pass) spawnWithTimeout > #given a command that exceeds timeout > returns timedOut true and kills the process [208.73ms]
+(pass) spawnWithTimeout > #given a nonexistent command > handles gracefully without hanging [3.55ms]
+(pass) spawnWithTimeout > #given a nonexistent command > does not consume process streams more than once [4.47ms]
+(pass) spawnWithTimeout > #given spawn throws a non-Error value > rethrows the unknown value [1.10ms]
+(pass) spawnWithTimeout > #given a spawned process exposes an already-used pipe > treats the pipe as empty output [2.86ms]
+
+packages/omo-opencode/src/cli/doctor/checks/model-resolution-cache-guidance.test.ts:
+(pass) model cache doctor guidance > reports the exact missing OpenCode cache path and refresh command [18.22ms]
+
+ 9 pass
+ 0 fail
+ 21 expect() calls
+Ran 9 tests across 2 files. [6.39s]

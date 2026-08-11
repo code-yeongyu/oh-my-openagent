@@ -1,0 +1,1 @@
+baseline worktree present after test: opencode QA sandbox cleanup is verified by opencode-qa-self-check.txt.
