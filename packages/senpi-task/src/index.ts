@@ -311,7 +311,7 @@ export {
   linesComponent,
   listTaskAgents,
   listTaskCategories,
-  normalizeRendererText,
+  normalizeRendererText, recordSummary,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,

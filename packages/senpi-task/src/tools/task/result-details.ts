@@ -6,20 +6,34 @@ import type { TaskToolDetails, TaskToolMode } from "./types"
 
 export type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
-export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails {
+export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
   return {
     task_id: record.task_id,
     status: record.status,
-    mode,
-    ...(record.task_summary !== undefined && { task_summary: record.task_summary }),
-    ...(record.name !== undefined && { name: record.name }),
-    ...(record.category !== undefined && { category: record.category }),
-    ...(record.agent_type !== undefined && { subagent_type: record.agent_type }),
+    task_summary: record.task_summary,
+    name: record.name,
+    category: record.category,
     execution_mode: record.execution_mode,
     model: record.model,
-    ...(record.resolved_model !== undefined && { resolved_model: record.resolved_model }),
-    ...(record.fallback_attempts !== undefined && { fallback_attempts: record.fallback_attempts }),
-    ...(record.run_stats !== undefined && { run_stats: record.run_stats }),
+    run_stats: record.run_stats,
+    ...(includeLifecycle && {
+          description: record.description,
+          agent_type: record.agent_type,
+          residency_state: record.residency_state,
+          depth: record.depth,
+          created_at: record.created_at,
+          updated_at: record.updated_at,
+        }),
+  }
+}
+
+export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails {
+  return {
+    ...recordSummary(record),
+    mode,
+    subagent_type: record.agent_type,
+    resolved_model: record.resolved_model,
+    fallback_attempts: record.fallback_attempts,
     run_in_background: false,
   }
 }
@@ -33,15 +47,15 @@ export function startedDetails(
     task_id: started.task_id,
     status: started.status,
     mode: "spawn",
-    ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
+    task_summary: params.task_summary,
     name: started.name,
-    ...(params.category !== undefined && { category: params.category }),
-    ...(params.subagent_type !== undefined && { subagent_type: params.subagent_type }),
+    category: params.category,
+    subagent_type: params.subagent_type,
     execution_mode: executionMode,
-    ...(params.model !== undefined && { model: params.model }),
-    ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
+    model: params.model,
+    resolved_model: started.resolved_model,
     run_in_background: params.run_in_background === true,
-    ...(started.queue_position !== undefined && { queue_position: started.queue_position }),
+    queue_position: started.queue_position,
   }
 }
 

@@ -24,15 +24,61 @@ const fakeSummary: SuspendSummary = {
   failures: [],
 }
 
+function taskRecord(overrides: Partial<TaskRecord> & { task_id: string; status: TaskRecord["status"] }): TaskRecord {
+  return {
+    name: "worker",
+    task_summary: "Inspect native task events",
+    description: "Prove task lifecycle snapshots reach RPC clients",
+    parent_session_id: "parent-session",
+    root_session_id: "parent-session",
+    depth: 1,
+    agent_type: "explore",
+    category: "deep",
+    execution_mode: "in-process",
+    model: "mock/worker",
+    residency_state: "resident",
+    created_at: "2026-08-11T00:00:00.000Z",
+    updated_at: "2026-08-11T00:00:01.000Z",
+    notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: true,
+    ...overrides,
+  }
+}
+
+function taskSnapshot(record: TaskRecord) {
+  return {
+    task_id: record.task_id,
+    name: record.name,
+    task_summary: record.task_summary,
+    description: record.description,
+    agent_type: record.agent_type,
+    category: record.category,
+    model: record.model,
+    status: record.status,
+    residency_state: record.residency_state,
+    execution_mode: record.execution_mode,
+    depth: record.depth,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    ...(record.run_stats === undefined ? {} : { run_stats: record.run_stats }),
+  }
+}
+
 type HarnessOptions = {
   readonly outcomes?: ReconcileResult["outcomes"]
   readonly records?: Readonly<Record<string, TaskRecord>>
   readonly cleanupDeleted?: readonly string[]
   readonly resumptionChannelCount?: number
+  readonly withRpc?: boolean
 }
 
 function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   const pi = new FakeExtensionAPI()
+  if (options.withRpc === true) {
+    pi.rpc = { emit: (name, data) => pi.rpcEvents.push({ name, data }) }
+  }
+  const records = { ...(options.records ?? {}) }
+  const storeMutationListeners = new Set<() => void>()
   const calls: SuspendInput[] = []
   const order: string[] = []
   const warnings: Array<{ message: string; details?: unknown }> = []
@@ -76,7 +122,11 @@ function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       },
     } satisfies Partial<TaskLifecycle> as unknown as TaskLifecycle,
     manager: {
-      get: (taskId: string) => options.records?.[taskId],
+      get: (taskId: string) => records[taskId],
+      list: (scope: { scope: "all" } | { scope: "parent-session"; session_id: string }) =>
+        Object.values(records)
+          .filter((record) => scope.scope === "all" || record.parent_session_id === scope.session_id)
+          .map((record) => ({ record })),
     } as unknown as TaskEngine["manager"],
     notifier: {
       reconcileUnnotifiedNotifications: (input: { sessionId: string; parentState: unknown }) => {
@@ -95,7 +145,10 @@ function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       order.push(`liveness:${record.task_id}`)
     },
     appendTaskEvent: () => {},
-    onStoreMutation: () => () => {},
+    onStoreMutation: (listener: () => void) => {
+      storeMutationListeners.add(listener)
+      return () => storeMutationListeners.delete(listener)
+    },
   } as unknown as TaskEngine
 
   const statusUi = {
@@ -160,8 +213,111 @@ function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
 
   wireEventBridge(pi, ctx, engine, statusUi, transitions, state)
 
-  return { pi, calls, order, warnings, infos, reconcileCalls, notifyCalls, livenessCalls, resumptionCalls }
+  return {
+    pi,
+    calls,
+    order,
+    warnings,
+    infos,
+    reconcileCalls,
+    notifyCalls,
+    livenessCalls,
+    resumptionCalls,
+    records,
+    emitStoreMutation: () => {
+      for (const listener of storeMutationListeners) listener()
+    },
+  }
 }
+
+describe("event-bridge native task RPC snapshots", () => {
+  it("#given current and foreign session tasks #when session_start completes #then it emits an initial omo.task.updated snapshot only for the captured parent session", async () => {
+    // given
+    const mine = taskRecord({ task_id: "st_current", status: "running" })
+    const foreign = taskRecord({
+      task_id: "st_foreign",
+      status: "running",
+      parent_session_id: "other-session",
+      root_session_id: "other-session",
+    })
+    const { pi } = wireHarness("parent-session", {
+      records: { [mine.task_id]: mine, [foreign.task_id]: foreign },
+      withRpc: true,
+    })
+
+    // when
+    await pi.dispatch("session_start", {}, {})
+
+    // then
+    expect(pi.rpcEvents).toEqual([
+      {
+        name: "omo.task.updated",
+        data: {
+          parent_session_id: "parent-session",
+          tasks: [taskSnapshot(mine)],
+        },
+      },
+    ])
+  })
+
+  it("#given an active captured session #when store mutations move its task through pending running and completed #then each lifecycle snapshot emits while foreign-session tasks stay excluded", async () => {
+    // given
+    const foreign = taskRecord({
+      task_id: "st_foreign",
+      status: "running",
+      parent_session_id: "other-session",
+      root_session_id: "other-session",
+    })
+    const harness = wireHarness("parent-session", {
+      records: { [foreign.task_id]: foreign },
+      withRpc: true,
+    })
+    await harness.pi.dispatch("session_start", {}, {})
+    harness.pi.rpcEvents.length = 0
+
+    // when
+    const pending = taskRecord({ task_id: "st_lifecycle", status: "pending" })
+    harness.records[pending.task_id] = pending
+    harness.emitStoreMutation()
+    const running = { ...pending, status: "running" as const, updated_at: "2026-08-11T00:00:02.000Z" }
+    harness.records[pending.task_id] = running
+    harness.emitStoreMutation()
+    const completed = { ...running, status: "completed" as const, updated_at: "2026-08-11T00:00:03.000Z" }
+    harness.records[pending.task_id] = completed
+    harness.emitStoreMutation()
+
+    // then
+    expect(harness.pi.rpcEvents).toEqual([
+      {
+        name: "omo.task.updated",
+        data: { parent_session_id: "parent-session", tasks: [taskSnapshot(pending)] },
+      },
+      {
+        name: "omo.task.updated",
+        data: { parent_session_id: "parent-session", tasks: [taskSnapshot(running)] },
+      },
+      {
+        name: "omo.task.updated",
+        data: { parent_session_id: "parent-session", tasks: [taskSnapshot(completed)] },
+      },
+    ])
+    expect(JSON.stringify(harness.pi.rpcEvents)).not.toContain(foreign.task_id)
+  })
+
+  it("#given a host without rpc emission #when session start and store mutation run #then task snapshot publication is a graceful no-op", async () => {
+    // given
+    const task = taskRecord({ task_id: "st_optional", status: "running" })
+    const harness = wireHarness("parent-session", { records: { [task.task_id]: task } })
+
+    // when
+    await expect(harness.pi.dispatch("session_start", {}, {})).resolves.toBeDefined()
+    harness.emitStoreMutation()
+
+    // then
+    expect(harness.pi.rpc).toBeUndefined()
+    expect(harness.pi.rpcEvents).toEqual([])
+  })
+})
 
 describe("event-bridge session_start recovery chain", () => {
   it("#given a resumed session with a revived record #when session_start fires #then the chain runs in the planned order with the session id threaded", async () => {

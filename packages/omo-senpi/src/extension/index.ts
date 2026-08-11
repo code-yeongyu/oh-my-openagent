@@ -14,10 +14,14 @@ import { createUlwLoopComponent } from "../components/ulw-loop"
 import { createTodoFanoutReminderComponent } from "../components/todo-fanout-reminder"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createNativeBadgeComponent } from "../components/native-badge"
+import { createOnboardingComponent } from "../components/onboarding"
+import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
 
 export const omoSenpiComponents: OmoSenpiComponent[] = [
   createConfigStartupComponent(),
   createNativeBadgeComponent(),
+  createOnboardingComponent(),
+  createInitDeepAdvisorComponent(),
   createOmoNativeTelemetryComponent(),
   createUltraworkComponent(),
   createStartWorkContinuationComponent(),

@@ -1,0 +1,39 @@
+Initial complete OMO Senpi test run:
+- 56 tests across 13 files
+- 53 pass
+- 3 fail
+- All failures were in `install-senpi-refresh.test.ts`.
+- Error: `Packed omo-senpi plugin is missing required runtime artifacts`.
+
+Hypotheses:
+1. `bun install --frozen-lockfile --ignore-scripts` skipped required artifact staging in the fresh worktree.
+2. Senpi 2026.8.11-4 changed runtime layout and broke installer artifact expectations.
+3. Refreshed origin/dev had an unrelated generated-artifact baseline defect.
+
+Toggle:
+- Ran the exact CI Bun version:
+  `npm exec --yes --package=bun@1.3.12 -- bun run build:senpi-plugin`
+- Exit code: 0.
+- Staged LSP, ast-grep MCP, agent-toolkit, extensions, skills, directive, and installer artifacts.
+
+Focused rerun:
+- Command: `bun test packages/omo-senpi/src/install/install-senpi-refresh.test.ts`
+- 3 pass
+- 0 fail
+- Confirms hypothesis 1: setup-generated artifacts were missing; no production installer fix was required.
+
+Complete rerun:
+- Command: `bun run --cwd packages/omo-senpi test`
+- 56 pass
+- 0 fail
+- Ran 56 tests across 13 files in 2.35s.
+
+Related verification:
+- OMO Senpi typecheck: PASS.
+- senpi-task tests: PASS.
+- senpi-task typecheck: PASS.
+
+Generated bundle:
+- `packages/omo-senpi/plugin/extensions/omo.js` was regenerated with Bun 1.3.12.
+- SHA-256 and final bundle freshness are verified in the build evidence.
+

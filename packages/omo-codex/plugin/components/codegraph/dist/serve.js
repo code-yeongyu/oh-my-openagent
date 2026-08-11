@@ -749,69 +749,69 @@ function config(newConfig) {
 // ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
-  BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
-  Class: () => Class,
-  NUMBER_FORMAT_RANGES: () => NUMBER_FORMAT_RANGES,
-  aborted: () => aborted,
-  allowsEval: () => allowsEval,
-  assert: () => assert,
-  assertEqual: () => assertEqual,
-  assertIs: () => assertIs,
-  assertNever: () => assertNever,
-  assertNotEqual: () => assertNotEqual,
-  assignProp: () => assignProp,
-  base64ToUint8Array: () => base64ToUint8Array,
-  base64urlToUint8Array: () => base64urlToUint8Array,
-  cached: () => cached,
-  captureStackTrace: () => captureStackTrace,
-  cleanEnum: () => cleanEnum,
-  cleanRegex: () => cleanRegex,
-  clone: () => clone,
-  cloneDef: () => cloneDef,
-  createTransparentProxy: () => createTransparentProxy,
-  defineLazy: () => defineLazy,
-  esc: () => esc,
-  escapeRegex: () => escapeRegex,
-  explicitlyAborted: () => explicitlyAborted,
-  extend: () => extend,
-  finalizeIssue: () => finalizeIssue,
-  floatSafeRemainder: () => floatSafeRemainder,
-  getElementAtPath: () => getElementAtPath,
-  getEnumValues: () => getEnumValues,
-  getLengthableOrigin: () => getLengthableOrigin,
-  getParsedType: () => getParsedType,
-  getSizableOrigin: () => getSizableOrigin,
-  hexToUint8Array: () => hexToUint8Array,
-  isObject: () => isObject,
-  isPlainObject: () => isPlainObject,
-  issue: () => issue,
-  joinValues: () => joinValues,
-  jsonStringifyReplacer: () => jsonStringifyReplacer,
-  merge: () => merge,
-  mergeDefs: () => mergeDefs,
-  normalizeParams: () => normalizeParams,
-  nullish: () => nullish,
-  numKeys: () => numKeys,
-  objectClone: () => objectClone,
-  omit: () => omit,
-  optionalKeys: () => optionalKeys,
-  parsedType: () => parsedType,
-  partial: () => partial,
-  pick: () => pick,
-  prefixIssues: () => prefixIssues,
-  primitiveTypes: () => primitiveTypes,
-  promiseAllObject: () => promiseAllObject,
-  propertyKeyTypes: () => propertyKeyTypes,
-  randomString: () => randomString,
-  required: () => required,
-  safeExtend: () => safeExtend,
-  shallowClone: () => shallowClone,
-  slugify: () => slugify,
-  stringifyPrimitive: () => stringifyPrimitive,
-  uint8ArrayToBase64: () => uint8ArrayToBase64,
-  uint8ArrayToBase64url: () => uint8ArrayToBase64url,
+  unwrapMessage: () => unwrapMessage,
   uint8ArrayToHex: () => uint8ArrayToHex,
-  unwrapMessage: () => unwrapMessage
+  uint8ArrayToBase64url: () => uint8ArrayToBase64url,
+  uint8ArrayToBase64: () => uint8ArrayToBase64,
+  stringifyPrimitive: () => stringifyPrimitive,
+  slugify: () => slugify,
+  shallowClone: () => shallowClone,
+  safeExtend: () => safeExtend,
+  required: () => required,
+  randomString: () => randomString,
+  propertyKeyTypes: () => propertyKeyTypes,
+  promiseAllObject: () => promiseAllObject,
+  primitiveTypes: () => primitiveTypes,
+  prefixIssues: () => prefixIssues,
+  pick: () => pick,
+  partial: () => partial,
+  parsedType: () => parsedType,
+  optionalKeys: () => optionalKeys,
+  omit: () => omit,
+  objectClone: () => objectClone,
+  numKeys: () => numKeys,
+  nullish: () => nullish,
+  normalizeParams: () => normalizeParams,
+  mergeDefs: () => mergeDefs,
+  merge: () => merge,
+  jsonStringifyReplacer: () => jsonStringifyReplacer,
+  joinValues: () => joinValues,
+  issue: () => issue,
+  isPlainObject: () => isPlainObject,
+  isObject: () => isObject,
+  hexToUint8Array: () => hexToUint8Array,
+  getSizableOrigin: () => getSizableOrigin,
+  getParsedType: () => getParsedType,
+  getLengthableOrigin: () => getLengthableOrigin,
+  getEnumValues: () => getEnumValues,
+  getElementAtPath: () => getElementAtPath,
+  floatSafeRemainder: () => floatSafeRemainder,
+  finalizeIssue: () => finalizeIssue,
+  extend: () => extend,
+  explicitlyAborted: () => explicitlyAborted,
+  escapeRegex: () => escapeRegex,
+  esc: () => esc,
+  defineLazy: () => defineLazy,
+  createTransparentProxy: () => createTransparentProxy,
+  cloneDef: () => cloneDef,
+  clone: () => clone,
+  cleanRegex: () => cleanRegex,
+  cleanEnum: () => cleanEnum,
+  captureStackTrace: () => captureStackTrace,
+  cached: () => cached,
+  base64urlToUint8Array: () => base64urlToUint8Array,
+  base64ToUint8Array: () => base64ToUint8Array,
+  assignProp: () => assignProp,
+  assertNotEqual: () => assertNotEqual,
+  assertNever: () => assertNever,
+  assertIs: () => assertIs,
+  assertEqual: () => assertEqual,
+  assert: () => assert,
+  allowsEval: () => allowsEval,
+  aborted: () => aborted,
+  NUMBER_FORMAT_RANGES: () => NUMBER_FORMAT_RANGES,
+  Class: () => Class,
+  BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES
 });
 function assertEqual(val) {
   return val;
@@ -4269,7 +4269,7 @@ function finalize(ctx, schema) {
     result.$schema = "http://json-schema.org/draft-07/schema#";
   } else if (ctx.target === "draft-04") {
     result.$schema = "http://json-schema.org/draft-04/schema#";
-  } else if (ctx.target === "openapi-3.0") {}
+  } else if (ctx.target === "openapi-3.0") {} else {}
   if (ctx.external?.uri) {
     const id = ctx.external.registry.get(schema)?.id;
     if (!id)
@@ -4478,7 +4478,7 @@ var literalProcessor = (schema, ctx, json, _params) => {
     if (val === undefined) {
       if (ctx.unrepresentable === "throw") {
         throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-      }
+      } else {}
     } else if (typeof val === "bigint") {
       if (ctx.unrepresentable === "throw") {
         throw new Error("BigInt literals cannot be represented in JSON Schema");
@@ -6021,6 +6021,15 @@ var OmoTeamSpecLayerSchema = OmoTeamSpecBaseSchema.partial();
 var OmoTeamsConfigSchema = record(string2(), OmoTeamSpecSchema);
 var OmoTeamsConfigLayerSchema = record(string2(), OmoTeamSpecLayerSchema);
 
+// ../../../../omo-config-core/src/schema/telemetry.ts
+var OmoTelemetrySettingsShape = {
+  enabled: boolean2()
+};
+var OmoTelemetrySettingsLayerSchema = object(OmoTelemetrySettingsShape).partial().strict();
+var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
+  enabled: boolean2().default(true)
+}).strict();
+
 // ../../../../omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoTypedHarnessConfigSchema = object({
@@ -6030,7 +6039,8 @@ var OmoTypedHarnessConfigSchema = object({
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
-  memory: OmoMemorySettingsLayerSchema.optional()
+  memory: OmoMemorySettingsLayerSchema.optional(),
+  telemetry: OmoTelemetrySettingsLayerSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
@@ -6040,6 +6050,7 @@ var OmoConfigProfileSchema = object({
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
+  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional()
@@ -6053,6 +6064,7 @@ var OmoConfigSchema = object({
   teams: OmoTeamsConfigSchema.optional(),
   models: OmoModelCatalogSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
+  telemetry: OmoTelemetrySettingsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
@@ -6069,6 +6081,7 @@ var OmoConfigLayerSchema = object({
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
+  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
@@ -9728,7 +9741,7 @@ function isDirectInvocation(argvPath) {
   return realpathSync3(resolve5(argvPath)) === realpathSync3(modulePath);
 }
 export {
-  resolveServeProcessInvocation,
+  runCodegraphServeCli,
   runCodegraphServe,
-  runCodegraphServeCli
+  resolveServeProcessInvocation
 };

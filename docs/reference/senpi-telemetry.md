@@ -53,7 +53,7 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `turn_completed` | `total_tokens` | `number` | - |
 | `turn_completed` | `turn_index` | `number` | - |
 | `skill_loaded` | `$session_id` | `string` | - |
-| `skill_loaded` | `skill_name` | `string` | `ast-grep`, `coding-agent-sessions`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `start-work`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa` |
+| `skill_loaded` | `skill_name` | `string` | `ast-grep`, `coding-agent-sessions`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `onboarding`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `start-work`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa` |
 | `delegation_started` | `$session_id` | `string` | - |
 | `delegation_started` | `background` | `boolean` | - |
 | `delegation_started` | `batch_size_bucket` | `string` | `1`, `2_4`, `5_plus` |

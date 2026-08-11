@@ -1,4 +1,5 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
+import { recordSummary } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -17,6 +18,17 @@ type EventBridgeState = {
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
 }
 
+function emitTaskSnapshot(pi: SenpiExtensionAPI, engine: TaskEngine): void {
+  const parent_session_id = engine.runtime.sessionId()
+  if (parent_session_id === undefined) return
+  pi.rpc?.emit("omo.task.updated", {
+    parent_session_id,
+    tasks: engine.manager
+      .list({ scope: "parent-session", session_id: parent_session_id })
+      .map(({ record }) => recordSummary(record, true)),
+  })
+}
+
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
 // BEFORE reconcile (revived children must not double-deliver buffered terminals), revive/reattach
 // the resumed session's children (undefined session id still runs the legacy crash-orphan sweep),
@@ -32,6 +44,7 @@ export function wireEventBridge(
   state: EventBridgeState,
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  const unsubscribeTaskSnapshots = engine.onStoreMutation(() => emitTaskSnapshot(pi, engine))
   wireReloadGuard(pi, engine.manager)
 
   pi.on("session_start", async (_payload, eventCtx) => {
@@ -57,6 +70,7 @@ export function wireEventBridge(
     }
     await tickLeadPollersBestEffort(ctx, state)
     statusUi.scheduleSync()
+    emitTaskSnapshot(pi, engine)
   })
 
   pi.on("session_before_switch", (_payload, eventCtx) => {
@@ -77,6 +91,7 @@ export function wireEventBridge(
   })
 
   pi.on("session_shutdown", async (payload, eventCtx) => {
+    unsubscribeTaskSnapshots()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()

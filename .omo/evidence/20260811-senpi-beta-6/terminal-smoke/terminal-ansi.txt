@@ -1,0 +1,3 @@
+omo 5.0.0-0.beta.5 (engine: senpi 2026.8.11-4)
+omo (omo-ai beta 5.0.0-0.beta.5)
+omo: sibling credentials detected; run `omo setup` to review them

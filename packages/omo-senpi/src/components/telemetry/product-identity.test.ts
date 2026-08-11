@@ -44,7 +44,7 @@ describe("OmO Native product identity", () => {
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
     expect(config.machineIdPrefix).toBe("omo-senpi:")
-    expect(config.packageVersion).toBe("5.0.0-beta.5")
+    expect(config.packageVersion).toBe("5.0.0-beta.6")
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip ?? false).toBe(false)
     expect(getTelemetryApiKey({ POSTHOG_API_KEY: "env-project-key" }, config.defaultApiKey)).toBe("env-project-key")

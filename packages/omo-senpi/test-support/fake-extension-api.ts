@@ -31,6 +31,11 @@ export interface FakeSendUserMessageCall {
   options?: { deliverAs?: "steer" | "followUp" }
 }
 
+export interface FakeRpcEvent {
+  name: string
+  data: unknown
+}
+
 export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly handlers: Array<{ event: string; handler: FakeEventHandler }> = []
   readonly tools: Record<string, unknown>[] = []
@@ -40,7 +45,9 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly userMessages: FakeSendUserMessageCall[] = []
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
   readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
+  readonly rpcEvents: FakeRpcEvent[] = []
   events?: SenpiExtensionAPI["events"]
+  rpc?: { emit(name: string, data: unknown): void }
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 

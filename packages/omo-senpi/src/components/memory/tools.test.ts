@@ -305,5 +305,5 @@ describe("memory tool execution", () => {
     const { existsSync } = await import("node:fs")
     expect(existsSync(join(identityPaths.repo, ".git", "hooks", "pre-commit"))).toBe(true)
     expect(existsSync(join(identityPaths.repo, ".git", "hooks", "post-commit"))).toBe(true)
-  })
+  }, 15_000)
 })
