@@ -83,12 +83,12 @@ describe("omo-omp installer", () => {
   test("#given a packed plugin #when installing with the omp CLI available #then omp plugin install is invoked", async () => {
     await withFakeRepo(async (repoRoot) => {
       makeFakePlugin(repoRoot)
-      const context = makeContext({ repoRoot, ompBin: "omp" })
+      const context = makeContext({ repoRoot, ompBin: join(repoRoot, "packages", "omo-omp", "plugin", "scripts", "install.mjs") })
       const result = await runOmpInstaller({
         repoRoot,
         pluginPath: context.pluginPath,
         agentDir: context.agentDir,
-        ompBin: "omp",
+        ompBin: join(repoRoot, "packages", "omo-omp", "plugin", "scripts", "install.mjs"),
         runCommand: context.runCommand,
         platform: "win32",
       })
