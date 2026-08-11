@@ -37,6 +37,7 @@ type ModelFallbackControllerWithState = Pick<
   | "clearSessionFallbackChain"
   | "setPendingModelFallback"
   | "getNextFallback"
+  | "peekNextFallback"
   | "clearPendingModelFallback"
   | "hasPendingModelFallback"
   | "getFallbackState"
@@ -109,6 +110,20 @@ export function getNextFallback(
 }
 
 /**
+ * Peeks at the next fallback model for a session WITHOUT consuming it.
+ * Does not advance attemptCount or clear pending state. Use this when
+ * the caller needs to know which fallback would be selected (e.g. to
+ * build a continuation launch model) while leaving chain consumption to
+ * the chat.message hook.
+ */
+export function peekNextFallback(
+  controller: Pick<ModelFallbackStateController, "peekNextFallback">,
+  sessionID: string,
+): { providerID: string; modelID: string; variant?: string } | null {
+  return controller.peekNextFallback(sessionID)
+}
+
+/**
  * Clears the pending fallback for a session.
  * Called after fallback is successfully applied.
  */
@@ -164,6 +179,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     clearSessionFallbackChain: controller.clearSessionFallbackChain,
     setPendingModelFallback: controller.setPendingModelFallback,
     getNextFallback: controller.getNextFallback,
+    peekNextFallback: controller.peekNextFallback,
     clearPendingModelFallback: controller.clearPendingModelFallback,
     hasPendingModelFallback: controller.hasPendingModelFallback,
     getFallbackState: controller.getFallbackState,

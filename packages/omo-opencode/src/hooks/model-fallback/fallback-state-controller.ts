@@ -37,6 +37,7 @@ export type ModelFallbackStateController = {
     currentModelID: string,
   ) => boolean
   getNextFallback: (sessionID: string) => ReturnType<typeof getNextReachableFallback>
+  peekNextFallback: (sessionID: string) => ReturnType<typeof getNextReachableFallback>
   clearPendingModelFallback: (sessionID: string) => void
   hasPendingModelFallback: (sessionID: string) => boolean
   getFallbackState: (sessionID: string) => ModelFallbackStateLike | undefined
@@ -93,8 +94,19 @@ export function createModelFallbackStateController(input: {
     }
 
     if (existing.pending) {
-      log(`[model-fallback] Pending fallback already armed for session: ${sessionID}`)
-      return false
+      // A fallback is already queued but not yet consumed by the chat.message
+      // hook. Block re-arm only when the failed model is the SAME as the one
+      // that armed it; a DIFFERENT failed model (e.g. the chain advanced to a
+      // new model that then also hit quota) must re-arm so the chain can
+      // advance again instead of stalling after the first fallback.
+      if (isSameFailedModel(existing, currentProviderID, currentModelID)) {
+        log(`[model-fallback] Pending fallback already armed for session: ${sessionID}`)
+        return false
+      }
+      existing.providerID = currentProviderID
+      existing.modelID = currentModelID
+      log(`[model-fallback] Re-armed pending fallback for changed failed model in session: ${sessionID}`)
+      return true
     }
 
     if (existing.attemptCount > 0 && isSameFailedModel(existing, currentProviderID, currentModelID)) {
@@ -125,6 +137,25 @@ export function createModelFallbackStateController(input: {
     return null
   }
 
+  function peekNextFallback(sessionID: string): ReturnType<typeof getNextReachableFallback> {
+    const state = pendingModelFallbacks.get(sessionID)
+    if (!state?.pending) return null
+
+    // Snapshot only the scalar fields getNextReachableFallback mutates
+    // (attemptCount, pending). fallbackChain is read-only inside the helper,
+    // so the array reference is safe to share. The snapshot lets the
+    // continuation dispatcher resolve the next fallback WITHOUT advancing
+    // the chain — the chat.message hook still owns chain consumption.
+    const snapshot: ModelFallbackStateLike = {
+      providerID: state.providerID,
+      modelID: state.modelID,
+      fallbackChain: state.fallbackChain,
+      attemptCount: state.attemptCount,
+      pending: state.pending,
+    }
+    return getNextReachableFallback(sessionID, snapshot)
+  }
+
   function clearPendingModelFallback(sessionID: string): void {
     pendingModelFallbacks.delete(sessionID)
     lastToastKey.delete(sessionID)
@@ -151,6 +182,7 @@ export function createModelFallbackStateController(input: {
     clearSessionFallbackChain,
     setPendingModelFallback,
     getNextFallback,
+    peekNextFallback,
     clearPendingModelFallback,
     hasPendingModelFallback,
     getFallbackState,

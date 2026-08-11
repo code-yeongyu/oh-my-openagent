@@ -7,6 +7,7 @@ import {
   type ModelFallbackHook,
 } from "../hooks/model-fallback/hook";
 import { shouldRetryError } from "../shared/model-error-classifier";
+import { shouldAttemptModelFallback } from "../shared/model-fallback-decision";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import {
   extractErrorMessage,
@@ -32,7 +33,10 @@ export function createModelFallbackEventHandler(args: {
   isSessionStopped: (sessionID: string) => boolean;
 }) {
   const lastHandledModelErrorMessageID = new Map<string, string>();
-  const lastHandledRetryStatusKey = new Map<string, string>();
+  // Per-session set of handled retry keys. A Set (not a single last-key) so a
+  // sequence like A -> B -> stale A still dedups the stale A: its key remains
+  // in the set after B was added. Cleared on idle and on session teardown.
+  const lastHandledRetryStatusKey = new Map<string, Set<string>>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
   const continuationsInFlight = new Set<string>();
   const lastDispatchedContinuationKeys = new Map<
@@ -46,6 +50,7 @@ export function createModelFallbackEventHandler(args: {
   const continuation = createModelFallbackContinuationController({
     pluginConfig: args.pluginConfig,
     pluginContext: args.pluginContext,
+    modelFallback: args.modelFallback,
     lastKnownModelBySession,
     continuationsInFlight,
     lastDispatchedContinuationKeys,
@@ -125,7 +130,7 @@ export function createModelFallbackEventHandler(args: {
 
     const providerHint = params.info.providerID as string | undefined;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
-    const rawModel = (params.info.modelID as string | undefined) ?? "claude-opus-4-7";
+    const rawModel = (params.info.modelID as string | undefined) ?? "";
     const currentModel = normalizeFallbackModelID(rawModel);
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
@@ -151,13 +156,23 @@ export function createModelFallbackEventHandler(args: {
     if (params.status?.type !== "retry" || !shouldHandleModelFallback()) return false;
 
     const retryMessage = typeof params.status.message === "string" ? params.status.message : "";
-    const parsedForKey = extractProviderModelFromErrorMessage(retryMessage);
     const retryAttempt = extractRetryAttempt(params.status.attempt, retryMessage);
-    const retryKey = `${retryAttempt}:${parsedForKey.providerID ?? ""}/${parsedForKey.modelID ?? ""}:${normalizeRetryStatusMessage(retryMessage)}`;
-    if (lastHandledRetryStatusKey.get(params.sessionID) === retryKey) return true;
-    lastHandledRetryStatusKey.set(params.sessionID, retryKey);
 
-    if (!shouldRetryError({ name: undefined, message: retryMessage })) return false;
+    // Resolve the trusted failed-model identity from session state (not from
+    // the retry message, which for quota-style 429s carries no provider/model
+    // and would collapse distinct failed models to the same dedup key).
+    const parsed = extractProviderModelFromErrorMessage(retryMessage);
+    const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
+    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? "");
+
+    const retryKey = `${retryAttempt}:${currentProvider}/${currentModel}:${normalizeRetryStatusMessage(retryMessage)}`;
+    const handledKeys = lastHandledRetryStatusKey.get(params.sessionID);
+    if (handledKeys?.has(retryKey)) return true;
+    if (handledKeys) handledKeys.add(retryKey);
+    else lastHandledRetryStatusKey.set(params.sessionID, new Set([retryKey]));
+
+    if (!shouldAttemptModelFallback({ name: undefined, message: retryMessage })) return false;
 
     const agentName = resolveFallbackAgentName({
       currentAgent: getSessionAgent(params.sessionID),
@@ -167,10 +182,6 @@ export function createModelFallbackEventHandler(args: {
     });
     if (!agentName) return false;
 
-    const parsed = extractProviderModelFromErrorMessage(retryMessage);
-    const lastKnown = lastKnownModelBySession.get(params.sessionID);
-    const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
-    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-7");
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: parsed.providerID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
@@ -206,7 +217,7 @@ export function createModelFallbackEventHandler(args: {
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined) || parsed.modelID || "claude-opus-4-7",
+      (params.props?.modelID as string | undefined) || parsed.modelID || "",
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);

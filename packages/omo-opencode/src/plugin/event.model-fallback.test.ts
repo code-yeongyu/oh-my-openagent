@@ -36,12 +36,15 @@ describe("createEventHandler - model fallback", () => {
     hooks?: unknown
     pluginConfig?: unknown
     abort?: (input: { path: { id: string } }) => Promise<unknown>
-    promptAsync?: (input: { path: { id: string } }) => Promise<unknown>
+    promptAsync?: (input: { path: { id: string }; body?: { model?: unknown } }) => Promise<unknown>
   }) => {
     setupConnectedProviderCacheMocks()
     const abortCalls: string[] = []
     const promptCalls: string[] = []
     const promptAsyncCalls: string[] = []
+    // Captures `body.model` from each promptAsync call so Problem-B RED tests
+    // can assert which model the auto-continuation actually dispatched.
+    const promptAsyncBodies: unknown[] = []
 
     const sessionClient = {
       abort: async ({ path }: { path: { id: string } }) => {
@@ -57,8 +60,11 @@ describe("createEventHandler - model fallback", () => {
       },
       ...(args?.promptAsync
         ? {
-            promptAsync: async (input: { path: { id: string } }) => {
+            promptAsync: async (input: { path: { id: string }; body?: { model?: unknown } }) => {
               promptAsyncCalls.push(input.path.id)
+              if (input.body && typeof input.body === "object" && "model" in input.body) {
+                promptAsyncBodies.push(input.body.model)
+              }
               return args.promptAsync?.(input)
             },
           }
@@ -90,7 +96,7 @@ describe("createEventHandler - model fallback", () => {
     })
     const handler = (input: EventInput): Promise<void> => eventHandler(asEventHandlerInput(input))
 
-    return { handler, abortCalls, promptCalls, promptAsyncCalls }
+    return { handler, abortCalls, promptCalls, promptAsyncCalls, promptAsyncBodies }
   }
 
   afterEach(() => {
@@ -1149,5 +1155,487 @@ describe("createEventHandler - model fallback", () => {
     //#then - no abort or prompt calls should have been made
     expect(abortCalls).toEqual([])
     expect(promptCalls).toEqual([])
+  })
+
+  // ---------------------------------------------------------------------------
+  // RED tests for sync model-fallback bugs (Task 2.1).
+  //
+  // These tests pin the CURRENT (buggy) behavior of the sync session.status
+  // model-fallback path. They are expected to FAIL until Task 2.2 (Fix A),
+  // 2.3 (Fix B), and 2.4 (Fix D) land. Each test names the problem it proves.
+  //
+  //   Problem A: handleSessionStatus calls shouldRetryError({name: undefined,
+  //     message}) and STOP_MESSAGE_PATTERNS contains "monthly limit" so a Z.ai
+  //     "Weekly/Monthly Limit Exhausted" message returns false BEFORE the
+  //     statusCode check -> fallback never armed.
+  //   Problem B: autoContinueAfterFallback dispatches fallbackContext.
+  //     {providerID, modelID} (the FAILED model) instead of the next entry
+  //     from the configured chain -> ProviderModelNotFoundError zombie.
+  //   Problem D: retryKey = attempt:provider/model:normalizedMessage; quota
+  //     messages without provider/model collapse two different failed models
+  //     (GLM -> GPT) to the same key -> second event wrongly treated as dup.
+  // ---------------------------------------------------------------------------
+
+  test("PROBLEM A (RED): session.status with Z.ai Weekly/Monthly Limit Exhausted message arms model-fallback for main session", async () => {
+    //#given - Z.ai returns HTTP 429 with a quota-exhaustion message that
+    // currently matches STOP_MESSAGE_PATTERNS ("monthly limit"), so
+    // shouldRetryError returns false before the statusCode branch can run.
+    // After Task 2.2, the handler must recognize quota-exhaustion 429s as
+    // fallback-eligible regardless of the message pattern.
+    const sessionID = "ses_problem_a_quota_exhaustion"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_problem_a",
+            sessionID,
+            role: "user",
+            modelID: "glm-5.2",
+            providerID: "zai-coding-plan",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - Z.ai quota exhaustion surfaces as session.status retry
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message:
+              "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-08-15 00:00:00",
+            next: 1234,
+          },
+        },
+      },
+    })
+
+    //#then - fallback MUST be armed and auto-continuation dispatched.
+    // EXPECTED ON CURRENT (BUGGY) CODE: FAIL — fallback is NOT armed because
+    // "monthly limit" in the message matches STOP_MESSAGE_PATTERNS and
+    // shouldRetryError returns false before the statusCode branch.
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+  })
+
+  test("PROBLEM B (RED): autoContinueAfterFallback dispatches the configured next model, not the failed model", async () => {
+    //#given - failed model = zai-coding-plan/glm-5.2; user-configured chain
+    // for sisyphus has exactly one next entry: deepseek/deepseek-v4-pro.
+    // autoContinueAfterFallback should pull that next entry via
+    // getNextFallback and dispatch it, NOT echo back the failed model.
+    const sessionID = "ses_problem_b_wrong_dispatched_model"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["deepseek/deepseek-v4-pro"],
+        },
+      },
+    }
+    const { handler, promptAsyncBodies } = createHandler({
+      hooks: { modelFallback },
+      pluginConfig,
+      promptAsync: async () => ({}),
+    })
+
+    // Seed lastKnownModel so the failed model resolves to glm-5.2.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_problem_b",
+            sessionID,
+            role: "user",
+            modelID: "glm-5.2",
+            providerID: "zai-coding-plan",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - session.status retry whose message carries NO model metadata
+    // (typical for Z.ai quota: the model is implied by lastKnown, not in the
+    // message text). shouldRetryError must still classify it as retryable so
+    // fallback arms and auto-continues.
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Rate limit reached for this request. Please retry shortly.",
+            next: 60,
+          },
+        },
+      },
+    })
+
+    //#then - the dispatched promptAsync body.model MUST be the configured
+    // next entry deepseek/deepseek-v4-pro.
+    // EXPECTED ON CURRENT (BUGGY) CODE: FAIL — autoContinueAfterFallback
+    // builds launchModel from fallbackContext.{providerID, modelID} which is
+    // the FAILED model (zai-coding-plan/glm-5.2), so body.model echoes the
+    // failed model instead of advancing the chain.
+    expect(promptAsyncBodies).toHaveLength(1)
+    expect(promptAsyncBodies[0]).toEqual({
+      providerID: "deepseek",
+      modelID: "deepseek-v4-pro",
+    })
+  })
+
+  test("PROBLEM B (extra): abort failure before continuation does not consume a fallback rung via getNextFallback", async () => {
+    //#given - abort throws before promptAsync runs. getNextFallback must not
+    // be called yet (it is called later by the chat.message hook, not by
+    // autoContinueAfterFallback), so attemptCount must not advance when the
+    // abort fails and the continuation short-circuits. This is a baseline
+    // characterization test: it documents whether the current code path
+    // happens to advance the chain on abort failure.
+    const sessionID = "ses_problem_b_abort_before_continuation"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["deepseek/deepseek-v4-pro"],
+        },
+      },
+    }
+    const { handler } = createHandler({
+      hooks: { modelFallback },
+      pluginConfig,
+      abort: async () => {
+        throw new Error("abort transport failed")
+      },
+      promptAsync: async () => ({}),
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_problem_b_abort",
+            sessionID,
+            role: "user",
+            modelID: "glm-5.2",
+            providerID: "zai-coding-plan",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - quota-style retry arrives; abort fails so continuation never
+    // dispatches.
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Rate limit reached for this request. Please retry shortly.",
+            next: 60,
+          },
+        },
+      },
+    })
+
+    //#then - attemptCount must not have advanced (getNextFallback is only
+    // called by the chat.message hook, which never ran). The pending
+    // fallback may still be armed; only the chain index is asserted here.
+    // BASELINE: this should PASS on current code because the chain advances
+    // exclusively inside the chat.message hook, not inside abort handling.
+    const state = modelFallback.getFallbackState(sessionID)
+    expect(state?.attemptCount ?? 0).toBe(0)
+  })
+
+  test("PROBLEM D (RED): two consecutive session.status retries with the same quota message but different failed models are both processed", async () => {
+    //#given - retryKey is built as `${attempt}:${providerID ?? ""}/${modelID
+    // ?? ""}:${normalizeRetryStatusMessage(message)}`. When the quota message
+    // carries no provider/model text (typical for Z.ai 429s), the key
+    // collapses to `1:/:<normalized-message>` for BOTH events even when the
+    // failed model changed (GLM -> GPT). The second event is then wrongly
+    // treated as a duplicate and skipped.
+    const sessionID = "ses_problem_d_dedup_collision"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    // First failed model: GLM via lastKnown.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_problem_d_glm",
+            sessionID,
+            role: "user",
+            modelID: "glm-5.2",
+            providerID: "zai-coding-plan",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - first quota retry for GLM
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Rate limit reached for this request. Please retry shortly.",
+            next: 60,
+          },
+        },
+      },
+    })
+
+    // Simulate the failed model changing to GPT before the next retry
+    // surfaces (e.g. the chat.message fallback advanced to a GPT model that
+    // then also hit the same provider quota).
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_problem_d_gpt",
+            sessionID,
+            role: "user",
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - second quota retry with the SAME normalized message but now for
+    // a DIFFERENT failed model (GPT). The two events have distinct
+    // semantics: the first triggers fallback for GLM, the second for GPT.
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Rate limit reached for this request. Please retry shortly.",
+            next: 60,
+          },
+        },
+      },
+    })
+
+    //#then - BOTH retries must have triggered abort + prompt.
+    // EXPECTED ON CURRENT (BUGGY) CODE: FAIL - only the first event
+    // processes; the second collides on retryKey `1:/:rate limit reached...`
+    // and is dropped as a duplicate.
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+  })
+
+  test("NEGATIVE (baseline): session.status with a benign non-retryable message does not arm model-fallback", async () => {
+    //#given - characterization baseline. The message below matches NO
+    // RETRYABLE_MESSAGE_PATTERNS and NO STOP patterns, so shouldRetryError
+    // returns false and no fallback is armed. This MUST stay green so the
+    // RED tests above cannot be accused of just arming fallback for any
+    // session.status event.
+    const sessionID = "ses_negative_benign_message"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_negative_benign",
+            sessionID,
+            role: "user",
+            modelID: "glm-5.2",
+            providerID: "zai-coding-plan",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Informational: session heartbeat acknowledged.",
+            next: 30,
+          },
+        },
+      },
+    })
+
+    //#then - no fallback, no abort/prompt.
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("NEGATIVE (baseline): session.error with AbortError does not arm model-fallback", async () => {
+    //#given - AbortError is not in NON_RETRYABLE_ERROR_NAMES verbatim, but
+    // with an empty message no RETRYABLE pattern matches, so shouldRetryError
+    // returns false. This pins the contract that genuine abort-style errors
+    // do not consume a fallback rung.
+    const sessionID = "ses_negative_abort_error"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "AbortError",
+            message: "Request aborted by user.",
+          },
+        },
+      },
+    })
+
+    //#then - no fallback armed.
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("CHAIN EXHAUSTION: once the configured fallback chain is fully consumed, a second retry does not dispatch another continuation", async () => {
+    //#given - user-configured chain has exactly ONE entry. The first retry
+    // consumes it; the second retry must NOT spawn another promptAsync
+    // continuation (no orphan reservations, no zombie session).
+    const sessionID = "ses_chain_exhaustion"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["deepseek/deepseek-v4-pro"],
+        },
+      },
+    }
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      pluginConfig,
+      promptAsync: async () => ({}),
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_chain_exhaustion_1",
+            sessionID,
+            role: "user",
+            modelID: "glm-5.2",
+            providerID: "zai-coding-plan",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - first quota retry; auto-continuation dispatches once.
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Rate limit reached for this request. Please retry shortly.",
+            next: 60,
+          },
+        },
+      },
+    })
+
+    // Surface a different failed model so the second retry is NOT dropped by
+    // the Problem-D dedup collision (we want to isolate chain-exhaustion
+    // behavior from the dedup bug).
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_chain_exhaustion_2",
+            sessionID,
+            role: "user",
+            modelID: "deepseek-v4-pro",
+            providerID: "deepseek",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Rate limit reached for this request. Please retry shortly.",
+            next: 60,
+          },
+        },
+      },
+    })
+
+    //#then - exactly ONE continuation was dispatched. The second retry must
+    // not spawn another promptAsync (the configured chain is exhausted).
+    // BASELINE/RED: see /tmp/omo-task21-report.txt for the observed outcome;
+    // current code may dispatch twice (Problem B echoes the failed model
+    // instead of consulting the chain, so exhaustion is invisible to
+    // autoContinueAfterFallback). After Task 2.3, this should PASS.
+    expect(promptAsyncCalls).toEqual([sessionID])
+    expect(abortCalls.length).toBeGreaterThanOrEqual(1)
   })
 })

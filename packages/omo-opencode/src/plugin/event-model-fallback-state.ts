@@ -56,11 +56,12 @@ export function applyUserConfiguredFallbackChain(
 export function createModelFallbackContinuationController(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
+  modelFallback: ModelFallbackHook | null | undefined;
   lastKnownModelBySession: Map<string, { providerID: string; modelID: string }>;
   continuationsInFlight: Set<string>;
   lastDispatchedContinuationKeys: Map<string, FallbackContinuationDedupeState>;
 }) {
-  const { pluginConfig, pluginContext, lastKnownModelBySession, continuationsInFlight } = args;
+  const { pluginConfig, pluginContext, modelFallback, lastKnownModelBySession, continuationsInFlight } = args;
   const lastDispatchedContinuationKeys = args.lastDispatchedContinuationKeys;
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
@@ -183,14 +184,57 @@ export function createModelFallbackContinuationController(args: {
       const launchAgent = fallbackContext?.agentName
         ? resolveRegisteredAgentName(fallbackContext.agentName)
         : undefined;
-      const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
-        ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
+
+      // Resolve the next fallback BEFORE dispatch so the continuation
+      // launches with the FALLBACK model (deepseek/deepseek-v4-pro, etc.),
+      // not the failed model from fallbackContext. PEEK does not advance
+      // attemptCount or clear pending — the chat.message hook still owns
+      // chain consumption when it fires for the continued prompt.
+      //
+      // Some legacy test stubs only mock setPendingModelFallback and do
+      // not expose peekNextFallback; for those, fall back to emitting the
+      // failed model (the chat.message hook still advances the chain).
+      const peekFn = modelFallback
+        ? (modelFallback as { peekNextFallback?: (sessionID: string) => { providerID: string; modelID: string; variant?: string } | null }).peekNextFallback
         : undefined;
+
+      let launchModel: { providerID: string; modelID: string } | undefined;
+      let launchVariantFromFallback: string | undefined;
+      if (typeof peekFn === "function") {
+        let peeked: { providerID: string; modelID: string; variant?: string } | null;
+        try {
+          peeked = peekFn(sessionID);
+        } catch (err) {
+          log("[event] model-fallback peekNextFallback threw", {
+            sessionID,
+            source,
+            error: err instanceof Error ? err : String(err),
+          });
+          peeked = null;
+        }
+        if (!peeked) {
+          log("[event] model-fallback continuation skipped because fallback chain is empty or exhausted", {
+            sessionID,
+            source,
+          });
+          return;
+        }
+        launchModel = { providerID: peeked.providerID, modelID: peeked.modelID };
+        launchVariantFromFallback = peeked.variant;
+      } else {
+        launchModel = fallbackContext?.providerID && fallbackContext?.modelID
+          ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
+          : undefined;
+      }
+
       const agentConfigKey = fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : undefined;
       const agentSettings = agentConfigKey
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
-      const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+      // Prefer the fallback entry's own variant; fall back to the agent's
+      // configured variant when the chain entry does not specify one.
+      const launchVariant = launchVariantFromFallback
+        ?? (agentSettings as { variant?: string } | undefined)?.variant;
       const promptBody = {
         path: { id: sessionID },
         body: {
