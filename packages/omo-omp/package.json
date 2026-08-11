@@ -1,0 +1,45 @@
+{
+  "name": "@oh-my-opencode/omo-omp",
+  "version": "5.0.0-beta.5",
+  "type": "module",
+  "private": true,
+  "description": "OMP harness adapter for oh-my-openagent.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./install": {
+      "types": "./src/install/index.ts",
+      "import": "./src/install/index.ts"
+    },
+    "./extension": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/ast-grep-mcp": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*",
+    "@oh-my-opencode/comment-checker-core": "workspace:*",
+    "@oh-my-opencode/telemetry-core": "workspace:*",
+    "@oh-my-opencode/prompts-core": "workspace:*",
+    "@oh-my-opencode/lsp-core": "workspace:*",
+    "@oh-my-opencode/senpi-task": "workspace:*",
+    "@oh-my-opencode/omo-config-core": "workspace:*",
+    "@oh-my-opencode/omo-opencode": "workspace:*",
+    "@oh-my-opencode/delegate-core": "workspace:*",
+    "@oh-my-opencode/team-core": "workspace:*",
+    "@oh-my-opencode/boulder-state": "workspace:*",
+    "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
+    "typebox": "1.1.38"
+  },
+  "devDependencies": {
+    "@oh-my-pi/pi-coding-agent": "17.2.12"
+  }
+}
