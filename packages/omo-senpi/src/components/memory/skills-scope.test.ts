@@ -23,10 +23,10 @@
  *    Extension paths are appended after the pre-existing set, so memory skills yield to
  *    project/user skills on name collision and otherwise load additively. Extension paths
  *    outside the user/project dirs classify as source "path".
- * 4. Missing dir tolerated: core/skills.ts loadSkills skips a nonexistent skill path with a
- *    { type: "warning", "skill path does not exist" } diagnostic and continues (no throw);
- *    loadSkillsFromDirInternal (:168+) likewise returns empty for a missing dir. => the
- *    create-free contract (return repo/skills even when absent) is safe.
+ * 4. Missing dir used to warn: core/skills.ts loadSkills emits
+ *    { type: "warning", "skill path does not exist" } for absent paths. This component now
+ *    ensure-creates repo/skills before contributing it, so first-run identities stay quiet
+ *    while remaining additive.
  * 5. Real-harness proof of the event round-trip: test/suite/hooks-builtin-extension.test.ts
  *    ("collects resource-discovered hook paths as runtime hook sources") and
  *    test/suite/hooks-lifecycle.test.ts:152 register pi.on("resources_discover", ...) via a
@@ -54,6 +54,7 @@ import { createMemoryIdentityContext, type MemoryIdentityContext } from "./conte
 import {
   MEMORY_SKILLS_DIRNAME,
   createMemorySkillsScopeHandler,
+  ensureMemorySkillsDir,
   memorySkillsDir,
   registerMemorySkillsScope,
   type MemorySkillsDiscoverResult,
@@ -186,9 +187,11 @@ describe("createMemorySkillsScopeHandler", () => {
     expect(result).toBeUndefined()
   })
 
-  test("returns the skills dir even when it does not exist on disk (create-free)", async () => {
+  test("creates the skills dir when missing, then returns it (ensure-on-discover)", async () => {
     // #given
     const { context, skillsDir } = await fixture()
+    const { existsSync } = await import("node:fs")
+    expect(existsSync(skillsDir)).toBe(false)
     const handler = createMemorySkillsScopeHandler({ resolveContext: () => context })
 
     // #when
@@ -196,8 +199,9 @@ describe("createMemorySkillsScopeHandler", () => {
 
     // #then
     expect(result).toEqual({ skillPaths: [skillsDir] })
-    const { existsSync } = await import("node:fs")
-    expect(existsSync(skillsDir)).toBe(false)
+    expect(existsSync(skillsDir)).toBe(true)
+    // Idempotent: a second ensure leaves the path stable.
+    expect(ensureMemorySkillsDir(context)).toBe(skillsDir)
   })
 
   test("ignores non-resources_discover payloads", async () => {

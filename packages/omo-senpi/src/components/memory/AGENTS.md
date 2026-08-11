@@ -23,7 +23,7 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 | `palace/` | Self-contained HTML memory viewer (0600/0700, machine-gated inline-JSON assertions). |
 | `guard.ts` | Soft cross-identity guard via `tool_call` (file tools only; bash advisory-only). |
 | `policy-guard.ts` | Hard guard: registers a filesystem policy when the host exposes `registerFilesystemPolicy` (senpi >= feat/extension-fs-policy), soft guard otherwise. |
-| `skills-scope.ts` | Agent memfs `skills/` exposure via `resources_discover`. |
+| `skills-scope.ts` | Agent memfs `skills/` exposure via `resources_discover` (ensure-creates empty dir). |
 | `status.ts` | Footer status + committed-only token advisory at `compile_warn_tokens`. |
 | `binding.ts` / `bindings/` | Binding entry record + renderer. |
 | `capabilities.ts` | `appendEntry`/`registerEntryRenderer` capability narrowing (`MemoryExtensionAPI`). |
@@ -40,7 +40,7 @@ Every row is intentional; each was weighed against the research corpus (claim-gr
 5. **No mid-conversation `<memory_update>` one-shot.** Letta special-cases `anthropic/claude-opus-4-8` (C15/C27); omo recompiles per run for every model (generalized, per-run `before_agent_start` re-check of HEAD).
 6. **No `/reflect --auto` selector subagent, no external-transcript staging, no `letta dream --to` doc maintenance.** Manual reflection takes `--recent N` / `--conversation <ids>` / free-text focus.
 7. **No recall subagent or conversation-bootstrap injection.** `/search` is the recall surface (letta's local path already disables AI description generation, C46).
-8. **No onboarding tutorial personality / welcome hints.** Default seeds (`system/persona.md`, `system/human.md`) are the only first-run content.
+8. **No onboarding tutorial personality / welcome hints.** Default seeds (`system/persona.md`, `system/human.md`, `skills/.gitkeep`) are the only first-run content.
 9. **Reflection sandbox default is `auto`**, not letta's fail-closed `required` (C33): default-on reflection must not break hosts without seatbelt/bwrap. `memory.reflection.sandbox: "required"` restores letta semantics.
 10. **`memory_description`/`limit` frontmatter tolerance matches letta; block-scalar descriptions are rejected** (letta's cut-prefix accepted `>` — that acceptance is treated as a bug).
 11. **str_replace replaces the FIRST occurrence** (letta actual behavior, C21) — the advisory's exactly-one-match proposal was rejected for parity.
