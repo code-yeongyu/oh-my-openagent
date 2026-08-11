@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:7bc4b0f020f0a1b4448cc75385a7e3c60042e3b270e304d4c1a43a859e81a4c2:e3e8cf6fc61cb0fb389d319dce31f73f8b2ebcb823ff09f8eee44a107186771b
+// omo-codex-install:01cee1543387564c19d57124ed5c708be20e8c0e409b36188fc82ab181528082:ed4f745d3e591add9448d9066317a87c547d3c4c3ee0f9ec2659c88d0f82d7c8
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -5927,7 +5927,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.5",
+    version: "5.0.0-beta.6",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -7180,6 +7180,38 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
 `);
   return rewroteAnyPackageJson;
 }
+async function removeCachedPackageWorkspaces(pluginRoot) {
+  const packageJsonPath = join8(pluginRoot, "package.json");
+  let packageJson;
+  try {
+    packageJson = JSON.parse(await readFile5(packageJsonPath, "utf8"));
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT")
+      return false;
+    throw error;
+  }
+  if (!isPlainRecord(packageJson))
+    return false;
+  let changed = false;
+  if (Array.isArray(packageJson.workspaces) && packageJson.workspaces.length > 0) {
+    packageJson.workspaces = [];
+    await writeFile2(packageJsonPath, `${JSON.stringify(packageJson, null, "\t")}
+`);
+    changed = true;
+  }
+  const packageLock = await readPackageLock(pluginRoot);
+  const packages = getPackageLockPackages(packageLock.value);
+  const lockRoot = packages?.[""];
+  if (isPlainRecord(lockRoot) && Array.isArray(lockRoot.workspaces) && lockRoot.workspaces.length > 0) {
+    lockRoot.workspaces = [];
+    packageLock.changed = true;
+    changed = true;
+  }
+  if (packageLock.changed)
+    await writeFile2(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}
+`);
+  return changed;
+}
 async function readPackageLock(pluginRoot) {
   const path = join8(pluginRoot, "package-lock.json");
   try {
@@ -7600,9 +7632,10 @@ async function installCachedPlugin(input) {
   try {
     await copyDirectory(input.sourcePath, tempPath);
     const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
+    const removedCachedWorkspaces = input.buildSource === false ? await removeCachedPackageWorkspaces(tempPath) : false;
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
-    const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
+    const installArgs = rewroteLocalFileDependencies || removedCachedWorkspaces ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
     await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)

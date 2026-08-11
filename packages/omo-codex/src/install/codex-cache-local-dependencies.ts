@@ -48,6 +48,42 @@ export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: stri
   return rewroteAnyPackageJson
 }
 
+/**
+ * A published Codex plugin contains prebuilt workspace components, not a runnable npm workspace.
+ * Keep npm from traversing the source workspace graph while it installs the small production
+ * dependency set needed by the cached plugin. The source tree keeps its workspace metadata so
+ * development and release builds remain unchanged.
+ */
+export async function removeCachedPackageWorkspaces(pluginRoot: string): Promise<boolean> {
+  const packageJsonPath = join(pluginRoot, "package.json")
+  let packageJson: unknown
+  try {
+    packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"))
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
+  }
+  if (!isPlainRecord(packageJson)) return false
+
+  let changed = false
+  if (Array.isArray(packageJson.workspaces) && packageJson.workspaces.length > 0) {
+    packageJson.workspaces = []
+    await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, "\t")}\n`)
+    changed = true
+  }
+
+  const packageLock = await readPackageLock(pluginRoot)
+  const packages = getPackageLockPackages(packageLock.value)
+  const lockRoot = packages?.[""]
+  if (isPlainRecord(lockRoot) && Array.isArray(lockRoot.workspaces) && lockRoot.workspaces.length > 0) {
+    lockRoot.workspaces = []
+    packageLock.changed = true
+    changed = true
+  }
+  if (packageLock.changed) await writeFile(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}\n`)
+  return changed
+}
+
 type PackageLockState = {
   readonly path: string
   readonly value: Record<string, unknown> | null

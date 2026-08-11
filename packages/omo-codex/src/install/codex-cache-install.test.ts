@@ -129,6 +129,74 @@ describe("codex-cache install", () => {
   )
 
   test(
+    "#given a packaged plugin has source workspace metadata #when caching plugin #then npm ignores the workspace graph",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-workspaces-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      const sharedRoot = join(root, "shared-lib")
+      await mkdir(sourceRoot, { recursive: true })
+      await mkdir(sharedRoot, { recursive: true })
+      await writeFile(
+        join(sourceRoot, "package.json"),
+        JSON.stringify({
+          name: "@scope/omo",
+          version: "0.1.0",
+          workspaces: ["components/local-tool"],
+          dependencies: { "shared-lib": "file:../shared-lib" },
+        }),
+      )
+      await writeFile(join(sharedRoot, "package.json"), JSON.stringify({ name: "shared-lib", version: "0.1.0" }))
+      await writeFile(
+        join(sourceRoot, "package-lock.json"),
+        JSON.stringify({
+          name: "@scope/omo",
+          version: "0.1.0",
+          lockfileVersion: 3,
+          requires: true,
+          packages: {
+            "": {
+              name: "@scope/omo",
+              version: "0.1.0",
+              workspaces: ["components/local-tool"],
+              dependencies: { "shared-lib": "file:../shared-lib" },
+            },
+          },
+        }),
+      )
+      let cachedPackageWorkspaces: unknown
+      let cachedLockWorkspaces: unknown
+
+      // when
+      const installed = await installCachedPlugin({
+        buildSource: false,
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async (command, args, options) => {
+          if (command !== "npm" || args[0] !== "install") return
+          const cachedPackage = JSON.parse(await readFile(join(options.cwd, "package.json"), "utf8")) as { readonly workspaces?: unknown }
+          const cachedLock = JSON.parse(await readFile(join(options.cwd, "package-lock.json"), "utf8")) as {
+            readonly packages?: { readonly ""?: { readonly workspaces?: unknown } }
+          }
+          cachedPackageWorkspaces = cachedPackage.workspaces
+          cachedLockWorkspaces = cachedLock.packages?.[""]?.workspaces
+        },
+      })
+
+      // then
+      expect(cachedPackageWorkspaces).toEqual([])
+      expect(cachedLockWorkspaces).toEqual([])
+      const installedPackage = JSON.parse(await readFile(join(installed.path, "package.json"), "utf8")) as { readonly workspaces?: unknown }
+      expect(installedPackage.workspaces).toEqual([])
+    },
+    15000,
+  )
+
+  test(
     "#given the local file: dependency rewrite changed nothing #when caching plugin #then the install stays npm ci --omit=dev",
     async () => {
       // given
