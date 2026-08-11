@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "bun:test"
 
@@ -142,6 +142,22 @@ describe("OmO Native telemetry notice and preview", () => {
       expect(notifications).toEqual([
         "omo-senpi sends anonymous usage telemetry (no prompts, no paths). Docs: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/senpi-telemetry.md - opt out: DO_NOT_TRACK=1",
       ])
+    })
+  })
+
+  it("#given the unconfigured project key #when session_start fires #then no first-run notice is sent", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const env = { SENPI_CODING_AGENT_DIR: agentDir }
+      const pi = register(agentDir, { env })
+      const notifications: string[] = []
+
+      // when
+      await pi.dispatch("session_start", {}, { ui: { notify: (message: string) => notifications.push(message) } })
+
+      // then
+      expect(notifications).toEqual([])
+      expect(existsSync(join(getOmoNativeStateDir(env), "notice-shown"))).toBe(false)
     })
   })
 

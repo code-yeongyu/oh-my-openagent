@@ -10,7 +10,7 @@ import {
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 
-export const OMO_NATIVE_POSTHOG_API_KEY = "phc_REPLACE_ME_OMO_NATIVE"
+export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9qcvcKtRNUWAn"
 
 export type OmoNativePropertyType = "boolean" | "number" | "string"
 

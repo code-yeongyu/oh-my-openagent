@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { shouldDisableTelemetry } from "./index"
+import {
+  UNCONFIGURED_POSTHOG_API_KEY,
+  hasTelemetryApiKey,
+  shouldDisableTelemetry,
+} from "./index"
 
 const OPT_OUT_CASES = [
   ["unset env enables telemetry", {}, false],
@@ -19,6 +23,17 @@ const OPT_OUT_CASES = [
   ["approved codex send yes convergence", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "yes" }, true],
   ["invalid disable value", { OMO_CODEX_DISABLE_POSTHOG: "maybe" }, false],
 ] as const
+
+describe("telemetry API key configuration", () => {
+  test.each([
+    ["empty", "", false],
+    ["whitespace-only", "   ", false],
+    ["exact unconfigured placeholder", UNCONFIGURED_POSTHOG_API_KEY, false],
+    ["longer key containing the placeholder", `${UNCONFIGURED_POSTHOG_API_KEY}_configured`, true],
+  ] as const)("#given %s input #when key availability is checked #then the expected result is returned", (_name, apiKey, expected) => {
+    expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
+  })
+})
 
 describe("opt-out telemetry env matrix", () => {
   test.each(OPT_OUT_CASES)(

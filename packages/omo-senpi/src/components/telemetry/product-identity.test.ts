@@ -18,7 +18,7 @@ import {
   maskProviderAndModel,
 } from "./product-identity"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
-import { getTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
+import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
 
 const originalAgentDir = process.env.SENPI_CODING_AGENT_DIR
 const temporaryRoots: string[] = []
@@ -40,7 +40,8 @@ describe("OmO Native product identity", () => {
   test("#given the native product #when config is created #then identity derivation and geoip settings are fixed", () => {
     const config = createOmoNativeProductConfig()
 
-    expect(OMO_NATIVE_POSTHOG_API_KEY).toBe("phc_REPLACE_ME_OMO_NATIVE")
+    expect(OMO_NATIVE_POSTHOG_API_KEY).not.toBe(UNCONFIGURED_POSTHOG_API_KEY)
+    expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
     expect(config.machineIdPrefix).toBe("omo-senpi:")
     expect(config.packageVersion).toBe("5.0.0-beta.5")

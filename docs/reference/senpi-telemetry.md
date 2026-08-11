@@ -2,7 +2,7 @@
 
 ## What this is
 
-OmO Native is the anonymous product analytics pipeline for the omo-senpi adapter. It's on by default: opt-out, never opt-in. Every switch in the opt-out matrix below turns it fully off.
+OmO Native is the anonymous product analytics pipeline for the omo-senpi adapter. It uses an opt-out model once configured, and every switch in the opt-out matrix below turns it fully off. Telemetry stays inactive while the shipped PostHog project key is an unconfigured placeholder. Setting `POSTHOG_API_KEY` to a real project key activates it without changing the packaged default.
 
 The payloads carry only booleans, buckets, counters, and allowlisted enum values. No free-form text ever leaves your machine. The exact schema is machine-generated below; if the generator and this document ever disagree, a drift test fails in CI.
 

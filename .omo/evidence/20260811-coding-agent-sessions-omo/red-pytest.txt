@@ -1,0 +1,27 @@
+WHAT WAS TESTED
+Command:
+  cd packages/shared-skills/skills/coding-agent-sessions
+  uv run --with pytest pytest scripts/tests/test_pi_family_scanners.py \
+    -k 'senpi_scanner_reads_omo_and_legacy_home_stores' -vv
+
+Purpose:
+  Prove the unchanged Senpi scanner does not discover the current
+  $HOME/.omo/agent/sessions store while it still discovers legacy
+  $HOME/.senpi/agent/sessions.
+
+WHAT WAS OBSERVED
+Exit code: 1
+
+Failure excerpt:
+  assert set(sessions) == {"omo-current", "senpi-legacy"}
+  E AssertionError: assert {'senpi-legacy'} == {'senpi-legacy', 'omo-current'}
+  E Extra items in the right set:
+  E 'omo-current'
+
+WHY IT IS ENOUGH
+The test reached the real scanner with valid JSONL fixtures and failed on the
+missing .omo result, not on setup, imports, syntax, or fixture parsing.
+
+WHAT WAS OMITTED
+Pytest formatting and repeated stack context were summarized. No credentials,
+environment dumps, or private session contents were captured.

@@ -1,0 +1,29 @@
+WHAT WAS TESTED
+Commands:
+  cd packages/shared-skills/skills/coding-agent-sessions
+  uv run --with pytest pytest scripts/tests/test_pi_family_scanners.py \
+    -k 'senpi_scanner_reads_omo_and_legacy_home_stores' -vv
+  uv run --with pytest pytest scripts/tests/test_pi_family_scanners.py \
+    -k 'senpi_scanner_deduplicates_overlapping_omo_and_legacy_sessions' -vv
+
+WHAT WAS OBSERVED
+Both commands exited 0.
+
+Happy-path result:
+  1 passed, 5 deselected
+
+Overlap result:
+  1 passed, 5 deselected
+
+The first test returned both `omo-current` and `senpi-legacy` as platform
+`senpi`. The second emitted one `shared` session and retained the `.omo`
+fixture carrying parsed agent linkage `sisyphus`.
+
+WHY IT IS ENOUGH
+The exact tests that failed before the production change now pass after only
+adding `.omo` to the Senpi config-root tuple. This proves the intended root
+coverage and preserves the existing dedupe contract.
+
+WHAT WAS OMITTED
+Repeated pytest headers were summarized. No secrets or private session data
+were captured.
