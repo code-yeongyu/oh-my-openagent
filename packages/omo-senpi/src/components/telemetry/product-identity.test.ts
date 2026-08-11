@@ -37,7 +37,7 @@ function useTemporaryAgentDir(): string {
 }
 
 describe("OmO Native product identity", () => {
-  test("#given the native product #when config is created #then identity derivation and geoip settings are fixed", () => {
+  test("#given the native product #when config is created #then identity derivation and effective geoip settings are fixed", () => {
     const config = createOmoNativeProductConfig()
 
     expect(OMO_NATIVE_POSTHOG_API_KEY).not.toBe(UNCONFIGURED_POSTHOG_API_KEY)
@@ -46,7 +46,7 @@ describe("OmO Native product identity", () => {
     expect(config.machineIdPrefix).toBe("omo-senpi:")
     expect(config.packageVersion).toBe("5.0.0-beta.5")
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
-    expect(config.disableGeoip).toBe(true)
+    expect(config.disableGeoip ?? false).toBe(false)
     expect(getTelemetryApiKey({ POSTHOG_API_KEY: "env-project-key" }, config.defaultApiKey)).toBe("env-project-key")
   })
 

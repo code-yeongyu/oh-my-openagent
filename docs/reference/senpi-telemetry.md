@@ -74,13 +74,13 @@ Identity is machine-level, not person-level:
 - The anonymous machine id is `sha256("omo-senpi:" + hostname)`. The raw hostname never leaves the machine; it's only hashed locally.
 - The `$session_id` value is a keyed hash: a per-machine random salt combined with the raw session id, then hashed. The raw session id is never sent, and sessions from different machines can't be correlated by session id.
 - Person profiles are disabled on every event (`$process_person_profile: false`), so PostHog builds no person records.
-- Geoip enrichment is disabled for these events, so no location is derived from the sending IP.
+- Geoip enrichment is enabled for these events, matching the legacy adapters, so PostHog may derive location data from the sending IP.
 
 Because identity is machine-level, a shared machine conflates its users into one id. That's an accepted, documented limitation, not a bug.
 
 ## SDK-added properties
 
-PostHog's node client attaches a few properties of its own to every event: `$lib`, `$lib_version`, and, because geoip is disabled, `$geoip_disable`. These are transport metadata added by the SDK, not authored by the omo-senpi client, so they don't appear in the allowlists above. They're listed here so an auditor comparing captured payloads against the schema isn't surprised.
+PostHog's node client attaches `$lib` and `$lib_version` to every event. Geoip enrichment is enabled, so the client does not attach `$geoip_disable`; PostHog may add derived location properties after ingestion. These are SDK or service metadata, not authored by the omo-senpi client, so they don't appear in the allowlists above. They're listed here so an auditor comparing captured and ingested payloads against the schema isn't surprised.
 
 ## Opt-out matrix
 
@@ -105,7 +105,7 @@ The following never leaves your machine:
 - Prompt or response text, prompt fragments, or exact prompt lengths (only coarse buckets)
 - File paths, the working directory, or repository and project names
 - Git identities or environment variable values
-- Raw hostnames or IP addresses
+- Raw hostnames or IP addresses in the application-authored payload (the transport connection still exposes its sending IP to PostHog for geoip enrichment)
 - Custom (non-builtin) skill names
 - Custom provider or model names, which are masked to `custom`
 

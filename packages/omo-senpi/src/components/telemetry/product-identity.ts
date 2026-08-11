@@ -151,12 +151,11 @@ const SALT_FILE_NAME = "session-id-salt"
 const SALT_LENGTH = 32
 const fallbackSalts = new Map<string, Buffer>()
 
-export function createOmoNativeProductConfig(): TelemetryProductConfig & { readonly disableGeoip: true } {
+export function createOmoNativeProductConfig(): TelemetryProductConfig {
   return {
     cacheDirName: "omo-native",
     defaultApiKey: OMO_NATIVE_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
-    disableGeoip: true,
     eventName: "daily_active",
     machineIdPrefix: "omo-senpi:",
     packageName: "@oh-my-opencode/omo-senpi",
