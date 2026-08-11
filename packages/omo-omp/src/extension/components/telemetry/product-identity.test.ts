@@ -43,7 +43,7 @@ describe("OmO Native product identity", () => {
     expect(OMO_NATIVE_POSTHOG_API_KEY).toBe("phc_REPLACE_ME_OMO_NATIVE")
     expect(config.platform).toBe("omo-omp")
     expect(config.machineIdPrefix).toBe("omo-omp:")
-    expect(config.packageVersion).toBe("5.0.0-beta.5")
+    expect(config.packageVersion).toBe("5.0.0-beta.6")
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip).toBe(true)
     expect(getTelemetryApiKey({ POSTHOG_API_KEY: "env-project-key" }, config.defaultApiKey)).toBe("env-project-key")
