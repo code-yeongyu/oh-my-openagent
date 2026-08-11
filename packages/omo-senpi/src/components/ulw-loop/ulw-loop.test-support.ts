@@ -82,6 +82,17 @@ export function completeStatus(): string {
   })
 }
 
+/** What `ulw-loop status --json` prints, with exit 1, in a directory that has no ledger. */
+export function planMissingStatus(): string {
+  return JSON.stringify({
+    ok: false,
+    error: {
+      code: "ULW_LOOP_PLAN_MISSING",
+      message: "No ulw-loop plan found at .omo/ulw-loop/goals.json. Run `omo-agent-toolkit ulw-loop create-goals ...` first.",
+    },
+  })
+}
+
 function createRunner(outputs: string[]): {
   readonly calls: RunnerCall[]
   readonly run: (bin: string, args: readonly string[], options: { cwd: string }) => Promise<{ code: number; stdout: string }>
@@ -218,6 +229,19 @@ export async function registerWithRunner(outputs: string[], logger = createLogge
     runCommand: runner.run,
   }).register(pi, { logger, config: { getFlag: () => false } })
   return { pi, logger, calls: runner.calls }
+}
+
+/** Register the component against a runner that always reports the given exit code and stdout. */
+export async function registerWithExitCode(code: number, stdout: string, logger = createLogger()): Promise<{
+  readonly pi: FakeExtensionAPI
+  readonly logger: ComponentLogger & { entries: RecordedLog[] }
+}> {
+  const pi = new FakeExtensionAPI()
+  await createUlwLoopComponent({
+    resolveOmoBin: () => "/tmp/omo",
+    runCommand: async () => ({ code, stdout }),
+  }).register(pi, { logger, config: { getFlag: () => false } })
+  return { pi, logger }
 }
 
 export function isTransformResult(value: unknown): value is { action: "transform"; text: string } {

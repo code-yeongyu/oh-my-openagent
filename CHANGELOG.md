@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking**: the OpenCode plugin, Senpi adapter, and Codex codegraph loader no longer read `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` or `~/.omo/config.jsonc` at runtime; the first startup migrates them into `~/.omo/omo.jsonc` (existing values win, skipped values become diagnostics) and moves the sources into the migration backup directory. Older strict config cores reject a newer `omo.jsonc` containing `models` / `profiles` / harness blocks; restore the legacy files from `~/.omo/migration-backup-*` when downgrading.
 - **Breaking**: `shared/<name>` skill invocations and `disabled_skills: ["shared/<name>"]` entries no longer resolve. Skills from the shared catalog now register under their bare name (e.g. `ulw-plan`, `frontend`). Update configs and prompts to use bare names. (PR #6180)
 
+### Fixed
+
+- The Senpi ulw-loop component no longer logs a `status ignored / non-zero-exit` warning in every working directory that has no ulw-loop ledger. `omo-agent-toolkit ulw-loop status --json` exits 1 with `ULW_LOOP_PLAN_MISSING` there by design, which means "no active run", not "the status check failed"; that state is now recognised and stays silent while genuine status failures still warn. One day of a single session log contained 105 of these warnings.
+
 ## [4.14.0] - 2026-06-29
 
 ### Added

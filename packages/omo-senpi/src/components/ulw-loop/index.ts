@@ -5,6 +5,8 @@ import { resolveOmoBin, runOmoCommand } from "./omo-command"
 
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
 const CONTINUATION_LIMIT = 8
+/** `ulw-loop status` reports this on stdout, with exit 1, when the cwd has no ledger at all. */
+const PLAN_MISSING_ERROR_CODE = "ULW_LOOP_PLAN_MISSING"
 const STEERING_REMINDER = [
   "<omo-senpi-ulw-loop>",
   "An active omo-agent-toolkit ulw-loop run is present in this working directory.",
@@ -172,7 +174,12 @@ async function readActiveStatus(
     return null
   }
   if (result.code !== 0) {
-    ctx.logger.warn("omo-senpi ulw-loop status ignored", { reason: "non-zero-exit", code: result.code })
+    // `ulw-loop status` exits 1 with ULW_LOOP_PLAN_MISSING in every directory that simply has no
+    // .omo/ulw-loop ledger, which is the normal state for most working directories. That is an
+    // answer ("no active run"), not a failure, so it must not be reported as one.
+    if (!isPlanMissingStatus(result.stdout)) {
+      ctx.logger.warn("omo-senpi ulw-loop status ignored", { reason: "non-zero-exit", code: result.code })
+    }
     return { raw: result.stdout, active: false }
   }
 
@@ -185,6 +192,18 @@ async function readActiveStatus(
   }
 
   return { raw: result.stdout, active: statusHasActiveIncompleteRun(parsed) }
+}
+
+/** True when stdout carries the CLI's documented "this directory has no ulw-loop plan" error. */
+function isPlanMissingStatus(stdout: string): boolean {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stdout)
+  } catch {
+    return false
+  }
+  if (!isRecord(parsed) || parsed["ok"] !== false || !isRecord(parsed["error"])) return false
+  return parsed["error"]["code"] === PLAN_MISSING_ERROR_CODE
 }
 
 function statusHasActiveIncompleteRun(value: unknown): boolean {

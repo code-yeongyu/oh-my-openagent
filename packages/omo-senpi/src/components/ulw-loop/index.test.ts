@@ -9,6 +9,8 @@ import {
   completeStatus,
   createLogger,
   isTransformResult,
+  planMissingStatus,
+  registerWithExitCode,
   registerWithRunner,
 } from "./ulw-loop.test-support"
 
@@ -154,6 +156,55 @@ describe("omo-senpi ulw-loop continuation", () => {
       level: "warn",
       message: "omo-senpi ulw-loop status ignored",
       details: { reason: "malformed-json" },
+    })
+  })
+
+  it("#given no ulw-loop plan in the cwd #when status exits non-zero #then it is silently inactive", async () => {
+    // `ulw-loop status --json` exits 1 with ULW_LOOP_PLAN_MISSING in any directory without a
+    // ledger, which is the normal state. Warning about it once per turn buried 105 real warnings
+    // a day in one session log.
+    const { pi, logger } = await registerWithExitCode(1, planMissingStatus())
+
+    const results = await pi.dispatch(
+      "input",
+      { type: "input", text: "hello", source: "interactive", streamingBehavior: "steer" },
+      { cwd: "/repo" },
+    )
+
+    expect(results).toEqual([{ action: "continue" }])
+    expect(pi.userMessages).toEqual([])
+    expect(logger.entries).toEqual([])
+  })
+
+  it("#given an unexpected non-zero status exit #when input checks status #then it still warns", async () => {
+    const { pi, logger } = await registerWithExitCode(1, JSON.stringify({ ok: false, error: { code: "ULW_LOOP_IO" } }))
+
+    await pi.dispatch(
+      "input",
+      { type: "input", text: "hello", source: "interactive", streamingBehavior: "steer" },
+      { cwd: "/repo" },
+    )
+
+    expect(logger.entries).toContainEqual({
+      level: "warn",
+      message: "omo-senpi ulw-loop status ignored",
+      details: { code: 1, reason: "non-zero-exit" },
+    })
+  })
+
+  it("#given a non-zero exit with unparseable stdout #when input checks status #then it still warns", async () => {
+    const { pi, logger } = await registerWithExitCode(1, "not json at all")
+
+    await pi.dispatch(
+      "input",
+      { type: "input", text: "hello", source: "interactive", streamingBehavior: "steer" },
+      { cwd: "/repo" },
+    )
+
+    expect(logger.entries).toContainEqual({
+      level: "warn",
+      message: "omo-senpi ulw-loop status ignored",
+      details: { code: 1, reason: "non-zero-exit" },
     })
   })
 
