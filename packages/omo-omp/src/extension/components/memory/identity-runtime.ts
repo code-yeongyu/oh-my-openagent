@@ -16,7 +16,7 @@ import type { MemoryIdentityContext } from "./context"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
 import {
-  SenpiSubprocessRunner,
+  OmpSubprocessRunner,
   type ReflectionLiveSession,
   type ReflectionReservationPort,
 } from "./worker"
@@ -52,7 +52,7 @@ export interface MemoryIdentityRuntime {
   readonly identity: MemoryIdentityContext
   readonly store: ReflectionReservationStore
   readonly reservationPort: ReflectionReservationPort
-  readonly runner: SenpiSubprocessRunner
+  readonly runner: OmpSubprocessRunner
   launch(run: ReservedRun): void
 }
 
@@ -102,7 +102,7 @@ export function createIdentityRuntime(
     identity,
     store,
     reservationPort: store,
-    runner: new SenpiSubprocessRunner({
+    runner: new OmpSubprocessRunner({
       identity: asMemoryIdentity(identity),
       reservation: store,
       resolveModelRegistry: deps.resolveModelRegistry,

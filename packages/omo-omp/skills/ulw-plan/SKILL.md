@@ -5,11 +5,11 @@ metadata:
   short-description: Explore-first planning consultant that waits for your okay before planning
 ---
 
-## Senpi Harness Tool Compatibility
+## Omp Harness Tool Compatibility
 
-This skill may include examples copied from the OpenCode harness. In Senpi, do not call OpenCode-only tools such as `call_omo_agent(...)`, `task(...)`, `background_output(...)`, or `team_*(...)` literally. Translate those examples to Senpi native tools:
+This skill may include examples copied from the OpenCode harness. In Omp, do not call OpenCode-only tools such as `call_omo_agent(...)`, `task(...)`, `background_output(...)`, or `team_*(...)` literally. Translate those examples to Omp native tools:
 
-| OpenCode example | Senpi tool to use |
+| OpenCode example | Omp tool to use |
 | --- | --- |
 | `call_omo_agent(subagent_type="explore", ...)` | `task` tool with `subagent_type: "explore"` |
 | `call_omo_agent(subagent_type="librarian", ...)` | `task` tool with `subagent_type: "librarian"` |
@@ -20,15 +20,15 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 
 If a code block below conflicts with this section, this section wins.
 
-## Senpi Review Policy (authoritative)
+## Omp Review Policy (authoritative)
 
-In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native `momus` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval. High-accuracy momus review is the default for every plan this skill produces (CLEAR and UNCLEAR alike); the only opt-out is the user explicitly declining. It uses a 5-round cap (unlimited only on explicit user request).
+In omo-omp the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native `momus` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval. High-accuracy momus review is the default for every plan this skill produces (CLEAR and UNCLEAR alike); the only opt-out is the user explicitly declining. It uses a 5-round cap (unlimited only on explicit user request).
 
 Only a plan file produced by this skill and recorded with `review_required` authorizes a `momus` or `metis` review. A bare `ulw` run without that file uses notepad self-review instead, however large the work feels. Narrow `/start-work` bootstrap exception: when `/start-work` invoked this skill because there was no selectable plan, the plan-gate deliberately locks metis and momus, so the bootstrap flow generates the plan WITHOUT metis gap analysis or momus review. State this exception explicitly, recommending a follow-up ulw-plan review session if rigor is needed.
 
 If a section below conflicts with this section, this section wins.
 
-## Senpi Design Consultation Lanes (authoritative)
+## Omp Design Consultation Lanes (authoritative)
 
 When the task tool's available categories include `architect` and/or `ultrabrain`, ACTIVELY consult them as background advisory lanes while grounding and drafting the plan:
 
@@ -70,7 +70,7 @@ Example opening (adapt the wording, keep every commitment):
 
 ## INTENT ROUTING - pick ONE intent reference
 
-**Review modifiers are a gate trigger, not a style cue.** If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent - in ANY turn, even appended to a follow-up question and even after the plan already exists - set `review_required: true` in the draft: the high-accuracy review (momus-only in omo-senpi) is now REQUIRED before handoff, and if the plan already exists you run it this same turn. Answering the current question more carefully does NOT satisfy it. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview.
+**Review modifiers are a gate trigger, not a style cue.** If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent - in ANY turn, even appended to a follow-up question and even after the plan already exists - set `review_required: true` in the draft: the high-accuracy review (momus-only in omo-omp) is now REQUIRED before handoff, and if the plan already exists you run it this same turn. Answering the current question more carefully does NOT satisfy it. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview.
 
 After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_required`, **ANNOUNCE both to the user in one line**, then load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length. This verdict line and the opening announcement above are the two mandatory user-visible signals of a planning session - it tells the user whether they will be interviewed and whether high-accuracy review is already requested; never skip either.
 

@@ -22,7 +22,7 @@ async function assertWorktreesClean(item: RunnerHarness): Promise<void> {
   expect(await readdir(item.identity.paths.worktrees)).toEqual([])
 }
 
-describe("SenpiSubprocessRunner integration", () => {
+describe("OmpSubprocessRunner integration", () => {
   test("#given a stub child that commits in its reflection worktree #when launched #then it merges records notifies and advances the cursor", async () => {
     // given
     const item = await harness({ childMode: "commit" })
@@ -46,11 +46,11 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(spawn?.cwd).toBe(spawn?.paths.worktree)
     expect(spawn?.env.MEMORY_DIR).toBe(spawn?.paths.worktree)
     expect(spawn?.env.TRANSCRIPT_PATH).toBe(spawn?.paths.transcript)
-    expect(spawn?.env.SENPI_MEMORY_REFLECTION).toBe("1")
-    // A detached child has no controlling terminal, so senpi's PTY-backed bash session errors
+    expect(spawn?.env.OMP_MEMORY_REFLECTION).toBe("1")
+    // A detached child has no controlling terminal, so omp's PTY-backed bash session errors
     // ("Native PTY session handle is missing write()") and the child can never git-commit; the
-    // pipe fallback is the supported non-interactive path (SENPI_PTY_FORCE_PIPE in pi-pty).
-    expect(spawn?.env.SENPI_PTY_FORCE_PIPE).toBe("1")
+    // pipe fallback is the supported non-interactive path (PI_NO_PTY in omp's bash-pty-selection).
+    expect(spawn?.env.PI_NO_PTY).toBe("1")
     expect(spawn?.args).toEqual([
       "-p",
       "--system-prompt", spawn?.paths.persona,

@@ -8,8 +8,8 @@ import {
   type TelemetryEnv,
 } from "@oh-my-opencode/telemetry-core"
 
-import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
-import { loadSenpiOmoConfig } from "../config-resolution"
+import type { ComponentContext, OmpExtensionAPI } from "../../types"
+import { loadOmpOmoConfig } from "../config-resolution"
 import { getOmoNativePayloadFilePath } from "./omo-native-buffer"
 import { createOmoNativeProductConfig, getOmoNativeStateDir } from "./product-identity"
 
@@ -43,7 +43,7 @@ export type OmoNativeNoticeOptions = {
 }
 
 export type OmoNativeNoticeRegistration = {
-  register(pi: SenpiExtensionAPI, ctx: ComponentContext): void
+  register(pi: OmpExtensionAPI, ctx: ComponentContext): void
 }
 
 export function createOmoNativeNoticeRegistration(
@@ -105,7 +105,7 @@ function configEnabled(
 ): boolean {
   if (options.isConfigEnabled !== undefined) return options.isConfigEnabled(cwd, env)
   try {
-    const loaded = loadSenpiOmoConfig({ env: { ...env }, ...(cwd === undefined ? {} : { cwd }) })
+    const loaded = loadOmpOmoConfig({ env: { ...env }, ...(cwd === undefined ? {} : { cwd }) })
     if (loaded.diagnostics.length === 0) return isOmoTelemetryEnabled(loaded.config)
     diagnostics(new Error(loaded.diagnostics.map(({ message }) => message).join("; ")))
     return false

@@ -20,12 +20,12 @@ This skill is intentionally compact. The full workflow lives in `references/full
 ## Non-Negotiables
 
 - Use the ulw-loop CLI state under `.omo/ulw-loop`; do not hand-edit goal state.
-- Register goals up front (`omo-agent-toolkit ulw-loop create-goals`, then `create_goal` from the printed handoff) and mirror every atomic step into the live `update_plan` checklist: one ultra-granular step per action, exactly one in_progress, transitions marked the instant they happen.
+- Register goals up front (`omo-agent-toolkit ulw-loop create-goals`, then `create_goal` from the printed handoff) and mirror every atomic step into the live `todo` checklist: one ultra-granular step per action, exactly one in_progress, transitions marked the instant they happen.
 - After any compaction or context loss, re-read brief + goals + ledger FIRST plus `omo-agent-toolkit ulw-loop status --json`, then resume; never re-plan from scratch.
 - If `omo-agent-toolkit ulw-loop create-goals` says the existing aggregate is already complete, start unrelated new work with a fresh `--session-id <new-id>` instead of steering or forcing the completed default state. Use `--force` only to intentionally overwrite completed evidence.
 - Every success criterion needs observable evidence from a real surface: a channel (terminal/TUI via the xterm.js web terminal, HTTP, browser, computer-use) or, for CLI- or data-shaped criteria, an auxiliary surface (CLI stdout, DB diff, parsed config dump).
 - Evidence is bound to the tree it was captured at (`git rev-parse --short "HEAD^{tree}"`); it goes stale only when tracked content changes — a rebase or amend that keeps the tree identical keeps it valid. When the tree differs, re-run at the current HEAD and re-record, never relabel or regenerate. Record only after cleanup receipts exist.
-- Delegate code edits, test writes, fixes, and QA execution to right-sized omo-senpi subagents through the native `task` tool.
+- Delegate code edits, test writes, fixes, and QA execution to right-sized omo-omp subagents through the native `task` tool.
 - Plan and reviewer agents may run for a long time; spawn them with `run_in_background: true` and keep doing independent root work.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
 - Track spawned task ids locally. Completion and progress arrive as injected notifications; use `task_output` for at most one midpoint status or transcript check per child, never a polling loop.
@@ -50,11 +50,11 @@ Under team mode, isolate and land per unit:
 - **Merge per work unit, as each unit is verified.** A member's unit lands when its own evidence is captured and its gates are green; it does not wait for the slowest sibling. Integrate each merged unit back into the base the others branch from, so overlapping members rebase onto real merged work rather than guessing at it.
 - **Conflicts are the lead's job.** When two members' units touch the same lines, the lead decides the order they land and tells the later member what changed; members never resolve a sibling's conflict blind.
 
-## Native Senpi Task Contract
+## Native Omp Task Contract
 
-Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. Use it directly. Do not route delegation through external app-server threads or another harness.
+Omp already exposes its real subagent spawn surface through the omo-omp `task` component. Use it directly. Do not route delegation through external app-server threads or another harness.
 
-| Intent | Native Senpi tool |
+| Intent | Native Omp tool |
 | --- | --- |
 | Spawn one worker | `task({ prompt, subagent_type | category, run_in_background: true })` |
 | Fan out independent workers | `task({ tasks: [{ prompt, subagent_type | category }, ...], run_in_background: true })` |

@@ -4,9 +4,9 @@ import { describe, expect, test } from "bun:test"
 
 const BEGIN_SENTINEL = "<!-- BEGIN GENERATED SCHEMA -->"
 const END_SENTINEL = "<!-- END GENERATED SCHEMA -->"
-const WORKSPACE_ROOT = resolve(import.meta.dir, "../../../../..")
+const WORKSPACE_ROOT = resolve(import.meta.dir, "../../../../../../")
 const DOC_PATH = resolve(WORKSPACE_ROOT, "docs/reference/senpi-telemetry.md")
-const GENERATOR_URL = new URL("../../../../../script/telemetry-schema-block.mjs", import.meta.url)
+const GENERATOR_URL = new URL("../../../../../../script/telemetry-schema-block.mjs", import.meta.url)
 
 type SchemaBlockGenerator = (schemas?: unknown) => string
 

@@ -37,11 +37,11 @@ function createFixture(): Fixture {
   return { agentDir, cwd, homeDir, projectDir, workDir, xdgConfigHome }
 }
 
-// Keep the senpi agent dir outside the fake HOME so existing ancestor
+// Keep the omp agent dir outside the fake HOME so existing ancestor
 // assertions keep covering the full cwd-to-home walk; the restricted-target
 // suite below pins the default under-HOME behavior.
-function fixtureEnv(fixture: Fixture): { HOME: string; XDG_CONFIG_HOME: string; SENPI_CODING_AGENT_DIR: string } {
-  return { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, SENPI_CODING_AGENT_DIR: fixture.agentDir }
+function fixtureEnv(fixture: Fixture): { HOME: string; XDG_CONFIG_HOME: string; OMP_CODING_AGENT_DIR: string } {
+  return { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, OMP_CODING_AGENT_DIR: fixture.agentDir }
 }
 
 function writeProjectConfig(directory: string): string {
@@ -181,18 +181,18 @@ describe("resolveOmoConfigWatchTargets", () => {
     expect(resolution.userConfigCreationWatched).toBe(false)
   })
 
-  it("#given the senpi agent dir defaulting under HOME #when resolving targets #then drops every target covering the protected agent paths", () => {
+  it("#given the omp agent dir defaulting under HOME #when resolving targets #then drops every target covering the protected agent paths", () => {
     const fixture = createFixture()
     const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome }
     const protectedPaths = [
-      join(fixture.homeDir, ".senpi", "agent", "auth.json"),
-      join(fixture.homeDir, ".senpi", "agent", "sessions"),
-      join(fixture.homeDir, ".senpi", "agent", "logs"),
+      join(fixture.homeDir, ".omp", "agent", "auth.json"),
+      join(fixture.homeDir, ".omp", "agent", "sessions"),
+      join(fixture.homeDir, ".omp", "agent", "logs"),
     ]
 
     const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env, platform: "linux" })
 
-    // The bare-HOME ancestor always covers ~/.senpi/agent, so senpi would
+    // The bare-HOME ancestor always covers ~/.omp/agent, so omp would
     // deterministically reject the registration; it must never be emitted.
     expect(targetFor(targets, fixture.homeDir, "/.omo")).toBe(false)
     for (const target of targets) {
@@ -209,10 +209,10 @@ describe("resolveOmoConfigWatchTargets", () => {
     ])
   })
 
-  it("#given an explicit SENPI_CODING_AGENT_DIR under HOME #when resolving targets #then drops the covering ancestor target", () => {
+  it("#given an explicit OMP_CODING_AGENT_DIR under HOME #when resolving targets #then drops the covering ancestor target", () => {
     const fixture = createFixture()
     const agentDir = join(fixture.homeDir, "custom-agent")
-    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, SENPI_CODING_AGENT_DIR: agentDir }
+    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, OMP_CODING_AGENT_DIR: agentDir }
 
     const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env, platform: "linux" })
 
@@ -237,7 +237,7 @@ describe("resolveOmoConfigWatchTargets", () => {
 
   it("#given the user config parent creation target #when resolving targets #then its glob is root-anchored", () => {
     const fixture = createFixture()
-    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, SENPI_CODING_AGENT_DIR: fixture.agentDir }
+    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, OMP_CODING_AGENT_DIR: fixture.agentDir }
     const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env, platform: "linux" })
     const userCreationTarget = targets.find((target) => target.path === fixture.homeDir && target.filterGlobs.includes("/omo"))
     expect(userCreationTarget?.filterGlobs).toEqual(["/omo"])

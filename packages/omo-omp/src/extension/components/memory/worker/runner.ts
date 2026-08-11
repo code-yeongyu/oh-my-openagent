@@ -57,7 +57,7 @@ export interface ReflectionRunner {
   launch(request: ReservedRun): Promise<ReflectionRunResult>
 }
 
-export interface SenpiSubprocessRunnerOptions {
+export interface OmpSubprocessRunnerOptions {
   readonly identity: MemoryIdentity
   readonly reservation: ReflectionReservationPort
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
@@ -80,13 +80,13 @@ type ExecutionResult = {
   readonly detail?: string
 }
 
-export class SenpiSubprocessRunner implements ReflectionRunner {
+export class OmpSubprocessRunner implements ReflectionRunner {
   private readonly loadConfig: (options?: { readonly cwd?: string }) => OmpOmoConfigResult
   private readonly now: () => Date
   private readonly warnedCategory = createOncePerSessionGuard()
   private readonly registeredApis = new WeakSet<object>()
 
-  constructor(private readonly options: SenpiSubprocessRunnerOptions) {
+  constructor(private readonly options: OmpSubprocessRunnerOptions) {
     this.loadConfig = options.loadConfig ?? loadOmpOmoConfig
     this.now = options.now ?? (() => new Date())
     this.ensureRenderer(options.liveSession?.())

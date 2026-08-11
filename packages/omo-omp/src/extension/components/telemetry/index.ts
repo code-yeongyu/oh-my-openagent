@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import type { OmoSenpiComponent } from "../../extension/types"
+import type { OmoOmpComponent } from "../../types"
 import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
@@ -13,7 +13,7 @@ import {
   TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
-import type { ComponentLogger } from "../../extension/types"
+import type { ComponentLogger } from "../../types"
 
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
 export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
@@ -67,7 +67,7 @@ export async function recordSenpiDailyActive(options: SenpiTelemetryOptions = {}
   )
 }
 
-export function createSenpiTelemetryComponent(options: SenpiTelemetryOptions = {}): OmoSenpiComponent {
+export function createSenpiTelemetryComponent(options: SenpiTelemetryOptions = {}): OmoOmpComponent {
   return {
     name: "telemetry",
     register(pi, ctx) {
@@ -121,7 +121,7 @@ function withTimeout(operation: Promise<void>, timeoutMs: number): Promise<void>
 
 function readPackageVersion(): string {
   try {
-    const manifestText = readFileSync(new URL("../../../package.json", import.meta.url), "utf-8")
+    const manifestText = readFileSync(new URL("../../../../package.json", import.meta.url), "utf-8")
     const parsed: unknown = JSON.parse(manifestText)
     if (isPackageManifest(parsed) && typeof parsed.version === "string") {
       return parsed.version

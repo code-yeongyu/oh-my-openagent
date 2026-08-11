@@ -8,7 +8,6 @@ import {
   type ReflectionWorktree,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
-import { detectBunBinary, resolveSenpiExecutable } from "@oh-my-opencode/senpi-task"
 
 const DEFAULT_GRACE_MS = 5_000
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024
@@ -85,11 +84,12 @@ export async function prepareReflectionSpawn(input: {
     ...input.env,
     MEMORY_DIR: input.worktree.dir,
     TRANSCRIPT_PATH: transcript,
-    SENPI_MEMORY_REFLECTION: "1",
-    // A detached child has no controlling terminal, so senpi's PTY-backed bash session fails with
-    // "Native PTY session handle is missing write()" and the child could never git-commit its
-    // reflection. pi-pty's documented non-interactive override selects the pipe session backend.
-    SENPI_PTY_FORCE_PIPE: "1",
+    OMP_MEMORY_REFLECTION: "1",
+    // A detached child has no controlling terminal, so omp's PTY-backed bash session fails with a
+    // "Native PTY session handle is missing write()" style error and the child could never git-commit
+    // its reflection. omp's documented non-interactive override (PI_NO_PTY=1, bash-pty-selection.ts)
+    // selects the pipe session backend instead.
+    PI_NO_PTY: "1",
   }
   // Verified against senpi packages/coding-agent/src/cli/args.ts and cli/file-processor.ts:
   // -p selects print mode; --system-prompt reads a file path; --tools is a comma allowlist;
@@ -110,7 +110,7 @@ export async function prepareReflectionSpawn(input: {
     `@${prompt}`,
   ]
   return {
-    command: input.senpiCommand ?? resolveDefaultSenpiCommand(input.env),
+    command: input.senpiCommand ?? resolveDefaultOmpCommand(input.env),
     args,
     cwd: input.worktree.dir,
     env,
@@ -207,14 +207,13 @@ function buildTaskPrompt(run: ReservedRun, worktree: string, transcript: string)
   ].join("\n")
 }
 
-function resolveDefaultSenpiCommand(env: NodeJS.ProcessEnv): string {
-  return resolveSenpiExecutable({
-    isBunBinary: detectBunBinary(import.meta.url),
-    execPath: process.execPath,
-    platform: process.platform,
-    parentEnv: env,
-    resolveRpcEntry: () => "",
-  }) ?? "senpi"
+function resolveDefaultOmpCommand(env: NodeJS.ProcessEnv): string {
+  // The reflection child is a real OMP session (same CLI surface: -p print mode, --system-prompt,
+  // --tools allowlist, --session-dir isolation, @file prompt). Resolve the omp binary the same way
+  // a user would: OMP_BIN wins, then the harness on PATH. The extension runs inside the omp process,
+  // so PATH lookup is the portable default for a detached child.
+  const explicit = env.OMP_BIN?.trim()
+  return explicit !== undefined && explicit !== "" ? explicit : "omp"
 }
 
 function safeRunId(runId: string): string {

@@ -1,6 +1,6 @@
 # ATTRIBUTION / NOTICE
 
-This skill (`ulw-research`, authored natively for omo-senpi) is authored by
+This skill (`ulw-research`, authored natively for omo-omp) is authored by
 the oh-my-openagent project. Design ideas are adapted from the third-party
 projects credited below. No third-party source is vendored here — only ideas
 are adapted into this skill's prompt contract.

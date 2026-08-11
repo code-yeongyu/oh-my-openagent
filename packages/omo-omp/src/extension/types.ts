@@ -55,6 +55,18 @@ export interface OmoBeforeAgentStartEventResult {
 }
 
 /**
+ * Payload shape of the `session_shutdown` event (senpi SessionShutdownEvent parity). The task
+ * component's suspend-on-shutdown path reads only `reason` off the payload; the structural union is
+ * declared here so the event-bridge and its tests share one local spelling instead of importing a
+ * harness event type.
+ */
+export interface OmoSessionShutdownEvent {
+  readonly type: "session_shutdown"
+  readonly reason?: "quit" | "reload" | "new" | "resume" | "fork" | (string & {})
+  readonly targetSessionFile?: string
+}
+
+/**
  * Entry renderer shape (senpi EntryRenderer parity). The memory reflection worker renders completion
  * entries via a shared senpi-task linesComponent; entry/options/theme are kept loose so the renderer
  * stays harness-agnostic.
@@ -70,6 +82,21 @@ export type OmoEntryRenderer<T = unknown> = (
  * the same contract as the senpi adapter: the harness hands the extension its
  * live API object at load time; every member is guarded before use.
  */
+/**
+ * `turn_end` event payload (senpi TurnEndEvent parity). The omo-native turn telemetry handler reads
+ * assistant-message usage/identity; the OMP shim delivers its own turn_end payload with this shape.
+ */
+export interface OmoTurnEndEvent {
+  readonly type: "turn_end"
+  readonly turnIndex: number
+  readonly message: {
+    readonly role: string
+    readonly usage?: Readonly<Record<string, unknown>>
+    readonly provider: string
+    readonly model: string
+  }
+}
+
 export interface OmpExtensionAPI {
   on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
   events?: {

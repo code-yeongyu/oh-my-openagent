@@ -1,4 +1,4 @@
-import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, OmoOmpComponent, OmpExtensionAPI } from "../../types"
 import { sharedSessionArming, type SessionArming } from "../ultrawork/index"
 import { TODO_FANOUT_REMINDER } from "./reminder"
 
@@ -12,10 +12,10 @@ interface TodoResultEvent {
 
 export function createTodoFanoutReminderComponent(
   arming: SessionArming = sharedSessionArming(),
-): OmoSenpiComponent {
+): OmoOmpComponent {
   return {
     name: "todo-fanout-reminder",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    register(pi: OmpExtensionAPI, ctx: ComponentContext): void {
       const remindedSessionIds = new Set<string>()
       let anonymousReminded = false
 

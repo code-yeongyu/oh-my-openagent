@@ -231,7 +231,7 @@ function readSalt(path: string): Buffer | undefined {
 
 function readPackageVersion(): string {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"))
+    const parsed: unknown = JSON.parse(readFileSync(new URL("../../../../package.json", import.meta.url), "utf8"))
     if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
       const version = Reflect.get(parsed, "version")
       if (typeof version === "string") return version

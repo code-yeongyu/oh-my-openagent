@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs"
 import { isAbsolute, relative, resolve, sep, win32 } from "node:path"
 
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { OmpExtensionAPI } from "../../types"
 import {
   BUILTIN_CATEGORY_NAMES,
   BUILTIN_SKILL_NAMES,
@@ -31,7 +31,7 @@ const BUILTIN_CATEGORIES = new Set<string>(BUILTIN_CATEGORY_NAMES)
 const BUILTIN_AGENTS = new Set<string>(CURATED_AGENTS)
 
 export function registerOmoNativeToolTelemetry(
-  pi: SenpiExtensionAPI,
+  pi: OmpExtensionAPI,
   options: ToolTelemetryOptions,
 ): void {
   const featureUsage = new Map<string, Set<string>>()

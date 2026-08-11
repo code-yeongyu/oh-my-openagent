@@ -19,7 +19,7 @@ import type {
   ReflectionCompletionApi,
   ReflectionCompletionRecord,
 } from "./completion"
-import { SenpiSubprocessRunner } from "./runner"
+import { OmpSubprocessRunner } from "./runner"
 import type { ReflectionSpawnArgs } from "./spawn"
 
 export class CapturedCompletionApi implements ReflectionCompletionApi {
@@ -47,7 +47,7 @@ export interface RunnerHarness {
   readonly journal: TranscriptJournal
   readonly store: ReflectionReservationStore
   readonly run: ReservedRun
-  readonly runner: SenpiSubprocessRunner
+  readonly runner: OmpSubprocessRunner
   readonly api: CapturedCompletionApi
   readonly notifications: Array<{ message: string; level: string }>
   readonly spawnCalls: ReflectionSpawnArgs[]
@@ -111,7 +111,7 @@ export async function createRunnerHarness(options: {
   const api = new CapturedCompletionApi()
   const notifications: Array<{ message: string; level: string }> = []
   const spawnCalls: ReflectionSpawnArgs[] = []
-  const runner = new SenpiSubprocessRunner({
+  const runner = new OmpSubprocessRunner({
     identity,
     reservation: store,
     resolveModelRegistry: () => ({

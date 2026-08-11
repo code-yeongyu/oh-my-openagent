@@ -11,6 +11,7 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 describe("omo-omp bundle purity", () => {
   it("#given the omp loader aliases #when tested #then the shared build constant pins all typebox peers", () => {
     expect(OMP_LOADER_ALIASES).toEqual([
+      "@code-yeongyu/senpi",
       "typebox",
       "typebox/compile",
       "typebox/value",

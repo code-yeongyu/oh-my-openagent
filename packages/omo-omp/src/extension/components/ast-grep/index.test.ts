@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentLogger } from "../../extension/types"
+import type { ComponentLogger } from "../../types"
 import { createAstGrepComponent } from "./index"
 
 const tempDirs: string[] = []

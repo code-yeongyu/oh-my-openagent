@@ -4,12 +4,12 @@ import { describe, expect, test } from "bun:test"
 import type { EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext } from "../../extension/types"
+import type { ComponentContext } from "../../types"
 import { createOmoNativePromptComponent } from "./omo-native-prompt"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS } from "./product-identity"
 import { createSilentLogger } from "./telemetry.test-support"
 import { createSessionArming, createUltraworkComponent, type SessionArming } from "../ultrawork/index"
-import { SENPI_ULTRAWORK_DIRECTIVE } from "../ultrawork/generated-directive"
+import { OMP_ULTRAWORK_DIRECTIVE } from "../ultrawork/generated-directive"
 
 type CapturedPrompt = { readonly name: string; readonly properties: EventTelemetryProperties }
 type Source = "interactive" | "rpc" | "extension"
@@ -28,7 +28,7 @@ function sessionCtx(sessionId: string): { sessionManager: { getSessionId(): stri
 function seedArming(arming: SessionArming): () => void {
   const registry = globalThis as unknown as Record<symbol, unknown>
   const previous = registry[ARMING_LEDGER_KEY]
-  registry[ARMING_LEDGER_KEY] = { directive: SENPI_ULTRAWORK_DIRECTIVE, arming }
+  registry[ARMING_LEDGER_KEY] = { directive: OMP_ULTRAWORK_DIRECTIVE, arming }
   return () => {
     if (previous === undefined) delete registry[ARMING_LEDGER_KEY]
     else registry[ARMING_LEDGER_KEY] = previous

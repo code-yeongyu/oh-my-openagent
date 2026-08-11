@@ -1,6 +1,6 @@
 ---
 name: ultrawork
-description: Binding ultrawork mode directive for omo-senpi. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive as a hidden custom message (customType omo-ultrawork:directive, display false) ahead of the user's text, which is left untouched; a prompt queued while the agent is streaming instead carries the directive appended inside that same message. The directive is present in the conversation context; on the idle path it is not shown in the visible prompt, while a queued prompt carries the directive visibly (exactly as before this change). When the directive is already present in the conversation, do not read this file again - this file is that same directive. Read this file only when ultrawork mode is requested and the directive is not already present in the conversation.
+description: Binding ultrawork mode directive for omo-omp. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive as a hidden custom message (customType omo-ultrawork:directive, display false) ahead of the user's text, which is left untouched; a prompt queued while the agent is streaming instead carries the directive appended inside that same message. The directive is present in the conversation context; on the idle path it is not shown in the visible prompt, while a queued prompt carries the directive visibly (exactly as before this change). When the directive is already present in the conversation, do not read this file again - this file is that same directive. Read this file only when ultrawork mode is requested and the directive is not already present in the conversation.
 metadata:
   short-description: Binding ultrawork mode directive
 ---
@@ -70,7 +70,7 @@ exercises the surface; capture the artifact.
      xterm.js web terminal (see the TUI visual QA note below). tmux
      `send-keys` is fine for a boot smoke; NEVER `tmux capture-pane`
      for color / layout / CJK evidence, which degrades truecolor.
-  3. Browser use — in omo-senpi, use `browser:control-in-app-browser`
+  3. Browser use — in omo-omp, use `browser:control-in-app-browser`
      first when available and no authenticated/persistent user browser
      profile is required. Otherwise use Chrome to drive the REAL page;
      if Chrome is not available, download and use agent-browser
@@ -218,7 +218,7 @@ section otherwise — THEN mirror every atomic step into the todo list.
 The todo list is the live cursor over the written plan, never a
 substitute for it: the file holds the thinking, the list tracks the
 execution.
-The todo tool is senpi `todo` — your live, user-visible checklist.
+The todo tool is omp `todo` — your live, user-visible checklist.
 `init` the phased list (one task per atomic work unit: an edit plus
 its verification, a QA scenario run, a teardown), then drive every
 state transition through it: `start` the instant a step begins,
@@ -378,7 +378,7 @@ required wait and an idle session is always woken.
   `bash_output` or `task_output({ mode: "tail" })`; both return
   immediately and neither is a completion wait.
 
-# omo-senpi task + team tools
+# omo-omp task + team tools
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
@@ -400,7 +400,7 @@ doing root work instead of waiting on them. Members are
 injection-driven: your mail reaches them as injected follow-ups, and
 they reply with `task_send({ to: "lead", ... })`.
 
-# omo-senpi subagent reliability
+# omo-omp subagent reliability
 Every child prompt is self-contained and starts with
 `TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`,
 `VERIFY`, and `STOP WHEN` — the observable condition that ends the

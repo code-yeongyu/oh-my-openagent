@@ -4,8 +4,8 @@ import { describe, expect, test } from "bun:test"
 
 import type { TelemetryCaptureMessage } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { composeOmoSenpiExtension } from "../../extension/compose"
-import { omoSenpiComponents } from "../../extension/index"
+import { composeOmoOmpExtension } from "../../compose"
+import { omoOmpComponents } from "../../index"
 import { createOmoNativeTelemetryComponent } from "./omo-native-component"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS } from "./product-identity"
 import {
@@ -96,7 +96,7 @@ function assertAllowlistedPayloadKeys(messages: readonly TelemetryCaptureMessage
 
 describe("OmO Native telemetry component integration", () => {
   test("#given the real component list #when composed #then telemetry input classification registers before ultrawork", () => {
-    const names = omoSenpiComponents.map(({ name }) => name)
+    const names = omoOmpComponents.map(({ name }) => name)
 
     expect(names.indexOf("telemetry")).toBeGreaterThanOrEqual(0)
     expect(names.indexOf("telemetry")).toBeLessThan(names.indexOf("ultrawork"))
@@ -160,9 +160,9 @@ describe("OmO Native telemetry component integration", () => {
       writeInventory(agentDir)
       const recorder = createTransportRecorder()
       const pi = new FakeExtensionAPI()
-      pi.setFlag("omo-senpi-telemetry-disabled", true)
+      pi.setFlag("omo-omp-telemetry-disabled", true)
 
-      await composeOmoSenpiExtension([
+      await composeOmoOmpExtension([
         createOmoNativeTelemetryComponent({
           env: createEnabledEnv(agentDir),
           hashSessionId: (raw) => `hashed:${raw}`,

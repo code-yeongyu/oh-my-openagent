@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { TurnEndEvent } from "@code-yeongyu/senpi"
+import type { OmoTurnEndEvent } from "../../types"
 import type {
   EventTelemetryClient,
   EventTelemetryProperties,
@@ -17,7 +17,7 @@ type CapturedEvent = { readonly name: string; readonly properties: EventTelemetr
 function createRecorder(): {
   readonly captured: CapturedEvent[]
   readonly diagnostics: TelemetryDiagnosticInput[]
-  readonly handle: (event: TurnEndEvent) => void
+  readonly handle: (event: OmoTurnEndEvent) => void
 } {
   const captured: CapturedEvent[] = []
   const diagnostics: TelemetryDiagnosticInput[] = []
@@ -43,7 +43,7 @@ function turnEvent(input: {
   readonly provider?: string
   readonly model?: string
   readonly usage?: unknown
-} = {}): TurnEndEvent {
+} = {}): OmoTurnEndEvent {
   const usage = input.usage ?? {
     input: 11,
     output: 22,
@@ -63,7 +63,7 @@ function turnEvent(input: {
     stopReason: "stop",
     timestamp: 1,
   }
-  return { type: "turn_end", turnIndex: input.turnIndex ?? 7, message, toolResults: [] } as unknown as TurnEndEvent
+  return { type: "turn_end", turnIndex: input.turnIndex ?? 7, message, toolResults: [] } as unknown as OmoTurnEndEvent
 }
 
 function firstKnownModel(provider: KnownProvider): string {

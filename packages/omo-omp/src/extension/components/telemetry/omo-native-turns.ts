@@ -1,4 +1,4 @@
-import type { TurnEndEvent } from "@code-yeongyu/senpi"
+import type { OmoTurnEndEvent } from "../../types"
 import type {
   EventTelemetryClient,
   TelemetryDiagnosticInput,
@@ -20,7 +20,7 @@ type NumberResult = { readonly value: number; readonly valid: boolean }
 
 export function createOmoNativeTurnHandler(
   options: OmoNativeTurnHandlerOptions,
-): (event: TurnEndEvent) => void {
+): (event: OmoTurnEndEvent) => void {
   return (event) => {
     if (event.message.role !== "assistant") return
 

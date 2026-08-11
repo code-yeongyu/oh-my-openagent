@@ -1,6 +1,6 @@
 import type { EventTelemetryClient, EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
-import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, OmoOmpComponent, OmpExtensionAPI } from "../../types"
 import {
   armingSnapshot,
   classifyUltraworkInput,
@@ -28,10 +28,10 @@ export type OmoNativePromptComponentOptions = {
   readonly hashSessionId?: (sessionId: string) => string
 }
 
-export function createOmoNativePromptComponent(options: OmoNativePromptComponentOptions): OmoSenpiComponent {
+export function createOmoNativePromptComponent(options: OmoNativePromptComponentOptions): OmoOmpComponent {
   return {
     name: "telemetry",
-    register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
+    register(pi: OmpExtensionAPI, _ctx: ComponentContext): void {
       const pending = new Map<string, PendingPrompt>()
       const completed = new Set<string>()
       const realPromptOrdinals = new Map<string, number>()

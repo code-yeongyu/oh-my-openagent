@@ -15,9 +15,9 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 import { isOmoTelemetryEnabled } from "@oh-my-opencode/omo-config-core"
 
-import type { OmoSenpiComponent } from "../../extension/types"
+import type { OmoOmpComponent } from "../../types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { loadSenpiOmoConfig } from "../config-resolution"
+import { loadOmpOmoConfig } from "../config-resolution"
 import { getSenpiTelemetryStateDir, recordSenpiDailyActive } from "./index"
 import {
   KNOWN_PROVIDERS,
@@ -56,7 +56,7 @@ type Inventory = {
   readonly providers: string
 }
 
-export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions = {}): OmoSenpiComponent {
+export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions = {}): OmoOmpComponent {
   let client: EventTelemetryClient | undefined
 
   return {
@@ -136,7 +136,7 @@ function configEnabled(options: OmoNativeSessionOptions, eventCtx: unknown, env:
   const cwd = extractString(eventCtx, "cwd")
   if (options.isConfigEnabled !== undefined) return options.isConfigEnabled(cwd, env)
   try {
-    const loaded = loadSenpiOmoConfig({
+    const loaded = loadOmpOmoConfig({
       env: { ...env },
       ...(cwd === undefined ? {} : { cwd }),
     })

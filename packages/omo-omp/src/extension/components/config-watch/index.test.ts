@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
-import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, OmpExtensionAPI } from "../../types"
 import { createConfigWatchComponent } from "./index"
 
 type EventHandler = (payload: unknown) => void
@@ -71,7 +71,7 @@ class FakeEvents {
   }
 }
 
-function createPi(events?: FakeEvents): SenpiExtensionAPI & { dispatch(name: string, payload?: unknown): void } {
+function createPi(events?: FakeEvents): OmpExtensionAPI & { dispatch(name: string, payload?: unknown): void } {
   const handlers = new Map<string, EventHandler[]>()
   return {
     ...(events === undefined ? {} : { events }),

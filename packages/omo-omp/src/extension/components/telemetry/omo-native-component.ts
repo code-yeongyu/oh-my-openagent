@@ -1,4 +1,4 @@
-import type { TurnEndEvent } from "@code-yeongyu/senpi"
+import type { OmoTurnEndEvent } from "../../types"
 import {
   createDefaultPostHogTransport,
   createEventTelemetryClient,
@@ -12,7 +12,7 @@ import type {
   TelemetryTransportOptions,
 } from "@oh-my-opencode/telemetry-core"
 
-import type { OmoSenpiComponent } from "../../extension/types"
+import type { OmoOmpComponent } from "../../types"
 import { createOmoNativePayloadBuffer } from "./omo-native-buffer"
 import { createOmoNativeNoticeRegistration } from "./omo-native-notice"
 import { createOmoNativePromptComponent } from "./omo-native-prompt"
@@ -40,7 +40,12 @@ export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
   readonly skillsRoot?: string
 }
 
-export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryComponentOptions = {}): OmoSenpiComponent {
+// OMP registry export: the composed omo-omp extension loads the full omo-native telemetry
+// component; the omp component list references it under the omp adapter's `OmoOmp*` naming
+// convention (senpi parity name `createOmoNativeTelemetryComponent`).
+export const createOmoOmpTelemetryComponent = createOmoNativeTelemetryComponent
+
+export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryComponentOptions = {}): OmoOmpComponent {
   const env = options.env ?? process.env
   const stateDir = options.stateDir ?? getOmoNativeStateDir(env)
   const buffer = createOmoNativePayloadBuffer({ stateDir, diagnostics: options.diagnostics })
@@ -187,7 +192,7 @@ function isOmoNativeEventName(name: string): name is OmoNativeEventName {
   return Object.hasOwn(OMO_NATIVE_PROPERTY_ALLOWLISTS, name)
 }
 
-function isTurnEndEvent(value: unknown): value is TurnEndEvent {
+function isTurnEndEvent(value: unknown): value is OmoTurnEndEvent {
   return isRecord(value) && value.type === "turn_end" && typeof value.turnIndex === "number" && isRecord(value.message)
 }
 

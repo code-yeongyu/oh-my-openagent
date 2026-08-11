@@ -26,9 +26,9 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 4. **Review** - Deduplicate, trim, validate
 
 <critical>
-**TodoWrite ALL phases. Mark in_progress → completed in real-time.**
+**todo ALL phases. Mark in_progress → completed in real-time.**
 ```
-TodoWrite([
+todo([
   { id: "discovery", content: "Fire explore agents + LSP/ast-grep map + read existing", status: "pending", priority: "high" },
   { id: "scoring", content: "Score directories, determine locations", status: "pending", priority: "high" },
   { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
@@ -134,7 +134,7 @@ Highest-signal source for the CODE MAP and the Symbol/Export/Reference scoring r
 
 ```
 // After main session analysis done, collect all task results
-for each background task ID (`bg_...`): background_output(task_id="bg_...")
+for each background task ID (`bg_...`): task_output({ task_id: "bg_..." })
 ```
 
 **Merge: bash + LSP/ast-grep + existing + explore findings. Mark "discovery" as completed.**

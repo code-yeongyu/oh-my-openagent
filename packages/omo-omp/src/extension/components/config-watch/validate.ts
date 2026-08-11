@@ -6,7 +6,7 @@ import {
   type OmoConfigEnv,
 } from "@oh-my-opencode/omo-config-core"
 
-import { loadSenpiOmoConfig, type SenpiConfigDiagnostic } from "../config-resolution"
+import { loadOmpOmoConfig, type OmpConfigDiagnostic } from "../config-resolution"
 
 const MERGED_OMO_CONFIG_DIAGNOSTIC_PATH = "(merged omo config)"
 /** Matches the frozen config-watch validation wire shape without importing senpi internals. */
@@ -20,15 +20,15 @@ export interface CreateOmoConfigValidatorOptions {
   readonly cwd: string
   readonly env?: OmoConfigEnv
   readonly platform?: NodeJS.Platform
-  readonly loadConfig?: typeof loadSenpiOmoConfig
+  readonly loadConfig?: typeof loadOmpOmoConfig
 }
 
 type FingerprintedDiagnostic = {
-  readonly diagnostic: SenpiConfigDiagnostic
+  readonly diagnostic: OmpConfigDiagnostic
   readonly fingerprint: string
 }
 
-function fingerprintDiagnostic(diagnostic: SenpiConfigDiagnostic): string {
+function fingerprintDiagnostic(diagnostic: OmpConfigDiagnostic): string {
   return createHash("sha256")
     .update(`${diagnostic.kind}\u0000${diagnostic.path}\u0000${diagnostic.message}`)
     .digest("hex")
@@ -54,7 +54,7 @@ function containingConfigDirectory(path: string, userConfigDirectory: string): s
 }
 
 function isAttributableDiagnostic(
-  diagnostic: SenpiConfigDiagnostic,
+  diagnostic: OmpConfigDiagnostic,
   changedPaths: readonly string[],
   userConfigDirectory: string,
 ): boolean {
@@ -68,7 +68,7 @@ function isAttributableDiagnostic(
   })
 }
 
-function formatDiagnostic(diagnostic: SenpiConfigDiagnostic): string {
+function formatDiagnostic(diagnostic: OmpConfigDiagnostic): string {
   return diagnostic.message
 }
 
@@ -81,7 +81,7 @@ function formatDiagnostic(diagnostic: SenpiConfigDiagnostic): string {
 export function createOmoConfigValidator(options: CreateOmoConfigValidatorOptions): OmoConfigValidator {
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
-  const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
+  const loadConfig = options.loadConfig ?? loadOmpOmoConfig
   const userConfigDirectory = resolveUserOmoConfigDirectory(env)
   let baseline = new Set(loadConfig({ cwd: options.cwd, env, platform }).diagnostics.map(fingerprintDiagnostic))
   const unresolvedRejected = new Set<string>()
@@ -109,7 +109,7 @@ export function createOmoConfigValidator(options: CreateOmoConfigValidatorOption
       if (unresolvedRejected.size > 0) {
         const errors = [...unresolvedRejected]
           .map((fingerprint) => diagnosticsByFingerprint.get(fingerprint))
-          .filter((diagnostic): diagnostic is SenpiConfigDiagnostic => diagnostic !== undefined)
+          .filter((diagnostic): diagnostic is OmpConfigDiagnostic => diagnostic !== undefined)
           .map(formatDiagnostic)
         return { ok: false, errors }
       }

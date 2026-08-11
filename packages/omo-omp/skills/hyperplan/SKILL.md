@@ -1,6 +1,6 @@
 ---
 name: hyperplan
-description: "Adversarial multi-agent planning skill for omo-senpi. Self-orchestrates a 5-member hostile team (categories unspecified-low, unspecified-high, deep, ultrabrain, artistry) via the native lead team tools for ruthless cross-critique debate, distills only the insights that survive the attacks, then MANDATORILY hands the distilled bundle to a planner task (load_skills ulw-plan) for executable plan formalization. Use when planning needs maximum rigor and surfacing of weak assumptions, blind spots, and over-engineering. Triggers: 'hyperplan', 'hpp', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'."
+description: "Adversarial multi-agent planning skill for omo-omp. Self-orchestrates a 5-member hostile team (categories unspecified-low, unspecified-high, deep, ultrabrain, artistry) via the native lead team tools for ruthless cross-critique debate, distills only the insights that survive the attacks, then MANDATORILY hands the distilled bundle to a planner task (load_skills ulw-plan) for executable plan formalization. Use when planning needs maximum rigor and surfacing of weak assumptions, blind spots, and over-engineering. Triggers: 'hyperplan', 'hpp', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'."
 metadata:
   short-description: Adversarial 5-member cross-critique planning, then a planner formalizes the survivors
 ---
@@ -15,7 +15,7 @@ You (the orchestrator) become the **Lead** of a 5-member adversarial team. The 5
 
 This is not consensus building. This is intellectual combat. Weakness gets exposed. Lazy thinking gets eviscerated. Only what survives the gauntlet makes it into the plan.
 
-## HOW THIS MAPS TO omo-senpi
+## HOW THIS MAPS TO omo-omp
 
 This skill runs on the native lead team tools. Members are background children routed through a category; you coordinate them entirely with these tools:
 
@@ -36,7 +36,7 @@ Members receive your rounds as injected follow-ups inside their child process; t
 Before starting, verify:
 
 1. **The lead team tools must be available** — `team_create`, `task_send`, `team_delete`. They register by default with the task component. If they are absent, the task component was disabled; STOP and tell the user:
-   > "Hyperplan needs the omo-senpi team tools, which are disabled. Restart senpi without `--no-omo-task` (the task component is on by default), then retry."
+   > "Hyperplan needs the omo-omp team tools, which are disabled. Restart omp without `--no-omo-task` (the task component is on by default), then retry."
 2. **You are the current top-level lead session** — the team tools are lead-only and never reach a child. If you are yourself a spawned member/child, this skill is the wrong tool; a member cannot lead a team.
 
 ## THE 5 ADVERSARIAL MEMBERS — RnR & CHARACTERISTICS

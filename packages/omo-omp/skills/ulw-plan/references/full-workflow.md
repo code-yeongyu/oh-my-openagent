@@ -5,11 +5,11 @@ metadata:
   short-description: Shared deep mechanics for the ulw-plan skill
 ---
 
-## Senpi Harness Tool Compatibility
+## Omp Harness Tool Compatibility
 
-This skill may include examples copied from the OpenCode harness. In Senpi, do not call OpenCode-only tools such as `call_omo_agent(...)`, `task(...)`, `background_output(...)`, or `team_*(...)` literally. Translate those examples to Senpi native tools:
+This skill may include examples copied from the OpenCode harness. In Omp, do not call OpenCode-only tools such as `call_omo_agent(...)`, `task(...)`, `background_output(...)`, or `team_*(...)` literally. Translate those examples to Omp native tools:
 
-| OpenCode example | Senpi tool to use |
+| OpenCode example | Omp tool to use |
 | --- | --- |
 | `call_omo_agent(subagent_type="explore", ...)` | `task` tool with `subagent_type: "explore"` |
 | `call_omo_agent(subagent_type="librarian", ...)` | `task` tool with `subagent_type: "librarian"` |
@@ -20,9 +20,9 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 
 If a code block below conflicts with this section, this section wins.
 
-## Senpi Review Policy (authoritative)
+## Omp Review Policy (authoritative)
 
-In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native `momus` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval. High-accuracy momus review is the default for every plan this skill produces (CLEAR and UNCLEAR alike); the only opt-out is the user explicitly declining. It uses a 5-round cap (unlimited only on explicit user request).
+In omo-omp the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native `momus` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval. High-accuracy momus review is the default for every plan this skill produces (CLEAR and UNCLEAR alike); the only opt-out is the user explicitly declining. It uses a 5-round cap (unlimited only on explicit user request).
 
 Only a plan file produced by this skill and recorded with `review_required` authorizes a `momus` or `metis` review. A bare `ulw` run without that file uses notepad self-review instead, however large the work feels. Narrow `/start-work` bootstrap exception: when `/start-work` invoked this skill because there was no selectable plan, the plan-gate deliberately locks metis and momus, so the bootstrap flow generates the plan WITHOUT metis gap analysis or momus review. State this exception explicitly, recommending a follow-up ulw-plan review session if rigor is needed.
 
@@ -201,8 +201,8 @@ Every "present the plan summary/brief" above delivers THIS structure, in the use
 5. **Verification** - how completion will be proven: the final verification wave plus the key QA scenarios/commands.
 6. **Execution handoff** - execution runs via `/start-work <plan-name>` in THIS session or a NEW session, whichever the user prefers. Introduce the options: `--worktree <absolute-path>` (task-owned worktree; required for PR/branch work), `--make-pr` (deliver as a PR; auto-creates a task-owned worktree), `--ship` (implies `--make-pr`, keeps working until the PR is reviewed and MERGED).
 
-### High-accuracy review (momus-only in omo-senpi)
-In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native `momus` review of the complete plan file. Momus runs at High and may take substantially longer than other agents. One round = exactly ONE `momus` review, dispatched against the COMPLETE plan file (todos + TL;DR filled) at the draft's exact recorded `plan_path`. Keep Momus in flight and wait for its terminal result: elapsed time alone never justifies cancelling, duplicating, replacing, or treating it as failed. After the verdict returns, fix every cited issue and resubmit fresh until it approves. Every round spawns a FRESH momus session; the dispatch prompt is the plan path ONLY. The harness forces the canonical contract and discards everything else, so literal substitution no longer applies to momus dispatch. `task_send` to momus is forbidden and refused by the harness; the only retry is fix-the-plan then spawn a NEW momus. Never cancel a momus for slowness. On cap exhaustion without approval: STOP, report outstanding blockers, ask the user - continue / accept / adjust.
+### High-accuracy review (momus-only in omo-omp)
+In omo-omp the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native `momus` review of the complete plan file. Momus runs at High and may take substantially longer than other agents. One round = exactly ONE `momus` review, dispatched against the COMPLETE plan file (todos + TL;DR filled) at the draft's exact recorded `plan_path`. Keep Momus in flight and wait for its terminal result: elapsed time alone never justifies cancelling, duplicating, replacing, or treating it as failed. After the verdict returns, fix every cited issue and resubmit fresh until it approves. Every round spawns a FRESH momus session; the dispatch prompt is the plan path ONLY. The harness forces the canonical contract and discards everything else, so literal substitution no longer applies to momus dispatch. `task_send` to momus is forbidden and refused by the harness; the only retry is fix-the-plan then spawn a NEW momus. Never cancel a momus for slowness. On cap exhaustion without approval: STOP, report outstanding blockers, ask the user - continue / accept / adjust.
 
 The parent records round_id, plan_sha256, and the spawned session id (receipt) in the DRAFT at launch; on completion the parent validates by re-hashing the live plan against the recorded plan_sha256 and matching the completion's session id to the recorded receipt; any mismatch or plan change terminalizes the round as inconclusive and requires a fresh momus round.
 

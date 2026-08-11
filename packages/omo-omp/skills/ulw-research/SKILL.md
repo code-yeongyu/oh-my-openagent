@@ -1,6 +1,6 @@
 ---
 name: ulw-research
-description: "Team-first maximum-saturation research orchestration for omo-senpi. Scopes solo, ALWAYS asks which final format to render (PDF+DOCX default), then stands up a max-size cooperating team (team_create): one member per axis plus skeptic/red-team members for ultradebate/hyperdebate cross-critique, explore/librarian lanes, live ulw-loop journaling, an EXPAND loop until leads run dry, claims proven by code or the claim-graph gate, and a cited synthesis with charts/Mermaid/assets behind visual-QA and `writing` proofread gates. ACTIVATES ONLY on an explicit user demand for research: the word 'ulw-research' ('/ulw-research', '$ulw-research'), any 'ulw' research wording, 'ultradebate' or 'hyperdebate' research requests, or an explicit request for research / deep research / an ultra-precise investigation, in any language. Never self-activates for ordinary questions, debugging, or implementation context-gathering. While active it overrides exploration-bounding defaults: exhaustive coverage is the goal."
+description: "Team-first maximum-saturation research orchestration for omo-omp. Scopes solo, ALWAYS asks which final format to render (PDF+DOCX default), then stands up a max-size cooperating team (team_create): one member per axis plus skeptic/red-team members for ultradebate/hyperdebate cross-critique, explore/librarian lanes, live ulw-loop journaling, an EXPAND loop until leads run dry, claims proven by code or the claim-graph gate, and a cited synthesis with charts/Mermaid/assets behind visual-QA and `writing` proofread gates. ACTIVATES ONLY on an explicit user demand for research: the word 'ulw-research' ('/ulw-research', '$ulw-research'), any 'ulw' research wording, 'ultradebate' or 'hyperdebate' research requests, or an explicit request for research / deep research / an ultra-precise investigation, in any language. Never self-activates for ordinary questions, debugging, or implementation context-gathering. While active it overrides exploration-bounding defaults: exhaustive coverage is the goal."
 metadata:
   short-description: Team-default saturation research with debate cross-critique and cited synthesis
 ---
@@ -15,9 +15,9 @@ Run this skill only when the user explicitly demands it: the word "ulw-research"
 
 Open your reply with the line `ULW-RESEARCH MODE ENABLED!`. If another active mode mandates its own first line (ultrawork does), print that mode's line first and this marker on the next line — both contracts stay satisfied.
 
-## How this maps to omo-senpi
+## How this maps to omo-omp
 
-This skill is authored against the native senpi task + team tool surface. You coordinate everything with these tools:
+This skill is authored against the native omp task + team tool surface. You coordinate everything with these tools:
 
 | Purpose | Tool | Key arguments |
 |---------|------|---------------|

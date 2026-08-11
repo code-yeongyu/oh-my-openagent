@@ -20,19 +20,19 @@ import {
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { getTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
 
-const originalAgentDir = process.env.SENPI_CODING_AGENT_DIR
+const originalAgentDir = process.env.OMP_CODING_AGENT_DIR
 const temporaryRoots: string[] = []
 
 afterEach(() => {
-  if (originalAgentDir === undefined) delete process.env.SENPI_CODING_AGENT_DIR
-  else process.env.SENPI_CODING_AGENT_DIR = originalAgentDir
+  if (originalAgentDir === undefined) delete process.env.OMP_CODING_AGENT_DIR
+  else process.env.OMP_CODING_AGENT_DIR = originalAgentDir
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 function useTemporaryAgentDir(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-native-identity-"))
   temporaryRoots.push(root)
-  process.env.SENPI_CODING_AGENT_DIR = root
+  process.env.OMP_CODING_AGENT_DIR = root
   return root
 }
 
@@ -81,7 +81,7 @@ describe("OmO Native product identity", () => {
   })
 
   test("#given an unwritable state path #when a session id is hashed #then fallback identity stays stable without throwing", () => {
-    process.env.SENPI_CODING_AGENT_DIR = "/dev/null"
+    process.env.OMP_CODING_AGENT_DIR = "/dev/null"
 
     const first = hashSessionId("session-a")
     expect(() => hashSessionId("session-a")).not.toThrow()

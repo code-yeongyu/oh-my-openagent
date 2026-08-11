@@ -1,4 +1,4 @@
-import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, OmoOmpComponent, OmpExtensionAPI } from "../../types"
 import {
   resolveOmoConfigWatchTargetResolution,
   type OmoConfigWatchTarget,
@@ -65,8 +65,8 @@ function release(unsubscribes: readonly (() => void)[]): void {
   for (const unsubscribe of unsubscribes) unsubscribe()
 }
 
-/** Registers omo config surfaces with senpi's optional in-process config-watch protocol. */
-export function createConfigWatchComponent(options: ConfigWatchComponentOptions = {}): OmoSenpiComponent {
+/** Registers omo config surfaces with OMP's optional in-process config-watch protocol. */
+export function createConfigWatchComponent(options: ConfigWatchComponentOptions = {}): OmoOmpComponent {
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   const resolveTargetResolution = options.resolveTargetResolution
     ?? ((request: { readonly cwd: string }): OmoConfigWatchTargetResolution => {
@@ -82,7 +82,7 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
 
   return {
     name: "config-watch",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    register(pi: OmpExtensionAPI, ctx: ComponentContext): void {
       releasePrevious?.()
       releasePrevious = undefined
 

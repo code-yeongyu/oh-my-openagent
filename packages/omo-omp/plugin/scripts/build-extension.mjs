@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 // hands the extension its live API object as the factory argument), so the only
 // externalized peers are the typebox family the omp host injects.
 export const OMP_LOADER_ALIASES = [
+  "@code-yeongyu/senpi",
   "typebox",
   "typebox/compile",
   "typebox/value",

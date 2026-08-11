@@ -1,15 +1,15 @@
 ---
 name: give-me-tips
-description: "Explains any senpi tip in depth - startup tips, working tips, and any Tip: line shown in the TUI (including the Fable-5-refusal fallback tip). Use when the user asks about a Tip: line, says give-me-tips, asks what a tip means, how a tipped feature works, or which tips they can see. Queries the live tip list (senpi --list-tips) first, checks what THIS user can actually see, then verifies the real feature code before explaining."
+description: "Explains any omp tip in depth - startup tips, working tips, and any Tip: line shown in the TUI (including the Fable-5-refusal fallback tip). Use when the user asks about a Tip: line, says give-me-tips, asks what a tip means, how a tipped feature works, or which tips they can see. Queries the live tip list (omp --list-tips) first, checks what THIS user can actually see, then verifies the real feature code before explaining."
 metadata:
-  short-description: Deep, verified, brag-worthy explanations of any senpi tip
+  short-description: Deep, verified, brag-worthy explanations of any omp tip
 ---
 
-# give-me-tips - explain any senpi tip, in depth
+# give-me-tips - explain any omp tip, in depth
 
 ## Purpose
 
-Senpi shows the user tips: startup tips, working tips, and `Tip:` lines injected by omo
+Omp shows the user tips: startup tips, working tips, and `Tip:` lines injected by omo
 components. When the user asks about any of them - "what was that Tip: line", "what does this tip
 mean", "how does that feature work" - this skill produces a DEEP explanation of that exact tip, in
 the USER'S language (match the language they asked in, always).
@@ -24,23 +24,23 @@ the tip text they already read.
 
 Never explain from memory. Get the ground truth of what tips exist:
 
-1. Run `senpi --list-tips`. It prints JSON: `[{id, text, requiresCommand?}]`. Match the user's tip
+1. Run `omp --list-tips`. It prints JSON: `[{id, text, requiresCommand?}]`. Match the user's tip
    against this list by id or by text fragment.
-2. If the flag is unavailable on this senpi version, fall back to reading the catalog sources
+2. If the flag is unavailable on this omp version, fall back to reading the catalog sources
    directly at `packages/coding-agent/src/modes/interactive/tips/catalog/` inside the installed
-   `@code-yeongyu/senpi` package (find it via the senpi install path or node_modules) or in a
-   local clone of code-yeongyu/senpi.
+   `@code-yeongyu/omp` package (find it via the omp install path or node_modules) or in a
+   local clone of code-yeongyu/omp.
 
 Then - and this is the part most explanations get wrong - **available tips DIFFER per user**. The
 catalog is the superset; what THIS user can actually see is gated by:
 
-- the `tips` toggle in the senpi agent dir `settings.json` (tips can be off entirely),
+- the `tips` toggle in the omp agent dir `settings.json` (tips can be off entirely),
 - `tipsHistory` in that same settings/state, which drives cooldown rotation so a tip the user saw
   recently will not reappear for a while,
 - `requiresCommand` gating: a tip tied to a command only shows when that command is available,
 - keybinding availability: some tips reference bindings the user's setup may not have.
 
-Read the senpi agent dir `settings.json` (and its tips history state) BEFORE explaining, and tell
+Read the omp agent dir `settings.json` (and its tips history state) BEFORE explaining, and tell
 the user which tips they personally can encounter and why - not the full catalog as if everyone
 sees everything.
 
@@ -49,10 +49,10 @@ sees everything.
 Never invent behavior. A tip is a one-line promise; the truth lives in code. Before writing the
 explanation, read the actual feature implementation:
 
-- senpi itself: `code-yeongyu/senpi`, under `packages/coding-agent/` (the tips catalog lives at
+- omp itself: `code-yeongyu/omp`, under `packages/coding-agent/` (the tips catalog lives at
   `packages/coding-agent/src/modes/interactive/tips/catalog/`; the features the tips point at live
   in the surrounding packages),
-- omo components: `code-yeongyu/oh-my-openagent`, under `packages/omo-senpi/`.
+- omo components: `code-yeongyu/oh-my-openagent`, under `packages/omo-omp/`.
 
 Cite the concrete file paths you read in your explanation. If the code and the tip text disagree,
 the code wins - say so and show what it actually does.
@@ -70,10 +70,10 @@ order of operations.
 
 When the user asks about the tip that appears after a Fable 5 refusal ("Fable 5 refused, but its
 refusals should not wear you down..."), explain the full fallback-architect pipeline, citing
-`packages/omo-senpi/src/components/fallback-architect/`:
+`packages/omo-omp/src/components/fallback-architect/`:
 
 1. **Refusal detection** (`detection.ts`): the component watches `message_end` events and applies
-   the same refusal semantics senpi's own retry classifier uses - stopReason checked FIRST (so an
+   the same refusal semantics omp's own retry classifier uses - stopReason checked FIRST (so an
    abort or normal stop carrying stale stopDetails can never masquerade as a refusal), then
    stopDetails of type refusal/sensitive, plus the Anthropic usage-policy errorMessage pattern for
    provider-side blocks that carry no stopDetails at all.
@@ -97,6 +97,6 @@ refusals should not wear you down..."), explain the full fallback-architect pipe
 The engineering worth bragging about: the refusal never deletes the user's question. Detection
 arms on the exact assistant message that preceded the switch (a later successful answer disarms
 it), reminders ride inside queued prompts instead of burning extra assistant turns, and the whole
-nudge self-cancels the moment Fable 5 becomes the active model again or senpi reverts the
+nudge self-cancels the moment Fable 5 becomes the active model again or omp reverts the
 fallback. One refusal triggers a coordinated downgrade in visibility with zero downgrade in
 reachable reasoning depth.

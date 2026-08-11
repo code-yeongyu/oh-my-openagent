@@ -10,7 +10,7 @@ import {
   type TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
 
-import type { ComponentLogger } from "../../extension/types"
+import type { ComponentLogger } from "../../types"
 
 export type RecordedTransport = {
   readonly messages: readonly TelemetryCaptureMessage[]
@@ -34,7 +34,7 @@ export function createOsProvider(hostname: string): TelemetryOsProvider {
 export function createEnabledEnv(agentDir: string): TelemetryEnv {
   return {
     POSTHOG_API_KEY: "test-api-key",
-    SENPI_CODING_AGENT_DIR: agentDir,
+    OMP_CODING_AGENT_DIR: agentDir,
   }
 }
 

@@ -18,7 +18,7 @@ const mode = process.argv[2]
 const worktree = process.env.MEMORY_DIR
 if (!worktree) throw new Error("MEMORY_DIR is required")
 if (!process.env.TRANSCRIPT_PATH) throw new Error("TRANSCRIPT_PATH is required")
-if (process.env.SENPI_MEMORY_REFLECTION !== "1") throw new Error("reflection sentinel is required")
+if (process.env.OMP_MEMORY_REFLECTION !== "1") throw new Error("reflection sentinel is required")
 
 if (mode === "commit") {
   await mkdir(join(worktree, "system"), { recursive: true })
