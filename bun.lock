@@ -2199,17 +2199,17 @@
 
     "@oh-my-opencode/mcp-stdio-core/bun-types/@types/node": ["@types/node@25.9.1", "", { "dependencies": { "undici-types": ">=7.24.0 <7.24.7" } }, "sha512-xfrlY7UD5rMJk3ZVJP8BNzS28J36YJg+xp+LPXV1TdWxr8uMH5A860QNxYDGQe/ylDSgjxE52Q9VnO7p75tJxg=="],
 
-    "@oh-my-opencode/omo-omp/@code-yeongyu/lsp-daemon/@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@file:packages/\lsp-core", {}],
+    "@oh-my-opencode/omo-omp/@code-yeongyu/lsp-daemon/@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@file:packages/lsp-core", {}],
 
-    "@oh-my-opencode/omo-omp/@code-yeongyu/lsp-daemon/@oh-my-opencode/mcp-stdio-core": ["@oh-my-opencode/mcp-stdio-core@file:packages/\mcp-stdio-core", {}],
+    "@oh-my-opencode/omo-omp/@code-yeongyu/lsp-daemon/@oh-my-opencode/mcp-stdio-core": ["@oh-my-opencode/mcp-stdio-core@file:packages/mcp-stdio-core", {}],
 
     "@oh-my-opencode/omo-omp/@code-yeongyu/lsp-daemon/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@oh-my-opencode/omo-opencode/@modelcontextprotocol/sdk/content-type": ["content-type@1.0.5", "", {}, "sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA=="],
 
-    "@oh-my-opencode/omo-senpi/@code-yeongyu/lsp-daemon/@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@file:packages/\lsp-core", {}],
+    "@oh-my-opencode/omo-senpi/@code-yeongyu/lsp-daemon/@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@file:packages/lsp-core", {}],
 
-    "@oh-my-opencode/omo-senpi/@code-yeongyu/lsp-daemon/@oh-my-opencode/mcp-stdio-core": ["@oh-my-opencode/mcp-stdio-core@file:packages/\mcp-stdio-core", {}],
+    "@oh-my-opencode/omo-senpi/@code-yeongyu/lsp-daemon/@oh-my-opencode/mcp-stdio-core": ["@oh-my-opencode/mcp-stdio-core@file:packages/mcp-stdio-core", {}],
 
     "@oh-my-opencode/omo-senpi/@code-yeongyu/lsp-daemon/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
