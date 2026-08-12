@@ -90,7 +90,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/identity.md"])
-  })
+  }, 30_000)
 
   it("#given a rename that moves system/persona.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given

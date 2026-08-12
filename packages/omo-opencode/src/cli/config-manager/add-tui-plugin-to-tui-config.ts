@@ -15,7 +15,7 @@ import {
 import { writeFileAtomically } from "../../shared/write-file-atomically"
 
 type ConfigShape = {
-  plugin?: string[]
+  plugin?: Array<string | [string, unknown]>
   [key: string]: unknown
 }
 
@@ -46,10 +46,8 @@ function readServerConfig(configDir: string): ConfigShape | null {
   return null
 }
 
-function pluginEntries(config: ConfigShape): string[] {
-  return Array.isArray(config.plugin)
-    ? config.plugin.filter((entry): entry is string => typeof entry === "string")
-    : []
+function pluginEntries(config: ConfigShape): Array<string | [string, unknown]> {
+  return Array.isArray(config.plugin) ? config.plugin : []
 }
 
 function desiredTuiEntry(serverEntry: string): string | null {
