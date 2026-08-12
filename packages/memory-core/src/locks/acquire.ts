@@ -43,7 +43,9 @@ async function readOwner(lockPath: string): Promise<OwnerSnapshot | null> {
     const raw = await readFile(lockPath, "utf8")
     return { raw, record: parseLockRecord(raw) }
   } catch (error) {
-    if (errorCode(error) === "ENOENT") return null
+    const code = errorCode(error)
+    if (code === "ENOENT") return null
+    if (path.sep === "\\" && code === "EPERM") return { raw: "", record: null }
     throw error
   }
 }

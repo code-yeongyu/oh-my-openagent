@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import { spawn } from "node:child_process"
+import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -101,7 +102,7 @@ async function fixture(): Promise<{
   readonly identity: MemoryIdentity
   readonly contentionPath: string
 }> {
-  const root = await mkdtemp(join(tmpdir(), "memory-two-process-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-two-process-")))
   temporaryDirectories.push(root)
   const identity: MemoryIdentity = {
     id: "shared-agent",
@@ -144,7 +145,7 @@ async function assertTwentyLinearCommits(identity: MemoryIdentity): Promise<void
 
 afterEach(async () => {
   for (const child of liveChildren) child.kill("SIGKILL")
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("one memory identity across real Bun processes", () => {
