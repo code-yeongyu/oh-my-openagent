@@ -12,8 +12,6 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
-  // Opaque provider catch-all: advance fallback instead of killing the task.
-  "unknownerror",
 ])
 
 const STOP_ERROR_NAMES = new Set([
@@ -172,6 +170,12 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   // STOP patterns take precedence over retryable patterns
   if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
     return false
+  }
+
+  // Opaque provider catch-all after STOP text, so "UnknownError" + "quota exceeded"
+  // still terminates instead of advancing fallback.
+  if (error.name?.toLowerCase() === "unknownerror") {
+    return true
   }
 
   if (hasProviderAutoRetrySignal(msg)) {

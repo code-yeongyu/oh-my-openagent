@@ -506,6 +506,17 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(false)
   })
+
+  test("treats UnknownError plus STOP quota message as non-retryable", () => {
+    //#given
+    const error = { name: "UnknownError", message: "quota exceeded for this billing period" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
 })
 
 export {}
