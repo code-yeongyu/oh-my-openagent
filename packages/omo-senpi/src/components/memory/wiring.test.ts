@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -255,6 +255,71 @@ const eventCtx = {
     getEntries: () => [],
   },
 }
+
+describe("memory wiring reflection completion delivery", () => {
+  describe("#given a pending completion and a bound session with a real UI callback", () => {
+    describe("#when afterBind drains the identity completion directory", () => {
+      test("#then the callback receives the completion notification payload and level", async () => {
+        // given
+        const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-wiring-notify-")))
+        roots.push(root)
+        const identity = createMemoryIdentityContext({
+          identity: "agent-notify",
+          identityPaths: buildIdentityPaths(root, "agent-notify"),
+          binding: { identity: "agent-notify", repoPathHash: "hash", boundAt: 1 },
+        })
+        const completionsDir = join(identity.identityPaths.reflection, "completions")
+        await mkdir(completionsDir, { recursive: true })
+        await writeFile(join(completionsDir, "run-notify.json"), `${JSON.stringify({
+          schemaVersion: 1,
+          runId: "run-notify",
+          identity: "agent-notify",
+          category: "quick",
+          conversationIds: ["past-session"],
+          trigger: "manual",
+          outcome: "failed",
+          reason: "child_exit",
+          detail: "fixture failure",
+          startedAt: "2026-08-12T00:00:00.000Z",
+          finishedAt: new Date().toISOString(),
+          delivery: { status: "pending" },
+        })}\n`)
+        const sessionId = "current-session"
+        const notifications: Array<{ message: string; level: string }> = []
+        const runtime = {
+          reconcile: async () => {},
+        } as unknown as MemoryIdentityRuntime
+        const wiring = createMemoryWiring({
+          sessions: new Map([[sessionId, { context: identity }]]),
+          loadConfig: () => loadedMemoryConfig(memorySettings()),
+          cwd: () => root,
+          env: {},
+          createRuntime: () => runtime,
+        })
+        const pi = new MemoryFakeExtensionAPI()
+        const bindContext = {
+          sessionManager: {
+            getSessionId: () => sessionId,
+            getEntries: () => [],
+          },
+          ui: {
+            setStatus: () => {},
+            notify: (message: string, level: string) => notifications.push({ message, level }),
+          },
+        }
+
+        // when
+        await wiring.afterBind(pi, sessionId, identity, bindContext)
+
+        // then
+        expect(notifications).toEqual([{
+          message: "Delivered 1 memory reflection completions; 1 need attention.",
+          level: "warning",
+        }])
+      })
+    })
+  })
+})
 
 describe("memory wiring reflection policy", () => {
   test("#given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts", async () => {
