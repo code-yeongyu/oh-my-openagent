@@ -46,6 +46,7 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
   readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
   readonly rpcEvents: FakeRpcEvent[] = []
+  readonly removedToolHints: Array<{ name: string; hint: string }> = []
   events?: SenpiExtensionAPI["events"]
   rpc?: { emit(name: string, data: unknown): void }
 
@@ -92,6 +93,10 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   registerMcpServer(name: string, config: Record<string, unknown>): void {
     this.mcpServers.push({ name, config })
+  }
+
+  registerRemovedToolHint(name: string, hint: string): void {
+    this.removedToolHints.push({ name, hint })
   }
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {

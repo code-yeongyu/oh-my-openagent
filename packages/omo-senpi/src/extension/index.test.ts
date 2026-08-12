@@ -53,6 +53,14 @@ describe("omo-senpi extension entry", () => {
     expect(pi.handlers.map((handler) => handler.event)).toEqual(
       expect.arrayContaining(["input", "tool_result", "session_start", "model_select", "message_end"]),
     )
+    expect(pi.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "ask_question",
+          label: "Ask Question",
+        }),
+      ]),
+    )
   })
 
   it("#given open todo state #when ordinary input arrives #then the extension does not inject continuity guidance", async () => {
