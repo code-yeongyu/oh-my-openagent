@@ -12,6 +12,8 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
+  // Opaque provider catch-all: advance fallback instead of killing the task.
+  "unknownerror",
 ])
 
 const STOP_ERROR_NAMES = new Set([

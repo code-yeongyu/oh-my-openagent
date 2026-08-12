@@ -473,6 +473,39 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("treats UnknownError name as retryable catch-all", () => {
+    //#given
+    const error = { name: "UnknownError" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats MessageAbortedError name as non-retryable", () => {
+    //#given
+    const error = { name: "MessageAbortedError" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats QuotaExceededError name as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "QuotaExceededError" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
 })
 
 export {}
