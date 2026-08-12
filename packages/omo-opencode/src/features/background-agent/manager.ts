@@ -2666,6 +2666,7 @@ The task was re-queued on a fallback model after a retryable failure.
       allComplete,
       remainingCount,
       completedTasks,
+      wakeOnEachCompletion: this.config?.wakeOnEachCompletion === true,
     })
 
       if (this.enableParentSessionNotifications) {
@@ -2678,7 +2679,7 @@ The task was re-queued on a fallback model after a retryable failure.
         })
 
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
+        const shouldReply = allComplete || isTaskFailure || this.config?.wakeOnEachCompletion === true
 
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 

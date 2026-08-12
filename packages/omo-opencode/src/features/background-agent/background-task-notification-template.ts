@@ -65,8 +65,9 @@ export function buildBackgroundTaskNotificationText(input: {
   allComplete: boolean
   remainingCount: number
   completedTasks: BackgroundTaskNotificationTask[]
+  wakeOnEachCompletion?: boolean
 }): string {
-  const { task, duration, statusText, allComplete, remainingCount, completedTasks } = input
+  const { task, duration, statusText, allComplete, remainingCount, completedTasks, wakeOnEachCompletion } = input
 
   const safeDescription = (t: BackgroundTaskNotificationTask): string => t.description || t.id
   const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
@@ -118,7 +119,7 @@ ${header}
 **Description:** ${safeDescription(task)}
 **Duration:** ${duration}${errorInfo}
 
-**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
+**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** ${wakeOnEachCompletion === true ? "You will be notified as each task completes." : "You WILL be notified when ALL complete."}
 ${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.

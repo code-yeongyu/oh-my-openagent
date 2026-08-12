@@ -24,6 +24,8 @@ export const BackgroundTaskConfigSchema = z.object({
   syncPollTimeoutMs: z.number().min(60000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
+  /** Wake the parent session after EACH background task completes (default: false). By default the parent is only woken once ALL of its background tasks have finished (or one fails); intermediate completions are deposited into the transcript without triggering a turn. */
+  wakeOnEachCompletion: z.boolean().optional(),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),
 })
 

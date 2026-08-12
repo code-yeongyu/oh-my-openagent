@@ -120,7 +120,7 @@ function isBackgroundTaskProgressNotification(notification: string): boolean {
   }
 
   return notification.split("\n").some((line) =>
-    /^\*\*\d+ tasks? still in progress\.\*\* You WILL be notified when ALL complete\.$/.test(line.trim())
+    /^\*\*\d+ tasks? still in progress\.\*\* You (?:WILL be notified when ALL complete|will be notified as each task completes)\.$/.test(line.trim())
   )
 }
 

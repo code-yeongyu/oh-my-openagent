@@ -37,4 +37,16 @@ describe("mergeParentWakeNotifications", () => {
     // then
     expect(notifications).toEqual([finalNotification, bodyMentionsProgress])
   })
+
+  test("#given a per-completion progress notification #when a final wake is merged #then the stale progress notification is dropped", () => {
+    // given
+    const perCompletionProgress = "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**1 task still in progress.** You will be notified as each task completes.\n</system-reminder>"
+    const finalNotification = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
+
+    // when
+    const notifications = mergeParentWakeNotifications([perCompletionProgress], finalNotification)
+
+    // then
+    expect(notifications).toEqual([finalNotification])
+  })
 })
