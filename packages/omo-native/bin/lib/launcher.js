@@ -7,6 +7,7 @@ import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
 import { printSetupReport } from "./setup-report.js"
 
 const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server"])
+const bundledThemes = ["dracula", "github-dark", "night-owl", "one-dark-pro", "tokyo-night"]
 const selfUpdateTargets = new Set(["self", "senpi", "omo"])
 // Updating extensions or model catalogs is the engine's job; everything else under `update`
 // would try to replace the pinned engine, so the launcher answers it instead.
@@ -78,7 +79,11 @@ function senpiEnvironment(senpiRoot) {
 function spawnSenpi(args, withExtension) {
   const senpi = resolveSenpi()
   const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
+    ? [
+        "--extension", join(packageRoot, "plugin"),
+        ...bundledThemes.flatMap((theme) => ["--theme", join(packageRoot, "themes", `${theme}.json`)]),
+        ...args,
+      ]
     : args
   spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
 }

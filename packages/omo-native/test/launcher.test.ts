@@ -140,7 +140,13 @@ describe("omo launcher", () => {
         const result = run(fixture, ["say", "hi", "-e", "/user/plugin"])
         expect(result.status).toBe(0)
         expect(capture(fixture).argv).toEqual([
-          "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
+          "--extension", join(fixture.packageRoot, "plugin"),
+          "--theme", join(fixture.packageRoot, "themes", "dracula.json"),
+          "--theme", join(fixture.packageRoot, "themes", "github-dark.json"),
+          "--theme", join(fixture.packageRoot, "themes", "night-owl.json"),
+          "--theme", join(fixture.packageRoot, "themes", "one-dark-pro.json"),
+          "--theme", join(fixture.packageRoot, "themes", "tokyo-night.json"),
+          "say", "hi", "-e", "/user/plugin",
         ])
       })
 

@@ -8,7 +8,8 @@
   },
   "files": [
     "bin",
-    "plugin"
+    "plugin",
+    "themes"
   ],
   "engines": {
     "node": ">=24.0.0"
