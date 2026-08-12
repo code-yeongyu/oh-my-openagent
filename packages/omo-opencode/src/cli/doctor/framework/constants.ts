@@ -20,6 +20,7 @@ export const STATUS_COLORS = {
 
 export const CHECK_IDS = {
   SYSTEM: "system",
+  INSTALL_SHADOWING: "install-shadowing",
   CONFIG: "config",
   TUI_PLUGIN: "tui-plugin",
   TOOLS: "tools",
@@ -31,6 +32,7 @@ export const CHECK_IDS = {
 
 export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.SYSTEM]: "System",
+  [CHECK_IDS.INSTALL_SHADOWING]: "Install Shadowing",
   [CHECK_IDS.CONFIG]: "Configuration",
   [CHECK_IDS.TUI_PLUGIN]: "TUI Plugin",
   [CHECK_IDS.TOOLS]: "Tools",

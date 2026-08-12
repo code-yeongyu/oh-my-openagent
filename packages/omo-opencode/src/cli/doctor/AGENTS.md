@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **8** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the eight are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
+`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **9** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the nine are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
 
 ## COMMAND FLAGS
 
@@ -17,11 +17,12 @@ bunx oh-my-opencode doctor --json       # Machine-readable output
 
 ## CHECK CATEGORIES
 
-Registered by `getAllCheckDefinitions()` (8):
+Registered by `getAllCheckDefinitions()` (9):
 
 | Check | File | Validates |
 |----------|------|-----------|
 | **SYSTEM** | `checks/system.ts` | OpenCode binary found + version >= `MIN_OPENCODE_VERSION` (`1.4.0`), plugin registered in opencode.json, loaded plugin version matches installed |
+| **INSTALL_SHADOWING** | `checks/install-shadowing.ts` | Multiple OmO family binaries on PATH (`oh-my-opencode`, `oh-my-openagent`, `omo-agent-toolkit`; not bare `omo`) report the same `--version` |
 | **CONFIG** | `checks/config.ts` | JSONC validity, Zod schema passes, no unknown keys, model override syntax correct |
 | **TUI_PLUGIN** | `checks/tui-plugin-config.ts` | TUI sidebar plugin entry resolvable |
 | `deprecated-reasoning-keys` | `checks/deprecated-reasoning-keys.ts` | Scans `~/.omo/omo.json[c]` for deprecated `variant` / `reasoningEffort` / `thinking` / `textVerbosity` / `fallback_models` keys, reporting file + dotted path and a `config migrate` hint. Skips the `[opencode]` block and passthrough containers (`provider_options`). Registered with a literal id, NOT in `CHECK_IDS`. |
@@ -43,6 +44,7 @@ checks/
 ├── system-binary.ts                       # OpenCode binary discovery (PATH + desktop app)
 ├── system-plugin.ts                       # opencode.json plugin entry detection
 ├── system-loaded-version.ts               # Cache vs npm latest
+├── install-shadowing.ts                   # Multiple OmO family installs on PATH
 ├── config.ts                              # Main Config aggregator
 ├── tools.ts                               # Main Tools aggregator
 ├── dependencies.ts                        # AST-Grep CLI/NAPI + comment-checker presence
@@ -71,7 +73,7 @@ checks/
 ```
 doctor command
   → runner.ts: parallel check execution with 30s per-check timeout
-  → checks/index.ts: getAllCheckDefinitions() (8) + getCodexCheckDefinitions() (3)
+  → checks/index.ts: getAllCheckDefinitions() (9) + getCodexCheckDefinitions() (3)
   → each check returns CheckResult: { name, status, message, details?, issues, duration? }
   → formatter.ts: render to stdout (text/status/json)
   → exit code: EXIT_CODES.SUCCESS (0) | EXIT_CODES.FAILURE (1)
