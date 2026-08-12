@@ -37,6 +37,8 @@ export interface FakeRpcEvent {
 }
 
 export class FakeExtensionAPI implements SenpiExtensionAPI {
+  // Mirrors the host's per-session cwd; left undefined to emulate hosts that predate it.
+  cwd?: string
   readonly handlers: Array<{ event: string; handler: FakeEventHandler }> = []
   readonly tools: Record<string, unknown>[] = []
   readonly commands: FakeCommandRegistration[] = []

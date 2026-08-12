@@ -1,0 +1,32 @@
+FULL PACKAGE RUNS AT COMMIT TIME (todo 6)
+=========================================
+
+bun test packages/memory-core
+  386 pass / 0 fail / 3290 expect() calls, 40 files, exit 0. GREEN in one run.
+
+bun test packages/omo-senpi
+  967 pass / 3 fail / 2785 expect() calls, 148 files.
+  Failure triage (none are task-6 files):
+  1. (fail) omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the
+     default omo binary #then Bun is not needed and PATH is ignored
+     PRE-EXISTING on pristine origin/dev per the task brief (12 pass 1 fail there);
+     reproduced in isolation here (44 pass / 1 fail). Not fixed, as instructed.
+  2. (fail) reflection and dream run reconciliation > #given a failed child outcome
+     with a valid commit #when reconciled #then output is never merged...
+  3. (fail) reflection and dream run reconciliation > #given an orphaned successful
+     dream worktree #when session-start reconciliation runs...
+     Both belong to todo 13's concurrently in-flight, UNCOMMITTED files
+     (packages/omo-senpi/src/components/memory/worker/run-reconciliation.* and
+     reflection machine/reservation edits). Not task-6 files; left untouched.
+
+Earlier in the session the same suite ran 958 pass / 1 fail (only the pre-existing
+OMO_BIN failure) once todo 25's churn settled, and the todo-6 acceptance domains
+(compile + seeds + prompt) are 38 pass / 0 fail on the final combined tree
+(post todo-3 nudge landing).
+
+Typecheck (tsgo --noEmit -p tsconfig.json per package; the LSP diagnostics tool is
+locked to the main checkout cwd and refuses worktree paths, so tsgo is the gate):
+  packages/omo-senpi: exit 0, clean (includes task-6 prompt.ts / prompt.test.ts).
+  packages/memory-core: 25 errors, ALL in concurrent agents' in-flight files
+  (23 in src/people/format.test.ts - todos 16/17; 2 in src/reflection/machine.test.ts
+  - todo 12/13). ZERO errors in any task-6 file (compile/*, seeds/*).

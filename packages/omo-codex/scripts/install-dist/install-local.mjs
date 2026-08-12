@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:7bc4b0f020f0a1b4448cc75385a7e3c60042e3b270e304d4c1a43a859e81a4c2:e3e8cf6fc61cb0fb389d319dce31f73f8b2ebcb823ff09f8eee44a107186771b
+// omo-codex-install:7bc4b0f020f0a1b4448cc75385a7e3c60042e3b270e304d4c1a43a859e81a4c2:87dc47bcd9f3fdc0552bcb44bedc0e618e29fc1f1dbf3d1f3645c2eed8c27cc8
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -2292,31 +2292,31 @@ var init_exception_steps = __esm(() => {
 // node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
 var exports_error_tracking = {};
 __export(exports_error_tracking, {
-  winjsStackLineParser: () => winjsStackLineParser,
-  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
-  reverseAndStripFrames: () => reverseAndStripFrames,
-  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
-  opera11StackLineParser: () => opera11StackLineParser,
-  opera10StackLineParser: () => opera10StackLineParser,
-  nodeStackLineParser: () => nodeStackLineParser,
-  getUtf8ByteLength: () => getUtf8ByteLength,
-  geckoStackLineParser: () => geckoStackLineParser,
-  createStackParser: () => createStackParser,
-  createDefaultStackParser: () => createDefaultStackParser,
-  chromeStackLineParser: () => chromeStackLineParser,
-  StringCoercer: () => StringCoercer,
-  ReduceableCache: () => ReduceableCache,
-  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
-  PrimitiveCoercer: () => PrimitiveCoercer,
-  ObjectCoercer: () => ObjectCoercer,
-  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
-  EventCoercer: () => EventCoercer,
-  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
-  ErrorEventCoercer: () => ErrorEventCoercer,
-  ErrorCoercer: () => ErrorCoercer,
-  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG,
   DOMExceptionCoercer: () => DOMExceptionCoercer,
-  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG
+  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  ErrorCoercer: () => ErrorCoercer,
+  ErrorEventCoercer: () => ErrorEventCoercer,
+  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
+  EventCoercer: () => EventCoercer,
+  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
+  ObjectCoercer: () => ObjectCoercer,
+  PrimitiveCoercer: () => PrimitiveCoercer,
+  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
+  ReduceableCache: () => ReduceableCache,
+  StringCoercer: () => StringCoercer,
+  chromeStackLineParser: () => chromeStackLineParser,
+  createDefaultStackParser: () => createDefaultStackParser,
+  createStackParser: () => createStackParser,
+  geckoStackLineParser: () => geckoStackLineParser,
+  getUtf8ByteLength: () => getUtf8ByteLength,
+  nodeStackLineParser: () => nodeStackLineParser,
+  opera10StackLineParser: () => opera10StackLineParser,
+  opera11StackLineParser: () => opera11StackLineParser,
+  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
+  reverseAndStripFrames: () => reverseAndStripFrames,
+  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
+  winjsStackLineParser: () => winjsStackLineParser
 });
 var init_error_tracking = __esm(() => {
   init_error_properties_builder();
@@ -5927,7 +5927,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.5",
+    version: "5.0.0-beta.6",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6132,14 +6132,14 @@ var init_posthog = __esm(() => {
 // packages/omo-codex/src/telemetry/index.ts
 var exports_telemetry = {};
 __export(exports_telemetry, {
-  getPostHogDistinctId: () => getPostHogDistinctId,
-  createPluginPostHog: () => createPluginPostHog,
-  createInstallPostHog: () => createInstallPostHog,
-  createCliPostHog: () => createCliPostHog,
-  __setOsProviderForTesting: () => __setOsProviderForTesting,
-  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting,
   __resetOsProviderForTesting: () => __resetOsProviderForTesting,
-  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting
+  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __setOsProviderForTesting: () => __setOsProviderForTesting,
+  createCliPostHog: () => createCliPostHog,
+  createInstallPostHog: () => createInstallPostHog,
+  createPluginPostHog: () => createPluginPostHog,
+  getPostHogDistinctId: () => getPostHogDistinctId
 });
 var init_telemetry = __esm(() => {
   init_posthog();
@@ -11832,23 +11832,23 @@ async function runLazyCodexInstallLocalCli(input) {
   return 0;
 }
 export {
-  updateCodexConfig,
-  stampGitBashMcpEnv,
-  runLazyCodexInstallLocalCli,
-  runDelegatedOmoCommand,
-  resolveDefaultRepoRootForEntrypoint,
-  resolveDefaultRepoRoot,
-  resolveCodexInstallerBinDir,
-  repairNearestProjectLocalCodexArtifacts,
-  readCodexModelCatalog,
-  parseLazyCodexInstallCliArgs,
-  linkRootRuntimeBin,
-  linkCachedPluginBins,
-  installMarketplaceLocally,
-  installCachedPlugin,
-  formatLazyCodexInstallHelp,
-  findMissingHookCommandTargets,
-  buildDelegatedOmoInvocation,
+  PASSTHROUGH_COMMANDS,
   assertHookCommandTargets,
-  PASSTHROUGH_COMMANDS
+  buildDelegatedOmoInvocation,
+  findMissingHookCommandTargets,
+  formatLazyCodexInstallHelp,
+  installCachedPlugin,
+  installMarketplaceLocally,
+  linkCachedPluginBins,
+  linkRootRuntimeBin,
+  parseLazyCodexInstallCliArgs,
+  readCodexModelCatalog,
+  repairNearestProjectLocalCodexArtifacts,
+  resolveCodexInstallerBinDir,
+  resolveDefaultRepoRoot,
+  resolveDefaultRepoRootForEntrypoint,
+  runDelegatedOmoCommand,
+  runLazyCodexInstallLocalCli,
+  stampGitBashMcpEnv,
+  updateCodexConfig
 };

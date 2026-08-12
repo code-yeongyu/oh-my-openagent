@@ -6,9 +6,12 @@
 
 import type { SenpiExtensionAPI } from "../../../extension/types"
 import {
+  checkAbandonedRuns,
   checkFrontmatter,
   checkLocks,
   checkRepository,
+  checkReflectionHealth,
+  checkSoulSeed,
   checkTokens,
   checkWorktrees,
   type CheckLevel,
@@ -46,8 +49,11 @@ export function registerDoctorCommand(pi: SenpiExtensionAPI, deps: MemoryCommand
         const warnTokens = deps.loadSettings().settings.compile_warn_tokens
         checks.push(
           ...(await checkFrontmatter(repoDir)),
+          await checkSoulSeed(repoDir),
           await checkLocks(deps, identity.identityPaths.locks),
           await checkWorktrees(deps, identity),
+          await checkAbandonedRuns(identity.identityPaths.reflection),
+          await checkReflectionHealth(identity.identityPaths.reflection),
           await checkTokens(repoDir, warnTokens),
         )
 

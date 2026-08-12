@@ -1,5 +1,4 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
-import { recordSummary } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -8,6 +7,7 @@ import type { LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
+import { wireTaskRpcBridge } from "./task-rpc-bridge"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -16,17 +16,6 @@ type EventBridgeState = {
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
-}
-
-function emitTaskSnapshot(pi: SenpiExtensionAPI, engine: TaskEngine): void {
-  const parent_session_id = engine.runtime.sessionId()
-  if (parent_session_id === undefined) return
-  pi.rpc?.emit("omo.task.updated", {
-    parent_session_id,
-    tasks: engine.manager
-      .list({ scope: "parent-session", session_id: parent_session_id })
-      .map(({ record }) => recordSummary(record, true)),
-  })
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -44,7 +33,8 @@ export function wireEventBridge(
   state: EventBridgeState,
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
-  const unsubscribeTaskSnapshots = engine.onStoreMutation(() => emitTaskSnapshot(pi, engine))
+  const taskRpc = wireTaskRpcBridge(pi, engine)
+  const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager)
 
   pi.on("session_start", async (_payload, eventCtx) => {
@@ -70,10 +60,11 @@ export function wireEventBridge(
     }
     await tickLeadPollersBestEffort(ctx, state)
     statusUi.scheduleSync()
-    emitTaskSnapshot(pi, engine)
+    taskRpc.attach()
   })
 
   pi.on("session_before_switch", (_payload, eventCtx) => {
+    taskRpc.detach()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onBeforeSwitch(engine.runtime.sessionId())
     engine.runtime.clearUi()
@@ -92,6 +83,7 @@ export function wireEventBridge(
 
   pi.on("session_shutdown", async (payload, eventCtx) => {
     unsubscribeTaskSnapshots()
+    taskRpc.dispose()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()

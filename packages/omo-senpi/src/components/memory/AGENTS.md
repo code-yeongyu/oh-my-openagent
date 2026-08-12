@@ -17,14 +17,26 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 | `tools.ts` | `memory` + `memory_apply_patch` ToolDefinitions over the core engines under the `memory-write` cross-process lock; execute-time activation gating. |
 | `journal-wiring.ts` | `agent_settled` branch-delta scan + `session_start` crash reconcile into per-session transcript journals (v3_assistant_steps cursor). |
 | `trigger-wiring.ts` | Trigger evaluation on successful settle only; compaction flag consumed once; manual entrypoint for `/reflect`. |
-| `worker/` | Detached `senpi -p` reflection child: quick-category model resolution, worktree isolation, hard deadline (SIGTERM->SIGKILL process group), completion validation, auto/explicit merge, durable completion records (`runtime/reflection/completions/`). |
+| `worker/` | Detached `senpi -p` reflection and dream children behind the run supervisor (`memory-run-supervisor.ts`): launch manifest + gated bootstrap handshake, durable run ledger, absolute hard deadline (SIGTERM->SIGKILL process group; `taskkill /T /F` tree kill on win32), `outcome.json`/`final.json` sentinels, crash reconciliation, completion validation, auto/explicit merge, durable completion records (`runtime/reflection/completions/`). |
+| `worker/health.ts` | Reflection health scan over completion records: failure streak, fingerprint, last outcome, `senpi-memory.health` journal entries. |
+| `worker/remediation.ts` | Maps reflection failure reasons to user-facing remediation hints. |
+| `nudge-wiring.ts` | Save-nudge accounting: counts accepted user turns since the last memory write (commit-trailer provenance), surfaces a nudge line in the compiled metadata block at `nudge.every_user_turns`. |
+| `facts-wiring.ts` / `facts-runner.ts` | Durable facts queue (settle-time enqueue, crash reconcile) + quick-pinned background extractor child; the parent applies the whole batch under the `memory-write` lock, the child never touches git. |
+| `dream-selector.ts` | Dream conversation auto-selector: unreflected-volume gate, caps at `dream.auto_select_max` conversations / `dream.auto_select_max_chars` UTF-8 bytes. |
+| `skills-usage.ts` | Per-skill read-count ledger consumed by the dream skill-audit phase. |
+| `soul-notice.ts` | Soul-edit notices: commits touching `system/persona.md` or `system/identity.md` emit a non-model-facing `appendEntry` notice, gated by `soul.edit_notice`. |
+| `shutdown-drain.ts` | Session-shutdown journal drain under a hard budget. |
 | `sandbox.ts` | Seatbelt/bwrap sandbox transform for reflection children (`required|auto|off`, default `auto`). |
-| `commands/` | Ten slash commands; read-only output never enters model context. |
+| `commands/` | Ten slash commands; read-only output never enters model context. `/sleeptime` shows the resolved nudge/facts/dream/people/soul settings. |
 | `palace/` | Self-contained HTML memory viewer (0600/0700, machine-gated inline-JSON assertions). |
 | `guard.ts` | Soft cross-identity guard via `tool_call` (file tools only; bash advisory-only). |
 | `policy-guard.ts` | Hard guard: registers a filesystem policy when the host exposes `registerFilesystemPolicy` (senpi >= feat/extension-fs-policy), soft guard otherwise. |
 | `skills-scope.ts` | Agent memfs `skills/` exposure via `resources_discover`. |
 | `status.ts` | Footer status + committed-only token advisory at `compile_warn_tokens`. |
+| `status-live.ts` | Generic footer animation: braille reflecting spinner, fingerprint-gated segment refresh, injectable timers. |
+| `status-live-wiring.ts` | Binds the footer animation to memory state: session-to-identity resolution, git-backed fingerprint, segment line via the shared status.ts formatter. |
+| `status-active-runs.ts` | Per-identity registry of in-flight reflection runs keyed by run id; drives footer animation and supplies run details to the rpc bridge. |
+| `memory-rpc-bridge.ts` | RPC surface: fingerprint-deduped `omo.memory.updated` snapshot push plus `omo.memory.status` pull; every rpc touch is guarded, so a host without `pi.rpc` is a silent no-op. |
 | `binding.ts` / `bindings/` | Binding entry record + renderer. |
 | `capabilities.ts` | `appendEntry`/`registerEntryRenderer` capability narrowing (`MemoryExtensionAPI`). |
 | `supervisor.ts` | Ref-counted module supervisor placeholder. |
@@ -38,10 +50,28 @@ Every row is intentional; each was weighed against the research corpus (claim-gr
 3. **No reflection arena, no channels.** The A/B arena experiment and Discord/Telegram `/reflection` routing have no omo analog.
 4. **Local search is text-only by design**, matching letta's local backend (its `vector|hybrid` modes degrade to FTS-lite locally). Senpi sessions are scanned via the senpi JSONL provider; archived-sidecar and internal-session exclusions apply, `--include-hidden` overrides.
 5. **No mid-conversation `<memory_update>` one-shot.** Letta special-cases `anthropic/claude-opus-4-8` (C15/C27); omo recompiles per run for every model (generalized, per-run `before_agent_start` re-check of HEAD).
-6. **No `/reflect --auto` selector subagent, no external-transcript staging, no `letta dream --to` doc maintenance.** Manual reflection takes `--recent N` / `--conversation <ids>` / free-text focus.
+6. **No `/reflect --auto` selector subagent, no external-transcript staging, no `letta dream --to` doc maintenance.** Manual reflection takes `--recent N` / `--conversation <ids>` / free-text focus. The dream pass (below) carries its own conversation auto-selector, but that is an omo extension riding the reservation machine, not a port of letta's slash surfaces.
 7. **No recall subagent or conversation-bootstrap injection.** `/search` is the recall surface (letta's local path already disables AI description generation, C46).
 8. **No onboarding tutorial personality / welcome hints.** Default seeds (`system/persona.md`, `system/human.md`) are the only first-run content.
 9. **Reflection sandbox default is `auto`**, not letta's fail-closed `required` (C33): default-on reflection must not break hosts without seatbelt/bwrap. `memory.reflection.sandbox: "required"` restores letta semantics.
-10. **`memory_description`/`limit` frontmatter tolerance matches letta; block-scalar descriptions are rejected** (letta's cut-prefix accepted `>` — that acceptance is treated as a bug).
-11. **str_replace replaces the FIRST occurrence** (letta actual behavior, C21) — the advisory's exactly-one-match proposal was rejected for parity.
+10. **`memory_description`/`limit` frontmatter tolerance matches letta; block-scalar descriptions are rejected** (letta's cut-prefix accepted `>`; that acceptance is treated as a bug). Frontmatter additionally parses and preserves typed `kind` + `aliases` for people cards, an omo extension letta has no analog for.
+11. **str_replace replaces the FIRST occurrence** (letta actual behavior, C21); the advisory's exactly-one-match proposal was rejected for parity.
 12. **Message store = senpi session JSONL** (letta's LocalStore JSONL was not ported; the engine reads senpi's native format).
+13. **`reflection.trigger.step_count` stays at letta's 25** (schema default); memory v2 changed the trigger machinery and added the dream kind, not the reflection cadence.
+
+## Extensions beyond parity
+
+Active learning is ON by default (`memory.enabled: true` plus every sub-feature below defaulting on). These are omo-only additions, not parity claims against letta-code:
+
+- **Save nudge** (`memory.nudge`): after `every_user_turns` (default 10) accepted user turns without a memory write, a nudge line joins the compiled metadata block. Write detection keys on commit trailers (`Omo-Writer`/`Omo-Session`/`Omo-Turn`), never on git author identity.
+- **Facts extractor** (`memory.facts`): settle-time queue entries debounce (`debounce_settles`, default 4) into a detached `senpi -p` child that emits `extraction.jsonl` only; the parent applies the batch as one commit with a `Generated-By: facts-extractor` trailer.
+- **Dream pass** (`memory.dream`): a distinct reservation trigger kind (`"dream"` with `origin: manual|idle|shutdown`) running a consolidation + skill-audit + people persona through the same worker pipeline, with the auto-selector capped by `auto_select_max` / `auto_select_max_chars`.
+- **People cards** (`memory.people`): typed card + observation formats in memory-core (`kind`/`aliases` frontmatter, per-card `max_entries`/`max_entry_chars` limits), plus a relationship graph view in the memory palace.
+- **Soul v2** (`memory.soul`): `system/identity.md` joins `<self>` alongside the persona, and committed soul edits surface a visible non-model-facing notice when `edit_notice` is true.
+- **MCP search surface** (`memory.tool_exposure: "search"`): opts the memory tools out of direct registration and into an extension-declared stdio MCP server behind senpi's `tool_search` catalog. Default stays `"direct"` because a failed MCP server would remove memory entirely.
+- **Run supervisor**: every reflection/dream/facts child is spawned through `memory-run-supervisor.mjs`, which owns the run identity handshake and the `outcome.json` sentinel. On win32, process groups and POSIX signals are unavailable: the child spawns non-detached, graceful `child.kill()` fires at the SIGTERM instant and `taskkill /pid <pid> /T /F` at the SIGKILL instant, process-start identity is always null so reconciliation of an abruptly dead supervisor resolves through the non-destructive UNKNOWN path to `abandoned.json`, and the bootstrap self-enforces the same absolute deadline.
+
+## Deliberate constants (not knobs)
+
+- **Facts extractor category is pinned `"quick"`** (`facts-runner.ts` `QUICK_CATEGORY`); resolution failure logs a warning and skips the run, never falls back to another category. The schema comment in `omo-config-core/src/schema/memory.ts` records the same decision.
+- **Shutdown drain budget is 1500 ms** (`shutdown-drain.ts` `SESSION_SHUTDOWN_DRAIN_BUDGET_MS`): senpi blocks shutdown on the drain handler, so the budget is a pinned constant rather than configuration.

@@ -125,9 +125,13 @@ describe("dependency security", () => {
     expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.66")
   })
 
+  // The scan spawns `git grep -P` over every first-party source and already bounds that spawn at
+  // 60s so a stalled grep fails deterministically. The case therefore has to outlive its own
+  // guard: on the 5s default the test died before the spawn budget could ever apply, which is the
+  // Windows failure. The assertion is unchanged - only the ceiling now exceeds what it wraps.
   it("#given first-party TypeScript sources #when dependency imports are scanned #then no source imports effect directly", async () => {
     const effectImports = await findFirstPartyEffectImports()
 
     expect(effectImports).toEqual([])
-  })
+  }, 90_000)
 })

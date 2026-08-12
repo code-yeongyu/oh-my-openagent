@@ -16,7 +16,9 @@ export interface ReflectionPersona {
 // import.meta.dir is Bun-only: the senpi extension bundle loads under plain Node through jiti, where it
 // is undefined and this module-scope join() killed the whole extension at import time (v5.0.0-beta.1).
 // jiti rewrites import.meta.url to the real file URL, so the standard ESM idiom works on every runtime.
-const PERSONA_PATH = join(dirname(fileURLToPath(import.meta.url)), "reflection-persona.md")
+const ASSETS_DIR = dirname(fileURLToPath(import.meta.url))
+const PERSONA_PATH = join(ASSETS_DIR, "reflection-persona.md")
+const DREAM_PERSONA_PATH = join(ASSETS_DIR, "dream-persona.md")
 
 function parseSections(markdown: string): ReflectionPersonaSection[] {
   const sections: ReflectionPersonaSection[] = []
@@ -39,5 +41,10 @@ function parseSections(markdown: string): ReflectionPersonaSection[] {
 
 export function loadReflectionPersona(): ReflectionPersona {
   const markdown = readFileSync(PERSONA_PATH, "utf8")
+  return { markdown, sections: parseSections(markdown) }
+}
+
+export function loadDreamPersona(): ReflectionPersona {
+  const markdown = readFileSync(DREAM_PERSONA_PATH, "utf8")
   return { markdown, sections: parseSections(markdown) }
 }

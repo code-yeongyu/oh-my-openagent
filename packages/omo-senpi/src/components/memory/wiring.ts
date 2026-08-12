@@ -1,86 +1,144 @@
-import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { MemoryBlockCache } from "@oh-my-opencode/memory-core"
+import { MemoryBlockCache, type ReservedRun } from "@oh-my-opencode/memory-core"
 
-import type { ComponentContext, ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
-import type { SenpiOmoConfigResult } from "../config-resolution"
+import { createOncePerSessionGuard } from "../task/usage-guidance"
+
+import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
-import {
-  createIdentityRuntime,
-  type MemoryIdentityRuntime,
-  type MemoryIdentityRuntimeDeps,
-} from "./identity-runtime"
-import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
-import { resolveMemoryModelRegistry } from "./model-registry-resolver"
-import { registerPalaceCommand } from "./palace/command"
-import { createMemoryPromptHandler } from "./prompt"
-import { registerMemoryCommands } from "./commands/register"
-import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
-import { registerMemoryGuard } from "./guard"
+import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
+import { resolveMemorySettings } from "./identity-runtime"
+import { createMemoryNudgeWiring } from "./nudge-wiring"
+import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
+import { createMemoryRpcBridge, type MemoryRpcBridge } from "./memory-rpc-bridge"
+import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } from "./shutdown-drain"
+import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { type SkillsUsageTracker } from "./skills-usage"
+import { createSoulNoticeWiring } from "./soul-notice"
 import { MEMORY_STATUS_KEY, refreshMemoryStatus } from "./status"
-import { registerMemorySkillsScope } from "./skills-scope"
-import { createReflectionTriggerWiring, type ReflectionTriggerSession } from "./trigger-wiring"
-import {
-  MEMORY_APPLY_PATCH_TOOL_NAME,
-  MEMORY_TOOL_NAME,
-  registerMemoryToolSurface,
-} from "./tools"
+import { createActiveReflectionRuns } from "./status-active-runs"
+import { createMemoryFooterStatusLive } from "./status-live-wiring"
 import {
   consumePendingReflectionCompletions,
-  registerReflectionCompletionRenderer,
+  emitReflectionHealthAlert,
   type ReflectionCompletionApi,
+  type ReflectionLiveSession,
 } from "./worker"
+import { branchEntryCount, readUi } from "./wiring-context"
+import { createMemoryRuntimeWiring } from "./wiring-runtime"
+import { registerMemoryStatic } from "./wiring-static"
+import type { MemoryCommandSettings } from "./commands/types"
+import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
-export interface MemorySessionStateLike {
-  readonly context?: MemoryIdentityContext
-  memoryStatusAttempted: boolean
-}
-
-export interface MemoryWiringOptions {
-  readonly sessions: Map<string, MemorySessionStateLike>
-  readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
-  readonly cwd: () => string
-  readonly env: Record<string, string | undefined>
-  readonly now?: () => number
-  readonly logger?: ComponentLogger
-  readonly refreshStatus?: typeof refreshMemoryStatus
-  readonly createRuntime?: (
-    identity: MemoryIdentityContext,
-    deps: MemoryIdentityRuntimeDeps,
-  ) => Pick<MemoryIdentityRuntime, "store" | "launch">
-  /** Boot-snapshot tool exposure; registration must not re-read config (latch order is observable). */
-  readonly toolExposure?: "direct" | "search"
-}
-
-export interface MemoryWiring {
-  registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void
-  clearStatus(eventCtx: unknown): void
-  afterBind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void>
-}
-
-type StatusUi = {
-  setStatus(key: string, text?: string): void
-  notify(message: string, level: "info" | "warning" | "error"): void
-}
+export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const promptCache = new MemoryBlockCache()
-  const refreshStatus = options.refreshStatus ?? refreshMemoryStatus
-  const runtimes = new Map<string, Pick<MemoryIdentityRuntime, "store" | "launch">>()
-  const journals = new Map<string, MemoryJournalWiring>()
   const lastEventCtx: { current?: unknown } = {}
-  let activeSessionId: string | undefined
-
-  const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
-    options.sessions.get(sessionId)?.context
-
-  function asCommandIdentity(identity: MemoryIdentityContext | undefined): MemoryCommandIdentity | undefined {
-    if (identity === undefined) return undefined
-    return { identity: identity.identity, identityPaths: identity.identityPaths }
+  const activeSession: { current?: string } = {}
+  const liveSession: { current?: ReflectionLiveSession } = {}
+  const healthAlertOnce = createOncePerSessionGuard()
+  const skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> } = { current: new Map() }
+  const activeRuns = createActiveReflectionRuns()
+  // The bridge needs the host API, which only arrives at registration; absent means no rpc surface.
+  const rpcBridge: { current?: MemoryRpcBridge } = {}
+  const footerLive = createMemoryFooterStatusLive({
+    resolveContext: (sessionId) => options.sessions.get(sessionId)?.context,
+    isActive: (identity) => activeRuns.isActive(identity),
+    ...(options.footerTimers === undefined ? {} : { timers: options.footerTimers }),
+  })
+  /** Records the launched run and refreshes both live surfaces behind their own change gates. */
+  async function onReflectionLaunched(identity: string, run: ReservedRun): Promise<void> {
+    activeRuns.start(identity, run.runId, launchDetails(identity, run))
+    footerLive.syncActive(activeSession.current, readUi(lastEventCtx.current))
+    await rpcBridge.current?.sync()
   }
+
+  /**
+   * Launch-time facts only. The concrete model is chosen inside the reflection child, so the
+   * snapshot reports the configured category and leaves `model` absent rather than guessing.
+   */
+  function launchDetails(identity: string, run: ReservedRun) {
+    const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+    return {
+      trigger: run.request.trigger,
+      category: resolveAgentReflectionSettings(settings, identity).category,
+      startedAt: run.reservedAt ?? new Date((options.now ?? Date.now)()).toISOString(),
+    }
+  }
+  const runtimeWiring = createMemoryRuntimeWiring(
+    options,
+    lastEventCtx,
+    () => liveSession.current,
+    { onLaunch: onReflectionLaunched },
+  )
+  const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
+
+  const nudgeWiring = createMemoryNudgeWiring({
+    resolveContext,
+    resolveSettings: (identity) => {
+      const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+      const override = settings.agents[identity]?.nudge
+      return {
+        enabled: override?.enabled ?? settings.nudge.enabled,
+        everyUserTurns: override?.every_user_turns ?? settings.nudge.every_user_turns,
+      }
+    },
+  })
+  const soulNoticeWiring = createSoulNoticeWiring({
+    resolveContext,
+    resolveEditNotice: (identity) => {
+      const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+      const override = settings.agents[identity]?.soul
+      return override?.edit_notice ?? settings.soul.edit_notice
+    },
+  })
+
+  async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
+    for (const tracker of skillsUsageTrackersRef.current.values()) {
+      if (signal?.aborted === true) return
+      await tracker.flush(signal)
+    }
+  }
+
+  const shutdownDrain = createShutdownDrain({
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+    steps: {
+      flushJournal: async (sessionId, signal) => {
+        const identity = resolveContext(sessionId)
+        if (identity === undefined) return
+        await journalWiringFor(identity).journalFor(sessionId).flush(signal)
+      },
+      enqueueFinalDelta: async (sessionId, signal) => {
+        const identity = resolveContext(sessionId)
+        if (identity === undefined || signal.aborted) return
+        await factsWiringFor(identity).enqueueSettled(sessionId, signal)
+      },
+      flushSkillsUsage: async (_sessionId, signal) => {
+        if (signal.aborted) return
+        await flushSkillsUsageTrackers(signal)
+      },
+      launchFacts: async (sessionId, signal) => {
+        const identity = resolveContext(sessionId)
+        if (identity === undefined || signal.aborted) return
+        await factsWiringFor(identity).launchIfThresholdMet(signal)
+      },
+    },
+  })
+
+  const dreamTriggerWiring = createDreamTriggerWiring({
+    resolveSession: (eventCtx) => runtimeWiring.dreamSessionFor(eventCtx),
+    resolveActiveSession: () => (activeSession.current === undefined ? undefined : runtimeWiring.dreamSessionById(activeSession.current)),
+    resolveSessionById: runtimeWiring.dreamSessionById,
+    resolveSettings: (identity) => {
+      const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+      return resolveDreamTriggerSettings(settings, identity)
+    },
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+  shutdownDrain.registerEvaluator(dreamTriggerWiring.shutdownEvaluator())
 
   function completionApi(pi: SenpiExtensionAPI): ReflectionCompletionApi | undefined {
     if (!hasMemoryCapabilities(pi)) return undefined
@@ -94,232 +152,129 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     }
   }
 
-  function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
-    const cached = journals.get(identity.identity)
-    if (cached !== undefined) return cached
-    const wiring = createMemoryJournalWiring({ identityPaths: identity.identityPaths })
-    journals.set(identity.identity, wiring)
-    return wiring
-  }
-
-  function runtimeFor(identity: MemoryIdentityContext): Pick<MemoryIdentityRuntime, "store" | "launch"> {
-    const cached = runtimes.get(identity.identity)
-    if (cached !== undefined) return cached
-    const create = options.createRuntime ?? createIdentityRuntime
-    const runtime = create(identity, {
-      loadConfig: options.loadConfig,
-      cwd: options.cwd,
-      resolveModelRegistry: () => resolveMemoryModelRegistry(lastEventCtx.current),
-      ...(options.logger === undefined ? {} : { logger: options.logger }),
-    })
-    runtimes.set(identity.identity, runtime)
-    return runtime
-  }
-
-  function triggerSessionFor(eventCtx: unknown): ReflectionTriggerSession | undefined {
-    const sessionId = sessionIdFrom(eventCtx)
-    if (sessionId === undefined) return undefined
-    const identity = resolveContext(sessionId)
-    if (identity === undefined) return undefined
-    const runtime = runtimeFor(identity)
+  /** Palace people-panel gate using the resolved `memory.people` settings. */
+  function resolvePalacePeople(): PalacePeopleOptions | undefined {
+    const people = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory).people
     return {
-      conversationId: sessionId,
-      ledger: identity.ledger,
-      engine: {
-        evaluate: async (conversationId, event) => {
-          lastEventCtx.current = eventCtx
-          const result = await runtime.store.evaluate(conversationId, event)
-          if (result?.status === "active") runtime.launch(result.run)
-          return result
-        },
-      },
-    }
-  }
-
-  function sessionIdFrom(eventCtx: unknown): string | undefined {
-    if (!isRecord(eventCtx)) return undefined
-    const manager = isRecord(eventCtx.sessionManager) ? eventCtx.sessionManager : undefined
-    const getter = manager?.getSessionId
-    if (typeof getter !== "function") return undefined
-    const id = Reflect.apply(getter, manager, [])
-    return typeof id === "string" && id.length > 0 ? id : undefined
-  }
-
-  function branchEntryCount(eventCtx: unknown): number {
-    if (!isRecord(eventCtx)) return 0
-    const manager = isRecord(eventCtx.sessionManager) ? eventCtx.sessionManager : undefined
-    const getEntries = manager?.getEntries
-    if (typeof getEntries !== "function") return 0
-    const entries = Reflect.apply(getEntries, manager, [])
-    return Array.isArray(entries) ? entries.length : 0
-  }
-
-  function readUi(eventCtx: unknown): StatusUi | undefined {
-    if (!isRecord(eventCtx)) return undefined
-    const ui = eventCtx.ui
-    if (!isRecord(ui)) return undefined
-    if (typeof ui.setStatus !== "function" || typeof ui.notify !== "function") return undefined
-    return {
-      setStatus: (key, text) => Reflect.apply(ui.setStatus as (...args: unknown[]) => unknown, ui, [key, text]),
-      notify: (message, level) => Reflect.apply(ui.notify as (...args: unknown[]) => unknown, ui, [message, level]),
+      enabled: people.enabled,
+      limits: { maxEntries: people.max_entries, maxEntryChars: people.max_entry_chars },
     }
   }
 
   function loadCommandSettings(): MemoryCommandSettings {
-    const settings = options.loadConfig({ cwd: options.cwd() }).config.memory
-    if (settings === undefined) throw new Error("memory settings unavailable")
-    return { settings }
+    const resolved = options.loadConfig({ cwd: options.cwd() }).config
+    return { settings: resolveMemorySettings(resolved.memory), config: resolved }
   }
 
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      const api = completionApi(pi)
-      if (api !== undefined) registerReflectionCompletionRenderer(api)
-      const toolExposure = options.toolExposure ?? "direct"
-      const promptHandler = createMemoryPromptHandler({
+      rpcBridge.current = createMemoryRpcBridge(pi, {
         resolveContext,
-        cache: promptCache,
-        searchExposure: () => toolExposure === "search",
+        activeRun: (identity) => activeRuns.current(identity),
       })
-      pi.on("before_agent_start", (payload, eventCtx) => {
-        lastEventCtx.current = eventCtx
-        return promptHandler(payload, eventCtx)
-      })
-      pi.on("session_start", (_payload, eventCtx) => {
-        if (eventCtx !== undefined) lastEventCtx.current = eventCtx
-      })
-      pi.on("agent_settled", (_payload, eventCtx) => {
-        lastEventCtx.current = eventCtx
-        const sessionId = sessionIdFrom(eventCtx)
-        if (sessionId === undefined) return undefined
-        const identity = resolveContext(sessionId)
-        if (identity === undefined) return undefined
-        activeSessionId = sessionId
-        if (branchEntryCount(eventCtx) === 0) return undefined
-        return journalWiringFor(identity).reconcileSession(eventCtx)
-      })
-      pi.on("tool_result", async (payload, eventCtx) => {
-        if (!isMemoryToolResult(payload)) return
-        const sessionId = sessionIdFrom(eventCtx)
-        if (sessionId === undefined) return
-        const state = options.sessions.get(sessionId)
-        if (state?.context === undefined || state.memoryStatusAttempted) return
-        const ui = readUi(eventCtx)
-        if (ui === undefined) return
-        state.memoryStatusAttempted = true
-        const settings = options.loadConfig({ cwd: options.cwd() }).config.memory
-        try {
-          const result = await refreshStatus({
-            context: state.context,
-            ui,
-            compileWarnTokens: settings?.compile_warn_tokens ?? 30_000,
-            alreadyNotified: false,
-            checkAdvisory: false,
-            ...(options.now === undefined ? {} : { now: options.now }),
-          })
-          state.memoryStatusAttempted = result.footerShown
-        } catch (error) {
-          state.memoryStatusAttempted = false
-          throw error
-        }
-      })
-      registerMemoryToolSurface(pi, () => (activeSessionId === undefined ? undefined : resolveContext(activeSessionId)), {
-        exposure: toolExposure,
-      })
-      registerMemoryGuard(pi, ctx, {
-        getContext: (eventContext) => {
-          const sessionId = sessionIdFrom(eventContext)
-          return sessionId === undefined ? undefined : resolveContext(sessionId)
+      registerMemoryStatic({
+        pi,
+        ctx,
+        options,
+        promptCache,
+        nudgeWiring,
+        soulNoticeWiring,
+        dreamTriggerWiring,
+        completionApi,
+        resolveContext,
+        journalWiringFor,
+        factsWiringFor,
+        runtimeFor,
+        triggerSessionFor: runtimeWiring.triggerSessionFor,
+        resolvePalacePeople,
+        loadCommandSettings,
+        lastEventCtx,
+        activeSession,
+        skillsUsageTrackersRef,
+        onReflectionLaunch: onReflectionLaunched,
+        onSettled: async (sessionId, eventCtx) => {
+          // The footer stays fire-and-forget; only the rpc snapshot is awaited by the caller.
+          void footerLive.refresh(sessionId, readUi(eventCtx))
+          await rpcBridge.current?.sync()
         },
-        resolveCwd: options.cwd,
-      })
-      registerMemorySkillsScope(pi, { resolveContext })
-      registerPalaceCommand(pi, () => (activeSessionId === undefined ? undefined : resolveContext(activeSessionId)))
-      registerMemoryCommands(pi, {
-        contextForSession: (sessionId) => asCommandIdentity(resolveContext(sessionId)),
-        resolveIdentity: () => (activeSessionId === undefined ? undefined : asCommandIdentity(resolveContext(activeSessionId))),
-        loadSettings: loadCommandSettings,
-        bustPromptCache: () => promptCache.clear(),
-        reflectionSink: {
-          request: async (request) => {
-            if (activeSessionId === undefined) throw new Error("no bound memory session")
-            const identity = resolveContext(activeSessionId)
-            if (identity === undefined) throw new Error("no bound memory session")
-            const runtime = runtimeFor(identity)
-            const result = await runtime.store.evaluate(activeSessionId, {
-              kind: "manual",
-              ...(request.focus === undefined ? {} : { focus: request.focus }),
-              ...(request.recentN === undefined ? {} : { recentN: request.recentN }),
-              ...(request.conversationIds === undefined ? {} : { conversationIds: request.conversationIds }),
-            })
-            if (result === null) throw new Error("reflection reservation rejected")
-            if (result.status === "active") runtime.launch(result.run)
-            return { disposition: result.status === "active" ? "reserved" : "pending", runId: result.run.runId }
-          },
+        onMemoryWrite: async () => {
+          await rpcBridge.current?.sync()
         },
-        sessionsDir: () => join(options.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"), "sessions"),
       })
-      const triggerWiring = createReflectionTriggerWiring({
-        resolveSession: triggerSessionFor,
-        onLaunch: () => {},
-        ...(options.logger === undefined ? {} : { logger: options.logger }),
-      })
-      triggerWiring.register(pi)
-    },
-
-    clearStatus(eventCtx: unknown): void {
-      readUi(eventCtx)?.setStatus(MEMORY_STATUS_KEY, undefined)
     },
 
     async afterBind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void> {
-      activeSessionId = sessionId
+      activeSession.current = sessionId
       lastEventCtx.current = eventCtx
+      rpcBridge.current?.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
+      await runtimeFor(identity).reconcile()
       if (branchEntryCount(eventCtx) > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
+      factsWiringFor(identity).reconcileExtractor()
       const ui = readUi(eventCtx)
+      const api = completionApi(pi)
+      liveSession.current = api === undefined
+        ? undefined
+        : {
+            sessionId,
+            api,
+            ...(ui === undefined ? {} : { ui }),
+            ...(options.logger === undefined ? {} : { logger: options.logger }),
+          }
       if (ui !== undefined) {
-        const settings = options.loadConfig({ cwd: options.cwd() }).config.memory
-        void refreshStatus({
+        const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+        void refreshMemoryStatus({
           context: identity,
           ui,
-          compileWarnTokens: settings?.compile_warn_tokens ?? 30_000,
+          compileWarnTokens: settings.compile_warn_tokens,
           alreadyNotified: false,
-          showFooter: false,
+          sessionId,
         }).catch(() => {})
       }
-      const api = completionApi(pi)
-      if (api !== undefined) {
-        void consumePendingReflectionCompletions(
-          join(identity.identityPaths.reflection, "completions"),
-          { sessionId, api },
-        ).catch(() => {})
+      if (liveSession.current !== undefined) {
+        try {
+          const completionsDir = join(identity.identityPaths.reflection, "completions")
+          const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession.current)
+          // A consumed completion is the settle signal: the run behind it is no longer in flight.
+          for (const record of consumed) activeRuns.settle(identity.identity, record.runId)
+          await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession.current, healthAlertOnce)
+          footerLive.syncActive(sessionId, ui)
+          await footerLive.refresh(sessionId, ui)
+        } catch (error) {
+          options.logger?.warn("memory reflection completion drain failed", { error: describe(error) })
+        }
       }
+      // Published last so the bind snapshot reflects the drained backlog, not the pre-drain state.
+      await rpcBridge.current?.sync()
+    },
+
+    async flushSkillsUsage(): Promise<void> {
+      await flushSkillsUsageTrackers()
+    },
+
+    async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      const identity = options.sessions.get(input.sessionId)?.context
+      if (identity !== undefined) activeRuns.clear(identity.identity)
+      // A leaked interval outlives the session, so the animation stops before the drain runs.
+      footerLive.dispose()
+      rpcBridge.current?.detach()
+      await shutdownDrain.run(input)
+    },
+
+    registerShutdownEvaluator(evaluator: ShutdownEvaluator): void {
+      shutdownDrain.registerEvaluator(evaluator)
+    },
+
+    clearStatus(eventCtx: unknown): void {
+      // Clearing the footer must also kill the animation, or the interval repaints what was cleared.
+      footerLive.stop()
+      readUi(eventCtx)?.setStatus(MEMORY_STATUS_KEY, undefined)
     },
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
-function isMemoryToolResult(value: unknown): boolean {
-  if (
-    !isRecord(value)
-    || value.type !== "tool_result"
-    || value.isError === true
-    || typeof value.toolName !== "string"
-  ) return false
-  return matchesToolName(value.toolName, MEMORY_TOOL_NAME)
-    || matchesToolName(value.toolName, MEMORY_APPLY_PATCH_TOOL_NAME)
-}
-
-function matchesToolName(toolName: string, expected: string): boolean {
-  const normalized = toolName.trim().toLowerCase().replaceAll("-", "_")
-  const suffix = expected.trim().toLowerCase().replaceAll("-", "_")
-  return normalized === suffix
-    || normalized.endsWith(`_${suffix}`)
-    || normalized.endsWith(`:${suffix}`)
-    || normalized.endsWith(`/${suffix}`)
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

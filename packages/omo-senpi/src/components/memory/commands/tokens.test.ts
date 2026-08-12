@@ -4,17 +4,18 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { estimateSystemTokens } from "./tokens"
+import { realpathSync } from "node:fs"
 
 const tempDirs: string[] = []
 
 async function tempRepo(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "memory-tokens-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-tokens-")))
   tempDirs.push(dir)
   return dir
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("estimateSystemTokens", () => {

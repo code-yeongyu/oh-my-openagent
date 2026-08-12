@@ -3,9 +3,16 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
 export interface SenpiExtensionAPI {
+  /**
+   * Absolute cwd of the session this extension instance was loaded for. senpi builds one
+   * ExtensionAPI per session and already knows the value at load time. Optional because hosts
+   * older than the release that added it do not report one; consumers fall back to process.cwd().
+   */
+  readonly cwd?: string
   on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
   rpc?: {
     emit(name: string, data: unknown): void
+    handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
   }
   events?: {
     emit(name: string, data: unknown): void

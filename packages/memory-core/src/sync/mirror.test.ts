@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { spawn } from "node:child_process"
-import { chmodSync } from "node:fs"
+import { chmodSync, realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -18,7 +18,7 @@ import {
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 interface RunResult {
@@ -44,7 +44,7 @@ function run(argv: readonly string[], cwd: string, env: NodeJS.ProcessEnv = {}):
 }
 
 async function tempDir(prefix: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), prefix))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), prefix)))
   tempDirs.push(dir)
   return dir
 }

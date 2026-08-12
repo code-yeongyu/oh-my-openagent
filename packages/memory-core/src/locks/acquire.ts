@@ -10,6 +10,7 @@ import { getPidLiveness, getProcessStartIdentity } from "./process-identity"
 export type AcquireLockOptions = {
   readonly waitTimeoutMs?: number
   readonly retryDelayMs?: number
+  readonly signal?: AbortSignal
 }
 
 type OwnerSnapshot = {
@@ -34,8 +35,18 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(finish, milliseconds)
+    const onAbort = () => finish(signal?.reason ?? new DOMException("The operation was aborted", "AbortError"))
+    signal?.addEventListener("abort", onAbort, { once: true })
+    function finish(error?: unknown) {
+      clearTimeout(timer)
+      signal?.removeEventListener("abort", onAbort)
+      error === undefined ? resolve() : reject(error)
+    }
+  })
 }
 
 async function readOwner(lockPath: string): Promise<OwnerSnapshot | null> {
@@ -126,12 +137,15 @@ export async function acquireLock(
   const deadline = Date.now() + waitTimeoutMs
 
   for (;;) {
+    options.signal?.throwIfAborted()
     if (await publishExclusive(lockPath, record)) return
+    options.signal?.throwIfAborted()
     const owner = await readOwner(lockPath)
     if (owner === null) continue
     if (await recoverDeadOwner(lockPath, owner, record)) continue
+    options.signal?.throwIfAborted()
     if (Date.now() >= deadline) throw new LockContentionError(lockPath, owner.record)
-    await delay(Math.min(retryDelayMs, Math.max(1, deadline - Date.now())))
+    await delay(Math.min(retryDelayMs, Math.max(1, deadline - Date.now())), options.signal)
   }
 }
 

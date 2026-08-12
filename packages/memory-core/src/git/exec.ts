@@ -7,6 +7,7 @@ export interface GitExecOptions {
   cwd: string
   timeoutMs: number
   env?: NodeJS.ProcessEnv
+  stdin?: string | Buffer
 }
 
 export interface GitExecResult {
@@ -75,11 +76,12 @@ function runGitCommand(
   environment: NodeJS.ProcessEnv,
 ): Promise<GitExecResult> {
   return new Promise((resolve, reject) => {
+    const hasStdin = options.stdin !== undefined
     const child = spawn(executable, [...argv], {
       cwd: options.cwd,
       env: environment,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe"],
     })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
@@ -91,8 +93,9 @@ function runGitCommand(
       child.kill("SIGKILL")
     }, options.timeoutMs)
 
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
+    child.stdout!.on("data", (chunk: Buffer) => stdout.push(chunk))
+    child.stderr!.on("data", (chunk: Buffer) => stderr.push(chunk))
+    if (hasStdin) child.stdin!.end(options.stdin)
     child.on("error", (error: NodeJS.ErrnoException) => {
       if (settled) return
       settled = true

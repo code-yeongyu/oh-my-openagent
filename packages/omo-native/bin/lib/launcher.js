@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs"
+import { homedir } from "node:os"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
+import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
 import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
 import { printSetupReport } from "./setup-report.js"
 
@@ -25,6 +26,7 @@ function isSelfUpdate(args) {
 // updates. The engine consumes this once and scrubs it, so nested engine processes are
 // unaffected.
 function brandProfile() {
+  const update = updateTarget()
   return {
     name: "omo",
     displayVersion: packageManifest().version,
@@ -36,7 +38,7 @@ function brandProfile() {
     update: {
       packageName: "omo-ai",
       distTag: "beta",
-      command: "npm i -g omo-ai@beta",
+      command: update.command,
       changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
     },
   }
@@ -55,6 +57,7 @@ function senpiEnvironment(senpiRoot) {
   delete env.OMO_BIN
   delete env.SENPI_BIN
   env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
+  env.SENPI_CODING_AGENT_DIR = join(env.HOME || homedir(), ".omo", "agent")
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
   // the plugin via --extension and therefore never match the settings-packages detection gates.
   env.OMO_NATIVE = "1"
@@ -109,7 +112,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // The engine is pinned by this package, so a self-update would break the pairing; every
   // self-update spelling is answered with the command that actually updates the product.
   if (isSelfUpdate(args)) {
-    console.log(`omo is updated via npm: ${brandProfile().update.command}`)
+    const update = updateTarget()
+    console.log(`omo is updated via ${update.manager}: ${update.command}`)
     process.exitCode = 0
     return
   }

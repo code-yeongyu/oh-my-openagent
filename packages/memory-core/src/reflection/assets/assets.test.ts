@@ -1,5 +1,35 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
 import { describe, expect, it } from "bun:test"
-import { loadReflectionPersona } from "./assets"
+import { loadDreamPersona, loadReflectionPersona } from "./assets"
+
+describe("dream persona asset", () => {
+  it("#given the dream persona asset #when loaded through assets.ts #then it resolves non-empty with parsed sections", () => {
+    // given / when
+    const persona = loadDreamPersona()
+
+    // then
+    expect(persona.markdown.length).toBeGreaterThan(0)
+    expect(persona.sections.length).toBeGreaterThan(0)
+  })
+
+  it("#given the source asset and the packaged plugin copy #when both are read #then they are identical", () => {
+    // given
+    const here = dirname(fileURLToPath(import.meta.url))
+    const source = readFileSync(join(here, "dream-persona.md"), "utf8")
+
+    // when
+    const packaged = readFileSync(
+      join(here, "..", "..", "..", "..", "omo-senpi", "plugin", "extensions", "dream-persona.md"),
+      "utf8",
+    )
+
+    // then
+    expect(packaged).toBe(source)
+  })
+})
 
 describe("reflection persona asset", () => {
   it("#given the persona asset #when sections are parsed #then exactly the five phase headings are present by name", () => {

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import type { MemoryIdentityRuntime } from "./identity-runtime"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { createMemoryComponent, ensureIdentityRuntimeDirs } from "./index"
@@ -19,11 +21,12 @@ import {
   type RefreshMemoryStatusInput,
 } from "./status"
 import { createMemoryWiring } from "./wiring"
+import { realpathSync } from "node:fs"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("memory footer wiring", () => {
@@ -143,7 +146,7 @@ async function createFixture(): Promise<{
   readonly identity: string
   readonly sessionId: string
 }> {
-  const root = await mkdtemp(join(tmpdir(), "omo-memory-footer-wiring-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-footer-wiring-")))
   roots.push(root)
   const cwd = join(root, "project")
   const env = { OMO_MEMORY_HOME: join(root, "memory") }
@@ -210,3 +213,249 @@ function expectRelativeStatus(
   expect(call?.key).toBe("memory")
   expect(call?.text).toMatch(new RegExp(`^mem:${identity} (?:just now|[1-9]\\d*[mhd] ago)$`))
 }
+
+async function reflectionFixture(settings: ReturnType<typeof memorySettings> | undefined): Promise<{
+  readonly pi: MemoryFakeExtensionAPI
+  readonly evaluations: { count: number }
+}> {
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-wiring-")))
+  roots.push(root)
+  const identity = createMemoryIdentityContext({
+    identity: "agent-test",
+    identityPaths: buildIdentityPaths(root, "agent-test"),
+    binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+  })
+  const sessions = new Map([["session-1", { context: identity }]])
+  const evaluations = { count: 0 }
+  const runtime = {
+    store: {
+      evaluate: async () => {
+        evaluations.count += 1
+        return null
+      },
+    },
+    launch: () => {},
+  } as unknown as MemoryIdentityRuntime
+  const pi = new MemoryFakeExtensionAPI()
+  createMemoryWiring({
+    sessions,
+    loadConfig: () => settings === undefined
+      ? { config: {}, diagnostics: [], layers: [], sources: [] }
+      : loadedMemoryConfig(settings),
+    cwd: () => root,
+    env: {},
+    createRuntime: () => runtime,
+  }).registerStatic(pi, componentContext())
+  return { pi, evaluations }
+}
+
+const eventCtx = {
+  sessionManager: {
+    getSessionId: () => "session-1",
+    getEntries: () => [],
+  },
+}
+
+describe("memory wiring reflection completion delivery", () => {
+  describe("#given a pending completion and a bound session with a real UI callback", () => {
+    describe("#when afterBind drains the identity completion directory", () => {
+      test("#then the callback receives the completion notification payload and level", async () => {
+        // given
+        const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-wiring-notify-")))
+        roots.push(root)
+        const identity = createMemoryIdentityContext({
+          identity: "agent-notify",
+          identityPaths: buildIdentityPaths(root, "agent-notify"),
+          binding: { identity: "agent-notify", repoPathHash: "hash", boundAt: 1 },
+        })
+        const completionsDir = join(identity.identityPaths.reflection, "completions")
+        await mkdir(completionsDir, { recursive: true })
+        await writeFile(join(completionsDir, "run-notify.json"), `${JSON.stringify({
+          schemaVersion: 1,
+          runId: "run-notify",
+          identity: "agent-notify",
+          category: "quick",
+          conversationIds: ["past-session"],
+          trigger: "manual",
+          outcome: "failed",
+          reason: "child_exit",
+          detail: "fixture failure",
+          startedAt: "2026-08-12T00:00:00.000Z",
+          finishedAt: new Date().toISOString(),
+          delivery: { status: "pending" },
+        })}\n`)
+        const sessionId = "current-session"
+        const notifications: Array<{ message: string; level: string }> = []
+        const runtime = {
+          reconcile: async () => {},
+        } as unknown as MemoryIdentityRuntime
+        const wiring = createMemoryWiring({
+          sessions: new Map([[sessionId, { context: identity }]]),
+          loadConfig: () => loadedMemoryConfig(memorySettings()),
+          cwd: () => root,
+          env: {},
+          createRuntime: () => runtime,
+        })
+        const pi = new MemoryFakeExtensionAPI()
+        const bindContext = {
+          sessionManager: {
+            getSessionId: () => sessionId,
+            getEntries: () => [],
+          },
+          ui: {
+            setStatus: () => {},
+            notify: (message: string, level: string) => notifications.push({ message, level }),
+          },
+        }
+
+        // when
+        await wiring.afterBind(pi, sessionId, identity, bindContext)
+
+        // then
+        expect(notifications).toEqual([{
+          message: "Delivered 1 memory reflection completions; 1 need attention.",
+          level: "warning",
+        }])
+      })
+    })
+  })
+})
+
+describe("memory wiring reflection policy", () => {
+  test("#given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts", async () => {
+    const settings = memorySettings()
+    settings.agents["agent-test"] = { reflection: { enabled: false } }
+    const { pi, evaluations } = await reflectionFixture(settings)
+
+    await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
+    await pi.dispatch("agent_settled", {}, eventCtx)
+
+    expect(evaluations.count).toBe(0)
+  })
+
+  test("#given the memory block is absent #when an automatic settle arrives #then schema-default reflection remains enabled", async () => {
+    const { pi, evaluations } = await reflectionFixture(undefined)
+
+    await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
+    await pi.dispatch("agent_settled", {}, eventCtx)
+
+    expect(evaluations.count).toBe(1)
+  })
+})
+
+/**
+ * Drives the real wiring with an injected timer set, so a reflection launch actually starts the
+ * footer animation. The spinner must be genuinely running before a stop path is asserted -
+ * otherwise "zero live handles" passes for the trivial reason that nothing ever started.
+ */
+async function liveFooterHarness(): Promise<{
+  readonly wiring: ReturnType<typeof createMemoryWiring>
+  readonly statusCalls: Array<{ key: string; text: string | undefined }>
+  readonly eventCtx: unknown
+  readonly sessionId: string
+  readonly liveTimers: () => number
+  readonly advanceFrames: (ticks: number) => void
+  readonly startReflection: () => Promise<void>
+  readonly pi: MemoryFakeExtensionAPI
+}> {
+  const fixture = await createFixture()
+  const pi = new MemoryFakeExtensionAPI()
+  const statusCalls: Array<{ key: string; text: string | undefined }> = []
+  const handles = new Map<number, () => void>()
+  let nextHandle = 1
+  const timers = {
+    set(callback: () => void) {
+      const handle = nextHandle
+      nextHandle += 1
+      handles.set(handle, callback)
+      return handle
+    },
+    clear(handle: number | ReturnType<typeof setInterval>) {
+      handles.delete(handle as number)
+    },
+  }
+  const runtime = {
+    store: {
+      evaluate: async () => ({
+        status: "active",
+        run: {
+          runId: "run-live-1",
+          request: { trigger: "settled", conversationIds: [fixture.sessionId], snapshots: [] },
+        },
+      }),
+    },
+    launch: () => {},
+    reconcile: async () => {},
+  } as unknown as MemoryIdentityRuntime
+  const wiring = createMemoryWiring({
+    sessions: new Map([[fixture.sessionId, { context: fixture.context, memoryStatusAttempted: false }]]),
+    loadConfig: () => loadedMemoryConfig(memorySettings()),
+    cwd: () => fixture.cwd,
+    env: fixture.env,
+    refreshStatus: fakeRefreshMemoryStatus,
+    footerTimers: timers,
+    createRuntime: () => runtime,
+  })
+  const eventCtx = sessionContext(fixture.sessionId, statusCalls)
+  wiring.registerStatic(pi, componentContext())
+
+  return {
+    wiring,
+    statusCalls,
+    eventCtx,
+    sessionId: fixture.sessionId,
+    pi,
+    liveTimers: () => handles.size,
+    advanceFrames(ticks) {
+      for (let tick = 0; tick < ticks; tick += 1) {
+        for (const callback of [...handles.values()]) callback()
+      }
+    },
+    async startReflection() {
+      await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
+      await pi.dispatch("agent_settled", {}, eventCtx)
+    },
+  }
+}
+
+describe("memory footer live wiring", () => {
+  test("#given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints", async () => {
+    const harness = await liveFooterHarness()
+
+    await harness.startReflection()
+    harness.advanceFrames(2)
+
+    // Non-vacuity: the animation is genuinely live before clearStatus is exercised.
+    expect(harness.liveTimers()).toBe(1)
+    expect(harness.statusCalls.some((call) => call.text?.includes("reflecting") === true)).toBe(true)
+
+    harness.wiring.clearStatus(harness.eventCtx)
+    const afterClear = harness.statusCalls.length
+
+    expect(harness.liveTimers()).toBe(0)
+    harness.advanceFrames(10)
+    expect(harness.statusCalls).toHaveLength(afterClear)
+    expect(harness.statusCalls.at(-1)).toEqual({ key: "memory", text: undefined })
+  })
+
+  test("#given a spinner animating mid-session #when the session shuts down #then the animation interval is released", async () => {
+    const harness = await liveFooterHarness()
+
+    await harness.startReflection()
+    harness.advanceFrames(2)
+
+    expect(harness.liveTimers()).toBe(1)
+
+    await harness.wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId: harness.sessionId,
+      deadlineAt: Date.now() + 1_000,
+      now: () => Date.now(),
+    })
+    const afterShutdown = harness.statusCalls.length
+
+    expect(harness.liveTimers()).toBe(0)
+    harness.advanceFrames(10)
+    expect(harness.statusCalls).toHaveLength(afterShutdown)
+  })
+})

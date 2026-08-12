@@ -1,0 +1,8 @@
+(pass) loadPrompt > #given bundled prompt source #then returns synchronously with multiple injections [0.10ms]
+(pass) loadPrompt > #given bundled prompt source #when using sync loader #then returns synchronously [0.07ms]
+(pass) loadPrompt > #given injection resolver throws #then propagates the error [0.50ms]
+
+ 26 pass
+ 0 fail
+ 40 expect() calls
+Ran 26 tests across 5 files. [136.00ms]

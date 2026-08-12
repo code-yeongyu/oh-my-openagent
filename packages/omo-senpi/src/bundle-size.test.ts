@@ -20,6 +20,17 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // feature commits (scoped revival, batch admission, suspension shutdown, respawn specs) grew the
 // minified bundle from 678,227 to a measured 706,927 bytes (pinned bun 1.3.12). This is plan-scoped
 // feature code, not dependency bloat - no new third-party dependency was inlined.
+// Raised 880,000 -> 1,000,000 for plan memory-v2-active-learning: the v2 wave lands the active-learning
+// runtime on top of the ported engine (nudge wiring + GitMemoryRepo.log, durable facts queue + quick-pinned
+// extractor, dream selector/persona/decision module, people cards + palace panel, the detached run supervisor
+// with its IC-8 containment, soul notices, and the LOC-split refactor that re-exported the same code through
+// cohesive sibling modules). bundle-purity still passes with no new third-party dependency inlined - verified
+// against origin/dev package manifests. Measured 974,066 bytes after minification; 1,000,000 leaves ~2.7%
+// headroom without inviting unrelated bloat.
+// Raised 1,000,000 -> 1,050,000 at merge time: dev's beta.5 + Windows-CI + native-telemetry wave
+// (34 commits) grew the shared single-file bundle past 1MB independently. The merged artifact measures
+// 1,000,377 bytes; 1,050,000 preserves explicit headroom per this comment's own rule (never the failing
+// value). Still no new third-party dependency - bundle-purity green against the merged manifest.
 // Raised 710,000 -> 880,000 for plan letta-memory-parity-port: the new `memory` component ports the
 // full Letta-Code local memory engine (git-backed MemFS, memory/memory_apply_patch tools, prompt
 // compiler, reflection/dreaming worker + state machine, palace viewer, transcript search, git sync
@@ -27,13 +38,7 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // user feature wired into the extension entry; the imports span the whole engine (nothing accidental
 // inlined, no new third-party dependency added). Measured 863,893 bytes after minification. Headroom to
 // 880,000 leaves margin for follow-up memory polish without inviting unrelated bloat.
-// Raised 880,000 -> 900,000 for plan omo-native-telemetry: the plan-scoped first-party feature code
-// is wired into the extension entry and grew the freshly rebuilt bundle to a measured 891,384 bytes.
-// No new third-party dependency was inlined; posthog-node was already present, and
-// bundle-purity.test.ts passes on the new build. A trim was attempted and rejected because reclaiming
-// the bytes would require a secondary chunk and loader-topology change. The round 900,000 ceiling
-// preserves explicit headroom instead of raising the budget to the failing value.
-const BUDGET_BYTES = 900_000
+const BUDGET_BYTES = 1_050_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

@@ -6,12 +6,13 @@ import { buildIdentityPaths, type MemoryIdentity } from "../identity"
 import { TranscriptJournal, type ReflectionSnapshot } from "../journal"
 import { ReflectionReservationStore } from "./reservation"
 import type { ReflectionRequest } from "./machine"
+import { realpathSync } from "node:fs"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
 async function fixture(stepCount = 2) {
-  const root = await mkdtemp(join(tmpdir(), "reflection-reservation-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))
   roots.push(root)
   const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
   const journals = new Map<string, TranscriptJournal>()
@@ -25,6 +26,8 @@ async function fixture(stepCount = 2) {
   const store = new ReflectionReservationStore({
     identity,
     config: { stepCount, onCompaction: true },
+    now: () => new Date("2026-08-10T00:00:00.000Z"),
+    launcherIdentity: async () => ({ pid: 4242, hostname: "fixture-host", processStart: "fixture-start" }),
     getJournal: async (id) => {
       const found = journals.get(id)
       if (!found) throw new Error(`missing journal: ${id}`)
@@ -35,13 +38,34 @@ async function fixture(stepCount = 2) {
   return { identity, journal, store }
 }
 
-async function captured(journal: TranscriptJournal, trigger: ReflectionRequest["trigger"]): Promise<ReflectionRequest> {
+async function captured(
+  journal: TranscriptJournal,
+  trigger: Exclude<ReflectionRequest["trigger"], "dream">,
+): Promise<ReflectionRequest> {
   const snapshot = await journal.captureReflectionSnapshot()
   if (snapshot === null) throw new Error("expected snapshot")
   return { trigger, conversationIds: ["conversation-a"], snapshots: [{ conversationId: "conversation-a", snapshot }] }
 }
 
 describe("persisted reflection reservation", () => {
+  it("#given an aborted signal #when reservation starts #then active and pending state remain empty", async () => {
+    // given
+    const { store } = await fixture()
+    const controller = new AbortController()
+    controller.abort()
+
+    // when
+    const reservation = store.tryReserve({
+      trigger: "step-count",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    }, controller.signal)
+
+    // then
+    await expect(reservation).rejects.toThrow()
+    expect(await store.readState()).toEqual({})
+  })
+
   it("#given journal state at threshold #when the persisted machine evaluates a successful settle #then it captures and reserves the cursor snapshot", async () => {
     const { store } = await fixture()
 
@@ -50,6 +74,21 @@ describe("persisted reflection reservation", () => {
     expect(result?.status).toBe("active")
     expect(result?.run.request.trigger).toBe("step-count")
     expect(result?.run.request.snapshots[0]?.snapshot.end_message_id).toBe("assistant-2")
+  })
+
+  it("#given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record", async () => {
+    const { identity, journal, store } = await fixture()
+
+    const result = await store.tryReserve(await captured(journal, "step-count"))
+    const persisted = JSON.parse(await readFile(join(identity.paths.reflection, "active.lock"), "utf8"))
+
+    expect(result.run).toMatchObject({
+      reservedAt: "2026-08-10T00:00:00.000Z",
+      launcherPid: 4242,
+      launcherHostname: "fixture-host",
+      launcherProcessStart: "fixture-start",
+    })
+    expect(persisted).toMatchObject(result.run)
   })
 
   it("#given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record", async () => {
@@ -67,6 +106,30 @@ describe("persisted reflection reservation", () => {
     expect(state.active).toBeDefined()
     expect(state.pending?.request).toMatchObject({ trigger: "manual", focus: "remember names", recentN: 5 })
     expect(await readFile(join(identity.paths.reflection, "pending.json"), "utf8")).toContain('"trigger": "manual"')
+  })
+
+  it("#given dream outcomes #when runs complete #then dream state advances only for merged and no_changes", async () => {
+    const { identity, store } = await fixture()
+    const outcomes = ["failed", "timed_out", "merged", "no_changes"] as const
+
+    for (const outcome of outcomes) {
+      const active = await store.tryReserve({
+        trigger: "dream",
+        origin: "idle",
+        conversationIds: ["conversation-a"],
+        snapshots: [],
+      })
+      await store.complete(active.run.runId, outcome)
+      const statePath = join(identity.paths.runtime, "dream", "state.json")
+      if (outcome === "failed" || outcome === "timed_out") {
+        expect(Bun.file(statePath).size).toBe(0)
+      } else {
+        expect(JSON.parse(await readFile(statePath, "utf8"))).toEqual({
+          last_dream_at: "2026-08-10T00:00:00.000Z",
+          lastRunId: active.run.runId,
+        })
+      }
+    }
   })
 
   it("#given a failed active run #when completed #then its cursor is unchanged and valid pending work is promoted", async () => {

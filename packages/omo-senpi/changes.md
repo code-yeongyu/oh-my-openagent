@@ -1,3 +1,18 @@
+## 2026-08-12 — Publish and control native tasks over RPC
+
+The task component now emits every available child-session, result, error, persisted/live run-stat,
+and semantic live-progress field through `omo.task.updated`. It owns one deduplicated child
+subscription per live resident task and releases subscriptions when a task settles, leaves the
+session, or the session shuts down.
+
+Modern Senpi hosts also receive session-scoped `omo.task.output`, `omo.task.send`, and
+`omo.task.cancel` request handlers. These handlers reuse the existing task tool policies, reject
+malformed or foreign-session requests, never enable `all_scope`, and remain an optional no-op on
+older hosts that expose only `pi.rpc.emit`.
+
+Future changes must preserve the single live-subscription owner, semantic snapshot deduplication,
+parent-session scoping, and old-host compatibility.
+
 ## 2026-08-06 — Refresh local Senpi installs before activation
 
 Source installs now rebuild every generated OMO Senpi artifact even when the previous bundle is
@@ -13,3 +28,47 @@ together can register duplicate components and retain obsolete task behavior.
 The parent-restart QA driver proves the integration boundary by SIGKILLing a real Senpi parent,
 reopening the same session and task state, and requiring the original in-process child task to
 continue without becoming `lost`. It also verifies process and temporary sandbox cleanup.
+
+## 2026-08-12 — Fence and bound desktop task RPC
+
+Task RPC controls now remain unavailable until a parent session is attached, detach before a
+session switch, and stay fenced after shutdown. Cancellation accepts exact task ids only, performs
+the current-parent ownership check before the shared cancel path, and redacts foreign-session
+details. Messages, reasons, task collections, terminal results, and errors are bounded with explicit
+snapshot truncation metadata; terminal records prefer durable run stats over retained live trackers.
+
+The packaged extension now lazy-loads the task component through the generated `omo-task.js`
+sidecar. Build freshness and import-purity checks cover both artifacts, while source tests keep the
+normal static component entrypoint. Preserve the `#omo-task-runtime` package import mapping and do
+not fold the task sidecar back into `omo.js`; the main artifact must remain below its fixed
+900,000-byte budget.
+
+## 2026-08-12 — Harden task RPC installation and output boundaries
+
+Packed installs now require both lazy task and member extension artifacts before mutating Senpi
+settings. Task controls cap identifiers and tail requests, return the same generic not-found result
+for foreign and absent task ids, and bound every task snapshot/status string exposed to RPC clients.
+Terminal results, errors, and descriptions carry explicit truncation flags.
+
+Keep authorization checks before the shared name-capable task control paths, and keep the generated
+installer synchronized with `install-senpi.ts`. A missing `omo-task.js` must fail installation rather
+than silently disabling the task component at activation time.
+
+The adapter peer and development dependency now require Senpi `2026.8.11-6`; this is the first
+published host contract with request handler registration and client-side extension requests.
+
+## 2026-08-12 — Anchor task state at the session cwd, not the process launch dir
+
+The task component resolved its project root from `process.cwd()`. In a multi-session host - one
+shared senpi process serving every session, as the OmO desktop rpc child does - that is the process
+LAUNCH directory, not the session's project root. Every session therefore shared a single task
+store, records from unrelated projects interleaved in it, and child artifacts landed where the
+host's per-project readers (`<projectDir>/.omo/senpi-task`) never look.
+
+`register` now takes the cwd the host reports for THIS session (`cwd` on the extension API), and
+falls back to `process.cwd()` only for hosts that predate it. Everything downstream - the record
+store, the `omo.json` load, team runtime dirs and the resumption channels - derives from that one
+value, so they all follow the session.
+
+Keep the fallback until the minimum supported Senpi guarantees `cwd`, and keep resolving the cwd
+ONCE at register: re-reading it later would let a session's store move mid-flight.

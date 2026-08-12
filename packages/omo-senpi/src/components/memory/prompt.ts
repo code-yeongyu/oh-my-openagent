@@ -8,7 +8,7 @@ import {
 
 import type { MemoryIdentityContext } from "./context"
 
-export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v1"
+export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v2"
 
 // Injected ONLY under the opt-in search exposure: pointing the agent at tool_search while the tools
 // are directly registered sent it hunting for a tool that does not exist (session 019fe95c-09d2).
@@ -26,6 +26,16 @@ export interface MemoryPromptInjectionOptions {
   readonly cache?: MemoryBlockCache
   readonly clock?: () => Date
   readonly searchExposure?: () => boolean
+  readonly resolveNudgeTurns?: (
+    repo: GitMemoryRepo,
+    sessionId: string,
+    identity: string,
+  ) => Promise<number | undefined>
+  readonly resolveSoulNotice?: (
+    repo: GitMemoryRepo,
+    sessionId: string,
+    identity: string,
+  ) => Promise<{ readonly sha: string } | undefined>
 }
 
 /**
@@ -47,10 +57,15 @@ export function createMemoryPromptHandler(
     const context = options.resolveContext(session.id)
     if (context === undefined) return undefined
 
-    const block = await cache.compile(createRepo(context), `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, {
+    const repo = createRepo(context)
+    const nudgeTurns = await options.resolveNudgeTurns?.(repo, session.id, context.identity)
+    const soulNotice = await options.resolveSoulNotice?.(repo, session.id, context.identity)
+    const block = await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, {
       agentId: context.identity,
       conversationId: session.id,
       previousMessageCount: session.priorMessageCount,
+      ...(nudgeTurns === undefined ? {} : { nudgeTurns }),
+      ...(soulNotice === undefined ? {} : { soulNotice }),
       ...(options.clock === undefined ? {} : { clock: options.clock }),
     })
     const composed = options.searchExposure?.() === true ? `${block}\n\n${MEMORY_TOOL_DISCOVERY_NOTE}` : block

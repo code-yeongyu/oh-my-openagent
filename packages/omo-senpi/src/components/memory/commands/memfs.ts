@@ -5,6 +5,8 @@
 // only destructive path: it requires confirmation (interactive) or --force
 // (noninteractive) and ALWAYS writes a backup before replacing the repository.
 
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 import { rm } from "node:fs/promises"
 
 import { MirrorSync, installHooks } from "@oh-my-opencode/memory-core"
@@ -49,6 +51,8 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
   if (dirty) {
     lines.push("", ...porcelain, "", "uncommitted changes present; inspect with /memfs diff or commit through the memory tools")
   }
+  const skillsBlock = await renderSkillsUsage(identity.identityPaths.runtime)
+  if (skillsBlock !== undefined) lines.push(skillsBlock)
   return respond(ctx, lines.join("\n"), dirty ? "warning" : "info")
 }
 
@@ -120,6 +124,35 @@ const memfsReset: MemfsSubcommand = async ({ deps, ctx, parsed, identity }) => {
   await rm(identity.identityPaths.repo, { recursive: true, force: true })
   const sha = await openRepo(deps, identity).init()
   return respond(ctx, `reset complete; backup at ${backup}; new HEAD ${shortSha(sha)}`)
+}
+
+const SKILLS_USAGE_FILENAME = "skills-usage.json"
+
+async function renderSkillsUsage(runtimeDir: string): Promise<string | undefined> {
+  let content: string
+  try {
+    content = await readFile(join(runtimeDir, SKILLS_USAGE_FILENAME), "utf8")
+  } catch {
+    return undefined
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(content)
+  } catch {
+    return undefined
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined
+  const entries = Object.entries(parsed as Record<string, unknown>)
+  if (entries.length === 0) return undefined
+  const lines = ["", "## Skills usage"]
+  for (const [skillId, value] of entries) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) continue
+    const entry = value as Record<string, unknown>
+    const count = typeof entry.count === "number" ? entry.count : 0
+    const lastUsedAt = typeof entry.lastUsedAt === "string" ? entry.lastUsedAt : "unknown"
+    lines.push(`  ${skillId}: ${count} read${count === 1 ? "" : "s"}, last ${lastUsedAt}`)
+  }
+  return lines.length > 2 ? lines.join("\n") : undefined
 }
 
 const HANDLERS: Record<string, MemfsSubcommand> = {

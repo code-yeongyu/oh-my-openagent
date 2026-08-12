@@ -1,0 +1,65 @@
+=== RED (todo 19 palace people-graph panel): failing before implementation ===
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/palace/people.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './people' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/palace/people.test.ts'
+-------------------------------
+
+
+packages/omo-senpi/src/components/memory/palace/command.test.ts:
+(pass) palace command > #given a bound identity #when the palace command is registered #then it exposes a description and handler [0.49ms]
+(pass) palace command > #given darwin without remote-session env #when /palace runs #then the generated file is opened with open [370.11ms]
+(pass) palace command > #given linux and win32 hosts #when /palace runs #then the platform opener is used [463.18ms]
+(pass) palace command > #given a tmux or ssh session #when /palace runs #then the path is printed instead of opened [435.97ms]
+(pass) palace command > #given a headless context #when /palace runs #then the path is returned as command output text [336.00ms]
+(pass) palace command > #given no bound memory identity #when /palace runs #then it reports the unbound state without generating a file [0.19ms]
+
+packages/omo-senpi/src/components/memory/palace/collectors.test.ts:
+(pass) palace collectors > #given a committed memory repo #when core entries are collected #then system files carry projection paths and bodies [299.14ms]
+(pass) palace collectors > #given committed binary and text assets #when external entries are collected #then binaries report size only and never content [331.94ms]
+(pass) palace collectors > #given a dirty working tree #when core entries are collected #then uncommitted files are labelled as absent from the system prompt [326.74ms]
+(pass) palace collectors > #given reflection and ordinary commits #when history is collected #then reflection commits are tagged and caps are declared [353.98ms]
+(pass) palace collectors > #given merge and chore reflection subjects #when matched against the reflection pattern #then only reflection-scoped commits match [0.08ms]
+(pass) palace collectors > #given journal state and completion records #when reflection data is collected #then cursor state and recent outcomes are returned newest first [252.77ms]
+(pass) palace collectors > #given more completion records than the limit #when reflection data is collected #then only the newest N are kept [260.20ms]
+
+packages/omo-senpi/src/components/memory/palace/generator.test.ts:
+(pass) palace generator machine gate > #given a fixture memory repo #when the palace is generated #then inline data pins the persona entry, HEAD sha and identity metadata [335.82ms]
+55 | 
+56 |     const result = await generatePalaceHtml(fixture.context)
+57 |     const html = await readFile(result.path, "utf8")
+58 | 
+59 |     const tabs = [...html.matchAll(/data-tab="([a-z]+)"/g)].map((match) => match[1])
+60 |     expect(tabs).toEqual(["core", "external", "history", "reflection", "people"])
+                      ^
+error: expect(received).toEqual(expected)
+
+  [
+    "core",
+    "external",
+    "history",
+    "reflection",
+-   "people",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/palace/generator.test.ts:60:18)
+(fail) palace generator machine gate > #given the default people gate #when the palace markup is parsed #then every tab has a matching panel [362.17ms]
+(pass) palace generator machine gate > #given people collection disabled #when the palace markup is parsed #then only the four always-on tabs remain [358.47ms]
+(pass) palace generator machine gate > #given the viewers runtime directory #when the palace is written #then the file is 0600 inside a 0700 directory [350.31ms]
+(pass) palace generator machine gate > #given memory content carrying a script-breakout payload #when the palace is generated #then the raw payload never appears and the escaped form does [359.25ms]
+(pass) palace generator machine gate > #given line-separator characters in memory content #when the palace is generated #then U+2028 and U+2029 are escaped in the inline payload [441.79ms]
+(pass) palace generator machine gate > #given a self-contained requirement #when the palace html is inspected #then it references no external fonts or CDNs [403.95ms]
+(pass) palace generator machine gate > #given a committed binary asset #when the palace is generated #then the external tab lists name and size but no binary body [342.27ms]
+
+ 20 pass
+ 2 fail
+ 1 error
+ 79 expect() calls
+Ran 22 tests across 4 files. [6.55s]

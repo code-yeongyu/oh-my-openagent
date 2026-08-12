@@ -150,7 +150,7 @@ If a verification command is unavailable or not applicable, state the exact reas
 
 ## GOAL REGISTRATION
 
-When a `create_goal` tool exists, register the run's goal with it before implementation: the objective, the scenario contract, and one WHEN TO STOP line naming the observable end state. Without the tool, record the same contract in your working notes and treat it as binding.
+When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, written outcome-first: the concrete outcome that will be true (never an activity), the named deliverable surfaces, the scenario contract as success criteria that can fail, scope bounds, and one WHEN TO STOP line naming the observable end state. Never invent a budget or deadline the user did not state. Without the tool, record the same contract in your working notes and treat it as binding.
 
 ## TODO DISCIPLINE
 

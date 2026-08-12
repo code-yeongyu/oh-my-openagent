@@ -1,0 +1,30 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/locks/domains.test.ts:
+(pass) lock domain paths > #given the runtime lock directory #when domain paths are resolved #then all three protocols have stable confined names [0.85ms]
+
+packages/omo-senpi/src/components/memory/skills-usage.test.ts:
+(pass) extractSkillId > #given a path inside skills/foo #when extracted #then returns the skill id [4.29ms]
+(pass) extractSkillId > #given a path inside notes #when extracted #then returns undefined [2.30ms]
+(pass) extractSkillId > #given a path outside the repo #when extracted #then returns undefined [4.21ms]
+(pass) incrementSkillUsage > #given a fresh ledger #when incrementing skill foo #then count is 1 and lastUsedAt is set [7.78ms]
+(pass) incrementSkillUsage > #given an existing ledger with count 1 #when incrementing foo again #then count is 2 [11.48ms]
+(pass) incrementSkillUsage > #given non-skill reads #when checking the ledger #then no entries are created [4.78ms]
+(pass) incrementSkillUsage > #given concurrent two-session interleaving #when both sessions increment different skills under lock #then no increment is lost [14.51ms]
+(pass) incrementSkillUsage > #given two sessions incrementing the SAME skill concurrently #when both acquire the lock serially #then count is 2 (no lost update) [35.98ms]
+(pass) SkillsUsageTracker > #given a read of skills/foo/SKILL.md #when recordRead is called then flushed #then foo.count is 1 [7.34ms]
+(pass) SkillsUsageTracker > #given a non-skill read #when recordRead is called then flushed #then ledger is empty [1.80ms]
+(pass) SkillsUsageTracker > #given multiple reads of the same skill before flush #when flushed #then count reflects all reads [5.95ms]
+(pass) SkillsUsageTracker > #given reads of multiple skills #when flushed #then all skills are present [5.39ms]
+(pass) registerSkillsUsage > #given a read tool targeting skills/foo/SKILL.md #when dispatched then flushed #then foo.count is 1 [5.86ms]
+(pass) registerSkillsUsage > #given a read tool targeting notes/facts.md #when dispatched then flushed #then ledger is empty [2.77ms]
+(pass) registerSkillsUsage > #given a write tool targeting skills/foo/SKILL.md #when dispatched then flushed #then ledger is empty (only read tools tracked) [3.28ms]
+(pass) registerSkillsUsage > #given an unbound session #when dispatched #then no tracker is created [0.13ms]
+(pass) readSkillsUsageLedger > #given a missing ledger file #when read #then returns empty object [1.83ms]
+(pass) readSkillsUsageLedger > #given a ledger with valid entries #when read #then returns parsed entries [1.97ms]
+(pass) readSkillsUsageLedger > #given a corrupted ledger file #when read #then returns empty object (write never blocks or fails the tool) [1.95ms]
+
+ 20 pass
+ 0 fail
+ 27 expect() calls
+Ran 20 tests across 2 files. [225.00ms]

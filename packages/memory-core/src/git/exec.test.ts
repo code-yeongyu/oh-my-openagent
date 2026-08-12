@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -79,7 +79,7 @@ describe("createNodeGitExec", () => {
           exec.run(["--version"], { cwd: dir, timeoutMs: 5000, env: { PATH: "/nonexistent" } }),
         ).rejects.toBeInstanceOf(GitNotFoundError)
       } finally {
-        rmSync(dir, { recursive: true, force: true })
+        rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
       }
     })
   })
@@ -290,6 +290,43 @@ describe("createNodeGitExec", () => {
 
     expect(result).toBe(nonzero)
     expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
+  })
+
+  test("#given stdin #when real Git runs #then bytes are piped and existing argv handling is unchanged", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-git-exec-"))
+    try {
+      const exec = createNodeGitExec()
+      const content = Buffer.from("stdin-content\n")
+      const path = join(dir, "content.txt")
+      writeFileSync(path, content)
+      const expected = await exec.run(["hash-object", "--", path], { cwd: dir, timeoutMs: 5000 })
+      const result = await exec.run(["hash-object", "--stdin"], {
+        cwd: dir,
+        timeoutMs: 5000,
+        stdin: content,
+      })
+      expect(result.code).toBe(0)
+      expect(result.stdout).toBe(expected.stdout)
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    }
+  })
+
+  test("#given stdin and a Windows fallback #when bare Git is absent #then stdin reaches the fallback runner", async () => {
+    const original = missingGitError()
+    const inputs: Array<string | Buffer | undefined> = []
+    const exec = createHermeticExec(async (executable, _argv, options) => {
+      inputs.push(options.stdin)
+      if (executable === "git") throw original
+      return SUCCESS
+    })
+
+    await exec.run(["hash-object", "--stdin"], {
+      ...execOptions({ ProgramFiles: "C:\\Program Files" }),
+      stdin: "fallback-input",
+    })
+
+    expect(inputs).toEqual(["fallback-input", "fallback-input"])
   })
 
   test("#given bare Git fails with a non-ENOENT error #when Windows roots exist #then the error propagates without fallback", async () => {

@@ -4,6 +4,9 @@
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
+  "imports": {
+    "#omo-task-runtime": "./src/extension/omo-task.ts"
+  },
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -41,7 +44,7 @@
     "typebox": "1.1.38"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.8.11-4"
+    "@code-yeongyu/senpi": "2026.8.12-4"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -49,6 +52,6 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.11-4"
+    "@code-yeongyu/senpi": "2026.8.12-4"
   }
 }

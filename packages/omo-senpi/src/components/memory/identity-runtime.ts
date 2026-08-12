@@ -14,31 +14,19 @@ import type { ComponentLogger } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
+import {
+  resolveAgentReflectionSettings,
+  resolveMemorySettings,
+} from "./reflection-settings"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
 import {
   SenpiSubprocessRunner,
+  reconcileReflectionRuns,
   type ReflectionLiveSession,
   type ReflectionReservationPort,
 } from "./worker"
 import type { ReflectionSpawnArgs } from "./worker"
-import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-
-const DEFAULT_MEMORY_SETTINGS: OmoMemorySettings = {
-  enabled: true,
-  agent: "auto",
-  tool_exposure: "direct",
-  reflection: {
-    trigger: { step_count: 0, on_compaction: true },
-    merge: "auto",
-    category: "quick",
-    timeout_minutes: 15,
-    sandbox: "auto",
-  },
-  sync: { enabled: true },
-  search: { enabled: true },
-  compile_warn_tokens: 30000,
-  agents: {},
-}
+export { resolveMemorySettings } from "./reflection-settings"
 
 export interface MemoryIdentityRuntimeDeps {
   readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
@@ -54,6 +42,7 @@ export interface MemoryIdentityRuntime {
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
   launch(run: ReservedRun): void
+  reconcile(): Promise<void>
 }
 
 let runCounter = 0
@@ -70,7 +59,8 @@ export function createIdentityRuntime(
   identity: MemoryIdentityContext,
   deps: MemoryIdentityRuntimeDeps,
 ): MemoryIdentityRuntime {
-  const settings = deps.loadConfig({ cwd: deps.cwd() }).config.memory ?? DEFAULT_MEMORY_SETTINGS
+  const settings = resolveMemorySettings(deps.loadConfig({ cwd: deps.cwd() }).config.memory)
+  const reflection = resolveAgentReflectionSettings(settings, identity.identity)
   const store = new ReflectionReservationStore({
     identity: asMemoryIdentity(identity),
     config: resolveReflectionTriggerConfig(settings, identity.identity),
@@ -83,7 +73,7 @@ export function createIdentityRuntime(
   const lazySandbox = (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs => {
     if (builtSandbox === undefined) {
       builtSandbox = buildSandboxTransform({
-        policy: (settings.reflection?.sandbox ?? "auto") as SandboxPolicy,
+        policy: reflection.sandbox as SandboxPolicy,
         worktreeDir: identity.identityPaths.worktrees,
         gitCommonDir: identity.identityPaths.repo,
         payloadPaths: [identity.identityPaths.transcripts],
@@ -98,22 +88,33 @@ export function createIdentityRuntime(
     return builtSandbox(spawnArgs)
   }
 
+  const runner = new SenpiSubprocessRunner({
+    identity: asMemoryIdentity(identity),
+    reservation: store,
+    logger: deps.logger,
+    resolveModelRegistry: deps.resolveModelRegistry,
+    loadConfig: (options) => deps.loadConfig(options ?? {}),
+    cwd: deps.cwd(),
+    sandbox: lazySandbox,
+    getTranscriptState: async (conversationId) =>
+      new TranscriptJournal({ journalDir: join(identity.identityPaths.transcripts, conversationId) }).getState(),
+    ...(deps.liveSession === undefined ? {} : { liveSession: deps.liveSession }),
+  })
+  const launch = (run: ReservedRun): void => {
+    void runner.launch(run).then((result) => {
+      if (result.launch !== undefined) launch(result.launch)
+    }).catch((error: unknown) => {
+      deps.logger?.warn("memory reflection launch failed", { error: describe(error) })
+    })
+  }
   const runtime: MemoryIdentityRuntime = {
     identity,
     store,
     reservationPort: store,
-    runner: new SenpiSubprocessRunner({
-      identity: asMemoryIdentity(identity),
-      reservation: store,
-      resolveModelRegistry: deps.resolveModelRegistry,
-      cwd: deps.cwd(),
-      sandbox: lazySandbox,
-      ...(deps.liveSession === undefined ? {} : { liveSession: deps.liveSession }),
-    }),
-    launch(run: ReservedRun): void {
-      void this.runner.launch(run).catch((error: unknown) => {
-        deps.logger?.warn("memory reflection launch failed", { error: describe(error) })
-      })
+    runner,
+    launch,
+    async reconcile(): Promise<void> {
+      await reconcileReflectionRuns({ identity: asMemoryIdentity(identity), reservation: store, launch })
     },
   }
   return runtime

@@ -7,7 +7,8 @@
  */
 
 import type { MessageRenderer } from "@code-yeongyu/senpi"
-import { linesComponent, normalizeRendererText } from "@oh-my-opencode/senpi-task"
+import { normalizeRendererText } from "@oh-my-opencode/senpi-task/renderer-text"
+import { linesComponent } from "@oh-my-opencode/senpi-task/task-renderers"
 
 export const FALLBACK_ARCHITECT_TIP_TYPE = "omo-fallback-architect:tip"
 

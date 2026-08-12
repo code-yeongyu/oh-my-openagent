@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { readFile, rm, writeFile, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -9,7 +9,7 @@ import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree
 const roots: string[] = []
 
 async function fixture(runId: string) {
-  const root = await mkdtemp(join(tmpdir(), "reflection-validation-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-validation-")))
   roots.push(root)
   const parentDir = join(root, "memory")
   const repo = new GitMemoryRepo({ dir: parentDir, agentId: "agent-one" })
@@ -19,7 +19,7 @@ async function fixture(runId: string) {
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)

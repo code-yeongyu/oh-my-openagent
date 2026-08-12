@@ -23,7 +23,7 @@ export type RpcSpawnDescriptor = {
   readonly env: NodeJS.ProcessEnv
 }
 
-type SenpiLauncher = {
+export type SenpiLauncher = {
   readonly command: string
   readonly prefixArgs: readonly string[]
 }
@@ -105,7 +105,7 @@ function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): S
   return cliPath === undefined ? null : { command: runtime.execPath, prefixArgs: [cliPath] }
 }
 
-function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
+export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
   const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
   if (executable !== null) {
     const normalized = normalizeSenpiLauncher(executable, runtime)

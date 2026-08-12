@@ -19,7 +19,7 @@ const tempDirs: string[] = []
 const CREDENTIALED_URL = "https://user:s3cr3t-token@127.0.0.1:1/memory.git"
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 const SEEDS = [

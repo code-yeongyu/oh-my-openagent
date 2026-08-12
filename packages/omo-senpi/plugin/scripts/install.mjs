@@ -3,16 +3,14 @@
 
 // packages/omo-senpi/src/install/cli-local.ts
 import { existsSync as existsSync3, readFileSync as readFileSync2 } from "fs";
-import { dirname as dirname4, join as join4, resolve as resolve4 } from "path";
+import { dirname as dirname5, join as join5, resolve as resolve4 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 
 // packages/omo-senpi/src/install/install-senpi.ts
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { constants as constants2, existsSync as existsSync2 } from "node:fs";
-import { access as access2, readFile as readFile2, stat } from "node:fs/promises";
+import { existsSync as existsSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { dirname as dirname3, join as join3, resolve as resolve3 } from "node:path";
+import { dirname as dirname4, join as join4, resolve as resolve3 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -99,6 +97,12 @@ function uninstallLocalLauncher(homeDir = homedir()) {
     rmSync(cmd);
   return true;
 }
+
+// packages/omo-senpi/src/install/plugin-artifacts.ts
+import { createHash } from "node:crypto";
+import { constants as constants2 } from "node:fs";
+import { access as access2, readFile as readFile2, stat } from "node:fs/promises";
+import { dirname as dirname3, join as join3 } from "node:path";
 
 // packages/omo-senpi/src/install/senpi-settings.ts
 import { constants } from "node:fs";
@@ -205,11 +209,15 @@ function isErrno(error, code) {
   return error instanceof Error && "code" in error && error.code === code;
 }
 
-// packages/omo-senpi/src/install/install-senpi.ts
-var execFileAsync = promisify(execFile);
+// packages/omo-senpi/src/install/plugin-artifacts.ts
 var REQUIRED_PLUGIN_ARTIFACTS = [
   join3("extensions", "omo.js"),
+  join3("extensions", "omo-task.js"),
+  join3("extensions", "omo-member.js"),
+  join3("extensions", "memory-run-supervisor.mjs"),
   join3("extensions", "reflection-persona.md"),
+  join3("extensions", "dream-persona.md"),
+  join3("extensions", "facts-persona.md"),
   join3("skills", "ast-grep", "SKILL.md"),
   join3("skills", "coding-agent-sessions", "SKILL.md"),
   join3("skills", "debugging", "SKILL.md"),
@@ -242,67 +250,6 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join3("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
   join3("scripts", "install.mjs")
 ];
-async function runSenpiInstaller(options = {}) {
-  const context = resolveInstallContext(options);
-  await ensurePluginArtifacts(context);
-  const settings = await readSettings(context.settingsPath);
-  const before = JSON.stringify(settings);
-  const packages = dedupePackages(await removeSupersededOmoPackages(removeLegacyBuiltinShadows(dedupePackages(readPackages(settings)), context.repoRoot, context.agentDir), context.pluginPath, context.agentDir));
-  if (!packages.includes(context.pluginPath))
-    packages.push(context.pluginPath);
-  settings.packages = packages;
-  const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  installLocalLauncher({
-    pluginPath: context.pluginPath,
-    senpiCliPath: join3(context.repoRoot, "packages", "coding-agent", "dist", "cli.js")
-  });
-  return {
-    ok: true,
-    action: "install",
-    agentDir: context.agentDir,
-    settingsPath: context.settingsPath,
-    pluginPath: context.pluginPath,
-    changed: JSON.stringify(settings) !== before,
-    backupPath
-  };
-}
-async function runSenpiUninstaller(options = {}) {
-  const context = resolveInstallContext(options);
-  const settings = await readSettings(context.settingsPath);
-  const before = JSON.stringify(settings);
-  const packages = dedupePackages(readPackages(settings));
-  const nextPackages = packages.filter((entry) => entry !== context.pluginPath);
-  settings.packages = nextPackages;
-  const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  uninstallLocalLauncher();
-  return {
-    ok: true,
-    action: "uninstall",
-    agentDir: context.agentDir,
-    settingsPath: context.settingsPath,
-    pluginPath: context.pluginPath,
-    changed: JSON.stringify(settings) !== before,
-    backupPath,
-    removed: nextPackages.length !== packages.length
-  };
-}
-function resolveInstallContext(options) {
-  const env = options.env ?? process.env;
-  const allowBuild = options.pluginPath === undefined;
-  const repoRoot = resolve3(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname3(fileURLToPath(import.meta.url))) : dirname3(resolve3(options.pluginPath))));
-  const agentDir = resolve3(options.agentDir ?? env.SENPI_CODING_AGENT_DIR ?? join3(homedir2(), ".senpi", "agent"));
-  const pluginPath = resolve3(options.pluginPath ?? join3(repoRoot, "packages", "omo-senpi", "plugin"));
-  return {
-    env,
-    repoRoot,
-    agentDir,
-    settingsPath: join3(agentDir, "settings.json"),
-    pluginPath,
-    platform: options.platform ?? process.platform,
-    allowBuild,
-    runCommand: options.runCommand ?? defaultRunCommand
-  };
-}
 async function ensurePluginArtifacts(context) {
   if (context.allowBuild) {
     await context.runCommand("node", [join3(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot });
@@ -374,22 +321,6 @@ function astGrepIntegrityError(runtimeEntry, reason) {
 function messageOf(error) {
   return error instanceof Error ? error.message : String(error);
 }
-async function defaultRunCommand(command, args, options) {
-  const result = await execFileAsync(command, [...args], { cwd: options.cwd });
-  if (result.stderr.trim().length > 0)
-    process.stderr.write(result.stderr);
-  if (result.stdout.trim().length > 0)
-    process.stdout.write(result.stdout);
-}
-function findRepoRoot(importerDir) {
-  let current = importerDir;
-  for (let depth = 0;depth <= 7; depth += 1) {
-    if (fileExistsSync(join3(current, "packages", "omo-senpi", "plugin", "package.json")))
-      return current;
-    current = resolve3(current, "..");
-  }
-  throw new Error("Unable to locate packages/omo-senpi/plugin/package.json from installer module");
-}
 async function fileExists2(path) {
   try {
     await access2(path, constants2.F_OK);
@@ -400,11 +331,91 @@ async function fileExists2(path) {
     throw error;
   }
 }
-function fileExistsSync(path) {
-  return existsSync2(path);
-}
 function isErrno2(error, code) {
   return error instanceof Error && "code" in error && error.code === code;
+}
+
+// packages/omo-senpi/src/install/install-senpi.ts
+var execFileAsync = promisify(execFile);
+async function runSenpiInstaller(options = {}) {
+  const context = resolveInstallContext(options);
+  await ensurePluginArtifacts(context);
+  const settings = await readSettings(context.settingsPath);
+  const before = JSON.stringify(settings);
+  const packages = dedupePackages(await removeSupersededOmoPackages(removeLegacyBuiltinShadows(dedupePackages(readPackages(settings)), context.repoRoot, context.agentDir), context.pluginPath, context.agentDir));
+  if (!packages.includes(context.pluginPath))
+    packages.push(context.pluginPath);
+  settings.packages = packages;
+  const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
+  installLocalLauncher({
+    pluginPath: context.pluginPath,
+    senpiCliPath: join4(context.repoRoot, "packages", "coding-agent", "dist", "cli.js")
+  });
+  return {
+    ok: true,
+    action: "install",
+    agentDir: context.agentDir,
+    settingsPath: context.settingsPath,
+    pluginPath: context.pluginPath,
+    changed: JSON.stringify(settings) !== before,
+    backupPath
+  };
+}
+async function runSenpiUninstaller(options = {}) {
+  const context = resolveInstallContext(options);
+  const settings = await readSettings(context.settingsPath);
+  const before = JSON.stringify(settings);
+  const packages = dedupePackages(readPackages(settings));
+  const nextPackages = packages.filter((entry) => entry !== context.pluginPath);
+  settings.packages = nextPackages;
+  const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
+  uninstallLocalLauncher();
+  return {
+    ok: true,
+    action: "uninstall",
+    agentDir: context.agentDir,
+    settingsPath: context.settingsPath,
+    pluginPath: context.pluginPath,
+    changed: JSON.stringify(settings) !== before,
+    backupPath,
+    removed: nextPackages.length !== packages.length
+  };
+}
+function resolveInstallContext(options) {
+  const env = options.env ?? process.env;
+  const allowBuild = options.pluginPath === undefined;
+  const repoRoot = resolve3(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname4(fileURLToPath(import.meta.url))) : dirname4(resolve3(options.pluginPath))));
+  const agentDir = resolve3(options.agentDir ?? env.SENPI_CODING_AGENT_DIR ?? join4(homedir2(), ".senpi", "agent"));
+  const pluginPath = resolve3(options.pluginPath ?? join4(repoRoot, "packages", "omo-senpi", "plugin"));
+  return {
+    env,
+    repoRoot,
+    agentDir,
+    settingsPath: join4(agentDir, "settings.json"),
+    pluginPath,
+    platform: options.platform ?? process.platform,
+    allowBuild,
+    runCommand: options.runCommand ?? defaultRunCommand
+  };
+}
+async function defaultRunCommand(command, args, options) {
+  const result = await execFileAsync(command, [...args], { cwd: options.cwd });
+  if (result.stderr.trim().length > 0)
+    process.stderr.write(result.stderr);
+  if (result.stdout.trim().length > 0)
+    process.stdout.write(result.stdout);
+}
+function findRepoRoot(importerDir) {
+  let current = importerDir;
+  for (let depth = 0;depth <= 7; depth += 1) {
+    if (fileExistsSync(join4(current, "packages", "omo-senpi", "plugin", "package.json")))
+      return current;
+    current = resolve3(current, "..");
+  }
+  throw new Error("Unable to locate packages/omo-senpi/plugin/package.json from installer module");
+}
+function fileExistsSync(path) {
+  return existsSync2(path);
 }
 
 // packages/omo-senpi/src/install/cli-local.ts
@@ -431,15 +442,15 @@ function printJson(result) {
 `);
 }
 function resolvePackagedPluginPath(importerUrl) {
-  const scriptDir = dirname4(fileURLToPath2(importerUrl));
+  const scriptDir = dirname5(fileURLToPath2(importerUrl));
   const candidate = resolve4(scriptDir, "..");
-  const manifestPath = join4(candidate, "package.json");
+  const manifestPath = join5(candidate, "package.json");
   if (!existsSync3(manifestPath))
     return;
   const parsed = JSON.parse(readFileSync2(manifestPath, "utf8"));
   if (!isRecord2(parsed) || parsed.name !== "@code-yeongyu/omo-senpi")
     return;
-  if (!existsSync3(join4(candidate, "extensions", "omo.js")))
+  if (!existsSync3(join5(candidate, "extensions", "omo.js")))
     return;
   return candidate;
 }

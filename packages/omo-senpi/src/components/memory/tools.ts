@@ -9,6 +9,8 @@ import {
   MemoryToolError,
   runMemoryApplyPatch,
   runMemoryTool,
+  type MemoryToolCommit,
+  type MemoryToolProvenance,
 } from "@oh-my-opencode/memory-core"
 import { Type, type Static, type TSchema } from "typebox"
 
@@ -20,11 +22,12 @@ import type { MemoryIdentityContext } from "./context"
 import {
   MEMORY_APPLY_PATCH_DESCRIPTION,
   MEMORY_APPLY_PATCH_TOOL_NAME,
+  MEMORY_MCP_SERVER_NAME,
   MEMORY_TOOL_DESCRIPTION,
   MEMORY_TOOL_NAME,
 } from "./tool-metadata"
 
-export { MEMORY_APPLY_PATCH_TOOL_NAME, MEMORY_TOOL_NAME }
+export { MEMORY_APPLY_PATCH_TOOL_NAME, MEMORY_MCP_SERVER_NAME, MEMORY_TOOL_NAME }
 
 const UNBOUND_IDENTITY_MESSAGE =
   "no memory identity bound to this session; enable omo memory and restart the session so the memory tools can initialize"
@@ -72,6 +75,8 @@ export interface MemoryToolsOptions {
   readonly lockWaitTimeoutMs?: number
   /** Writer-lock retry cadence while waiting; defaults to the memory-core default (25ms). */
   readonly lockRetryDelayMs?: number
+  /** Post-commit notice seam (plan IC-4): invoked once after each successful commit, never on errors. */
+  readonly onCommit?: (commit: MemoryToolCommit) => void
 }
 
 export type MemoryContextResolver = () => MemoryIdentityContext | undefined
@@ -93,8 +98,6 @@ export function registerMemoryTools(
 ): void {
   for (const tool of createMemoryTools(resolveContext, options)) pi.registerTool({ ...tool })
 }
-
-export const MEMORY_MCP_SERVER_NAME = "omo-memory"
 
 export interface MemoryToolSurfaceOptions extends MemoryToolsOptions {
   readonly exposure?: "direct" | "search"
@@ -143,7 +146,13 @@ function createMemoryTool(
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
       try {
         const { repo, lock, author } = await prepareEngine(context, options)
-        const result = await runMemoryTool({ repo, lock, params: { ...params, author } })
+        const provenance = readToolProvenance(params)
+        const result = await runMemoryTool({
+          repo,
+          lock,
+          params: { ...params, author, ...(provenance === undefined ? {} : { provenance }) },
+        })
+        if (result.commit !== undefined) options.onCommit?.(result.commit)
         return okResult(result.message)
       } catch (error) {
         if (error instanceof MemoryToolError) return errorResult(error.message)
@@ -173,7 +182,13 @@ function createMemoryApplyPatchTool(
       if (context === undefined) return errorResult(`${MEMORY_APPLY_PATCH_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
       try {
         const { repo, lock, author } = await prepareEngine(context, options)
-        const result = await runMemoryApplyPatch({ repo, lock, params: { ...params, author } })
+        const provenance = readToolProvenance(params)
+        const result = await runMemoryApplyPatch({
+          repo,
+          lock,
+          params: { ...params, author, ...(provenance === undefined ? {} : { provenance }) },
+        })
+        if (result.commit !== undefined) options.onCommit?.(result.commit)
         return okResult(result.message)
       } catch (error) {
         if (
@@ -191,6 +206,23 @@ function createMemoryApplyPatchTool(
 
 async function prepareEngine(context: MemoryIdentityContext, options: MemoryToolsOptions) {
   return prepareMemoryEngineSession(context.identity, context.identityPaths, options)
+}
+
+function readToolProvenance(value: unknown): MemoryToolProvenance | undefined {
+  if (!isRecord(value) || !isRecord(value.provenance)) return undefined
+  const provenance = value.provenance
+  if (
+    typeof provenance.sessionId !== "string"
+    || provenance.sessionId.length === 0
+    || typeof provenance.userTurns !== "number"
+    || !Number.isSafeInteger(provenance.userTurns)
+    || provenance.userTurns < 0
+  ) return undefined
+  return { sessionId: provenance.sessionId, userTurns: provenance.userTurns }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
 function okResult(message: string): MemoryToolExecutionResult {

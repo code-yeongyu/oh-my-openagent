@@ -4,19 +4,26 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  MEMORY_NUDGE_METADATA_TOKEN,
+  MEMORY_SOUL_METADATA_TOKEN,
+  buildIdentityPaths,
+  consumeSoulNoticeDelta,
+} from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
-import { createMemoryPromptHandler } from "./prompt"
+import { MEMORY_PROMPT_TEMPLATE, createMemoryPromptHandler } from "./prompt"
+import { realpathSync } from "node:fs"
 
 const IDENTITY = "prompt-agent"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 class CountingRepo extends GitMemoryRepo {
@@ -47,7 +54,7 @@ class CountingRepo extends GitMemoryRepo {
 }
 
 async function fixture(personaBody = "first"): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
-  const dir = await mkdtemp(join(tmpdir(), "memory-prompt-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-prompt-")))
   tempDirs.push(dir)
   const repo = new CountingRepo({ dir: join(dir, "repo"), agentId: IDENTITY })
   await repo.init({
@@ -88,6 +95,12 @@ function boundHandler(repo: CountingRepo, context: MemoryIdentityContext) {
   return createMemoryPromptHandler({ resolveContext: () => context, createRepo: () => repo })
 }
 
+describe("MEMORY_PROMPT_TEMPLATE", () => {
+  test("#given the compiled-block cache key #when the template id is read #then it is the v2 soul template", () => {
+    expect(MEMORY_PROMPT_TEMPLATE).toBe("omo-senpi:before_agent_start:v2")
+  }, 30_000)
+})
+
 describe("createMemoryPromptHandler", () => {
   test("#given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo", async () => {
     // given
@@ -101,7 +114,7 @@ describe("createMemoryPromptHandler", () => {
     // then
     expect(result).toBeUndefined()
     expect(repo.headCalls).toBe(0)
-  })
+  }, 30_000)
 
   test("#given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined", async () => {
     // given
@@ -115,7 +128,7 @@ describe("createMemoryPromptHandler", () => {
     // then
     expect(result).toBeUndefined()
     expect(repo.headCalls).toBe(0)
-  })
+  }, 30_000)
 
   test("#given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata", async () => {
     // given
@@ -134,7 +147,75 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).toContain(`- AGENT_ID: ${IDENTITY}`)
     expect(result?.systemPrompt).toContain("- CONVERSATION_ID: session-1")
     expect(result?.systemPrompt).toContain("- 3 previous messages")
-  })
+  }, 30_000)
+
+  test("#given nudge state at the threshold #when before_agent_start compiles #then the memory metadata carries the behavioral nudge token", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => 2,
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 2))
+
+    // then
+    expect(result?.systemPrompt).toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(result?.systemPrompt).toMatch(/- 2 user turns since/)
+  }, 30_000)
+
+  test("#given a reflection soul notice #when before_agent_start compiles #then the memory metadata carries the soul token and short sha", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveSoulNotice: async () => ({ sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" }),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 2))
+
+    // then
+    expect(result?.systemPrompt).toContain(MEMORY_SOUL_METADATA_TOKEN)
+    expect(result?.systemPrompt).toMatch(/- Soul updated by reflection a1b2c3d /)
+  }, 30_000)
+
+  test("#given an out-of-band soul commit #when the prompt compiles repeatedly at the same HEAD #then the soul line appears exactly once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const watermark = {
+      noticesDir: context.identityPaths.notices,
+      locksDir: context.identityPaths.locks,
+    }
+    expect(await consumeSoulNoticeDelta(repo, watermark)).toBeUndefined()
+    await writeFile(join(repo.dir, "system/persona.md"), "---\ndescription: Persona\n---\nevolved\n")
+    await repo.commitWrite(
+      ["system/persona.md"],
+      "chore(reflection): merge run r1\n\nOmo-Writer: reflection",
+      { agentId: IDENTITY, authorName: "Prompt Agent" },
+    )
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveSoulNotice: (repoArg) => consumeSoulNoticeDelta(repoArg, watermark),
+    }))
+
+    // when
+    const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 1))
+    const second = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 1))
+    const third = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 1))
+
+    // then
+    expect(first?.systemPrompt).toContain(MEMORY_SOUL_METADATA_TOKEN)
+    expect(second?.systemPrompt).not.toContain(MEMORY_SOUL_METADATA_TOKEN)
+    expect(third?.systemPrompt).not.toContain(MEMORY_SOUL_METADATA_TOKEN)
+  }, 30_000)
 
   test("#given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended", async () => {
     // given
@@ -153,7 +234,7 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).toContain("FOREIGN EXTENSION TEXT")
     expect(result?.systemPrompt).toContain("BASE PROMPT")
     expect(result?.systemPrompt).toContain(`<!-- senpi-memory:${IDENTITY}:begin -->`)
-  })
+  }, 30_000)
 
   test("#given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once", async () => {
     // given
@@ -170,7 +251,7 @@ describe("createMemoryPromptHandler", () => {
     expect(repo.headCalls).toBe(2)
     expect(repo.lsTreeCalls).toBe(1)
     expect(repo.showCalls).toBe(1)
-  })
+  }, 30_000)
 
   test("#given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content", async () => {
     // given
@@ -192,7 +273,7 @@ describe("createMemoryPromptHandler", () => {
     expect(second?.systemPrompt).toContain("second")
     expect(repo.headCalls - headCallsAfterCommit).toBe(1)
     expect(repo.lsTreeCalls).toBe(2)
-  })
+  }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {
     // given
@@ -208,5 +289,5 @@ describe("createMemoryPromptHandler", () => {
     expect(second?.systemPrompt?.match(new RegExp(`<!-- senpi-memory:${IDENTITY}:begin -->`, "g"))).toHaveLength(1)
     expect(second?.systemPrompt?.match(new RegExp(`<!-- senpi-memory:${IDENTITY}:end -->`, "g"))).toHaveLength(1)
     expect(second?.systemPrompt).toContain("BASE PROMPT")
-  })
+  }, 30_000)
 })

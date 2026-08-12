@@ -111,10 +111,11 @@ Install oh-my-openagent. Type `ultrawork`. Done.
 
 ## Installation
 
-oh-my-openagent ships in two editions of the same product:
+oh-my-openagent ships in three editions of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
 - **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, ulw-loop, ultrawork, hashline edits — everything.
 - **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. No agent orchestration and no `team_*` tools — Codex CLI's own surface does that work.
+- **Senpi Edition (standalone, beta)** — the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` rather than loading into OpenCode or Codex.
 
 Pick the edition(s) you want.
 
@@ -128,6 +129,16 @@ Pick the edition(s) you want.
 | **Senpi edition** (beta) | `npm i -g omo-ai@beta`, then `omo` | The `omo` command: pinned senpi release with the OMO extension built in. Beta channel only; a bare `npm i -g omo-ai` fails by design. See the [install guide](docs/guide/installation.md#senpi-edition-beta-omo-via-npm-omo-ai). |
 
 `lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo-agent-toolkit` CLI still defaults to `opencode` (Ultimate).
+
+### Which edition should I pick?
+
+- Already use OpenCode, or want the most-tested path? Choose **Ultimate**: `bunx oh-my-openagent install`.
+- Already use Codex CLI? Choose **Light**: `npx lazycodex-ai install`.
+- Want one command without installing a host first? Choose **Senpi/native (beta)**: `npm i -g omo-ai@beta`.
+
+Ultimate and Light are plugins that load into a host you already run. Senpi is standalone: it ships a pinned Senpi engine with OMO built in.
+
+For Senpi, the `@beta` tag is required; bare `npm i -g omo-ai` fails by design. Do not install plain `omo` from npm: it is an unrelated package by a different author.
 
 ### For Humans
 

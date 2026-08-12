@@ -3,6 +3,7 @@ import { mkdir, readFile, rm } from "node:fs/promises"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
 import { validateCompletion } from "./completion-validation"
+import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
 
 const GIT_TIMEOUT_MS = 30_000
 
@@ -26,6 +27,11 @@ export interface ReflectionCleanupReceipt {
   readonly branchRemoved: boolean
 }
 
+export interface ReflectionWorktreeIdentity {
+  readonly dir: string
+  readonly branch: string
+}
+
 export interface ReflectionFinalizeResult {
   readonly status: ReflectionOutcome
   readonly detail?: string
@@ -35,7 +41,13 @@ export interface ReflectionFinalizeResult {
 type WriterLock = <T>(operation: () => Promise<T>) => Promise<T>
 
 export type ReflectionFinalizeOptions =
-  | { readonly mode: "auto"; readonly summary: string; readonly withWriterLock: WriterLock }
+  | {
+      readonly mode: "auto"
+      readonly summary: string
+      readonly runId?: string
+      readonly allowedPaths?: readonly string[]
+      readonly withWriterLock: WriterLock
+    }
   | { readonly mode: "explicit"; readonly withWriterLock: WriterLock }
 
 export async function createReflectionWorktree(
@@ -43,6 +55,7 @@ export async function createReflectionWorktree(
   runId: string,
   worktreesDir: string,
   exec: GitExec = createNodeGitExec(),
+  beforeCreate?: (identity: ReflectionWorktreeIdentity) => void | Promise<void>,
 ): Promise<ReflectionWorktree> {
   if (!isAbsolute(worktreesDir)) throw new TypeError("worktreesDir must be absolute")
   const baseSha = await repo.head()
@@ -52,10 +65,11 @@ export async function createReflectionWorktree(
   const suffix = `${Date.now()}-${id}`
   const branch = `memory/reflection-${suffix}`
   const dir = join(resolve(worktreesDir), suffix)
-  await mkdir(worktreesDir, { recursive: true })
-  await repo.worktreeAdd(dir, branch, baseSha)
+  await beforeCreate?.({ dir, branch })
 
   try {
+    await mkdir(worktreesDir, { recursive: true })
+    await repo.worktreeAdd(dir, branch, baseSha)
     const gitFilePath = join(dir, ".git")
     const gitFileSnapshot = await readFile(gitFilePath, "utf8")
     const commonDirResult = await git(exec, repo.dir, ["rev-parse", "--git-common-dir"])
@@ -80,6 +94,15 @@ export async function createReflectionWorktree(
   }
 }
 
+export async function discardReflectionWorktree(
+  repo: GitMemoryRepo,
+  dir: string,
+  branch: string,
+  exec: GitExec = createNodeGitExec(),
+): Promise<ReflectionCleanupReceipt> {
+  return removeWorktreeAndBranch(repo, dir, branch, exec)
+}
+
 export async function finalizeReflectionWorktree(
   worktree: ReflectionWorktree,
   options: ReflectionFinalizeOptions,
@@ -92,48 +115,30 @@ export async function finalizeReflectionWorktree(
     if (validation.status !== "valid") {
       status = validation.status
       detail = "detail" in validation ? validation.detail : undefined
+    } else if (options.mode === "auto" && options.allowedPaths !== undefined
+      && validation.changedPaths.some((path) => !options.allowedPaths?.includes(path))) {
+      detail = `Dream document maintenance changed paths outside its target: ${validation.changedPaths.join(", ")}`
     } else {
-      const integrated = await options.withWriterLock(async () => {
-        if ((await worktree.parent.status()).trim()) return { status: "parent_dirty" as const }
-        if (options.mode === "explicit") {
-          const reachable = await run(worktree.exec, worktree.parent.dir, [
-            "merge-base", "--is-ancestor", validation.tipSha, "HEAD",
-          ])
-          return reachable.code === 0
-            ? { status: "merged" as const }
-            : { status: "failed" as const, detail: "Reflection branch tip is not reachable from parent HEAD" }
-        }
-        return autoMerge(worktree, options.summary)
+      const integrated = await integrateValidatedReflection(worktree, {
+        mode: options.mode === "auto" ? "auto" : "integration",
+        runId: options.mode === "auto" ? options.runId ?? worktree.branch : worktree.branch,
+        summary: options.mode === "auto" ? options.summary : "external integration",
+        validated: validation,
+        withWriterLock: options.withWriterLock,
       })
-      status = integrated.status
+      status = integrated.outcome
       detail = integrated.detail
     }
   } catch (error) {
-    status = "failed"
     detail = errorMessage(error)
   }
 
-  const cleanup = await removeWorktreeAndBranch(worktree.parent, worktree.dir, worktree.branch, worktree.exec)
+  const cleanup = await cleanupReflectionWorktree(worktree)
   if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) {
     status = "failed"
     detail = [detail, "Reflection cleanup did not fully complete"].filter(Boolean).join("; ")
   }
   return { status, ...(detail ? { detail } : {}), cleanup }
-}
-
-async function autoMerge(worktree: ReflectionWorktree, summary: string) {
-  const merge = await run(worktree.exec, worktree.parent.dir, [
-    "merge", "--no-ff", worktree.branch, "-m", `merge(reflection): ${summary}`,
-  ])
-  if (merge.code === 0) return { status: "merged" as const }
-
-  const mergeHead = await run(worktree.exec, worktree.parent.dir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])
-  const unmerged = await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U"])
-  if (mergeHead.code === 0) await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
-  if (mergeHead.code === 0 || unmerged.stdout.trim()) {
-    return { status: "merge_conflict" as const, detail: merge.stderr.trim() }
-  }
-  return { status: "failed" as const, detail: merge.stderr.trim() || "Reflection merge failed" }
 }
 
 async function removeWorktreeAndBranch(

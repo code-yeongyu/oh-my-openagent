@@ -1,0 +1,199 @@
+RED: targeted defect coverage before implementation
+$ bun test packages/omo-senpi/src/components/memory/wiring.test.ts packages/omo-senpi/src/components/memory/facts-wiring.test.ts packages/omo-senpi/src/components/memory/dream-trigger.test.ts packages/omo-senpi/src/components/memory/worker/spawn.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/dream-trigger.test.ts:
+(pass) resolveDreamTriggerSettings > #given base dream settings #when no agent override exists #then the base values resolve [0.49ms]
+(pass) resolveDreamTriggerSettings > #given a per-agent dream override #when resolving #then overridden fields win and the rest inherit [0.08ms]
+(pass) evaluateDreamGates > #given every gate failing #when the origin is manual #then the gates are bypassed without probing [0.15ms]
+(pass) evaluateDreamGates > #given dream disabled #when an idle origin evaluates #then it is rejected before probing [0.09ms]
+(pass) evaluateDreamGates > #given shutdown_launch disabled #when a shutdown origin evaluates #then it is rejected before probing [0.08ms]
+(pass) evaluateDreamGates > #given the last dream exactly min_hours_between ago #when an idle origin evaluates #then the spacing gate rejects without a volume probe [0.11ms]
+(pass) evaluateDreamGates > #given the last dream one millisecond past min_hours_between #when an idle origin evaluates #then it is allowed [0.09ms]
+(pass) evaluateDreamGates > #given no recorded dream #when an idle origin evaluates #then the spacing gate passes [0.06ms]
+(pass) evaluateDreamGates > #given unreflected volume exactly at the floor #when an idle origin evaluates #then the volume gate rejects [0.06ms]
+(pass) evaluateDreamGates > #given unreflected volume one byte above the floor #when a shutdown origin evaluates #then it is allowed [0.06ms]
+(pass) dream idle timer matrix > #given a settled agent #when the settle event arrives #then an idle timer is armed for idle_minutes [1.88ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the agent settles again #then the first timer is cancelled and a fresh one armed [1.62ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when an input event arrives #then the timer resets and the next settle re-arms [12.72ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when an agent_start event arrives #then the timer resets and the next settle re-arms [8.70ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when a session_compact event arrives #then the timer resets and the next settle re-arms [8.36ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the session shuts down #then the timer is cancelled and a stale fire launches nothing [5.09ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the session aborts #then the timer is cancelled and a stale fire launches nothing [5.21ms]
+(pass) dream idle timer matrix > #given idle_minutes zero #when the agent settles #then no timer is armed [1.53ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when it fires while the agent is streaming #then no dream is requested [4.84ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when it fires with pending messages #then no dream is requested [4.67ms]
+(pass) dream idle timer matrix > #given a timer armed from a context without idle probes #when it fires #then no dream is requested [4.58ms]
+(pass) automatic dream gates > #given dream disabled #when the idle timer fires #then no reservation is made [4.79ms]
+(pass) automatic dream gates > #given a dream one hour ago #when the idle timer fires #then the spacing gate blocks the launch [6.46ms]
+(pass) automatic dream gates > #given unreflected volume exactly at the floor #when the idle timer fires #then the volume gate blocks the launch [5.35ms]
+(pass) automatic dream gates > #given every gate passing #when the idle timer fires #then a dream run is reserved and launched [10.56ms]
+(pass) dream shutdown evaluator > #given every gate passing #when a quit drains through the registered evaluator #then a shutdown dream launches [8.55ms]
+(pass) dream shutdown evaluator > #given every gate passing #when a non-quit shutdown drains #then the evaluator never runs [4.80ms]
+(pass) dream shutdown evaluator > #given shutdown_launch disabled #when the evaluator runs #then no reservation is made [4.23ms]
+(pass) dream shutdown evaluator > #given a dream one hour ago #when the evaluator runs #then the spacing gate blocks the launch [4.43ms]
+(pass) dream shutdown evaluator > #given a pre-aborted drain signal #when the evaluator runs #then no reservation is made [4.45ms]
+518 |
+519 |     controller.abort()
+520 |     releaseReservation?.()
+521 |     await evaluating
+522 |
+523 |     expect(f.launches).toHaveLength(0)
+                             ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/dream-trigger.test.ts:523:24)
+(fail) dream shutdown evaluator > #given abort arrives while shutdown reservation is in flight #when the reservation returns active #then no dream child launch starts [10.35ms]
+(pass) manual dream origin > #given a fresh sub-floor transcript and a recent dream #when a manual dream is requested #then it launches past every gate [27.21ms]
+(pass) manual dream origin > #given dream disabled #when a manual dream is requested #then it still launches [9.14ms]
+(pass) manual dream origin > #given explicit conversation ids #when a manual dream is requested #then those conversations are reserved [8.76ms]
+(pass) manual dream origin > #given no unreflected content anywhere #when a manual dream is requested #then it declines to reserve [4.56ms]
+(pass) dream reservation integration > #given an active reflection run #when the idle timer fires #then the dream queues as pending and does not launch [17.32ms]
+
+packages/omo-senpi/src/components/memory/wiring.test.ts:
+65 |     const { pi, evaluations } = await fixture(settings)
+66 |
+67 |     await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
+68 |     await pi.dispatch("agent_settled", {}, eventCtx)
+69 |
+70 |     expect(evaluations.count).toBe(0)
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/wiring.test.ts:70:31)
+(fail) memory wiring reflection policy > #given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts [8.47ms]
+(pass) memory wiring reflection policy > #given the memory block is absent #when an automatic settle arrives #then schema-default reflection remains enabled [0.53ms]
+
+packages/omo-senpi/src/components/memory/facts-wiring.test.ts:
+(pass) facts wiring settle enqueue > #given debounce four #when four settles complete #then exactly one all-pending extractor launch fires [19.75ms]
+(pass) facts wiring settle enqueue > #given facts enabled and a new journal delta #when settle runs #then one queue file is published [7.63ms]
+(pass) facts wiring settle enqueue > #given the same cursor #when settle runs twice #then no duplicate entry is published [9.64ms]
+(pass) facts wiring settle enqueue > #given facts disabled #when settle runs #then nothing is enqueued [1.90ms]
+(pass) facts wiring settle enqueue > #given an empty journal #when settle runs #then nothing is enqueued [1.60ms]
+173 |       }) as unknown as TranscriptJournal,
+174 |     })
+175 |
+176 |     const result = await wiring.enqueueSettled(SESSION, controller.signal)
+177 |
+178 |     expect(result.enqueued).toBe(false)
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/facts-wiring.test.ts:178:29)
+(fail) facts wiring settle enqueue > #given a pre-aborted drain signal #when final-delta enqueue is requested #then no journal read or queue mutation starts [4.69ms]
+195 |       }) as unknown as TranscriptJournal,
+196 |     })
+197 |
+198 |     const result = await wiring.enqueueSettled(SESSION, controller.signal)
+199 |
+200 |     expect(result.enqueued).toBe(false)
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/facts-wiring.test.ts:200:29)
+(fail) facts wiring settle enqueue > #given abort arrives while the final journal delta is being read #when enqueue reaches the queue boundary #then no queue mutation starts [4.73ms]
+(pass) facts wiring shutdown launch > #given a pre-aborted drain signal at a met threshold #when launch is requested #then no extractor spawn starts [6.39ms]
+(pass) facts wiring shutdown launch > #given abort arrives during the threshold probe #when launch reaches the extractor boundary #then no extractor spawn starts [6.96ms]
+(pass) facts wiring session_start reconcile > #given a leftover queue file from a crashed run #when reconcile runs #then it is reported launchable [10.39ms]
+(pass) facts wiring session_start reconcile > #given facts disabled #when reconcile runs #then no leftover work is reported [6.70ms]
+(pass) facts wiring session_start reconcile > #given a consumed batch #when reconcile runs #then nothing is left to relaunch [18.15ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn.test.ts:
+(pass) worker payload mode relaxation > #given a missing facts payload from the first launch #when mode relaxation reports ENOENT #then preparation continues [1.11ms]
+63 |       model: "provider/model",
+64 |       env: {},
+65 |       chmodFile: async () => { throw chmodFailure("EPERM") },
+66 |     }).catch((error: unknown) => error)
+67 |
+68 |     expect((failure as NodeJS.ErrnoException).code).toBe("EPERM")
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "EPERM"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/spawn.test.ts:68:53)
+(fail) worker payload mode relaxation > #given facts payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.64ms]
+86 |       dreamStateSource: join(base, "dream.json"),
+87 |       peoplePolicy: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+88 |       chmodFile: async () => { throw chmodFailure("EACCES") },
+89 |     }).catch((error: unknown) => error)
+90 |
+91 |     expect((failure as NodeJS.ErrnoException).code).toBe("EACCES")
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "EACCES"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/spawn.test.ts:91:53)
+(fail) worker payload mode relaxation > #given reflection payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [1.72ms]
+
+6 tests failed:
+(fail) dream shutdown evaluator > #given abort arrives while shutdown reservation is in flight #when the reservation returns active #then no dream child launch starts [10.35ms]
+(fail) memory wiring reflection policy > #given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts [8.47ms]
+(fail) facts wiring settle enqueue > #given a pre-aborted drain signal #when final-delta enqueue is requested #then no journal read or queue mutation starts [4.69ms]
+(fail) facts wiring settle enqueue > #given abort arrives while the final journal delta is being read #when enqueue reaches the queue boundary #then no queue mutation starts [4.73ms]
+(fail) worker payload mode relaxation > #given facts payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.64ms]
+(fail) worker payload mode relaxation > #given reflection payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [1.72ms]
+
+ 47 pass
+ 6 fail
+ 118 expect() calls
+Ran 53 tests across 4 files. [1210.00ms]
+
+GREEN: focused runtime defect coverage
+
+$ bun test packages/omo-senpi/src/components/memory/wiring.test.ts packages/omo-senpi/src/components/memory/facts-wiring.test.ts packages/omo-senpi/src/components/memory/dream-trigger.test.ts packages/omo-senpi/src/components/memory/worker/spawn.test.ts
+
+53 pass, 0 fail, 121 expect() calls
+
+
+
+GREEN: package typechecks
+
+$ bun run --cwd packages/omo-senpi typecheck
+
+exit 0
+
+$ bun run --cwd packages/memory-core typecheck
+
+exit 0
+
+
+
+GREEN: memory-core package suite
+
+$ bun test packages/memory-core
+
+418 pass, 0 fail, 3657 expect() calls
+
+
+
+EXPECTED PRE-EXISTING FAILURE: omo-senpi package suite
+
+$ bun test packages/omo-senpi
+
+1078 pass, 1 fail, 3041 expect() calls
+
+Only failure: packages/omo-senpi/src/components/ulw-loop/runtime.test.ts OMO_BIN precedence test, explicitly excluded by task.
+
+
+
+GREEN: owned-path diff check
+
+$ git diff --check -- <owned paths>
+
+exit 0

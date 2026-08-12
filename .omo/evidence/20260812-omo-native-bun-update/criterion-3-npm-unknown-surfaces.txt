@@ -1,0 +1,17 @@
+npm-managed real-surface QA
+
+```text
+NPM_INSTALL_EXIT=0
+added 5 packages
+VERSION_OUTPUT=omo 5.0.0-0.beta.6 (engine: senpi 2026.8.11-4)
+UPDATE_OUTPUT=omo is updated via npm: npm i -g omo-ai@beta
+NPM_GUIDANCE=PASS
+```
+
+Unknown-layout fallback QA
+
+```text
+UNKNOWN_OUTPUT=omo is updated via npm: npm i -g omo-ai@beta
+UNKNOWN_FALLBACK=PASS
+UNKNOWN_QA_CLEANUP=.../omo-native-unknown-green.XXXXXX.rN3gIFPiyb
+```

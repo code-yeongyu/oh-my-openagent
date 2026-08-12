@@ -4,6 +4,9 @@
   "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
+  "imports": {
+    "#omo-task-runtime": "./extensions/omo-task.js"
+  },
   "keywords": [
     "pi-package",
     "senpi",

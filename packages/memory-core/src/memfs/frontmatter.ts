@@ -24,6 +24,8 @@ export interface ParsedMemoryFile {
   frontmatter: {
     description: string;
     read_only?: string;
+    kind?: string;
+    aliases?: readonly string[];
   };
   body: string;
 }
@@ -54,6 +56,8 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
 
   let description: string | undefined;
   let readOnly: string | undefined;
+  let kind: string | undefined;
+  let aliases: readonly string[] | undefined;
 
   for (const line of frontmatterText.split(/\r?\n/)) {
     const idx = line.indexOf(":");
@@ -66,6 +70,10 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
       description = value;
     } else if (key === "read_only") {
       readOnly = value;
+    } else if (key === "kind") {
+      kind = value;
+    } else if (key === "aliases") {
+      aliases = parseAliases(value, line);
     }
     // 'limit' and unknown keys are tolerated-ignored per letta source.
   }
@@ -80,6 +88,8 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
     frontmatter: {
       description,
       ...(readOnly !== undefined ? { read_only: readOnly } : {}),
+      ...(kind !== undefined ? { kind } : {}),
+      ...(aliases !== undefined ? { aliases } : {}),
     },
     body,
   };
@@ -96,7 +106,7 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
  * Throws FrontmatterError if description is empty after trimming.
  */
 export function renderMemoryFile(
-  frontmatter: { description: string; read_only?: string },
+  frontmatter: { description: string; read_only?: string; kind?: string; aliases?: readonly string[] },
   body: string,
 ): string {
   const description = frontmatter.description.trim();
@@ -115,6 +125,14 @@ export function renderMemoryFile(
     lines.push(`read_only: ${frontmatter.read_only}`);
   }
 
+  if (frontmatter.kind !== undefined) {
+    lines.push(`kind: ${sanitizeFrontmatterValue(frontmatter.kind)}`);
+  }
+
+  if (frontmatter.aliases !== undefined) {
+    lines.push(`aliases: ${JSON.stringify(frontmatter.aliases)}`);
+  }
+
   lines.push("---");
 
   const header = lines.join("\n");
@@ -130,4 +148,44 @@ export function renderMemoryFile(
  */
 function sanitizeFrontmatterValue(value: string): string {
   return value.replace(/\r?\n/g, " ").trim();
+}
+
+/**
+ * Parse the aliases frontmatter value per IC-13.
+ *
+ * A value starting with `[` is parsed as JSON and must yield an array
+ * of non-empty strings. Anything else raises a FrontmatterError.
+ */
+function parseAliases(value: string, rawLine: string): readonly string[] {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[")) {
+    throw new FrontmatterError(
+      `frontmatter: 'aliases' must be a JSON array of non-empty strings (line: ${rawLine})`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    throw new FrontmatterError(
+      `frontmatter: 'aliases' is not valid JSON (line: ${rawLine})`,
+    );
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new FrontmatterError(
+      `frontmatter: 'aliases' must be a JSON array, not ${typeof parsed} (line: ${rawLine})`,
+    );
+  }
+
+  for (const item of parsed) {
+    if (typeof item !== "string" || item.trim() === "") {
+      throw new FrontmatterError(
+        `frontmatter: 'aliases' array must contain only non-empty strings (line: ${rawLine})`,
+      );
+    }
+  }
+
+  return parsed as string[];
 }

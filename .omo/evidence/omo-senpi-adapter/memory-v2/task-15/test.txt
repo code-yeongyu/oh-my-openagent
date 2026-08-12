@@ -1,0 +1,7 @@
+$ bun test packages/memory-core/src/reflection/assets
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.13ms]
+
+ 6 pass
+ 0 fail
+ 20 expect() calls
+Ran 6 tests across 1 file. [85.00ms]

@@ -1,5 +1,5 @@
 {
-  "_comment": "Derived from @code-yeongyu/senpi 2026.8.11. Re-derive builtin provider ids and mappings whenever that pin changes.",
+  "_comment": "Derived from @code-yeongyu/senpi 2026.8.11. Verified against 2026.8.12-4: every mapped id still resolves in the engine registry (ollama/radius are dynamic providers without static model modules). Re-derive builtin provider ids and mappings whenever that pin changes.",
   "builtinProviderIds": [
     "alibaba-token-plan",
     "amazon-bedrock",

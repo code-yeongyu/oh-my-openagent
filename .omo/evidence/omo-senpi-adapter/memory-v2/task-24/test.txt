@@ -1,0 +1,26 @@
+Task 24 verification
+
+RED
+- Command: bun test packages/omo-senpi/src/components/memory/dream-selector.test.ts
+- Observed: 0 pass, 1 fail, 1 error because ./dream-selector did not exist.
+- Full output: red.txt
+
+GREEN
+- Focused selector suite: 4 pass, 0 fail, 8 assertions.
+- Memory component suite: 305 pass, 0 fail, 964 assertions across 44 files.
+- Omo-senpi typecheck: clean.
+- LSP diagnostics: [] for dream-selector.ts and dream-selector.test.ts.
+- Full outputs: green.txt and memory-suite.txt
+
+Package gate
+- bun run test:senpi completed 957 pass and 2 fail across 146 files.
+- Known pristine-origin failure: ulw-loop OMO_BIN environment resolution.
+- Additional shared-branch failure unrelated to task 24: generated extension size 897430 exceeds the 880000 budget. dream-selector.ts is not wired into the extension bundle, so this new unimported module cannot contribute bundle bytes. The generated extension files were restored immediately after the gate.
+- Full output: package-gate.txt
+
+Behavioral proof
+- Determinism: a fixed journal corpus is selected twice with an injected clock and compared as byte-identical JSON.
+- Stable tie-break: equal scores resolve by higher unreflectedSteps, newer last activity, then code-unit lexical conversationId.
+- Packing: a ranked oversized middle candidate is skipped and a later fitting candidate is packed, producing [first, later] at the exact byte cap.
+- UTF-8 metric: emoji and CJK fixture content is measured with Buffer.byteLength using only present text, argsText, and resultText fields joined by single newlines.
+- Snapshot eligibility: a fully reflected conversation is excluded from both selection and unreflected volume.

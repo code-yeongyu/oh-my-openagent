@@ -45,7 +45,7 @@ Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`sc
 | [`comment-checker-core/`](comment-checker-core/AGENTS.md) | `src/`, `tsconfig.json` | apply-patch parser and binary runner with injectable spawn. |
 | [`hashline-core/`](hashline-core/AGENTS.md) | `src/`, `tsconfig.json` | Hashline edit primitives and diff helpers shared by adapter shims. |
 | [`boulder-state/`](boulder-state/AGENTS.md) | `src/`, `tsconfig.json` | Work tracking state machine with split storage. |
-| [`memory-core/`](memory-core) | `src/`, `tsconfig.json` | Harness-neutral Letta-Code-parity memory engine: git MemFS substrate, memory tools, committed-HEAD compiler, reflection state machine, FTS-lite search, locks. |
+| [`memory-core/`](memory-core/AGENTS.md) | `src/`, `tsconfig.json` | Harness-neutral Letta-Code-parity memory engine: git MemFS substrate, memory tools, committed-HEAD compiler, reflection state machine, FTS-lite search, locks. |
 | [`telemetry-core/`](telemetry-core/AGENTS.md) | `src/`, `tsconfig.json` | Harness-neutral telemetry primitives and PostHog wrappers. |
 | [`lsp-core/`](lsp-core/AGENTS.md) | `src/`, `tsconfig.json` | Harness-neutral LSP engine, request context, tool definitions, and MCP entry helpers. |
 | [`mcp-stdio-core/`](mcp-stdio-core/AGENTS.md) | `src/`, `tsconfig.json` | Shared JSON-RPC stdio framing and dispatch primitives for MCP servers. |

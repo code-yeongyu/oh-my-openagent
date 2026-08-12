@@ -19,6 +19,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [Sisyphus Tasks](#sisyphus-tasks)
 - [Features](#features)
   - [Skills](#skills)
+  - [Memory](#memory)
   - [Hooks](#hooks)
   - [Commands](#commands)
   - [Browser Automation](#browser-automation)
@@ -597,6 +598,115 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 | `path`           | -       | Local path or remote URL        |
 | `recursive`      | `false` | Recurse into subdirectories     |
 | `glob`           | -       | Glob pattern for file selection |
+
+### Memory
+
+Persistent, per-agent memory stored as a git repository. Memory is on by default and learns
+actively: it reflects on its own, nudges when durable facts go unsaved, extracts facts in the
+background, consolidates during a dream pass, and keeps records about people.
+
+Configured under `memory` in `omo.json`, with per-agent overrides under `memory.agents.<name>`.
+
+```json
+{
+  "memory": {
+    "enabled": true,
+    "agent": "auto",
+    "tool_exposure": "direct",
+    "reflection": { "trigger": { "step_count": 25 } },
+    "nudge": { "every_user_turns": 10 },
+    "dream": { "idle_minutes": 30 },
+    "agents": {
+      "reviewer": { "dream": { "enabled": false } }
+    }
+  }
+}
+```
+
+| Option               | Default    | Description                                                                     |
+| -------------------- | ---------- | ------------------------------------------------------------------------------- |
+| `enabled`            | `true`     | Master switch for the whole memory component                                     |
+| `agent`              | `"auto"`   | Which agent identity owns the memory repository                                  |
+| `tool_exposure`      | `"direct"` | `direct` registers the memory tools always-on; `search` opts into the MCP server |
+| `compile_warn_tokens`| `30000`    | Warn when the compiled memory block exceeds this many tokens                     |
+| `agents`             | `{}`       | Per-agent overrides; any block below may be overridden field by field            |
+
+`tool_exposure` defaults to `direct` deliberately. The `search` value moves the tools behind
+senpi's `tool_search` catalog through an extension-declared MCP server, which keeps the tool list
+smaller but removes memory entirely if that server fails to start.
+
+#### Reflection
+
+Reflection reviews the conversation and writes durable notes back into memory.
+
+| Option                     | Default  | Description                                               |
+| -------------------------- | -------- | --------------------------------------------------------- |
+| `reflection.enabled`       | `true`   | Turn reflection off without disabling the rest of memory   |
+| `reflection.trigger.step_count`   | `25` | Reflect every N steps; `0` disables the step trigger   |
+| `reflection.trigger.on_compaction`| `true` | Also reflect when the context is compacted            |
+| `reflection.merge`         | `"auto"` | `auto` or `integration` merge strategy                     |
+| `reflection.category`      | `"quick"`| Task executor category for the reflection child            |
+| `reflection.timeout_minutes`| `15`    | Hard timeout for a reflection run                          |
+| `reflection.sandbox`       | `"auto"` | `auto`, `required`, or `off`                               |
+
+#### Nudge
+
+Reminds the agent to save when durable facts have gone unwritten.
+
+| Option                    | Default | Description                                          |
+| ------------------------- | ------- | ---------------------------------------------------- |
+| `nudge.enabled`           | `true`  | Emit the nudge line in the memory metadata block      |
+| `nudge.every_user_turns`  | `10`    | Nudge after this many user turns without a save       |
+
+#### Facts
+
+Background extraction of durable facts from settled turns.
+
+| Option                    | Default | Description                                              |
+| ------------------------- | ------- | -------------------------------------------------------- |
+| `facts.enabled`           | `true`  | Run background fact extraction                            |
+| `facts.debounce_settles`  | `4`     | Settled turns to accumulate before extracting             |
+
+#### Dream
+
+A consolidation pass that reorganizes memory, audits skill usage, and updates people records.
+It runs opportunistically when the session goes idle, and optionally at shutdown.
+
+| Option                        | Default  | Description                                                  |
+| ----------------------------- | -------- | ------------------------------------------------------------ |
+| `dream.enabled`               | `true`   | Enable the dream pass                                         |
+| `dream.idle_minutes`          | `30`     | Idle minutes before a dream may start; `0` disables the trigger|
+| `dream.min_hours_between`     | `24`     | Minimum hours between two dream runs                          |
+| `dream.shutdown_launch`       | `true`   | Allow a dream to be launched at shutdown                      |
+| `dream.auto_select_max`       | `5`      | Conversations `--auto` may select (1-10)                      |
+| `dream.auto_select_max_chars` | `150000` | Byte budget for auto-selected conversations                   |
+
+#### People
+
+Records about individuals, stored as cards with an observation ledger.
+
+| Option                    | Default | Description                                       |
+| ------------------------- | ------- | ------------------------------------------------- |
+| `people.enabled`          | `true`  | Maintain people records                            |
+| `people.max_entries`      | `40`    | Maximum observation entries per person (1-100)     |
+| `people.max_entry_chars`  | `200`   | Maximum characters per entry (50-500)              |
+
+#### Soul
+
+| Option             | Default | Description                                            |
+| ------------------ | ------- | ------------------------------------------------------ |
+| `soul.edit_notice` | `true`  | Surface a notice when the persona or identity changes   |
+
+#### Sync and Search
+
+| Option           | Default | Description                                    |
+| ---------------- | ------- | ---------------------------------------------- |
+| `sync.enabled`   | `true`  | Sync the memory repository                      |
+| `sync.remote`    | -       | Optional git remote for the memory repository   |
+| `search.enabled` | `true`  | Enable memory search                            |
+
+Run `/sleeptime` in a session to see every resolved value, including which ones a per-agent
+override changed.
 
 ### Hooks
 

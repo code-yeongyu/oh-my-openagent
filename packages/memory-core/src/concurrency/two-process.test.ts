@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
 import { ReflectionReservationStore, type ReservationResult } from "../reflection/reservation"
+import { realpathSync } from "node:fs"
 
 const writerChildPath = fileURLToPath(new URL("./writer-child.ts", import.meta.url))
 const reflectionChildPath = fileURLToPath(new URL("./reflection-child.ts", import.meta.url))

@@ -2,7 +2,7 @@
   "emit-migrate": [],
   "test-expectation": [],
   "input-compat-preserve": [
-    "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:222: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:223: omo ulw-loop",
     "packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts:98: omo ulw-loop",
     "packages/omo-codex/plugin/components/ulw-loop/src/steering.ts:179: omo ulw-loop",
     "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts:155: omo ulw-loop",

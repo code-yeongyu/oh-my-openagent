@@ -38,15 +38,14 @@ const TASK_ENABLED_FLAG = "omo-task"
 export { wireEventBridge } from "./event-bridge"
 
 export interface TaskComponentOptions {
-  // Project root the task engine anchors its state dir + omo.json load to. Defaults to the senpi
-  // launch cwd; injectable so tests never write task state into the repo working tree.
+  // Project root the task engine anchors its state dir + omo.json load to. Defaults to the cwd the
+  // host reports for THIS session; injectable so tests never write task state into the repo tree.
   readonly loadConfig?: typeof loadSenpiOmoConfig
   readonly resolveCwd?: () => string
 }
 
 export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenpiComponent {
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
-  const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   return {
     name: "task",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
@@ -66,7 +65,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         return
       }
 
-      const cwd = resolveCwd()
+      const cwd = options.resolveCwd?.() ?? sessionCwd(pi)
       const loaded = loadConfig({ cwd })
 
       const engine = composeTaskEngine({
@@ -119,6 +118,15 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
     },
   }
+}
+
+// senpi loads one extension instance per session and builds its ExtensionAPI with that session's
+// cwd. A multi-session host keeps every session in ONE process, so process.cwd() is the process
+// launch directory: anchoring there collapses every session's task state into a single store and
+// hides child artifacts from the host's per-project readers. It remains the fallback only for
+// hosts that predate `cwd` on the extension API.
+function sessionCwd(pi: SenpiExtensionAPI): string {
+  return typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : process.cwd()
 }
 
 function registerRemovedTeamWaitHint(pi: SenpiExtensionAPI): void {

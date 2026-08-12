@@ -1,0 +1,78 @@
+=== RED PHASE (failing tests before implementation) ===
+
+Command: bun test packages/omo-senpi/src/components/memory/trigger-wiring.test.ts packages/omo-senpi/src/components/memory/commands/reflect.test.ts
+
+10 tests failed before implementation:
+  - reflection trigger wiring > #given reflection disabled #when a clean run settles #then no reservation is made and no launch fires
+  - reflection trigger wiring > #given reflection disabled #when a pending compaction is consumed at settle #then no compaction launch fires
+  - reflection trigger wiring > #given reflection disabled #when a manual request is made #then no launch fires
+  - resolveReflectionTriggerConfig > #given resolved memory settings #when no agent override applies #then the base trigger config is used
+  - resolveReflectionTriggerConfig > #given a per-agent override #when the bound agent matches #then its trigger fields win field by field
+  - resolveReflectionTriggerConfig > #given reflection disabled in base settings #when no agent override applies #then enabled is false
+  - resolveReflectionTriggerConfig > #given reflection enabled in base but disabled by per-agent override #when the bound agent matches #then enabled is false
+  - resolveReflectionTriggerConfig > #given reflection disabled in base but enabled by per-agent override #when the bound agent matches #then enabled is true
+  - /reflect > #given reflection.enabled false #when invoked #then an error is returned and no request is submitted
+  - /reflect > #given reflection enabled in base but disabled by per-agent override #when invoked #then an error is returned and no request is submitted
+
+26 pass, 10 fail, 88 expect() calls
+
+=== GREEN PHASE (all tests passing after implementation) ===
+
+Command: bun test packages/omo-senpi/src/components/memory/trigger-wiring.test.ts packages/omo-senpi/src/components/memory/commands/reflect.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/trigger-wiring.test.ts:
+(pass) reflection trigger wiring > #given a met step threshold #when a clean run settles #then exactly one step-count launch fires with no visible message [14.98ms]
+(pass) reflection trigger wiring > #given the wiring #when registered #then it observes only agent_end, agent_settled and session_compact [1.26ms]
+(pass) reflection trigger wiring > #given a zero step threshold #when a clean run settles #then nothing ever launches [27.58ms]
+(pass) reflection trigger wiring > #given an unsuccessful or missing run outcome #when settled #then no launch is attempted [20.17ms]
+(pass) reflection trigger wiring > #given a retried run #when the final agent_end is clean #then the settle counts as success [8.22ms]
+(pass) reflection trigger wiring > #given a settled run outcome #when a second settle arrives without a new run #then the stale outcome cannot relaunch [7.42ms]
+(pass) reflection trigger wiring > #given an accepted compaction #when the event fires #then it only records the pending flag and never launches [4.80ms]
+(pass) reflection trigger wiring > #given a rejected compaction #when the event fires #then no pending flag is recorded [4.45ms]
+(pass) reflection trigger wiring > #given a pending compaction #when the next settle fails and only then succeeds #then the flag is consumed exactly once [10.34ms]
+(pass) reflection trigger wiring > #given compaction and the step threshold ready in the same settle #when it is evaluated #then exactly one run launches [13.36ms]
+(pass) reflection trigger wiring > #given repeated successful settles before the active run completes #when they are evaluated #then one launch fires and pending collapses to a single record [22.55ms]
+(pass) reflection trigger wiring > #given a manual request #when it is made outside any event #then it launches with its focus and journal filters [8.20ms]
+(pass) reflection trigger wiring > #given a manual request without arguments #when it is made #then it targets the bound conversation without a focus [7.21ms]
+(pass) reflection trigger wiring > #given an active run #when a manual request queues behind it #then it is reserved as pending without launching [15.32ms]
+(pass) reflection trigger wiring > #given a launch handler that never settles #when a run settles #then the event handler still completes [7.69ms]
+(pass) reflection trigger wiring > #given no launch handler #when a run settles #then the reservation still happens without throwing [9.05ms]
+(pass) reflection trigger wiring > #given no bound memory session #when events fire #then the wiring stays inert [1.45ms]
+(pass) reflection trigger wiring > #given an engine failure #when a run settles #then the host handler resolves and the failure is logged once [1.44ms]
+(pass) reflection trigger wiring > #given reflection disabled #when a clean run settles #then no reservation is made and no launch fires [4.39ms]
+(pass) reflection trigger wiring > #given reflection disabled #when a pending compaction is consumed at settle #then no compaction launch fires [3.71ms]
+(pass) reflection trigger wiring > #given reflection disabled #when a manual request is made #then no launch fires [1.07ms]
+(pass) reflection trigger wiring > #given reflection enabled #when a clean run settles #then the launch fires exactly as before [7.08ms]
+(pass) resolveReflectionTriggerConfig > #given resolved memory settings #when no agent override applies #then the base trigger config is used [0.14ms]
+(pass) resolveReflectionTriggerConfig > #given a per-agent override #when the bound agent matches #then its trigger fields win field by field [0.06ms]
+(pass) resolveReflectionTriggerConfig > #given reflection disabled in base settings #when no agent override applies #then enabled is false [0.06ms]
+(pass) resolveReflectionTriggerConfig > #given reflection enabled in base but disabled by per-agent override #when the bound agent matches #then enabled is false [0.05ms]
+(pass) resolveReflectionTriggerConfig > #given reflection disabled in base but enabled by per-agent override #when the bound agent matches #then enabled is true [0.04ms]
+
+packages/omo-senpi/src/components/memory/commands/reflect.test.ts:
+(pass) /reflect > #given free-text focus #when invoked #then a manual request is reserved and reported with its run id [0.83ms]
+(pass) /reflect > #given --recent N #when invoked #then the journal filter carries the count [0.23ms]
+(pass) /reflect > #given --conversation with ids #when invoked #then the ids are split into the request [0.22ms]
+(pass) /reflect > #given an active run #when the sink queues the request #then the pending disposition is reported [0.18ms]
+(pass) /reflect > #given a non-numeric --recent #when invoked #then a usage error is returned and no request is made [0.20ms]
+(pass) /reflect > #given no reflection sink #when invoked #then an actionable error is returned [0.17ms]
+(pass) /reflect > #given an unbound session #when invoked #then an actionable error is returned [0.07ms]
+(pass) /reflect > #given reflection.enabled false #when invoked #then an error is returned and no request is submitted [0.19ms]
+(pass) /reflect > #given reflection enabled in base but disabled by per-agent override #when invoked #then an error is returned and no request is submitted [0.20ms]
+
+ 36 pass
+ 0 fail
+ 96 expect() calls
+Ran 36 tests across 2 files. [297.00ms]
+
+=== Typecheck ===
+
+Command: npx tsc --noEmit --project packages/omo-senpi/tsconfig.json
+Result: clean (no errors)
+
+=== Broader suite ===
+
+Command: bun test packages/omo-senpi
+Result: 899 pass, 1 fail (pre-existing, unrelated OMO_BIN env test)

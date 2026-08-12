@@ -1,0 +1,33 @@
+=== RED 1: facts queue core (no implementation yet) ===
+$ bun test packages/memory-core/src/facts/
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/facts/queue.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './queue' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/queue.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [83.00ms]
+
+=== RED 2: facts wiring (no implementation yet) ===
+$ bun test packages/omo-senpi/src/components/memory/facts-wiring.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/facts-wiring.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './facts-wiring' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/facts-wiring.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [120.00ms]

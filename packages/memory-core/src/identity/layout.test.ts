@@ -27,6 +27,10 @@ describe("memory identity layout constants", () => {
       "worktrees",
       "viewers",
       "push-queue",
+      "facts-queue",
+      "facts",
+      "notices",
+      "tool-receipts",
     ])
   })
 })
@@ -90,6 +94,10 @@ describe("buildIdentityPaths", () => {
     expect(paths.worktrees).toBe(join(runtime, "worktrees"))
     expect(paths.viewers).toBe(join(runtime, "viewers"))
     expect(paths.pushQueue).toBe(join(runtime, "push-queue"))
+    expect(paths.factsQueue).toBe(join(runtime, "facts-queue"))
+    expect(paths.facts).toBe(join(runtime, "facts"))
+    expect(paths.notices).toBe(join(runtime, "notices"))
+    expect(paths.toolReceipts).toBe(join(runtime, "tool-receipts"))
   })
 
   it("#given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime", () => {

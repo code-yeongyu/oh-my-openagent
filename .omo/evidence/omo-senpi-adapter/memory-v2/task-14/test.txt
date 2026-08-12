@@ -1,0 +1,150 @@
+RED: bun test packages/omo-senpi/src/components/memory/commands/dream.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/commands/dream.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './dream' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/commands/dream.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [104.00ms]
+
+
+GREEN: exact todo-14 affected tests
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/reflection/reservation.test.ts:
+(pass) persisted reflection reservation > #given journal state at threshold #when the persisted machine evaluates a successful settle #then it captures and reserves the cursor snapshot [13.24ms]
+(pass) persisted reflection reservation > #given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record [5.18ms]
+(pass) persisted reflection reservation > #given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record [40.48ms]
+(pass) persisted reflection reservation > #given dream outcomes #when runs complete #then dream state advances only for merged and no_changes [28.96ms]
+(pass) persisted reflection reservation > #given a failed active run #when completed #then its cursor is unchanged and valid pending work is promoted [15.91ms]
+(pass) persisted reflection reservation > #given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once [13.52ms]
+(pass) persisted reflection reservation > #given a pending threshold request made stale by successful cursor advancement #when dequeued #then it is dropped [14.83ms]
+(pass) persisted reflection reservation > #given automatic pending work below its threshold #when dequeued #then it is dropped but a manual pending request remains launchable [21.07ms]
+
+packages/memory-core/src/reflection/machine.test.ts:
+(pass) reflection trigger machine > #given a successful settle at the configured step threshold #when evaluated #then it requests a step-count reservation [0.14ms]
+(pass) reflection trigger machine > #given zero or undefined thresholds #when a successful run settles #then step count never launches [0.07ms]
+(pass) reflection trigger machine > #given an aborted or failed run #when it settles #then no automatic trigger launches [0.04ms]
+(pass) reflection trigger machine > #given compaction was accepted #when several successful boundaries settle #then its reservation is emitted exactly once [0.09ms]
+(pass) reflection trigger machine > #given an active threshold run #when compaction and manual requests arrive #then one pending slot unions conversations and preserves manual priority [0.09ms]
+(pass) reflection trigger machine > #given reflection and dream requests #when they compete for one pending slot #then the specified priority order and newest tie winner are preserved [0.08ms]
+(pass) reflection trigger machine > #given two dream requests during an active reflection #when they merge #then one pending dream unions snapshots and the newest equal-priority request wins [0.07ms]
+(pass) reflection trigger machine > #given interleaved reflection and dream requests #when every bounded event sequence is applied #then at most one active and one pending run exist [0.43ms]
+(pass) reflection trigger machine > #given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor [0.11ms]
+(pass) reflection trigger machine > #given a failed active run and a queued request #when completed #then the cursor stays unmoved and pending is promoted [0.07ms]
+(pass) reflection trigger machine > #given pending automatic work became stale #when dequeued #then it is dropped, while manual work survives [0.06ms]
+
+packages/memory-core/src/reflection/worktree.test.ts:
+(pass) reflection worktree finalization > #given a clean committed reflection #when auto-finalized #then it no-ff merges and cleans up [495.46ms]
+(pass) reflection worktree finalization > #given a document-maintenance allowlist #when the child changes another path #then nothing is merged [507.99ms]
+(pass) reflection worktree finalization > #given a reflection with no commits #when finalized #then it reports no_changes and cleans up [373.72ms]
+(pass) reflection worktree finalization > #given conflicting child and parent commits #when auto-finalized #then merge aborts cleanly and cleanup always runs [593.75ms]
+(pass) reflection worktree finalization > #given a dirty parent #when auto-finalized #then it refuses before merge and cleans up [476.18ms]
+(pass) reflection worktree finalization > #given a non-conflicting parent advance after launch #when auto-finalized #then recorded-base drift merges successfully [564.85ms]
+(pass) reflection worktree finalization > #given an externally merged reflection branch #when explicit finalization verifies reachability #then it reports merged and cleans up [516.21ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger.test.ts:
+(pass) resolveDreamTriggerSettings > #given base dream settings #when no agent override exists #then the base values resolve [0.20ms]
+(pass) resolveDreamTriggerSettings > #given a per-agent dream override #when resolving #then overridden fields win and the rest inherit [0.06ms]
+(pass) evaluateDreamGates > #given every gate failing #when the origin is manual #then the gates are bypassed without probing [0.14ms]
+(pass) evaluateDreamGates > #given dream disabled #when an idle origin evaluates #then it is rejected before probing [0.06ms]
+(pass) evaluateDreamGates > #given shutdown_launch disabled #when a shutdown origin evaluates #then it is rejected before probing [0.05ms]
+(pass) evaluateDreamGates > #given the last dream exactly min_hours_between ago #when an idle origin evaluates #then the spacing gate rejects without a volume probe [0.08ms]
+(pass) evaluateDreamGates > #given the last dream one millisecond past min_hours_between #when an idle origin evaluates #then it is allowed [0.06ms]
+(pass) evaluateDreamGates > #given no recorded dream #when an idle origin evaluates #then the spacing gate passes [0.05ms]
+(pass) evaluateDreamGates > #given unreflected volume exactly at the floor #when an idle origin evaluates #then the volume gate rejects [0.06ms]
+(pass) evaluateDreamGates > #given unreflected volume one byte above the floor #when a shutdown origin evaluates #then it is allowed [0.06ms]
+(pass) dream idle timer matrix > #given a settled agent #when the settle event arrives #then an idle timer is armed for idle_minutes [1.30ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the agent settles again #then the first timer is cancelled and a fresh one armed [0.86ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when an input event arrives #then the timer resets and the next settle re-arms [8.95ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when an agent_start event arrives #then the timer resets and the next settle re-arms [6.94ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when a session_compact event arrives #then the timer resets and the next settle re-arms [7.86ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the session shuts down #then the timer is cancelled and a stale fire launches nothing [4.41ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the session aborts #then the timer is cancelled and a stale fire launches nothing [4.60ms]
+(pass) dream idle timer matrix > #given idle_minutes zero #when the agent settles #then no timer is armed [0.97ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when it fires while the agent is streaming #then no dream is requested [4.30ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when it fires with pending messages #then no dream is requested [4.73ms]
+(pass) dream idle timer matrix > #given a timer armed from a context without idle probes #when it fires #then no dream is requested [3.90ms]
+(pass) automatic dream gates > #given dream disabled #when the idle timer fires #then no reservation is made [3.49ms]
+(pass) automatic dream gates > #given a dream one hour ago #when the idle timer fires #then the spacing gate blocks the launch [3.97ms]
+(pass) automatic dream gates > #given unreflected volume exactly at the floor #when the idle timer fires #then the volume gate blocks the launch [4.43ms]
+(pass) automatic dream gates > #given every gate passing #when the idle timer fires #then a dream run is reserved and launched [10.24ms]
+(pass) dream shutdown evaluator > #given every gate passing #when a quit drains through the registered evaluator #then a shutdown dream launches [7.82ms]
+(pass) dream shutdown evaluator > #given every gate passing #when a non-quit shutdown drains #then the evaluator never runs [3.91ms]
+(pass) dream shutdown evaluator > #given shutdown_launch disabled #when the evaluator runs #then no reservation is made [3.65ms]
+(pass) dream shutdown evaluator > #given a dream one hour ago #when the evaluator runs #then the spacing gate blocks the launch [4.02ms]
+(pass) dream shutdown evaluator > #given a pre-aborted drain signal #when the evaluator runs #then no reservation is made [4.05ms]
+(pass) manual dream origin > #given a fresh sub-floor transcript and a recent dream #when a manual dream is requested #then it launches past every gate [8.11ms]
+(pass) manual dream origin > #given dream disabled #when a manual dream is requested #then it still launches [7.97ms]
+(pass) manual dream origin > #given explicit conversation ids #when a manual dream is requested #then those conversations are reserved [7.39ms]
+(pass) manual dream origin > #given no unreflected content anywhere #when a manual dream is requested #then it declines to reserve [3.94ms]
+(pass) dream reservation integration > #given an active reflection run #when the idle timer fires #then the dream queues as pending and does not launch [14.50ms]
+
+packages/omo-senpi/src/components/memory/index.test.ts:
+(pass) createMemoryComponent > #given missing custom-entry capabilities #when registered #then it warns once and registers nothing [0.45ms]
+(pass) createMemoryComponent > #given no memory section #when config resolves #then memory defaults enabled with the auto identity [0.06ms]
+(pass) createMemoryComponent > #given no memory key in config #when resolved through adapter fallback #then it matches parsing {} through the schema [0.52ms]
+(pass) createMemoryComponent > #given disabled config or a global/component disable flag #when registered #then the host registration surface is byte-identical [0.11ms]
+(pass) createMemoryComponent > #given enabled memory #when session_start binds an auto identity #then it appends a hidden binding and performs no filesystem writes [7.38ms]
+(pass) createMemoryComponent > #given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding [0.35ms]
+(pass) createMemoryComponent > #given enablement latched false or true at session_start #when config reload flips it #then registration stays fixed and restart notice appears once [2.23ms]
+(pass) createMemoryComponent > #given per-instance module state #when session_shutdown fires #then the identity context and supervisor reference are released [3.74ms]
+
+packages/omo-senpi/src/components/memory/dream-selector.test.ts:
+(pass) dream conversation scoring > #given a fixed scoring vector #when scored #then every normalized operand and the exact total match [0.16ms]
+(pass) dream conversation scoring > #given three equal scores #when ranked #then unreflected steps recency and conversation id break ties in order [0.10ms]
+(pass) dream conversation packing > #given an oversized middle candidate #when packed #then it is skipped and a later fitting candidate is selected [0.06ms]
+(pass) dream journal selection > #given UTF-8 journals with one fully reflected conversation #when volume and selection run twice #then bytes snapshots ranking and output stay deterministic [3.94ms]
+
+packages/omo-senpi/src/components/memory/commands/register.test.ts:
+(pass) registerMemoryCommands > #given a fresh extension api #when the suite registers #then exactly the documented commands appear [0.48ms]
+(pass) registerMemoryCommands > #given the registered suite #when each registration is inspected #then description, argumentHint, and handler are present [0.28ms]
+(pass) registerMemoryCommands > #given a bound identity with a repository #when a registered handler runs #then it renders through the shared seams [634.52ms]
+
+packages/omo-senpi/src/components/memory/commands/dream.test.ts:
+(pass) /dream scoring and selection > #given the fixed letta-parity scoring vector #when scored #then the exact operands and total are reproduced [0.18ms]
+(pass) /dream scoring and selection > #given --auto and focus #when invoked #then manual dream selection is delegated without explicit ids [0.76ms]
+(pass) /dream scoring and selection > #given three conversations #when --recent 2 is invoked #then two conversations are chosen by last activity [3.85ms]
+(pass) /dream scoring and selection > #given explicit conversation ids #when invoked #then their parsed selection is submitted unchanged [0.31ms]
+(pass) /dream external transcript staging and target validation > #given a senpi JSONL transcript with a malformed line #when imported twice #then message ids are staged once [3.74ms]
+(pass) /dream external transcript staging and target validation > #given non-session JSONL #when imported #then it is rejected without submitting a dream [0.54ms]
+(pass) /dream external transcript staging and target validation > #given valid and escaping --to paths #when invoked #then only the memory-relative document is accepted [516.63ms]
+
+packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts:
+(pass) reflection and dream run reconciliation > #given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final [441.41ms]
+(pass) reflection and dream run reconciliation > #given a failed child outcome with a valid commit #when reconciled #then output is never merged and the cursor remains retryable [406.68ms]
+(pass) reflection and dream run reconciliation > #given unavailable process identities and no outcome #when the bounded watch expires #then the run is abandoned without cleanup or cursor advance [246.88ms]
+(pass) reflection and dream run reconciliation > #given a dead identified supervisor and live identified child #when the shared deadline elapses #then reconciliation signals on the persisted timeline and cleans only after confirmed death [372.99ms]
+(pass) reflection and dream run reconciliation > #given old pre-launch reservations with unverifiable or reused launcher pids #when reconciled #then only confirmed pid reuse releases the reservation [255.76ms]
+(pass) reflection and dream run reconciliation > #given an old active reservation with no run directory and a confirmed-dead local launcher #when reconciled #then the pre-launch wedge is released [253.84ms]
+
+packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts:
+(pass) dream worker dispatch > #given a dream with people disabled #when the worker launches #then it selects dream inputs and touches no people path [585.99ms]
+(pass) dream worker dispatch > #given absent dream ledgers #when the worker launches #then it supplies readable empty objects [807.12ms]
+(pass) dream worker dispatch > #given custom people limits #when the dream writes fixture entries #then it honors the resolved limits exactly [610.16ms]
+(pass) dream worker dispatch > #given a memory document target #when the dream completes #then only that document is merged [593.80ms]
+
+packages/omo-senpi/src/components/memory/worker/runner-finalization.test.ts:
+(pass) live reflection run finalization > #given a successful supervised run #when the parent finalizer completes #then final is published after integration and the merge carries its run receipt [568.86ms]
+
+ 94 pass
+ 0 fail
+ 982 expect() calls
+Ran 94 tests across 11 files. [11.62s]
+GREEN: memory-core typecheck
+GREEN: omo-senpi typecheck
+$ tsgo --noEmit -p tsconfig.json
+GREEN: diff check
+
+
+BROAD-SUITE DISCREPANCIES (not used as the todo-14 green gate):
+- Full memory suite: 442 pass, 1 fail. Existing 100 ms supervisor timeout test observed supervisor exit 1 under full parallel load; exact affected worker tests pass.
+- Broader command-inclusive suite: 201 pass, 1 fail. Existing /memfs status test exceeded its 5 s timeout under parallel Git load; exact affected command tests pass.
+- No extension bundles were regenerated, per task constraint.

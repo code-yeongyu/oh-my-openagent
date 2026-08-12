@@ -1,0 +1,26 @@
+SANDBOX=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-5etNy9
+EXIT_STATUS=0
+--- stdout tail ---
+stantMessageEvent":{"type":"text_end","contentIndex":0,"content":"done","partial":{"role":"assistant","content":[{"type":"text","text":"done"}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"stop","timestamp":1786349471701}},"message":{"role":"assistant","content":[{"type":"text","text":"done"}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"stop","timestamp":1786349471701}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"done"}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"stop","timestamp":1786349471701}}
+{"type":"turn_end","message":{"role":"assistant","content":[{"type":"text","text":"done"}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"stop","timestamp":1786349471701},"toolResults":[]}
+{"type":"entry_appended","entry":{"type":"custom","customType":"senpi.hooks.stop-state","data":{"count":0,"sessionId":"019feab9-c264-7137-b61e-bdcb66e62fc7","turnKey":"1:556fe40e"},"id":"232e340b","parentId":"556fe40e","timestamp":"2026-08-10T08:11:11.703Z"}}
+{"type":"agent_end","messages":[{"role":"user","content":[{"type":"text","text":"rewrite your persona"}],"timestamp":1786349470724},{"role":"assistant","content":[{"type":"toolCall","id":"omo-mock-tool-1","name":"tool_search","arguments":{"query":"memory"}}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"toolUse","timestamp":1786349470764},{"role":"toolResult","toolCallId":"omo-mock-tool-1","toolName":"tool_search","content":[{"type":"text","text":"Found 2 MCP tool(s) matching \"memory\". They are now active and callable from your NEXT turn:\n\n- mcp_omo-memory_memory — A convenience tool for memories stored in the omo memory repo that automatically commits changes....\n- mcp_omo-memory_memory_apply_patch — Apply a codex-style patch to memory files in the omo memory repo, then automatically commit the c...\n\n[tool_search:activated] mcp_omo-memory_memory mcp_omo-memory_memory_apply_patch"}],"details":{"activated":["mcp_omo-memory_memory","mcp_omo-memory_memory_apply_patch"],"query":"memory"},"addedToolNames":["mcp_omo-memory_memory","mcp_omo-memory_memory_apply_patch"],"isError":false,"timestamp":1786349470770},{"role":"assistant","content":[{"type":"toolCall","id":"omo-mock-tool-2","name":"mcp_omo-memory_memory","arguments":{"command":"str_replace","reason":"QA soul rewrite","file_path":"system/persona.md","old_string":"It is your soul and they should know.","new_string":"It is your soul and they should know. QA touched it."}}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"toolUse","timestamp":1786349470771},{"role":"toolResult","toolCallId":"omo-mock-tool-2","toolName":"mcp_omo-memory_memory","content":[{"type":"text","text":"Memory str_replace committed locally (b983f8c).\nThis was a soul edit: announce it to the user in your reply."}],"details":{"preview":"Memory str_replace committed locally (b983f8c).\nThis was a soul edit: announce it to the user in your reply.","server":"omo-memory","tool":"memory"},"isError":false,"timestamp":1786349471700},{"role":"assistant","content":[{"type":"text","text":"done"}],"api":"openai-completions","provider":"omo-mock","model":"mock-1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":0},"stopReason":"stop","timestamp":1786349471701}],"willRetry":false}
+{"type":"agent_settled"}
+
+--- stderr tail ---
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
+
+PASS bound identity repo created :: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-5etNy9/memory/agents/qa-soul-agent-e726656a/repo
+PASS persona commit subject landed :: QA soul rewrite
+PASS IC-2 trailers present on the MCP-surface commit :: QA soul rewrite | Omo-Writer: memory-tool | Omo-Session: 019feab9-c264-7137-b61e-bdcb66e62fc7 | Omo-Turn: 1 |  | 
+PASS tool result carries the soul-edit discipline line
+PASS tool receipt consumed by tool_result
+PASS exactly one persisted soul-updated entry :: count=1
+PASS persisted entry carries the commit sha and affected paths :: {"sha":"b983f8c604f839cd62a5504f61f9e3e735f7cf7d","subject":"QA soul rewrite","affectedPaths":["system/persona.md"]}
+REAL_SURFACE_RESULT=PASS
+REAL-SURFACE TEARDOWN: rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-5etNy9
+REAL-SURFACE TEARDOWN VERIFIED: absent

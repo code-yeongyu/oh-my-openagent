@@ -3,7 +3,7 @@
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import {
   cleanupTempDirs,
@@ -25,6 +25,10 @@ import {
   gitTouchedFilesSince,
   gitTrackedFileCount,
 } from "./git-helpers"
+
+// This suite creates real Git repositories and commits. Keep the default strict on POSIX,
+// but give loaded Windows runners enough headroom for Git-for-Windows process startup.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 afterEach(() => {
   cleanupTempDirs()

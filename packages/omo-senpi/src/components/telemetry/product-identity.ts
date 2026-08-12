@@ -7,7 +7,8 @@ import {
   type TelemetryEnv,
   type TelemetryProductConfig,
 } from "@oh-my-opencode/telemetry-core"
-import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
+import { CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task/agents-builtin"
+import { BUILTIN_CATEGORY_DEFAULTS } from "@oh-my-opencode/senpi-task/category-builtins"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 
 export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9qcvcKtRNUWAn"

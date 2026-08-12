@@ -7,16 +7,20 @@ import {
   deriveState,
   finalizeCursor,
   initialReflectionState,
-  type ReflectionSnapshot,
-  type ReflectionTranscriptState,
+  type ReflectionSnapshot, type ReflectionTranscriptState,
 } from "./cursor"
 import {
   projectTranscriptEntries,
   type TranscriptEntry,
   type TranscriptProjection,
 } from "./entries"
+import { syncJournalDirectory, syncJournalFile } from "./fsync"
 
-export type JournalLock = <T>(lockPath: string, task: () => Promise<T>) => Promise<T>
+export type JournalLock = <T>(
+  lockPath: string,
+  task: () => Promise<T>,
+  signal?: AbortSignal,
+) => Promise<T>
 
 export type TranscriptJournalOptions = {
   readonly journalDir: string
@@ -35,21 +39,27 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-export const withLocalJournalLock: JournalLock = async (lockPath, task) => {
+export const withLocalJournalLock: JournalLock = async (lockPath, task, signal) => {
   const deadline = Date.now() + 5_000
   let handle
   for (;;) {
+    // Abort before acquisition leaves no lock file behind (IC-11), so a drain that already
+    // returned never creates and deletes state.lock behind the caller's back.
+    signal?.throwIfAborted()
     try {
       handle = await open(lockPath, "wx", 0o600)
       break
     } catch (error) {
       if (errorCode(error) !== "EEXIST" || Date.now() >= deadline) throw error
+      signal?.throwIfAborted()
       await delay(10)
     }
   }
 
+  // The lock is held: the finally below is exempt cleanup and always runs, abort or not.
   try {
     await handle.writeFile(`${process.pid}\n`, "utf8")
+    signal?.throwIfAborted()
     return await task()
   } finally {
     await handle.close()
@@ -156,18 +166,38 @@ export class TranscriptJournal {
     })
   }
 
-  async captureReflectionSnapshot(): Promise<ReflectionSnapshot | null> {
+  async captureReflectionSnapshot(signal?: AbortSignal): Promise<ReflectionSnapshot | null> {
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
       const snapshot = captureCursorSnapshot(entries, state)
       if (snapshot === null) return null
+      signal?.throwIfAborted()
       await this.writeStateUnlocked(
         { ...state, last_reflection_started_at: this.now().toISOString() },
         entries,
       )
       return snapshot
-    })
+    }, signal)
+  }
+
+  /**
+   * Makes the journal durable under the cancellable lock (IC-11): the transcript file, the
+   * state file, and the journal directory are fsynced in turn, re-checking the signal before
+   * each one so an aborted flush STARTS no further I/O once the shutdown drain has returned.
+   */
+  async flush(signal?: AbortSignal): Promise<void> {
+    // Read through a call so the check is re-evaluated after every await: abort can fire
+    // between two fsyncs, which a narrowed property read would miss.
+    const aborted = (): boolean => signal?.aborted ?? false
+    await this.locked(async () => {
+      if (aborted()) return
+      await syncJournalFile(this.transcriptPath)
+      if (aborted()) return
+      await syncJournalFile(this.statePath)
+      if (aborted()) return
+      await syncJournalDirectory(this.options.journalDir)
+    }, signal)
   }
 
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {
@@ -181,9 +211,10 @@ export class TranscriptJournal {
     })
   }
 
-  private async locked<T>(task: () => Promise<T>): Promise<T> {
+  private async locked<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted()
     await mkdir(this.options.journalDir, { recursive: true, mode: 0o700 })
-    return this.lock(this.lockPath, task)
+    return this.lock(this.lockPath, task, signal)
   }
 
   private async appendUnlocked(entries: readonly TranscriptEntry[]): Promise<AppendResult> {

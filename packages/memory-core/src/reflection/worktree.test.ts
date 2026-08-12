@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
 import {
   createReflectionWorktree,
+  discardReflectionWorktree,
   finalizeReflectionWorktree,
   type ReflectionWorktree,
 } from "./worktree"
@@ -14,7 +15,7 @@ const roots: string[] = []
 const exec = createNodeGitExec()
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "reflection-worktree-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-worktree-")))
   roots.push(root)
   const parentDir = join(root, "memory")
   const repo = new GitMemoryRepo({ dir: parentDir, agentId: "agent-one" })
@@ -38,10 +39,39 @@ async function assertCleaned(worktree: ReflectionWorktree, parentDir: string) {
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("reflection worktree finalization", () => {
+  it("#given recorded identity before Git creation #when cleanup runs #then missing resources are idempotently confirmed absent", async () => {
+    // given
+    const { repo, root } = await fixture()
+    const dir = join(root, "worktrees", "never-created")
+    const branch = "memory/reflection-never-created"
+
+    // when
+    const cleanup = await discardReflectionWorktree(repo, dir, branch)
+
+    // then
+    expect(cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
+  })
+
+  it("#given a precreate callback #when a worktree is created #then identity is published before Git resources exist", async () => {
+    // given
+    const { repo, worktreesDir } = await fixture()
+    let observed: { readonly dir: string; readonly branch: string } | undefined
+
+    // when
+    const worktree = await createReflectionWorktree(repo, "prelaunch", worktreesDir, undefined, async (identity) => {
+      expect(existsSync(identity.dir)).toBe(false)
+      observed = identity
+    })
+
+    // then
+    expect(observed).toEqual({ dir: worktree.dir, branch: worktree.branch })
+    expect(existsSync(worktree.dir)).toBe(true)
+  })
+
   it("#given a clean committed reflection #when auto-finalized #then it no-ff merges and cleans up", async () => {
     // #given
     const { repo, parentDir, worktreesDir } = await fixture()
@@ -63,6 +93,29 @@ describe("reflection worktree finalization", () => {
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
     expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim())
       .toBe("merge(reflection): learned facts")
+    await assertCleaned(worktree, parentDir)
+  })
+
+  it("#given a document-maintenance allowlist #when the child changes another path #then nothing is merged", async () => {
+    // #given
+    const { repo, parentDir, worktreesDir } = await fixture()
+    const worktree = await createReflectionWorktree(repo, "targeted", worktreesDir)
+    await commit(worktree, "reference-style.md", "target\n")
+    await commit(worktree, "unrelated.md", "unrelated\n")
+
+    // #when
+    let lockCalls = 0
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "targeted dream",
+      allowedPaths: ["reference-style.md"],
+      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+    })
+
+    // #then
+    expect(result.status).toBe("failed")
+    expect(lockCalls).toBe(0)
+    expect(await repo.lsTree()).toEqual(["memory.md"])
     await assertCleaned(worktree, parentDir)
   })
 

@@ -1,0 +1,44 @@
+{
+  "sandbox": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.ojrkce3Y4v",
+  "bindSessionId": "new-session-not-in-provenance",
+  "provenanceSessionIds": [
+    "past-session-0",
+    "past-session-1",
+    "past-session-2",
+    "past-session-3",
+    "past-session-4",
+    "past-session-5",
+    "past-session-6",
+    "past-session-7"
+  ],
+  "dirtyWorktreeProbe": "dirty worktree probe\n",
+  "firstBind": {
+    "detailedEntries": 5,
+    "summaryEntries": 1,
+    "notifications": [
+      {
+        "message": "Delivered 6 memory reflection completions; 1 need attention.",
+        "level": "warning"
+      }
+    ]
+  },
+  "secondBind": {
+    "newEntries": 0,
+    "newNotifications": 0
+  },
+  "staleConsumedSilently": true,
+  "allConsumedByNewSession": true,
+  "misleadingSuccessOutputProbe": {
+    "actualUiCallbackCount": 1,
+    "actualUiCallbackPayload": [
+      {
+        "message": "Delivered 6 memory reflection completions; 1 need attention.",
+        "level": "warning"
+      }
+    ]
+  },
+  "staleStateProbe": {
+    "legacyRecordHasDurationMs": false,
+    "rendererReturnedComponent": true
+  }
+}

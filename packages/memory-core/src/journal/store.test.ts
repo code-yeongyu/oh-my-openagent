@@ -1,18 +1,19 @@
 import { afterEach, describe, expect, it } from "bun:test"
+import { existsSync, realpathSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { TranscriptJournal } from "./store"
+import { TranscriptJournal, withLocalJournalLock } from "./store"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createJournal(): Promise<{ dir: string; journal: TranscriptJournal }> {
-  const dir = await mkdtemp(join(tmpdir(), "memory-journal-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-")))
   tempDirs.push(dir)
   return {
     dir,
@@ -80,5 +81,99 @@ describe("transcript journal store", () => {
     // then
     expect(state.steps_since_last_successful_reflection).toBe(1)
     expect(state.pending_compaction).toBe(true)
+  })
+})
+
+describe("cancellable journal flush", () => {
+  it("#given a journal with rows #when flush runs #then it settles and leaves no lock behind", async () => {
+    // given
+    const { dir, journal } = await createJournal()
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] }])
+
+    // when
+    await journal.flush()
+
+    // then
+    expect(existsSync(join(dir, "state.lock"))).toBe(false)
+    expect((await readFile(join(dir, "transcript.jsonl"), "utf8")).trim().split("\n")).toHaveLength(1)
+  })
+
+  it("#given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file", async () => {
+    // given
+    const { dir, journal } = await createJournal()
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] }])
+    const controller = new AbortController()
+    controller.abort()
+
+    // when
+    const failure = await journal.flush(controller.signal).catch((error: unknown) => error)
+
+    // then
+    expect((failure as Error).name).toBe("AbortError")
+    expect(existsSync(join(dir, "state.lock"))).toBe(false)
+  })
+
+  it("#given an abort during the acquisition retry loop #when the lock is contended #then it throws without acquiring", async () => {
+    // given
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
+    tempDirs.push(dir)
+    const lockPath = join(dir, "state.lock")
+    await writeFile(lockPath, "held-by-another-holder\n", "utf8")
+    const controller = new AbortController()
+    let taskRuns = 0
+
+    // when
+    queueMicrotask(() => controller.abort())
+    const failure = await withLocalJournalLock(
+      lockPath,
+      async () => { taskRuns += 1 },
+      controller.signal,
+    ).catch((error: unknown) => error)
+
+    // then
+    expect((failure as Error).name).toBe("AbortError")
+    expect(taskRuns).toBe(0)
+    expect(await readFile(lockPath, "utf8")).toBe("held-by-another-holder\n")
+  })
+
+  it("#given an abort raised while the task holds the lock #when the task settles #then the lock file is released anyway", async () => {
+    // given
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
+    tempDirs.push(dir)
+    const lockPath = join(dir, "state.lock")
+    const controller = new AbortController()
+
+    // when
+    await withLocalJournalLock(
+      lockPath,
+      async () => {
+        controller.abort()
+        expect(existsSync(lockPath)).toBe(true)
+      },
+      controller.signal,
+    )
+
+    // then
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
+  it("#given a signal aborted mid-flush #when the remaining fsyncs are reached #then flush returns early without throwing", async () => {
+    // given
+    const { dir, journal } = await createJournal()
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] }])
+    const controller = new AbortController()
+    const aborting = new TranscriptJournal({
+      journalDir: dir,
+      lock: async (lockPath, task, signal) => withLocalJournalLock(lockPath, async () => {
+        controller.abort()
+        return task()
+      }, signal),
+    })
+
+    // when
+    await aborting.flush(controller.signal)
+
+    // then
+    expect(existsSync(join(dir, "state.lock"))).toBe(false)
   })
 })

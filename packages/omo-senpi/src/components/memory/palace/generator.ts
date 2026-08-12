@@ -17,11 +17,17 @@ import {
   type PalaceHistory,
   type PalaceReflection,
 } from "./collectors"
-import { PALACE_DATA_PLACEHOLDER, PALACE_TEMPLATE } from "./template"
+import { collectPeople, type PalacePeople, type PalacePeopleOptions } from "./people"
+import { PALACE_DATA_PLACEHOLDER, PALACE_PEOPLE_PANEL, PALACE_PEOPLE_TAB, PALACE_TEMPLATE } from "./template"
 
 const VIEWER_DIR_MODE = 0o700
 const VIEWER_FILE_MODE = 0o600
 const DEFAULT_OUTCOME_LIMIT = 10
+/** Schema defaults (`memory.people`); callers with resolved settings pass their own. */
+const DEFAULT_PEOPLE_OPTIONS: PalacePeopleOptions = {
+  enabled: true,
+  limits: { maxEntries: 40, maxEntryChars: 200 },
+}
 
 export interface PalaceMetadata {
   readonly identity: string
@@ -35,11 +41,14 @@ export interface PalaceData {
   readonly external: { readonly entries: readonly PalaceExternalEntry[]; readonly tree: string }
   readonly history: PalaceHistory
   readonly reflection: PalaceReflection
+  /** Absent when `memory.people.enabled` is false: the panel is then never rendered. */
+  readonly people?: PalacePeople
 }
 
 export interface GeneratePalaceOptions {
   readonly now?: () => Date
   readonly outcomeLimit?: number
+  readonly people?: PalacePeopleOptions
 }
 
 export interface GeneratePalaceResult {
@@ -55,6 +64,7 @@ export async function generatePalaceHtml(
   const data = await collectPalaceData(context, {
     generatedAt,
     outcomeLimit: options.outcomeLimit ?? DEFAULT_OUTCOME_LIMIT,
+    ...(options.people === undefined ? {} : { people: options.people }),
   })
   const html = renderPalaceHtml(data)
 
@@ -70,15 +80,21 @@ export async function generatePalaceHtml(
 
 export async function collectPalaceData(
   context: MemoryIdentityContext,
-  options: { readonly generatedAt: Date; readonly outcomeLimit: number },
+  options: {
+    readonly generatedAt: Date
+    readonly outcomeLimit: number
+    readonly people?: PalacePeopleOptions
+  },
 ): Promise<PalaceData> {
   const repo = new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity })
   const head = await repo.head().catch(() => null)
-  const [core, external, history, reflection] = await Promise.all([
+  const peopleOptions = options.people ?? DEFAULT_PEOPLE_OPTIONS
+  const [core, external, history, reflection, people] = await Promise.all([
     collectCore(repo, head),
     collectExternal(repo, head),
     collectHistory(repo),
     collectReflection(context.identityPaths, { limit: options.outcomeLimit }),
+    collectPeople(repo, head, peopleOptions),
   ])
   return {
     metadata: {
@@ -90,11 +106,14 @@ export async function collectPalaceData(
     external: { entries: external, tree: renderExternalProjection(external.map((entry) => entry.path)) },
     history,
     reflection,
+    ...(people === undefined ? {} : { people }),
   }
 }
 
 export function renderPalaceHtml(data: PalaceData): string {
   return PALACE_TEMPLATE.replace(PALACE_DATA_PLACEHOLDER, () => encodePalaceData(data))
+    .replace(PALACE_PEOPLE_TAB, () => (data.people === undefined ? "" : PALACE_PEOPLE_TAB))
+    .replace(PALACE_PEOPLE_PANEL, () => (data.people === undefined ? "" : PALACE_PEOPLE_PANEL))
 }
 
 /**

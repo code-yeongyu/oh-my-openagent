@@ -3,13 +3,15 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor, resolveMemoryConfig } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { cwd: string; memoryHome: string } {
@@ -51,6 +53,19 @@ describe("createMemoryComponent", () => {
     expect(resolveMemoryConfig({ config: {}, diagnostics: [], layers: [], sources: [] })).toEqual(memorySettings())
   })
 
+  test("#given no memory key in config #when resolved through adapter fallback #then it matches parsing {} through the schema", () => {
+    // given
+    const emptyConfigResult = { config: {}, diagnostics: [] as const, layers: [] as const, sources: [] as const }
+    const schemaParsed = OmoMemorySettingsSchema.parse({})
+
+    // when
+    const fallbackResolved = resolveMemoryConfig(emptyConfigResult)
+
+    // then
+    expect(fallbackResolved).toEqual(schemaParsed)
+    expect(fallbackResolved).toEqual(memorySettings())
+  })
+
   test("#given disabled config or a global/component disable flag #when registered #then the host registration surface is byte-identical", () => {
     for (const scenario of [
       { memory: memorySettings({ enabled: false }), flags: {} },
@@ -84,6 +99,8 @@ describe("createMemoryComponent", () => {
 
     expect(pi.entryRenderers.map((entry) => entry.customType)).toEqual([
       "senpi-memory.reflection-completion",
+      "senpi-memory.reflection-launched",
+      SOUL_UPDATED_ENTRY_TYPE,
       MEMORY_BINDING_CUSTOM_TYPE,
     ])
     // Direct registration is the default surface so memory always works; the exposure-search MCP

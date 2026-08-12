@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { realpathSync } from "node:fs"
 import {
   GitMemoryRepo,
   type GitExec,
@@ -14,7 +15,7 @@ import {
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 class ContentionProbeExec implements GitExec {
@@ -54,7 +55,7 @@ describe("serialized git config", () => {
 
   it("#given two concurrent configSet calls #when they mutate one repo #then their git config processes do not overlap", async () => {
     // given
-    const dir = await mkdtemp(join(tmpdir(), "memory-config-lock-"))
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-config-lock-")))
     tempDirs.push(dir)
     const exec = new ContentionProbeExec()
     const repo = new GitMemoryRepo({ dir, agentId: "lock-agent", exec })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -13,13 +13,13 @@ import {
 const tempDirs: string[] = []
 
 async function createRepo(agentId = "agent-one") {
-  const dir = await mkdtemp(join(tmpdir(), "memory-git-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-git-")))
   tempDirs.push(dir)
   return { dir, repo: new GitMemoryRepo({ dir, agentId }) }
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("GitMemoryRepo", () => {
@@ -127,6 +127,7 @@ describe("GitMemoryRepo", () => {
     expect(await repo.configGet("user.name")).toBe("Operator")
     expect(await repo.configGet("omo.agentId")).toBe("new-agent")
     expect(await repo.configGet("commit.gpgsign")).toBe("false")
+    expect(await repo.configGet("gc.auto")).toBe("0")
   })
 
   it("#given commit signing is explicitly enabled locally #when init reconciles config #then the override is preserved", async () => {
@@ -169,11 +170,54 @@ describe("GitMemoryRepo", () => {
     expect(await readFile(join(dir, "fact.md"), "utf8")).toBe("fact\n")
   })
 
+  it("#given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    const initial = await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "initial\n" }] })
+    await writeFile(join(dir, "system/persona.md"), "updated\n")
+    const first = await repo.commitWrite(
+      ["system/persona.md"],
+      "remember persona\n\nContext: durable\nOmo-Writer: memory-tool\nOmo-Session: session-1\nOmo-Turn: 2",
+      { agentId: "agent-one", authorName: "Memory Agent", authorEmail: "memory@example.test" },
+    )
+    await writeFile(join(dir, "notes.md"), "note\n")
+    const second = await repo.commitWrite(
+      ["notes.md"],
+      "remember note\n\nOmo-Writer: memory-tool\nOmo-Session: session-2\nOmo-Turn: 4",
+      { agentId: "agent-one", authorName: "Memory Agent", authorEmail: "memory@example.test" },
+    )
+
+    // when
+    const history = await repo.log({ range: `${initial}..HEAD`, includePaths: true })
+    const filtered = await repo.log({ paths: ["system/persona.md"], limit: 1 })
+
+    // then
+    expect(history.map((commit) => commit.sha)).toEqual([second.sha, first.sha])
+    expect(history[0]).toEqual(expect.objectContaining({
+      subject: "remember note",
+      authorName: "Memory Agent",
+      authorEmail: "memory@example.test",
+      committedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      trailers: { "Omo-Writer": "memory-tool", "Omo-Session": "session-2", "Omo-Turn": "4" },
+      paths: ["notes.md"],
+    }))
+    expect(history[1]?.body).toContain("Context: durable")
+    expect(history[1]?.trailers).toEqual({
+      Context: "durable",
+      "Omo-Writer": "memory-tool",
+      "Omo-Session": "session-1",
+      "Omo-Turn": "2",
+    })
+    expect(history[1]?.paths).toEqual(["system/persona.md"])
+    expect(filtered.map((commit) => commit.sha)).toEqual([first.sha])
+    expect(filtered[0]?.paths).toBeUndefined()
+  })
+
   it("#given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree", async () => {
     // given
     const { repo } = await createRepo()
     await repo.init()
-    const worktreeParent = await mkdtemp(join(tmpdir(), "memory-worktree-"))
+    const worktreeParent = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-worktree-")))
     tempDirs.push(worktreeParent)
     const worktreeDir = join(worktreeParent, "checkout")
     await repo.worktreeAdd(worktreeDir, "memory/reflection-test")

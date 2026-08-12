@@ -8,7 +8,7 @@ import { MEMORY_COMMAND_NAMES, registerMemoryCommands } from "./register"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("registerMemoryCommands", () => {
@@ -33,7 +33,9 @@ describe("registerMemoryCommands", () => {
       "memory-repository",
       "sleeptime",
       "reflect",
+      "dream",
       "search",
+      "people",
     ])
   })
 

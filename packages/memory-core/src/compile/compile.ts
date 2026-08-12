@@ -7,13 +7,19 @@ import {
 } from "./render"
 
 const PERSONA_PATH = "system/persona.md"
+const IDENTITY_PATH = "system/identity.md"
+export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory save"
+export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
 const REMINDER =
-  "Reminder: <projection> contains the local path of the memory file projection. <memory> is your persistent memory across conversations: consult it before asking the user anything it may already answer, and save durable facts, preferences, decisions, and corrections with the memory tools as soon as they emerge instead of waiting to be asked."
+  "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md)."
 
 export interface CompileMemoryBlockOptions {
   agentId: string
   conversationId: string
   previousMessageCount: number
+  nudgeTurns?: number
+  /** Newest out-of-band soul commit since the identity watermark (plan IC-5); rendered once, then consumed. */
+  soulNotice?: { readonly sha: string }
   clock?: () => Date
 }
 
@@ -33,11 +39,14 @@ export async function compileMemoryBlockAtRevision(
   const persona = revision && paths.includes(PERSONA_PATH)
     ? await readSystemFile(repo, revision, PERSONA_PATH)
     : undefined
+  const identity = revision && paths.includes(IDENTITY_PATH)
+    ? await readSystemFile(repo, revision, IDENTITY_PATH)
+    : undefined
   const systemFiles = revision
     ? await readSystemFiles(repo, revision, paths.filter(isOtherSystemMarkdown))
     : []
   const externalPaths = paths.filter(isExternalPath)
-  const projection = renderProjection(persona, systemFiles, externalPaths)
+  const projection = renderProjection(persona, identity, systemFiles, externalPaths)
   const metadata = renderMetadata(options, (options.clock ?? (() => new Date()))())
   return [projection, metadata].filter((part) => part.length > 0).join("\n\n")
 }
@@ -71,19 +80,27 @@ async function readSystemFile(
 
 function renderProjection(
   persona: CompiledSystemFile | undefined,
+  identity: CompiledSystemFile | undefined,
   systemFiles: readonly CompiledSystemFile[],
   externalPaths: readonly string[],
 ): string {
-  if (!persona && systemFiles.length === 0 && externalPaths.length === 0) return ""
+  if (!persona && !identity && systemFiles.length === 0 && externalPaths.length === 0) return ""
   const lines = [REMINDER]
-  if (persona) {
-    lines.push(
-      "",
-      "<self>",
-      "<projection>$MEMORY_DIR/system/persona.md</projection>",
-      persona.body.trimEnd(),
-      "</self>",
-    )
+  if (persona || identity) {
+    lines.push("", "<self>")
+    if (persona) {
+      lines.push(
+        "<projection>$MEMORY_DIR/system/persona.md</projection>",
+        persona.body.trimEnd(),
+      )
+    }
+    if (identity) {
+      lines.push(
+        "<projection>$MEMORY_DIR/system/identity.md</projection>",
+        identity.body.trimEnd(),
+      )
+    }
+    lines.push("</self>")
   }
   if (systemFiles.length > 0 || externalPaths.length > 0) {
     lines.push("", "<memory>")
@@ -95,7 +112,7 @@ function renderProjection(
 }
 
 function isOtherSystemMarkdown(path: string): boolean {
-  return path.startsWith("system/") && path !== PERSONA_PATH && path.endsWith(".md")
+  return path.startsWith("system/") && path !== PERSONA_PATH && path !== IDENTITY_PATH && path.endsWith(".md")
 }
 
 function isExternalPath(path: string): boolean {
@@ -109,6 +126,12 @@ function renderMetadata(options: CompileMemoryBlockOptions, compiledAt: Date): s
     `- CONVERSATION_ID: ${options.conversationId}`,
     `- System prompt last recompiled: ${formatUtcTimestamp(compiledAt)}`,
     `- ${options.previousMessageCount} previous messages between you and the user are stored in recall memory`,
+    ...(options.nudgeTurns === undefined
+      ? []
+      : [`- ${options.nudgeTurns} ${MEMORY_NUDGE_METADATA_TOKEN}. Save durable facts now, or decide nothing qualifies.`]),
+    ...(options.soulNotice === undefined
+      ? []
+      : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${options.soulNotice.sha.slice(0, 7)} since your last run`]),
     "</memory_metadata>",
   ].join("\n")
 }
