@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { getLocale, initI18n, t } from "../shared/i18n"
 import { PLUGIN_NAME } from "../shared"
+import { PROCESS_LISTENERS_CAP_DEFAULT } from "../shared/raise-process-listeners-cap"
 import { createPluginModule } from "./create-plugin-module"
 
 const sourcePlugin = new URL("../index.ts", import.meta.url).href
@@ -21,6 +22,7 @@ const mockGetDuplicateOmoPluginWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRaiseProcessListenersCap = mock(() => {})
 const mockRunOpenCodeStartupMigration = mock(() => ({
   journalResumed: false,
   migratedFrom: [],
@@ -93,6 +95,7 @@ function createTestPluginModule(overrides: Parameters<typeof createPluginModule>
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    raiseProcessListenersCap: mockRaiseProcessListenersCap,
     runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
     loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
@@ -121,6 +124,7 @@ describe("createPluginModule()", () => {
     mockInjectServerAuthIntoClient.mockClear()
     mockLoadPluginConfig.mockClear()
     mockLoadConfigChain.mockClear()
+    mockRaiseProcessListenersCap.mockClear()
     mockRunOpenCodeStartupMigration.mockClear()
     mockCreateManagers.mockClear()
     mockRuntimeSkillSourceStop.mockClear()
@@ -161,6 +165,42 @@ describe("createPluginModule()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given the plugin server starts (#4334)", () => {
+    it("#when startup runs #then the listener cap is raised before any listener-registering work", async () => {
+      // given
+      mockRaiseProcessListenersCap.mockClear()
+      mockCreateManagers.mockClear()
+      mockCreateTools.mockClear()
+      mockCreateHooks.mockClear()
+      mockStartTmuxCheck.mockClear()
+      mockLoadPluginConfig.mockReturnValue({ tmux: { enabled: true } })
+      const pluginModule = createTestPluginModule()
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then - raised exactly once with the default cap
+      expect(mockRaiseProcessListenersCap).toHaveBeenCalledTimes(1)
+      expect(mockRaiseProcessListenersCap).toHaveBeenCalledWith(PROCESS_LISTENERS_CAP_DEFAULT)
+
+      // then - and raised before anything that registers process listeners
+      const raisedAt = mockRaiseProcessListenersCap.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+      const listenerRegistrars = [
+        mockStartTmuxCheck.mock.invocationCallOrder[0],
+        mockCreateManagers.mock.invocationCallOrder[0],
+        mockCreateTools.mock.invocationCallOrder[0],
+        mockCreateHooks.mock.invocationCallOrder[0],
+      ]
+      for (const registeredAt of listenerRegistrars) {
+        expect(registeredAt).toBeDefined()
+        expect(raisedAt).toBeLessThan(registeredAt ?? Number.MIN_SAFE_INTEGER)
+      }
     })
   })
 

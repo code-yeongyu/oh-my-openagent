@@ -110,6 +110,7 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 
 ```
 pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/src/testing/create-plugin-module.ts
+  ├─→ raiseProcessListenersCap()      # raise process listener cap once (skip Node unlimited 0)
   ├─→ installAgentSortShim()          # patches Array.prototype.{toSorted,sort} for canonical agent ordering
   ├─→ initConfigContext()             # opencode-vs-openagent layout flag
   ├─→ logLegacyPluginStartupWarning() # warn if loaded under the legacy oh-my-opencode entry
