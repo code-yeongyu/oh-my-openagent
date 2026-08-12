@@ -18,11 +18,19 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
 var OMO_OMP_PACKAGE_NAME = "@code-yeongyu/omo-omp";
+var BUNDLED_AGENTS_TO_DISABLE = [
+  "designer",
+  "reviewer",
+  "scout",
+  "security-reviewer",
+  "sonic"
+];
 var REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("skills", "ultrawork", "SKILL.md"),
+  join("agents", "sisyphus.md"),
   join("scripts", "install.mjs")
 ];
 function resolveInstallContext(options) {
@@ -53,12 +61,13 @@ function resolveInstallContext(options) {
 }
 async function ensurePluginArtifacts(context) {
   if (context.allowBuild) {
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("bun", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agents.mjs")], { cwd: context.repoRoot });
   }
   if (await hasMissingPluginArtifact(context.pluginPath)) {
     throw new Error(`Packed omo-omp plugin is missing required runtime artifacts at ${context.pluginPath}`);
@@ -77,6 +86,7 @@ async function runOmpInstaller(options = {}) {
   try {
     await ensurePluginArtifacts(context);
     const registration = await registerWithOmp(context);
+    await applyBundledAgentDisable(context);
     return {
       ok: true,
       action: "install",
@@ -165,6 +175,55 @@ function parseConfigState(content) {
     path: "",
     hasExtensionsKey: /^\s*extensions:/m.test(content)
   };
+}
+async function applyBundledAgentDisable(context) {
+  const configPath = join(context.agentDir, "config.yml");
+  const existing = await readIfPresent(configPath);
+  const next = mergeTaskDisabledAgents(existing, BUNDLED_AGENTS_TO_DISABLE);
+  if (next === existing)
+    return;
+  await backupAndWrite(configPath, next);
+}
+function mergeTaskDisabledAgents(content, names) {
+  const listBlock = names.map((name) => `    - ${name}`).join(`
+`);
+  const keyOnlyTaskLine = /^task:[ \t]*(?:#.*)?$/m;
+  const match = keyOnlyTaskLine.exec(content);
+  if (match === null) {
+    if (/^task:/m.test(content))
+      return content;
+    const separator = content.length === 0 || content.endsWith(`
+`) ? "" : `
+`;
+    return `${content}${separator}task:
+  disabledAgents:
+${listBlock}
+`;
+  }
+  const lines = content.split(`
+`);
+  const keyLine = content.slice(0, match.index).split(`
+`).length - 1;
+  let blockEnd = lines.length;
+  for (let index = keyLine + 1;index < lines.length; index += 1) {
+    if (/^\S/.test(lines[index])) {
+      blockEnd = index;
+      break;
+    }
+  }
+  const withoutExisting = [...lines];
+  const existingKey = withoutExisting.findIndex((line, index) => index > keyLine && index < blockEnd && /^  disabledAgents:/.test(line));
+  if (existingKey !== -1) {
+    let listEnd = existingKey + 1;
+    while (listEnd < blockEnd && /^    - /.test(withoutExisting[listEnd]))
+      listEnd += 1;
+    withoutExisting.splice(existingKey, listEnd - existingKey);
+  }
+  const insertion = ["  disabledAgents:", ...names.map((name) => `    - ${name}`)];
+  withoutExisting.splice(keyLine + 1, 0, ...insertion);
+  return `${withoutExisting.join(`
+`)}
+`;
 }
 function insertExtension(content, entry) {
   const lines = content.split(`

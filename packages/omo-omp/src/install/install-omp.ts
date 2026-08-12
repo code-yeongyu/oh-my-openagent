@@ -10,11 +10,24 @@ const execFileAsync = promisify(execFile)
 
 export const OMO_OMP_PACKAGE_NAME = "@code-yeongyu/omo-omp"
 
+// The omp bundled agents the omo-omp adapter disables on install, mirroring how the OpenCode
+// harness adapter removes the engine's builtin agents from the agent list. The generic `task`
+// executor stays enabled: the omp task tool resolves category spawns to it (the categories are
+// task-tool-internal, not real agents), so disabling it would break task children.
+export const BUNDLED_AGENTS_TO_DISABLE = [
+  "designer",
+  "reviewer",
+  "scout",
+  "security-reviewer",
+  "sonic",
+] as const
+
 const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("skills", "ultrawork", "SKILL.md"),
+  join("agents", "sisyphus.md"),
   join("scripts", "install.mjs"),
 ] as const
 
@@ -92,6 +105,7 @@ export async function ensurePluginArtifacts(context: InstallOmpContext): Promise
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agents.mjs")], { cwd: context.repoRoot })
   }
   if (await hasMissingPluginArtifact(context.pluginPath)) {
     throw new Error(`Packed omo-omp plugin is missing required runtime artifacts at ${context.pluginPath}`)
@@ -124,6 +138,7 @@ export async function runOmpInstaller(options: {
   try {
     await ensurePluginArtifacts(context)
     const registration = await registerWithOmp(context)
+    await applyBundledAgentDisable(context)
     return {
       ok: true,
       action: "install",
@@ -235,6 +250,62 @@ function parseConfigState(content: string): ConfigYamlState {
     path: "",
     hasExtensionsKey: /^\s*extensions:/m.test(content),
   }
+}
+
+// ============================================================================
+// Bundled-agent disabling (OpenCode-parity: the engine's builtin agents are disabled
+// so the OMO catalog is the only agent surface). Persisted via the task.disabledAgents
+// setting, which both marks the agents disabled in the /agents Control Center and
+// removes them from the task tool's spawnable set.
+// ============================================================================
+
+export async function applyBundledAgentDisable(context: InstallOmpContext): Promise<void> {
+  const configPath = join(context.agentDir, "config.yml")
+  const existing = await readIfPresent(configPath)
+  const next = mergeTaskDisabledAgents(existing, BUNDLED_AGENTS_TO_DISABLE)
+  if (next === existing) return
+  await backupAndWrite(configPath, next)
+}
+
+export function mergeTaskDisabledAgents(content: string, names: readonly string[]): string {
+  const listBlock = names.map((name) => `    - ${name}`).join("\n")
+  const keyOnlyTaskLine = /^task:[ \t]*(?:#.*)?$/m
+  const match = keyOnlyTaskLine.exec(content)
+  if (match === null) {
+    // A task key exists but carries an inline value — leave the config untouched rather
+    // than guess at its structure.
+    if (/^task:/m.test(content)) return content
+    const separator = content.length === 0 || content.endsWith("\n") ? "" : "\n"
+    return `${content}${separator}task:\n  disabledAgents:\n${listBlock}\n`
+  }
+
+  const lines = content.split("\n")
+  const keyLine = content.slice(0, match.index).split("\n").length - 1
+
+  // The task block runs from the key line to the next top-level key (a non-blank line
+  // starting at column 0 that is not itself a list entry).
+  let blockEnd = lines.length
+  for (let index = keyLine + 1; index < lines.length; index += 1) {
+    if (/^\S/.test(lines[index])) {
+      blockEnd = index
+      break
+    }
+  }
+
+  // Drop any existing disabledAgents block (the key plus its 4-space list entries) from the
+  // task block, then insert the fresh list immediately after the task key line.
+  const withoutExisting = [...lines]
+  const existingKey = withoutExisting.findIndex(
+    (line, index) => index > keyLine && index < blockEnd && /^  disabledAgents:/.test(line),
+  )
+  if (existingKey !== -1) {
+    let listEnd = existingKey + 1
+    while (listEnd < blockEnd && /^    - /.test(withoutExisting[listEnd])) listEnd += 1
+    withoutExisting.splice(existingKey, listEnd - existingKey)
+  }
+  const insertion = ["  disabledAgents:", ...names.map((name) => `    - ${name}`)]
+  withoutExisting.splice(keyLine + 1, 0, ...insertion)
+  return `${withoutExisting.join("\n")}\n`
 }
 
 function insertExtension(content: string, entry: string): string {

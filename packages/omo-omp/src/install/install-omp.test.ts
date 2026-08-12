@@ -13,12 +13,19 @@ import {
   runOmpUninstaller,
 } from "./install-omp"
 
+import {
+  applyBundledAgentDisable,
+  BUNDLED_AGENTS_TO_DISABLE,
+  mergeTaskDisabledAgents,
+} from "./install-omp"
+
 function makeFakePlugin(repoRoot: string): string {
   const pluginPath = join(repoRoot, "packages", "omo-omp", "plugin")
   for (const artifact of [
     join(pluginPath, "extensions", "omo.js"),
     join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"),
     join(pluginPath, "skills", "ultrawork", "SKILL.md"),
+    join(pluginPath, "agents", "sisyphus.md"),
     join(pluginPath, "scripts", "install.mjs"),
   ]) {
     mkdirSync(dirname(artifact), { recursive: true })
@@ -188,6 +195,38 @@ describe("omo-omp installer", () => {
       resolve(import.meta.dir, "..", "..", "..", "..", "packages", "omo-omp", "plugin", "package.json"),
     )))
     expect(pluginManifest.name).toBe(OMO_OMP_PACKAGE_NAME)
+  })
+})
+
+describe("mergeTaskDisabledAgents", () => {
+  test("#given a config without a task section #when merged #then a task block with the disabled list is appended", () => {
+    const next = mergeTaskDisabledAgents("theme:\n  dark: opencode\ncompaction:\n  enabled: false\n", BUNDLED_AGENTS_TO_DISABLE)
+    expect(next).toContain("task:\n  disabledAgents:\n    - designer\n    - reviewer\n")
+    expect(next.endsWith(`    - sonic\n`)).toBe(true)
+    expect(next).toContain("compaction:\n  enabled: false")
+  })
+
+  test("#given a config ending without a newline #when merged #then the file is terminated before the new block", () => {
+    const next = mergeTaskDisabledAgents("symbolPreset: nerd", BUNDLED_AGENTS_TO_DISABLE)
+    expect(next.startsWith("symbolPreset: nerd\ntask:\n")).toBe(true)
+  })
+
+  test("#given an existing empty task block #when merged #then the list is inserted inside it", () => {
+    const next = mergeTaskDisabledAgents("theme:\n  dark: opencode\ntask:\ncompaction:\n  enabled: false\n", BUNDLED_AGENTS_TO_DISABLE)
+    expect(next).toContain("task:\n  disabledAgents:\n    - designer")
+    expect(next).toContain("compaction:\n  enabled: false")
+  })
+
+  test("#given an existing disabledAgents list #when merged #then it is replaced in place", () => {
+    const next = mergeTaskDisabledAgents("task:\n  disabledAgents:\n    - old-agent\n  agentPrewalk:\n    - foo\n", ["designer", "sonic"])
+    expect(next).not.toContain("old-agent")
+    expect(next).toContain("  disabledAgents:\n    - designer\n    - sonic\n")
+    expect(next).toContain("  agentPrewalk:\n    - foo")
+  })
+
+  test("#given a task key with an inline value #when merged #then the config is left untouched", () => {
+    const content = "task: something\n"
+    expect(mergeTaskDisabledAgents(content, BUNDLED_AGENTS_TO_DISABLE)).toBe(content)
   })
 })
 
