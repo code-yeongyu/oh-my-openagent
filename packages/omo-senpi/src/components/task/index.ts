@@ -8,6 +8,7 @@ import {
   createTaskSendTool,
   createTaskTool,
   defaultResolveCallerSessionId,
+  isTeamMemberProcess,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
@@ -169,13 +170,18 @@ function registerTaskTools(
       resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })
-  pi.registerTool({
-    ...createTaskSendTool({
-      manager,
-      resolveCallerSessionId,
-      teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
-    }),
-  })
+  // A team member child already loads the member extension, which registers the member-scoped
+  // task_send. Registering the lead-scoped one too makes senpi reject THIS whole extension on the
+  // name collision, leaving the member with no omo config, agents, or providers.
+  if (!isTeamMemberProcess()) {
+    pi.registerTool({
+      ...createTaskSendTool({
+        manager,
+        resolveCallerSessionId,
+        teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
+      }),
+    })
+  }
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
   pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
 }

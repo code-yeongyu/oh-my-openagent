@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema, loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import { createRuntimeState, transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 import {
+  MEMBER_IDENTITY_ENV,
   createTaskRecordStore,
   normalizeSenpiTeamSpec,
   teamStorageBaseDir,
@@ -204,6 +205,26 @@ describe("omo-senpi task component wiring", () => {
     const registered = toolNames(pi)
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
     expect(registered).not.toContain("team_wait")
+  })
+
+  it("#given the process is a spawned team member #when the task component registers #then task_send is left to the member extension", () => {
+    // given a child process carrying the member identity the member extension registers task_send for
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+    const previousIdentity = process.env[MEMBER_IDENTITY_ENV]
+    process.env[MEMBER_IDENTITY_ENV] = "3a80dbd1-3fd2-4e86-b110-596e645b6bd4::a1-incumbents"
+
+    // when
+    try {
+      createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    } finally {
+      if (previousIdentity === undefined) delete process.env[MEMBER_IDENTITY_ENV]
+      else process.env[MEMBER_IDENTITY_ENV] = previousIdentity
+    }
+
+    // then only task_send is withheld, so senpi keeps loading THIS extension instead of dropping it
+    // on the name collision and stripping the member of its config, agents, and providers
+    expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].filter((name) => name !== "task_send").sort())
   })
 
   it("#given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance", () => {

@@ -6,9 +6,12 @@ import { log } from "@oh-my-opencode/utils"
 
 import { parseTaskId, type TaskId } from "../../state"
 import { createTaskRecordStore } from "../../store"
+import { MEMBER_IDENTITY_ENV } from "./identity"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
 import { createQaAfterInjectHold } from "./qa-inject-hold"
 import { createMemberTaskSendTool } from "./tools"
+
+export { MEMBER_IDENTITY_ENV, isTeamMemberProcess } from "./identity"
 
 const MEMBER_POLL_INTERVAL_MS = 1_000
 const ACK_POLL_INTERVAL_MS = 100
@@ -57,7 +60,7 @@ export function resolveMemberExtensionEntryPath(extensionUrl = import.meta.url):
 }
 
 export function parseMemberExtensionEnv(env: NodeJS.ProcessEnv): ParsedMemberExtensionEnv {
-  const identity = requiredEnv(env, "SENPI_TASK_MEMBER")
+  const identity = requiredEnv(env, MEMBER_IDENTITY_ENV)
   const taskIdRaw = requiredEnv(env, "SENPI_TASK_MEMBER_TASK_ID")
   const teamConfigRaw = requiredEnv(env, "SENPI_TASK_TEAM_CONFIG")
   const sessionDir = requiredEnv(env, "SENPI_CODING_AGENT_SESSION_DIR")
@@ -72,7 +75,7 @@ export function parseMemberExtensionEnv(env: NodeJS.ProcessEnv): ParsedMemberExt
     || !MEMBER_NAME_PATTERN.test(memberName)
   ) {
     throw new MemberExtensionConfigError(
-      "SENPI_TASK_MEMBER must be '<teamRunId>::<memberName>'",
+      `${MEMBER_IDENTITY_ENV} must be '<teamRunId>::<memberName>'`,
       "invalid_identity",
     )
   }

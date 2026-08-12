@@ -56,9 +56,11 @@ export {
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
 export {
+  MEMBER_IDENTITY_ENV,
   SenpiTeamSpecError,
   TEAM_LEAD_SENTINEL,
   ensureTeamRuntimeDirs,
+  isTeamMemberProcess,
   loadTeamRegistry,
   normalizeSenpiTeamSpec,
   resolveProjectTeamSpecPath,

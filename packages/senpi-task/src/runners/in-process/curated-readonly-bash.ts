@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 
-import { defineTool, type ToolDefinition } from "@code-yeongyu/senpi"
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, defineTool, formatSize, truncateHead, type ToolDefinition } from "@code-yeongyu/senpi"
 import { Type, type Static } from "typebox"
 
 const CurlProgram = Type.Literal("curl")
@@ -61,8 +61,16 @@ export function planCuratedReadonlyCommand(request: CuratedReadonlyRequest): Cur
   throw new CuratedReadonlyCommandError("The curated bash tool accepts read-only GitHub and HTTPS retrieval operations only.")
 }
 
+export type CuratedReadonlyExecutor = (
+  command: CuratedReadonlyCommand,
+  cwd: string,
+  timeoutSeconds: number,
+  signal: AbortSignal | undefined,
+) => Promise<string>
+
 export function createCuratedReadonlyBashTool(
   cwd: string,
+  execute: CuratedReadonlyExecutor = executeCommand,
 ): ToolDefinition {
   return defineTool({
     name: "bash",
@@ -72,10 +80,26 @@ export function createCuratedReadonlyBashTool(
     parameters: CuratedReadonlyBashParams,
     execute: async (_toolCallId, input, signal) => {
       const command = planCuratedReadonlyCommand(input)
-      const text = await executeCommand(command, cwd, input.timeout_seconds ?? 30, signal)
-      return { content: [{ type: "text", text }], details: undefined }
+      const text = await execute(command, cwd, input.timeout_seconds ?? 30, signal)
+      return { content: [{ type: "text", text: capResultText(text) }], details: undefined }
     },
   })
+}
+
+/**
+ * This tool replaces senpi's own bash, whose contract truncates every result. A retrieval returns a
+ * whole remote document, and a single turn can fan out many of them, so returning them whole pushes
+ * the child past its compaction threshold in ONE turn; compaction then cannot summarise a history
+ * that large and the child dies unrecoverably. Truncating from the head keeps the same limits the
+ * replaced tool advertises and states what was dropped.
+ */
+export function capResultText(text: string): string {
+  const truncation = truncateHead(text, { maxBytes: DEFAULT_MAX_BYTES, maxLines: DEFAULT_MAX_LINES })
+  if (!truncation.truncated) return text
+  const shown = truncation.truncatedBy === "lines"
+    ? `${truncation.outputLines} of ${truncation.totalLines} lines`
+    : `${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}`
+  return `${truncation.content}\n[truncated: ${shown}. Narrow the request (a smaller page, an API endpoint, or a query parameter) instead of refetching.]`
 }
 
 function isReadonlyCurl(args: readonly string[]): boolean {
