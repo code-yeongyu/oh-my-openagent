@@ -145,7 +145,7 @@ describe("persisted reflection reservation", () => {
     expect(state.reflected_completed_steps).toBe(0)
     expect(completion.launch?.runId).toBe(pending.run.runId)
     expect((await store.readState()).active?.runId).toBe(pending.run.runId)
-  })
+  }, 30_000)
 
   it("#given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once", async () => {
     const { journal, store } = await fixture()

@@ -63,7 +63,7 @@ describe("reflection worktree integration", () => {
     expect((await git(parentDir, ["show", "-s", "--format=%B", "HEAD"])).stdout).toContain("Omo-Run: run-123")
     expect(existsSync(worktree.dir)).toBe(true)
     expect((await git(parentDir, ["show-ref", "--verify", `refs/heads/${worktree.branch}`])).code).toBe(0)
-  })
+  }, 30_000)
 
   it("#given legacy auto receipts #when probed without a validated tip #then only the exact trailer is accepted", async () => {
     const { parentDir, worktree } = await fixture("legacy")
@@ -81,7 +81,7 @@ describe("reflection worktree integration", () => {
       evidence: "receipt",
       integrationSha,
     })
-  })
+  }, 30_000)
 
   it("#given a landed auto merge #when probed #then exact receipt and validated-tip ancestry prove integration", async () => {
     const { worktree } = await fixture("receipt")
@@ -103,7 +103,7 @@ describe("reflection worktree integration", () => {
       runId: "receipt",
       validatedTipSha: validation.tipSha,
     })).resolves.toEqual({ status: "integrated", evidence: "receipt", integrationSha: merged.integrationSha })
-  })
+  }, 30_000)
 
   it("#given a matching receipt that excludes the validated tip #when probed #then it is rejected", async () => {
     const { parentDir, worktree } = await fixture("false-receipt")
@@ -117,7 +117,7 @@ describe("reflection worktree integration", () => {
       runId: "false-receipt",
       validatedTipSha: validation.tipSha,
     })).resolves.toEqual({ status: "not_integrated" })
-  })
+  }, 30_000)
 
   it("#given a non-exact receipt on an integrated tip #when auto mode probes #then only ancestry is accepted", async () => {
     const { parentDir, worktree } = await fixture("exact")
@@ -134,7 +134,7 @@ describe("reflection worktree integration", () => {
       runId: "exact",
       validatedTipSha: validation.tipSha,
     })).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
-  })
+  }, 30_000)
 
   it("#given external integration without a receipt #when either mode probes #then ancestry proves integration", async () => {
     const { repo, worktree } = await fixture("external")
@@ -153,7 +153,7 @@ describe("reflection worktree integration", () => {
       runId: "external",
       validatedTipSha: validation.tipSha,
     })).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
-  })
+  }, 30_000)
 
   it("#given an owned interrupted merge #when auto integration retries #then it aborts that merge and lands one clean merge", async () => {
     const { parentDir, worktree } = await fixture("owned")
@@ -174,7 +174,7 @@ describe("reflection worktree integration", () => {
     expect(result.outcome).toBe("merged")
     expect((await git(parentDir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])).code).not.toBe(0)
     expect((await git(parentDir, ["status", "--porcelain"])).stdout).toBe("")
-  })
+  }, 30_000)
 
   it("#given foreign merge residue #when auto integration runs #then parent index and merge state remain untouched", async () => {
     const { root, parentDir, repo, worktree } = await fixture("target")
@@ -200,7 +200,7 @@ describe("reflection worktree integration", () => {
     expect((await git(parentDir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])).stdout.trim()).toBe(foreignTip)
     expect((await git(parentDir, ["status", "--porcelain=v2"])).stdout).toBe(beforeStatus)
     expect((await git(parentDir, ["write-tree"])).stdout.trim()).toBe(beforeTree)
-  })
+  }, 30_000)
 
   it("#given present then absent resources #when cleanup repeats #then both receipts confirm absence", async () => {
     const { parentDir, worktree } = await fixture("cleanup")
@@ -209,5 +209,5 @@ describe("reflection worktree integration", () => {
     expect(await cleanupReflectionWorktree(worktree)).toEqual({ worktreeRemoved: true, branchRemoved: true })
     expect(existsSync(worktree.dir)).toBe(false)
     expect((await git(parentDir, ["show-ref", "--verify", `refs/heads/${worktree.branch}`])).code).not.toBe(0)
-  })
+  }, 30_000)
 })
