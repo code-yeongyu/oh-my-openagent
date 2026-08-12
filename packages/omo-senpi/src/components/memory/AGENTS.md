@@ -18,6 +18,8 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 | `journal-wiring.ts` | `agent_settled` branch-delta scan + `session_start` crash reconcile into per-session transcript journals (v3_assistant_steps cursor). |
 | `trigger-wiring.ts` | Trigger evaluation on successful settle only; compaction flag consumed once; manual entrypoint for `/reflect`. |
 | `worker/` | Detached `senpi -p` reflection and dream children behind the run supervisor (`memory-run-supervisor.ts`): launch manifest + gated bootstrap handshake, durable run ledger, absolute hard deadline (SIGTERM->SIGKILL process group; `taskkill /T /F` tree kill on win32), `outcome.json`/`final.json` sentinels, crash reconciliation, completion validation, auto/explicit merge, durable completion records (`runtime/reflection/completions/`). |
+| `worker/health.ts` | Reflection health scan over completion records: failure streak, fingerprint, last outcome, `senpi-memory.health` journal entries. |
+| `worker/remediation.ts` | Maps reflection failure reasons to user-facing remediation hints. |
 | `nudge-wiring.ts` | Save-nudge accounting: counts accepted user turns since the last memory write (commit-trailer provenance), surfaces a nudge line in the compiled metadata block at `nudge.every_user_turns`. |
 | `facts-wiring.ts` / `facts-runner.ts` | Durable facts queue (settle-time enqueue, crash reconcile) + quick-pinned background extractor child; the parent applies the whole batch under the `memory-write` lock, the child never touches git. |
 | `dream-selector.ts` | Dream conversation auto-selector: unreflected-volume gate, caps at `dream.auto_select_max` conversations / `dream.auto_select_max_chars` UTF-8 bytes. |
@@ -31,6 +33,10 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 | `policy-guard.ts` | Hard guard: registers a filesystem policy when the host exposes `registerFilesystemPolicy` (senpi >= feat/extension-fs-policy), soft guard otherwise. |
 | `skills-scope.ts` | Agent memfs `skills/` exposure via `resources_discover`. |
 | `status.ts` | Footer status + committed-only token advisory at `compile_warn_tokens`. |
+| `status-live.ts` | Generic footer animation: braille reflecting spinner, fingerprint-gated segment refresh, injectable timers. |
+| `status-live-wiring.ts` | Binds the footer animation to memory state: session-to-identity resolution, git-backed fingerprint, segment line via the shared status.ts formatter. |
+| `status-active-runs.ts` | Per-identity registry of in-flight reflection runs keyed by run id; drives footer animation and supplies run details to the rpc bridge. |
+| `memory-rpc-bridge.ts` | RPC surface: fingerprint-deduped `omo.memory.updated` snapshot push plus `omo.memory.status` pull; every rpc touch is guarded, so a host without `pi.rpc` is a silent no-op. |
 | `binding.ts` / `bindings/` | Binding entry record + renderer. |
 | `capabilities.ts` | `appendEntry`/`registerEntryRenderer` capability narrowing (`MemoryExtensionAPI`). |
 | `supervisor.ts` | Ref-counted module supervisor placeholder. |

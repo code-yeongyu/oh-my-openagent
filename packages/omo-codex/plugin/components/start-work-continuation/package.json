@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-start-work-continuation",
-	"version": "5.0.0-beta.6",
+	"version": "5.0.0-beta.7",
 	"description": "Codex Stop hook continuation injector for omo-codex start-work plans.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",

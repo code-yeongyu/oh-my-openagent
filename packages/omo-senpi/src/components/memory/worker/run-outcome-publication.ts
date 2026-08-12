@@ -33,7 +33,7 @@ export async function publishRunOutcome(
   await withRunTerminalGate(runDir, manifest.runId, async () => {
     if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) return
     if (!runTerminalClaimMatches(readRunTerminalClaim(runDir), identity, "publish")) return
-    const retrying = manifest.nextAttempt !== undefined && isRetryableModelMiss({
+    const retrying = isRetryableModelMiss({
       code: outcome.childExit.code,
       stdout: readFileSync(manifest.stdoutPath, "utf8"),
       stderr: readFileSync(manifest.stderrPath, "utf8"),

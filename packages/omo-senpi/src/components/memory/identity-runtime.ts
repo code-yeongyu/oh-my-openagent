@@ -91,6 +91,7 @@ export function createIdentityRuntime(
   const runner = new SenpiSubprocessRunner({
     identity: asMemoryIdentity(identity),
     reservation: store,
+    logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,
     loadConfig: (options) => deps.loadConfig(options ?? {}),
     cwd: deps.cwd(),

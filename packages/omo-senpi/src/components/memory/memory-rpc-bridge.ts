@@ -5,15 +5,13 @@ import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { MEMORY_HEALTH_SCAN_LIMIT } from "./status"
 import { readReflectionHealth } from "./worker/health"
 
 /** Push channel: RPC clients receive `{type:"extension_event", name, data}` frames under this name. */
 export const MEMORY_UPDATED_RPC_EVENT = "omo.memory.updated"
 /** Pull channel: clients request the current snapshot with an `extension_request` for this method. */
 export const MEMORY_STATUS_RPC_METHOD = "omo.memory.status"
-/** Health scan bound, matching the footer's so both surfaces agree on the streak they report. */
-const HEALTH_SCAN_LIMIT = 20
-
 export interface MemoryRpcGitRepo {
   head(): Promise<string | null>
   headCommitTimestamp(): Promise<number | null>
@@ -289,7 +287,7 @@ async function readHealth(context: MemoryIdentityContext): Promise<HealthState> 
   try {
     const health = await readReflectionHealth(
       join(context.identityPaths.reflection, "completions"),
-      { limit: HEALTH_SCAN_LIMIT },
+      { limit: MEMORY_HEALTH_SCAN_LIMIT },
     )
     const last = health.lastOutcome
     return {

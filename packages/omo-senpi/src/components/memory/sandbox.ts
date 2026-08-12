@@ -1,5 +1,5 @@
 import { accessSync, constants, existsSync, mkdirSync, realpathSync } from "node:fs"
-import { delimiter, dirname, join } from "node:path"
+import { delimiter, dirname, isAbsolute, join } from "node:path"
 
 import type { FactsSandbox, FactsSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
 
@@ -101,15 +101,15 @@ function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsSpawnArg
     const tempDir = join(dirname(payloads[0] ?? canonicalPath(input.fallbackDir)), ".sandbox-tmp")
     mkdirSync(tempDir, { recursive: true, mode: 0o700 })
     const profile = buildDarwinProfile({ writableDirs, tempDir, payloads, foreignRoots })
-    return sandboxedTransform((spawnArgs) => ({
+    return guardedSandboxedTransform((spawnArgs, innerCommand) => ({
       ...spawnArgs,
       command: executable,
-      args: ["-p", profile, "--", spawnArgs.command, ...spawnArgs.args],
+      args: ["-p", profile, "--", innerCommand, ...spawnArgs.args],
       env: { ...spawnArgs.env, TMPDIR: tempDir },
     }))
   }
 
-  return sandboxedTransform((spawnArgs) => ({
+  return guardedSandboxedTransform((spawnArgs, innerCommand) => ({
     ...spawnArgs,
     command: executable,
     args: [
@@ -118,7 +118,7 @@ function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsSpawnArg
       "--tmpfs", "/tmp",
       ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
       "--chdir", spawnArgs.cwd,
-      "--", spawnArgs.command, ...spawnArgs.args,
+      "--", innerCommand, ...spawnArgs.args,
     ],
   }))
 }
@@ -187,6 +187,37 @@ function identityTransform<T>(warning?: string): GenericSandboxTransform<T> {
   })
 }
 
-function sandboxedTransform<T>(transform: (spawnArgs: T) => T): GenericSandboxTransform<T> {
-  return Object.assign(transform, { wasSandboxed: true })
+function guardedSandboxedTransform<T extends ReflectionSpawnArgs | FactsSpawnArgs>(
+  transform: (spawnArgs: T, innerCommand: string) => T,
+): GenericSandboxTransform<T> {
+  let wasSandboxed = true
+  let warning: string | undefined
+  const guarded = (spawnArgs: T): T => {
+    const innerCommand = resolveInnerCommand(spawnArgs.command, spawnArgs.env)
+    if (innerCommand === undefined) {
+      wasSandboxed = false
+      warning = `reflection sandbox unavailable: inner command "${spawnArgs.command}" is not absolute and could not be resolved; running unsandboxed`
+      return spawnArgs
+    }
+    return transform(spawnArgs, innerCommand)
+  }
+  return Object.defineProperties(guarded, {
+    wasSandboxed: { get: () => wasSandboxed },
+    warning: { get: () => warning },
+  }) as GenericSandboxTransform<T>
+}
+
+function resolveInnerCommand(command: string, env: NodeJS.ProcessEnv): string | undefined {
+  if (isAbsolute(command)) return command
+  for (const entry of (env.PATH ?? "").split(delimiter)) {
+    if (entry === "") continue
+    const candidate = join(entry, command)
+    try {
+      accessSync(candidate, constants.X_OK)
+      return candidate
+    } catch {
+      // Not executable on this child PATH entry; keep scanning.
+    }
+  }
+  return undefined
 }

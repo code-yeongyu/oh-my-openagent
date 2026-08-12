@@ -36,6 +36,9 @@ if (mode === "commit") {
 } else if (mode === "model-not-found") {
   console.error('Error: Model "extension-only/primary" not found. Use --list-models to see available models.')
   process.exitCode = 1
+} else if (mode === "auth-missing") {
+  console.error("No API key found for kimi-coding")
+  process.exitCode = 1
 } else {
   throw new Error(`unknown reflection child mode: ${mode}`)
 }

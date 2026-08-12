@@ -122,5 +122,6 @@ export interface PrepareFactsSpawnInput {
   readonly nextAttempt?: RunAttempt
   readonly env: NodeJS.ProcessEnv
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
   readonly chmodFile?: (path: string, mode: number) => Promise<void>
 }

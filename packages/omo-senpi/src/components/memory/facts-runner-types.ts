@@ -22,6 +22,7 @@ export interface FactsExtractorRunnerOptions {
   readonly terminationGraceMs?: number
   readonly maxOutputBytes?: number
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
   readonly supervisorPath?: string
   readonly sandbox?: FactsSandbox
   readonly now?: () => Date

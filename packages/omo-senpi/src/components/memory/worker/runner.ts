@@ -29,13 +29,16 @@ import {
   type ReflectionModelResolution,
 } from "./resolve-model"
 import {
+  MemoryModelExhaustedError,
   runMemoryModelAttempts,
   type MemoryModelChain,
 } from "./memory-model-attempts"
+import { preflightMemoryModels } from "./model-preflight"
+import { resolveSenpiLaunch } from "./senpi-command"
 import { createRunWorktree } from "./create-run-worktree"
 import { prepareReflectionCandidateSpawn } from "./reflection-spawn-input"
 import { readRunJson } from "./run-artifacts"
-import { failReservationRun, finalizeRecordedOutcome } from "./run-finalization"
+import { failReservationRun, finalizeRecordedOutcome, overrideFailedReservationRun } from "./run-finalization"
 import type { RunFinalizationContext } from "./run-finalization-types"
 import { parseReservationRunLedger } from "./reservation-run-ledger"
 import { requireFinalizedResult } from "./runner-finalization-result"
@@ -111,8 +114,22 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
         },
         ...resolution.fallbacks,
       ]
+      const env = this.options.env ?? process.env
+      const launch = this.options.senpiCommand === undefined
+        ? resolveSenpiLaunch(env)
+        : { command: this.options.senpiCommand, prefixArgs: this.options.senpiPrefixArgs ?? [] }
+      const preflight = await preflightMemoryModels({
+        candidates,
+        launch,
+        env: { ...env, SENPI_MEMORY_REFLECTION: "1", SENPI_PTY_FORCE_PIPE: "1" },
+        configSources: loaded.sources,
+        warn: (message, details) => this.options.logger?.warn(message, details),
+      })
+      if (preflight.kind === "none_visible") {
+        throw new Error(`No reflection model candidate is visible to the discovery-disabled child: ${preflight.rejected.map((item) => `${item.model} (${item.cause})`).join(", ")}`)
+      }
       let launched = false
-      await runMemoryModelAttempts(candidates, async (candidate, attemptNumber, nextAttempt) => {
+      await runMemoryModelAttempts(preflight.candidates, async (candidate, attemptNumber, nextAttempt) => {
         const spawnArgs = await prepareReflectionCandidateSpawn({
           run,
           worktree: activeWorktree,
@@ -124,7 +141,7 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
           nextAttempt,
           config: loaded.config,
           identity: this.options.identity,
-          env: this.options.env ?? process.env,
+          env,
           senpiCommand: this.options.senpiCommand,
         })
         if (!launched) {
@@ -142,13 +159,15 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
       const runDir = join(this.options.identity.paths.reflection, "runs", run.runId)
       if (existsSync(join(runDir, "ledger.json"))) {
         const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
-        const finalized = await failReservationRun(
-          this.finalizationContext(),
-          runDir,
-          ledger,
-          "failed",
-          errorMessage(error),
-        )
+        const finalized = error instanceof MemoryModelExhaustedError
+          ? await overrideFailedReservationRun(this.finalizationContext(), runDir, ledger, error.message)
+          : await failReservationRun(
+              this.finalizationContext(),
+              runDir,
+              ledger,
+              "failed",
+              errorMessage(error),
+            )
         return requireFinalizedResult(finalized)
       }
       const discarded = worktree === undefined ? undefined : await this.discard(worktree)

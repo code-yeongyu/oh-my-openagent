@@ -34,6 +34,8 @@ export interface MemoryRuntimeWiring {
 export interface MemoryRuntimeWiringHooks {
   /** Fires at the real launch site so the footer can animate while the run is in flight. */
   readonly onLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
+  /** Fires after a completion was delivered directly to the currently bound session. */
+  readonly onLiveCompletion?: (identity: string, runId: string) => void | Promise<void>
 }
 
 export function createMemoryRuntimeWiring(
@@ -113,7 +115,18 @@ export function createMemoryRuntimeWiring(
       cwd: options.cwd,
       resolveModelRegistry,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
-      ...(liveSession === undefined ? {} : { liveSession }),
+      ...(liveSession === undefined
+        ? {}
+        : {
+            liveSession: () => {
+              const live = liveSession()
+              if (live === undefined || hooks.onLiveCompletion === undefined) return live
+              return {
+                ...live,
+                onCompletion: (runId: string) => hooks.onLiveCompletion?.(identity.identity, runId),
+              }
+            },
+          }),
     })
     runtimes.set(identity.identity, runtime)
     return runtime

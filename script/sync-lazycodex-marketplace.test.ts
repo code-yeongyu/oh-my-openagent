@@ -356,7 +356,7 @@ describe("sync-lazycodex-marketplace", () => {
     // then
     expect(message).toContain("missing hook command target")
     expect(message).toContain("components/rules/dist/cli.js")
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("#given a previous payload without lsp-daemon dist #when syncing with allowMissingBundledDists #then reconstructs and skips the missing dist", async () => {
     // given

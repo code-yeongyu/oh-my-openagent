@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 
 import type { FactsSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
 import {
@@ -187,6 +187,37 @@ describe("reflection worker OS sandbox", () => {
       "--chdir", setup.worktree,
       "--", "/bin/sh", "-c", "exit 0",
     ])
+  }, 30_000)
+
+  test("#given a bare inner command available on the child PATH #when sandbox arguments are transformed #then the wrapper receives its absolute path", () => {
+    // given
+    const { setup, transform } = build("required", { platform: "linux", which: () => "/usr/bin/bwrap" })
+    const original = {
+      ...spawnArgs(setup.worktree),
+      command: basename(process.execPath),
+      env: { PATH: dirname(process.execPath) },
+    }
+
+    // when
+    const transformed = transform(original)
+
+    // then
+    expect(transformed.command).toBe("/usr/bin/bwrap")
+    expect(transformed.args.slice(-4)).toEqual(["--", process.execPath, "-c", "exit 0"])
+  }, 30_000)
+
+  test("#given a bare inner command missing from the child PATH #when sandbox arguments are transformed #then it degrades to identity with an explicit warning", () => {
+    // given
+    const { setup, transform } = build("required", { platform: "linux", which: () => "/usr/bin/bwrap" })
+    const original = { ...spawnArgs(setup.worktree), command: "missing-senpi", env: { PATH: "" } }
+
+    // when
+    const transformed = transform(original)
+
+    // then
+    expect(transformed).toBe(original)
+    expect(transform.wasSandboxed).toBe(false)
+    expect(transform.warning).toContain('inner command "missing-senpi" is not absolute and could not be resolved')
   }, 30_000)
 
   test("#given required policy without a platform sandbox #when the transform is built #then a typed unavailable error is thrown", () => {

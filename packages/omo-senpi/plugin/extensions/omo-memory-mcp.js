@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo:y-KaGsCViqMHfCMxFtReX2v9L5ENoe92Zj0BD-N5yJ4:6UmcwcQjjEC9U3JlmzLz-2rCv44cf26vN9Z_idLrjyA
+// omo:xn5Te8bFNgqss1r0rCc_hdcrp6O576a0M4Nmkg9C2NA:6UmcwcQjjEC9U3JlmzLz-2rCv44cf26vN9Z_idLrjyA
 import{dirname as qt,resolve as Ge}from"node:path";import{pathToFileURL as Vi}from"node:url";function _(t){return typeof t==="object"&&t!==null&&!Array.isArray(t)}function q(t,n){return{jsonrpc:"2.0",id:t,result:n}}function J(t,n,e,r){return{jsonrpc:"2.0",id:t,error:r===void 0?{code:n,message:e}:{code:n,message:e,data:r}}}function V(t){return typeof t==="string"||typeof t==="number"||t===null?t:null}function Vt(t){return t instanceof Error?t.message:String(t)}var Ut=Buffer.from(`\r
 \r
 `);async function*tn(t){let n=Buffer.alloc(0);for await(let r of t){n=Buffer.concat([n,Je(r)]);while(!0){let o=Be(n);if(o.kind==="incomplete")break;if(n=o.remaining,o.message)yield o.message}}let e=n.toString("utf8").trim();if(e.length>0)yield Rt(e,"line")}async function nn(t,n,e){let r=JSON.stringify(n),o=e==="framed"?`Content-Length: ${Buffer.byteLength(r,"utf8")}\r

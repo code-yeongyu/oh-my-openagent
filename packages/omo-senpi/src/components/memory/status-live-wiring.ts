@@ -3,6 +3,7 @@ import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityContext } from "./context"
 import {
   formatMemoryStatusLine,
+  formatRelativeAge,
   readMemoryStatusSegments,
   type GitRepoForStatus,
 } from "./status"
@@ -13,9 +14,6 @@ import {
 } from "./status-live"
 
 const SECOND_MS = 1_000
-const MINUTE_MS = 60 * SECOND_MS
-const HOUR_MS = 60 * MINUTE_MS
-const DAY_MS = 24 * HOUR_MS
 
 export interface MemoryFooterStatusLiveOptions {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -119,16 +117,6 @@ export function createMemoryFooterStatusLive(
       live.dispose()
     },
   }
-}
-
-/** Mirrors status.ts's age vocabulary, including its future-timestamp suppression. */
-function formatRelativeAge(committedAt: number, current: number): string | null {
-  const age = current - committedAt
-  if (!Number.isFinite(age) || age < 0) return null
-  if (age < MINUTE_MS) return "just now"
-  if (age < HOUR_MS) return `${Math.floor(age / MINUTE_MS)}m ago`
-  if (age < DAY_MS) return `${Math.floor(age / HOUR_MS)}h ago`
-  return `${Math.floor(age / DAY_MS)}d ago`
 }
 
 function defaultGitRepo(repoPath: string): GitRepoForStatus {

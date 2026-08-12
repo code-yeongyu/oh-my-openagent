@@ -16,6 +16,7 @@ const AUTHOR: GitCommitAuthor = {
 }
 
 const roots: string[] = []
+const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
@@ -66,7 +67,7 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.commit?.affectedPaths).toEqual(["system/persona.md"])
     expect(result.commit?.subject).toBe("rewrite my persona")
     expect(result.commit?.sha).toBe((await setup.repo.head()) ?? undefined)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   it("#given a str_replace on system/identity.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given
@@ -90,7 +91,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/identity.md"])
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   it("#given a rename that moves system/persona.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given
@@ -113,7 +114,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/persona.md", "reference/old-persona.md"])
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   it("#given a commit that touches only non-soul files #when the tool runs #then no soul-edit directive appears but commit metadata is present", async () => {
     // given
@@ -137,7 +138,7 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["notes/facts/2026-08.md"])
     expect(result.commit?.subject).toBe("record a fact")
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 })
 
 describe("runMemoryApplyPatch soul-edit result", () => {
@@ -169,7 +170,7 @@ describe("runMemoryApplyPatch soul-edit result", () => {
     expect(result.commit?.affectedPaths).toEqual(["system/persona.md"])
     expect(result.commit?.subject).toBe("evolve persona")
     expect(result.commit?.sha).toBe((await setup.repo.head()) ?? undefined)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   it("#given a patch adding a non-soul file #when applied #then no soul-edit directive appears", async () => {
     // given
@@ -197,5 +198,5 @@ describe("runMemoryApplyPatch soul-edit result", () => {
     // then
     expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["reference/note.md"])
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 })

@@ -4,7 +4,7 @@ import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths, type ReservedRun } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, GitMemoryRepo, type ReservedRun } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -23,6 +23,7 @@ import {
 import type { MemoryStatusResult, RefreshMemoryStatusInput } from "./status"
 import { MEMORY_STATUS_KEY } from "./status"
 import { createMemoryWiring } from "./wiring"
+import { recordReflectionCompletion, type ReflectionCompletionRecord } from "./worker"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -229,6 +230,122 @@ describe("memory rpc wiring", () => {
         trigger: "manual",
         category: "quick",
       })
+    })
+
+    test("#when a live reflection completion is delivered #then the footer and rpc snapshot become idle", async () => {
+      const fixture = await createFixture()
+      await new GitMemoryRepo({ dir: fixture.context.identityPaths.repo, agentId: fixture.identity }).init()
+      const pi = new RpcFakeExtensionAPI()
+      const statusCalls: Array<{ key: string; text: string | undefined }> = []
+      const handles = new Map<number, () => void>()
+      let nextHandle = 1
+      const timers = {
+        set(callback: () => void) {
+          const handle = nextHandle++
+          handles.set(handle, callback)
+          return handle
+        },
+        clear(handle: number | ReturnType<typeof setInterval>) {
+          handles.delete(handle as number)
+        },
+      }
+      let liveSession: (() => Parameters<typeof recordReflectionCompletion>[2]) | undefined
+      let releaseCompletion: (() => void) | undefined
+      const completionReleased = new Promise<void>((resolve) => { releaseCompletion = resolve })
+      let completionTask: Promise<void> | undefined
+      const run = reservedRun("run-live-completed")
+      const completion: ReflectionCompletionRecord = {
+        schemaVersion: 1,
+        runId: run.runId,
+        identity: fixture.identity,
+        category: "quick",
+        conversationIds: [fixture.sessionId],
+        trigger: "manual",
+        outcome: "merged",
+        startedAt: "2026-08-12T00:00:00.000Z",
+        finishedAt: "2026-08-12T00:00:01.000Z",
+        delivery: { status: "pending" },
+      }
+      const runtime = {
+        store: { evaluate: async () => ({ status: "active", run }) },
+        launch: () => {
+          completionTask = (async () => {
+            await completionReleased
+            await recordReflectionCompletion(
+              join(fixture.context.identityPaths.reflection, "completions"),
+              completion,
+              liveSession?.(),
+            )
+          })()
+        },
+        reconcile: async () => {},
+      } as unknown as MemoryIdentityRuntime
+      const wiring = createMemoryWiring({
+        sessions: new Map([[fixture.sessionId, { context: fixture.context, memoryStatusAttempted: false }]]),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => fixture.cwd,
+        env: fixture.env,
+        refreshStatus: fakeRefreshMemoryStatus,
+        footerTimers: timers,
+        createRuntime: (_identity, deps) => {
+          liveSession = deps.liveSession
+          return runtime
+        },
+      })
+      const eventCtx = sessionContext(fixture.sessionId, statusCalls)
+
+      wiring.registerStatic(pi, componentContext())
+      await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
+      await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
+      await pi.dispatch("agent_settled", {}, eventCtx)
+      expect(handles.size).toBe(1)
+      expect(pi.memoryEvents().at(-1)?.reflection.activeRun?.runId).toBe(run.runId)
+
+      releaseCompletion?.()
+      await completionTask
+
+      expect(handles.size).toBe(0)
+      expect(statusCalls.at(-1)?.text).toMatch(/^mem:agent-test /)
+      expect(statusCalls.at(-1)?.text).not.toContain("reflecting")
+      expect(pi.memoryEvents().at(-1)?.reflection.activeRun).toBeUndefined()
+    })
+
+    test("#when a pending completion is drained at bind #then the same active run becomes idle", async () => {
+      const fixture = await createFixture()
+      const pi = new RpcFakeExtensionAPI()
+      const run = reservedRun("run-bind-completed")
+      const runtime = {
+        store: { evaluate: async () => ({ status: "active", run }) },
+        launch: () => {},
+        reconcile: async () => {},
+      } as unknown as MemoryIdentityRuntime
+      const wiring = wiringFor(fixture, runtime)
+      const eventCtx = sessionContext(fixture.sessionId)
+
+      wiring.registerStatic(pi, componentContext())
+      await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
+      await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
+      await pi.dispatch("agent_settled", {}, eventCtx)
+      expect(pi.memoryEvents().at(-1)?.reflection.activeRun?.runId).toBe(run.runId)
+
+      await recordReflectionCompletion(
+        join(fixture.context.identityPaths.reflection, "completions"),
+        {
+          schemaVersion: 1,
+          runId: run.runId,
+          identity: fixture.identity,
+          category: "quick",
+          conversationIds: [fixture.sessionId],
+          trigger: "manual",
+          outcome: "merged",
+          startedAt: "2026-08-12T00:00:00.000Z",
+          finishedAt: "2026-08-12T00:00:01.000Z",
+          delivery: { status: "pending" },
+        },
+      )
+      await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
+
+      expect(pi.memoryEvents().at(-1)?.reflection.activeRun).toBeUndefined()
     })
 
     test("#when a client pulls the status method #then it receives the live snapshot", async () => {

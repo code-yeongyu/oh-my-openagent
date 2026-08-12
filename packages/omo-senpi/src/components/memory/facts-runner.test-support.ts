@@ -1,5 +1,5 @@
 import { afterEach, expect } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, writeFileSync } from "node:fs"
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -73,6 +73,12 @@ export function runnerOptions(
     AVAILABLE_MODEL,
   ]
   const models = mode === "model-fallback" ? fallbackModels : [AVAILABLE_MODEL]
+  const senpiLauncher = join(root, "fake-senpi.mjs")
+  writeFileSync(
+    senpiLauncher,
+    `process.stdout.write(${JSON.stringify(`${models.map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)})\n`,
+    "utf8",
+  )
   return {
     identity,
     queue,
@@ -103,6 +109,8 @@ export function runnerOptions(
     deadlineMs: 10_000,
     terminationGraceMs: 100,
     supervisorPath: supervisorFixture,
+    senpiCommand: process.execPath,
+    senpiPrefixArgs: [senpiLauncher],
     createBatchId: () => "11111111-1111-4111-8111-111111111111",
     sandbox: (args) => ({
       ...args,

@@ -56,6 +56,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     await rpcBridge.current?.sync()
   }
 
+  async function onLiveReflectionCompleted(identity: string, runId: string): Promise<void> {
+    activeRuns.settle(identity, runId)
+    const ui = readUi(lastEventCtx.current)
+    footerLive.syncActive(activeSession.current, ui)
+    await footerLive.refresh(activeSession.current, ui)
+    await rpcBridge.current?.sync()
+  }
+
   /**
    * Launch-time facts only. The concrete model is chosen inside the reflection child, so the
    * snapshot reports the configured category and leaves `model` absent rather than guessing.
@@ -72,7 +80,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     options,
     lastEventCtx,
     () => liveSession.current,
-    { onLaunch: onReflectionLaunched },
+    { onLaunch: onReflectionLaunched, onLiveCompletion: onLiveReflectionCompleted },
   )
   const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
 
@@ -236,7 +244,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       if (liveSession.current !== undefined) {
         try {
           const completionsDir = join(identity.identityPaths.reflection, "completions")
-          const consumed = await consumePendingReflectionCompletions(completionsDir, liveSession.current)
+          const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession.current)
           // A consumed completion is the settle signal: the run behind it is no longer in flight.
           for (const record of consumed) activeRuns.settle(identity.identity, record.runId)
           await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession.current, healthAlertOnce)

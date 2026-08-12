@@ -159,7 +159,7 @@ export async function prepareFactsSpawn(input: PrepareFactsSpawnInput): Promise<
   ]
   const launch = input.senpiCommand === undefined
     ? resolveSenpiLaunch(input.env)
-    : { command: input.senpiCommand, prefixArgs: [] }
+    : { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
   return {
     runId: input.runId,
     attempt: input.attempt ?? 1,

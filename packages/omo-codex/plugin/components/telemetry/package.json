@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-telemetry",
-	"version": "5.0.0-beta.6",
+	"version": "5.0.0-beta.7",
 	"description": "Codex plugin component that emits omo-codex anonymous daily-active telemetry on SessionStart.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",

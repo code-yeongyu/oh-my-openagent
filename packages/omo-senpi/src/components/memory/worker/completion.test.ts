@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -160,7 +160,7 @@ describe("reflection completion flow", () => {
     registerReflectionCompletionRenderer(api)
 
     // when
-    const consumed = await consumePendingReflectionCompletions(root, {
+    const consumed = await consumePendingReflectionCompletions(root, "agent-test", {
       sessionId: "conversation-a",
       api,
       ui: { notify: (message, level) => notifications.push({ message, level }) },
@@ -177,6 +177,62 @@ describe("reflection completion flow", () => {
     expect(consumed[0]?.delivery).toMatchObject({ status: "consumed", sessionId: "conversation-a" })
   })
 
+  describe("#given target foreign and missing-identity pending completions in one drained directory", () => {
+    describe("#when the target identity drains the backlog", () => {
+      test("#then only target records are delivered counted and consumed", async () => {
+        // given
+        const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-completion-")))
+        roots.push(root)
+        const now = Date.now()
+        const targetRecords = Array.from({ length: 8 }, (_, index): ReflectionCompletionRecord => ({
+          ...record(),
+          runId: `target-${index}`,
+          finishedAt: new Date(now - (index + 2) * 60_000).toISOString(),
+        }))
+        const foreignRecords = Array.from({ length: 2 }, (_, index): ReflectionCompletionRecord => ({
+          ...record(),
+          runId: `foreign-${index}`,
+          identity: "agent-foreign",
+          finishedAt: new Date(now - index * 60_000).toISOString(),
+        }))
+        for (const pending of [...targetRecords, ...foreignRecords]) await recordReflectionCompletion(root, pending)
+        const { identity: _identity, ...missingIdentity } = {
+          ...record(),
+          runId: "missing-identity",
+          finishedAt: new Date(now + 60_000).toISOString(),
+        }
+        await writeFile(join(root, "missing-identity.json"), `${JSON.stringify(missingIdentity, null, 2)}\n`)
+        const api = new CapturedCompletionApi()
+
+        // when
+        await consumePendingReflectionCompletions(root, "agent-test", {
+          sessionId: "target-session",
+          api,
+        })
+
+        // then
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)).toHaveLength(5)
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE).map((entry) => entry.data)).toEqual(
+          expect.arrayContaining(targetRecords.slice(0, 5).map((pending) => expect.objectContaining({ runId: pending.runId, identity: "agent-test" }))),
+        )
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_SUMMARY_ENTRY_TYPE)).toEqual([{
+          customType: REFLECTION_SUMMARY_ENTRY_TYPE,
+          data: expect.objectContaining({ count: 3 }),
+        }])
+        for (const pending of foreignRecords) {
+          expect(JSON.parse(await readFile(join(root, `${pending.runId}.json`), "utf8"))).toMatchObject({
+            identity: "agent-foreign",
+            delivery: { status: "pending" },
+          })
+        }
+        expect(JSON.parse(await readFile(join(root, "missing-identity.json"), "utf8"))).toMatchObject({
+          runId: "missing-identity",
+          delivery: { status: "pending" },
+        })
+      })
+    })
+  })
+
   describe("#given a throwing reflection UI", () => {
     describe("#when a pending completion is delivered", () => {
       test("#then the entry is consumed and the UI failure is logged", async () => {
@@ -188,7 +244,7 @@ describe("reflection completion flow", () => {
         const warnings: unknown[] = []
 
         // when
-        const consumed = await consumePendingReflectionCompletions(root, {
+        const consumed = await consumePendingReflectionCompletions(root, "agent-test", {
           sessionId: "different-session",
           api,
           ui: { notify: () => { throw new Error("ui unavailable") } },
@@ -228,8 +284,8 @@ describe("reflection completion flow", () => {
         }
 
         // when
-        const first = await consumePendingReflectionCompletions(root, live)
-        const second = await consumePendingReflectionCompletions(root, live)
+        const first = await consumePendingReflectionCompletions(root, "agent-test", live)
+        const second = await consumePendingReflectionCompletions(root, "agent-test", live)
 
         // then
         expect(first).toHaveLength(8)

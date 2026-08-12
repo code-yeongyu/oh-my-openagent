@@ -11,7 +11,8 @@ export const MEMORY_STATUS_KEY = "memory"
 export const MEMORY_STATUS_MAX_WIDTH = 60
 /** A streak at or above this many consecutive failures earns the `!N` badge. */
 const STREAK_BADGE_THRESHOLD = 3
-const HEALTH_SCAN_LIMIT = 20
+/** Shared health history bound so footer and RPC streaks are computed from the same window. */
+export const MEMORY_HEALTH_SCAN_LIMIT = 20
 const SECOND_MS = 1_000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
@@ -154,7 +155,7 @@ async function readStreak(context: MemoryIdentityContext): Promise<number> {
   try {
     const health = await readReflectionHealth(
       join(context.identityPaths.reflection, "completions"),
-      { limit: HEALTH_SCAN_LIMIT },
+      { limit: MEMORY_HEALTH_SCAN_LIMIT },
     )
     return health.streak
   } catch {
@@ -177,7 +178,7 @@ function isSystemMarkdown(path: string): boolean {
   return path.startsWith("system/") && path.endsWith(".md")
 }
 
-function formatRelativeAge(committedAt: number, now: number): string | null {
+export function formatRelativeAge(committedAt: number, now: number): string | null {
   const age = now - committedAt
   if (!Number.isFinite(age) || age < 0) return null
   if (age < MINUTE_MS) return "just now"

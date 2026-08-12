@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 
@@ -74,6 +74,9 @@ async function launchDream(
   const loaded: SenpiOmoConfigResult = { config, diagnostics: [], layers: [], sources: [] }
   const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
   const calls: ReflectionSpawnArgs[] = []
+  const senpiCommand = join(root, "fake-senpi")
+  await writeFile(senpiCommand, '#!/bin/sh\nprintf "omo-mock/mock-1\\n"\n', "utf8")
+  await chmod(senpiCommand, 0o700)
   const runner = new SenpiSubprocessRunner({
     identity,
     reservation: {
@@ -91,6 +94,7 @@ async function launchDream(
     // a loaded CI runner needs more for the supervisor + bootstrap + child chain to finish.
     deadlineMs: 20_000,
     supervisorPath: supervisorFixture,
+    senpiCommand,
     sandbox: (spawn) => {
       calls.push(spawn)
       return { ...spawn, command: process.execPath, args: [childFixture] }

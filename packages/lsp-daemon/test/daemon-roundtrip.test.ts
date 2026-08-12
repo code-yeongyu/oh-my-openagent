@@ -10,6 +10,7 @@ import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const tempDirectories: string[] = [];
 const servers: DaemonServerHandle[] = [];
+const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000;
 
 afterEach(async () => {
 	for (const server of servers.splice(0)) await server.close();
@@ -46,7 +47,7 @@ describe("daemon roundtrip", () => {
 
 		expect(result.content[0]?.type).toBe("text");
 		expect(result.content[0]?.text).toContain("Configured LSP servers");
-	});
+	}, WINDOWS_INTEGRATION_TEST_TIMEOUT);
 
 	it("#given a running daemon #when two calls race #then both receive responses", async () => {
 		const paths = tempPaths();

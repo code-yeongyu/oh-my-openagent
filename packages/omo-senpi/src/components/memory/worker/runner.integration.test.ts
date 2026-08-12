@@ -7,6 +7,7 @@ import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { REFLECTION_COMPLETION_ENTRY_TYPE, REFLECTION_LAUNCHED_ENTRY_TYPE } from "./completion"
+import { resetModelPreflightCacheForTests } from "./model-preflight"
 import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
 
 // Each case drives a real supervisor, bootstrap, and model child - three spawned bun processes
@@ -15,7 +16,10 @@ import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 30_000)
 
 const harnesses: RunnerHarness[] = []
-afterEach(async () => Promise.all(harnesses.splice(0).map((item) => rm(item.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => {
+  resetModelPreflightCacheForTests()
+  await Promise.all(harnesses.splice(0).map((item) => rm(item.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+})
 
 async function harness(options: Parameters<typeof createRunnerHarness>[0]): Promise<RunnerHarness> {
   const created = await createRunnerHarness(options)
@@ -115,6 +119,7 @@ describe("SenpiSubprocessRunner integration", () => {
       REFLECTION_LAUNCHED_ENTRY_TYPE,
     ])
     expect(item.notifications).toHaveLength(1)
+    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
     expect(item.spawnCalls).toHaveLength(1)
     const spawn = item.spawnCalls[0]
     expect(spawn?.detached).toBe(true)
@@ -206,6 +211,40 @@ describe("SenpiSubprocessRunner integration", () => {
       outcome: "merged",
     })
     await assertWorktreesClean(item)
+  }, 30_000)
+
+  test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then only the fresh verdict fails closed", async () => {
+    // given
+    const item = await harness({
+      childMode: "commit",
+      preflightModels: [{ provider: "other", id: "model" }],
+    })
+
+    // when
+    const fresh = await item.runner.launch(item.run)
+    const cached = await item.runner.launch(await item.reserveAgain())
+
+    // then
+    expect(fresh).toMatchObject({ outcome: "failed", reason: "spawn_failed" })
+    expect(fresh.detail).toContain("No reflection model candidate is visible")
+    expect(cached.outcome).toBe("merged")
+    expect(item.spawnCalls).toHaveLength(1)
+    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
+  }, 30_000)
+
+  test("#given every child-visible candidate misses its model or auth #when the chain is exhausted #then the failed outcome fingerprints every attempted cause", async () => {
+    // given
+    const item = await harness({ childMode: "model-exhausted" })
+
+    // when
+    const result = await item.runner.launch(item.run)
+
+    // then
+    expect(result).toMatchObject({ outcome: "failed", reason: "spawn_failed" })
+    expect(result.detail).toContain("model_not_visible:extension-only/primary")
+    expect(result.detail).toContain("auth_missing:kimi-coding")
+    expect(result.detail).toContain("attempted:extension-only/primary,kimi-coding/fallback")
+    expect(item.spawnCalls).toHaveLength(2)
   }, 30_000)
 
   test("#given empty categories and no quick model #when launched twice in one session #then both fail without spawning and only one unsuppressed warning appears", async () => {

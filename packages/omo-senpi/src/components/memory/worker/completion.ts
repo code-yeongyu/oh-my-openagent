@@ -76,6 +76,7 @@ export interface ReflectionLiveSession {
   readonly sessionId: string
   readonly api: ReflectionCompletionApi
   readonly ui?: ReflectionCompletionUi
+  readonly onCompletion?: (runId: string) => void | Promise<void>
   readonly logger?: {
     warn(message: string, details?: unknown): void
   }
@@ -115,7 +116,9 @@ export async function recordReflectionCompletion(
   if (!live || durable.delivery.status === "consumed") {
     return durable
   }
-  return deliverRecord(completionsDir, durable, live)
+  const delivered = await deliverRecord(completionsDir, durable, live)
+  await live.onCompletion?.(delivered.runId)
+  return delivered
 }
 
 export async function ensureReflectionCompletion(
@@ -143,6 +146,7 @@ export async function readReflectionCompletion(
 
 export async function consumePendingReflectionCompletions(
   completionsDir: string,
+  identity: string,
   live: ReflectionLiveSession,
 ): Promise<readonly ReflectionCompletionRecord[]> {
   let names: string[]
@@ -156,7 +160,7 @@ export async function consumePendingReflectionCompletions(
   const pending: ReflectionCompletionRecord[] = []
   for (const name of names) {
     const record = await readRecord(join(completionsDir, name))
-    if (record?.delivery.status === "pending") pending.push(record)
+    if (record?.identity === identity && record.delivery.status === "pending") pending.push(record)
   }
   pending.sort((left, right) => Date.parse(right.finishedAt) - Date.parse(left.finishedAt))
 

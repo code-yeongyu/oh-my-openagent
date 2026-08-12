@@ -78,6 +78,31 @@ export async function failReservationRun(
   return claimedValue(claimed)
 }
 
+export async function overrideFailedReservationRun(
+  context: RunFinalizationContext,
+  runDir: string,
+  ledger: ReservationRunLedger,
+  detail: string,
+): Promise<ReservationRunResult | undefined> {
+  const claimed = await withRunFinalizationClaim(
+    context.identity,
+    runDir,
+    ledger.runId,
+    async () => withRunTerminalGate(runDir, ledger.runId, async () => {
+      const current = await readLedger(runDir, ledger.runId)
+      const decision: DurableFinalizationDecision = {
+        outcome: "failed",
+        reason: "spawn_failed",
+        detail,
+      }
+      await checkpointFailure(runDir, decision)
+      await cleanupOrThrow(context, current)
+      return settleReservationRun(context, runDir, current, decision)
+    }),
+  )
+  return claimedValue(claimed)
+}
+
 export async function abandonReservationRun(
   context: RunFinalizationContext,
   runDir: string,
