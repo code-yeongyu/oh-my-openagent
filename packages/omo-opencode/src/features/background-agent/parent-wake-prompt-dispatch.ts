@@ -9,6 +9,7 @@ import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
+import { logParentWakeLedger } from "./parent-wake-ledger"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 
 type ParentWakePromptDispatchInput = {
@@ -30,6 +31,7 @@ type ParentWakePromptDispatchInput = {
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
   const notificationContent = input.latestWake.notifications.join("\n\n")
+  const noReplyDispatch = input.forceNoReply === true || !input.latestWake.shouldReply
   let dispatchStartedAt = Date.now()
   try {
     dispatchStartedAt = Date.now()
@@ -48,10 +50,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       input: {
         path: { id: input.sessionID },
         body: {
-          noReply: input.forceNoReply === true || !input.latestWake.shouldReply,
+          noReply: noReplyDispatch,
           ...input.latestWake.promptContext,
           parts: [
-            input.forceNoReply === true || !input.latestWake.shouldReply
+            noReplyDispatch
               ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
               : createInternalAgentTextPart(notificationContent),
           ],
@@ -66,6 +68,12 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
           markRetainedNoReplyAdmission(input, dispatchStartedAt)
           input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
+          logParentWakeLedger("dispatched", input.sessionID, input.latestWake, {
+            noReply: noReplyDispatch,
+            retained: input.retainPendingWake === true,
+            treatedAsAccepted: true,
+            error: getErrorText(promptResult.error),
+          })
           log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
             sessionID: input.sessionID,
             error: promptResult.error,
@@ -85,6 +93,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       }
       input.requeueWake(input.latestWake)
       input.scheduleFlush(2_000)
+      logParentWakeLedger("dispatch-requeued", input.sessionID, input.latestWake, { reason: "gate-reserved" })
       log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", {
         sessionID: input.sessionID,
       })
@@ -93,6 +102,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     if (!isInternalPromptDispatchAccepted(promptResult)) {
       input.requeueWake(input.latestWake)
       input.scheduleFlush()
+      logParentWakeLedger("dispatch-requeued", input.sessionID, input.latestWake, {
+        reason: "gate-skipped",
+        promptStatus: promptResult.status,
+      })
       log("[background-agent] Deferred parent wake skipped by promptAsync gate:", {
         sessionID: input.sessionID,
         status: promptResult.status,
@@ -103,10 +116,19 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     delete input.latestWake.allowEmptyAssistantTurnRetry
     markRetainedNoReplyAdmission(input, dispatchStartedAt)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
+    logParentWakeLedger("dispatched", input.sessionID, input.latestWake, {
+      noReply: noReplyDispatch,
+      retained: input.retainPendingWake === true,
+      promptStatus: promptResult.status,
+    })
   } catch (error) {
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
     input.requeueWake(input.latestWake)
     input.scheduleFlush()
+    logParentWakeLedger("dispatch-requeued", input.sessionID, input.latestWake, {
+      reason: "dispatch-error",
+      error: errorText,
+    })
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })
   }
 }

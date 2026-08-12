@@ -101,6 +101,24 @@ export class ParentWakeSessionInspector {
     })
   }
 
+  // Best-effort context for the wake ledger at abandonment time: enough to tell
+  // "parent turn ran without us" apart from "parent loop never scheduled".
+  async snapshotParentSessionState(sessionID: string): Promise<Record<string, unknown>> {
+    const messages = await this.loadMessages(sessionID)
+    if (!messages) {
+      return { messagesAvailable: false }
+    }
+    const lastMessage = messages[messages.length - 1]
+    const lastRole = lastMessage?.info?.role ?? lastMessage?.role
+    const lastCreated = lastMessage?.info?.time?.created ?? lastMessage?.time?.created
+    return {
+      messagesAvailable: true,
+      messageCount: messages.length,
+      ...(typeof lastRole === "string" ? { lastRole } : {}),
+      ...(typeof lastCreated === "number" ? { lastMessageAgeMs: Date.now() - lastCreated } : {}),
+    }
+  }
+
   shutdown(): void {
     this.recentParentSessionActivity.clear()
   }
