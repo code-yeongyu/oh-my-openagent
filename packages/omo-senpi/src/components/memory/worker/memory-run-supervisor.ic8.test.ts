@@ -166,7 +166,7 @@ describe("memory run supervisor IC-8 containment", () => {
       }
     }, 60_000)
 
-    test(`#given the injected ${platform} branch and a released child #when the supervisor dies abruptly #then the bootstrap alone enforces the persisted deadline`, async () => {
+    test(`#given the injected ${platform} branch and a released child #when the supervisor dies abruptly #then the platform containment policy is preserved`, async () => {
       // given
       const { runDir, clockPath, childExited } = await makeRun("graceful")
       const supervisor = launchSupervisor(runDir, clockPath, platform)
@@ -180,7 +180,13 @@ describe("memory run supervisor IC-8 containment", () => {
       await exit
       expect(existsSync(join(runDir, "outcome.json"))).toBe(false)
       await advanceClock(clockPath, 2_000)
-      await waitForPath(join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${ledger.childPid}.json`))
+      if (platform === "win32") {
+        await childExited
+        liveProcesses.delete(ledger.childPid)
+        expect(existsSync(join(runDir, `win32-graceful-${ledger.childPid}.json`))).toBe(false)
+        return
+      }
+      await waitForPath(join(runDir, `posix-SIGTERM-${ledger.childPid}.json`))
       await childExited
       untrackProcessGroup(ledger.childPid)
 

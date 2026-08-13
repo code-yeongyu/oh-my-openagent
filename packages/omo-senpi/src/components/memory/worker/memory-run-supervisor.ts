@@ -24,6 +24,7 @@ import {
   type SupervisorChildExit,
 } from "./supervisor-process-identity"
 import { publishRunOutcome } from "./run-outcome-publication"
+import { bootstrapProcessOptions, modelChildWindowOptions } from "./supervisor-spawn-options"
 
 async function readRelease(): Promise<boolean> {
   for await (const chunk of process.stdin) {
@@ -49,6 +50,7 @@ async function runChildBootstrap(runDir: string): Promise<void> {
     env: manifest.env,
     detached: false,
     stdio: ["ignore", "inherit", "inherit"],
+    ...modelChildWindowOptions(platform),
   })
   writeBootstrapStatus({ code: child.pid ?? null, signal: "MODEL_PID" })
   const cascadeGraceful = () => {
@@ -97,8 +99,8 @@ async function runSupervisor(runDir: string): Promise<void> {
   const stderrFd = openSync(manifest.stderrPath, "w")
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
-    detached: true,
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
+    ...bootstrapProcessOptions(platform),
   })
   let childPid = bootstrap.pid
   let modelPid: number | undefined
