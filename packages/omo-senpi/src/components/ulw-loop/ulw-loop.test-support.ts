@@ -122,7 +122,28 @@ export function withEnv<T>(patch: Record<string, string | undefined>, run: () =>
 }
 
 export async function withEnvAsync<T>(patch: Record<string, string | undefined>, run: () => Promise<T>): Promise<T> {
-  return withEnv(patch, run)
+  const previous: Record<string, string | undefined> = {}
+  for (const key of Object.keys(patch)) {
+    previous[key] = process.env[key]
+    const value = patch[key]
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
+  }
+
+  try {
+    return await run()
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
+  }
 }
 
 export function createTempOmoBin(stdout = activeStatus(), name = "omo"): { dir: string; bin: string; cleanup: () => void } {
@@ -204,6 +225,41 @@ function resolveNodeExecutable(): string {
   if (executable.length === 0) throw new Error("node did not report process.execPath")
   cachedNodeExecutable = executable
   return executable
+}
+
+// Session-scope-aware runner that models the real CLI: unscoped calls (the pre-fix fallback)
+// see the root `.omo/ulw-loop/` state where the shared-cwd foreign run lives, while calls
+// scoped to `--session-id senpi-<id>` only see that session's own state.
+export function sessionScopeRunner(sessionStatuses: Record<string, string>): {
+  readonly calls: RunnerCall[]
+  readonly run: (bin: string, args: readonly string[], options: { cwd: string }) => Promise<{ code: number; stdout: string }>
+} {
+  const calls: RunnerCall[] = []
+  return {
+    calls,
+    async run(bin, args, options) {
+      calls.push({ bin, args, cwd: options.cwd })
+      const sessionIndex = args.indexOf("--session-id")
+      const scope = sessionIndex >= 0 && args[sessionIndex + 1] !== undefined ? args[sessionIndex + 1] : null
+      const stdout = scope === null ? activeStatus("ROOT-A") : (sessionStatuses[scope] ?? completeStatus())
+      return { code: 0, stdout }
+    },
+  }
+}
+
+export interface SessionContext {
+  readonly sessionId: string
+}
+
+// Event context as the real Senpi host provides it: cwd plus a sessionManager that resolves
+// the current session id.
+export function sessionEventCtx(cwd: string, session: SessionContext): Record<string, unknown> {
+  return {
+    cwd,
+    sessionManager: {
+      getSessionId: () => session.sessionId,
+    },
+  }
 }
 
 export async function registerWithRunner(outputs: string[], logger = createLogger()): Promise<{
