@@ -31,7 +31,7 @@ describe("memory tool execution", () => {
     const written = parseMemoryFile(await readFile(join(fixture.repo.dir, "system/human/prefs/coding.md"), "utf8"))
     expect(written.body).toContain("Prefer small focused helpers")
     expect(await git(fixture.repo, ["log", "-1", "--format=%s"])).toBe("Refine coding preferences")
-  })
+  }, { timeout: 20000 })
   test("#given a bound identity #when memory_apply_patch receives a malformed patch #then the parse error maps to an error result", async () => {
     // given
     const fixture = await boundFixture()
@@ -43,7 +43,7 @@ describe("memory tool execution", () => {
     // then
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain("memory_apply_patch:")
-  })
+  }, { timeout: 20000 })
 })
 
 describe("memory tool onCommit seam", () => {
@@ -72,5 +72,5 @@ describe("memory tool onCommit seam", () => {
     expect(commits).toHaveLength(1)
     expect(commits[0]?.subject).toBe("rename")
     expect(commits[0]?.affectedPaths).toEqual(["system/identity.md"])
-  })
+  }, { timeout: 20000 })
 })

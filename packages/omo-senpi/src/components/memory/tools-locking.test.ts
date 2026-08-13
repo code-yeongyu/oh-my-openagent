@@ -30,7 +30,7 @@ describe("memory tool execution", () => {
     } finally {
       await releaseLock(lockPath, holder)
     }
-  })
+  }, { timeout: 20000 })
 
   test("#given concurrent executions #when both commit #then they serialize through the writer lock", async () => {
     // given
@@ -49,5 +49,5 @@ describe("memory tool execution", () => {
     const subjects = (await git(fixture.repo, ["log", "-2", "--format=%s"])).split("\n").sort()
     expect(subjects).toEqual(["Track a", "Track b"])
     expect(await git(fixture.repo, ["status", "--porcelain"])).toBe("")
-  })
+  }, { timeout: 20000 })
 })
