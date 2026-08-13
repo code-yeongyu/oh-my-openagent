@@ -22,6 +22,7 @@ export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
 
 export const OmoOpenCodeHarnessConfigSchema = z.record(z.string(), z.unknown())
+const OmoProfileNameSchema = z.string().regex(/\S/, "Profile name must contain a non-whitespace character")
 
 /**
  * Canonical skill denylist. Names listed here are absent from the run on every harness that
@@ -90,6 +91,7 @@ export const OmoConfigProfileSchema = z
 
 export const OmoConfigSchema = z
   .object({
+    active_profile: OmoProfileNameSchema.optional(),
     provenance: OmoProvenanceSettingsSchema.optional(),
     session_wake: OmoSessionWakeSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationSchema.optional(),
@@ -114,7 +116,7 @@ export const OmoConfigSchema = z
     "[native]": OmoTypedHarnessConfigSchema.optional(),
     "[senpi]": OmoTypedHarnessConfigSchema.optional(),
     "[codex]": OmoTypedHarnessConfigSchema.optional(),
-    profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
+    profiles: z.record(OmoProfileNameSchema, OmoConfigProfileSchema).default({}),
     _migrations: z.array(z.string()).optional(),
     legacy_migrations: z.record(z.string(), z.unknown()).optional(),
   })
@@ -122,6 +124,7 @@ export const OmoConfigSchema = z
 
 export const OmoConfigLayerSchema = z
   .object({
+    active_profile: OmoProfileNameSchema.optional(),
     provenance: OmoProvenanceSettingsSchema.optional(),
     session_wake: OmoSessionWakeSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
@@ -146,7 +149,7 @@ export const OmoConfigLayerSchema = z
     "[native]": OmoTypedHarnessConfigSchema.optional(),
     "[senpi]": OmoTypedHarnessConfigSchema.optional(),
     "[codex]": OmoTypedHarnessConfigSchema.optional(),
-    profiles: z.record(z.string(), OmoConfigProfileSchema).optional(),
+    profiles: z.record(OmoProfileNameSchema, OmoConfigProfileSchema).optional(),
     _migrations: z.array(z.string()).optional(),
     legacy_migrations: z.record(z.string(), z.unknown()).optional(),
   })

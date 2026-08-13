@@ -5,6 +5,10 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "active_profile": {
+      "type": "string",
+      "pattern": "\\S"
+    },
     "provenance": {
       "type": "object",
       "properties": {
@@ -10190,7 +10194,8 @@
       "default": {},
       "type": "object",
       "propertyNames": {
-        "type": "string"
+        "type": "string",
+        "pattern": "\\S"
       },
       "additionalProperties": {
         "type": "object",

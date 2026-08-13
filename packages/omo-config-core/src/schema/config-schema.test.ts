@@ -130,6 +130,25 @@ describe("omo config schema", () => {
     expect(result.success).toBe(false)
   })
 
+  test("#given empty profile selectors or names #when parsed #then both root and layer schemas reject them", () => {
+    // given
+    const invalidConfigs = [
+      { active_profile: "" },
+      { active_profile: "   " },
+      { profiles: { "": {} } },
+      { profiles: { "  \t": {} } },
+    ]
+
+    // when
+    const results = invalidConfigs.flatMap((config) => [
+      OmoConfigSchema.safeParse(config),
+      OmoConfigLayerSchema.safeParse(config),
+    ])
+
+    // then
+    expect(results.every((result) => !result.success)).toBe(true)
+  })
+
   test("#given a wrong typed git_master setting #when parsed #then the issue path identifies the bad field", () => {
     // given
     const config = { git_master: { include_co_authored_by: "yes" } }
