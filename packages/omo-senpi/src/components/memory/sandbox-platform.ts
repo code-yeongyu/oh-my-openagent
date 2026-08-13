@@ -43,7 +43,7 @@ export function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsS
     return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
   }
 
-  const writableDirs = input.writableDirs.map(canonicalPath)
+  const writableDirs = input.writableDirs.map(canonicalWritableDir)
   if (platform === "darwin") {
     const payloads = input.payloadPaths.map(canonicalPath)
     const foreignRoots = (input.foreignRoots ?? []).map(canonicalPath)
@@ -116,6 +116,17 @@ function defaultWhich(command: string): string | undefined {
 }
 
 function canonicalPath(path: string): string {
+  return realpathSync(path)
+}
+
+/**
+ * A writable grant names a directory, and the layout can add one before any writer has created it, so
+ * the grant is resolved through creation. Resolving a missing path instead throws ENOENT out of the
+ * sandbox builder, which reads as a spawn failure and hides which directory was actually absent.
+ * Payload paths are files and are never created here.
+ */
+function canonicalWritableDir(path: string): string {
+  mkdirSync(path, { recursive: true, mode: 0o700 })
   return realpathSync(path)
 }
 

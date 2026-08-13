@@ -3,6 +3,10 @@ export function reflectionRemediation(reason: string | undefined, detail: string
   if (combined.includes("model-not-found") || combined.includes("model_not_visible") || combined.includes("model not found")) {
     return "the reflection child cannot see the configured category model; adjust memory.reflection category/model in your omo config"
   }
+  const missingPath = /ENOENT[^']*'([^']+)'/i.exec(`${reason ?? ""} ${detail ?? ""}`)
+  if (missingPath !== null) {
+    return `the reflection child could not use ${missingPath[1]}; check that path exists and is writable`
+  }
   if (combined.includes("spawn") || combined.includes("enoent")) {
     return "senpi executable not resolvable for the reflection child; set SENPI_BIN"
   }

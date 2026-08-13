@@ -98,6 +98,33 @@ function build(policy: SandboxPolicy, options: {
   }
 }
 
+describe("reflection worker OS sandbox writable grants", () => {
+  test("#given a granted runtime dir the layout added but no writer has created #when the sandbox is built #then it is created and granted instead of failing the spawn", () => {
+    // given a grant that does not exist yet, as after a layout gains a new runtime subdir
+    const setup = fixture()
+    const absentGrant = join(setup.parentRepo, "runtime", "reflection-sessions")
+    expect(existsSync(absentGrant)).toBe(false)
+
+    // when
+    const transform = buildSandboxTransform({
+      policy: "required",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: setup.payloadPaths,
+      runtimeWrites: [absentGrant],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "darwin",
+      which: () => "/usr/bin/sandbox-exec",
+    })
+
+    // then
+    expect(existsSync(absentGrant)).toBe(true)
+    const profile = transform(spawnArgs(setup.worktree)).args[1] ?? ""
+    expect(profile).toContain(realpathSync(absentGrant))
+  })
+})
+
 describe("reflection worker OS sandbox", () => {
   test.skipIf(process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec"))(
     "#given the real Darwin seatbelt #when a child writes inside the worktree and its parent repo #then only the worktree write succeeds",
