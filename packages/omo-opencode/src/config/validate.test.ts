@@ -235,6 +235,21 @@ describe("validatePluginConfig", () => {
     })
   })
 
+  it("#given active_profile #when validating #then applies the profile without forwarding the control key", () => {
+    withOmoConfig("active-profile", (fixture) => {
+      writeUserConfig(fixture, {
+        active_profile: "kimi",
+        profiles: { kimi: { "[opencode]": { tui: { sidebar: { enabled: false } } } } },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.valid).toBe(true)
+      expect(result.messages).toEqual([])
+      expect(result.config.tui?.sidebar.enabled).toBe(false)
+    })
+  })
+
   it("#given a model catalog reference in the opencode view #when validating #then resolves the model identifier", () => {
     withOmoConfig("model-catalog", (fixture) => {
       writeProjectConfig(fixture, {

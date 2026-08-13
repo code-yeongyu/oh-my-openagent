@@ -19,7 +19,7 @@ export type OmoOpenCodeConfigChain = {
   readonly views: readonly OmoOpenCodeConfigView[]
 }
 
-const NON_PLUGIN_FIELDS = new Set(["legacy_migrations", "models", "task", "teams"])
+const NON_PLUGIN_FIELDS = new Set(["active_profile", "legacy_migrations", "models", "task", "teams"])
 
 function block(config: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const value = config["[opencode]"]
