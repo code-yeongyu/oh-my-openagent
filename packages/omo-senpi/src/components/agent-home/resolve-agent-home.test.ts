@@ -31,6 +31,13 @@ describe("resolveAgentHome", () => {
         ).toBe(resolve("/explicit/pi"))
       })
 
+      test("#then the flat branded home wins over any legacy default", () => {
+        const flatBrandedHome = join(HOME, ".omo")
+        expect(
+          resolveAgentHome({ env: { SENPI_CODING_AGENT_DIR: flatBrandedHome }, homeDir: HOME, exists: () => false }),
+        ).toBe(resolve(flatBrandedHome))
+      })
+
       test("#then a blank value is ignored", () => {
         expect(resolveAgentHome({ env: { OMO_CODING_AGENT_DIR: "   " }, homeDir: HOME, exists: () => false })).toBe(
           join(HOME, ".senpi", "agent"),
