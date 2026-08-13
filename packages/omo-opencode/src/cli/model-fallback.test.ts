@@ -89,6 +89,18 @@ describe("generateModelConfig", () => {
       expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
     })
 
+    test("keeps every generated fallback on ZAI when it is the only provider", () => {
+      // #given only ZAI is available
+      const config = createConfig({ hasZaiCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then no generated route depends on an unavailable provider
+      expect(JSON.stringify(result)).not.toContain('"model":"opencode/')
+      expect(result.agents?.explore?.model).toBe("zai-coding-plan/glm-5.2")
+    })
+
     test("omits librarian when only ZAI is available with isMax20 flag", () => {
       // #given ZAI is available with Max 20 plan
       const config = createConfig({ hasZaiCodingPlan: true, isMax20: true })

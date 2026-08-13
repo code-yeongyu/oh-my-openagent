@@ -147,7 +147,26 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
   }
 }
 
+function resolveUltimateFallback(
+  availability: ReturnType<typeof toProviderAvailability>,
+): string {
+  const isZaiOnly =
+    availability.zai &&
+    !availability.native.claude &&
+    !availability.native.openai &&
+    !availability.native.gemini &&
+    !availability.opencodeZen &&
+    !availability.copilot &&
+    !availability.kimiForCoding &&
+    !availability.opencodeGo &&
+    !availability.bailianCodingPlan &&
+    !availability.minimaxCnCodingPlan &&
+    !availability.minimaxCodingPlan &&
+    !availability.vercelAiGateway
 
+  if (isZaiOnly) return "zai-coding-plan/glm-5.2"
+  return ULTIMATE_FALLBACK
+}
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
@@ -178,6 +197,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
+  const ultimateFallback = resolveUltimateFallback(avail)
   const agents: Record<string, AgentConfig> = {}
   const categories: Record<string, CategoryConfig> = {}
 
@@ -209,7 +229,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
           const variant = resolved.variant ?? req.variant
           agentConfig = toCompatibleModelConfig(resolved.model, { variant })
         } else {
-          agentConfig = { model: "opencode/gpt-5-nano" }
+          agentConfig = { model: ultimateFallback }
         }
       }
       agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
@@ -243,7 +263,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       const agentConfig = toCompatibleModelConfig(resolved.model, { variant })
       agents[role] = attachFallbackModels(agentConfig, req.fallbackChain, avail)
     } else {
-      agents[role] = { model: ULTIMATE_FALLBACK }
+      agents[role] = { model: ultimateFallback }
     }
   }
 
@@ -267,7 +287,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       const categoryConfig = toCompatibleModelConfig(resolved.model, { variant })
       categories[cat] = attachFallbackModels(categoryConfig, fallbackChain, avail)
     } else {
-      categories[cat] = { model: ULTIMATE_FALLBACK }
+      categories[cat] = { model: ultimateFallback }
     }
   }
 
