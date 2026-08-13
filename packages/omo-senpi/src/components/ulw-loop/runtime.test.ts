@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync, realpathSync } from "node:fs"
-import { delimiter, join } from "node:path"
+import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { __testInternals, createUlwLoopComponent } from "./index"
@@ -121,29 +121,27 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
   it("#given a PATH omo-agent-toolkit and no envs #when the component registers with defaults #then the toolkit binary receives the status argv", async () => {
     const fake = createTempOmoBin(activeStatus("DEFAULT-REGISTRATION"), "omo-agent-toolkit")
     try {
-      // Windows spawns the .cmd shim through cmd.exe, which is resolved via PATH, so the
-      // temp bin dir is PREPENDED (not replacing) the real PATH while the fake bin still
-      // wins resolution because it appears first.
-      await withEnvAsync(
-        { OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: `${fake.dir}${delimiter}${process.env.PATH ?? ""}` },
-        async () => {
-          const pi = new FakeExtensionAPI()
-          await createUlwLoopComponent().register(pi, {
-            logger: createLogger(),
-            config: { getFlag: () => false },
-          })
+      // register is synchronous: resolveOmoBin runs inside it, so the fake bin dir only needs
+      // to lead PATH during registration. The dispatch then runs under the REAL environment:
+      // on Windows the .cmd shim spawns through cmd.exe, which itself resolves via PATH.
+      let pi: FakeExtensionAPI
+      withEnv({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: fake.dir }, () => {
+        pi = new FakeExtensionAPI()
+        createUlwLoopComponent().register(pi, {
+          logger: createLogger(),
+          config: { getFlag: () => false },
+        })
+      })
 
-          const results = await pi.dispatch(
-            "input",
-            { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-            { cwd: fake.dir, sessionManager: { getSessionId: () => "A" } },
-          )
-
-          expect(results).toHaveLength(1)
-          expect(results[0]).toMatchObject({ action: "transform" })
-          expect(readRunnerArgv(fake.dir)).toEqual(["ulw-loop", "status", "--json", "--session-id", "senpi-A"])
-        },
+      const results = await pi.dispatch(
+        "input",
+        { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
+        { cwd: fake.dir, sessionManager: { getSessionId: () => "A" } },
       )
+
+      expect(results).toHaveLength(1)
+      expect(results[0]).toMatchObject({ action: "transform" })
+      expect(readRunnerArgv(fake.dir)).toEqual(["ulw-loop", "status", "--json", "--session-id", "senpi-A"])
     } finally {
       fake.cleanup()
     }
