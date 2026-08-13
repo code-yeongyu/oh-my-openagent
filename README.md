@@ -512,6 +512,15 @@ Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/Lazy
 
 ## Loved by professionals at
 
+<a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=oh-my-openagent">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/atlas-cloud-logo-white.svg" />
+    <img src="./.github/assets/atlas-cloud-logo.svg" alt="Atlas Cloud" width="163" />
+  </picture>
+</a>
+
+[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=oh-my-openagent) offers OpenAI-compatible inference for coding-agent workflows. [View the coding plan](https://www.atlascloud.ai/console/coding-plan).
+
 - [Indent](https://indentcorp.com)
   - Makers of Spray (influencer marketing solution), vovushop (cross-border commerce platform), and vreview (AI commerce review marketing solution).
 - [Google](https://google.com)
