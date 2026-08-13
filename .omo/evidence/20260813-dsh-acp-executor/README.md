@@ -34,3 +34,23 @@ registry gating proves the default install is unaffected.
 change). The wire contract comes from their published acp/acp README and
 codec; the tool surface we depend on (initialize/session.new/session.prompt/
 session.update/session.request_permission) is the documented baseline.
+
+# UPDATE: headless mode added (published CLI entry)
+
+**WHAT WAS TESTED:** the npm-published entry is `npx @deepseek-ai/dsh
+--profile headless "<task>"` (one-shot, prints the final assistant message,
+exits). The ACP server package (@deepseek-ai/dsh-acp) is a library with no
+bin, so the tool now supports both modes: `headless` (default, works with
+the published CLI today) and `acp` (protocol-first, for source compositions).
+
+**WHAT WAS OBSERVED:**
+1. Live CLI discovery: `npx -y @deepseek-ai/dsh --help` -> profiles web /
+   headless / tui; `--profile headless "task"` boots and prints the result.
+   A real smoke run reported `MISSING_CREDENTIAL: llm-deepseek: no API key
+   for provider route "deepseek-official"` (expected: no DEEPSEEK_API_KEY in
+   the sandbox env) — proving the entry, profile boot, and credential path
+   all work end to end.
+2. `bun test packages/omo-opencode/src/tools/dsh-agent/` -> 13 pass / 0 fail
+   (headless runner: ok/fail/hang/abort via a real child fixture; tool
+   dispatches headless vs acp modes correctly).
+3. Config suite -> 141 pass; typecheck + build -> exit 0.

@@ -2,6 +2,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { PluginContext } from "../../plugin/types"
 import type { DshConfig } from "../../config/schema/dsh"
 import { runDshAcpAgent } from "./acp-client"
+import { runDshHeadless } from "./headless-runner"
 import { log } from "../../shared"
 
 const DSH_AGENT_DESCRIPTION =
@@ -30,33 +31,54 @@ export function createDshAgentTool(deps: DshAgentDeps): ToolDefinition {
     async execute(args, toolContext) {
       const cwd = args.cwd ?? (config.cwd || ctx.directory)
       const startedAt = Date.now()
-      log("[dsh-agent] starting ACP run", {
+      log("[dsh-agent] starting run", {
         sessionID: toolContext.sessionID,
         cwd,
+        mode: config.mode,
         command: config.command,
       })
 
-      const result = await runDshAcpAgent({
+      if (config.mode === "acp") {
+        const result = await runDshAcpAgent({
+          command: config.command,
+          args: [...config.args, "acp"],
+          cwd,
+          prompt: args.prompt,
+          permission: config.permission,
+          timeoutMs: config.timeout_ms,
+          abort: toolContext.abort,
+        })
+        log("[dsh-agent] ACP run settled", {
+          sessionID: toolContext.sessionID,
+          stopReason: result.stopReason,
+          elapsedMs: Date.now() - startedAt,
+          outputChars: result.output.length,
+        })
+        return {
+          title: `dsh agent (${result.stopReason})`,
+          output: result.output,
+          metadata: { stopReason: result.stopReason },
+        }
+      }
+
+      const result = await runDshHeadless({
         command: config.command,
         args: config.args,
         cwd,
         prompt: args.prompt,
-        permission: config.permission,
         timeoutMs: config.timeout_ms,
         abort: toolContext.abort,
       })
-
-      log("[dsh-agent] ACP run settled", {
+      log("[dsh-agent] headless run settled", {
         sessionID: toolContext.sessionID,
-        stopReason: result.stopReason,
+        exitCode: result.exitCode,
         elapsedMs: Date.now() - startedAt,
         outputChars: result.output.length,
       })
-
       return {
-        title: `dsh agent (${result.stopReason})`,
+        title: `dsh agent (headless, exit ${result.exitCode ?? "n/a"})`,
         output: result.output,
-        metadata: { stopReason: result.stopReason },
+        metadata: { exitCode: result.exitCode },
       }
     },
   })
