@@ -7,7 +7,7 @@
     "packages/omo-codex/plugin/components/ulw-loop/src/steering.ts:179: omo ulw-loop",
     "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts:155: omo ulw-loop",
     "packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts:425: omo ulw-loop",
-    "packages/omo-codex/scripts/install-config.test.mjs:115: omo install",
+    "packages/omo-codex/scripts/install-config.test.mjs:149: omo install",
     "packages/omo-codex/scripts/install-delegated-command.test.mjs:86: omo doctor",
     "packages/omo-codex/scripts/install-local-entrypoint.test.mjs:123: omo doctor",
     "packages/omo-codex/src/install/codex-config-toml.test.ts:233: omo install",
@@ -24,7 +24,7 @@
   "docs": [
     ".agents/skills/codex-qa/SKILL.md:72: omo get-local-version",
     ".github/workflows/publish.yml:915: /bin/omo",
-    "packages/omo-codex/README.md:52: omo get-local-version",
+    "packages/omo-codex/README.md:75: omo get-local-version",
     "packages/omo-native/test/doctor.test.ts:62: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts:228: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts:97: omo doctor",
