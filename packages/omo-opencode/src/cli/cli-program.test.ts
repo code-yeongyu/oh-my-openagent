@@ -77,6 +77,17 @@ describe("cli-program", () => {
     expect(migrateBlock?.[1]).toContain("runConfigMigrate")
   })
 
+  test("profile command is registered as a built-in command group", async () => {
+    // given
+    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
+
+    // when
+    const registersProfileCommand = cliProgramSource.includes("program.addCommand(createProfileCommand())")
+
+    // then
+    expect(registersProfileCommand).toBe(true)
+  })
+
   test("doctor command exposes explicit platform selection for Codex-only diagnostics", async () => {
     // given
     const cliProgramSource = await readFile(
