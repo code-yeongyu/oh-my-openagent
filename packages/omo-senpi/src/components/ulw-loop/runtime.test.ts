@@ -131,12 +131,12 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
         const results = await pi.dispatch(
           "input",
           { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-          { cwd: fake.dir },
+          { cwd: fake.dir, sessionManager: { getSessionId: () => "A" } },
         )
 
         expect(results).toHaveLength(1)
         expect(results[0]).toMatchObject({ action: "transform" })
-        expect(readRunnerArgv(fake.dir)).toEqual(["ulw-loop", "status", "--json"])
+        expect(readRunnerArgv(fake.dir)).toEqual(["ulw-loop", "status", "--json", "--session-id", "senpi-A"])
       })
     } finally {
       fake.cleanup()

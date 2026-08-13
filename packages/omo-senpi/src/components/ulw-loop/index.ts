@@ -2,8 +2,8 @@ import { findContinuableBoulderWork } from "../start-work-continuation/boulder-e
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
 import { resolveOmoBin, runOmoCommand } from "./omo-command"
+import { extractSenpiSessionId, resolveSenpiUlwSessionId, SenpiUlwSessionScope } from "./session-scope"
 
-const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
 const CONTINUATION_LIMIT = 8
 const STEERING_REMINDER = [
   "<omo-senpi-ulw-loop>",
@@ -51,13 +51,16 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
       const runCommand = options.runCommand ?? runOmoCommand
       const footerStatus = createUlwLoopFooterStatus(options.footerStatus)
+      const sessionScope = new SenpiUlwSessionScope()
       const state = {
         consecutiveContinuations: 0,
         previousStatusRaw: undefined as string | undefined,
       }
 
       pi.on("session_start", async (_payload, eventCtx) => {
-        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        const scopeId = resolveSenpiUlwSessionId(eventCtx)
+        sessionScope.activate(scopeId)
+        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), scopeId, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
       })
 
@@ -68,7 +71,8 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         state.consecutiveContinuations = 0
         state.previousStatusRaw = undefined
         if (payload.streamingBehavior === undefined) return { action: "continue" }
-        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        const scopeId = resolveSenpiUlwSessionId(eventCtx)
+        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), scopeId, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null || !status.active) return { action: "continue" }
         return {
@@ -88,13 +92,14 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         }
 
         const cwd = cwdFromContext(eventCtx)
-        const sessionId = extractSessionId(eventCtx)
+        const scopeId = resolveSenpiUlwSessionId(eventCtx)
+        const sessionId = extractSenpiSessionId(eventCtx)
         if (sessionId && findContinuableBoulderWork(cwd, sessionId) !== null) {
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "boulder-continuation-active" })
           return
         }
 
-        const status = await readActiveStatus(omoBin, runCommand, cwd, ctx)
+        const status = await readActiveStatus(omoBin, runCommand, cwd, scopeId, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null) {
           return
@@ -116,12 +121,19 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
       pi.on("tool_result", async (payload, eventCtx) => {
         if (!shouldRefreshFooterAfterToolResult(payload)) return
-        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        const scopeId = resolveSenpiUlwSessionId(eventCtx)
+        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), scopeId, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
       })
 
-      pi.on("session_before_switch", () => footerStatus.dispose())
-      pi.on("session_shutdown", () => footerStatus.dispose())
+      pi.on("session_before_switch", () => {
+        sessionScope.clear()
+        footerStatus.dispose()
+      })
+      pi.on("session_shutdown", () => {
+        sessionScope.clear()
+        footerStatus.dispose()
+      })
     },
   }
 }
@@ -159,11 +171,18 @@ async function readActiveStatus(
   omoBin: string,
   runCommand: RunCommand,
   cwd: string,
+  scopeId: string | null,
   ctx: ComponentContext,
 ): Promise<ActiveStatus | null> {
+  if (scopeId === null) {
+    // No session identity means no ownership proof: never fall back to the cwd-global
+    // `.omo/ulw-loop/` state, which may belong to another session in the same directory.
+    ctx.logger.info("omo-senpi ulw-loop status skipped", { reason: "no-session-scope" })
+    return { raw: "", active: false }
+  }
   let result: { code: number; stdout: string }
   try {
-    result = await runCommand(omoBin, STATUS_ARGS, { cwd })
+    result = await runCommand(omoBin, statusArgs(scopeId), { cwd })
   } catch (error) {
     ctx.logger.warn("omo-senpi ulw-loop status ignored", {
       reason: "run-command-failed",
@@ -185,6 +204,10 @@ async function readActiveStatus(
   }
 
   return { raw: result.stdout, active: statusHasActiveIncompleteRun(parsed) }
+}
+
+function statusArgs(scopeId: string): readonly string[] {
+  return ["ulw-loop", "status", "--json", "--session-id", scopeId]
 }
 
 function statusHasActiveIncompleteRun(value: unknown): boolean {
@@ -220,15 +243,6 @@ function shouldRefreshFooterAfterToolResult(value: unknown): boolean {
     || toolName === "update_goal"
     || toolName === "bash"
     || toolName === "interactive_bash"
-}
-
-function extractSessionId(eventCtx: unknown): string | undefined {
-  if (!isRecord(eventCtx)) return undefined
-  const value = eventCtx["sessionManager"]
-  if (!isRecord(value) || typeof value["getSessionId"] !== "function") return undefined
-  const manager = value as unknown as { getSessionId(): unknown }
-  const id = manager.getSessionId()
-  return typeof id === "string" ? id : undefined
 }
 
 function cwdFromContext(value: unknown): string {

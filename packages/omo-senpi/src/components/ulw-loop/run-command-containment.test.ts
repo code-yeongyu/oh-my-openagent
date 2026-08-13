@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
-import { createLogger } from "./ulw-loop.test-support"
+import { createLogger, sessionEventCtx } from "./ulw-loop.test-support"
 
 describe("omo-senpi ulw-loop run-command failure containment", () => {
   it("#given runCommand rejects synchronously with EINVAL #when input dispatches #then the handler resolves continue and never rejects", async () => {
@@ -19,7 +19,7 @@ describe("omo-senpi ulw-loop run-command failure containment", () => {
     const results = await pi.dispatch(
       "input",
       { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-      { cwd: "/repo" },
+      sessionEventCtx("/repo", { sessionId: "A" }),
     )
 
     expect(results).toEqual([{ action: "continue" }])
@@ -38,7 +38,7 @@ describe("omo-senpi ulw-loop run-command failure containment", () => {
       runCommand: async () => ({ code: 127, stdout: "" }),
     }).register(pi, { logger, config: { getFlag: () => false } })
 
-    const results = await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    const results = await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo", { sessionId: "A" }))
 
     expect(results).toEqual([undefined])
     expect(pi.userMessages).toEqual([])
@@ -55,7 +55,7 @@ describe("omo-senpi ulw-loop run-command failure containment", () => {
     const results = await pi.dispatch(
       "input",
       { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-      { cwd: "/repo" },
+      sessionEventCtx("/repo", { sessionId: "A" }),
     )
 
     expect(results).toEqual([{ action: "continue" }])

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "../components/ulw-loop"
-import { activeStatus, createLogger } from "../components/ulw-loop/ulw-loop.test-support"
+import { activeStatus, createLogger, sessionEventCtx } from "../components/ulw-loop/ulw-loop.test-support"
 import { createParentNotifier } from "../components/task/parent-notifier"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
@@ -29,7 +29,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator: coordinator })
 
     // when the ulw continuation fires at turn end (enqueues, defers its flush)
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo", { sessionId: "A" }))
     expect(delivered).toEqual([])
 
     // and a background completion wakes the idle parent on the same edge (synchronous, throw-safe path)

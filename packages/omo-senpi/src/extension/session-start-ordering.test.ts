@@ -53,7 +53,12 @@ describe("session_start component ordering", () => {
     const scheduleFlush = spyOn(idleCoordinator, "scheduleFlush")
     const sendMessage = spyOn(pi, "sendMessage")
     const select = mockFn(async () => undefined)
-    const eventCtx = { cwd: root, hasUI: true, ui: { select } }
+    const eventCtx = {
+      cwd: root,
+      hasUI: true,
+      ui: { select },
+      sessionManager: { getSessionId: () => "ordering-session" },
+    }
     const componentContext: ComponentContext = {
       logger,
       config: { getFlag: (name) => pi.getFlag(name) },
