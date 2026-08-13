@@ -20,6 +20,7 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 }
 
 interface WritePluginFixtureOptions {
+  readonly includeLazycodexBranding?: boolean
   readonly includeLazycodexRepositoryWorkflow?: boolean
 }
 
@@ -104,6 +105,26 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
       "name: PR source guidance\n\non:\n  pull_request_target:\n",
     )
   }
+  if (options.includeLazycodexBranding === true) {
+    const fragmentRoot = join(sourceRoot, "packages", "omo-codex", "lazycodex-repository")
+    await mkdir(fragmentRoot, { recursive: true })
+    await writeFile(
+      join(fragmentRoot, "README.atlas-cloud.md"),
+      [
+        "<!-- atlas-cloud:start -->",
+        "## ☁️ Atlas Cloud",
+        "",
+        "![Atlas Cloud](.github/assets/atlas-cloud-logo.svg)",
+        "",
+        "Use `ATLASCLOUD_API_KEY` and `model_provider=atlascloud`.",
+        "<!-- atlas-cloud:end -->",
+        "",
+      ].join("\n"),
+    )
+    await mkdir(join(sourceRoot, ".github", "assets"), { recursive: true })
+    await writeFile(join(sourceRoot, ".github", "assets", "atlas-cloud-logo.svg"), "<svg>light</svg>\n")
+    await writeFile(join(sourceRoot, ".github", "assets", "atlas-cloud-logo-white.svg"), "<svg>dark</svg>\n")
+  }
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist"), { recursive: true })
@@ -171,6 +192,41 @@ async function expectPathMissing(path: string): Promise<void> {
 }
 
 describe("sync-lazycodex-marketplace", () => {
+  test("#given legacy Atlas branding #when syncing twice #then README and logos come from the canonical source idempotently", async () => {
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-branding-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-branding-lazycodex-"))
+    await writePluginFixture(sourceRoot, { includeLazycodexBranding: true })
+    await writeFile(
+      join(lazycodexRoot, "README.md"),
+      [
+        "# LazyCodex",
+        "",
+        "## ☁️ Atlas Cloud",
+        "",
+        "legacy unmanaged copy",
+        "",
+        "## 👷 Maintainer",
+        "",
+        "Jobdori",
+        "",
+      ].join("\n"),
+    )
+
+    await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    const firstRun = await readFile(join(lazycodexRoot, "README.md"), "utf8")
+    await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    const secondRun = await readFile(join(lazycodexRoot, "README.md"), "utf8")
+
+    expect(secondRun).toBe(firstRun)
+    expect(secondRun.match(/<!-- atlas-cloud:start -->/g)).toHaveLength(1)
+    expect(secondRun.match(/## ☁️ Atlas Cloud/g)).toHaveLength(1)
+    expect(secondRun).toContain("Use `ATLASCLOUD_API_KEY` and `model_provider=atlascloud`.")
+    expect(secondRun).not.toContain("legacy unmanaged copy")
+    expect(secondRun).toContain("## 👷 Maintainer\n\nJobdori")
+    expect(await readFile(join(lazycodexRoot, ".github", "assets", "atlas-cloud-logo.svg"), "utf8")).toBe("<svg>light</svg>\n")
+    expect(await readFile(join(lazycodexRoot, ".github", "assets", "atlas-cloud-logo-white.svg"), "utf8")).toBe("<svg>dark</svg>\n")
+  })
+
   test("#given marketplace sync #when copying plugin bundle #then emits self-contained mcp paths", async () => {
     // given
     const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-source-"))

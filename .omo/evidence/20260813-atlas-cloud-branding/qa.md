@@ -18,15 +18,15 @@ Date: 2026-08-13
 - The Atlas Cloud homepage and coding-plan links both returned HTTP 200.
 - GitHub GFM preserved the dark-theme source, fallback logo, `Atlas Cloud` alt text, `width="163"`, clickable campaign destination, and coding-plan link.
 - Whitespace and credential-pattern checks passed.
-- The intended change is documentation-only: `README.md` plus the two local logo assets. Four unrelated CRLF-normalized evidence files were already dirty immediately after checkout and were explicitly excluded from staging.
+- This report covers the original branding slice only: `README.md` plus the two local logo assets. The later Atlas Cloud provider implementation has separate runtime QA evidence. Four unrelated CRLF-normalized evidence files were already dirty immediately after checkout and were explicitly excluded from staging.
 
 ## Why this is enough
 
-The only observable behavior is GitHub README presentation and navigation. Exercising GitHub's own Markdown renderer, validating both link destinations, and proving that the local assets are valid official SVGs covers that surface without running unrelated runtime suites.
+For the branding slice, the observable behavior is GitHub README presentation and navigation. Exercising GitHub's own Markdown renderer, validating both link destinations, and proving that the local assets are valid official SVGs covers that slice. Provider registration, model routing, installation, cleanup, and generated runtime behavior are covered separately.
 
 ## What was omitted
 
-- No runtime harness QA was run because no OpenCode, Codex, package, configuration, or executable path changed.
+- This branding report does not duplicate the provider runtime harness results; see the Atlas Cloud provider QA evidence added with the implementation.
 - The full rendered HTML and full SVG bodies were not copied into this report; the focused assertions and hashes are sufficient and avoid noisy evidence.
 - No credentials, environment dumps, authentication headers, or private values were captured.
 
