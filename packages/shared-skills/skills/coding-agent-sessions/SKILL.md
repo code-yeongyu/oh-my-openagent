@@ -120,7 +120,7 @@ Use `references/codex.md` for Codex storage details.
 |---|---|
 | Missing Codex sessions | Set `CODEX_HOME` or pass `--root /path/to/.codex`. |
 | Missing oh-my-pi / gajae-code sessions | Those stores live in `~/.omp/agent/sessions` and `~/.gjc/agent/sessions`. For a custom `PI_CONFIG_DIR` / `PI_CODING_AGENT_DIR`, pass that agent dir with `--root`. |
-| Missing OMO / Senpi sessions | The `senpi` platform searches `~/.omo/agent/sessions`, `~/.senpi/agent/sessions`, and `~/.pi/agent/sessions` (plus matching profile roots). Pass a nonstandard agent directory with `--root`. |
+| Missing OMO / Senpi sessions | The `senpi` platform searches flat branded OMO state at `~/.omo/sessions`, plus the standalone engine stores `~/.senpi/agent/sessions` and `~/.pi/agent/sessions` (and matching profile roots). Pass a nonstandard agent directory with `--root`. |
 | Missing OpenCode sessions | Pass the data dir that contains `messages/` and `parts/`, often `~/.opencode` or `~/.local/share/opencode`. |
 | Missing Claude sessions | Search `~/.claude/projects`, `~/.claude/transcripts`, and `~/.claude/pre-compact-session-histories`; use `--root` for nonstandard config dirs. |
 | Missing Aside sessions | The Aside browser agent stores per-user data under `~/.aside/u/<n>/` (`sessions/<date>_<id>/messages.jsonl` transcripts + a `state.db` index; `agents/*/sessions/` is just a hardlink mirror). Pass `--root` for a nonstandard `.aside` dir or an exported user dir. |

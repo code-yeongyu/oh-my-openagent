@@ -14,7 +14,7 @@ Extra roots scanned for every pi-family platform:
 - XDG stores (macOS/Linux, default profile): `$XDG_DATA_HOME/<app>/sessions/**` and `$XDG_DATA_HOME/<app>/profiles/<profile>/sessions/**`, where `<app>` is `senpi`, `omp`, or `gjc`. XDG flattens the `agent/` path segment.
 - A custom `PI_CONFIG_DIR` / `PI_CODING_AGENT_DIR` / `GJC_CONFIG_DIR` store: pass that agent directory with `--root`.
 
-`~/.omo/agent` and `~/.senpi/agent` are the current and legacy OMO/Senpi stores. Their `settings.json`, `models.json`, and `auth.json` files provide environment context; oh-my-pi and gajae-code keep the same files plus `config.yml` and `models.yml` next to their sessions directory.
+`~/.omo` (flat, branded OMO) and `~/.senpi/agent` (standalone engine) are the branded and legacy OMO/Senpi stores. Their `settings.json`, `models.json`, and `auth.json` files provide environment context; oh-my-pi and gajae-code keep the same files plus `config.yml` and `models.yml` next to their sessions directory.
 
 Common event types:
 
