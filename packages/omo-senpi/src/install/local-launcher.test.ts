@@ -36,6 +36,9 @@ describe("local omo launcher", () => {
         expect(source).toContain("--extension")
         expect(source).toContain("OMO_SENPI_CLI_PATH")
         expect(source).toContain("OMO_PLUGIN_ROOT")
+        // The published launcher pins the engine's agent directory so bare reflection children see
+        // the flat OMO state; a local launcher that omitted it would split the contract again.
+        expect(source).toContain("SENPI_CODING_AGENT_DIR: join(process.env.HOME ?? homedir(), \".omo\")")
       })
     })
 
