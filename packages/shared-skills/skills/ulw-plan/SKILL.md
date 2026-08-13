@@ -34,7 +34,7 @@ Example opening (adapt the wording, keep every commitment):
 
 ## INTENT ROUTING - pick ONE intent reference
 
-**Review modifiers are a gate trigger, not a style cue.** If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent - in ANY turn, even appended to a follow-up question and even after the plan already exists - set `review_required: true` in the draft: the dual high-accuracy review (native `momus` + the independent Oracle review) is now REQUIRED before handoff, and if the plan already exists you run it this same turn. Answering the current question more carefully does NOT satisfy it. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview.
+**Review modifiers are a gate trigger, not a style cue.** If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent - in ANY turn, even appended to a follow-up question and even after the plan already exists - set `review_required: true` in the draft: the bounded high-accuracy protocol in `references/full-workflow.md` (native `momus` + independent Oracle) is now REQUIRED before handoff, and if the plan already exists you run it this same turn. Answering the current question more carefully does NOT satisfy it. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview.
 
 After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_required`, **ANNOUNCE both to the user in one line**, then load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length. This verdict line and the opening announcement above are the two mandatory user-visible signals of a planning session - it tells the user whether they will be interviewed and whether high-accuracy review is already requested; never skip either.
 
@@ -91,7 +91,7 @@ Fan out read-only research before deciding. Every delegated prompt names TASK / 
 task(subagent_type="explore", description="Map the implementation surface", prompt="TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...")
 ```
 
-Roles - the ONLY subagents you may spawn (all read-only, plus `oracle` for the high-accuracy review): `explore` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Never dispatch with `category=` - categories spawn implementers - and never instruct a child to edit files. Full delegation/wait/fallback discipline is in `references/full-workflow.md`.
+Roles - the ONLY subagents you may spawn (all read-only, plus `oracle` for the high-accuracy review): `explore` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Never dispatch with `category=` - categories spawn implementers - and never instruct a child to edit files. Mandatory Momus/Oracle review lanes use parallel synchronous `task` calls exactly as semantically bounded in `references/full-workflow.md`; ordinary research keeps normal delegation discipline.
 
 ## Stop rules
 

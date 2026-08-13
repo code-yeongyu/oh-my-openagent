@@ -36,89 +36,42 @@ Make ONE judgment and follow ONE reference. Review modifiers are not routing sig
 - CLEAR -> `intent-clear.md`: run the **two filters** on every candidate question; ask only surviving forks (owner-decisions), with WHY.
 - UNCLEAR -> `intent-unclear.md`: research maximally, adopt announced best-practice defaults, do not ask the user extra questions. Unless classification is Trivial, set `review_required: true` in the draft because this route requires automatic high-accuracy review.
 
-If a draft/plan already exists and the user says a review modifier - even appended to an otherwise unrelated follow-up question - or asks to make the plan more accurate, do not reroute from scratch unless the scope changed. Load the draft, preserve its recorded `intent`, answer the question if one was asked, update stale plan content if needed, then run the required review loop against the current plan in that same turn. A more rigorous answer is not a substitute for the review.
+If a draft/plan already exists and the user says a review modifier - even appended to an otherwise unrelated follow-up question - or asks to make the plan more accurate, do not reroute from scratch unless the scope changed. Load the draft, preserve its recorded `intent`, answer the question if one was asked, update stale plan content if needed, then run the required bounded protocol against the current plan in that same turn. A more rigorous answer is not a substitute for the review.
 
 Both paths record `intent`, `review_required`, and decisions to `.omo/drafts/<slug>.md` as they go - long sessions outlive your context, and plan generation reads the draft, not your memory.
 
-As soon as `<slug>`, intent, and classification are known, run the scaffold with `--draft-only`. Add `--review-required` when an explicit modifier requires review or intent is UNCLEAR and classification is non-Trivial, so the first durable write contains the complete request state below; never defer that already-known obligation to a later edit. If review becomes required only after the draft exists, atomically replace stale action/review fields with this request state. If a complete plan already exists, initialize a review round directly.
+As soon as `<slug>`, intent, and classification are known, run the scaffold with `--draft-only`. Add `--review-required` when an explicit modifier requires review or intent is UNCLEAR and classification is non-Trivial, so the first durable write seeds matrix `D01-D10/v1`, `phase: discovery_pending`, an unused recovery flag, and `terminal: null`. The scaffold creates no plan in draft-only mode, launches no reviewer, and performs no semantic transition. If review becomes required only after the draft exists, atomically replace stale action/review fields with the same compact seed. If a complete plan already exists, freeze its current bytes and initialize discovery without changing intent or approval state.
 
-<!-- ulw-plan-review-request-state-contract -->
-```json
-{
-  "transition": "replace",
-  "phase": "review_requested",
-  "applies_when": ["explicit_review_modifier_before_complete_plan", "intent=unclear_and_nontrivial"],
-  "atomic": true,
-  "review_required": true,
-  "plan_path": ".omo/plans/<slug>.md",
-  "plan_sha256": null,
-  "review_round_id": null,
-  "pending_action_policy": { "review_required": "write and review .omo/plans/<slug>.md", "otherwise": "write .omo/plans/<slug>.md" },
-  "pending-action": "write and review .omo/plans/<slug>.md",
-  "review": {
-    "momus": { "status": "pending", "workspace_root": null, "runtime_home": null, "target": ".omo/plans/<slug>.md", "round_id": null, "plan_sha256": null, "launch_id": null, "session": null, "result": null },
-    "independent": { "status": "pending", "workspace_root": null, "runtime_home": null, "target": ".omo/plans/<slug>.md", "round_id": null, "plan_sha256": null, "launch_id": null, "session": null, "result": null }
-  }
-}
-```
+Review state is durable and state-derived, never reconstructed from chat history. It contains:
+- coverage-matrix version;
+- current phase;
+- whether the current phase consumed its only recovery;
+- one nullable terminal record.
 
-After approval and only after the plan is complete, replace the request state atomically with the initialized review round before launching either reviewer:
+Keep this frontmatter seed compact. Frontmatter is the current-state authority after compaction: `plan_path`, `plan_sha256`, and `review_round_id` identify the active frozen pair; `review_protocol.phase`, `recovery_used`, and `terminal` identify its controller state. Set the digest and round pointer before every pair dispatch. The draft's `## Review evidence (workflow only)` section is the append-only receipt ledger. Each `pair` block uses these required keys: `round_id`, `phase`, `recovery_of`, `plan_path`, `sha256`, `byte_count`; Momus and Oracle lane entries each use `reviewer`, `launch_id`, `expected_receipt`, `actual_session`, `completion_used`, `native_verdict`, `normalized_verdict`, `status`; the pair footer uses `reconciliation`, `eligible_blockers`, and `repair_summary`. Update only the active pair as its lanes return; finalized and prior pair blocks are immutable. A ledger block that conflicts with the frontmatter pointer invalidates the pair. This durable record prevents stale, duplicate, late, or mismatched completions without putting workflow machinery in the formal plan.
 
-<!-- ulw-plan-review-round-state-contract -->
-```json
-{
-  "transition": "replace",
-  "phase": "review_round_initialized",
-  "applies_when": ["complete_plan_after_review_request", "explicit_review_modifier_with_complete_plan", "retry_after_plan_change"],
-  "atomic": true,
-  "review_required": true,
-  "plan_path": ".omo/plans/<slug>.md",
-  "plan_sha256": "<sha256-of-complete-plan>",
-  "review_round_id": "<fresh-unique-round-id>",
-  "round_status": "active",
-  "completion_cas": ["status=in_flight", "workspace_root", "runtime_home", "target", "launch_id", "round_id", "plan_sha256", "session", "receipt_identity=session", "live_plan_sha256=plan_sha256", "echoed_binding", "terminal_transition=in_flight->approved|changes_requested|inconclusive"],
-  "pending-action": "review .omo/plans/<slug>.md",
-  "review": {
-    "momus": { "status": "pending", "workspace_root": "<literal-canonical-source-workspace-root>", "runtime_home": null, "target": ".omo/plans/<validated-slug>.md", "round_id": "<review-round-id>", "plan_sha256": "<plan-sha256>", "launch_id": null, "session": null, "result": null },
-    "independent": { "status": "pending", "workspace_root": "<literal-canonical-source-workspace-root>", "runtime_home": null, "target": ".omo/plans/<validated-slug>.md", "round_id": "<review-round-id>", "plan_sha256": "<plan-sha256>", "launch_id": null, "session": null, "result": null }
-  }
-}
-```
+Phase transitions are exhaustive and atomic:
+- `discovery_pending` -> `discovery_running`: freeze the plan, write current pointers and the pending discovery pair, then dispatch.
+- An invalid discovery pair stays `discovery_running`; when same-byte recovery is eligible, set `recovery_used: true`, replace current pointers with the recovery pair, then dispatch it.
+- Valid discovery with no eligible blocker -> `terminal`; write final live read-back and the immutable terminal together.
+- Valid discovery with eligible blockers -> `repair_pending`; persist the blocker ledger before mutating the plan.
+- `repair_pending` -> `closure_running`: apply the one aggregate repair, freeze repaired bytes, write fresh current pointers and the pending closure pair, and reset `recovery_used: false` immediately before closure dispatch.
+- An invalid closure pair stays `closure_running`; when same-byte recovery is eligible, set `recovery_used: true`, replace current pointers with the recovery pair, then dispatch it.
+- Valid closure, or an invalid pair whose recovery is unavailable or exhausted -> `terminal`; write final live read-back and exactly one terminal together.
+No phase regresses or skips an intermediate state. Terminalization sets `phase: terminal` and writes `{ status: OKAY | INCONCLUSIVE, plan_path, sha256, byte_count, round_id, reason }`; later returns or transition requests are ledgered as rejected and cannot change it.
 
-<!-- ulw-plan-review-lifecycle-state-contract -->
-```json
-{
-  "transitions": {
-    "launch": { "from": "pending", "to": "launching", "cas": ["round_status=active", "status=pending", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256"], "writes": ["launch_id=<fresh-launch-id>"] },
-    "receipt": { "from": "launching", "to": "in_flight", "cas": ["round_status=active", "status=launching", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256", "launch_id"], "writes": ["session=<session-or-process-receipt>"] },
-    "complete": {
-      "from": "in_flight",
-      "to": ["approved", "changes_requested", "inconclusive"],
-      "one_shot": true,
-      "cas": ["round_status=active", "workspace_root", "runtime_home", "target", "launch_id", "round_id", "plan_sha256", "session", "receipt_identity=session", "live_plan_sha256=plan_sha256", "echoed_binding"]
-    },
-    "launch_interrupted": {
-      "from": { "round_status": "active", "lane_status": "launching" },
-      "to": { "round_status": "inconclusive", "lane_status": "inconclusive", "result": "launch_interrupted_without_receipt" },
-      "cas": ["round_status=active", "status=launching", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256", "launch_id"],
-      "invalidates_other_lane": true,
-      "next": "fresh_review_round"
-    }
-  },
-  "resume_after_compaction": {
-    "pending": "dispatch_with_launch_cas",
-    "launching": "apply_launch_interrupted_transition",
-    "in_flight": "wait_for_matching_completion_only",
-    "approved|changes_requested|inconclusive": "do_not_mutate",
-    "round_status=inconclusive": "start_fresh_review_round"
-  },
-  "rejected_completions": ["duplicate", "late", "stale", "mismatched"]
-}
-```
+`plan_path` must equal `.omo/plans/<validated-slug>.md`; reject absolute paths, `..`, and normalization drift. Before every discovery, recovery, or closure pair, read the regular file from the canonical workspace, freeze exact bytes, byte count, SHA-256, and a unique round identity, then bind both lanes to that immutable snapshot. Any stale target binding, unauthorized byte change, scope drift, duplicate dispatch/completion, mismatched identity, or post-terminal transition request makes the pair invalid. Do not repair from an invalid pair.
 
-`plan_path` must equal `.omo/plans/<validated-slug>.md`; reject absolute paths, `..`, and normalization drift. Bind the file operation to the workspace itself: open the canonical workspace root as a directory descriptor, then open `.omo`, `plans`, and the final file descriptor-relative with no-follow semantics on every segment, requiring directories for ancestors and a regular final file. Compute `plan_sha256` only from bytes read from that final descriptor. If the platform cannot provide that descriptor chain, return `INCONCLUSIVE`; do not substitute path-based validate-then-open checks.
+Every mandatory lane follows one order:
+1. Persist the frozen digest, byte count, round identity, lane and launch identities, expected receipt, pending status, and `completion_used: false` in the draft review-evidence section before dispatch.
+2. Dispatch exactly one Momus and one Oracle lane independently as parallel synchronous `task` calls against the same frozen content. Do not share findings between lanes or start a third reviewer.
+3. Persist each raw return and actual task/session receipt before semantic parsing. Require one dedicated first non-empty verdict line: Momus exactly `[OKAY]` or `[REJECT]`; Oracle exactly `APPROVED` or `BLOCKED`. Reject a receipt containing zero verdict lines, more than one allowed verdict token, a contradictory token anywhere else, or conditional/qualified verdict text. Only then normalize Momus `[OKAY]` -> `APPROVED` and `[REJECT]` -> `BLOCKED`; Oracle verdicts remain unchanged. A normalized `BLOCKED` receipt must include at least one evidence-bearing candidate finding; otherwise it is malformed.
+4. A matching receipt with a clear verdict but incomplete assigned-domain coverage gets one synchronous receipt-only continuation to the same lane/session and digest. Set that lane's `completion_used: true` before dispatch. It must not reopen content review or modify the plan.
+5. Remaining incomplete coverage after that continuation, transport failure, mismatched identity, absent or conditional verdict, or failed completion request invalidates the pair. If live bytes still equal the frozen target and the current phase has not consumed recovery, set `recovery_used: true` before starting one fresh pair with new task/launch/receipt identities. If recovery is ineligible or invalid, terminalize `INCONCLUSIVE`.
 
-Apply the lifecycle transition table exactly. Every launch, receipt, interruption, and completion CAS compares the persisted workspace, runtime, target, round, and digest binding; a delayed action from a replaced round cannot claim or terminalize the new round. On compaction, resume from persisted round and lane state: dispatch only `pending`, terminalize stranded `launching`, wait only for the matching `in_flight` completion, and never mutate terminal lanes. A matching launch interruption terminalizes the round as inconclusive, invalidates the other lane, and requires a fresh round. Any plan change also invalidates both lanes. Never reconstruct state from chat history.
+This prompt-level protocol bounds semantic review and repair count, not wall-clock duration. Current OpenCode synchronous task calls expose no enforceable absolute deadline or completion timestamp. Do not claim wall-clock boundedness; runtime deadline execution belongs to separate implementation work.
+
+Review receipts, blocker ledgers, reconciliation records, deadline diagnostics, and recovery evidence are workflow output. Never copy them into the formal plan. The plan may contain implementation decisions, acceptance criteria, QA properties, evidence destinations, delivery constraints, and residual risks only.
 
 ## Approval gate (DO NOT SKIP)
 This gate is the only thing between a finished brief and the plan file, and the one place a planner can loop. Handle it as a decision with durable state, not a passphrase hunt.
@@ -165,8 +118,8 @@ Runs in parallel; ALL must APPROVE; surface results and wait for the user's expl
 
 ## Phase 4 - Deliver
 - CLEAR with `review_required: false`: present the plan summary, then ask ONE question and stop - start work now, or run a high-accuracy review first? Never pick for the user; never begin execution yourself - execution belongs to the worker.
-- CLEAR with `review_required: true`: run the high-accuracy review before delivery, record receipts, then present the plan summary and review result. Do not ask whether to run the review; the user already asked.
-- UNCLEAR: run the high-accuracy review AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
+- CLEAR with `review_required: true`: run the bounded high-accuracy protocol before delivery, record receipts, then present the plan summary and terminal result. Do not ask whether to run the review; the user already asked.
+- UNCLEAR: run the bounded high-accuracy protocol AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
 
 ### Handoff explanation (the mandatory shape of every plan summary)
 
@@ -179,37 +132,49 @@ Every "present the plan summary/brief" above delivers THIS structure, in the use
 5. **Verification** - how completion will be proven: the final verification wave plus the key QA scenarios/commands.
 6. **Execution handoff** - the plan runs in a worker session via `$start-work <plan-name>`; introduce the options: `--worktree <absolute-path>` (task-owned worktree; required for PR/branch work), `--make-pr` (deliver as a PR; auto-creates a task-owned worktree), `--ship` (implies `--make-pr`, keeps working until the PR is reviewed and MERGED).
 
-### High-accuracy review (dual review)
-The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Oracle review via `task(subagent_type="oracle", ...)` on the strongest available reasoning model, in a fully isolated sub-session with normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. Momus runs at High and may take substantially longer than other agents. One round = exactly ONE `momus` + ONE independent review, dispatched together against the COMPLETE plan file (todos + TL;DR filled) at the draft's exact recorded `plan_path`. Keep Momus in flight and wait for its terminal result: elapsed time alone never justifies cancelling, duplicating, replacing, or treating it as failed. After both verdicts return, fix every cited issue and resubmit both fresh until each approves. CLEAR: runs when the user opts in or `review_required: true`. UNCLEAR: runs automatically unless Classify=Trivial.
+### High-accuracy review (bounded dual review)
 
-Every reviewer prompt must carry this intake contract with all angle-bracket values replaced by literals from the current round before dispatch. Never pass `draft.plan_path`, `draft.plan_sha256`, field names, or another symbolic reference to an isolated reviewer. Its first action is to read the exact recorded path; retrieval drift stops that lane before review:
+The high-accuracy protocol always uses native `momus` plus an independent Oracle logical lane. Mandatory lanes are isolated, read-only, and keep normal approval/sandbox policy. Each review epoch has at most two valid pairs: one discovery pair, then one closure pair only when accepted blockers caused a plan repair. Each invalid pair gets at most one same-byte recovery pair. Recovery replaces an invalid attempt within the same phase; it does not add another semantic review round.
 
-<!-- ulw-plan-review-intake-contract -->
-```json
-{
-  "independent_reviewer": "oracle",
-  "lanes": ["momus", "independent"],
-  "binding": "substitute_literals_before_dispatch",
-  "workspace_root": "<literal-canonical-review-workspace-root>",
-  "runtime_home": "<literal-runtime-home-or-null>",
-  "target": "<literal-.omo/plans/validated-slug.md>",
-  "first_action": "read_exact_plan_path",
-  "read_mechanism": "open_workspace_root_then_openat_no_follow_each_segment_fstat_read_hash",
-  "artifact_identity": "<literal-plan-sha256>",
-  "round_identity": "<literal-review-round-id>",
-  "launch_identity": "<literal-launch-id>",
-  "required_echo": ["workspace_root", "runtime_home", "target", "artifact_identity", "round_identity", "launch_identity"],
-  "required_receipt": ["session_or_process_identity"],
-  "pre_read_validation": ["workspace_relative_canonical_equality", "open_workspace_root_directory_descriptor", "descriptor_relative_no_follow_each_segment", "regular_file"],
-  "drift_verdict": "INCONCLUSIVE",
-  "drift_conditions": ["read_failure", "path_mismatch", "unsafe_path", "ancestor_descriptor_mismatch", "digest_mismatch", "runtime_home_mismatch", "launch_identity_mismatch", "receipt_identity_mismatch", "stale_or_different_artifact", "incomplete_retrieval"],
-  "forbidden_fallbacks": ["search", "memory", "summaries", "alternate_files"]
-}
-```
+#### Mandatory matrix `D01-D10/v1`
 
-The first action must open the literal workspace root as a directory descriptor, then traverse `.omo`, `plans`, and the final target with descriptor-relative no-follow opens, `fstat` each ancestor as a directory and the final descriptor as a regular file, and hash all bytes read from that same final descriptor. If the platform cannot guarantee this chain, or any path/runtime/launch/receipt/digest check drifts, return `INCONCLUSIVE` before reviewing. Echo the literal workspace, runtime home, target, digest, round, and launch ID; the parent separately matches the completion envelope to the persisted session/process receipt. Never search or use another artifact.
+Discovery uses this unchanged matrix. Every lane returns one evidence-bearing row per assigned domain. Omission that remains after the one receipt-only completion, `not_checked`, unsupported `no_blocker`, stale digest, incomplete source evidence, or a receipt that fails its frozen identity invalidates the pair and follows the one-recovery rule.
 
-The draft must record the native Momus session/result, the independent review session/result, and the fix/retry summary. Immediately before handoff, repeat the same live canonical-path and SHA-256 validation and require it to match the approved round digest; drift invalidates both approvals and starts a fresh round. Do not say "high-accuracy review completed" unless both receipts exist, both final verdicts are unconditional approval, and the final live-plan validation passes.
+| ID | Domain | Mandatory minimum probe |
+|---|---|---|
+| D01 | Owner decisions, accepted outcome, Scope IN/OUT | Map every accepted decision and exclusion to protocol and success criteria |
+| D02 | Current source and reference accuracy | Verify cited OpenCode paths, ownership, consumers, tests, scripts, and current behavior from source |
+| D03 | Dependencies, ordering, parallel safety | Build prerequisite DAG; reject read/write races and missing generation barriers |
+| D04 | Behavioral completeness and equivalent paths | Enumerate normal, correction, blocker, non-blocker, and exhausted-budget flows |
+| D05 | Failure handling and terminal exhaustiveness | Require implementation/QA event-to-terminal truth table with exactly one outcome per state/event pair |
+| D06 | Test and QA executability | Verify setup, consumer path, arguments, expected/failure results, and evidence path for each behavior check |
+| D07 | Evidence identity, persistence, read-back | Require binding/read-back of path, digest, bytes, round, launch, reviewer, receipt, and artifact |
+| D08 | OpenCode consumer and authority accuracy | Verify actual source authority and behavior-level OpenCode consumption |
+| D09 | Agent/tool capability and isolation | Match review, command, filesystem, and isolated state needs to actual capabilities |
+| D10 | Concrete security, compatibility, data-loss, external-contract risk | Require causal evidence and reproducible impact; unsupported risk is non-blocking |
+
+#### Finding admission
+
+Admit `ELIGIBLE_BLOCKER` only for violation of an explicit owner decision or accepted scope, failure of an accepted success criterion, an existing regression or reproducible broken OpenCode flow, or a concrete security/data-loss/compatibility/external-contract risk. Each admitted finding carries stable ID, violated criterion, exact location or reproducible input, concrete impact, causal evidence, and minimal correction boundary. Preference, wording taste, speculative improvement, unrelated cleanup, unsupported risk, reviewer severity, raw `changes_requested`, and scope expansion are non-blocking. Resolve lane disagreement by evidence and accepted criteria, never votes, reviewer/model authority, or rhetoric. Normalized reviewer verdicts classify receipts; they do not override finding admission. After reconciliation, a valid lane is effectively `APPROVED` when none of its candidate findings remain in the eligible-blocker ledger, including a lane whose normalized verdict was `BLOCKED` but whose candidates were all rejected as non-blocking.
+
+#### Discovery, repair, and closure
+
+1. Freeze complete plan bytes and dispatch one Momus/Oracle discovery pair over D01-D10.
+2. After both valid receipts arrive, reconcile candidates by accepted criteria and causal evidence. Freeze one deduplicated ledger of eligible blockers; record rejected findings as non-blocking workflow notes.
+3. If no eligible blocker remains, both valid lanes are effectively `APPROVED` after reconciliation. Read live bytes again. If digest and byte count still match the frozen target, terminalize `OKAY`. If they differ, terminalize `INCONCLUSIVE`; changed target identity is not eligible for same-byte recovery. Do not run closure against an unchanged approved plan.
+4. Otherwise apply every accepted blocker to the formal plan in one smallest aggregate repair. Replace, simplify, or delete the smallest relevant text before appending. Never add workflow receipts, controller state, implementation recipes, or material unrelated to a closure assertion.
+5. Re-read repaired bytes and dispatch the only Momus/Oracle closure pair over ledger closure, repair regressions, and admissible novel blockers. A novel blocker is admissible only when caused by repair, based on a newly verified fact unavailable to discovery, or a concrete D10 risk that makes continuation unsafe; otherwise keep it as a non-blocking note.
+6. Reconcile closure findings before terminalization. A normalized `APPROVED` receipt that carries an eligible blocker invalidates the pair and follows the current phase's one-recovery rule before any terminal decision. For a valid closure pair, if both lanes are effectively `APPROVED` for the same digest, no eligible blocker remains, and final live read-back matches, terminalize `OKAY`; otherwise terminalize `INCONCLUSIVE` with remaining eligible blockers or changed target identity. No further repair, discovery, or semantic closure pair exists; only the one same-byte recovery pair permitted for invalid closure evidence may replace that invalid pair.
+
+#### Immutable terminals
+
+Record exactly one terminal, once:
+- `OKAY`: every mandatory receipt valid, no admitted blocker remains, live digest equals final frozen bytes.
+- `INCONCLUSIVE`: a pair and its only recovery both fail, target identity cannot be preserved, valid discovery does not yield dual approval or an eligible repair boundary, or the only closure pair does not prove dual approval.
+
+Terminal record is immutable. No terminal starts implementation. Handoff only reports result and leaves execution to a separate worker session.
+
+Before handoff, verify final live path, bytes, SHA, and byte count against terminal binding. Emit compact workflow evidence: round identity, lane bindings, recovery outcome, coverage, verdicts, reconciliation decisions, repair summary, and final live read-back. D05/D07 describe future implementation and QA evidence properties; they do not require review machinery or receipts inside the formal plan.
 
 ## Delegation discipline (OpenCode-native)
 Every delegated prompt starts with `TASK:`, then DELIVERABLE / SCOPE / VERIFY; state the role inside the prompt and include only the context the child needs:
@@ -218,9 +183,9 @@ Every delegated prompt starts with `TASK:`, then DELIVERABLE / SCOPE / VERIFY; s
 task(subagent_type="explore", description="Map the implementation surface", prompt="TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...")
 ```
 
-Roles - the ONLY spawnable subagents (all read-only, plus `oracle` for the high-accuracy review): `explore`, `librarian`, `metis`, `momus`. Never dispatch with `category=` and never instruct a child to edit files. Spawn long plan/reviewer agents in the background through the OpenCode task surface; between waits, back off — double the timeout up to ~5 minutes — instead of spinning short cycles. Require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A timeout only means no new update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller delegated job. Close each agent after integrating its result.
+Roles - the ONLY spawnable subagents (all read-only, plus `oracle` for the high-accuracy review): `explore`, `librarian`, `metis`, `momus`. Never dispatch with `category=` and never instruct a child to edit files. Ordinary research may use background tasks under normal completion notifications. Mandatory review lanes obey the frozen identity, receipt completion, and one-recovery rules above.
 
 ## Stop rules
-- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts recorded: present the handoff explanation (Phase 4 format), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. Execution belongs to the worker, never to you.
+- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required bounded-review terminal plus workflow evidence recorded outside the plan: present the handoff explanation (Phase 4 format), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the terminal result - and stop. Execution belongs to the worker, never to you.
 - Brief presented and `status: awaiting-approval` recorded: wait. Do not re-explore unless the user changes scope.
 - Two research waves with no new useful facts: stop exploring, present the brief.

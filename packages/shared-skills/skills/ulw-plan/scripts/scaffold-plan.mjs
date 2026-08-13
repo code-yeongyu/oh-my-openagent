@@ -20,8 +20,8 @@
 // commands; it only guarantees the mandated generator never escapes .omo). Mirrors
 // packages/omo-opencode/src/hooks/prometheus-md-only/path-policy.ts.
 
-import { lstat, mkdir, writeFile, readFile, realpath } from "node:fs/promises";
-import { dirname, join, relative, resolve, isAbsolute } from "node:path";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 // The canonical AI-plan section headers, in order. references/full-workflow.md
@@ -162,27 +162,11 @@ plan_path: .omo/plans/${slug}.md
 plan_sha256: null
 review_round_id: null
 pending-action: write and review .omo/plans/${slug}.md
-review:
-  momus:
-    status: pending
-    workspace_root: null
-    runtime_home: null
-    target: .omo/plans/${slug}.md
-    round_id: null
-    plan_sha256: null
-    launch_id: null
-    session: null
-    result: null
-  independent:
-    status: pending
-    workspace_root: null
-    runtime_home: null
-    target: .omo/plans/${slug}.md
-    round_id: null
-    plan_sha256: null
-    launch_id: null
-    session: null
-    result: null`
+review_protocol:
+  coverage_matrix_version: D01-D10/v1
+  phase: discovery_pending
+  recovery_used: false
+  terminal: null`
 		: `review_required: false
 pending-action: write .omo/plans/${slug}.md`;
 	return `---
@@ -190,7 +174,7 @@ slug: ${slug}
 status: drafting
 intent: ${intent}
 ${reviewState}
-approach: <fill: the approach you intend to plan>
+approach: null
 ---
 
 # Draft: ${slug}
@@ -212,6 +196,9 @@ approach: <fill: the approach you intend to plan>
 ## Scope OUT (Must NOT have)
 
 ## Open questions
+
+## Review evidence (workflow only)
+<!-- Append protocol-defined pair blocks here. Frontmatter plan_sha256/review_round_id point to the active pair. Never copy workflow evidence into the formal plan. -->
 
 ## Approval gate
 status: drafting
