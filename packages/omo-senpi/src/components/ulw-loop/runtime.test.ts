@@ -124,7 +124,7 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
       // register is synchronous: resolveOmoBin runs inside it, so the fake bin dir only needs
       // to lead PATH during registration. The dispatch then runs under the REAL environment:
       // on Windows the .cmd shim spawns through cmd.exe, which itself resolves via PATH.
-      let pi: FakeExtensionAPI
+      let pi = new FakeExtensionAPI()
       withEnv({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: fake.dir }, () => {
         pi = new FakeExtensionAPI()
         createUlwLoopComponent().register(pi, {
