@@ -14,7 +14,12 @@ import { invalidValueDiagnostics, validateConfigLayer, validationDiagnostic } fr
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
 import { pruneInvalidConfigPaths } from "./prune-invalid-leaves"
-import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
+import {
+  ignoredProjectProfileDiagnostics,
+  readPersistedOmoProfileFromLayers,
+  resolveOmoConfigView,
+  resolveOmoProfileName,
+} from "./resolution"
 import {
   DEFAULT_READ_FILE_SYSTEM,
   MERGED_OMO_CONFIG_PATH,
@@ -60,6 +65,7 @@ function stripResolutionControlKeys(config: OmoConfig): OmoConfig {
     "[native]": _native,
     "[opencode]": _opencode,
     "[senpi]": _senpi,
+    active_profile: _activeProfile,
     profiles: _profiles,
     ...resolved
   } = config
@@ -176,8 +182,11 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     }
   }
 
+  const persistedProfile = readPersistedOmoProfileFromLayers(layers)
+  diagnostics.push(...ignoredProjectProfileDiagnostics(persistedProfile.ignoredPaths))
   const requestedProfile = resolveOmoProfileName({
     ...(options.env === undefined ? {} : { env: options.env }),
+    ...(persistedProfile.persisted === undefined ? {} : { persisted: persistedProfile.persisted }),
     ...(options.profile === undefined ? {} : { profile: options.profile }),
   })
   const resolved = resolveOmoConfigView({
