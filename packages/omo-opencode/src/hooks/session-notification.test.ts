@@ -725,39 +725,53 @@ describe("session-notification", () => {
   })
 
   test("should cancel notification for activity after grace period", async () => {
-    // given - a regular session notification is scheduled
-    const sessionID = "main-grace-cancel"
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
 
-    const hook = createSessionNotification(createMockPluginInput(), {
-      idleConfirmationDelay: 200,
-      skipIfIncompleteTodos: false,
-      activityGracePeriodMs: 50,
-      enforceMainSessionFilter: false,
-    })
+    try {
+      // given - a regular session notification is scheduled
+      const sessionID = "main-grace-cancel"
 
-    // when - session goes idle
-    await hook({
-      event: {
-        type: "session.idle",
-        properties: { sessionID },
-      },
-    })
+      const hook = createSessionNotification(createMockPluginInput(), {
+        idleConfirmationDelay: 200,
+        skipIfIncompleteTodos: false,
+        activityGracePeriodMs: 50,
+        enforceMainSessionFilter: false,
+      })
 
-    // when - wait for grace period to pass
-    await new Promise((resolve) => setTimeout(resolve, 60))
+      // when - session goes idle
+      await hook({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
 
-    // when - activity happens after grace period
-    await hook({
-      event: {
-        type: "tool.execute.before",
-        properties: { sessionID },
-      },
-    })
+      // when - grace period elapses deterministically
+      jest.setSystemTime(new Date("2026-01-01T00:00:00.051Z"))
+      jest.advanceTimersByTime(51)
 
-    // Wait for original delay to pass
-    await new Promise((resolve) => setTimeout(resolve, 200))
+      // when - activity happens after grace period
+      await hook({
+        event: {
+          type: "tool.execute.before",
+          properties: { sessionID },
+        },
+      })
 
-    // then - notification should NOT be sent (activity cancelled it after grace period)
-    expect(notificationCalls).toHaveLength(0)
+      // when - original idle delay would have fired
+      jest.advanceTimersByTime(200)
+      jest.runOnlyPendingTimers()
+      await Promise.resolve()
+
+      // then - notification should NOT be sent (activity cancelled it after grace period)
+      expect(notificationCalls).toHaveLength(0)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+      globalThis.setTimeout = originalSetTimeout
+      globalThis.clearTimeout = originalClearTimeout
+      Date.now = originalDateNow
+    }
   })
 })

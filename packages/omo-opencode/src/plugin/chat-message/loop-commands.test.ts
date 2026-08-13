@@ -30,6 +30,7 @@ describe("handleGoalMessage", () => {
       input,
       output,
       isFirstMessage: false,
+      nativeGoalCommand: false,
       pluginConfig: {},
     })
 
@@ -60,6 +61,7 @@ describe("handleGoalMessage", () => {
       input,
       output,
       isFirstMessage: false,
+      nativeGoalCommand: false,
       pluginConfig: {},
     })
 
@@ -90,6 +92,7 @@ describe("handleGoalMessage", () => {
       input,
       output,
       isFirstMessage: true,
+      nativeGoalCommand: false,
       pluginConfig: { default_mode: { goal: true } },
     })
 
@@ -121,6 +124,7 @@ describe("handleGoalMessage", () => {
       input,
       output,
       isFirstMessage: false,
+      nativeGoalCommand: false,
       pluginConfig: {},
     })
 
