@@ -8,6 +8,10 @@
     "$schema": {
       "type": "string"
     },
+    "active_profile": {
+      "type": "string",
+      "pattern": "\\S"
+    },
     "categories": {
       "type": "object",
       "propertyNames": {
@@ -14899,7 +14903,8 @@
       "default": {},
       "type": "object",
       "propertyNames": {
-        "type": "string"
+        "type": "string",
+        "pattern": "\\S"
       },
       "additionalProperties": {
         "type": "object",
