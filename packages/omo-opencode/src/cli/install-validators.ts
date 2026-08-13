@@ -56,6 +56,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, "MiniMax-M3 fallback"))
   lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, "MiniMax-M3 fallback"))
   lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
+  lines.push(formatProvider("Atlas Cloud", config.hasAtlasCloud === true, "OpenAI-compatible model gateway"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -64,7 +65,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
-  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Atlas Cloud > Vercel`)
 
   return lines.join("\n")
 }
@@ -188,6 +189,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --vercel-ai-gateway value: ${args.vercelAiGateway} (expected: no, yes)`)
   }
 
+  if (args.atlasCloud !== undefined && !["no", "yes"].includes(args.atlasCloud)) {
+    errors.push(`Invalid --atlas-cloud value: ${args.atlasCloud} (expected: no, yes)`)
+  }
+
   if (hasCodexOnly) {
     const opencodeFlagErrors = collectCodexOnlyOpenCodeFlagErrors(args)
     errors.push(...opencodeFlagErrors)
@@ -214,6 +219,7 @@ function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
   if (args.minimaxCnCodingPlan !== undefined) errors.push("--minimax-cn-coding-plan cannot be used with --platform=codex")
   if (args.minimaxCodingPlan !== undefined) errors.push("--minimax-coding-plan cannot be used with --platform=codex")
   if (args.vercelAiGateway !== undefined) errors.push("--vercel-ai-gateway cannot be used with --platform=codex")
+  if (args.atlasCloud !== undefined) errors.push("--atlas-cloud cannot be used with --platform=codex")
   return errors
 }
 
@@ -241,6 +247,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasMinimaxCnCodingPlan: hasOpenCode && args.minimaxCnCodingPlan === "yes",
     hasMinimaxCodingPlan: hasOpenCode && args.minimaxCodingPlan === "yes",
     hasVercelAiGateway: hasOpenCode && args.vercelAiGateway === "yes",
+    hasAtlasCloud: hasOpenCode && args.atlasCloud === "yes",
     codexAutonomous: hasCodex && args.codexAutonomous !== false,
   }
 }
@@ -258,6 +265,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   minimaxCnCodingPlan: BooleanArg
   minimaxCodingPlan: BooleanArg
   vercelAiGateway: BooleanArg
+  atlasCloud: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -277,5 +285,6 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     minimaxCnCodingPlan: detected.hasMinimaxCnCodingPlan ? "yes" : "no",
     minimaxCodingPlan: detected.hasMinimaxCodingPlan ? "yes" : "no",
     vercelAiGateway: detected.hasVercelAiGateway ? "yes" : "no",
+    atlasCloud: detected.hasAtlasCloud ? "yes" : "no",
   }
 }

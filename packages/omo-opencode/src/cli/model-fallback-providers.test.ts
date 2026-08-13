@@ -29,6 +29,27 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
 }
 
 describe("generateModelConfig provider routes", () => {
+  describe("Atlas Cloud provider", () => {
+    test("routes coding agents through Atlas Cloud using fully qualified model IDs", () => {
+      const result = generateModelConfig(createConfig({ hasAtlasCloud: true }))
+
+      expect(result.agents?.sisyphus?.model).toBe("atlascloud/moonshotai/kimi-k3")
+      expect(result.agents?.hephaestus?.model).toBe("atlascloud/openai/gpt-5.6-sol")
+      expect(result.agents?.explore?.model).toBe("atlascloud/deepseek-ai/deepseek-v4-flash")
+      expect(result.categories?.quick?.model).toBe("atlascloud/deepseek-ai/deepseek-v4-flash")
+    })
+
+    test("selects Atlas Cloud before the catch-all Vercel gateway", () => {
+      const result = generateModelConfig(createConfig({ hasAtlasCloud: true, hasVercelAiGateway: true }))
+
+      expect(result.agents?.hephaestus?.model).toBe("atlascloud/openai/gpt-5.6-sol")
+      const sisyphusFallbacks = result.agents?.sisyphus?.fallback_models?.map((entry) => entry.model) ?? []
+      expect(sisyphusFallbacks.indexOf("atlascloud/moonshotai/kimi-k3")).toBeLessThan(
+        sisyphusFallbacks.indexOf("vercel/moonshotai/kimi-k3"),
+      )
+    })
+  })
+
   describe("Hephaestus agent special cases", () => {
     test("Hephaestus is created when OpenAI is available (openai provider connected)", () => {
       // given only OpenAI is available

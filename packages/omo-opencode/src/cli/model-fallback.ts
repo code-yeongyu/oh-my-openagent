@@ -163,6 +163,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.bailianCodingPlan ||
     avail.minimaxCnCodingPlan ||
     avail.minimaxCodingPlan ||
+    avail.atlasCloud ||
     avail.vercelAiGateway
   if (!hasAnyProvider) {
     return {

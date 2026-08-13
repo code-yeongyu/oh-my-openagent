@@ -18,6 +18,7 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 		minimaxCnCodingPlan: config.hasMinimaxCnCodingPlan,
 		minimaxCodingPlan: config.hasMinimaxCodingPlan,
 		vercelAiGateway: config.hasVercelAiGateway,
+		atlasCloud: config.hasAtlasCloud === true,
 		isMaxPlan: config.isMax20,
 	}
 }
@@ -36,6 +37,7 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 		"minimax-cn-coding-plan": availability.minimaxCnCodingPlan,
 		"minimax-coding-plan": availability.minimaxCodingPlan,
 		vercel: availability.vercelAiGateway,
+		atlascloud: availability.atlasCloud,
 	}
 	return mapping[provider] ?? false
 }
@@ -54,6 +56,7 @@ export function hasAnyConfiguredProvider(config: InstallConfig): boolean {
 		availability.bailianCodingPlan ||
 		availability.minimaxCnCodingPlan ||
 		availability.minimaxCodingPlan ||
+		availability.atlasCloud ||
 		availability.vercelAiGateway
 	)
 }

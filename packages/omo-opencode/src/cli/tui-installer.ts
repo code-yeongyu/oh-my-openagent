@@ -4,6 +4,7 @@ import { PLUGIN_NAME } from "../shared"
 import type { InstallArgs } from "./types"
 import {
   addPluginToOpenCodeConfig,
+  addAtlasCloudProviderToOpenCodeConfig,
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
@@ -48,6 +49,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
         hasMinimaxCnCodingPlan: false,
         hasMinimaxCodingPlan: false,
         hasVercelAiGateway: false,
+        hasAtlasCloud: false,
       }
   const isUpdate = hasOpenCode && detected.isInstalled
 
@@ -92,6 +94,16 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
       return 1
     }
     spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
+    if (config.hasAtlasCloud === true) {
+      spinner.start("Adding Atlas Cloud provider")
+      const atlasResult = addAtlasCloudProviderToOpenCodeConfig()
+      if (!atlasResult.success) {
+        spinner.stop(`Failed to add Atlas Cloud provider: ${atlasResult.error}`)
+        p.outro(color.red("Installation failed."))
+        return 1
+      }
+      spinner.stop(`Atlas Cloud provider configured in ${color.cyan(atlasResult.configPath)}`)
+    }
     try {
       ensureTuiPluginEntry()
     } catch (error) {
