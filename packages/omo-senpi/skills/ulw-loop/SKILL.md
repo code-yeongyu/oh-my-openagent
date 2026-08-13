@@ -21,6 +21,7 @@ This skill is intentionally compact. The full workflow lives in `references/full
 ## Non-Negotiables
 
 - Use the ulw-loop CLI state under `.omo/ulw-loop`; do not hand-edit goal state.
+- Senpi runtime owns `OMO_ULW_LOOP_SESSION_ID` for the duration of the session: it scopes all ulw-loop CLI state to `.omo/ulw-loop/senpi-<sessionId>/` so parallel sessions in one working directory never see each other's runs. Never unset or override it during an active run; the explicit `--session-id <new-id>` flag on a command overrides the env for that one command only.
 - Register goals up front, shaped by `references/define-goal.md` (`omo-agent-toolkit ulw-loop create-goals`, then `create_goal` from the printed handoff), and mirror every atomic step into the live `update_plan` checklist: one ultra-granular step per action, exactly one in_progress, transitions marked the instant they happen.
 - After any compaction or context loss, re-read brief + goals + ledger FIRST plus `omo-agent-toolkit ulw-loop status --json`, then resume; never re-plan from scratch.
 - If `omo-agent-toolkit ulw-loop create-goals` says the existing aggregate is already complete, start unrelated new work with a fresh `--session-id <new-id>` instead of steering or forcing the completed default state. Use `--force` only to intentionally overwrite completed evidence.
