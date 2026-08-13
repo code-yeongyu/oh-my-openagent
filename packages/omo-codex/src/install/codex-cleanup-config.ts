@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { parseAgentHeaderName, parseHookStateHeaderKey, parsePluginHeaderKey } from "./codex-config-toml-sections"
+import { ATLAS_CLOUD_CODEX_PROVIDER_HEADER, isCanonicalAtlasCloudModelProviderSection } from "./codex-config-model-providers"
 
 const MANAGED_MARKETPLACES = ["sisyphuslabs", "lazycodex", "code-yeongyu-codex-plugins"] as const
 
@@ -30,6 +31,10 @@ export function cleanupCodexLightConfigText(config: string): string {
     nextConfig = removeTomlSections(nextConfig, (header) => isManagedHookStateHeader(header, marketplace))
   }
   nextConfig = removeManagedAgentBlocks(nextConfig)
+  nextConfig = removeTomlSections(
+    nextConfig,
+    (header, section) => header === ATLAS_CLOUD_CODEX_PROVIDER_HEADER && isCanonicalAtlasCloudModelProviderSection(section.text),
+  )
   return nextConfig.replace(/\n{3,}/g, "\n\n")
 }
 
@@ -76,9 +81,12 @@ function isManagedHookStateHeader(header: string, marketplace: string): boolean 
   return hookKey.slice(0, separator).endsWith(`@${marketplace}`)
 }
 
-function removeTomlSections(config: string, shouldRemove: (header: string) => boolean): string {
+function removeTomlSections(
+  config: string,
+  shouldRemove: (header: string, section: { readonly header: string | null; readonly text: string }) => boolean,
+): string {
   return splitTomlSections(config)
-    .filter((section) => section.header === null || !shouldRemove(section.header))
+    .filter((section) => section.header === null || !shouldRemove(section.header, section))
     .map((section) => section.text)
     .join("")
 }

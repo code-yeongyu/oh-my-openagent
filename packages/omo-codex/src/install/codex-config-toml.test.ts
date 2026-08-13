@@ -666,6 +666,7 @@ describe("codex-config-toml", () => {
         { name: "plan", configFile: "./agents/plan.toml" },
       ],
     })
+    const firstRun = await readFile(configPath, "utf8")
     await updateCodexConfig({
       configPath,
       repoRoot: "/repo/packages/omo-codex",
@@ -685,7 +686,15 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
+    expect(content.replace(/^last_updated = "[^"]+"$/gm, 'last_updated = "<timestamp>"')).toBe(
+      firstRun.replace(/^last_updated = "[^"]+"$/gm, 'last_updated = "<timestamp>"'),
+    )
     expect(content).toContain("[features]")
+    expect(content).toContain("[model_providers.atlascloud]")
+    expect(content).toContain('base_url = "https://api.atlascloud.ai/v1"')
+    expect(content).toContain('env_key = "ATLASCLOUD_API_KEY"')
+    expect(content).toContain('wire_api = "responses"')
+    expect(content).not.toMatch(/^model_provider\s*=\s*"atlascloud"/m)
     expect(content).toContain("plugins = true")
     expect(content).toContain("plugin_hooks = true")
     expect(content).toContain("[marketplaces.sisyphuslabs]")

@@ -8,6 +8,40 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
+test("#given canonical OMO marketplace #when generated installer updates config #then registers Atlas Cloud without selecting it", async () => {
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-atlas-cloud-"));
+	const configPath = join(root, "config.toml");
+
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+	});
+	const firstRun = await readFile(configPath, "utf8");
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+	});
+
+	const config = await readFile(configPath, "utf8");
+	assert.equal(withoutMarketplaceTimestamp(config), withoutMarketplaceTimestamp(firstRun));
+	assert.equal(config.match(/\[model_providers\.atlascloud\]/g)?.length, 1);
+	assert.match(config, /\[model_providers\.atlascloud\]/);
+	assert.match(config, /base_url = "https:\/\/api\.atlascloud\.ai\/v1"/);
+	assert.match(config, /env_key = "ATLASCLOUD_API_KEY"/);
+	assert.match(config, /wire_api = "responses"/);
+	assert.doesNotMatch(config, /^model_provider\s*=/m);
+});
+
+function withoutMarketplaceTimestamp(config) {
+	return config.replace(/^last_updated = "[^"]+"$/gm, 'last_updated = "<timestamp>"');
+}
+
 test("#given empty Codex config #when script installer updates config #then sets subagent thread limits without forcing MultiAgentV2", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-"));
