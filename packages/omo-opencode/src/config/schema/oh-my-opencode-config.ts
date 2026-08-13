@@ -18,6 +18,7 @@ import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 import { GoalConfigSchema } from "./goal"
+import { DshConfigSchema } from "./dsh"
 import { MonitorConfigSchema } from "./monitor"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
@@ -70,6 +71,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   goal: GoalConfigSchema.optional(),
+  dsh: DshConfigSchema.optional(),
   /** Deprecated compatibility shim. Old \`ralph_loop\` key is parsed and migrated to \`goal\` in validate.ts. */
   ralph_loop: z.record(z.string(), z.unknown()).optional(),
   /**
