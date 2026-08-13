@@ -47,16 +47,15 @@ export function resolveSenpi() {
 }
 
 export function nearestNodeBin(startPath) {
-  // Hoisted layouts place the engine package inside a shared node_modules (…/node_modules/senpi),
-  // whose .bin is a sibling, not a child - starting the climb inside node_modules would walk to the
-  // filesystem root and never find it. Begin at the package's parent so that sibling .bin is seen.
-  let current = basename(startPath) === "node_modules" ? dirname(startPath)
-    : basename(dirname(startPath)) === "node_modules" ? dirname(dirname(startPath))
-    : startPath
+  // Executable shims live beside packages in node_modules/.bin, not inside a package's private
+  // node_modules/.bin. Scoped packages add one more directory between the package and its bin.
+  let current = dirname(startPath)
   const root = parse(current).root
   while (true) {
-    const candidate = join(current, "node_modules", ".bin")
-    if (existsSync(candidate)) return candidate
+    if (basename(current) === "node_modules") {
+      const candidate = join(current, ".bin")
+      if (existsSync(candidate)) return candidate
+    }
     if (current === root) return undefined
     current = dirname(current)
   }
