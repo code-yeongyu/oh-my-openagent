@@ -161,7 +161,7 @@ describe("omo launcher", () => {
         expect(realpathSync.native(binDir ?? "")).toBe(realpathSync.native(dirname(fixture.shimPath ?? "")))
         expect(existsSync(binDir ?? "")).toBe(true)
         expect(environment.OMO_AGENT_TOOLKIT_BIN).toBe(join(fixture.packageRoot, "bin", "omo-agent-toolkit.js"))
-        expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+        expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, ".omo"))
         // An inherited value must never survive; it is replaced by this launcher's own entry so
         // anything resolving the product by name re-enters here instead of the bare engine.
         // Windows reports this path in its long form while the fixture root may be the 8.3 short
@@ -200,6 +200,19 @@ describe("omo launcher", () => {
           command: "npm i -g omo-ai@beta",
           changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
         })
+      })
+
+      test("#then the agent-dir pin matches the brand's flat home for bare children", () => {
+        const fixture = createFixture()
+        const home = join(fixture.root, "home")
+        const result = run(fixture, ["say", "hi"], { HOME: home })
+        expect(result.status).toBe(0)
+
+        const environment = capture(fixture).env
+        const brand = JSON.parse(environment.SENPI_BRAND ?? "{}")
+        // Bare reflection children lose SENPI_BRAND once the parent consumes it, so the pinned
+        // agent dir is what keeps them on the same state the brand profile names.
+        expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, brand.configDir))
       })
 
       test("#then OMO_BIN names this launcher, so the product never resolves to the bare engine", () => {
