@@ -181,9 +181,14 @@ describe("memory run supervisor IC-8 containment", () => {
       expect(existsSync(join(runDir, "outcome.json"))).toBe(false)
       await advanceClock(clockPath, 2_000)
       if (platform === "win32") {
+        if (process.platform !== "win32") {
+          await waitForPath(join(runDir, `win32-graceful-${ledger.childPid}.json`))
+        }
         await childExited
         liveProcesses.delete(ledger.childPid)
-        expect(existsSync(join(runDir, `win32-graceful-${ledger.childPid}.json`))).toBe(false)
+        if (process.platform === "win32") {
+          expect(existsSync(join(runDir, `win32-graceful-${ledger.childPid}.json`))).toBe(false)
+        }
         return
       }
       await waitForPath(join(runDir, `posix-SIGTERM-${ledger.childPid}.json`))
