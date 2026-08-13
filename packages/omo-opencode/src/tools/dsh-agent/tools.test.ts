@@ -4,12 +4,16 @@ import { describe, expect, test, mock, afterAll } from "bun:test"
 
 const runMock = mock(async () => ({ output: "done", stopReason: "end_turn" }))
 const headlessMock = mock(async () => ({ output: "headless done", exitCode: 0 }))
+const verifyMock = mock(async () => ({ verified: true, evidence: "3 pass" }))
 
 mock.module("./acp-client", () => ({
   runDshAcpAgent: runMock,
 }))
 mock.module("./headless-runner", () => ({
   runDshHeadless: headlessMock,
+}))
+mock.module("./verify", () => ({
+  runVerificationGate: verifyMock,
 }))
 
 afterAll(() => {
@@ -113,5 +117,62 @@ describe("createDshAgentTool", () => {
     // then
     const call = headlessMock.mock.calls[0]?.[0] as { cwd: string }
     expect(call.cwd).toBe("/explicit/dir")
+  })
+
+  test("#given a verify gate that passes #when executed #then returns the verified result with the gate metadata", async () => {
+    // given
+    headlessMock.mockClear()
+    verifyMock.mockClear()
+    verifyMock.mockResolvedValueOnce({ verified: true, evidence: "3 pass" })
+    const tool = createDshAgentTool({ ctx: makeCtx(), config: makeConfig("headless") })
+    const context = {
+      sessionID: "ses_3",
+      messageID: "msg_3",
+      agent: "sisyphus",
+      directory: "/workspace/project",
+      worktree: "/workspace/project",
+      abort: new AbortController().signal,
+      metadata: () => {},
+      ask: async () => {},
+    }
+
+    // when
+    const result = await tool.execute({ prompt: "task", verify: "bun test" }, context)
+
+    // then
+    expect(verifyMock).toHaveBeenCalledTimes(1)
+    const gateCall = verifyMock.mock.calls[0]?.[0] as { command: string; cwd: string }
+    expect(gateCall.command).toBe("bun test")
+    expect(gateCall.cwd).toBe("/workspace/project")
+    expect(result).toMatchObject({
+      title: "dsh agent (verified)",
+      output: "headless done",
+      metadata: { verified: true, verify: "bun test" },
+    })
+  })
+
+  test("#given a verify gate that fails #when executed #then returns the result with verification evidence appended", async () => {
+    // given
+    verifyMock.mockClear()
+    verifyMock.mockResolvedValueOnce({ verified: false, evidence: "1 fail" })
+    const tool = createDshAgentTool({ ctx: makeCtx(), config: makeConfig("headless") })
+    const context = {
+      sessionID: "ses_4",
+      messageID: "msg_4",
+      agent: "sisyphus",
+      directory: "/workspace/project",
+      worktree: "/workspace/project",
+      abort: new AbortController().signal,
+      metadata: () => {},
+      ask: async () => {},
+    }
+
+    // when
+    const result = await tool.execute({ prompt: "task", verify: "bun test" }, context)
+
+    // then
+    expect(result).toMatchObject({ title: "dsh agent (VERIFICATION FAILED)" })
+    expect(String(result.output)).toContain("VERIFICATION FAILED")
+    expect(String(result.output)).toContain("1 fail")
   })
 })

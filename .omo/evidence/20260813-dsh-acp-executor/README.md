@@ -54,3 +54,21 @@ the published CLI today) and `acp` (protocol-first, for source compositions).
    (headless runner: ok/fail/hang/abort via a real child fixture; tool
    dispatches headless vs acp modes correctly).
 3. Config suite -> 141 pass; typecheck + build -> exit 0.
+
+# UPDATE: C — deterministic self-verification gate on call_dsh_agent
+
+**WHAT WAS TESTED:** the tool now accepts an optional `verify` arg (e.g. "bun
+test", "bun run typecheck"). After the executor settles, omo runs the
+deterministic gate locally in the working directory (no model call, no DeepSeek
+key) and returns `{ verified, verify, evidence }`. On failure the output text is
+appended with the captured gate evidence and the title marks VERIFICATION
+FAILED. The gate metadata feeds the v4-verification-gate's metadata failure
+detection (PR #6639 A+B).
+
+**WHAT WAS OBSERVED:**
+1. `bun test packages/omo-opencode/src/tools/dsh-agent/` -> 19 pass / 0 fail.
+   New: verify gate passing -> title "verified", metadata verified:true; gate
+   failing -> title "VERIFICATION FAILED" with evidence appended; real-child
+   verify tests (true -> verified; failing -> evidence captured incl stderr;
+   timeout -> rejects).
+2. `bun run typecheck` + `bun run build` -> exit 0.
