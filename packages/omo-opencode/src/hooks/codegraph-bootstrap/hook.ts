@@ -5,6 +5,7 @@ import { join } from "node:path"
 import {
   CODEGRAPH_PINNED_VERSION,
   buildCodegraphEnv,
+  codegraphCommandRequiresSupportedLocalNode,
   ensureCodegraphGitignored,
   ensureCodegraphProvisioned,
   prepareCodegraphWorkspace,
@@ -111,15 +112,6 @@ async function resolveOrProvisionCommand(
   const resolved = resolveInitialCommand(deps, config)
   if (resolved.exists) return resolved
   if (config.auto_provision === false) return null
-  const nodeSupport = deps.nodeSupport()
-  if (!nodeSupport.supported) {
-    deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
-      major: nodeSupport.major,
-      reason: nodeSupport.reason,
-      source: resolved.source,
-    })
-    return null
-  }
 
   const installDir = config.install_dir ?? defaultInstallDir()
   const provisioned = await deps.ensureProvisioned({
@@ -158,14 +150,16 @@ async function runBootstrap(
       deps.log("[codegraph-bootstrap] CodeGraph unavailable; skipping bootstrap", { projectRoot })
       return
     }
-    const nodeSupport = deps.nodeSupport()
-    if (command.source !== "bundled" && command.source !== "env" && !nodeSupport.supported) {
-      deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
-        major: nodeSupport.major,
-        projectRoot,
-        reason: nodeSupport.reason,
-      })
-      return
+    if (codegraphCommandRequiresSupportedLocalNode(command)) {
+      const nodeSupport = deps.nodeSupport()
+      if (!nodeSupport.supported) {
+        deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
+          major: nodeSupport.major,
+          projectRoot,
+          reason: nodeSupport.reason,
+        })
+        return
+      }
     }
 
     const workspace = deps.prepareWorkspace(projectRoot)
