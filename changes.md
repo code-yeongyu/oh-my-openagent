@@ -1,3 +1,16 @@
+## 2026-08-13 — Track Senpi 2026.8.13 for the omo-ai beta line
+
+All native Senpi workspace pins now use `2026.8.13` across the root, native
+launcher, OmO Senpi adapter, and task engine. Senpi 2026.8.13 adds `baseten`
+and `qwen-token-plan-individual`; this update also synchronizes the local map
+with the already-available `opengateway` provider. Keep
+`packages/omo-native/bin/lib/provider-map.json` synchronized with
+`builtinProviders()` whenever the shared pin moves.
+
+The lockfile must move with the exact pins. The focused pin tests continue to
+reject manifest drift, while the provider-map contract now compares the local
+map directly with the installed engine registry.
+
 ## 2026-08-06 — Model packed Senpi installs in compatibility fixtures
 
 The root Senpi compatibility fixture now passes the packed plugin path explicitly when exercising

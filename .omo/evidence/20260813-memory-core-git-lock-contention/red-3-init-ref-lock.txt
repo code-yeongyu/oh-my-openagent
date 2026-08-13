@@ -1,0 +1,21 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/git/repo.test.ts:
+282 |       async run(argv: readonly string[], options: GitExecOptions): Promise<GitExecResult> {
+283 |         const verb = argv.find((token) => !token.startsWith("-")) ?? ""
+284 |         const shouldFail = (verb === "symbolic-ref" || verb === "commit") && !failedOnce.has(verb)
+285 |         if (shouldFail) {
+286 |           failedOnce.add(verb)
+287 |           throw new Error(
+                          ^
+error: fatal: cannot lock ref 'HEAD': Unable to create '/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-git-lock-VJ1wgG/.git/HEAD.lock': File exists.
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/repo.test.ts:287:21)
+      at git (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/repo.ts:229:31)
+      at init (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/repo.ts:50:18)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/repo.test.ts:298:29)
+(fail) GitMemoryRepo > #given a transient ref lock on the first attempt #when a repo is initialized #then the retry lets HEAD settle [20.50ms]
+
+ 0 pass
+ 11 filtered out
+ 1 fail
+Ran 1 test across 1 file. [118.00ms]

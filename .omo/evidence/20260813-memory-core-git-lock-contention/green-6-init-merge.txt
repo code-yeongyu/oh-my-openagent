@@ -1,0 +1,20 @@
+red3
+packages/memory-core/src/git/repo.test.ts:
+(pass) GitMemoryRepo > #given a transient ref lock on the first attempt #when a repo is initialized #then the retry lets HEAD settle [251.60ms]
+
+ 1 pass
+ 11 filtered out
+ 0 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [349.00ms]
+
+git
+(pass) git lock retry > #given a non-lock git failure #when an operation runs #then it surfaces immediately without retrying [0.19ms]
+
+ 51 pass
+ 0 fail
+ 123 expect() calls
+Ran 51 tests across 4 files. [5.64s]
+
+tc
+$ tsgo --noEmit -p tsconfig.json

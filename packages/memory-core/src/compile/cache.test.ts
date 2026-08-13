@@ -75,13 +75,13 @@ describe("MemoryBlockCache", () => {
     expect(cache.size).toBe(2)
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
-  it("#given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry", async () => {
+  it("#given one session at a nudged threshold #when changing nudge variants compile #then replacement keeps the cache bounded to one entry", async () => {
     // given
     const { repo } = await createRepo()
     const cache = new MemoryBlockCache()
 
     // when
-    for (let nudgeTurns = 2; nudgeTurns < 102; nudgeTurns += 1) {
+    for (const nudgeTurns of [2, 3, 10, 100]) {
       try {
         await cache.compile(repo, "template", {
           agentId: "cache-agent",

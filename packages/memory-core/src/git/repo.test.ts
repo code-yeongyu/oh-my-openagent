@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { GitExec, GitExecOptions, GitExecResult } from "./index"
 import {
   DirtyRepoError,
   GitMemoryRepo,
@@ -240,6 +241,72 @@ describe("GitMemoryRepo", () => {
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
     expect(existsSync(worktreeDir)).toBe(false)
   })
+
+  it("#given concurrent commits across worktrees #when index and ref locks contend #then every commit lands", async () => {
+    // given - reflection commits from per-agent worktrees that share one object store
+    // and ref namespace, which is where Windows surfaces index.lock and ref-lock races.
+    // Each worktree owns its index, so every writer is expected to succeed outright.
+    const { repo } = await createRepo()
+    await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "initial\n" }] })
+    const writers = 6
+    const author = { agentId: "agent-one", authorName: "Memory Agent" }
+    const parent = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-worktrees-")))
+    tempDirs.push(parent)
+
+    // when - worktrees are added and committed into concurrently
+    const results = await Promise.allSettled(
+      Array.from({ length: writers }, async (_, index) => {
+        const checkout = join(parent, `checkout-${index}`)
+        await repo.worktreeAdd(checkout, `memory/concurrent-${index}`)
+        await writeFile(join(checkout, "learned.md"), `learned ${index}\n`)
+        const child = new GitMemoryRepo({ dir: checkout, agentId: "agent-one" })
+        return child.commitWrite(["learned.md"], `concurrent write ${index}`, author)
+      }),
+    )
+
+    // then - no writer may be lost to a transient lock, and every commit is distinct
+    const rejections = results.flatMap((result) =>
+      result.status === "rejected" ? [String(result.reason)] : [],
+    )
+    expect(rejections).toEqual([])
+    const shas = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value.sha] : [],
+    )
+    expect(new Set(shas).size).toBe(writers)
+  })
+
+
+  it("#given a transient ref lock on the first attempt #when a repo is initialized #then the retry lets HEAD settle", async () => {
+    // given - git loses the HEAD.lock race once, exactly as it does under Windows contention
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-git-lock-")))
+    tempDirs.push(dir)
+    const inner = createNodeGitExec()
+    const failedOnce = new Set<string>()
+
+    class FlakyLockExec implements GitExec {
+      async run(argv: readonly string[], options: GitExecOptions): Promise<GitExecResult> {
+        const verb = argv.find((token) => !token.startsWith("-")) ?? ""
+        const shouldFail = (verb === "symbolic-ref" || verb === "commit") && !failedOnce.has(verb)
+        if (shouldFail) {
+          failedOnce.add(verb)
+          throw new Error(
+            `fatal: cannot lock ref 'HEAD': Unable to create '${dir}/.git/HEAD.lock': File exists.`,
+          )
+        }
+        return inner.run(argv, options)
+      }
+    }
+
+    const repo = new GitMemoryRepo({ dir, agentId: "agent-one", exec: new FlakyLockExec() })
+
+    // when
+    const head = await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "seed\n" }] })
+
+    // then - the transient lock must be retried away, not surfaced
+    expect(head).toMatch(/^[0-9a-f]{7,}$/)
+    expect(failedOnce.has("symbolic-ref")).toBe(true)
+  })
+
 })
 
 async function rejectedError(operation: Promise<unknown>): Promise<Error> {

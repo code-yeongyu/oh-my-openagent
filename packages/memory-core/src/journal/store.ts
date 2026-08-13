@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
@@ -14,13 +14,10 @@ import {
   type TranscriptEntry,
   type TranscriptProjection,
 } from "./entries"
+import { withLocalJournalLock, type JournalLock } from "./lock"
 import { syncJournalDirectory, syncJournalFile } from "./fsync"
 
-export type JournalLock = <T>(
-  lockPath: string,
-  task: () => Promise<T>,
-  signal?: AbortSignal,
-) => Promise<T>
+export { withLocalJournalLock, type JournalLock }
 
 export type TranscriptJournalOptions = {
   readonly journalDir: string
@@ -33,40 +30,6 @@ export type AppendResult = { readonly appended: number; readonly skipped: number
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
   return typeof error.code === "string" ? error.code : undefined
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
-}
-
-export const withLocalJournalLock: JournalLock = async (lockPath, task, signal) => {
-  const deadline = Date.now() + 5_000
-  let handle
-  for (;;) {
-    // Abort before acquisition leaves no lock file behind (IC-11), so a drain that already
-    // returned never creates and deletes state.lock behind the caller's back.
-    signal?.throwIfAborted()
-    try {
-      handle = await open(lockPath, "wx", 0o600)
-      break
-    } catch (error) {
-      if (errorCode(error) !== "EEXIST" || Date.now() >= deadline) throw error
-      signal?.throwIfAborted()
-      await delay(10)
-    }
-  }
-
-  // The lock is held: the finally below is exempt cleanup and always runs, abort or not.
-  try {
-    await handle.writeFile(`${process.pid}\n`, "utf8")
-    signal?.throwIfAborted()
-    return await task()
-  } finally {
-    await handle.close()
-    await unlink(lockPath).catch((error: unknown) => {
-      if (errorCode(error) !== "ENOENT") throw error
-    })
-  }
 }
 
 function isTranscriptEntry(value: unknown): value is TranscriptEntry {

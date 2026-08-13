@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { realpathSync, rmSync } from "node:fs"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -21,12 +22,12 @@ import {
   type RefreshMemoryStatusInput,
 } from "./status"
 import { createMemoryWiring } from "./wiring"
-import { realpathSync } from "node:fs"
-
 const roots: string[] = []
 
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+afterEach(() => {
+  for (const root of roots.splice(0)) {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  }
 })
 
 describe("memory footer wiring", () => {
