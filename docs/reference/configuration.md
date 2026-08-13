@@ -65,10 +65,14 @@ Defaults apply once at the end. The option keys documented in this reference are
 
 No default profiles ship: a profile exists only when you write one under `profiles.<name>` or the migration derives one from a legacy profile directory. Activation, highest priority first:
 
-1. `OMO_PROFILE`
-2. `OCX_PROFILE` (set by `ocx oc -p <name>`)
-3. An `OPENCODE_CONFIG_DIR` whose path ends in `profiles/<name>`
-4. None
+1. An explicit loader profile
+2. `OMO_PROFILE`
+3. `OCX_PROFILE` (set by `ocx oc -p <name>`)
+4. An `OPENCODE_CONFIG_DIR` whose path ends in `profiles/<name>`
+5. `active_profile` in `~/.omo/omo.jsonc`
+6. None
+
+Use `omo-agent-toolkit profile list|current|use <name>|clear` to inspect or update the persisted user-level selection. `profile use` rejects project-only profiles. A project `.omo/omo.jsonc` cannot activate a profile; project-level `active_profile` is ignored with a diagnostic.
 
 Activating a profile that does not exist produces a diagnostic and falls back to the base configuration.
 
