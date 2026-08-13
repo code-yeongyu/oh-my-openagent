@@ -1,0 +1,13 @@
+red command:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6799 test ./packages/omo-opencode/src/cli/model-fallback.test.ts --test-name-pattern "keeps every generated fallback on ZAI"
+
+red observation:
+  0 pass, 1 fail
+  The generated JSON contained fourteen `"model":"opencode/gpt-5-nano"`
+  routes while only ZAI was configured.
+
+green command:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6799 test ./packages/omo-opencode/src/cli/model-fallback.test.ts --test-name-pattern "keeps every generated fallback on ZAI"
+
+green observation:
+  1 pass, 0 fail

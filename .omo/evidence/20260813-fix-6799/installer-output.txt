@@ -1,0 +1,21 @@
+command:
+  bun packages/omo-opencode/src/cli/index.ts install --no-tui
+    --platform=opencode
+    --claude=no --openai=no --gemini=no --copilot=no
+    --opencode-zen=no --zai-coding-plan=yes
+    --kimi-for-coding=no --opencode-go=no
+    --bailian-coding-plan=no
+    --minimax-cn-coding-plan=no --minimax-coding-plan=no
+    --vercel-ai-gateway=no --skip-auth
+
+sandbox:
+  C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6799/.omo/qa-sandbox-6799
+
+observed:
+  exit_code=0
+  generated file: home/.omo/omo.jsonc
+  agents.sisyphus.model=zai-coding-plan/glm-5.2
+  agents.explore.model=zai-coding-plan/glm-5.2
+  agents.multimodal-looker.model=zai-coding-plan/glm-4.6v
+  every other generated agent/category model=zai-coding-plan/glm-5.2
+  opencode model count=0

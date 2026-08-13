@@ -1,0 +1,15 @@
+installer suites:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6799 test ./packages/omo-opencode/src/cli/model-fallback.test.ts ./packages/omo-opencode/src/cli/model-fallback-providers.test.ts
+  53 pass, 0 fail, 95 expect calls
+
+TypeScript audit:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6799 packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-opencode/src/cli/model-fallback.ts packages/omo-opencode/src/cli/model-fallback.test.ts
+  No violations in 2 files.
+
+upstream package typecheck baseline:
+  C:/Users/pss/OneDrive/Documents/github/oh-my-openagent/node_modules/.bin/tsgo.exe --noEmit -p C:/Users/pss/OneDrive/Documents/github/oh-my-openagent/packages/omo-opencode/tsconfig.json
+  exit code 0
+
+patch check:
+  git -C C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6799 diff --check
+  exit code 0
