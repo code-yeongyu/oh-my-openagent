@@ -51,6 +51,7 @@ export async function launchFactsModelChain(input: FactsChildLaunchInput) {
     warn: input.warn,
     surfaceName: "facts",
     attempt: async (candidate, attempt, nextAttempt) => {
+      console.error(`[facts-runner-trace] child:attempt:start attempt=${attempt} model=${candidate.model}`)
       const spawnArgs = await prepareFactsSpawn({
         runId: input.runId,
         runDir: input.runDir,
@@ -64,7 +65,8 @@ export async function launchFactsModelChain(input: FactsChildLaunchInput) {
         senpiCommand: input.senpiCommand,
         senpiPrefixArgs: input.senpiPrefixArgs,
       })
-      return runFactsChild(spawnArgs, {
+      console.error(`[facts-runner-trace] child:prepare:done attempt=${attempt}`)
+      const child = await runFactsChild(spawnArgs, {
         terminationGraceMs: input.terminationGraceMs,
         maxOutputBytes: input.maxOutputBytes,
         sandbox: input.sandbox,
@@ -73,6 +75,8 @@ export async function launchFactsModelChain(input: FactsChildLaunchInput) {
         queued: input.queued,
         now: () => input.launchedAt,
       })
+      console.error(`[facts-runner-trace] child:attempt:done attempt=${attempt} code=${child.code}`)
+      return child
     },
   })
 }

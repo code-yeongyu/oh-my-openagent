@@ -59,24 +59,35 @@ export class FactsExtractorRunner {
   }
 
   private async launchPendingOnce(signal?: AbortSignal): Promise<FactsLaunchResult> {
+    console.error("[facts-runner-trace] launch:start")
     const isAborted = (): boolean => signal?.aborted === true
     if (isAborted()) return { status: "skipped" }
-    if (await this.reconcileRuns()) return { status: "active" }
+    console.error("[facts-runner-trace] launch:reconcile:start")
+    const hasActiveRun = await this.reconcileRuns()
+    console.error(`[facts-runner-trace] launch:reconcile:done active=${hasActiveRun}`)
+    if (hasActiveRun) return { status: "active" }
+    console.error("[facts-runner-trace] launch:queue:start")
     const entries = await this.queue.listPending()
+    console.error(`[facts-runner-trace] launch:queue:done count=${entries.length}`)
     if (isAborted()) return { status: "skipped" }
     if (entries.length === 0) return { status: "empty" }
+    console.error("[facts-runner-trace] launch:config:start")
     const loaded = this.options.loadConfig()
     const resolution = resolveReflectionModel(QUICK_CATEGORY, loaded.config, this.options.resolveModelRegistry())
+    console.error(`[facts-runner-trace] launch:config:done kind=${resolution.kind}`)
     if (resolution.kind === "category_unavailable") {
       this.options.logger?.warn("facts extractor quick category unavailable", { cause: resolution.cause })
       return { status: "skipped" }
     }
 
     const repo = new GitMemoryRepo({ dir: this.options.identity.paths.repo, agentId: this.options.identity.id })
+    console.error("[facts-runner-trace] launch:repo:start")
     if (!existsSync(join(repo.dir, ".git"))) await repo.init({ seedFiles: buildDefaultSeedFiles() })
+    console.error("[facts-runner-trace] launch:repo:done")
     const batchId = (this.options.createBatchId ?? randomUUID)()
     const launchedAt = this.now().getTime()
     if (isAborted()) return { status: "skipped" }
+    console.error("[facts-runner-trace] launch:reserve:start")
     const runDir = await reserveFactsRunDir({
       factsDir: this.options.identity.paths.facts,
       entries,
@@ -85,9 +96,12 @@ export class FactsExtractorRunner {
       deadlineMs: this.options.deadlineMs,
       terminationGraceMs: this.options.terminationGraceMs,
     })
+    console.error(`[facts-runner-trace] launch:reserve:done active=${runDir === undefined}`)
     if (runDir === undefined) return { status: "active" }
     const runId = basename(runDir)
+    console.error(`[facts-runner-trace] launch:people:start runId=${runId}`)
     const people = await readFactsPeoplePayload(repo.dir)
+    console.error(`[facts-runner-trace] launch:people:done runId=${runId}`)
     const payload: FactsPayload = {
       version: 1,
       identity: this.options.identity.id,
@@ -97,6 +111,7 @@ export class FactsExtractorRunner {
     }
     if (isAborted()) return { status: "skipped" }
     try {
+      console.error(`[facts-runner-trace] launch:child:start runId=${runId}`)
       const { child } = await launchFactsModelChain({
         runId,
         runDir,
@@ -117,6 +132,7 @@ export class FactsExtractorRunner {
         queued: queueKeys(entries),
         launchedAt,
       })
+      console.error(`[facts-runner-trace] launch:child:done runId=${runId} code=${child.code}`)
       if (child.timedOut || child.code !== 0) {
         await this.writeFinal(runDir, runId, "failed", child.stderr.trim() || "facts child failed")
         return { status: "failed", runId }
@@ -125,6 +141,7 @@ export class FactsExtractorRunner {
       await this.writeFinal(runDir, runId, "failed", describe(error))
       return { status: "failed", runId }
     }
+    console.error(`[facts-runner-trace] launch:finalize:start runId=${runId}`)
     return this.finalizeRun(runDir, repo)
   }
 

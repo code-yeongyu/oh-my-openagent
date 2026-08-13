@@ -1,6 +1,6 @@
 import { afterEach, expect } from "bun:test"
-import { existsSync, writeFileSync } from "node:fs"
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
+import { existsSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtemp, readFile, readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -22,8 +22,14 @@ export const childFixture = join(import.meta.dir, "worker", "__fixtures__", "fac
 export const supervisorFixture = join(import.meta.dir, "worker", "memory-run-supervisor.ts")
 const tempDirs: string[] = []
 
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+afterEach(() => {
+  console.error(`[facts-runner-trace] cleanup:start count=${tempDirs.length}`)
+  for (const dir of tempDirs.splice(0)) {
+    console.error(`[facts-runner-trace] cleanup:remove:start dir=${dir}`)
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    console.error(`[facts-runner-trace] cleanup:remove:done dir=${dir}`)
+  }
+  console.error("[facts-runner-trace] cleanup:done")
 })
 
 export async function fixture() {

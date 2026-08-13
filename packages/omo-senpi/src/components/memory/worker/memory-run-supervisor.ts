@@ -50,6 +50,7 @@ async function runChildBootstrap(runDir: string): Promise<void> {
     detached: false,
     stdio: ["ignore", "inherit", "inherit"],
   })
+  process.stderr.write(`[facts-runner-trace] model:spawned pid=${child.pid ?? "unknown"}\n`)
   writeBootstrapStatus({ code: child.pid ?? null, signal: "MODEL_PID" })
   const cascadeGraceful = () => {
     if (platform === "win32" || process.platform === "win32") child.kill()
@@ -57,20 +58,24 @@ async function runChildBootstrap(runDir: string): Promise<void> {
   process.on("SIGTERM", cascadeGraceful)
   process.on("SIGINT", cascadeGraceful)
   const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
+    process.stderr.write("[facts-runner-trace] model:deadline:graceful\n")
     if (platform === "win32") terminateSupervisorChildGracefully(platform, child)
     else signalSupervisorProcessGroup(process.pid, "SIGTERM")
   })
   const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
+    process.stderr.write("[facts-runner-trace] model:deadline:hard\n")
     terminateSupervisorChildHard(platform, process.pid)
   })
   const status = await new Promise<SupervisorChildExit>((resolve) => {
     let settled = false
     child.once("error", () => {
+      process.stderr.write("[facts-runner-trace] model:error\n")
       if (settled) return
       settled = true
       resolve({ code: null, signal: null })
     })
     child.once("close", (code, signal) => {
+      process.stderr.write(`[facts-runner-trace] model:close code=${code ?? "null"} signal=${signal ?? "null"}\n`)
       if (settled) return
       settled = true
       resolve({ code, signal })
@@ -100,6 +105,7 @@ async function runSupervisor(runDir: string): Promise<void> {
     detached: true,
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
   })
+  process.stderr.write(`[facts-runner-trace] bootstrap:spawned pid=${bootstrap.pid ?? "unknown"}\n`)
   let childPid = bootstrap.pid
   let modelPid: number | undefined
   let bootstrapStatus = ""
@@ -150,40 +156,53 @@ async function runSupervisor(runDir: string): Promise<void> {
   let finishHardKill: (() => void) | undefined
   if (platform === "win32") hardKillFinished = new Promise<void>((resolve) => { finishHardKill = resolve })
   const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
+    process.stderr.write("[facts-runner-trace] bootstrap:deadline:graceful\n")
     timedOut = true
     if (platform === "win32") recordSupervisorGracefulDeadline(bootstrap.pid)
     else terminateSupervisorChildGracefully(platform, bootstrap)
   })
   const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
+    process.stderr.write(`[facts-runner-trace] bootstrap:deadline:hard target=${modelPid ?? childPid ?? "unknown"}\n`)
     terminateSupervisorChildHard(platform, modelPid ?? childPid)
+    process.stderr.write("[facts-runner-trace] bootstrap:deadline:hard:done\n")
     finishHardKill?.()
   })
   const wrapperExit = await new Promise<SupervisorChildExit>((resolve, reject) => {
     let settled = false
     bootstrap.once("error", (error) => {
+      process.stderr.write(`[facts-runner-trace] bootstrap:error ${String(error)}\n`)
       if (settled) return
       settled = true
       reject(error)
     })
     bootstrap.once("close", (code, signal) => {
+      process.stderr.write(`[facts-runner-trace] bootstrap:close code=${code ?? "null"} signal=${signal ?? "null"}\n`)
       if (settled) return
       settled = true
       resolve({ code, signal })
     })
   })
+  process.stderr.write("[facts-runner-trace] supervisor:post-bootstrap:start\n")
   const childExit = parseSupervisorChildExit(bootstrapStatus)
-  if (platform === "win32" && timedOut && childExit === undefined) await hardKillFinished
+  process.stderr.write(`[facts-runner-trace] supervisor:post-bootstrap:parsed childExit=${childExit === undefined ? "undefined" : "defined"} timedOut=${timedOut}\n`)
+  if (platform === "win32" && timedOut && childExit === undefined) {
+    process.stderr.write("[facts-runner-trace] supervisor:hard-kill-wait:start\n")
+    await hardKillFinished
+    process.stderr.write("[facts-runner-trace] supervisor:hard-kill-wait:done\n")
+  }
   cancelTerm()
   cancelKill()
   childPid = undefined
   closeSync(stdoutFd)
   closeSync(stderrFd)
+  process.stderr.write("[facts-runner-trace] supervisor:fds:closed\n")
 
   // Record the timeout from whether the deadline instant was actually reached, not from which
   // process's deadline callback happened to run first: the bootstrap's own enforcement can end
   // the child before the supervisor's callback fires, and the cancels above would otherwise
   // erase a deadline that was in fact exceeded.
   const clockNow = readSupervisorClockNow()
+  process.stderr.write(`[facts-runner-trace] supervisor:clock:read value=${clockNow}\n`)
   const finishedAt = new Date().toISOString()
   const outcome: RunOutcome = {
     version: 1,
@@ -193,8 +212,11 @@ async function runSupervisor(runDir: string): Promise<void> {
     childExit: childExit ?? wrapperExit,
     timedOut: timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt),
   }
+  process.stderr.write("[facts-runner-trace] supervisor:publish:start\n")
   await publishRunOutcome(runDir, manifest, outcome)
+  process.stderr.write("[facts-runner-trace] supervisor:publish:done\n")
   await unlinkRunArtifact(launchPath)
+  process.stderr.write("[facts-runner-trace] supervisor:unlink:done\n")
 }
 const args = process.argv.slice(2)
 try {

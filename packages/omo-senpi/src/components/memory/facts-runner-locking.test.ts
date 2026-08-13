@@ -9,8 +9,10 @@ import { enqueue, fixture, onlyRunDir, runnerOptions } from "./facts-runner.test
 
 describe("deterministic facts writer-lock interleavings", () => {
   test("#given the lock releases through the injected retry boundary #when finalization retries #then the batch commits and the queue empties", async () => {
+    console.error("[facts-runner-trace] first:start")
     // given
     const { root, identity, queue } = await fixture()
+    console.error("[facts-runner-trace] first:fixture")
     const attempts: number[] = []
     let released = false
     const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
@@ -25,17 +27,22 @@ describe("deterministic facts writer-lock interleavings", () => {
 
     // when
     const result = await runner.launchPending()
+    console.error("[facts-runner-trace] first:launch")
 
     // then
     expect(result.status).toBe("committed")
     expect(attempts).toEqual([1, 2])
     expect(await queue.listPending()).toHaveLength(0)
+    console.error("[facts-runner-trace] first:done")
   }, 30_000)
 
   test("#given the lock remains held for all three attempts #when finalization exhausts retries #then no commit lands and one warning leaves queue and watermarks unchanged", async () => {
+    console.error("[facts-runner-trace] second:start")
     // given
     const { root, identity, queue } = await fixture()
+    console.error("[facts-runner-trace] second:fixture")
     const before = await queue.readCursor("session-1")
+    console.error("[facts-runner-trace] second:cursor-before")
     const attempts: number[] = []
     const delays: number[] = []
     const warnings: string[] = []
@@ -55,6 +62,7 @@ describe("deterministic facts writer-lock interleavings", () => {
 
     // when
     const result = await runner.launchPending()
+    console.error("[facts-runner-trace] second:launch")
 
     // then
     expect(result.status).toBe("failed")
@@ -62,8 +70,11 @@ describe("deterministic facts writer-lock interleavings", () => {
     expect(delays).toEqual([1, 2])
     expect(warnings).toHaveLength(1)
     expect(await queue.listPending()).toHaveLength(1)
+    console.error("[facts-runner-trace] second:pending")
     expect(await queue.readCursor("session-1")).toEqual(before)
+    console.error("[facts-runner-trace] second:cursor-after")
     const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
     expect((await repo.log()).filter((commit) => commit.trailers["Generated-By"] === "facts-extractor")).toHaveLength(0)
+    console.error("[facts-runner-trace] second:done")
   }, 30_000)
 })
