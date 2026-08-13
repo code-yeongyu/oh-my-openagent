@@ -83,7 +83,16 @@ export function createIdentityRuntime(
           process.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"),
           ...(process.env.XDG_CONFIG_HOME === undefined ? [] : [process.env.XDG_CONFIG_HOME]),
         ],
+        command: spawnArgs.command,
+        env: spawnArgs.env,
       })
+      if (builtSandbox.warning !== undefined) {
+        deps.logger?.warn("memory reflection sandbox degraded", {
+          identity: identity.identity,
+          runId: spawnArgs.runId,
+          warning: builtSandbox.warning,
+        })
+      }
     }
     return builtSandbox(spawnArgs)
   }

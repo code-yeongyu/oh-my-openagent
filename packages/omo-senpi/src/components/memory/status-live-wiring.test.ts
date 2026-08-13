@@ -8,7 +8,7 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { MEMORY_STATUS_KEY, refreshMemoryStatus, type GitRepoForStatus } from "./status"
-import { MEMORY_REFLECTING_FRAMES, type MemoryFooterTimers } from "./status-live"
+import { type MemoryFooterTimers } from "./status-live"
 import { createMemoryFooterStatusLive } from "./status-live-wiring"
 
 const roots: string[] = []
@@ -94,9 +94,10 @@ describe("memory footer status live wiring", () => {
     live.syncActive("session-1", ui.ui)
     timers.advance(1)
 
+    // Literal glyphs: expectations built from MEMORY_REFLECTING_FRAMES would survive a corrupted table.
     expect(ui.calls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: `mem:agent-test ${MEMORY_REFLECTING_FRAMES[0]} reflecting` },
-      { key: MEMORY_STATUS_KEY, text: `mem:agent-test ${MEMORY_REFLECTING_FRAMES[1]} reflecting` },
+      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠋ reflecting" },
+      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠙ reflecting" },
     ])
     live.dispose()
   })

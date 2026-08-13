@@ -17,7 +17,7 @@ type Fixture = {
   shimPath?: string
 }
 
-type InstallLayout = "bun" | "bun-posix-special" | "npm" | "unknown"
+type InstallLayout = "bun" | "bun-legacy" | "bun-posix-special" | "npm" | "unknown"
 
 function writeFile(path: string, content: string, mode?: number): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -43,7 +43,9 @@ function createFixture(options: { hoisted?: boolean; shim?: boolean; installLayo
   // the fixture root is canonicalized once and every derived path inherits the same spelling.
   const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
   roots.push(root)
-  const packagePath = options.installLayout?.startsWith("bun")
+  const packagePath = options.installLayout === "bun-legacy"
+    ? join(root, "home", "node_modules", "omo-ai")
+    : options.installLayout?.startsWith("bun")
     ? join(
       root,
       options.installLayout === "bun-posix-special"
@@ -319,6 +321,53 @@ describe("omo launcher", () => {
         expect(result.status).toBe(0)
         expect(result.stdout.trim()).toBe("omo is updated via npm: npm i -g omo-ai@beta")
         expect(existsSync(fixture.captureFile)).toBe(false)
+      })
+    })
+
+    describe("#given a legacy Bun global manifest contains the empty dot dependency", () => {
+      test("#then launching omo removes only the invalid dependency entry", () => {
+        const fixture = createFixture({ installLayout: "bun-legacy" })
+        const home = join(fixture.root, "home")
+        const manifestPath = join(home, "package.json")
+        writeFile(manifestPath, JSON.stringify({
+          dependencies: {
+            "": ".",
+            "left-pad": "1.3.0",
+          },
+        }))
+
+        const result = run(fixture, ["--version"], { HOME: home })
+
+        expect(result.status).toBe(0)
+        expect(JSON.parse(readFileSync(manifestPath, "utf8")).dependencies).toEqual({
+          "left-pad": "1.3.0",
+        })
+      })
+
+      test("#then a different empty dependency value is preserved", () => {
+        const fixture = createFixture({ installLayout: "bun-legacy" })
+        const home = join(fixture.root, "home")
+        const manifestPath = join(home, "package.json")
+        const original = `${JSON.stringify({ dependencies: { "": "file:.", "left-pad": "1.3.0" } }, null, 2)}\n`
+        writeFile(manifestPath, original)
+
+        const result = run(fixture, ["--version"], { HOME: home })
+
+        expect(result.status).toBe(0)
+        expect(readFileSync(manifestPath, "utf8")).toBe(original)
+      })
+
+      test("#then malformed JSON is preserved", () => {
+        const fixture = createFixture({ installLayout: "bun-legacy" })
+        const home = join(fixture.root, "home")
+        const manifestPath = join(home, "package.json")
+        const original = "{ not-json\n"
+        writeFile(manifestPath, original)
+
+        const result = run(fixture, ["--version"], { HOME: home })
+
+        expect(result.status).toBe(0)
+        expect(readFileSync(manifestPath, "utf8")).toBe(original)
       })
     })
 

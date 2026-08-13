@@ -169,8 +169,9 @@ describe("reflection completion flow", () => {
     // then
     expect(consumed).toHaveLength(1)
     expect(api.renderers.map((item) => item.customType)).toEqual([
-      REFLECTION_COMPLETION_ENTRY_TYPE,
-      REFLECTION_LAUNCHED_ENTRY_TYPE,
+      "senpi-memory.reflection-completion",
+      "senpi-memory.reflection-launched",
+      "senpi-memory.reflection-summary",
     ])
     expect(api.entries).toEqual([{ customType: REFLECTION_COMPLETION_ENTRY_TYPE, data: consumed[0] }])
     expect(notifications).toHaveLength(1)

@@ -58,9 +58,11 @@ describe("SenpiSubprocessRunner integration", () => {
         deep: { model: "override/model", reasoning: "high" },
       },
     }
+    const runStartedAt = Date.now()
     const item = await harness({
       childMode: "commit",
       config,
+      now: () => new Date(runStartedAt),
       models: [
         { provider: "base", id: "model" },
         { provider: "override", id: "model" },
@@ -68,7 +70,6 @@ describe("SenpiSubprocessRunner integration", () => {
     })
 
     // when
-    const startedAt = Date.now()
     const result = await item.runner.launch(item.run)
 
     // then
@@ -80,8 +81,7 @@ describe("SenpiSubprocessRunner integration", () => {
       thinking: "high",
       mergePolicy: "auto",
     })
-    expect(item.spawnCalls[0]?.hardDeadlineAt).toBeGreaterThanOrEqual(startedAt + 59_000)
-    expect(item.spawnCalls[0]?.hardDeadlineAt).toBeLessThanOrEqual(startedAt + 61_000)
+    expect(item.spawnCalls[0]?.hardDeadlineAt).toBe(runStartedAt + 60_000)
   }, 30_000)
 
   test("#given a stub child that commits in its reflection worktree #when launched #then it merges records notifies and advances the cursor", async () => {
@@ -115,8 +115,9 @@ describe("SenpiSubprocessRunner integration", () => {
       }),
     })
     expect(item.api.renderers.map((entry) => entry.customType)).toEqual([
-      REFLECTION_COMPLETION_ENTRY_TYPE,
-      REFLECTION_LAUNCHED_ENTRY_TYPE,
+      "senpi-memory.reflection-completion",
+      "senpi-memory.reflection-launched",
+      "senpi-memory.reflection-summary",
     ])
     expect(item.notifications).toHaveLength(1)
     expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")

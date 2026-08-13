@@ -3,6 +3,7 @@ import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/sen
 
 import type { ComponentLogger } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
+import type { ResolveAndPreflightMemoryLaunch } from "./worker/memory-launch-preflight"
 import type { FactsSandbox } from "./worker/spawn"
 
 export type FactsLaunchResult =
@@ -23,6 +24,7 @@ export interface FactsExtractorRunnerOptions {
   readonly maxOutputBytes?: number
   readonly senpiCommand?: string
   readonly senpiPrefixArgs?: readonly string[]
+  readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
   readonly supervisorPath?: string
   readonly sandbox?: FactsSandbox
   readonly now?: () => Date

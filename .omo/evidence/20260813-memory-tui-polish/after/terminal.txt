@@ -1,0 +1,62 @@
+  senpi-memory.health [expanded]
+  ✗ Memory reflection failing · 4 runs in a row
+  Commit or stash the memory worktree, then rerun /memory r...
+  reason child_exit · worktree merge refused because memory...
+
++----------------------------------------------------------------------------------------------------+
+| TERMINAL WIDTH 100                                                                                 |
++----------------------------------------------------------------------------------------------------+
+
+  reflection-launched [collapsed]
+  ◐ Memory reflection started · reflection-run-2
+  Triggered by step-count after 25 new steps.
+
+  reflection-launched [expanded]
+  ◐ Memory reflection started · reflection-run-2
+  Triggered by step-count after 25 new steps.
+  category quick · model anthropic/claude-sonnet-4 · thinking high · identity project-a1b2c3d4
+
+  reflection-completion (merged) [collapsed]
+  ● Memory reflection merged · reflection-run-2
+  Reflection merged its findings into memory.
+
+  reflection-completion (merged) [expanded]
+  ● Memory reflection merged · reflection-run-2
+  Reflection merged its findings into memory.
+  category quick · files 3 · commit 9f2c1ab · took 1m12s
+
+  reflection-completion (failed) [collapsed]
+  ✗ Memory reflection failed · reflection-run-2
+  Reflection did not finish; the transcript cursor was not advanced.
+
+  reflection-completion (failed) [expanded]
+  ✗ Memory reflection failed · reflection-run-2
+  Reflection did not finish; the transcript cursor was not advanced.
+  category quick · took 4.3s · reason child_exit · worktree merge refused because memory had uncomm...
+
+  reflection-completion (timed out) [collapsed]
+  ⚠ Memory reflection timed out · reflection-run-2
+  Reflection hit its deadline; the transcript cursor was not advanced.
+
+  reflection-completion (timed out) [expanded]
+  ⚠ Memory reflection timed out · reflection-run-2
+  Reflection hit its deadline; the transcript cursor was not advanced.
+  category quick · took 10m00s · reason deadline_exceeded
+
+  reflection-summary [collapsed]
+  ⚠ Memory reflection · 7 older completions collapsed
+  Delivered while this session was away; 2 need attention.
+
+  reflection-summary [expanded]
+  ⚠ Memory reflection · 7 older completions collapsed
+  Delivered while this session was away; 2 need attention.
+  most common child_exit:worktree merge refused because memory was dirty · oldest 2026-08-11T04:00:...
+
+  senpi-memory.health [collapsed]
+  ✗ Memory reflection failing · 4 runs in a row
+  Commit or stash the memory worktree, then rerun /memory reflect.
+
+  senpi-memory.health [expanded]
+  ✗ Memory reflection failing · 4 runs in a row
+  Commit or stash the memory worktree, then rerun /memory reflect.
+  reason child_exit · worktree merge refused because memory had uncommitted changes · since 2026-08...

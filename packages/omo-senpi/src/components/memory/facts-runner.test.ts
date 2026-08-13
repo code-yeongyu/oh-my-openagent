@@ -5,6 +5,8 @@ import { join } from "node:path"
 import { FactsQueue, GitMemoryRepo, factsQueuePaths } from "@oh-my-opencode/memory-core"
 import { FactsExtractorRunner } from "./facts-runner"
 import { enqueue, fixture, onlyRunDir, runnerOptions } from "./facts-runner.test-support"
+import type { ResolveAndPreflightMemoryLaunch } from "./worker/memory-launch-preflight"
+import { createRunnerHarness } from "./worker/runner.test-support"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
 describe("quick-pinned facts launch", () => {
   test("#given quick cannot resolve #when pending facts are launched #then no child spawns and the queue stays intact with one warning", async () => {
@@ -38,6 +40,33 @@ describe("quick-pinned facts launch", () => {
     expect(warnings).toHaveLength(1)
     expect(await queue.listPending()).toHaveLength(1)
   }, 30_000)
+  test("#given one injected launch-preflight seam #when reflection and facts launch #then both surfaces route through it", async () => {
+    // given
+    const surfaces: string[] = []
+    const observe: ResolveAndPreflightMemoryLaunch = async (input) => {
+      surfaces.push(input.surfaceName)
+      throw new Error(`observed ${input.surfaceName}`)
+    }
+    const reflection = await createRunnerHarness({
+      childMode: "commit",
+      resolveAndPreflightLaunch: observe,
+    })
+    const { root, identity, queue } = await fixture()
+    const facts = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
+      resolveAndPreflightLaunch: observe,
+    }))
+
+    // when
+    const reflectionResult = await reflection.runner.launch(reflection.run)
+    const factsResult = await facts.launchPending()
+
+    // then
+    expect(reflectionResult).toMatchObject({ outcome: "failed", detail: "observed reflection" })
+    expect(factsResult.status).toBe("failed")
+    expect(surfaces).toEqual(["reflection", "facts"])
+    await rm(reflection.root, { recursive: true, force: true })
+  }, 30_000)
+
   test("#given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit", async () => {
     // given
     const { root, identity, queue } = await fixture()

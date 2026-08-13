@@ -4,6 +4,7 @@ import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/sen
 import type { SenpiOmoConfigResult } from "../../config-resolution"
 import type { ComponentLogger } from "../../../extension/types"
 import type { ReflectionCompletionRecord, ReflectionLiveSession } from "./completion"
+import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import type { ReflectionThinkingLevel } from "./resolve-model"
 import type { ReflectionSandbox } from "./spawn"
 
@@ -45,6 +46,7 @@ export interface SenpiSubprocessRunnerOptions {
   readonly now?: () => Date
   readonly senpiCommand?: string
   readonly senpiPrefixArgs?: readonly string[]
+  readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
   readonly supervisorPath?: string
   readonly withWriterLock?: <T>(operation: () => Promise<T>) => Promise<T>
 }

@@ -3,6 +3,7 @@ import { homedir } from "node:os"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
+import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
 import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
 import { printSetupReport } from "./setup-report.js"
@@ -90,6 +91,7 @@ function isInteractiveDefault(args) {
 }
 
 export async function runLauncher(args = process.argv.slice(2)) {
+  migrateLegacyBunGlobalManifest()
   const command = args[0]
   if (command === "ulw-loop") {
     spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))

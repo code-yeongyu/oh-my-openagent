@@ -83,6 +83,11 @@ export function createMemoryRuntimeWiring(
       env: options.env,
       sandbox: buildFactsSandboxTransform({
         policy: sandboxPolicy as SandboxPolicy,
+        onWarning: (warning, spawnArgs) => options.logger?.warn("memory facts sandbox degraded", {
+          identity: identity.identity,
+          runId: spawnArgs.runId,
+          warning,
+        }),
       }),
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
