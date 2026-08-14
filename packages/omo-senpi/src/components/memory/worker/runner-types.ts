@@ -5,7 +5,7 @@ import type { SenpiOmoConfigResult } from "../../config-resolution"
 import type { ComponentLogger } from "../../../extension/types"
 import type { ReflectionCompletionRecord, ReflectionLiveSession } from "./completion"
 import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
-import type { ReflectionThinkingLevel } from "./resolve-model"
+import type { ReflectionSessionModel, ReflectionThinkingLevel } from "./resolve-model"
 import type { ReflectionSandbox } from "./spawn"
 
 export interface ReflectionReservationPort {
@@ -34,6 +34,7 @@ export interface SenpiSubprocessRunnerOptions {
   readonly reservation: ReflectionReservationPort
   readonly logger?: ComponentLogger
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly resolveSessionModel?: () => ReflectionSessionModel | undefined
   readonly loadConfig?: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd?: string
   readonly env?: NodeJS.ProcessEnv

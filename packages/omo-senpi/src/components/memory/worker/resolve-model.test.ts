@@ -154,6 +154,155 @@ describe("resolveReflectionModel", () => {
     })
   })
 
+  describe("#given no category rung covers the connected providers", () => {
+    // Discord report 1537678248337739826: providers whose model ids appear in no quick-chain
+    // rung (google here) dead-chain today, so resolution must fall back to what the runtime
+    // registry actually exposes.
+    const flash = {
+      provider: "google",
+      id: "gemini-3.6-flash",
+      cost: { input: 0.3, output: 2.5, cacheRead: 0.03 },
+      contextWindow: 1_000_000,
+    }
+    const pro = {
+      provider: "google",
+      id: "gemini-3.1-pro",
+      cost: { input: 2, output: 12, cacheRead: 0.2 },
+      contextWindow: 1_000_000,
+    }
+    const embedding = {
+      provider: "google",
+      id: "text-embedding-005",
+      cost: { input: 0.01, output: 0, cacheRead: 0 },
+      contextWindow: 8192,
+    }
+    const liveRegistry = {
+      getAvailable: () => [pro, embedding, flash],
+      find: (provider: string, modelId: string) =>
+        [pro, embedding, flash].find((candidate) => candidate.provider === provider && candidate.id === modelId),
+    }
+
+    test("#when the live registry exposes priced chat models #then the cheapest one resolves as registry fallback", () => {
+      // when
+      const result = resolveReflectionModel("quick", { categories: {} }, liveRegistry)
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind === "resolved") {
+        expect(result.model).toBe("google/gemini-3.6-flash")
+        expect(result.source).toBe("registry_fallback")
+        expect(result.fallbacks).toEqual([{ model: "google/gemini-3.1-pro" }])
+      }
+    })
+
+    test("#when a pricier session model is also present #then the registry candidate still wins the ladder", () => {
+      // when: session runs the expensive pro model, registry still exposes the cheap flash
+      const result = resolveReflectionModel("quick", { categories: {} }, liveRegistry, {
+        sessionModel: { provider: "google", id: "gemini-3.1-pro" },
+      })
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind === "resolved") {
+        expect(result.model).toBe("google/gemini-3.6-flash")
+        expect(result.source).toBe("registry_fallback")
+      }
+    })
+
+    test("#when the session model is cheaper than every registry candidate #then the cost chooser inherits it", () => {
+      // given: only a pricey registry candidate is connected, session runs a cheaper model
+      const pricey = {
+        provider: "google",
+        id: "gemini-3.1-pro",
+        cost: { input: 2, output: 12, cacheRead: 0.2 },
+        contextWindow: 1_000_000,
+      }
+      const cheapSession = {
+        provider: "google",
+        id: "gemini-3.6-flash",
+        cost: { input: 0.3, output: 2.5, cacheRead: 0.03 },
+        contextWindow: 1_000_000,
+      }
+      const pricedRegistry = {
+        getAvailable: () => [pricey],
+        find: (provider: string, modelId: string) =>
+          [pricey, cheapSession].find((entry) => entry.provider === provider && entry.id === modelId),
+      }
+
+      // when
+      const result = resolveReflectionModel("quick", { categories: {} }, pricedRegistry, {
+        sessionModel: { provider: "google", id: "gemini-3.6-flash" },
+      })
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind === "resolved") {
+        expect(result.model).toBe("google/gemini-3.6-flash")
+        expect(result.source).toBe("session_inherit")
+      }
+    })
+
+    test("#when the registry scan finds nothing but a session model exists #then reflection inherits the session model", () => {
+      // given
+      const emptyRegistry = { getAvailable: () => [], find: () => undefined }
+
+      // when
+      const result = resolveReflectionModel("quick", { categories: {} }, emptyRegistry, {
+        sessionModel: { provider: "anthropic", id: "claude-opus-5", thinking: "low" },
+      })
+
+      // then
+      expect(result).toEqual({
+        kind: "resolved",
+        category: "quick",
+        model: "anthropic/claude-opus-5",
+        thinking: "low",
+        source: "session_inherit",
+        fallbacks: [],
+      })
+    })
+
+    test("#when even the registry object is missing #then the session model still resolves", () => {
+      // when
+      const result = resolveReflectionModel("quick", { categories: {} }, undefined, {
+        sessionModel: { provider: "anthropic", id: "claude-opus-5" },
+      })
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind === "resolved") {
+        expect(result.model).toBe("anthropic/claude-opus-5")
+        expect(result.source).toBe("session_inherit")
+      }
+    })
+
+    test("#when an explicitly pinned model is unresolvable but other models exist #then the fallback keeps reflection alive", () => {
+      // A pin that cannot resolve (typo, disconnected provider) still means "run reflection",
+      // unlike disable:true which means "do not run" - so the ladder applies and the chosen
+      // model is reported as registry_fallback rather than silently masquerading as the pin.
+      const result = resolveReflectionModel(
+        "quick",
+        { categories: { quick: { model: "google/ghost-model" } } },
+        liveRegistry,
+      )
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind === "resolved") {
+        expect(result.model).toBe("google/gemini-3.6-flash")
+        expect(result.source).toBe("registry_fallback")
+      }
+    })
+
+    test("#when neither registry nor session model can help #then it still fails closed", () => {
+      // when
+      const result = resolveReflectionModel("quick", { categories: {} }, { getAvailable: () => [], find: () => undefined })
+
+      // then
+      expect(result.kind).toBe("category_unavailable")
+    })
+  })
+
   test("#given the task warning suppression convention #when evaluated #then global opt-out and per-category opt-in retain their precedence", () => {
     // given
     const globallySuppressed: OmoConfig = {

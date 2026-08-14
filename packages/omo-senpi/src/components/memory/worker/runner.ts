@@ -34,6 +34,17 @@ export type {
 
 import type { ExecutionResult, ReflectionRunResult, ReflectionRunner, SenpiSubprocessRunnerOptions } from "./runner-types"
 
+// missing_providers rides the failure detail so the health fingerprint and the remediation hint
+// can name what to connect; the fingerprint truncates at 60 chars, keeping it stable.
+function categoryUnavailableDetail(
+  category: string,
+  resolution: Extract<ReflectionModelResolution, { readonly kind: "category_unavailable" }>,
+): string {
+  const base = `Reflection category "${category}" could not resolve a usable model (cause: ${resolution.cause})`
+  const providers = resolution.missingProviders?.join(", ")
+  return providers === undefined || providers.length === 0 ? base : `${base}; missing providers: ${providers}`
+}
+
 export class SenpiSubprocessRunner implements ReflectionRunner {
   private readonly loadConfig: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
   private readonly now: () => Date
@@ -53,14 +64,18 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     const loaded = this.loadConfig({ cwd })
     const reflection = resolveAgentReflectionSettings(loaded.config.memory, this.options.identity.id)
     const category = reflection.category
-    const resolution = resolveReflectionModel(category, loaded.config, this.options.resolveModelRegistry())
+    const registry = this.options.resolveModelRegistry()
+    const sessionModel = this.options.resolveSessionModel?.()
+    const resolution = resolveReflectionModel(category, loaded.config, registry, {
+      ...(sessionModel === undefined ? {} : { sessionModel }),
+    })
 
     if (resolution.kind === "category_unavailable") {
       this.notifyCategoryUnavailable(loaded.config, resolution)
       return this.settle(run, {
         outcome: "failed",
         reason: "category_unavailable",
-        detail: `Reflection category "${category}" could not resolve a usable model (cause: ${resolution.cause})`,
+        detail: categoryUnavailableDetail(category, resolution),
       }, startedAt, resolution, true)
     }
 

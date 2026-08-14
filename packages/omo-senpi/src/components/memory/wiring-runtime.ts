@@ -14,10 +14,11 @@ import {
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
 import { resolveMemoryModelRegistry } from "./model-registry-resolver"
+import { resolveMemorySessionModel } from "./session-model-resolver"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
-import type { ReflectionLiveSession } from "./worker"
+import type { ReflectionLiveSession, ReflectionSessionModel } from "./worker"
 import { buildFactsSandboxTransform, type SandboxPolicy } from "./sandbox"
 
 export interface MemoryRuntimeWiring {
@@ -53,6 +54,10 @@ export function createMemoryRuntimeWiring(
 
   function resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]> {
     return resolveMemoryModelRegistry(lastEventCtx.current)
+  }
+
+  function resolveSessionModel(): ReflectionSessionModel | undefined {
+    return resolveMemorySessionModel(lastEventCtx.current)
   }
 
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
@@ -119,6 +124,7 @@ export function createMemoryRuntimeWiring(
       loadConfig: options.loadConfig,
       cwd: options.cwd,
       resolveModelRegistry,
+      resolveSessionModel,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
       ...(liveSession === undefined
         ? {}

@@ -24,6 +24,7 @@ import {
   reconcileReflectionRuns,
   type ReflectionLiveSession,
   type ReflectionReservationPort,
+  type ReflectionSessionModel,
 } from "./worker"
 import type { ReflectionSpawnArgs } from "./worker"
 export { resolveMemorySettings } from "./reflection-settings"
@@ -32,6 +33,7 @@ export interface MemoryIdentityRuntimeDeps {
   readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd: () => string
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly resolveSessionModel?: () => ReflectionSessionModel | undefined
   readonly liveSession?: () => ReflectionLiveSession | undefined
   readonly logger?: ComponentLogger
 }
@@ -102,6 +104,7 @@ export function createIdentityRuntime(
     reservation: store,
     logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,
+    ...(deps.resolveSessionModel === undefined ? {} : { resolveSessionModel: deps.resolveSessionModel }),
     loadConfig: (options) => deps.loadConfig(options ?? {}),
     cwd: deps.cwd(),
     sandbox: lazySandbox,
