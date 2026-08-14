@@ -38,12 +38,17 @@ Focused aggregate: 46 pass, 0 fail, 154 assertions.
 
 7. `npx --yes bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm`
    - Exit: 0.
-   - Bundled 933 modules; output `dist/cli/index.js`.
-   - Bundle SHA-256: `53858b7fe99818bffb480044c5195754129f472e14974c7b793b5a0a148f83d9`.
+   - Bundled 934 modules; output `dist/cli/index.js`.
+   - Bundle SHA-256: `55ece27fd523a401ff43549ce4ac144e1e907588fc53a0f4397d6bcb4296bd92`.
    - Bundle contains the project-only persistence guard and whitespace schema guard.
 
 8. `git diff --check`
    - Exit: 0.
+
+9. `npx --yes bun run build:senpi-plugin:stage`
+   - Exit: 0 after rebasing onto `038ed0cbbefe2b40677b63867aeea0d16bc303e0`.
+   - The conflicted historical generated-bundle commit was dropped and regenerated from the rebased source with the repository's official generator.
+   - Changed generated outputs are limited to `omo-init-deep-advisor.js`, `omo-task.js`, and `omo.js`; no conflict markers remain.
 
 ## Known broader Windows-only limitations
 

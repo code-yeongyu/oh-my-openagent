@@ -132,10 +132,10 @@
                                            }
                  },
     "configs":  {
-                    "before":  "{\n  // QA comment must survive profile writes\n  \"profiles\": {\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\n  }\n}",
-                    "after_use":  "{\n  // QA comment must survive profile writes\n  \"profiles\": {\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\n  },\n  \"active_profile\": \"gpt\"\n}",
-                    "after_clear":  "{\n  // QA comment must survive profile writes\n  \"profiles\": {\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\n  }\n}",
-                    "before_negative_cases":  "{\n  // QA comment must survive profile writes\n  \"profiles\": {\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\n  }\n}",
+                    "before":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  }\r\n}",
+                    "after_use":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  },\r\n  \"active_profile\": \"gpt\"\r\n}",
+                    "after_clear":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  }\r\n}",
+                    "before_negative_cases":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  }\r\n}",
                     "whitespace_fixture":  "{ \"active_profile\": \"   \", \"profiles\": { \"gpt\": {} } }",
                     "malformed_fixture":  "{ \"profiles\": {"
                 },
@@ -175,19 +175,19 @@
                                              "sha256":  "572e69958d0c11c4416af88f49c23f06fb0d39ae788f637b3d80eda0ae525a0e"
                                          },
                                          {
-                                             "relative_path":  "home/.omo/omo.jsonc.bak.2026-08-13T18-39-41-544Z",
-                                             "length":  206,
-                                             "sha256":  "d7f5def086bc9cc0564e46d8ac296cd03ef380dd3dcba8ccd97fda5fe10f1447"
+                                             "relative_path":  "home/.omo/omo.jsonc.bak.2026-08-14T11-46-30-780Z",
+                                             "length":  212,
+                                             "sha256":  "1077ce8120d92a2af524f0d09eb1f77f50bf7dbaddb5445cdb180ac532ea3a72"
                                          },
                                          {
-                                             "relative_path":  "home/.omo/omo.jsonc.bak.2026-08-13T18-39-45-517Z",
-                                             "length":  233,
-                                             "sha256":  "bfc7280224f3461b9dc1bcfeca1fb6fd4a2e22192022eda6f414c74f434d2c44"
+                                             "relative_path":  "home/.omo/omo.jsonc.bak.2026-08-14T11-46-34-630Z",
+                                             "length":  240,
+                                             "sha256":  "38e261afb754430fa2b4a20195a90d0138c4ddb4271ad03c78da910d2f155be0"
                                          },
                                          {
                                              "relative_path":  "project/.omo/omo.jsonc",
-                                             "length":  102,
-                                             "sha256":  "92f5261ede066da2325a8a785a8c56438587ca111f8fcbc134d4fea0fa6325a8"
+                                             "length":  106,
+                                             "sha256":  "7bfce70c8463bc766dc2c2f80724ac472652cc74575105f0e16c9b71526d800e"
                                          }
                                      ],
     "host_config":  {
