@@ -7,6 +7,7 @@ export type DshHeadlessRunInput = {
   readonly prompt: string
   readonly timeoutMs: number
   readonly abort: AbortSignal
+  readonly env?: Record<string, string | undefined>
 }
 
 export type DshHeadlessRunResult = {
@@ -24,7 +25,10 @@ export type DshHeadlessRunResult = {
 export async function runDshHeadless(input: DshHeadlessRunInput): Promise<DshHeadlessRunResult> {
   const child = spawn(input.command, [...input.args, "--profile", "headless", input.prompt], {
     cwd: input.cwd,
-    env: process.env,
+    env: {
+      ...process.env,
+      ...input.env,
+    },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: process.platform === "win32",
   })

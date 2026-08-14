@@ -72,3 +72,27 @@ detection (PR #6639 A+B).
    verify tests (true -> verified; failing -> evidence captured incl stderr;
    timeout -> rejects).
 2. `bun run typecheck` + `bun run build` -> exit 0.
+
+# UPDATE: D — auto-route dsh to opencode-go (no DeepSeek key needed)
+
+**WHAT WAS TESTED:** verified live that opencode-go is an OpenAI-compatible
+endpoint at https://opencode.ai/zen/go/v1 (models list + chat-completions both
+respond; deepseek-v4-flash returns reasoning_content). Terms permit use from
+any agent ("use it with any agent"). Running the REAL dsh headless profile with
+DEEPSEEK_API_KEY=<opencode-go key> + DEEPSEEK_BASE_URL=https://opencode.ai/zen/go/v1
++ DSH_MODEL=deepseek-v4-flash returns the model answer (smoke: "OK", "PROVEN").
+Zero dsh code changes — it's a plain OpenAI-compatible endpoint override.
+
+The tool now resolves auth automatically: explicit DEEPSEEK_* env wins, else the
+opencode-go key from opencode's auth store (auth.json) with the zen/go/v1 base
+URL and deepseek-v4-flash default. Env is passed explicitly to the child so the
+tool is self-sufficient without shell config.
+
+**WHAT WAS OBSERVED:**
+1. Live smoke: `dsh --profile headless "Reply with exactly: OK"` -> OK, and
+   "PROVEN" -> PROVEN, both via opencode-go. End-to-end DeepSeek Harness
+   execution on the opencode-go subscription.
+2. `bun test packages/omo-opencode/src/tools/dsh-agent/` -> 22 pass / 0 fail
+   (3 new auth tests: explicit env wins, auth-store fallback with default
+   baseUrl/model, missing store -> empty).
+3. `bun run typecheck` + `bun run build` -> exit 0.

@@ -4,6 +4,7 @@ import type { DshConfig } from "../../config/schema/dsh"
 import { runDshAcpAgent } from "./acp-client"
 import { runDshHeadless } from "./headless-runner"
 import { runVerificationGate } from "./verify"
+import { resolveDshAuth } from "./auth"
 import { log } from "../../shared"
 
 const DSH_AGENT_DESCRIPTION =
@@ -36,11 +37,23 @@ export function createDshAgentTool(deps: DshAgentDeps): ToolDefinition {
     async execute(args, toolContext) {
       const cwd = args.cwd ?? (config.cwd || ctx.directory)
       const startedAt = Date.now()
+      const auth = resolveDshAuth()
+      const childEnv: Record<string, string | undefined> = {}
+      if (auth.apiKey) {
+        childEnv.DEEPSEEK_API_KEY = auth.apiKey
+      }
+      if (auth.baseUrl) {
+        childEnv.DEEPSEEK_BASE_URL = auth.baseUrl
+      }
+      if (auth.model) {
+        childEnv.DSH_MODEL = auth.model
+      }
       log("[dsh-agent] starting run", {
         sessionID: toolContext.sessionID,
         cwd,
         mode: config.mode,
         command: config.command,
+        auth: auth.apiKey ? "resolved" : "none",
       })
 
       let outputText = ""
@@ -56,6 +69,7 @@ export function createDshAgentTool(deps: DshAgentDeps): ToolDefinition {
           permission: config.permission,
           timeoutMs: config.timeout_ms,
           abort: toolContext.abort,
+          env: childEnv,
         })
         outputText = result.output
         stopReason = result.stopReason
@@ -73,6 +87,7 @@ export function createDshAgentTool(deps: DshAgentDeps): ToolDefinition {
           prompt: args.prompt,
           timeoutMs: config.timeout_ms,
           abort: toolContext.abort,
+          env: childEnv,
         })
         outputText = result.output
         exitCode = result.exitCode
