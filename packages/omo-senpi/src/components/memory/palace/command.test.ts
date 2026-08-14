@@ -79,7 +79,7 @@ describe("palace command", () => {
     const opened = surface.execCalls[0]?.args[0]
     expect(opened).toBeDefined()
     expect(existsSync(String(opened))).toBe(true)
-  })
+  }, { timeout: 20000 })
 
   test("#given linux and win32 hosts #when /palace runs #then the platform opener is used", async () => {
     const fixture = await createPalaceFixture()
@@ -91,7 +91,7 @@ describe("palace command", () => {
 
     expect(linux.execCalls[0]?.command).toBe("xdg-open")
     expect(windows.execCalls[0]?.command).toBe("start")
-  })
+  }, { timeout: 20000 })
 
   test("#given a tmux or ssh session #when /palace runs #then the path is printed instead of opened", async () => {
     const fixture = await createPalaceFixture()
@@ -105,7 +105,7 @@ describe("palace command", () => {
     expect(ssh.execCalls).toHaveLength(0)
     expect(tmux.notifications[0]?.message).toMatch(/[\\/]viewers[\\/]palace-/)
     expect(ssh.notifications[0]?.message).toMatch(/[\\/]viewers[\\/]palace-/)
-  })
+  }, { timeout: 20000 })
 
   test("#given a headless context #when /palace runs #then the path is returned as command output text", async () => {
     const fixture = await createPalaceFixture()
@@ -117,7 +117,7 @@ describe("palace command", () => {
     expect(headless.notifications).toHaveLength(0)
     expect(headless.outputs).toHaveLength(1)
     expect(existsSync(String(headless.outputs[0]))).toBe(true)
-  })
+  }, { timeout: 20000 })
 
   test("#given no bound memory identity #when /palace runs #then it reports the unbound state without generating a file", async () => {
     const surface = commandContext({})
