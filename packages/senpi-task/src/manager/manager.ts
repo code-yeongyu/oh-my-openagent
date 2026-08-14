@@ -4,7 +4,7 @@ import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecord, isSpawnSpecV1, parseTaskId, syncTaskIdFloor } from "../state"
+import { createTaskRecord, parseTaskId, syncTaskIdFloor } from "../state"
 import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import { TaskIdSpaceExhaustedError } from "../state/id"
 import type { TaskRecord, TaskRunStats } from "../state"
@@ -23,11 +23,11 @@ import {
   inSession,
   isTerminalRecord,
   nowIso,
-  recordSpawnedPid,
 } from "./manager-helpers"
 import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
 import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { reattachManagedTask, respawnManagedTask } from "./manager-respawn"
+import { recordSpawnFacts } from "./record-spawn-facts"
 import { NameRegistry } from "./names"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeTranscriptLog } from "./transcript-log"
@@ -544,9 +544,8 @@ class TaskManagerImpl implements TaskManager {
     return { ok: true }
   }
 
-  // Persist the spawned child's OS pid onto the running record so task_output(status) and session_start
-  // reconciliation can see (and, for an orphan, signal) the live process. The pure decision lives in
-  // recordSpawnedPid; in-process children (no pid) and already-terminal records are left untouched.
+  // Persist child identity and process facts so adapter projections and session-start reconciliation
+  // can address the exact live child across in-process and rpc runners.
   #attachChildSubscribers(taskId: string, handle: ManagedChildHandle): void {
     const subscribers = this.#childSubscribers.get(taskId)
     if (subscribers === undefined) return
@@ -563,20 +562,11 @@ class TaskManagerImpl implements TaskManager {
   #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
     const current = this.#tryLoad(taskId)
     if (current === null || isTerminalRecord(current)) return
-    const withPid = recordSpawnedPid(current, handle.pid) ?? current
-    const spawnSpec = handle.spawnSpec
-    // A v1 spawn_spec persisted at spawn is authoritative: the rpc echo would rewrite it as the
-    // legacy {cwd, extensions, member_env} shape, dropping the rebuild facts v1 carries.
-    const updated: TaskRecord = spawnSpec === undefined || (current.spawn_spec !== undefined && isSpawnSpecV1(current.spawn_spec))
-      ? withPid
-      : {
-          ...withPid,
-          spawn_spec: {
-            cwd: spawnSpec.cwd,
-            ...(spawnSpec.extensions === undefined ? {} : { extensions: spawnSpec.extensions }),
-            ...(spawnSpec.memberEnv === undefined ? {} : { member_env: spawnSpec.memberEnv }),
-          },
-        }
+    const updated = recordSpawnFacts(current, {
+      pid: handle.pid,
+      sessionId: handle.sessionId,
+      spawnSpec: handle.spawnSpec,
+    })
     if (updated !== current) this.#options.store.replace(updated)
   }
 
@@ -587,6 +577,7 @@ class TaskManagerImpl implements TaskManager {
     const transcript = subscribeTranscriptLog(handle, this.#options.store, taskId)
     this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
     const stats = handle.subscribe((event) => {
+      this.#recordSpawnFacts(taskId, handle)
       this.#runStats.get(taskId)?.accept(event)
     })
     return () => {

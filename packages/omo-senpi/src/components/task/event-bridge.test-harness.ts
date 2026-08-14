@@ -15,6 +15,7 @@ import { fakeSummary } from "./event-bridge.test-fixtures"
 import type { TaskEngine } from "./engine"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
+import type { HerdrTaskProjection } from "./herdr-task-projection"
 
 type HarnessOptions = {
   readonly outcomes?: ReconcileResult["outcomes"]
@@ -23,6 +24,11 @@ type HarnessOptions = {
   readonly cleanupDeleted?: readonly string[]
   readonly resumptionChannelCount?: number
   readonly withRpc?: boolean | "emit-only"
+  readonly herdrProjection?: HerdrTaskProjection
+  readonly order?: string[]
+  readonly suspendError?: Error
+  readonly resumptionShutdownError?: Error
+  readonly leadShutdownError?: Error
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -45,7 +51,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   const calls: SuspendInput[] = []
   const sendCalls: SendInput[] = []
   const cancelCalls: Array<{ idOrName: string; reason?: string }> = []
-  const order: string[] = []
+  const order = options.order ?? []
   const warnings: Array<{ message: string; details?: unknown }> = []
   const infos: Array<{ message: string; details?: unknown }> = []
   const reconcileCalls: Array<string | undefined> = []
@@ -68,6 +74,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       suspendOnSessionShutdown: async (input: SuspendInput) => {
         calls.push(input)
         order.push("suspend")
+        if (options.suspendError !== undefined) throw options.suspendError
         return fakeSummary
       },
       destroyResidentTask: async () => {},
@@ -168,7 +175,9 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   } as unknown as TaskStatusUi
 
   const transitions = {
-    onBeforeSwitch: () => {},
+    onBeforeSwitch: () => {
+      order.push("beforeSwitch")
+    },
     onBeforeCompact: () => {},
     onCompact: () => {},
     onShutdown: () => {
@@ -189,6 +198,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       },
       shutdown: () => {
         order.push("leadShutdown")
+        if (options.leadShutdownError !== undefined) throw options.leadShutdownError
       },
     },
     resumptionChannels: {
@@ -200,8 +210,10 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       emitShutdown: async () => {
         resumptionCalls.push(0)
         order.push("resumptionShutdown:0")
+        if (options.resumptionShutdownError !== undefined) throw options.resumptionShutdownError
       },
     },
+    ...(options.herdrProjection === undefined ? {} : { herdrProjection: options.herdrProjection }),
   } as unknown as Parameters<typeof wireEventBridge>[5]
 
   const ctx = {

@@ -7,6 +7,7 @@ import type { LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
+import type { HerdrTaskProjection } from "./herdr-task-projection"
 import { wireTaskRpcBridge } from "./task-rpc-bridge"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
@@ -16,6 +17,7 @@ type EventBridgeState = {
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
+  readonly herdrProjection?: HerdrTaskProjection
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -34,7 +36,10 @@ export function wireEventBridge(
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
   const taskRpc = wireTaskRpcBridge(pi, engine)
-  const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
+  const unsubscribeTaskSnapshots = engine.onStoreMutation(() => {
+    taskRpc.sync()
+    state.herdrProjection?.scheduleSync()
+  })
   wireReloadGuard(pi, engine.manager)
 
   pi.on("session_start", async (_payload, eventCtx) => {
@@ -60,14 +65,16 @@ export function wireEventBridge(
     }
     await tickLeadPollersBestEffort(ctx, state)
     statusUi.scheduleSync()
+    state.herdrProjection?.resume()
     taskRpc.attach()
   })
 
-  pi.on("session_before_switch", (_payload, eventCtx) => {
+  pi.on("session_before_switch", async (_payload, eventCtx) => {
     taskRpc.detach()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onBeforeSwitch(engine.runtime.sessionId())
     engine.runtime.clearUi()
+    await state.herdrProjection?.clear()
   })
 
   pi.on("session_before_compact", (_payload, eventCtx) => {
@@ -82,25 +89,38 @@ export function wireEventBridge(
   })
 
   pi.on("session_shutdown", async (payload, eventCtx) => {
-    unsubscribeTaskSnapshots()
-    taskRpc.dispose()
-    engine.runtime.captureFrom(asLiveContext(eventCtx))
-    transitions.onShutdown(engine.runtime.sessionId())
-    engine.runtime.clearUi()
-    statusUi.dispose()
-    state.leadPollers.shutdown()
-    await state.resumptionChannels.emitShutdown()
-    const shutdownEvent = payload as SessionShutdownEvent
-    const parentSessionId = engine.runtime.sessionId()
-    const reason = shutdownEvent.reason
-    if (parentSessionId === undefined || typeof reason !== "string") {
-      ctx.logger.warn(
-        "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
-        { parentSessionId, reason },
-      )
-      return
+    try {
+      unsubscribeTaskSnapshots()
+      taskRpc.dispose()
+      engine.runtime.captureFrom(asLiveContext(eventCtx))
+      try {
+        transitions.onShutdown(engine.runtime.sessionId())
+        engine.runtime.clearUi()
+        statusUi.dispose()
+      } finally {
+        try {
+          state.leadPollers.shutdown()
+        } finally {
+          try {
+            await state.resumptionChannels.emitShutdown()
+          } finally {
+            const shutdownEvent = payload as SessionShutdownEvent
+            const parentSessionId = engine.runtime.sessionId()
+            const reason = shutdownEvent.reason
+            if (parentSessionId === undefined || typeof reason !== "string") {
+              ctx.logger.warn(
+                "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
+                { parentSessionId, reason },
+              )
+            } else {
+              await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason })
+            }
+          }
+        }
+      }
+    } finally {
+      await state.herdrProjection?.dispose()
     }
-    await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason })
   })
 
   pi.on("model_select", (_payload, eventCtx) => {

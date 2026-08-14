@@ -28,6 +28,8 @@ import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLivene
 import { createResumptionChannelEmitter } from "./resumption-channel-emitter"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { createHerdrCommandClientFromEnvironment } from "./herdr-environment"
+import { createHerdrTaskProjection } from "./herdr-task-projection"
 import { createSkillInvocationTracker, type SkillInvocationTracker } from "./skill-invocation-tracker"
 import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
@@ -110,11 +112,28 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         })
       })
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
+      const herdr = createHerdrCommandClientFromEnvironment(process.env)
+      const herdrProjection = herdr === undefined
+        ? undefined
+        : createHerdrTaskProjection({
+            manager: engine.manager,
+            client: herdr.client,
+            workspaceId: herdr.workspaceId,
+            cwd,
+            parentSessionId: () => engine.runtime.sessionId(),
+            includeAssistantOutput: process.env.OMO_HERDR_NATIVE_TASK_OUTPUT === "1",
+            onError: (error) => {
+              ctx.logger.warn("omo-senpi Herdr task projection failed", {
+                error: error instanceof Error ? error.message : String(error),
+              })
+            },
+          })
 
       wireEventBridge(pi, ctx, engine, statusUi, transitions, {
         reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
         leadPollers: teamTools.leadPollers,
         resumptionChannels,
+        ...(herdrProjection === undefined ? {} : { herdrProjection }),
       })
     },
   }
