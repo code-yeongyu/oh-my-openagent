@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 
 import type { ReflectionCompletionRecord } from "./completion-contracts"
+import { isReflectionFailureError } from "./failure-error"
 
 export async function ensureReflectionCompletion(
   completionsDir: string,
@@ -72,6 +73,7 @@ function isCompletionRecord(value: unknown): value is ReflectionCompletionRecord
     && typeof record.outcome === "string"
     && typeof record.startedAt === "string"
     && typeof record.finishedAt === "string"
+    && (record.failureError === undefined || isReflectionFailureError(record.failureError))
     && !!delivery && typeof delivery === "object" && !Array.isArray(delivery)
     && (((delivery as Record<string, unknown>).status === "pending") || ((delivery as Record<string, unknown>).status === "consumed"))
 }

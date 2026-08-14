@@ -18,6 +18,7 @@ import { resolveFinalizationDecision } from "./run-finalization-git"
 import { settleReservationRun } from "./run-finalization-settlement"
 import { withRunTerminalGate } from "./run-terminal-gate"
 import { checkRunAbandonmentPrecedence } from "./run-terminal-precedence"
+import type { ReflectionFailureError } from "./failure-error"
 import type {
   DurableFinalizationDecision,
   ReservationRunResult,
@@ -55,6 +56,7 @@ export async function failReservationRun(
   ledger: ReservationRunLedger,
   outcome: "failed" | "timed_out",
   detail?: string,
+  failureError?: ReflectionFailureError,
 ): Promise<ReservationRunResult | undefined> {
   const claimed = await withRunFinalizationClaim(
     context.identity,
@@ -69,6 +71,7 @@ export async function failReservationRun(
         outcome,
         reason: outcome === "timed_out" ? "deadline_exceeded" : "supervisor_failed",
         ...(detail === undefined ? {} : { detail }),
+        ...(failureError === undefined ? {} : { failureError }),
       }
       await checkpointFailure(runDir, decision)
       await cleanupOrThrow(context, current)
@@ -181,6 +184,7 @@ async function checkpointFailure(
     finalizeOutcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
+    ...(decision.failureError === undefined ? {} : { finalizeFailureError: decision.failureError }),
   })
 }
 

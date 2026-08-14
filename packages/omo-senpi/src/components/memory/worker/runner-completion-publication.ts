@@ -48,6 +48,7 @@ export async function settleReflectionRun(input: {
     outcome: input.result.outcome,
     ...(input.result.reason === undefined ? {} : { reason: input.result.reason }),
     ...(input.result.detail === undefined ? {} : { detail: input.result.detail }),
+    ...(input.result.failureError === undefined ? {} : { failureError: input.result.failureError }),
     startedAt: input.startedAt,
     finishedAt,
     durationMs: Math.max(0, Date.parse(finishedAt) - Date.parse(input.startedAt)),
@@ -67,6 +68,7 @@ export async function settleReflectionRun(input: {
     outcome: input.result.outcome,
     ...(input.result.reason === undefined ? {} : { reason: input.result.reason }),
     ...(input.result.detail === undefined ? {} : { detail: input.result.detail }),
+    ...(input.result.failureError === undefined ? {} : { failureError: input.result.failureError }),
     completion,
     ...(transition.launch === undefined ? {} : { launch: transition.launch }),
   }

@@ -18,6 +18,7 @@ export function buildSandboxTransform(input: {
   readonly gitCommonDir: string
   readonly payloadPaths: readonly string[]
   readonly runtimeWrites?: readonly string[]
+  readonly externalWritableDirs?: readonly string[]
   readonly foreignRoots?: readonly string[]
   readonly command: string
   readonly env: NodeJS.ProcessEnv
@@ -31,8 +32,9 @@ export function buildSandboxTransform(input: {
     writableDirs: [
       input.worktreeDir,
       input.gitCommonDir,
-      ...(input.runtimeWrites ?? []),
+      ...(input.externalWritableDirs ?? []),
     ],
+    ownedWritableDirs: input.runtimeWrites,
     payloadPaths: input.payloadPaths,
     fallbackDir: input.worktreeDir,
     foreignRoots: input.foreignRoots,
@@ -56,7 +58,8 @@ export function buildFactsSandboxTransform(input: {
     const transform = buildPathSandboxTransform<FactsSpawnArgs>({
       surface: "facts",
       policy: input.policy,
-      writableDirs: [spawnArgs.paths.runDir],
+      writableDirs: [],
+      ownedWritableDirs: [spawnArgs.paths.runDir],
       payloadPaths: [spawnArgs.paths.payload],
       fallbackDir: spawnArgs.paths.runDir,
       foreignRoots: input.foreignRoots,

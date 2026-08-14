@@ -68,7 +68,7 @@ export async function emitReflectionHealthAlert(
   if (health.recentFailureFingerprints.filter((item) => item === health.fingerprint).length < 2) return false
   if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
   const failure = health.lastFailure
-  const recommendation = reflectionRemediation(failure?.reason, failure?.detail)
+  const recommendation = reflectionRemediation(failure?.reason, failure?.detail, failure?.failureError)
   const entry: ReflectionHealthEntry = {
     schemaVersion: 1,
     identity,

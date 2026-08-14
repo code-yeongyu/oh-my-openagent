@@ -61,6 +61,23 @@ describe("reflection health", () => {
     })
   })
 
+  test("#given a persisted failure with structured errno fields #when health is derived #then the exact path survives", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "reflection-health-"))
+    roots.push(root)
+    const path = "/tmp/O'Brien/missing"
+    await writeFile(join(root, "failed.json"), JSON.stringify({
+      ...completion("failed", "2026-08-12T01:00:00.000Z", "failed", "spawn_failed", "ENOENT"),
+      failureError: { code: "ENOENT", syscall: "lstat", path },
+    }))
+
+    // when
+    const health = await readReflectionHealth(root)
+
+    // then
+    expect(health.lastFailure?.failureError).toEqual({ code: "ENOENT", syscall: "lstat", path })
+  })
+
   test("#given a failure streak that would trip alerting #when health is derived #then the completions directory is left byte-identical", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "reflection-health-"))
@@ -87,7 +104,7 @@ describe("reflection health", () => {
     const imports = [...source.matchAll(/^import[\s\S]*?from "(.+?)"$/gm)].map((match) => match[1])
 
     // then
-    expect(imports).toEqual(["node:fs/promises", "node:path", "@oh-my-opencode/memory-core"])
+    expect(imports).toEqual(["node:fs/promises", "node:path", "@oh-my-opencode/memory-core", "./failure-error"])
     expect(source).not.toContain("appendEntry")
     expect(source).not.toContain("safeNotify")
     expect(source).not.toContain("writeFile")

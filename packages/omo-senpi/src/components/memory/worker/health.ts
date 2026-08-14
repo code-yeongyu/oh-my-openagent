@@ -3,6 +3,8 @@ import { join } from "node:path"
 
 import type { ReflectionOutcome } from "@oh-my-opencode/memory-core"
 
+import { isReflectionFailureError, type ReflectionFailureError } from "./failure-error"
+
 /**
  * READ-ONLY derived health. This module must never write: no transcript entries, no notifications,
  * no filesystem mutations. The alerting side effects live in `./health-alert`.
@@ -13,6 +15,7 @@ export interface ReflectionHealth {
   readonly lastFailure?: {
     readonly reason: string
     readonly detail?: string
+    readonly failureError?: ReflectionFailureError
     readonly finishedAt: string
   }
   readonly lastSuccessAt?: string
@@ -39,6 +42,7 @@ type HealthRecord = {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly failureError?: ReflectionFailureError
   readonly finishedAt: string
   readonly pending: boolean
 }
@@ -87,6 +91,7 @@ export async function readReflectionHealth(
           lastFailure: {
             reason: lastFailure.reason ?? "failed",
             ...(lastFailure.detail === undefined ? {} : { detail: lastFailure.detail }),
+            ...(lastFailure.failureError === undefined ? {} : { failureError: lastFailure.failureError }),
             finishedAt: lastFailure.finishedAt,
           },
         }),
@@ -132,6 +137,7 @@ async function readHealthRecord(path: string): Promise<HealthRecord | undefined>
       outcome: parsed.outcome,
       ...(typeof parsed.reason === "string" ? { reason: parsed.reason } : {}),
       ...(typeof parsed.detail === "string" ? { detail: parsed.detail } : {}),
+      ...(isReflectionFailureError(parsed.failureError) ? { failureError: parsed.failureError } : {}),
       finishedAt: parsed.finishedAt,
       pending: delivery?.status === "pending",
     }

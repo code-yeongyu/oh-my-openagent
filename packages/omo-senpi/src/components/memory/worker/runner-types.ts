@@ -7,6 +7,7 @@ import type { ReflectionCompletionRecord, ReflectionLiveSession } from "./comple
 import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import type { ReflectionSessionModel, ReflectionThinkingLevel } from "./resolve-model"
 import type { ReflectionSandbox } from "./spawn"
+import type { ReflectionFailureError } from "./failure-error"
 
 export interface ReflectionReservationPort {
   readState(): Promise<{ readonly active?: ReservedRun }>
@@ -21,6 +22,7 @@ export interface ReflectionRunResult {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly failureError?: ReflectionFailureError
   readonly completion: ReflectionCompletionRecord
   readonly launch?: ReservedRun
 }
@@ -59,6 +61,7 @@ export type ExecutionResult = {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly failureError?: ReflectionFailureError
   readonly model?: string
   readonly thinking?: ReflectionThinkingLevel
 }

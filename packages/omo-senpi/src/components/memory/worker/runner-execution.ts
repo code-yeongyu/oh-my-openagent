@@ -20,6 +20,7 @@ import {
   type MemoryModelChain,
 } from "./memory-model-attempts"
 import type { MemoryLaunchRoute } from "./fork-cost"
+import { reflectionFailureError } from "./failure-error"
 import { prepareReflectionCandidateSpawn } from "./reflection-spawn-input"
 import type { ReflectionModelResolution } from "./resolve-model"
 import { readRunJson } from "./run-artifacts"
@@ -118,11 +119,19 @@ async function finalizeExecutionFailure(
   error: unknown,
 ): Promise<ExecutionResult | ReflectionRunResult> {
   const runDir = join(input.options.identity.paths.reflection, "runs", input.run.runId)
+  const failureError = reflectionFailureError(error)
   if (existsSync(join(runDir, "ledger.json"))) {
     const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
     const finalized = error instanceof MemoryModelExhaustedError
       ? await overrideFailedReservationRun(input.finalizationContext(), runDir, ledger, error.message)
-      : await failReservationRun(input.finalizationContext(), runDir, ledger, "failed", errorMessage(error))
+      : await failReservationRun(
+          input.finalizationContext(),
+          runDir,
+          ledger,
+          "failed",
+          errorMessage(error),
+          failureError,
+        )
     return requireFinalizedResult(finalized)
   }
   const discarded = worktree === undefined ? undefined : await discardWorktree(worktree)
@@ -130,6 +139,7 @@ async function finalizeExecutionFailure(
     outcome: "failed",
     reason: discarded !== undefined && !cleanupSucceeded(discarded) ? "cleanup_failed" : "spawn_failed",
     detail: [errorMessage(error), discarded?.detail].filter(Boolean).join("; "),
+    ...(failureError === undefined ? {} : { failureError }),
   }
 }
 

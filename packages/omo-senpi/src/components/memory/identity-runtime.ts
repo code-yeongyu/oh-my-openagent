@@ -85,6 +85,8 @@ export function createIdentityRuntime(
         runtimeWrites: [
           identity.identityPaths.reflectionSessions,
           identity.identityPaths.reflection,
+        ],
+        externalWritableDirs: [
           process.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"),
           ...(process.env.XDG_CONFIG_HOME === undefined ? [] : [process.env.XDG_CONFIG_HOME]),
         ],

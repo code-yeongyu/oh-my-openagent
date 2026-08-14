@@ -1,6 +1,8 @@
 import type { EntryRenderer } from "@code-yeongyu/senpi"
 import type { DreamOrigin, ReflectionOutcome, ReflectionTrigger } from "@oh-my-opencode/memory-core"
 
+import type { ReflectionFailureError } from "./failure-error"
+
 export const REFLECTION_COMPLETION_ENTRY_TYPE = "senpi-memory.reflection-completion"
 export const REFLECTION_LAUNCHED_ENTRY_TYPE = "senpi-memory.reflection-launched"
 export const REFLECTION_SUMMARY_ENTRY_TYPE = "senpi-memory.reflection-summary"
@@ -40,6 +42,7 @@ export interface ReflectionCompletionRecord {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly failureError?: ReflectionFailureError
   readonly startedAt: string
   /** Palace Reflection-tab contract: ISO completion timestamp used for newest-first ordering. */
   readonly finishedAt: string
