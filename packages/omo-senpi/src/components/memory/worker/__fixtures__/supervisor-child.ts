@@ -23,6 +23,9 @@ if (mode === "inspect") {
 if (mode === "model-not-found") {
   console.error('Error: Model "extension-only/primary" not found. Use --list-models to see available models.')
   process.exit(1)
+} else if (mode === "provider-limited") {
+  console.error("403 permission_error\nYou've reached your usage limit for this billing cycle")
+  process.exit(1)
 } else if (mode === "graceful") {
   let terminating = false
   process.on("SIGTERM", () => {

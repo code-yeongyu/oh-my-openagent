@@ -39,6 +39,9 @@ if (mode === "commit") {
 } else if (mode === "provider-cooldown") {
   console.error('503: {"message":"All providers are temporarily cooling down"}')
   process.exitCode = 1
+} else if (mode === "provider-limited") {
+  console.error("403 permission_error\nYou've reached your usage limit for this billing cycle")
+  process.exitCode = 1
 } else if (mode === "auth-missing") {
   console.error("No API key found for kimi-coding")
   process.exitCode = 1

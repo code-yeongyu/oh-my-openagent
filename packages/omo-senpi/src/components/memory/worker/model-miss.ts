@@ -15,6 +15,8 @@ export type RetryableModelMiss =
 const MODEL_NOT_FOUND_PATTERN = /^Error: Model "([^"]+)" not found\. Use --list-models to see available models\.$/m
 const API_KEY_NOT_FOUND_PATTERN = /^(?:Error:\s*)?No API key found for\s+([^\s.]+)/m
 const HTTP_STATUS_PATTERN = /(?:^|\s)(\d{3})\s*:/
+const KIMI_BILLING_CYCLE_LIMIT_PATTERN = /\byou(?:'|’)ve reached your usage limit for this billing cycle\b/i
+const KIMI_PERMISSION_ERROR_CONTEXT_PATTERN = /(?:\b403\b[\s\S]*\bpermission_error\b|\bpermission_error\b[\s\S]*\b403\b)/i
 const PROVIDER_DETAIL_MAX_CHARS = 200
 
 export function classifyRetryableModelMiss(result: ModelMissResult): RetryableModelMiss | undefined {
@@ -31,21 +33,27 @@ export function classifyRetryableModelMiss(result: ModelMissResult): RetryableMo
   const detail = providerFailureDetail(result)
   if (detail === undefined) return undefined
   const statusCode = Number.parseInt(HTTP_STATUS_PATTERN.exec(detail)?.[1] ?? "", 10)
-  return isRetryableModelError({
+  const providerError = {
     message: detail,
     ...(Number.isNaN(statusCode) ? {} : { statusCode }),
-  })
+  }
+  return (isRetryableModelError(providerError) || isKimiBillingCycleLimit(output))
     ? { kind: "provider_unavailable", detail }
     : undefined
 }
 
-/** First meaningful child error line: senpi prints the fatal provider error and exits. */
+function isKimiBillingCycleLimit(output: string): boolean {
+  return KIMI_PERMISSION_ERROR_CONTEXT_PATTERN.test(output)
+    && KIMI_BILLING_CYCLE_LIMIT_PATTERN.test(output)
+}
+
+/** Bounded child error detail: Senpi may split the status and provider reason across lines. */
 function providerFailureDetail(result: ModelMissResult): string | undefined {
+  const lines: string[] = []
   for (const stream of [result.stderr, result.stdout]) {
-    const line = stream.split("\n").map((entry) => entry.trim()).find((entry) => entry.length > 0)
-    if (line !== undefined) return line.slice(0, PROVIDER_DETAIL_MAX_CHARS)
+    lines.push(...stream.split(/\r?\n/).map((entry) => entry.trim()).filter((entry) => entry.length > 0))
   }
-  return undefined
+  return lines.length === 0 ? undefined : lines.join(" | ").slice(0, PROVIDER_DETAIL_MAX_CHARS)
 }
 
 export function isRetryableModelMiss(result: ModelMissResult): boolean {

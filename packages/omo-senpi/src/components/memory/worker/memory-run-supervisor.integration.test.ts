@@ -52,7 +52,7 @@ interface Outcome {
 }
 
 async function makeRun(options: {
-  readonly mode: "inspect" | "graceful" | "stubborn" | "model-not-found"
+  readonly mode: "inspect" | "graceful" | "stubborn" | "model-not-found" | "provider-limited"
   readonly hardDeadlineAt?: number
   readonly terminationGraceMs?: number
   readonly nextAttempt?: { readonly attempt: number; readonly model: string; readonly thinking?: string }
@@ -190,10 +190,10 @@ describe("memory run supervisor", () => {
     await expect(exit).resolves.toEqual({ code: 0, signal: null })
   }, 60_000)
 
-  test("#given a retryable model miss and a next attempt #when the supervisor publishes the outcome #then the ledger advances first", async () => {
+  test.each(["model-not-found", "provider-limited"] as const)("#given a retryable %s child failure and a next attempt #when the supervisor publishes the outcome #then the ledger advances first", async (mode) => {
     // given
     const runDir = await makeRun({
-      mode: "model-not-found",
+      mode,
       nextAttempt: { attempt: 2, model: "omo-mock/mock-1", thinking: "minimal" },
     })
 

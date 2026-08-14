@@ -57,6 +57,23 @@ describe("classifyRetryableModelMiss", () => {
     })
   })
 
+  test("#given Kimi's billing-cycle permission error #when classified #then it is retryable with both error lines preserved", () => {
+    // given
+    const child = result([
+      "403 permission_error",
+      "You've reached your usage limit for this billing cycle",
+    ].join("\n"))
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toEqual({
+      kind: "provider_unavailable",
+      detail: "403 permission_error | You've reached your usage limit for this billing cycle",
+    })
+  })
+
   test("#given a billing exhaustion child failure #when classified #then it is not retryable because another model cannot fix it", () => {
     // given
     const child = result("Error: quota exceeded for this organization")

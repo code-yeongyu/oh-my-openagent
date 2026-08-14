@@ -63,12 +63,15 @@ const childFixture = join(import.meta.dir, "__fixtures__", "reflection-child.ts"
 
 /** Modes whose scenario needs the two-rung category chain rather than the single mock model. */
 function isChainMode(childMode: string): boolean {
-  return childMode === "model-fallback" || childMode === "model-exhausted" || childMode === "provider-cooldown"
+  return childMode === "model-fallback"
+    || childMode === "model-exhausted"
+    || childMode === "provider-cooldown"
+    || childMode === "provider-limit-fallback"
 }
 const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 
 export async function createRunnerHarness(options: {
-  readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
+  readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown" | "provider-limit-fallback"
   readonly categoryAvailable?: boolean
   readonly config?: OmoConfig
   readonly models?: readonly HarnessModel[]
@@ -192,6 +195,8 @@ export async function createRunnerHarness(options: {
           ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "auth-missing"
           : options.childMode === "provider-cooldown"
             ? spawnArgs.args.includes("extension-only/primary") ? "provider-cooldown" : "commit"
+            : options.childMode === "provider-limit-fallback"
+              ? spawnArgs.args.includes("extension-only/primary") ? "provider-limited" : "commit"
             : options.childMode
       return {
         ...spawnArgs,

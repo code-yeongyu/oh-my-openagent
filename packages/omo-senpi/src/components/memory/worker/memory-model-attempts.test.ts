@@ -77,6 +77,24 @@ describe("runMemoryModelAttempts", () => {
     expect(result.child.code).toBe(0)
   })
 
+  test("#given Kimi's billing-cycle permission error #when a fallback exists #then it retries the fallback instead of failing the run", async () => {
+    // given
+    const attempted: string[] = []
+
+    // when
+    const result = await runMemoryModelAttempts(candidates, async (candidate) => {
+      attempted.push(candidate.model)
+      return candidate.model === "extension-only/primary"
+        ? child({ stderr: "403 permission_error\nYou've reached your usage limit for this billing cycle" })
+        : child({ code: 0 })
+    })
+
+    // then
+    expect(attempted).toEqual(["extension-only/primary", "builtin/fallback"])
+    expect(result.candidate.model).toBe("builtin/fallback")
+    expect(result.child.code).toBe(0)
+  })
+
   test("#given a billing exhaustion failure #when a fallback exists #then it does not burn the chain", async () => {
     // given
     const attempted: string[] = []

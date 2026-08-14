@@ -257,6 +257,29 @@ describe("SenpiSubprocessRunner integration", () => {
     await assertWorktreesClean(item)
   }, 60_000)
 
+  test("#given a quota-limited primary and a healthy fallback #when reflection runs #then it advances once and records the fallback", async () => {
+    // given
+    const item = await harness({ childMode: "provider-limit-fallback" })
+
+    // when
+    const result = await item.runner.launch(item.run)
+
+    // then
+    expect(result.outcome).toBe("merged")
+    expect(item.spawnCalls.map((spawn) => spawn.args[spawn.args.indexOf("--model") + 1])).toEqual([
+      "extension-only/primary",
+      "kimi-coding/fallback",
+    ])
+    expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
+    expect(new Set(item.spawnCalls.map((spawn) => spawn.hardDeadlineAt)).size).toBe(1)
+    expect(result.completion).toMatchObject({
+      model: "kimi-coding/fallback",
+      thinking: "minimal",
+      outcome: "merged",
+    })
+    await assertWorktreesClean(item)
+  }, 30_000)
+
   test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then only the fresh verdict fails closed", async () => {
     // given
     const item = await harness({
