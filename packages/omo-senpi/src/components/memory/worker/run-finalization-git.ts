@@ -171,6 +171,7 @@ function decisionFromLedger(
     outcome: ledger.finalizeOutcome,
     ...(ledger.finalizeReason === undefined ? {} : { reason: ledger.finalizeReason }),
     ...(ledger.finalizeDetail === undefined ? {} : { detail: ledger.finalizeDetail }),
+    ...(ledger.finalizeFailureError === undefined ? {} : { failureError: ledger.finalizeFailureError }),
     ...(ledger.integrationSha === undefined ? {} : { integrationSha: ledger.integrationSha }),
   }
 }
@@ -180,6 +181,7 @@ async function checkpointDecision(path: string, decision: DurableFinalizationDec
     finalizeOutcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
+    ...(decision.failureError === undefined ? {} : { finalizeFailureError: decision.failureError }),
   })
 }
 

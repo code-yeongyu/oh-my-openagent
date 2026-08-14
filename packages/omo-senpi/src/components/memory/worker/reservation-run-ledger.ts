@@ -6,6 +6,8 @@ import {
   type ReflectionWorktree,
 } from "@oh-my-opencode/memory-core"
 
+import { isReflectionFailureError, type ReflectionFailureError } from "./failure-error"
+
 export interface ReservationRunLedger {
   readonly version: 1
   readonly runId: string
@@ -42,6 +44,7 @@ export interface ReservationRunLedger {
   readonly finalizeOutcome?: ReflectionOutcome
   readonly finalizeReason?: string
   readonly finalizeDetail?: string
+  readonly finalizeFailureError?: ReflectionFailureError
   readonly finalizedAt?: string
 }
 
@@ -102,6 +105,9 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   if (value.validatedChangedPaths !== undefined
     && (!Array.isArray(value.validatedChangedPaths) || !value.validatedChangedPaths.every((path) => typeof path === "string"))) {
     throw new Error("Invalid validated changed paths")
+  }
+  if (value.finalizeFailureError !== undefined && !isReflectionFailureError(value.finalizeFailureError)) {
+    throw new Error("Invalid finalization failure error")
   }
   if (value.finalizeOutcome !== undefined && !isReflectionOutcome(value.finalizeOutcome)) {
     throw new Error("Invalid finalization outcome")

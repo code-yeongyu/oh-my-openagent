@@ -7,6 +7,7 @@ import type {
 import type { ReflectionReservationPort } from "./runner"
 import type { ReflectionCompletionRecord } from "./completion"
 import type { RunLivenessSeams } from "./run-liveness"
+import type { ReflectionFailureError } from "./failure-error"
 
 export type ReservationStatePort = ReflectionReservationPort & {
   readState(): Promise<{ readonly active?: ReservedRun }>
@@ -25,6 +26,7 @@ export interface ReservationRunResult {
   readonly outcome: ReflectionOutcome | "abandoned_unknown"
   readonly reason?: string
   readonly detail?: string
+  readonly failureError?: ReflectionFailureError
   readonly completion?: ReflectionCompletionRecord
   readonly launch?: ReservedRun
 }
@@ -33,5 +35,6 @@ export interface DurableFinalizationDecision {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly failureError?: ReflectionFailureError
   readonly integrationSha?: string
 }

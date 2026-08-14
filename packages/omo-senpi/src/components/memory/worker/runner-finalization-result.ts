@@ -13,6 +13,7 @@ export function requireFinalizedResult(
     outcome: result.outcome,
     ...(result.reason === undefined ? {} : { reason: result.reason }),
     ...(result.detail === undefined ? {} : { detail: result.detail }),
+    ...(result.failureError === undefined ? {} : { failureError: result.failureError }),
     completion: result.completion,
     ...(result.launch === undefined ? {} : { launch: result.launch }),
   }

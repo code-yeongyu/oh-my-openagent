@@ -212,7 +212,7 @@ export async function checkReflectionHealth(reflectionDir: string): Promise<Doct
     }
   }
   const failure = health.lastFailure
-  const hint = reflectionRemediation(failure?.reason, failure?.detail)
+  const hint = reflectionRemediation(failure?.reason, failure?.detail, failure?.failureError)
   return {
     name: "reflection-health",
     level: health.streak >= 3 ? "warn" : "ok",

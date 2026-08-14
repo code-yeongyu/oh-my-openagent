@@ -33,6 +33,32 @@ describe("reflectionRemediation", () => {
       expect(advice).not.toContain("SENPI_BIN")
     })
 
+    test("#given structured errno fields with an apostrophe path #when advising #then the path round-trips exactly", () => {
+      // given
+      const path = "/tmp/O'Brien/missing"
+
+      // when
+      const advice = reflectionRemediation(
+        "spawn_failed",
+        `ENOENT: no such file or directory, lstat '${path}'`,
+        { code: "ENOENT", syscall: "lstat", path },
+      )
+
+      // then
+      expect(advice).toBe(`the reflection child could not use ${path}; check that path exists and is writable`)
+    })
+
+    test("#given a legacy ENOENT string with legal punctuation and newlines #when advising #then its complete path is recovered", () => {
+      // given
+      const path = "/tmp/O'Brien/back\\slash/ユニ\nコード"
+
+      // when
+      const advice = reflectionRemediation("spawn_failed", `ENOENT: no such file or directory, lstat '${path}'`)
+
+      // then
+      expect(advice).toBe(`the reflection child could not use ${path}; check that path exists and is writable`)
+    })
+
     test("#given a spawn failure with no path #when advising #then the executable hint still stands", () => {
       // given
       const detail = "spawn senpi ENOENT"

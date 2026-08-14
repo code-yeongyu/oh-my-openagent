@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 
@@ -99,6 +99,79 @@ function build(policy: SandboxPolicy, options: {
 }
 
 describe("reflection worker OS sandbox writable grants", () => {
+  test("#given absent structural and external grants #when the inner command is missing #then no grant is created before the unsandboxed fallback", () => {
+    // given
+    const setup = fixture()
+    const worktree = join(setup.root, "absent-worktree")
+    const gitCommonDir = join(setup.root, "absent-git-common")
+    const externalDir = join(setup.root, "absent-external-config")
+    const ownedDir = join(setup.root, "absent-owned-runtime")
+
+    // when
+    const transform = buildSandboxTransform({
+      policy: "required",
+      worktreeDir: worktree,
+      gitCommonDir,
+      payloadPaths: setup.payloadPaths,
+      runtimeWrites: [ownedDir],
+      externalWritableDirs: [externalDir],
+      command: "missing-senpi",
+      env: { PATH: "" },
+      platform: "linux",
+      which: () => "/usr/bin/bwrap",
+    })
+
+    // then
+    expect(transform.wasSandboxed).toBe(false)
+    expect([worktree, gitCommonDir, externalDir, ownedDir].map(existsSync)).toEqual([false, false, false, false])
+  })
+
+  test("#given absent structural grants #when sandbox canonicalization starts #then it fails without creating either grant", () => {
+    // given
+    const setup = fixture()
+    const worktree = join(setup.root, "absent-worktree")
+    const gitCommonDir = join(setup.root, "absent-git-common")
+
+    // when
+    const build = () => buildSandboxTransform({
+      policy: "required",
+      worktreeDir: worktree,
+      gitCommonDir,
+      payloadPaths: setup.payloadPaths,
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "linux",
+      which: () => "/usr/bin/bwrap",
+    })
+
+    // then
+    expect(build).toThrow()
+    expect([worktree, gitCommonDir].map(existsSync)).toEqual([false, false])
+  })
+
+  test("#given an absent environment-supplied grant #when sandbox canonicalization starts #then it fails without creating the grant", () => {
+    // given
+    const setup = fixture()
+    const externalDir = join(setup.root, "absent-external-config")
+
+    // when
+    const build = () => buildSandboxTransform({
+      policy: "required",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: setup.payloadPaths,
+      externalWritableDirs: [externalDir],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "linux",
+      which: () => "/usr/bin/bwrap",
+    })
+
+    // then
+    expect(build).toThrow()
+    expect(existsSync(externalDir)).toBe(false)
+  })
+
   test("#given a granted runtime dir the layout added but no writer has created #when the sandbox is built #then it is created and granted instead of failing the spawn", () => {
     // given a grant that does not exist yet, as after a layout gains a new runtime subdir
     const setup = fixture()
@@ -128,6 +201,43 @@ describe("reflection worker OS sandbox writable grants", () => {
 })
 
 describe("reflection worker OS sandbox", () => {
+  test.skipIf(process.platform === "win32")(
+    "#given a symlink to a directory with a literal backslash component #when grants are canonicalized #then the legal path resolves to its symlink target",
+    () => {
+      // given
+      const root = mkdtempSync(join(tmpdir(), "omo-memory-backslash-sandbox-"))
+      roots.push(root)
+      const target = join(root, "back\\slash")
+      const worktree = join(target, "worktree")
+      const gitCommonDir = join(target, ".git")
+      const payload = join(target, "transcript.json")
+      mkdirSync(worktree, { recursive: true })
+      mkdirSync(gitCommonDir)
+      writeFileSync(payload, "payload")
+      const alias = join(root, "alias")
+      symlinkSync(target, alias, "dir")
+
+      // when
+      const transform = buildSandboxTransform({
+        policy: "required",
+        worktreeDir: join(alias, "worktree"),
+        gitCommonDir: join(alias, ".git"),
+        payloadPaths: [join(alias, "transcript.json")],
+        command: "/bin/sh",
+        env: { PATH: process.env.PATH },
+        platform: "linux",
+        which: () => "/usr/bin/bwrap",
+      })
+      const transformed = transform(spawnArgs(join(alias, "worktree")))
+
+      // then
+      const grantArgs = transformed.args.slice(0, transformed.args.indexOf("--chdir"))
+      expect(grantArgs).toContain(join(realpathSync(root), "back\\slash", "worktree"))
+      expect(grantArgs).toContain(join(realpathSync(root), "back\\slash", ".git"))
+      expect(grantArgs).not.toContain(join(alias, "worktree"))
+    },
+  )
+
   test.skipIf(process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec"))(
     "#given the real Darwin seatbelt #when a child writes inside the worktree and its parent repo #then only the worktree write succeeds",
     () => {

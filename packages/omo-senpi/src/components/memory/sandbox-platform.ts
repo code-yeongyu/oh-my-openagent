@@ -1,5 +1,5 @@
-import { accessSync, constants, existsSync, mkdirSync, realpathSync } from "node:fs"
-import { delimiter, dirname, isAbsolute, join } from "node:path"
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync } from "node:fs"
+import { delimiter, dirname, isAbsolute, join, parse, resolve, sep } from "node:path"
 
 import type { FactsSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
 import { SandboxUnavailableError, type SandboxPolicy } from "./sandbox-contracts"
@@ -8,6 +8,7 @@ export interface PathSandboxInput {
   readonly surface: "reflection" | "facts"
   readonly policy: SandboxPolicy
   readonly writableDirs: readonly string[]
+  readonly ownedWritableDirs?: readonly string[]
   readonly payloadPaths: readonly string[]
   readonly fallbackDir: string
   readonly foreignRoots?: readonly string[]
@@ -43,22 +44,30 @@ export function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsS
     return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
   }
 
-  const writableDirs = input.writableDirs.map(canonicalWritableDir)
+  const innerCommand = resolveInnerCommand(input.command, input.env)
+  if (innerCommand === undefined) {
+    return identityTransform(`${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`)
+  }
+
+  const writableDirs = [
+    ...input.writableDirs.map(canonicalPath),
+    ...(input.ownedWritableDirs ?? []).map(canonicalOwnedWritableDir),
+  ]
   if (platform === "darwin") {
     const payloads = input.payloadPaths.map(canonicalPath)
     const foreignRoots = (input.foreignRoots ?? []).map(canonicalPath)
     const tempDir = join(dirname(payloads[0] ?? canonicalPath(input.fallbackDir)), ".sandbox-tmp")
     mkdirSync(tempDir, { recursive: true, mode: 0o700 })
     const profile = buildDarwinProfile({ writableDirs, tempDir, payloads, foreignRoots })
-    return guardedSandboxedTransform(input.surface, input.command, input.env, (spawnArgs, innerCommand) => ({
+    return sandboxedTransform<T>((spawnArgs) => ({
       ...spawnArgs,
       command: executable,
       args: ["-p", profile, "--", innerCommand, ...spawnArgs.args],
       env: { ...spawnArgs.env, TMPDIR: tempDir },
-    }))
+    }) as T)
   }
 
-  return guardedSandboxedTransform(input.surface, input.command, input.env, (spawnArgs, innerCommand) => ({
+  return sandboxedTransform<T>((spawnArgs) => ({
     ...spawnArgs,
     command: executable,
     args: [
@@ -69,7 +78,7 @@ export function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsS
       "--chdir", spawnArgs.cwd,
       "--", innerCommand, ...spawnArgs.args,
     ],
-  }))
+  }) as T)
 }
 
 function buildDarwinProfile(input: {
@@ -116,18 +125,43 @@ function defaultWhich(command: string): string | undefined {
 }
 
 function canonicalPath(path: string): string {
-  return realpathSync(path)
+  if (process.platform === "win32") return realpathSync(path)
+  const absolute = resolve(path)
+  const root = parse(absolute).root
+  let pending = pathComponents(absolute, root)
+  let resolved = root
+  let followedLinks = 0
+  while (pending.length > 0) {
+    const candidate = join(resolved, pending.shift() ?? "")
+    let stat: ReturnType<typeof lstatSync>
+    try {
+      stat = lstatSync(candidate)
+    } catch (error) {
+      if (existsSync(candidate)) {
+        throw new Error(`Sandbox path is incompatible with this runtime: ${candidate}`, { cause: error })
+      }
+      throw error
+    }
+    if (!stat.isSymbolicLink()) {
+      resolved = candidate
+      continue
+    }
+    followedLinks += 1
+    if (followedLinks > 40) throw new Error(`Too many symbolic links while resolving sandbox path: ${path}`)
+    const target = resolve(resolved, readlinkSync(candidate))
+    pending = [...pathComponents(target, root), ...pending]
+    resolved = root
+  }
+  return resolved
 }
 
-/**
- * A writable grant names a directory, and the layout can add one before any writer has created it, so
- * the grant is resolved through creation. Resolving a missing path instead throws ENOENT out of the
- * sandbox builder, which reads as a spawn failure and hides which directory was actually absent.
- * Payload paths are files and are never created here.
- */
-function canonicalWritableDir(path: string): string {
+function pathComponents(path: string, root: string): string[] {
+  return path.slice(root.length).split(sep).filter((component) => component.length > 0)
+}
+
+function canonicalOwnedWritableDir(path: string): string {
   mkdirSync(path, { recursive: true, mode: 0o700 })
-  return realpathSync(path)
+  return canonicalPath(path)
 }
 
 function seatbeltString(path: string): string {
@@ -141,17 +175,8 @@ function identityTransform<T>(warning?: string): GenericSandboxTransform<T> {
   })
 }
 
-function guardedSandboxedTransform<T extends ReflectionSpawnArgs | FactsSpawnArgs>(
-  surface: "reflection" | "facts",
-  command: string,
-  env: NodeJS.ProcessEnv,
-  transform: (spawnArgs: T, innerCommand: string) => T,
-): GenericSandboxTransform<T> {
-  const innerCommand = resolveInnerCommand(command, env)
-  if (innerCommand === undefined) {
-    return identityTransform(`${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`)
-  }
-  return Object.assign((spawnArgs: T) => transform(spawnArgs, innerCommand), { wasSandboxed: true })
+function sandboxedTransform<T>(transform: (spawnArgs: T) => T): GenericSandboxTransform<T> {
+  return Object.assign(transform, { wasSandboxed: true })
 }
 
 function resolveInnerCommand(command: string, env: NodeJS.ProcessEnv): string | undefined {

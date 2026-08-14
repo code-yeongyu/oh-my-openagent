@@ -34,6 +34,7 @@ export async function settleReservationRun(
     finalizeOutcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
+    ...(decision.failureError === undefined ? {} : { finalizeFailureError: decision.failureError }),
     ...(decision.integrationSha === undefined ? {} : { integrationSha: decision.integrationSha }),
     finalizedAt,
   })
@@ -70,6 +71,7 @@ export async function settleReservationRun(
     outcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { reason: decision.reason }),
     ...(decision.detail === undefined ? {} : { detail: decision.detail }),
+    ...(decision.failureError === undefined ? {} : { failureError: decision.failureError }),
     startedAt: current.startedAt,
     finishedAt: finalizedAt,
     durationMs: Math.max(0, Date.parse(finalizedAt) - Date.parse(current.startedAt)),
@@ -93,6 +95,7 @@ export async function settleReservationRun(
     outcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { reason: decision.reason }),
     ...(decision.detail === undefined ? {} : { detail: decision.detail }),
+    ...(decision.failureError === undefined ? {} : { failureError: decision.failureError }),
     completion,
     ...(launch === undefined ? {} : { launch }),
   }
