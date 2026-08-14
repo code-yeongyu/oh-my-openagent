@@ -3,11 +3,12 @@ import { join } from "node:path"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { MemoryIdentity, ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
 
-import { prepareReflectionSpawn } from "./spawn"
+import { prepareReflectionForkSpawn, prepareReflectionSpawn } from "./spawn"
 import type { ReflectionModelCandidate } from "./resolve-model"
 import type { RunAttempt } from "./run-artifacts"
 
 type ReflectionSpawnInput = {
+  readonly fork?: { readonly parentSessionFile: string; readonly parentCwd?: string }
   readonly run: ReservedRun
   readonly worktree: ReflectionWorktree
   readonly mergePolicy: "auto" | "integration"
@@ -23,7 +24,14 @@ type ReflectionSpawnInput = {
 }
 
 export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
-  return prepareReflectionSpawn({
+  const builder = input.fork === undefined ? prepareReflectionSpawn : prepareReflectionForkSpawn
+  return builder({
+    ...(input.fork === undefined
+      ? {}
+      : {
+          parentSessionFile: input.fork.parentSessionFile,
+          ...(input.fork.parentCwd === undefined ? {} : { parentCwd: input.fork.parentCwd }),
+        }),
     run: input.run,
     worktree: input.worktree,
     reflectionSessionsDir: join(input.identity.paths.reflection, "runs"),

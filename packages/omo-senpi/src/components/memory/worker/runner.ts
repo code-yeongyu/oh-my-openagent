@@ -12,9 +12,17 @@ import {
   type ReflectionLiveSession,
 } from "./completion"
 import {
+  chooseMemoryLaunchRoute,
+  MEMORY_WORKLOAD_PROFILES,
+  type MemoryLaunchRoute,
+  type MemoryLaunchSurface,
+} from "./fork-cost"
+import { readModelPricing } from "./registry-fallback"
+import {
   resolveReflectionModel,
   shouldWarnCategoryUnavailable,
   type ReflectionModelResolution,
+  type ReflectionSessionModel,
 } from "./resolve-model"
 import { readRunJson } from "./run-artifacts"
 import type { RunFinalizationContext } from "./run-finalization-types"
@@ -33,6 +41,24 @@ export type {
 } from "./runner-types"
 
 import type { ExecutionResult, ReflectionRunResult, ReflectionRunner, SenpiSubprocessRunnerOptions } from "./runner-types"
+
+function quickCandidateCost(model: string, registry: ReturnType<SenpiSubprocessRunnerOptions["resolveModelRegistry"]>) {
+  if (registry === undefined) return undefined
+  const separator = model.indexOf("/")
+  if (separator <= 0) return undefined
+  return readModelPricing(registry.find(model.slice(0, separator), model.slice(separator + 1)))
+}
+
+// missing_providers rides the failure detail so the health fingerprint and the remediation hint
+// can name what to connect; the fingerprint truncates at 60 chars, keeping it stable.
+function categoryUnavailableDetail(
+  category: string,
+  resolution: Extract<ReflectionModelResolution, { readonly kind: "category_unavailable" }>,
+): string {
+  const base = `Reflection category "${category}" could not resolve a usable model (cause: ${resolution.cause})`
+  const providers = resolution.missingProviders?.join(", ")
+  return providers === undefined || providers.length === 0 ? base : `${base}; missing providers: ${providers}`
+}
 
 export class SenpiSubprocessRunner implements ReflectionRunner {
   private readonly loadConfig: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
@@ -53,20 +79,27 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     const loaded = this.loadConfig({ cwd })
     const reflection = resolveAgentReflectionSettings(loaded.config.memory, this.options.identity.id)
     const category = reflection.category
-    const resolution = resolveReflectionModel(category, loaded.config, this.options.resolveModelRegistry())
+    const registry = this.options.resolveModelRegistry()
+    const sessionModel = this.options.resolveSessionModel?.()
+    const resolution = resolveReflectionModel(category, loaded.config, registry, {
+      ...(sessionModel === undefined ? {} : { sessionModel }),
+    })
 
     if (resolution.kind === "category_unavailable") {
       this.notifyCategoryUnavailable(loaded.config, resolution)
       return this.settle(run, {
         outcome: "failed",
         reason: "category_unavailable",
-        detail: `Reflection category "${category}" could not resolve a usable model (cause: ${resolution.cause})`,
+        detail: categoryUnavailableDetail(category, resolution),
       }, startedAt, resolution, true)
     }
+
+    const route = this.chooseLaunchRoute(run, resolution, registry, sessionModel)
 
     const execution = await executeReflectionRun({
       run,
       resolution,
+      route,
       loaded,
       startedAt,
       options: this.options,
@@ -76,6 +109,43 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     })
     if ("runId" in execution) return this.deliverFinalized(execution)
     return this.settle(run, execution, startedAt, resolution, false)
+  }
+
+  // Fork-vs-quick is orthogonal to category resolution: even a user with a working quick chain
+  // should fork when the session model's cache reads are cheap and the job is short. The resolved
+  // quick candidate is compared against fork+inherit on measured per-turn cost; facts never forks.
+  private chooseLaunchRoute(
+    run: ReservedRun,
+    resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>,
+    registry: ReturnType<SenpiSubprocessRunnerOptions["resolveModelRegistry"]>,
+    sessionModel: ReflectionSessionModel | undefined,
+  ): MemoryLaunchRoute {
+    const surface: MemoryLaunchSurface = run.request.trigger === "dream" ? "dream" : "reflection"
+    const quickCost = quickCandidateCost(resolution.model, registry)
+    const sessionCost = sessionModel === undefined || registry === undefined
+      ? undefined
+      : readModelPricing(registry.find(sessionModel.provider, sessionModel.id))
+    const parentContextTokens = this.options.resolveParentContextTokens?.()
+    return chooseMemoryLaunchRoute({
+      surface,
+      quick: {
+        model: resolution.model,
+        ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }),
+        ...(quickCost === undefined ? {} : { cost: quickCost }),
+      },
+      ...(sessionModel === undefined || sessionCost === undefined
+        ? {}
+        : {
+            session: {
+              model: `${sessionModel.provider}/${sessionModel.id}`,
+              ...(sessionModel.thinking === undefined ? {} : { thinking: sessionModel.thinking }),
+              cost: sessionCost,
+            },
+          }),
+      ...(parentContextTokens === undefined ? {} : { parentContextTokens }),
+      turns: MEMORY_WORKLOAD_PROFILES[surface].turns,
+      cacheHit: this.options.resolveParentCacheReusable?.() ?? false,
+    })
   }
 
   private settle(
