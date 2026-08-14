@@ -5,7 +5,7 @@ Verdict: PASS for the scoped profile CLI change on the frozen implementation tre
 ## Frozen tree
 
 - Base commit: `038ed0cbbefe2b40677b63867aeea0d16bc303e0`.
-- Rebased implementation head: `8c4b764bcfda7f3728230634e1e515e859783966`.
+- Rebased implementation head: `03acb9daf` (the final generated-bundle verification commit; subsequent evidence text updates do not change product code).
 - The original generated-bundle commit was replaced after rebase by an official `build:senpi-plugin:stage` regeneration, so no conflict markers or hand-edited minified output remain.
 - Revalidated on `2026-08-14` after rebasing onto the current `dev` head.
 - `git diff --check`: exit 0.

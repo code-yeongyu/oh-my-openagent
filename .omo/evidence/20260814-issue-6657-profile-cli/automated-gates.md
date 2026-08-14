@@ -48,7 +48,7 @@ Focused aggregate: 46 pass, 0 fail, 154 assertions.
 9. `npx --yes bun run build:senpi-plugin:stage`
    - Exit: 0 after rebasing onto `038ed0cbbefe2b40677b63867aeea0d16bc303e0`.
    - The conflicted historical generated-bundle commit was dropped and regenerated from the rebased source with the repository's official generator.
-   - Changed generated outputs are limited to `omo-init-deep-advisor.js`, `omo-task.js`, and `omo.js`; no conflict markers remain.
+   - The final branch diff changes only `omo-init-deep-advisor.js` and `omo.js`; `omo-task.js` was restored byte-for-byte to the current-base output after its workspace junction was relinked locally. No conflict markers remain.
 
 ## Known broader Windows-only limitations
 
