@@ -4,10 +4,10 @@ Verdict: PASS for the scoped profile CLI change on the frozen implementation tre
 
 ## Frozen tree
 
-- Base commit: `ac650406c84a862e207f79b81cbe13cb20eeba19`.
-- Implementation-tree SHA-256: `2c463f6d9c9a5f23057fcd4e133cb0a78f41609513bbc6de33fbf144e20d2add`.
-- The hash covers the base commit, the complete tracked binary diff, and all untracked implementation files, excluding this evidence directory and generated `dist` output.
-- Frozen at `2026-08-13T18:40:54.7200985Z` (`2026-08-14` Asia/Singapore).
+- Base commit: `038ed0cbbefe2b40677b63867aeea0d16bc303e0`.
+- Rebased implementation head: `8c4b764bcfda7f3728230634e1e515e859783966`.
+- The original generated-bundle commit was replaced after rebase by an official `build:senpi-plugin:stage` regeneration, so no conflict markers or hand-edited minified output remain.
+- Revalidated on `2026-08-14` after rebasing onto the current `dev` head.
 - `git diff --check`: exit 0.
 
 ## What was tested
