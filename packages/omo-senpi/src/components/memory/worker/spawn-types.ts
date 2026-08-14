@@ -21,6 +21,10 @@ export interface DreamPeoplePolicy {
 }
 
 export interface ReflectionSpawnArgs {
+  /** Fork mode reuses the parent session's request prefix so the provider cache can hit. */
+  readonly fork?: {
+    readonly parentSessionFile: string
+  }
   readonly runId?: string
   readonly attempt: number
   readonly hardDeadlineAt: number
@@ -93,6 +97,9 @@ export interface FactsRunLedgerEnvelope {
 export type FactsSandbox = (spawnArgs: FactsSpawnArgs) => FactsSpawnArgs | Promise<FactsSpawnArgs>
 
 export interface PrepareReflectionSpawnInput {
+  /** Fork mode: the live parent session file to fork, and the parent's cwd for prefix identity. */
+  readonly parentSessionFile?: string
+  readonly parentCwd?: string
   readonly run: ReservedRun
   readonly worktree: ReflectionWorktree
   readonly reflectionSessionsDir: string

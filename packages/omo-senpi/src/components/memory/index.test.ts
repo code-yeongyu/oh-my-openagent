@@ -83,6 +83,36 @@ describe("createMemoryComponent", () => {
     }
   })
 
+  test("#given a memory child sentinel in env #when registered #then memory registers nothing so a forked child cannot recurse", () => {
+    // A fork-mode child loads extensions (the request prefix must match its parent for the provider
+    // cache to hit), so --no-extensions no longer protects against recursion. The sentinel that the
+    // child already carries must therefore act as a hard disable.
+    for (const sentinel of ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"]) {
+      const pi = new MemoryFakeExtensionAPI()
+      const ctx = componentContext()
+
+      createMemoryComponent({
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        env: { [sentinel]: "1" },
+      }).register(pi, ctx)
+
+      expect({ sentinel, handlers: pi.handlers, tools: pi.tools, commands: pi.commands, renderers: pi.entryRenderers }).toEqual({
+        sentinel, handlers: [], tools: [], commands: [], renderers: [],
+      })
+    }
+  })
+
+  test("#given the sentinel is absent or not exactly 1 #when registered #then memory stays enabled", () => {
+    for (const env of [{}, { SENPI_MEMORY_REFLECTION: "0" }, { SENPI_MEMORY_REFLECTION: "" }]) {
+      const pi = new MemoryFakeExtensionAPI()
+      const ctx = componentContext()
+
+      createMemoryComponent({ loadConfig: () => loadedMemoryConfig(memorySettings()), env }).register(pi, ctx)
+
+      expect(pi.handlers.length).toBeGreaterThan(0)
+    }
+  })
+
   test("#given enabled memory #when session_start binds an auto identity #then it appends a hidden binding and performs no filesystem writes", async () => {
     const { cwd, memoryHome } = fixture()
     const pi = new MemoryFakeExtensionAPI()

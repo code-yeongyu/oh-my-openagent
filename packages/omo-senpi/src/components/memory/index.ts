@@ -64,7 +64,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       const cwd = resolveCwd()
       const bootConfig = resolveMemoryConfig(loadConfig({ cwd }))
-      if (!isEnabled(bootConfig, ctx)) return
+      if (!isEnabled(bootConfig, ctx, env)) return
 
       const missing = missingMemoryCapabilities(pi)
       if (missing.length > 0 || !hasMemoryCapabilities(pi)) {
@@ -89,7 +89,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
-        const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx)
+        const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx, env)
         for (const state of sessions.values()) {
           if (state.enabled === enabled || state.restartNotified) continue
           state.restartNotified = true
@@ -101,7 +101,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         const surface = readSessionSurface(eventCtx)
         wiring.clearStatus(eventCtx)
         const sessionConfig = resolveMemoryConfig(loadConfig({ cwd }))
-        const enabled = isEnabled(sessionConfig, ctx)
+        const enabled = isEnabled(sessionConfig, ctx, env)
         releaseSession(sessions.get(surface.id))
         const state: SessionState = {
           enabled,
@@ -159,8 +159,23 @@ export function resolveMemoryConfig(loaded: SenpiOmoConfigResult): ResolvedMemor
   return resolveMemorySettings(loaded.config.memory)
 }
 
-function isEnabled(config: ResolvedMemoryConfig, ctx: ComponentContext): boolean {
+// A memory child carries one of these sentinels. Today the child also runs --no-extensions, so omo
+// never loads there; a fork-mode child cannot pass --no-extensions (its request prefix must match
+// the parent for the provider cache to hit), so the sentinel is the only thing standing between a
+// forked reflection and unbounded self-triggering recursion.
+const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
+
+export function isMemoryChildProcess(env: Record<string, string | undefined>): boolean {
+  return CHILD_SENTINELS.some((sentinel) => env[sentinel] === "1")
+}
+
+function isEnabled(
+  config: ResolvedMemoryConfig,
+  ctx: ComponentContext,
+  env: Record<string, string | undefined>,
+): boolean {
   return config.enabled
+    && !isMemoryChildProcess(env)
     && ctx.config.getFlag(GLOBAL_DISABLED_FLAG) !== true
     && ctx.config.getFlag(MEMORY_DISABLED_FLAG) !== true
 }
