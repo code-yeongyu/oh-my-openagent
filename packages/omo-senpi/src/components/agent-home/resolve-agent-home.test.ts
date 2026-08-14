@@ -58,4 +58,19 @@ describe("resolveAgentHome", () => {
       })
     })
   })
+
+  describe("#given the canonical branded agent directory holds engine state", () => {
+    describe("#when no directory is configured", () => {
+      test("#then it wins over the legacy flat home", () => {
+        const home = resolveAgentHome({
+          env: {},
+          homeDir: HOME,
+          exists: (path) =>
+            path === join(HOME, ".omo", "agent", AGENT_HOME_SENTINEL) || path === join(HOME, ".omo", AGENT_HOME_SENTINEL),
+        })
+
+        expect(home).toBe(join(HOME, ".omo", "agent"))
+      })
+    })
+  })
 })

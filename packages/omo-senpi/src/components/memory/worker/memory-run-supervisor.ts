@@ -195,6 +195,7 @@ async function runSupervisor(runDir: string): Promise<void> {
   }
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
+  process.exit(0)
 }
 const args = process.argv.slice(2)
 try {

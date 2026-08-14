@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { canonicalAgentDir } from "./agent-dir.js"
 
 export const KNOWN_AUTH_SCHEMA_VERSIONS = new Set([4, 7])
 
@@ -129,7 +130,7 @@ function inspectSqlite(id, path, DatabaseSync, modelHint) {
 export async function detectHarnesses(options = {}) {
   const home = options.home ?? homedir()
   const env = options.env ?? process.env
-  const agentDir = env.SENPI_CODING_AGENT_DIR || join(home, ".senpi", "agent")
+  const agentDir = canonicalAgentDir(env, home)
   const dataHome = env.XDG_DATA_HOME || join(home, ".local", "share")
   const senpi = readAuthJson("senpi", join(agentDir, "auth.json"))
   readSenpiModels(join(agentDir, "models.json"), senpi)

@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs"
-import { homedir } from "node:os"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
+import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
 import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
 import { printSetupReport } from "./setup-report.js"
@@ -32,7 +32,9 @@ function brandProfile() {
     name: "omo",
     displayVersion: packageManifest().version,
     configDir: ".omo",
-    flatLayout: true,
+    // Engine state lives at the canonical `~/.omo/agent`, never directly under the config
+    // directory: a flat home would disagree with the directory every omo surface resolves.
+    flatLayout: false,
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
@@ -58,7 +60,11 @@ function senpiEnvironment(senpiRoot) {
   delete env.OMO_BIN
   delete env.SENPI_BIN
   env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
-  env.SENPI_CODING_AGENT_DIR = join(env.HOME || homedir(), ".omo", "agent")
+  // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
+  // tool inherits the same state instead of falling back to its own home.
+  const agentDir = canonicalAgentDir(env)
+  env.OMO_CODING_AGENT_DIR = agentDir
+  env.SENPI_CODING_AGENT_DIR = agentDir
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
   // the plugin via --extension and therefore never match the settings-packages detection gates.
   env.OMO_NATIVE = "1"
@@ -90,8 +96,26 @@ function isInteractiveDefault(args) {
   return process.stderr.isTTY === true && !args.includes("-p") && !args.includes("--print")
 }
 
+/**
+ * Engine state that predates the unified directory is carried forward once, so unifying the
+ * location never presents itself to the user as one more round of erased settings.
+ */
+function reportLegacyFlatAdoption() {
+  let result
+  try {
+    result = adoptLegacyFlatState()
+  } catch (error) {
+    console.error(`omo: could not adopt legacy state: ${error.message}`)
+    return
+  }
+  if (!result.adopted) return
+  const moved = [...result.copied, ...result.backfilled].join(", ")
+  console.error(`omo: carried forward settings from the legacy ~/.omo layout (${moved})`)
+}
+
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
+  reportLegacyFlatAdoption()
   const command = args[0]
   if (command === "ulw-loop") {
     spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))

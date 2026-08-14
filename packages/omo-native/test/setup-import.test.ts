@@ -255,3 +255,26 @@ describe("omo setup credential inheritance", () => {
     expect(existsSync(join(item.agentDir, "models.json"))).toBe(false)
   })
 })
+
+describe("omo setup import", () => {
+  describe("#given no agent directory is configured", () => {
+    describe("#when credentials are imported", () => {
+      test("#then they land in the canonical branded directory", () => {
+        const item = fixture()
+        write(
+          join(item.xdg, "opencode", "auth.json"),
+          JSON.stringify({ google: { type: "api", key: "IMPORT-SECRET" } }),
+        )
+        const env: NodeJS.ProcessEnv = { ...process.env, HOME: item.home, USERPROFILE: item.home, XDG_DATA_HOME: item.xdg }
+        delete env.OMO_CODING_AGENT_DIR
+        delete env.SENPI_CODING_AGENT_DIR
+        delete env.PI_CODING_AGENT_DIR
+
+        const result = spawnSync(process.execPath, [item.launcher, "setup", "--yes"], { encoding: "utf8", env })
+
+        expect(result.status).toBe(0)
+        expect(existsSync(join(item.home, ".omo", "agent", "auth.json"))).toBe(true)
+      })
+    })
+  })
+})

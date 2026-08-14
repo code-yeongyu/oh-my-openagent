@@ -27,7 +27,7 @@
     "test": "bun test src/**/*.test.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-tui": "0.80.3",
+    "@earendil-works/pi-tui": "0.84.1",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -44,7 +44,7 @@
     "typebox": "1.1.38"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.8.13"
+    "@code-yeongyu/senpi": "2026.8.14"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -52,6 +52,6 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.13"
+    "@code-yeongyu/senpi": "2026.8.14"
   }
 }

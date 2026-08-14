@@ -14,7 +14,7 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@code-yeongyu/senpi": "2026.8.13"
+    "@code-yeongyu/senpi": "2026.8.14"
   },
   "repository": {
     "type": "git",

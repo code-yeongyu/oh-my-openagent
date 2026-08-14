@@ -149,6 +149,25 @@ afterEach(async () => {
 })
 
 describe("memory run supervisor", () => {
+  test("#given an unrelated active handle #when the durable outcome is published #then the standalone supervisor exits", async () => {
+    // given
+    const runDir = await makeRun({ mode: "inspect" })
+    const keepalivePath = join(import.meta.dir, "__fixtures__", "supervisor-keepalive.ts")
+    const supervisor = spawn(process.execPath, [keepalivePath, runDir], {
+      detached: true,
+      stdio: "ignore",
+    })
+    if (supervisor.pid !== undefined) processGroups.add(supervisor.pid)
+    const exit = waitForExit(supervisor)
+
+    // when
+    const outcome = await readOutcome(runDir)
+
+    // then
+    expect(outcome.childExit).toEqual({ code: 23, signal: null })
+    await expect(exit).resolves.toEqual({ code: 0, signal: null })
+  }, 60_000)
+
   test("#given a retryable model miss and a next attempt #when the supervisor publishes the outcome #then the ledger advances first", async () => {
     // given
     const runDir = await makeRun({
