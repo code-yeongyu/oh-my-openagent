@@ -121,7 +121,9 @@ describe("reflection worker OS sandbox writable grants", () => {
     // then
     expect(existsSync(absentGrant)).toBe(true)
     const profile = transform(spawnArgs(setup.worktree)).args[1] ?? ""
-    expect(profile).toContain(realpathSync(absentGrant))
+    // The profile quotes each path through JSON.stringify, which escapes the separators of a Windows
+    // path, so the grant is matched in that same encoding rather than as a raw path.
+    expect(profile).toContain(JSON.stringify(realpathSync(absentGrant)))
   })
 })
 
