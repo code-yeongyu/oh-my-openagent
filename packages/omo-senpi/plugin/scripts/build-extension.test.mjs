@@ -66,6 +66,15 @@ describe("checkExtensionCurrent", () => {
     }
   })
 
+  test("#given freshly built memory runtimes #when process launches are inspected #then every Windows console stays hidden", async () => {
+    // given / when
+    const outputs = await builtOutputs()
+    const supervisor = await readFile(outputs.supervisorOutputPath, "utf8")
+
+    // then
+    expect(supervisor.match(/windowsHide:!0/g)).toHaveLength(5)
+  })
+
   test("#given platform-specific source paths #when normalized #then build markers use portable separators", () => {
     expect(toPortableBuildPath("packages\\omo-senpi\\src\\extension\\index.ts"))
       .toBe("packages/omo-senpi/src/extension/index.ts")

@@ -112,11 +112,19 @@ function spawnTerminationCommand(command: readonly string[], args: readonly stri
   const [executable, ...prefix] = command
   if (executable === undefined) throw new TypeError("termination command is required")
   if (synchronous) {
-    const result = spawnSync(executable, [...prefix, ...args], { env: process.env, stdio: "ignore" })
+    const result = spawnSync(executable, [...prefix, ...args], {
+      env: process.env,
+      stdio: "ignore",
+      windowsHide: true,
+    })
     if (result.error !== undefined) throw result.error
     return
   }
-  const child = spawn(executable, [...prefix, ...args], { env: process.env, stdio: "ignore" })
+  const child = spawn(executable, [...prefix, ...args], {
+    env: process.env,
+    stdio: "ignore",
+    windowsHide: true,
+  })
   child.once("error", (error) => process.stderr.write(`${error.message}\n`))
 }
 
@@ -165,7 +173,11 @@ export function terminateSupervisorChildHard(
 
 async function readCommand(command: string, args: readonly string[]): Promise<string | null> {
   return await new Promise((resolve) => {
-    execFile(command, [...args], { encoding: "utf8", timeout: 2_000 }, (error, stdout) => {
+    execFile(command, [...args], {
+      encoding: "utf8",
+      timeout: 2_000,
+      windowsHide: true,
+    }, (error, stdout) => {
       if (error !== null) {
         resolve(null)
         return

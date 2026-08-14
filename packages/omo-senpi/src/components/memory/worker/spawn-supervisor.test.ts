@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { spawn } from "node:child_process"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -19,6 +20,7 @@ describe("supervised child outcome authority", () => {
     const payloadDir = join(runDir, "payload")
     await mkdir(payloadDir)
     const exec = createNodeGitExec()
+    let windowsHide: boolean | undefined
 
     // when
     const result = await runReflectionChild({
@@ -57,11 +59,16 @@ describe("supervised child outcome authority", () => {
         exec,
       },
     }, {
+      spawnSupervisor: (command, args, options) => {
+        windowsHide = options.windowsHide
+        return spawn(command, args, options)
+      },
       supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-outcome-then-fail.ts"),
     })
 
     // then
     expect(result).toMatchObject({ code: null, signal: "SIGTERM", timedOut: true })
+    expect(windowsHide).toBe(true)
   }, 30_000)
 
   test("#given an outcome before launch cleanup and a supervisor failure #when the parent completes #then the incomplete outcome is rejected", async () => {

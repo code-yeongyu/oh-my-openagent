@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process"
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
@@ -32,6 +32,11 @@ const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024
 // Publication can still be waiting for the terminal gate after the child deadline expires.
 // Keep the parent alive for one additional default grace window so the durable outcome can land.
 const OUTCOME_PUBLICATION_MARGIN_MS = 5_000
+type SpawnSupervisor = (
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+) => ChildProcess
 
 export async function runReflectionChild(
   spawnArgs: ReflectionSpawnArgs,
@@ -39,6 +44,7 @@ export async function runReflectionChild(
     readonly terminationGraceMs?: number
     readonly maxOutputBytes?: number
     readonly sandbox?: ReflectionSandbox
+    readonly spawnSupervisor?: SpawnSupervisor
     readonly supervisorPath?: string
     readonly now?: () => number
   },
@@ -68,6 +74,7 @@ export async function runReflectionChild(
     hardDeadlineAt: prepared.hardDeadlineAt,
     terminationGraceMs: graceMs,
     maxOutputBytes,
+    spawnSupervisor: options.spawnSupervisor,
     supervisorPath: options.supervisorPath,
     ledger: {
       version: 1,
@@ -103,6 +110,7 @@ export async function runFactsChild(
     readonly terminationGraceMs?: number
     readonly maxOutputBytes?: number
     readonly sandbox?: FactsSandbox
+    readonly spawnSupervisor?: SpawnSupervisor
     readonly supervisorPath?: string
     readonly now?: () => number
     readonly batchId: string
@@ -135,6 +143,7 @@ export async function runFactsChild(
     hardDeadlineAt: prepared.hardDeadlineAt,
     terminationGraceMs: graceMs,
     maxOutputBytes,
+    spawnSupervisor: options.spawnSupervisor,
     supervisorPath: options.supervisorPath,
     ledger: {
       version: 1,
@@ -168,6 +177,7 @@ async function runSupervisedChild(input: {
   readonly hardDeadlineAt: number
   readonly terminationGraceMs: number
   readonly maxOutputBytes: number
+  readonly spawnSupervisor?: SpawnSupervisor
   readonly supervisorPath?: string
   readonly ledger: Readonly<Record<string, unknown>>
 }): Promise<ReflectionChildResult> {
@@ -202,10 +212,15 @@ async function runSupervisedChild(input: {
   await writeRunJsonAtomic(join(input.runDir, "ledger.json"), ledger)
   await writeRunJsonAtomic(join(input.runDir, "launch.json"), launch)
 
-  const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
-    detached: true,
-    stdio: "ignore",
-  })
+  const supervisor = (input.spawnSupervisor ?? spawn)(
+    process.execPath,
+    [input.supervisorPath ?? defaultSupervisorPath(), input.runDir],
+    {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  )
   supervisor.unref()
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
