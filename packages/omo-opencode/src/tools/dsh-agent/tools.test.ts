@@ -31,7 +31,7 @@ function makeConfig(mode: "headless" | "acp" = "headless") {
     enabled: true,
     mode,
     command: "npx",
-    args: ["@deepseek-ai/dsh"],
+    args: ["-y", "@deepseek-ai/dsh"],
     permission: "reject" as const,
     timeout_ms: 300000,
   }
@@ -66,7 +66,7 @@ describe("createDshAgentTool", () => {
       timeoutMs: number
     }
     expect(call.command).toBe("npx")
-    expect(call.args).toEqual(["@deepseek-ai/dsh"])
+    expect(call.args).toEqual(["-y", "@deepseek-ai/dsh"])
     expect(call.cwd).toBe("/workspace/project")
     expect(call.prompt).toBe("fix the widget")
     expect(result).toHaveProperty("output", "headless done")
@@ -92,7 +92,7 @@ describe("createDshAgentTool", () => {
 
     // then
     const call = runMock.mock.calls[0]?.[0] as { args: string[]; permission: string }
-    expect(call.args).toEqual(["@deepseek-ai/dsh", "acp"])
+    expect(call.args).toEqual(["-y", "@deepseek-ai/dsh", "acp"])
     expect(call.permission).toBe("reject")
   })
 

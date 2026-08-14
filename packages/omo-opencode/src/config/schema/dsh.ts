@@ -7,8 +7,8 @@ export const DshConfigSchema = z.object({
   mode: z.enum(["headless", "acp"]).default("headless"),
   /** Executable to spawn per run (default: npx) */
   command: z.string().default("npx"),
-  /** Base arguments for the dsh CLI (default: @deepseek-ai/dsh) */
-  args: z.array(z.string()).default(["@deepseek-ai/dsh"]),
+  /** Base arguments for the dsh CLI (default: npx -y @deepseek-ai/dsh; -y avoids an interactive install prompt) */
+  args: z.array(z.string()).default(["-y", "@deepseek-ai/dsh"]),
   /** Optional working-directory override for the child process */
   cwd: z.string().optional(),
   /** Auto-answer policy for the ACP child's permission requests (ACP mode only) */
