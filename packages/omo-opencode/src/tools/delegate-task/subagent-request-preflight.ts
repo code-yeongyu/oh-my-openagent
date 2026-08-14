@@ -8,7 +8,7 @@ import type { ResolveSubagentExecutionOptions, SubagentRequestPreflight } from "
 function buildSisyphusJuniorError(categoryExamples: string): string {
   const exampleHint = categoryExamples.trim() !== ""
     ? `Use category parameter instead (e.g., ${categoryExamples}).`
-    : `Use the category parameter instead (pick one of: quick, deep, ultrabrain, visual-engineering, artistry, writing).`
+    : `Use the category parameter instead (pick one of: quick, deep, ultrabrain, visual-engineering, artistry, writing, non-coding-writing).`
 
   return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. ${exampleHint}
 

@@ -188,7 +188,8 @@ Turn-local reset (mandatory): classify from the CURRENT user message, not conver
 Domain guess (provisional - finalized in ROUTE after exploration):
 - Visual (UI, CSS, styling, layout, design, animation) → likely visual-engineering
 - Logic (algorithms, architecture, complex business logic) → likely ultrabrain
-- Writing (docs, prose, technical writing) → likely writing
+- Technical documentation, READMEs, API docs, docstrings, and developer guides → likely writing
+- Reports, proposals, official documents, policy writing, creative prose, and product documents → likely non-coding-writing
 - Git (commits, branches, rebases) → likely git
 - General → determine after exploration
 

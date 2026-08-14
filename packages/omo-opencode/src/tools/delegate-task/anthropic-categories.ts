@@ -5,7 +5,7 @@ You are working on tasks that don't fit specific categories but require substant
 
 <Selection_Gate>
 BEFORE selecting this category, VERIFY ALL conditions:
-1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
+1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (technical docs), non-coding-writing (prose-first documents)
 2. Task requires substantial effort across multiple systems/modules
 3. Changes have broad impact or require careful coordination
 4. NOT just "complex" - must be genuinely unclassifiable AND high-effort

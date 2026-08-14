@@ -24,6 +24,7 @@ const expectedCategories = [
   "unspecified-low",
   "unspecified-high",
   "writing",
+  "non-coding-writing",
 ] as const
 
 describe("model requirement global invariants", () => {

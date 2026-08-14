@@ -4,6 +4,23 @@ import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
 import { agentBrowserSkill, playwrightSkill } from "./skills/playwright"
 
+const ALWAYS_ON_NON_BROWSER_SKILLS = [
+	"frontend",
+	"git-master",
+	"review-work",
+	"remove-ai-slops",
+	"init-deep",
+	"debugging",
+	"security-research",
+	"security-review",
+	"visual-qa",
+	"locale-aware-writing",
+	"official-document-writing",
+	"creative-writing",
+	"law-policy-writing",
+	"product-definition-writing",
+]
+
 describe("createBuiltinSkills", () => {
 	test("returns playwright skill by default", () => {
 		// given - no options (default)
@@ -102,9 +119,12 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "init-deep")).toBeDefined()
 			expect(skills.find((s) => s.name === "debugging")).toBeDefined()
 			expect(skills.find((s) => s.name === "security-research")).toBeDefined()
-			expect(skills.find((s) => s.name === "security-review")).toBeDefined()
-			expect(skills.find((s) => s.name === "visual-qa")).toBeDefined()
-		}
+				expect(skills.find((s) => s.name === "security-review")).toBeDefined()
+				expect(skills.find((s) => s.name === "visual-qa")).toBeDefined()
+				for (const skillName of ALWAYS_ON_NON_BROWSER_SKILLS) {
+					expect(skills.find((s) => s.name === skillName)).toBeDefined()
+				}
+			}
 	})
 
 	test("git-master skill keeps commit workflow phases in order", () => {
@@ -118,7 +138,7 @@ describe("createBuiltinSkills", () => {
 		expect(gitMaster).toBeDefined()
 	})
 
-	test("returns exactly 10 skills regardless of provider", () => {
+	test("returns exactly 15 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -127,9 +147,9 @@ describe("createBuiltinSkills", () => {
 		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(10)
-		expect(agentBrowserSkills).toHaveLength(10)
-		expect(devBrowserSkills).toHaveLength(10)
+		expect(defaultSkills).toHaveLength(15)
+		expect(agentBrowserSkills).toHaveLength(15)
+		expect(devBrowserSkills).toHaveLength(15)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -151,7 +171,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
 		expect(skills.map((s) => s.name)).toContain("visual-qa")
-		expect(skills.length).toBe(9)
+		expect(skills.map((s) => s.name)).toContain("locale-aware-writing")
+		expect(skills.length).toBe(14)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -173,25 +194,13 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
 		expect(skills.map((s) => s.name)).toContain("visual-qa")
-		expect(skills.length).toBe(8)
+		expect(skills.map((s) => s.name)).toContain("official-document-writing")
+		expect(skills.length).toBe(13)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
-		const options = {
-			disabledSkills: new Set([
-				"playwright",
-				"frontend",
-				"git-master",
-				"review-work",
-				"remove-ai-slops",
-				"init-deep",
-				"debugging",
-				"security-research",
-				"security-review",
-				"visual-qa",
-			]),
-		}
+		const options = { disabledSkills: new Set(["playwright", ...ALWAYS_ON_NON_BROWSER_SKILLS]) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
@@ -200,7 +209,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.length).toBe(0)
 	})
 
-	test("should return all 10 skills when disabledSkills set is empty", () => {
+	test("should return all 15 skills when disabledSkills set is empty", () => {
 		// #given
 		const options = { disabledSkills: new Set<string>() }
 
@@ -208,7 +217,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(10)
+		expect(skills.length).toBe(15)
 	})
 
 	test("#given disabled_skills with debugging and visual-qa #when creating builtin skills #then both are filtered out", () => {
@@ -316,6 +325,26 @@ describe("createBuiltinSkills", () => {
 		expect(securityReview?.description).toContain("Alias for security-research")
 		expect(securityReview?.description).toContain("/security-review")
 		expect(securityReview?.template).toBe(securityResearch?.template)
+	})
+
+	test("non-coding writing skills keep their domain boundaries", () => {
+		// #given
+		const skills = createBuiltinSkills()
+
+		// #when
+		const localeAware = skills.find((skill) => skill.name === "locale-aware-writing")
+		const officialDocument = skills.find((skill) => skill.name === "official-document-writing")
+		const creativeWriting = skills.find((skill) => skill.name === "creative-writing")
+		const lawPolicy = skills.find((skill) => skill.name === "law-policy-writing")
+		const productDefinition = skills.find((skill) => skill.name === "product-definition-writing")
+
+		// #then
+		expect(localeAware?.template).toContain("document culture")
+		expect(officialDocument?.template).toContain("official correspondence")
+		expect(creativeWriting?.template).toContain("voice")
+		expect(lawPolicy?.template).toContain("Out of Scope")
+		expect(lawPolicy?.template).toContain("Client-specific legal advice")
+		expect(productDefinition?.template).toContain("acceptance criteria")
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {

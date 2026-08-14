@@ -1,4 +1,4 @@
-# src/features/builtin-skills/ — 12 Built-in Skill Files
+# src/features/builtin-skills/ — 17 Built-in Skill Files
 
 **Generated:** 2026-07-17 (7d664b96b)
 
@@ -11,7 +11,7 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
-├── skills.ts             # createBuiltinSkills() factory — registers all 12 below
+├── skills.ts             # createBuiltinSkills() factory — registers all 17 below
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
 │   ├── git-master.ts                  # 1111 LOC
@@ -26,6 +26,11 @@ builtin-skills/
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
 │   ├── security-research.ts           # Team Mode exploitability-driven security research
 │   ├── security-review.ts             # Alias for security-research
+│   ├── locale-aware-writing.ts        # Language, register, and document-culture matching
+│   ├── official-document-writing.ts   # Reports, proposals, memos, and official correspondence
+│   ├── creative-writing.ts             # Fiction, essays, scripts, and narrative prose
+│   ├── law-policy-writing.ts           # Public law, policy, reform, and institutional analysis
+│   ├── product-definition-writing.ts   # PRDs, requirements, flows, and acceptance criteria
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
@@ -50,6 +55,11 @@ builtin-skills/
 | `init-deep` | — | — | Hierarchical AGENTS.md generation |
 | `security-research` | SKILL.md | — | Team Mode exploitability-driven security research |
 | `security-review` | wrapper | — | Alias for `security-research` |
+| `locale-aware-writing` | ~30 | — | Language, register, locale, and document-culture aware prose |
+| `official-document-writing` | ~35 | — | Formal reports, proposals, memos, and correspondence |
+| `creative-writing` | ~30 | — | Fiction, essays, scripts, scenes, and narrative prose |
+| `law-policy-writing` | ~35 | — | Public and analytical law/policy writing; no litigation or client advice |
+| `product-definition-writing` | ~35 | — | PRDs, product briefs, requirements, flows, and acceptance criteria |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |
 
 ## BROWSER VARIANT SELECTION

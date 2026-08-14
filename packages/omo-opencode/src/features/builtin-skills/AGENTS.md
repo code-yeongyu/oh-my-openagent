@@ -1,4 +1,4 @@
-# src/features/builtin-skills/ — 12 Built-in Skill Files
+# src/features/builtin-skills/ — 17 Built-in Skill Files
 
 **Generated:** 2026-05-15
 
@@ -11,7 +11,7 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
-├── skills.ts             # createBuiltinSkills() factory — registers all 12 below
+├── skills.ts             # createBuiltinSkills() factory — re-exports the shared factory with all 17 below
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
 │   ├── git-master.ts                  # 1111 LOC

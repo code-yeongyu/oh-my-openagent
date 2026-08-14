@@ -16,6 +16,11 @@ import {
   securityResearchSkill,
   securityReviewSkill,
   visualQaSkill,
+  localeAwareWritingSkill,
+  officialDocumentWritingSkill,
+  creativeWritingSkill,
+  lawPolicyWritingSkill,
+  productDefinitionWritingSkill,
   teamModeSkill,
 } from "./skills/index"
 
@@ -65,6 +70,11 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 		securityResearchSkill,
 		securityReviewSkill,
 		visualQaSkill,
+		localeAwareWritingSkill,
+		officialDocumentWritingSkill,
+		creativeWritingSkill,
+		lawPolicyWritingSkill,
+		productDefinitionWritingSkill,
 	]
 
   if (teamModeEnabled && !disabledSkills?.has("team-mode")) {

@@ -122,6 +122,12 @@ Every delegation MUST use the category that matches the task's domain. Mismatche
 
 Any task involving UI, UX, CSS, styling, layout, animation, design, or frontend components MUST go to \`visual-engineering\`. Never delegate visual work to \`quick\`, \`unspecified-*\`, or any other category.
 
+**NON-CODING WRITING WORK = ALWAYS \`non-coding-writing\`.**
+
+Any task involving reports, proposals, official correspondence, policy documents, public statements, essays, creative prose, PRDs, product briefs, or other prose artifacts for non-developer readers MUST go to \`non-coding-writing\`. Use relevant writing skills such as \`locale-aware-writing\`, \`official-document-writing\`, \`creative-writing\`, \`law-policy-writing\`, or \`product-definition-writing\`.
+
+Use \`writing\` for technical documentation such as READMEs, API docs, docstrings, and developer guides. Do not route non-coding prose through \`quick\`, \`unspecified-*\`, or the technical \`writing\` category.
+
 \`\`\`typescript
 // CORRECT: Visual work → visual-engineering category
 task(category="visual-engineering", load_skills=["frontend"], run_in_background=false, prompt="Redesign the sidebar layout with new spacing...")
@@ -133,6 +139,7 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Redesign
 | Task Domain | MUST Use Category |
 |---|---|
 | UI, styling, animations, layout, design | \`visual-engineering\` |
+| Reports, proposals, official letters, policy documents, creative prose, PRDs | \`non-coding-writing\` |
 | Hard logic, architecture decisions, algorithms | \`ultrabrain\` |
 | Autonomous research + end-to-end implementation | \`deep\` |
 | Single-file typo, trivial config change | \`quick\` |

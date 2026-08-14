@@ -158,4 +158,27 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
     ],
   },
+  "non-coding-writing": {
+    fallbackChain: [
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode", "vercel"],
+        model: "kimi-k3",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-5",
+        variant: "low",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.6-flash",
+      },
+      {
+        providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      },
+    ],
+  },
 };

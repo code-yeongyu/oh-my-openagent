@@ -45,7 +45,7 @@ background-task.ts → BackgroundManager.launch() → (async polling) → backgr
 ## CATEGORY RESOLUTION
 
 1. Check user-defined categories (`pluginConfig.categories`)
-2. Fall back to built-in 8 categories
+2. Fall back to built-in 9 categories
 3. Resolve model from category config
 4. Check model availability → fallback if unavailable
 

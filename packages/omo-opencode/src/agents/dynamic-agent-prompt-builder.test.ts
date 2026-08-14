@@ -138,6 +138,23 @@ describe("buildCategorySkillsDelegationGuide", () => {
     expect(result).toContain("`quick`")
     expect(result).toContain("Trivial tasks")
   })
+
+  it("should identify non-coding writing as a category and expose relevant skills", () => {
+    //#given: prose category and writing skills
+    const categories: AvailableCategory[] = [{ name: "non-coding-writing", description: "Prose-first documents" }]
+    const skills: AvailableSkill[] = [
+      { name: "locale-aware-writing", description: "Locale-aware prose", location: "plugin" },
+      { name: "official-document-writing", description: "Formal documents", location: "plugin" },
+    ]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, skills)
+
+    //#then: category and relevant skills should be visible to the orchestrator
+    expect(result).toContain("`non-coding-writing`")
+    expect(result).toContain("locale-aware-writing")
+    expect(result).toContain("official-document-writing")
+  })
 })
 
 describe("buildUltraworkSection", () => {
@@ -271,4 +288,3 @@ describe("buildNonClaudePlannerSection", () => {
     expect(result).not.toBe("")
   })
 })
-
