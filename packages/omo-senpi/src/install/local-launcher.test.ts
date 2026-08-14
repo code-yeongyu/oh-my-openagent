@@ -22,7 +22,7 @@ describe("local omo launcher", () => {
           name: "omo",
           displayVersion: "9.9.9",
           configDir: ".omo",
-          flatLayout: true,
+          flatLayout: false,
           envPrefix: "OMO",
           userAgent: "omo",
           originator: "omo",
@@ -36,6 +36,9 @@ describe("local omo launcher", () => {
         expect(source).toContain("--extension")
         expect(source).toContain("OMO_SENPI_CLI_PATH")
         expect(source).toContain("OMO_PLUGIN_ROOT")
+        expect(source).toContain("OMO_CODING_AGENT_DIR")
+        expect(source).toContain("SENPI_CODING_AGENT_DIR")
+        expect(source).toContain('join(homedir(), ".omo", "agent")')
       })
     })
 

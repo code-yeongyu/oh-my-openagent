@@ -275,3 +275,21 @@ describe("omo setup sibling detection", () => {
     })
   })
 })
+
+describe("setup detection", () => {
+  describe("#given credentials in the canonical branded agent directory", () => {
+    describe("#when no agent directory is configured", () => {
+      test("#then the canonical directory is the one detected", async () => {
+        const fixture = createFixture()
+        write(
+          join(fixture.home, ".omo", "agent", "auth.json"),
+          JSON.stringify({ "canonical-provider": { type: "api_key", key: "SENPI-SECRET" } }),
+        )
+
+        const inventory = await detectHarnesses({ home: fixture.home, env: { XDG_DATA_HOME: fixture.xdg } })
+
+        expect(inventory.harnesses.find((harness) => harness.id === "senpi")?.providers).toContain("canonical-provider")
+      })
+    })
+  })
+})

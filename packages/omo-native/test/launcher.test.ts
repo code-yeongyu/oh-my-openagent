@@ -113,9 +113,15 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
 }
 
 function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}) {
+  // A developer machine exports the agent directory for its own install; inheriting it would let
+  // the override path answer assertions that are about the unconfigured default.
+  const inherited: NodeJS.ProcessEnv = { ...process.env, PATH: "/usr/bin:/bin", CAPTURE_FILE: fixture.captureFile }
+  delete inherited.OMO_CODING_AGENT_DIR
+  delete inherited.SENPI_CODING_AGENT_DIR
+  delete inherited.PI_CODING_AGENT_DIR
   return spawnSync(process.execPath, [fixture.launcher, ...args], {
     encoding: "utf8",
-    env: { ...process.env, PATH: "/usr/bin:/bin", CAPTURE_FILE: fixture.captureFile, ...env },
+    env: { ...inherited, ...env },
   })
 }
 
@@ -161,6 +167,7 @@ describe("omo launcher", () => {
         expect(realpathSync.native(binDir ?? "")).toBe(realpathSync.native(dirname(fixture.shimPath ?? "")))
         expect(existsSync(binDir ?? "")).toBe(true)
         expect(environment.OMO_AGENT_TOOLKIT_BIN).toBe(join(fixture.packageRoot, "bin", "omo-agent-toolkit.js"))
+        expect(environment.OMO_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
         expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
         // An inherited value must never survive; it is replaced by this launcher's own entry so
         // anything resolving the product by name re-enters here instead of the bare engine.
@@ -181,7 +188,7 @@ describe("omo launcher", () => {
 
 
     describe("#when the product identity is handed to the engine", () => {
-      test("#then the brand profile names the product, its flat home and its update channel", () => {
+      test("#then the brand profile names the product, its home and its update channel", () => {
         const fixture = createFixture()
         const result = run(fixture, ["say", "hi"])
         expect(result.status).toBe(0)
@@ -189,7 +196,7 @@ describe("omo launcher", () => {
         const brand = JSON.parse(capture(fixture).env.SENPI_BRAND ?? "{}")
         expect(brand.name).toBe("omo")
         expect(brand.configDir).toBe(".omo")
-        expect(brand.flatLayout).toBe(true)
+        expect(brand.flatLayout).toBe(false)
         expect(brand.envPrefix).toBe("OMO")
         expect(brand.userAgent).toBe("omo")
         expect(brand.originator).toBe("omo")

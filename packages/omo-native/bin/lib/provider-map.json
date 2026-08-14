@@ -1,5 +1,5 @@
 {
-  "_comment": "Derived from @code-yeongyu/senpi 2026.8.13 builtinProviders(). Hosted gateways remain excluded; ollama/radius are dynamic providers without static model modules. Re-derive builtin provider ids and mappings whenever that pin changes.",
+  "_comment": "Derived from @code-yeongyu/senpi 2026.8.14 builtinProviders(). Hosted gateways remain excluded; ollama/radius are dynamic providers without static model modules. Re-derive builtin provider ids and mappings whenever that pin changes.",
   "builtinProviderIds": [
     "alibaba-token-plan",
     "amazon-bedrock",

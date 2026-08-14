@@ -24,7 +24,12 @@
   "docs": [
     ".agents/skills/codex-qa/SKILL.md:72: omo get-local-version",
     ".github/workflows/publish.yml:915: /bin/omo",
+    "AGENTS.md:411: omo doctor",
+    "CLAUDE.md:411: omo doctor",
     "packages/omo-codex/README.md:52: omo get-local-version",
+    "packages/omo-native/AGENTS.md:12: omo doctor",
+    "packages/omo-native/bin/lib/agent-dir.js:8: omo doctor",
+    "packages/omo-native/test/doctor.test.ts:159: omo doctor",
     "packages/omo-native/test/doctor.test.ts:62: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts:228: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts:97: omo doctor",

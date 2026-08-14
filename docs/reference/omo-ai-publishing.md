@@ -74,7 +74,7 @@ identity instead of impersonating the product.
 | --- | --- | --- |
 | `name` | `omo` | welcome header, terminal titles, help, tips, first-run, system-prompt identity |
 | `displayVersion` | the omo-ai version | `omo --version` and the TUI header; the engine version stays internal for update comparisons |
-| `configDir` + `flatLayout` | `.omo`, flat | agent state lives directly under `~/.omo` |
+| `configDir` + `flatLayout` | `.omo`, nested | agent state lives at `~/.omo/agent` - the one directory every omo entry point resolves through `bin/lib/agent-dir.js`; the launcher pins it for the engine with `OMO_CODING_AGENT_DIR` plus the legacy `SENPI_CODING_AGENT_DIR` |
 | `envPrefix` | `OMO` | `OMO_*` variables are read first, then the legacy `SENPI_*` and `PI_*` names |
 | `userAgent` / `originator` | `omo` | outgoing request identity |
 | `update` | `omo-ai`, `beta`, `npm i -g omo-ai@beta` | the update banner checks the beta dist-tag of omo-ai and prints the product's own command |
