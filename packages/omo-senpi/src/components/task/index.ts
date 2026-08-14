@@ -50,6 +50,12 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   return {
     name: "task",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      // The separately loaded member extension owns the member's only task tool: scoped task_send.
+      // Pinned senpi retains every loaded extension and resolves duplicate tool names first-wins; it
+      // does not reject this whole extension. Skip the lead component here to keep task lifecycle,
+      // team control, commands, and lead pollers out of member processes.
+      if (isTeamMemberProcess()) return
+
       // Unconditional omo process hygiene (T16): fires on session_start before any
       // flag/capability gate can skip the rest of the component.
       wireSessionStartProcessSweep(pi, ctx)
@@ -170,18 +176,13 @@ function registerTaskTools(
       resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })
-  // A team member child already loads the member extension, which registers the member-scoped
-  // task_send. Registering the lead-scoped one too makes senpi reject THIS whole extension on the
-  // name collision, leaving the member with no omo config, agents, or providers.
-  if (!isTeamMemberProcess()) {
-    pi.registerTool({
-      ...createTaskSendTool({
-        manager,
-        resolveCallerSessionId,
-        teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
-      }),
-    })
-  }
+  pi.registerTool({
+    ...createTaskSendTool({
+      manager,
+      resolveCallerSessionId,
+      teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
+    }),
+  })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
   pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
 }

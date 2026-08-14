@@ -207,9 +207,10 @@ describe("omo-senpi task component wiring", () => {
     expect(registered).not.toContain("team_wait")
   })
 
-  it("#given the process is a spawned team member #when the task component registers #then task_send is left to the member extension", () => {
-    // given a child process carrying the member identity the member extension registers task_send for
+  it("#given the process is a spawned team member #when the task component registers #then the whole lead surface is left to the member extension", () => {
+    // given a child process whose separate member extension registers its only safe tool, task_send
     const pi = new FakeExtensionAPI()
+    pi.registerTool({ name: "task_send" })
     const logger = createLogger()
     const previousIdentity = process.env[MEMBER_IDENTITY_ENV]
     process.env[MEMBER_IDENTITY_ENV] = "3a80dbd1-3fd2-4e86-b110-596e645b6bd4::a1-incumbents"
@@ -222,9 +223,11 @@ describe("omo-senpi task component wiring", () => {
       else process.env[MEMBER_IDENTITY_ENV] = previousIdentity
     }
 
-    // then only task_send is withheld, so senpi keeps loading THIS extension instead of dropping it
-    // on the name collision and stripping the member of its config, agents, and providers
-    expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].filter((name) => name !== "task_send").sort())
+    // then this lead-oriented component contributes nothing beyond the preloaded member-safe surface
+    expect(toolNames(pi)).toEqual(["task_send"])
+    expect(pi.commands).toEqual([])
+    expect(pi.handlers).toEqual([])
+    expect(pi.messageRenderers).toEqual([])
   })
 
   it("#given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance", () => {

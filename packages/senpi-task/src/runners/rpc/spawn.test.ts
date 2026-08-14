@@ -3,6 +3,7 @@ import { homedir, tmpdir } from "node:os"
 import { dirname, isAbsolute, join, sep } from "node:path"
 import { describe, expect, test } from "bun:test"
 
+import { isTeamMemberProcess } from "../../team/member-extension/identity"
 import { buildChildArgs, buildRpcSpawn, detectBunBinary, resolveChildSessionDir, resolveSenpiExecutable } from "./spawn"
 
 const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
@@ -260,12 +261,22 @@ describe("buildRpcSpawn spawn strategy", () => {
     ])
   })
 
-  test("#given a parent env #when building #then the child gets an isolated session dir and inherits parent vars untouched", () => {
+  test("#given a team member parent #when building a generic child #then member identity and extension state are not inherited", () => {
     // given
-    const parentEnv = { PATH: "/usr/bin", HOME: "/Users/me", ANTHROPIC_API_KEY: "secret" }
+    const parentEnv = {
+      PATH: "/usr/bin",
+      HOME: "/Users/me",
+      ANTHROPIC_API_KEY: "secret",
+      SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alice",
+      SENPI_TASK_MEMBER_TASK_ID: "st_parent01",
+      SENPI_TASK_TEAM_CONFIG: '{"members":["alice"]}',
+    }
 
     // when
-    const descriptor = buildRpcSpawn(baseSpec, {
+    const descriptor = buildRpcSpawn({
+      ...baseSpec,
+      extensions: ["/plugin/omo-member.js", "/plugin/omo.js"],
+    }, {
       isBunBinary: false,
       execPath: "/usr/bin/node",
       platform: "linux",
@@ -283,6 +294,12 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.env.PATH).toBe("/usr/bin")
     expect(descriptor.env.ANTHROPIC_API_KEY).toBe("secret")
     expect(descriptor.env.SENPI_CODING_AGENT_DIR).toBeUndefined()
+    expect(descriptor.env.SENPI_TASK_MEMBER).toBeUndefined()
+    expect(descriptor.env.SENPI_TASK_MEMBER_TASK_ID).toBeUndefined()
+    expect(descriptor.env.SENPI_TASK_TEAM_CONFIG).toBeUndefined()
+    expect(isTeamMemberProcess(descriptor.env)).toBe(false)
+    expect(descriptor.args).toContain("/plugin/omo.js")
+    expect(descriptor.args).not.toContain("/plugin/omo-member.js")
     // a fresh object, not a mutation of the caller's env
     expect(descriptor.env).not.toBe(parentEnv)
     expect(parentEnv).not.toHaveProperty(SESSION_DIR_ENV)
@@ -299,7 +316,7 @@ describe("buildRpcSpawn spawn strategy", () => {
 
     // when
     const descriptor = buildRpcSpawn(
-      { ...baseSpec, memberEnv },
+      { ...baseSpec, memberEnv, extensions: ["/plugin/omo-member.js", "/plugin/omo.js"] },
       {
         isBunBinary: false,
         execPath: "/usr/bin/node",
@@ -315,5 +332,8 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.env.SENPI_TASK_MEMBER_TASK_ID).toBe(memberEnv.SENPI_TASK_MEMBER_TASK_ID)
     expect(descriptor.env.SENPI_TASK_TEAM_CONFIG).toBe(memberEnv.SENPI_TASK_TEAM_CONFIG)
     expect(descriptor.env.SENPI_CODING_AGENT_SESSION_DIR).toBe(resolveChildSessionDir(baseSpec.state_dir, baseSpec.task_id))
+    expect(isTeamMemberProcess(descriptor.env)).toBe(true)
+    expect(descriptor.args).toContain("/plugin/omo-member.js")
+    expect(descriptor.args).toContain("/plugin/omo.js")
   })
 })

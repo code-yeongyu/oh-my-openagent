@@ -6,19 +6,24 @@ import { log } from "@oh-my-opencode/utils"
 
 import { parseTaskId, type TaskId } from "../../state"
 import { createTaskRecordStore } from "../../store"
-import { MEMBER_IDENTITY_ENV } from "./identity"
+import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_IDENTITY_ENV } from "./identity"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
 import { createQaAfterInjectHold } from "./qa-inject-hold"
 import { createMemberTaskSendTool } from "./tools"
 
-export { MEMBER_IDENTITY_ENV, isTeamMemberProcess } from "./identity"
+export {
+  MEMBER_EXTENSION_BUNDLE_NAME,
+  MEMBER_IDENTITY_ENV,
+  MEMBER_PROCESS_ENV_NAMES,
+  MEMBER_TASK_ID_ENV,
+  MEMBER_TEAM_CONFIG_ENV,
+  isTeamMemberProcess,
+} from "./identity"
 
 const MEMBER_POLL_INTERVAL_MS = 1_000
 const ACK_POLL_INTERVAL_MS = 100
 const MEMBER_NAME_PATTERN = /^[a-z0-9-]+$/
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-export const MEMBER_EXTENSION_BUNDLE_NAME = "omo-member.js"
 
 export type ParsedMemberExtensionEnv = {
   readonly teamRunId: string

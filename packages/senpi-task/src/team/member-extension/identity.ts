@@ -1,10 +1,10 @@
 export const MEMBER_IDENTITY_ENV = "SENPI_TASK_MEMBER"
+export const MEMBER_TASK_ID_ENV = "SENPI_TASK_MEMBER_TASK_ID"
+export const MEMBER_TEAM_CONFIG_ENV = "SENPI_TASK_TEAM_CONFIG"
+export const MEMBER_PROCESS_ENV_NAMES = [MEMBER_IDENTITY_ENV, MEMBER_TASK_ID_ENV, MEMBER_TEAM_CONFIG_ENV] as const
+export const MEMBER_EXTENSION_BUNDLE_NAME = "omo-member.js"
 
-/**
- * Whether THIS process is a team member child, which owns `task_send` through the member extension.
- * senpi drops an ENTIRE extension whose tool name is already registered, so a host extension that
- * registers its own `task_send` here loses every other tool, agent, and provider it carries.
- */
+/** Whether THIS process was explicitly launched as a team member child. */
 export function isTeamMemberProcess(env: NodeJS.ProcessEnv = process.env): boolean {
   const identity = env[MEMBER_IDENTITY_ENV]
   return identity !== undefined && identity.length > 0
