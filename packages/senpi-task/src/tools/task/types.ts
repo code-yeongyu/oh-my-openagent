@@ -48,6 +48,7 @@ export type TaskToolDeps = {
   readonly manager: TaskManager
   readonly omoConfig: OmoConfig
   readonly agents: Readonly<Record<string, AgentDefinition>>
+  readonly onExecutionContext?: (context: TaskToolContext) => void
   readonly resolveAncestry?: ResolveAncestry
   readonly loadSkills?: SkillLoader
   // Session-scoped skill-invocation state for plan-gated agents (metis/momus). When absent the

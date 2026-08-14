@@ -5,6 +5,27 @@ import { CTX, createFakeManager, makeDeps } from "./__fixtures__/task-tool-fakes
 import { buildTaskExecute } from "./execute"
 
 describe("buildTaskExecute spawn validation", () => {
+  test("#given an execution-context observer #when executed #then it captures the caller before validation", async () => {
+    let captured: unknown
+    const manager = createFakeManager({})
+    const execute = buildTaskExecute({
+      ...makeDeps(manager),
+      onExecutionContext: (context) => {
+        captured = context
+      },
+    })
+
+    await execute(
+      "c",
+      { prompt: "p", category: "quick", subagent_type: "momus" },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    expect(captured).toBe(CTX)
+  })
+
   test("#given both category and subagent_type #when executed #then it returns the XOR error result without spawning", async () => {
     let started = false
     const manager = createFakeManager({

@@ -185,6 +185,9 @@ function registerTaskTools(
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
+      onExecutionContext: (context) => {
+        engine.runtime.captureFrom(context)
+      },
       resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })

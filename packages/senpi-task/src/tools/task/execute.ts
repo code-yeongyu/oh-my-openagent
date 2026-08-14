@@ -212,6 +212,7 @@ function invalidArguments(message: string): AgentToolResult<TaskToolDetails> {
 
 export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOptions = {}): TaskExecute {
   return async (_toolCallId, params, signal, onUpdate, ctx) => {
+    deps.onExecutionContext?.(ctx)
     const shape = validateBatchShape(params)
     if (shape.kind === "error") return invalidArguments(shape.error.message)
 
