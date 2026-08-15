@@ -484,7 +484,7 @@ Every problem I hit, the fix is baked into this plugin. Install and go.
 
 If OpenCode is Debian/Arch, oh-my-openagent is Ubuntu/[Omarchy](https://omarchy.org/).
 
-Heavily influenced by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/overview). Features ported, often improved. Still building. It's **Open**Code.
+Heavily influenced by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs). Features ported, often improved. Still building. It's **Open**Code.
 
 Other harnesses promise multi-model orchestration. We ship it. Stability too. And features that actually work.
 
