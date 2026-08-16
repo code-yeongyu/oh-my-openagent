@@ -146,7 +146,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       // writing - docs/prose
       "writing": { "model": "kimi-for-coding/kimi-k3", "reasoning": "low" },
 
-      // visual-engineering - Opus 5, then Kimi K3 and GLM 5.2
+      // visual-engineering - Opus 5, then Kimi K3 and GLM 5.3
       "visual-engineering": {
         "model": "anthropic/claude-opus-5",
         "reasoning": "max",
@@ -433,15 +433,15 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 | Agent | Default Model | Provider Priority |
 | --- | --- | --- |
-| **Sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5.2` → `opencode/big-pickle` |
+| **Sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|zhipuai-coding-plan\|opencode-go/glm-5.3` → `opencode/big-pickle` |
 | **Hephaestus** | `gpt-5.6-sol` | `openai\|github-copilot\|vercel\|opencode/gpt-5.6-sol (medium)` |
-| **Oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|vercel/glm-5.2` |
+| **Oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `zai-coding-plan\|zhipuai-coding-plan\|opencode-go/glm-5.3` |
 | **Librarian** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **Explore** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **Multimodal Looker** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (low)` → `opencode-go\|vercel/kimi-k3` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
 | **Prometheus** | `claude-fable-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (max)` |
 | **Metis** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (high)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (low)` |
-| **Momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
+| **Momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `zai-coding-plan\|zhipuai-coding-plan\|opencode-go/glm-5.3` |
 | **Atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-5` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
 | **Sisyphus Junior** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-5` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
 
@@ -451,7 +451,7 @@ This table mirrors the authoritative hardcoded category fallback chains, includi
 
 | Category | Provider Chain Primary | Provider Priority |
 | --- | --- | --- |
-| **Visual Engineering** | `claude-opus-5` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `zai-coding-plan\|opencode-go\|vercel/glm-5.2 (max)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
+| **Visual Engineering** | `claude-opus-5` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `zai-coding-plan\|zhipuai-coding-plan\|opencode-go/glm-5.3 (max)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
 | **Ultrabrain** | `gpt-5.6-sol` | `openai\|quotio-openai\|vercel/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|opencode\|vercel/gpt-5.6-sol (max)` |
 | **Deep** | `gpt-5.6-sol` | `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
 | **Artistry** | `claude-fable-5` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` |

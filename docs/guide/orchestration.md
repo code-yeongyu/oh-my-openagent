@@ -37,7 +37,7 @@ flowchart TB
         User[(" User")]
         Prometheus[" Prometheus<br/>(Planner)<br/>claude-fable-5 / kimi-k3"]
         Metis[" Metis<br/>(Consultant)<br/>claude-opus-5 / kimi-k3"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.6-sol / claude-opus-5 / gemini-3.1-pro / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.6-sol / claude-opus-5 / gemini-3.1-pro / glm-5.3"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
@@ -46,10 +46,10 @@ flowchart TB
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
-        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-5 / glm-5.2"]
+        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-5 / glm-5.3"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / claude-fable-5 / gemini-3.1-pro / glm-5.2"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / claude-fable-5 / gemini-3.1-pro / glm-5.3"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -103,7 +103,7 @@ Three names can appear together in logs or the TUI:
 
 - **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
 - **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
-- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.2`
+- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.3`
 
 The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k3`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
 
@@ -499,7 +499,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.3` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |

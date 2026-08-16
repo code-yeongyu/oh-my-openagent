@@ -64,7 +64,10 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
         { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-5", variant: "max" },
         { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
-        { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+        {
+          providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
+          model: "glm-5.3",
+        },
         { providers: ["kimi-for-coding"], model: "kimi-k3" },
       ],
       momus: [
@@ -74,7 +77,10 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
         { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-5", variant: "max" },
         { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-        { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+        {
+          providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
+          model: "glm-5.3",
+        },
       ],
     })
   })

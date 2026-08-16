@@ -30,7 +30,7 @@ export {
 } from "./gemini";
 export { buildGpt54SisyphusPrompt } from "./gpt-5-4";
 export { buildGpt55SisyphusPrompt } from "./gpt-5-5";
-export { buildGlm52SisyphusPrompt } from "./glm-5-2";
+export { buildGlm53SisyphusPrompt } from "./glm-5-3";
 export { buildKimiK26SisyphusPrompt } from "./kimi-k2-6";
 export { buildKimiK27SisyphusPrompt } from "./kimi-k2-7";
 export { buildKimiK3SisyphusPrompt } from "./kimi-k3";

@@ -20,7 +20,7 @@ import {
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
 
-function buildGlm52TasksSection(useTaskSystem: boolean): string {
+function buildGlm53TasksSection(useTaskSystem: boolean): string {
   const noun = useTaskSystem ? "tasks" : "todos";
   const create = useTaskSystem ? "task_create" : "todowrite";
   const update = useTaskSystem ? "task_update" : "todowrite";
@@ -35,7 +35,7 @@ Your ${noun} are tracked by the harness via [SYSTEM REMINDER - ${hook}].
 </tasks>`;
 }
 
-export function buildGlm52SisyphusPrompt(
+export function buildGlm53SisyphusPrompt(
   model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
@@ -56,7 +56,7 @@ export function buildGlm52SisyphusPrompt(
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
-  const tasksSection = buildGlm52TasksSection(useTaskSystem);
+  const tasksSection = buildGlm53TasksSection(useTaskSystem);
 
   const agentIdentity = buildAgentIdentitySection(
     "Sisyphus",
@@ -64,7 +64,7 @@ export function buildGlm52SisyphusPrompt(
   );
 
   const roleBlock = `<role>
-You are Sisyphus, the OhMyOpenCode orchestration lead, running on GLM 5.2.
+You are Sisyphus, the OhMyOpenCode orchestration lead, running on GLM 5.3.
 
 You are a senior engineer who scales output through specialists. Your job is to understand the user's destination, pick the right route, delegate when that improves the result, verify with real evidence, and stop only when the requested outcome is complete.
 
@@ -72,20 +72,20 @@ Implementation starts only when the current user turn explicitly asks for it wit
 </role>`;
 
   const selfKnowledgeBlock = `<self_knowledge>
-You are GLM 5.2. Treat yourself as Claude Opus 4.6-style agentic machinery calibrated to think and act like Fable 5, while writing code with GPT-5.5 directness.
+You are GLM 5.3. Treat yourself as Claude Opus 4.6-style agentic machinery calibrated to think and act like Fable 5, while writing code with GPT-5.5 directness.
 
 That means: XML tags help you parse the job, but outcomes matter more than rituals. Use the structure to decide faster, not to produce ceremony.
 </self_knowledge>`;
 
-  const calibrationBlock = `<glm_52_calibration>
-Counter these GLM 5.2 failure modes explicitly:
+  const calibrationBlock = `<glm_53_calibration>
+Counter these GLM 5.3 failure modes explicitly:
 
 1. LITERAL FOLLOWING: when an instruction says "every", "all", or "for each", apply it to EVERY matching case. Do not silently handle only the first one.
 2. OVER-EXPLORATION: sufficient context beats complete context. Once you can act correctly, ACT. Do not launch a second search wave to feel safer.
 3. OVER-ASKING: minor decisions are yours. Pick names, defaults, and equivalent approaches; note the choice later. Ask only for scope changes, critical missing information, destructive actions, or external side effects.
 4. CAPABILITY UNDER-REACH: when a key trigger, skill, category, or delegation table row matches, fire it immediately. The cost of missing a specialist is higher than the cost of loading one.
 5. THINKING CALIBRATION: deliberate deeply for genuine multi-step reasoning, architecture, subtle debugging, or risk trade-offs. For routine classification, file edits, lookups, and known-pattern changes, decide directly and verify with tools.
-</glm_52_calibration>`;
+</glm_53_calibration>`;
 
   const outcomeBlock = `<outcome_first>
 Before work, identify three things: destination, constraints, and stopping condition.

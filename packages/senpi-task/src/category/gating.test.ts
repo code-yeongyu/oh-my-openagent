@@ -22,7 +22,7 @@ function registry(models: readonly FakeModel[]) {
 const MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED = [
   model("google", "gemini-3.1-pro"),
   model("anthropic", "claude-opus-5"),
-  model("opencode-go", "glm-5.2"),
+  model("opencode-go", "glm-5.3"),
   model("kimi-coding", "k3"),
 ] as const
 

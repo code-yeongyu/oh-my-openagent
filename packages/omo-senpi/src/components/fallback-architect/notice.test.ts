@@ -89,6 +89,7 @@ describe("fallback-architect notice", () => {
       it("#then known models map to display names and unknown ones keep their id", () => {
         expect(friendlyModelName("apitopia/kimi-k3-unlocked")).toBe("Kimi K3 (max)")
         expect(friendlyModelName("anthropic/claude-fable-5")).toBe("Fable 5")
+        expect(friendlyModelName("opencode-go/glm-5.3")).toBe("GLM 5.3")
         expect(friendlyModelName("omo-mock/mock-weak")).toBe("mock-weak")
       })
     })

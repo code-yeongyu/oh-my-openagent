@@ -131,7 +131,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Baili
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-5, etc.)
-  Z.ai          zai-coding-plan/glm-5.2 (visual-engineering fallback)
+  Z.ai          zai-coding-plan/glm-5.3 (visual-engineering fallback)
   Kimi          kimi-for-coding/kimi-k3 (Sisyphus/Prometheus fallback)
   Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)
   MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)

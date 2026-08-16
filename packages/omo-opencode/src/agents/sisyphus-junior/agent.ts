@@ -10,7 +10,7 @@
  * 3. Kimi K2.x -> kimi-k2-6.ts
  * 4. GPT models (openai/*, github-copilot/gpt-*) -> gpt-5-5.ts / gpt-5-4.ts / gpt.ts
  * 5. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
- * 6. GLM models -> glm-5-2.ts
+ * 6. GLM models -> glm-5-3.ts
  * 7. Default (Claude, etc.) -> default.ts (Claude-optimized)
  */
 
@@ -32,7 +32,7 @@ import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
 import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
-import { buildGlm52SisyphusJuniorPrompt } from "./glm-5-2"
+import { buildGlm53SisyphusJuniorPrompt } from "./glm-5-3"
 
 const MODE: AgentMode = "subagent"
 
@@ -54,7 +54,7 @@ export type SisyphusJuniorPromptSource =
   | "gpt-5-5"
   | "gpt-5-4"
   | "gemini"
-  | "glm-5-2"
+  | "glm-5-3"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
   if (model && isKimiK3Model(model)) return "kimi-k3"
@@ -69,7 +69,7 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
   if (model && isGeminiModel(model)) {
     return "gemini"
   }
-  if (model && isGlmModel(model)) return "glm-5-2"
+  if (model && isGlmModel(model)) return "glm-5-3"
   return "default"
 }
 
@@ -98,8 +98,8 @@ export function buildSisyphusJuniorPrompt(
       return buildGptSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gemini":
       return buildGeminiSisyphusJuniorPrompt(useTaskSystem, promptAppend)
-    case "glm-5-2":
-      return buildGlm52SisyphusJuniorPrompt(useTaskSystem, promptAppend)
+    case "glm-5-3":
+      return buildGlm53SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "default":
     default:
       return buildDefaultSisyphusJuniorPrompt(useTaskSystem, promptAppend)

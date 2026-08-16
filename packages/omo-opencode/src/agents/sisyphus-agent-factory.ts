@@ -15,7 +15,7 @@ import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
 import { buildClaudeOpus5SisyphusPrompt } from "./sisyphus/claude-opus-5";
-import { buildGlm52SisyphusPrompt } from "./sisyphus/glm-5-2";
+import { buildGlm53SisyphusPrompt } from "./sisyphus/glm-5-3";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
@@ -56,7 +56,7 @@ export type SisyphusPromptFamily =
   | "claude-opus-5"
   | "claude-opus-4-8"
   | "claude-opus-4-7"
-  | "glm-5-2"
+  | "glm-5-3"
   | "fallback";
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
@@ -69,7 +69,7 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isClaudeOpus5Model(model)) return "claude-opus-5";
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
-  if (isGlmModel(model)) return "glm-5-2";
+  if (isGlmModel(model)) return "glm-5-3";
   return "fallback";
 }
 
@@ -141,11 +141,11 @@ export function createSisyphusAgent(
         model,
         buildClaudeOpus47SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-    case "glm-5-2":
+    case "glm-5-3":
       return buildGlmSisyphusAgentConfig(
         MODE,
         model,
-        buildGlm52SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+        buildGlm53SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
     case "fallback": {
       const prompt = buildFallbackSisyphusPrompt(

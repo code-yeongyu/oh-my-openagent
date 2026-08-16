@@ -24,7 +24,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "kimi-k3",
       },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
-      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5.2" },
+      {
+        providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+      },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
@@ -62,7 +65,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-5",
         variant: "max",
       },
-      { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+      {
+        providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+      },
     ],
   },
   librarian: {
@@ -151,7 +157,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3.1-pro",
         variant: "high",
       },
-      { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+      {
+        providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+      },
     ],
   },
   atlas: {

@@ -68,7 +68,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       {},
-      () => registry([model("zai-coding-plan", "glm-5.2")]),
+      () => registry([model("zai-coding-plan", "glm-5.3")]),
     )
 
     // when
@@ -84,8 +84,8 @@ describe("createTaskChildPlanner", () => {
     expect(resolved.plan.resolved_model).toMatchObject({
       source: "category",
       provider: "zai-coding-plan",
-      model_id: "glm-5.2",
-      display: "zai-coding-plan/glm-5.2",
+      model_id: "glm-5.3",
+      display: "zai-coding-plan/glm-5.3",
       variant: "max",
     })
   })
@@ -225,7 +225,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("zai-coding-plan", "glm-5.2")]),
+      () => registry([model("zai-coding-plan", "glm-5.3")]),
     )
 
     // when
@@ -426,7 +426,7 @@ describe("createTaskChildPlanner plan variant", () => {
     const planner = createTaskChildPlanner(
       {},
       {},
-      () => registry([model("zai-coding-plan", "glm-5.2")]),
+      () => registry([model("zai-coding-plan", "glm-5.3")]),
     )
 
     // when
