@@ -241,7 +241,25 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     let runtimeSkillSource: Awaited<ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]>> | undefined
     if (runtimeSecuritySkills.length > 0) {
       try {
-        runtimeSkillSource = await deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
+        // Startup perf (A3): bound the runtime skill source handshake so a
+        // slow server cannot stall opencode's session boot. On timeout the
+        // server is skipped for this session (graceful degradation — the
+        // catch below logs and continues without config.skills.urls).
+        let skillSourceTimer: ReturnType<typeof setTimeout> | undefined
+        const skillSourceTimeout = new Promise<never>((_, reject) => {
+          skillSourceTimer = setTimeout(
+            () => reject(new Error("runtime skill source server did not become ready within 500ms")),
+            500,
+          )
+        })
+        try {
+          runtimeSkillSource = await Promise.race([
+            deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills }),
+            skillSourceTimeout,
+          ])
+        } finally {
+          clearTimeout(skillSourceTimer)
+        }
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         console.warn(`[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: ${detail}`)
