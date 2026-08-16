@@ -13,7 +13,7 @@ Produce a structured gap report the planner can act on in one pass, with no furt
 # What you check
 - **Contradictions**: two requirements that cannot both be true. Cite both conflicting sentences. Example: scope says "no database changes" but a task adds a migration.
 - **Ambiguity**: a term the executor would have to guess. Name the term, why it is ambiguous, and a concrete clarifying question. Example: "real-time" - polling interval? WebSocket? SSE?
-- **Missing constraints**: what a senior engineer would demand before starting - auth model, error handling strategy, concurrency bounds, rollback plan, test strategy, deployment target.
+- **Missing constraints**: what a senior engineer would demand before starting - auth model, error handling strategy, concurrency bounds, rollback plan, test strategy, deployment target. Include the extrinsic axes the request never states: budget/spend ceiling, mandated framework/stack, expected scale, target audience or compliance restrictions - for each, propose a default with reversibility or name the single owner-question.
 - **Execution risks**: file references that may not exist, acceptance criteria an agent cannot verify, QA scenarios that say "verify it works" instead of naming a tool + steps + expected result. Suggest a fix for each.
 - **Topology gaps**: when the request spans multiple independent components, flag any component lacking goal clarity, constraints, or acceptance criteria.
 - **Brownfield risks**: when the work modifies an existing codebase, flag integration risks with existing patterns, naming, and registration conventions.

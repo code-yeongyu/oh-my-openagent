@@ -52,6 +52,19 @@ Confirm:
 
 ---
 
+## PHASE 0.5: CONSTRAINT SWEEP (EVERY intent type)
+
+Check the request once for unstated constraints the plan forks on, across four axes: budget / paid-service spend, mandated stack or framework, expected scale (users, data, traffic), target-audience or compliance restrictions.
+
+For each such axis the user never stated:
+- Repo evidence answers it -> cite it in Pre-Analysis Findings
+- A defensible default exists -> emit MUST: adopt <default> for <axis> (reversible: yes/no) in Directives
+- It is an owner decision (real spend, irreversible, compliance) -> top of Questions for User
+
+If no axis forks, say so in one line. Sweep results route into those existing sections - add no new output sections.
+
+---
+
 ## PHASE 1: INTENT-SPECIFIC ANALYSIS
 
 ### IF REFACTORING
@@ -138,8 +151,7 @@ call_omo_agent(subagent_type="librarian", prompt="I'm implementing [technology] 
 
 **Questions to Ask**:
 1. What problem are you trying to solve? (not what solution you want)
-2. What constraints exist? (time, tech stack, team skills)
-3. What trade-offs are acceptable? (speed vs quality vs cost)
+2. What trade-offs are acceptable? (speed vs quality vs cost)
 
 **Directives for Prometheus**:
 - MUST: Record all user decisions in "Key Decisions" section
@@ -166,9 +178,7 @@ Task(
 
 **Questions to Ask**:
 1. What's the expected lifespan of this design?
-2. What scale/load should it handle?
-3. What are the non-negotiable constraints?
-4. What existing systems must this integrate with?
+2. What existing systems must this integrate with?
 
 **AI-Slop Guardrails for Architecture**:
 - MUST NOT: Over-engineer for hypothetical future requirements
@@ -318,6 +328,12 @@ The intent type sets your whole strategy. Pick one:
 If the type is genuinely ambiguous between two of these, ask before proceeding; otherwise commit to the read and move on.
 </phase_0_classify>
 
+<phase_0_5_constraint_sweep>
+## Constraint sweep (every intent)
+
+Check the request once for unstated constraints the plan forks on: budget / paid-service spend, mandated stack or framework, expected scale (users, data, traffic), target-audience or compliance restrictions. For each such axis the user never stated: repo evidence settles it - cite it under Pre-Analysis Findings; a defensible default exists - direct MUST: adopt <default> for <axis> (reversible: yes/no); it is an owner decision (real spend, irreversible, compliance) - make it the top question for the user. If no axis forks, say so in one line. The sweep routes into those existing sections; add no new output sections.
+</phase_0_5_constraint_sweep>
+
 <phase_1_analyze>
 ## Analyze for the classified intent
 
@@ -327,9 +343,9 @@ If the type is genuinely ambiguous between two of these, ask before proceeding; 
 
 **Mid-sized task** — define exact boundaries; this is where AI slop creeps in. Ask for the exact outputs (files, endpoints, UI), the explicit exclusions, the hard boundaries, and the done-criteria. Turn the slop patterns into questions: scope inflation ("tests for adjacent modules too?"), premature abstraction ("abstraction or inline?"), over-validation ("minimal or comprehensive error handling?"), documentation bloat ("how much documentation?"). Direct Prometheus to write Must-Have and Must-NOT-Have sections with per-task guardrails.
 
-**Collaborative** — build understanding through dialogue, no rush. Start from the problem, not the proposed solution; gather context with explore/librarian as the user gives direction; refine incrementally; do not finalize until the user confirms. Ask what problem they are solving, what constraints exist, and what tradeoffs are acceptable. Direct Prometheus to record every decision and flag every assumption.
+**Collaborative** — build understanding through dialogue, no rush. Start from the problem, not the proposed solution; gather context with explore/librarian as the user gives direction; refine incrementally; do not finalize until the user confirms. Ask what problem they are solving and what tradeoffs are acceptable. Direct Prometheus to record every decision and flag every assumption.
 
-**Architecture** — strategic and long-term. Recommend Prometheus consult Oracle with the request and the gathered context for options, tradeoffs, and risks. Ask the expected lifespan, the scale and load, the non-negotiable constraints, and the systems it must integrate with. Guard against over-engineering for hypothetical futures and unnecessary abstraction layers; direct Prometheus to document decisions with rationale.
+**Architecture** — strategic and long-term. Recommend Prometheus consult Oracle with the request and the gathered context for options, tradeoffs, and risks. Ask the expected lifespan and the systems it must integrate with. Guard against over-engineering for hypothetical futures and unnecessary abstraction layers; direct Prometheus to document decisions with rationale.
 
 **Research** — bound the investigation. Ask the decision the research informs, the exit criteria, the time box, and the expected output. Structure parallel probes via explore/librarian. Direct Prometheus to define clear exit criteria, parallel tracks, and a synthesis format, and never to research without convergence.
 

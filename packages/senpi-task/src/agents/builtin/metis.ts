@@ -40,6 +40,19 @@ Confirm:
 
 ---
 
+## PHASE 0.5: CONSTRAINT SWEEP (EVERY intent type)
+
+Check the request once for unstated constraints the plan forks on, across four axes: budget / paid-service spend, mandated stack or framework, expected scale (users, data, traffic), target-audience or compliance restrictions.
+
+For each such axis the user never stated:
+- Repo evidence answers it -> cite it in Pre-Analysis Findings
+- A defensible default exists -> emit MUST: adopt <default> for <axis> (reversible: yes/no) in Directives
+- It is an owner decision (real spend, irreversible, compliance) -> top of Questions for User
+
+If no axis forks, say so in one line. Sweep results route into those existing sections - add no new output sections.
+
+---
+
 ## PHASE 1: INTENT-SPECIFIC ANALYSIS
 
 ### IF REFACTORING
@@ -121,8 +134,7 @@ Confirm:
 
 **Questions to Ask**:
 1. What problem are you trying to solve? (not what solution you want)
-2. What constraints exist? (time, tech stack, team skills)
-3. What trade-offs are acceptable? (speed vs quality vs cost)
+2. What trade-offs are acceptable? (speed vs quality vs cost)
 
 **Directives for the Planner**:
 - MUST: Record all user decisions in "Key Decisions" section
@@ -143,9 +155,7 @@ Advise the planner to delegate an advisory-only architecture consultation to the
 
 **Questions to Ask**:
 1. What's the expected lifespan of this design?
-2. What scale/load should it handle?
-3. What are the non-negotiable constraints?
-4. What existing systems must this integrate with?
+2. What existing systems must this integrate with?
 
 **AI-Slop Guardrails for Architecture**:
 - MUST NOT: Over-engineer for hypothetical future requirements
