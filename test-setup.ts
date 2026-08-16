@@ -13,6 +13,7 @@ import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-
 import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
+import { _resetTaskIdFloorForTesting as resetTaskIdFloor } from "./packages/senpi-task/src/state/id"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
 // out-of-band before `bun test`; mirror that here so fresh clones/worktrees pass too.
@@ -99,6 +100,7 @@ beforeEach(() => {
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
+  resetTaskIdFloor()
 })
 
 afterEach(() => {

@@ -1,8 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { afterAll, describe, expect, mock, test } from "bun:test"
-import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import { describe, expect, mock, test } from "bun:test"
+import { createAutoUpdateCheckerHook } from "./hook"
 
-type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
+type CreateAutoUpdateCheckerHook = typeof createAutoUpdateCheckerHook
 type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
 type HookDeps = NonNullable<Parameters<CreateAutoUpdateCheckerHook>[2]>
 
@@ -20,25 +20,15 @@ const latestVersionMock = async () => {
   return "3.0.1"
 }
 
+// Injected through the hook's deps seam. NEVER mock.module these: module mocks
+// leak across test files in one bun process and flaked checker.test.ts, which
+// asserts against the real getLatestVersion.
 const scheduleDeferredStartupCheckMock = (runCheck: () => void) => {
   scheduleDeferredStartupCheckCallCount += 1
   scheduledCheck = runCheck
 }
 
 let scheduledCheck: (() => void) | null = null
-
-mock.module("./checker/latest-version", () => ({
-  getLatestVersion: latestVersionMock,
-}))
-
-mock.module("./hook/deferred-startup-check", () => ({
-  scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
-}))
-preserveModuleMocksForTestFile(import.meta.url)
-
-afterAll(() => {
-  restoreModuleMocksForTestFile(import.meta.url)
-})
 
 const createPluginInput = (): PluginInput => ({
   client: {} as PluginInput["client"],
@@ -71,6 +61,7 @@ const createDeps = (overrides: Partial<HookDeps> = {}) => {
     showLocalDevToast,
     showVersionToast,
     runBackgroundUpdateCheck,
+    scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
     log: () => undefined,
     ...overrides,
   }
@@ -93,11 +84,10 @@ const createHook = async (
   options: HookOptions = {},
   overrides: Partial<HookDeps> = {},
 ) => {
-  const module = await import("./hook")
   const { deps, mocks } = createDeps(overrides)
 
   return {
-    hook: module.createAutoUpdateCheckerHook(
+    hook: createAutoUpdateCheckerHook(
       createPluginInput(),
       {
         showStartupToast: true,

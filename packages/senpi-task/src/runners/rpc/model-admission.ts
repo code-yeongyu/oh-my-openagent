@@ -30,8 +30,13 @@ export type RpcModelAdmissionOptions = {
   readonly now?: () => number
 }
 
+type ProbedCatalog = {
+  readonly models: ReadonlySet<string>
+  readonly stderrTail: string
+}
+
 type CachedCatalog = {
-  readonly catalog: Promise<ReadonlySet<string>>
+  readonly catalog: Promise<ProbedCatalog>
   readonly cachedAt: number
 }
 
@@ -133,16 +138,21 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
           const detail = result.stderr.trim().slice(-2_000)
           throw admissionFailure(model, `catalog probe exited ${result.code}${detail.length === 0 ? "" : `: ${detail}`}`)
         }
-        return parseModelCatalog(result.stdout)
+        return { models: parseModelCatalog(result.stdout), stderrTail: result.stderr.trim().slice(-1_000) }
       })
       catalogs.set(key, { catalog, cachedAt: now() })
     }
     try {
       const available = await catalog
-      if (!available.has(model)) {
+      if (!available.models.has(model)) {
+        // Name the probed catalog and the child's stderr: a rejection here is
+        // otherwise undiagnosable (the probe exited 0, so the only witnesses are
+        // what the child listed and what it warned about while loading extensions).
         throw admissionFailure(
           model,
-          "model is not visible in the child profile; forward its provider extension or child-visible settings",
+          `model is not visible in the child profile (probed catalog has ${available.models.size} models${
+            available.stderrTail.length === 0 ? "" : `; child stderr: ${available.stderrTail}`
+          }); forward its provider extension or child-visible settings`,
         )
       }
     } catch (error) {

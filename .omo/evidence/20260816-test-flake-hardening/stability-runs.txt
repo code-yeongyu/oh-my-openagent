@@ -1,0 +1,9 @@
+=== 4 consecutive full-suite runs on this branch ===
+run1 (time-bomb fix only): 15486 pass / 41 skip / 0 fail (227.32s)
+run-a (all fixes): 15488 pass / 0 fail / EXIT=0
+run-b (all fixes): 15488 pass / 0 fail / EXIT=0
+run-c (all fixes): 15488 pass / 0 fail / EXIT=0
+
+=== parity reproduction attempts (all passed = no repro) ===
+4x instrumented full-suite runs (origin/dev-equivalent worktree): parity passed every run
+12x 'bun test packages/omo-senpi' pinned to 2 cores (taskset -c 0,1, CI-like): NO_REPRO

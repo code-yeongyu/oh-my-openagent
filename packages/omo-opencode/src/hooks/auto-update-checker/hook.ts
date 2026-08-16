@@ -23,6 +23,10 @@ interface AutoUpdateCheckerDeps {
   showLocalDevToast: typeof showLocalDevToast
   showVersionToast: typeof showVersionToast
   runBackgroundUpdateCheck: typeof runBackgroundUpdateCheck
+  // Optional so injected-deps callers built before this seam existed keep working;
+  // it exists so tests can drive the deferred check without mock.module, which
+  // leaks across test files and flakes the sibling checker.test.ts suite.
+  scheduleDeferredStartupCheck?: typeof scheduleDeferredStartupCheck
   log: typeof log
 }
 
@@ -37,6 +41,7 @@ const defaultDeps: AutoUpdateCheckerDeps = {
   showLocalDevToast,
   showVersionToast,
   runBackgroundUpdateCheck,
+  scheduleDeferredStartupCheck,
   log,
 }
 
@@ -86,7 +91,8 @@ export function createAutoUpdateCheckerHook(
 
       hasScheduled = true
 
-      scheduleDeferredStartupCheck(() => {
+      const scheduleCheck = deps.scheduleDeferredStartupCheck ?? scheduleDeferredStartupCheck
+      scheduleCheck(() => {
         hasChecked = true
         void (async () => {
           const bundledVersion = deps.getBundledVersion?.()

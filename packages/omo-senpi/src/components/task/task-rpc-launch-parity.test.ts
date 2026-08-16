@@ -13,11 +13,17 @@ const mockProviderExtension = fileURLToPath(
   new URL("../../../scripts/qa/mock-provider/index.ts", import.meta.url),
 )
 
+// Snapshot at module load, before any test in this process can mutate process.env:
+// other suites prepend fixture bin dirs to PATH (and leaked async cleanup can do it
+// mid-test), and a poisoned PATH changes which senpi launcher the probe resolves.
+const moduleLoadEnv: NodeJS.ProcessEnv = { ...process.env }
+
 function createAdmission() {
   const agentDir = mkdtempSync(join(tmpdir(), "omo-task-rpc-model-profile-"))
   agentDirs.push(agentDir)
   const parentEnv = {
-    ...process.env,
+    ...moduleLoadEnv,
+    OMO_DISABLE_POSTHOG: "true",
     OMO_CODING_AGENT_DIR: agentDir,
     SENPI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_DIR: agentDir,
@@ -52,8 +58,9 @@ describe("task RPC launch profile parity", () => {
     // when
     const admission = admit(makeSpec([mockProviderExtension]))
 
-    // then
-    await expect(admission).resolves.toBeUndefined()
+    // then: await directly so a rejection surfaces the RunnerError message (which
+    // carries the probe's stderr tail) instead of an opaque "promise rejected".
+    expect(await admission).toBeUndefined()
   }, 30_000)
 
   test("#given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch", async () => {

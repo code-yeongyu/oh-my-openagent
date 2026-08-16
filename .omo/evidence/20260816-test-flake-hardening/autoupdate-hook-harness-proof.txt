@@ -1,0 +1,8 @@
+=== auto-update-checker deferred-check real-harness proof ===
+isolated XDG sandbox: /tmp/omo-qa-autoupdate.fEzwXB (mktemp; real ~/.local/share/opencode untouched, DB file absent on this VM)
+plugin: /workspace/.local-ignore/worktrees/reflection-fix/dist/index.js (built from this branch)
+session created via POST /session at 16:21:43 UTC -> ses_ff49ef932ffe62ytHxHvZUgfl2
+deferred check fired ~5s later through the NEW deps seam (default binding):
+[2026-08-16T16:21:48.928Z] [auto-update-checker] Connected providers cache created on first run 
+[2026-08-16T16:21:49.087Z] [auto-update-checker] Plugin not found in config 
+[2026-08-16T16:21:54.371Z] [auto-update-checker] Startup toast shown: v5.0.0-beta.7 

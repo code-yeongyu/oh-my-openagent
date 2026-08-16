@@ -33,6 +33,17 @@ export function syncTaskIdFloor(id: TaskId): void {
   lastTaskIdValue = Math.max(lastTaskIdValue ?? -1, value)
 }
 
+/**
+ * The floor is process-global on purpose (ids stay monotonic across managers),
+ * but in one bun test process that means any test that stores a high literal id
+ * (st_deadbeef fixtures) silently poisons every later allocation in unrelated
+ * test files. The root test-setup calls this before each test; production code
+ * must never call it.
+ */
+export function _resetTaskIdFloorForTesting(): void {
+  lastTaskIdValue = undefined
+}
+
 export function parseTaskId(value: string): TaskId {
   if (!isTaskId(value)) throw new Error("Invalid task id; expected st_[0-9a-f]{8}")
   return value
