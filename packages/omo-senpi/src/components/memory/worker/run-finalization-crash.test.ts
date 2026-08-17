@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -158,6 +159,154 @@ describe("reflection finalization crash recovery", () => {
       join(item.identity.paths.reflection, "completions", "run-1.json"),
       "utf8",
     ))).toMatchObject({ outcome: "merged" })
+  }, 30_000)
+
+  test("#given a terminal sentinel from an earlier run still holding the reservation #when finalization short-circuits #then the reservation is released instead of stranding the lock", async () => {
+    // given
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "2026-08-08T22:46:46.812Z",
+    })
+    expect((await item.store.readState()).active?.runId).toBe(item.ledger.runId)
+
+    // when
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+    }, item.runDir, item.ledger)
+
+    // then
+    expect(result?.outcome).toBe("merged")
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
+  test("#given a child that died on a provider usage limit inside a run directory an earlier run had settled #when finalization runs #then the lock is released a failed completion carries the provider error and the worktree is pruned", async () => {
+    // given
+    const item = await fixture(false)
+    await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      attempt: 1,
+      finishedAt: "2026-08-11T10:00:30.000Z",
+      childExit: { code: 1, signal: null },
+      timedOut: false,
+    })
+    await writeFile(join(item.runDir, "child-stderr.log"), "Codex error: The usage limit has been reached\n")
+    // The colliding run id let an older run's success sentinel survive into this run's directory,
+    // which is what made the failure invisible and stranded the lock on the live machine.
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "2026-08-08T22:46:46.812Z",
+    })
+
+    // when
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+    }, item.runDir, item.ledger)
+
+    // then
+    expect(result?.outcome).toBe("failed")
+    expect(result?.reason).toBe("child_exit")
+    expect(result?.detail).toBe("Codex error: The usage limit has been reached")
+    expect((await item.store.readState()).active).toBeUndefined()
+    expect(JSON.parse(await readFile(
+      join(item.identity.paths.reflection, "completions", "run-1.json"),
+      "utf8",
+    ))).toMatchObject({ outcome: "failed", detail: "Codex error: The usage limit has been reached" })
+    expect(existsSync(item.worktree.dir)).toBe(false)
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
+  }, 30_000)
+
+  test("#given a settled run #when it publishes its final sentinel #then the spawn payload is not retained alongside the result", async () => {
+    // given
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "transcript-payload.json"), {
+      request: { conversationIds: ["conversation-a"] },
+    })
+
+    // when
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      withWriterLock: async (operation) => operation(),
+    }, item.runDir, item.ledger)
+
+    // then
+    expect(result?.outcome).toBe("merged")
+    expect(existsSync(join(item.runDir, "transcript-payload.json"))).toBe(false)
+    expect(existsSync(join(item.runDir, "final.json"))).toBe(true)
+  }, 30_000)
+
+  test("#given a terminal sentinel naming a different run #when finalization runs #then the reservation is still released instead of stranded", async () => {
+    // given
+    const item = await fixture(false)
+    await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      attempt: 1,
+      finishedAt: "2026-08-11T10:00:30.000Z",
+      childExit: { code: 1, signal: null },
+      timedOut: false,
+    })
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: "a-different-run",
+      outcome: "merged",
+      finishedAt: "2026-08-08T22:46:46.812Z",
+    })
+
+    // when
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+    }, item.runDir, item.ledger)
+
+    // then
+    expect(result?.outcome).toBe("failed")
+    expect((await item.store.readState()).active).toBeUndefined()
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
+  }, 30_000)
+
+  test("#given a child that died on a provider usage limit #when finalization runs #then a failed completion carries the provider error and the worktree is pruned", async () => {
+    // given
+    const item = await fixture(false)
+    await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      attempt: 1,
+      finishedAt: "2026-08-11T10:00:30.000Z",
+      childExit: { code: 1, signal: null },
+      timedOut: false,
+    })
+    await writeFile(join(item.runDir, "child-stderr.log"), "Codex error: The usage limit has been reached\n")
+
+    // when
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+    }, item.runDir, item.ledger)
+
+    // then
+    expect(result?.outcome).toBe("failed")
+    expect(result?.reason).toBe("child_exit")
+    expect(result?.detail).toBe("Codex error: The usage limit has been reached")
+    expect((await item.store.readState()).active).toBeUndefined()
+    expect(JSON.parse(await readFile(
+      join(item.identity.paths.reflection, "completions", "run-1.json"),
+      "utf8",
+    ))).toMatchObject({ outcome: "failed", detail: "Codex error: The usage limit has been reached" })
+    expect(existsSync(item.worktree.dir)).toBe(false)
   }, 30_000)
 
   test("#given parent_dirty was checkpointed before cleanup #when finalization retries #then the durable decision and user edit are preserved", async () => {

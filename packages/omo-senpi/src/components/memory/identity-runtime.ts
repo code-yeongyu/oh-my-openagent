@@ -13,6 +13,8 @@ import type { ComponentLogger } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
+import { createReflectionRunId } from "./reflection-run-id"
+import { readRunDeadline, settleReclaimedReservation } from "./reflection-reclaim-settlement"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import {
   resolveAgentReflectionSettings,
@@ -52,8 +54,6 @@ export interface MemoryIdentityRuntime {
   reconcile(): Promise<void>
 }
 
-let runCounter = 0
-
 function asMemoryIdentity(context: MemoryIdentityContext): MemoryIdentity {
   return {
     id: context.identity,
@@ -73,7 +73,28 @@ export function createIdentityRuntime(
     config: resolveReflectionTriggerConfig(settings, identity.identity),
     getJournal: async (conversationId: string) =>
       new TranscriptJournal({ journalDir: `${identity.identityPaths.transcripts}/${conversationId}` }),
-    createRunId: () => `reflection-run-${++runCounter}`,
+    createRunId: createReflectionRunId,
+    getRunDeadline: (runId) => readRunDeadline(identity.identityPaths, runId),
+    onReclaim: (reclaimed) => {
+      deps.logger?.warn("memory reflection reclaimed a stale reservation", {
+        identity: identity.identity,
+        runId: reclaimed.run.runId,
+        reason: reclaimed.reason,
+        ...(reclaimed.detail === undefined ? {} : { detail: reclaimed.detail }),
+      })
+      void settleReclaimedReservation({
+        identity: identity.identity,
+        paths: identity.identityPaths,
+        reclaimed,
+        now: () => new Date(),
+      }).catch((error: unknown) => {
+        deps.logger?.warn("memory reflection reclaim completion failed", {
+          identity: identity.identity,
+          runId: reclaimed.run.runId,
+          error: describe(error),
+        })
+      })
+    },
   })
 
   let builtSandbox: SandboxTransform | undefined
@@ -136,6 +157,17 @@ export function createIdentityRuntime(
     launch,
     async reconcile(): Promise<void> {
       await reconcileReflectionRuns({ identity: asMemoryIdentity(identity), reservation: store, launch })
+      // Reclaim contends for the scheduler lock, so a busy peer must degrade to "try again next
+      // bind" rather than fail the session binding that hosts it.
+      try {
+        const reclaim = await store.reclaimStaleActive()
+        if (reclaim?.launch !== undefined) launch(reclaim.launch)
+      } catch (error) {
+        deps.logger?.warn("memory reflection stale reservation reclaim failed", {
+          identity: identity.identity,
+          error: describe(error),
+        })
+      }
     },
   }
   return runtime

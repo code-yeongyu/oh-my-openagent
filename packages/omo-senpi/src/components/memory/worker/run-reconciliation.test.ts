@@ -295,6 +295,43 @@ describe("reflection and dream run reconciliation", () => {
     expect((await unknown.journal.getState()).reflected_completed_steps).toBe(0)
   }, 30_000)
 
+  test("#given an active run left holding the lock behind a terminal sentinel #when reconciliation runs #then the reservation is released instead of skipped", async () => {
+    // given
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: "run-orphan",
+      outcome: "failed",
+      finishedAt: "2026-08-10T00:00:01.000Z",
+    })
+    expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+
+    // when
+    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store })
+
+    // then
+    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
+  test("#given a settled run that is no longer the active reservation #when reconciliation runs #then its terminal sentinel is left alone", async () => {
+    // given
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: "run-orphan",
+      outcome: "merged",
+      finishedAt: "2026-08-10T00:00:01.000Z",
+    })
+    await item.store.complete("run-orphan", "merged")
+
+    // when
+    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store })
+
+    // then
+    expect(results).toEqual([])
+  }, 30_000)
+
   test("#given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released", async () => {
     // given
     const item = await fixture()

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import type { ProcessLiveness } from "../locks"
+import type { ReflectionReclaimedReservation } from "./reclaim"
+import { RESERVATION_FINALIZATION_GRACE_MS } from "./reclaim"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
@@ -7,9 +10,40 @@ import { TranscriptJournal, type ReflectionSnapshot } from "../journal"
 import { ReflectionReservationStore } from "./reservation"
 import type { ReflectionRequest } from "./machine"
 import { realpathSync } from "node:fs"
+import { hostname } from "node:os"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+
+async function reclaimFixture(overrides: {
+  readonly now?: () => Date
+  readonly getPidLiveness?: (pid: number) => ProcessLiveness
+  readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
+} = {}) {
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reclaim-")))
+  roots.push(root)
+  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+  const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
+  const reclaimed: ReflectionReclaimedReservation[] = []
+  const deadlines = new Map<string, number>()
+  let nextId = 0
+  const store = new ReflectionReservationStore({
+    identity,
+    config: { stepCount: 2, onCompaction: true },
+    now: overrides.now ?? (() => new Date("2026-08-10T00:00:00.000Z")),
+    launcherIdentity: async () => ({ pid: 4242, hostname: hostname(), processStart: "launcher-start" }),
+    getJournal: async () => journal,
+    createRunId: () => `run-${++nextId}`,
+    onReclaim: (event) => { reclaimed.push(event) },
+    getRunDeadline: async (runId) => deadlines.get(runId),
+    ...(overrides.getPidLiveness === undefined ? {} : { getPidLiveness: overrides.getPidLiveness }),
+    ...(overrides.getProcessStartIdentity === undefined ? {} : { getProcessStartIdentity: overrides.getProcessStartIdentity }),
+  })
+  const writeLedger = async (runId: string, deadlineAt: number): Promise<void> => {
+    deadlines.set(runId, deadlineAt)
+  }
+  return { identity, store, reclaimed, writeLedger, deadlines }
+}
 
 async function fixture(stepCount = 2) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))
@@ -171,6 +205,144 @@ describe("persisted reflection reservation", () => {
 
     expect(completion.launch).toBeUndefined()
     expect((await journal.getState()).steps_since_last_successful_reflection).toBe(0)
+    expect((await store.readState()).active).toBeUndefined()
+  })
+
+  it("#given an active run whose deadline and finalization window have both passed #when a later trigger reserves #then the stale reservation is reclaimed with a logged reason", async () => {
+    // given
+    let clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store, reclaimed, writeLedger } = await reclaimFixture({
+      now: () => new Date(clock),
+      getPidLiveness: () => "alive",
+      getProcessStartIdentity: async () => "launcher-start",
+    })
+    const stuck = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+    const deadlineAt = clock + 60_000
+    await writeLedger(stuck.run.runId, deadlineAt)
+
+    // when
+    clock = deadlineAt + RESERVATION_FINALIZATION_GRACE_MS + 1
+    const next = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+
+    // then
+    expect(next.status).toBe("active")
+    expect(next.run.runId).not.toBe(stuck.run.runId)
+    expect(reclaimed).toHaveLength(1)
+    expect(reclaimed[0]?.reason).toBe("deadline_expired")
+    expect(reclaimed[0]?.run.runId).toBe(stuck.run.runId)
+  })
+
+  it("#given a freshly reserved run whose launcher has already exited #when another process reserves #then the young reservation is not stolen", async () => {
+    // given
+    const clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store, reclaimed } = await reclaimFixture({
+      getPidLiveness: () => "dead",
+      now: () => new Date(clock),
+    })
+    const first = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+
+    // when
+    const second = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+
+    // then
+    expect(second.status).toBe("pending")
+    expect(reclaimed).toHaveLength(0)
+    expect((await store.readState()).active?.runId).toBe(first.run.runId)
+  })
+
+  it("#given an active run inside its deadline held by a live launcher #when a later trigger reserves #then the reservation is preserved", async () => {
+    // given
+    const clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store, reclaimed, writeLedger } = await reclaimFixture({
+      now: () => new Date(clock),
+      getPidLiveness: () => "alive",
+      getProcessStartIdentity: async () => "launcher-start",
+    })
+    const active = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+    await writeLedger(active.run.runId, clock + 60_000)
+
+    // when
+    const next = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+
+    // then
+    expect(next.status).toBe("pending")
+    expect(reclaimed).toHaveLength(0)
+    expect((await store.readState()).active?.runId).toBe(active.run.runId)
+  })
+
+  it("#given a live launcher still finalizing just past its deadline #when a later trigger reserves #then its lock is not stolen", async () => {
+    // given
+    let clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store, reclaimed, writeLedger } = await reclaimFixture({
+      now: () => new Date(clock),
+      getPidLiveness: () => "alive",
+      getProcessStartIdentity: async () => "launcher-start",
+    })
+    const active = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+    const deadlineAt = clock + 60_000
+    await writeLedger(active.run.runId, deadlineAt)
+
+    // when
+    clock = deadlineAt + 1
+    const next = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+
+    // then
+    expect(next.status).toBe("pending")
+    expect(reclaimed).toHaveLength(0)
+    expect((await store.readState()).active?.runId).toBe(active.run.runId)
+  })
+
+  it("#given a stale active reservation with queued pending work #when it is reclaimed #then the pending run is promoted and handed back to launch", async () => {
+    // given
+    let clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store } = await reclaimFixture({ getPidLiveness: () => "dead", now: () => new Date(clock) })
+    const stuck = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+    const queued = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [], focus: "queued" })
+    expect(queued.status).toBe("pending")
+    clock += 120_000
+
+    // when
+    const result = await store.reclaimStaleActive()
+
+    // then
+    expect(result?.reclaimed.run.runId).toBe(stuck.run.runId)
+    expect(result?.launch?.runId).toBe(queued.run.runId)
+    expect((await store.readState()).active?.runId).toBe(queued.run.runId)
+  })
+
+  it("#given an active run whose launcher process is gone #when the store reclaims on startup #then the reservation is released", async () => {
+    // given
+    let clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store, reclaimed } = await reclaimFixture({ getPidLiveness: () => "dead", now: () => new Date(clock) })
+    const stuck = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+    clock += 120_000
+
+    // when
+    const result = await store.reclaimStaleActive()
+
+    // then
+    expect(result?.reclaimed.reason).toBe("launcher_dead")
+    expect(result?.reclaimed.run.runId).toBe(stuck.run.runId)
+    expect((await store.readState()).active).toBeUndefined()
+    expect(reclaimed).toHaveLength(1)
+  })
+
+  it("#given an active run whose launcher pid was recycled #when the store reclaims #then the reservation is released as replaced", async () => {
+    // given
+    let clock = Date.parse("2026-08-10T00:00:00.000Z")
+    const { store } = await reclaimFixture({
+      getPidLiveness: () => "alive",
+      getProcessStartIdentity: async () => "a-different-process",
+      now: () => new Date(clock),
+    })
+    await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
+    clock += 120_000
+
+    // when
+    const result = await store.reclaimStaleActive()
+
+    // then
+    expect(result?.reclaimed.reason).toBe("launcher_replaced")
     expect((await store.readState()).active).toBeUndefined()
   })
 

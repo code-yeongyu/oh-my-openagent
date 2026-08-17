@@ -14,6 +14,11 @@ export interface ReflectionReservationPort {
     runId: string,
     outcome: ReflectionOutcome,
   ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun }>
+  /** Atomic check-and-complete; absent on in-memory doubles that cannot race. */
+  completeIfActive?(
+    runId: string,
+    outcome: ReflectionOutcome,
+  ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun } | undefined>
 }
 
 export interface ReflectionRunResult {

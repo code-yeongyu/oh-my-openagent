@@ -1,13 +1,19 @@
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises"
-import { hostname } from "node:os"
 import { dirname, join } from "node:path"
 import type { MemoryIdentity } from "../identity"
 import type { TranscriptJournal } from "../journal"
+import { hostname } from "node:os"
 import { createLockRecord, getProcessStartIdentity, reflectionSchedulerLockPath, withLock } from "../locks"
+import type { ProcessLiveness } from "../locks"
+import {
+  findStaleReservation,
+  type ReflectionReclaimedReservation,
+} from "./reclaim"
 import {
   completeTransition,
   evaluateTransitions,
+  isStillTriggered,
   reserveTransition,
   type CapturedConversation,
   type JournalSnapshot,
@@ -25,6 +31,11 @@ export interface ReflectionLauncherIdentity {
   readonly processStart: string | null
 }
 
+export interface ReflectionReclaimResult {
+  readonly reclaimed: ReflectionReclaimedReservation
+  readonly launch?: ReservedRun
+}
+
 export interface ReflectionReservationStoreOptions {
   readonly identity: MemoryIdentity
   readonly config: TriggerConfig
@@ -32,6 +43,11 @@ export interface ReflectionReservationStoreOptions {
   readonly createRunId?: () => string
   readonly now?: () => Date
   readonly launcherIdentity?: () => Promise<ReflectionLauncherIdentity>
+  readonly onReclaim?: (reclaimed: ReflectionReclaimedReservation) => void
+  readonly getPidLiveness?: (pid: number) => ProcessLiveness
+  readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
+  /** Resolves a run's absolute deadline. The ledger that records it is owned by the adapter. */
+  readonly getRunDeadline?: (runId: string) => Promise<number | undefined>
 }
 
 export interface ReservationResult {
@@ -51,6 +67,7 @@ export class ReflectionReservationStore {
   private readonly createRunId: () => string
   private readonly now: () => Date
   private readonly launcherIdentity: () => Promise<ReflectionLauncherIdentity>
+  private readonly runDeadline: (runId: string) => Promise<number | undefined>
 
   constructor(private readonly options: ReflectionReservationStoreOptions) {
     this.activePath = join(options.identity.paths.reflection, "active.lock")
@@ -59,6 +76,45 @@ export class ReflectionReservationStore {
     this.createRunId = options.createRunId ?? randomUUID
     this.now = options.now ?? (() => new Date())
     this.launcherIdentity = options.launcherIdentity ?? currentLauncherIdentity
+    this.runDeadline = options.getRunDeadline ?? (async () => undefined)
+  }
+
+  async reclaimStaleActive(): Promise<ReflectionReclaimResult | undefined> {
+    return this.locked(undefined, async () => {
+      const current = await this.readStateUnlocked()
+      const reclaimed = await this.staleActive(current)
+      if (reclaimed === undefined) return undefined
+      // Dropping the active run without promoting its queue would strand the pending reservation
+      // with nothing running, which is the same "reflection never happens again" symptom one level down.
+      // Promotion still honours the machine's staleness contract so a queue entry whose trigger no
+      // longer holds is retired rather than launched.
+      const launchable = await this.stillTriggered(current.pending)
+      const promoted = launchable === undefined ? undefined : await this.withLaunchOwner(launchable)
+      await this.writeStateUnlocked(promoted === undefined ? {} : { active: promoted })
+      this.options.onReclaim?.(reclaimed)
+      return { reclaimed, ...(promoted === undefined ? {} : { launch: promoted }) }
+    })
+  }
+
+  private async stillTriggered(pending: ReservedRun | undefined): Promise<ReservedRun | undefined> {
+    if (pending === undefined) return undefined
+    const journals = new Map<string, JournalSnapshot>()
+    for (const conversationId of pending.request.conversationIds) {
+      const journal = await this.options.getJournal(conversationId)
+      journals.set(conversationId, { conversationId, state: await journal.getState(), snapshot: null })
+    }
+    return isStillTriggered(pending.request, journals, this.options.config) ? pending : undefined
+  }
+
+  private async staleActive(state: ReservationState): Promise<ReflectionReclaimedReservation | undefined> {
+    return findStaleReservation(state.active, {
+      now: this.now,
+      getRunDeadline: this.runDeadline,
+      ...(this.options.getPidLiveness === undefined ? {} : { getPidLiveness: this.options.getPidLiveness }),
+      ...(this.options.getProcessStartIdentity === undefined
+        ? {}
+        : { getProcessStartIdentity: this.options.getProcessStartIdentity }),
+    })
   }
 
   async evaluate(conversationId: string, event: ReflectionEvent): Promise<ReservationResult | null> {
@@ -90,7 +146,14 @@ export class ReflectionReservationStore {
     const runId = this.createRunId()
     return this.locked(runId, async () => {
       signal?.throwIfAborted()
-      const current = await this.readStateUnlocked()
+      const read = await this.readStateUnlocked()
+      const reclaimed = await this.staleActive(read)
+      // reserveTransition drops a pending run when no active exists, so a queued reflection is
+      // promoted into the vacated slot rather than handed to it and discarded.
+      const current: ReservationState = reclaimed === undefined
+        ? read
+        : (read.pending === undefined ? {} : { active: read.pending })
+      if (reclaimed !== undefined) this.options.onReclaim?.(reclaimed)
       signal?.throwIfAborted()
       const transition = reserveTransition(current, request, runId)
       const state = transition.result === "active"
@@ -105,8 +168,24 @@ export class ReflectionReservationStore {
   }
 
   async complete(runId: string, outcome: ReflectionOutcome): Promise<CompletionResult> {
-    return this.locked(runId, async () => {
+    const result = await this.locked(runId, () => this.completeUnlocked(runId, outcome, false))
+    if (result === undefined) throw new Error(`Reflection run is not active: ${runId}`)
+    return result
+  }
+
+  /** Completes only while the run still owns the reservation, so a lost race is not an error. */
+  async completeIfActive(runId: string, outcome: ReflectionOutcome): Promise<CompletionResult | undefined> {
+    return this.locked(runId, () => this.completeUnlocked(runId, outcome, true))
+  }
+
+  private async completeUnlocked(
+    runId: string,
+    outcome: ReflectionOutcome,
+    onlyIfActive: boolean,
+  ): Promise<CompletionResult | undefined> {
+    return (async () => {
       const current = await this.readStateUnlocked()
+      if (onlyIfActive && current.active?.runId !== runId) return undefined
       const conversationIds = new Set([
         ...(current.active?.request.conversationIds ?? []),
         ...(current.pending?.request.conversationIds ?? []),
@@ -151,7 +230,7 @@ export class ReflectionReservationStore {
         outcome,
         ...(promoted === undefined ? {} : { launch: promoted }),
       }
-    })
+    })()
   }
 
   async readState(): Promise<ReservationState> {

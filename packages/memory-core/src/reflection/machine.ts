@@ -240,7 +240,7 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)]
 }
 
-function isStillTriggered(
+export function isStillTriggered(
   request: ReflectionRequest,
   journals: ReadonlyMap<string, JournalSnapshot>,
   config: TriggerConfig,

@@ -45,10 +45,24 @@ export interface RunOutcome {
 }
 
 export function runOutcomeMatchesLedger(
-  ledger: { readonly attempt?: number },
+  ledger: { readonly attempt?: number; readonly startedAt?: string },
   outcome: RunOutcome,
 ): boolean {
-  return ledger.attempt === outcome.attempt
+  return ledger.attempt === outcome.attempt && runArtifactIsFresh(ledger, outcome.finishedAt)
+}
+
+// An artifact belongs to the run that is finalizing only if it was written after that run started.
+// Attempt numbers restart per run, so a directory inherited from a colliding run id carries
+// artifacts that match on attempt while describing a different, older run.
+export function runArtifactIsFresh(
+  ledger: { readonly startedAt?: string },
+  finishedAt: string | undefined,
+): boolean {
+  if (ledger.startedAt === undefined || finishedAt === undefined) return true
+  const startedAt = Date.parse(ledger.startedAt)
+  const written = Date.parse(finishedAt)
+  if (Number.isNaN(startedAt) || Number.isNaN(written)) return true
+  return written >= startedAt
 }
 
 export async function readRunJson<T>(path: string): Promise<T> {

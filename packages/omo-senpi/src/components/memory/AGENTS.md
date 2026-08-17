@@ -12,7 +12,8 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 |------|---------|
 | `index.ts` | Component factory: capability checks, config latch, session binding (`senpi-memory.session-binding`), fail-closed resume conflicts, supervisor refcount, shutdown cleanup. |
 | `wiring.ts` | Registration surface: prompt handler, journal routing, tools, guard, skills scope, commands, trigger wiring, completion renderer/consumption, policy registration, status refresh. |
-| `identity-runtime.ts` | Per-identity reflection assembly: reservation store (trigger engine), worker runner, lazy OS-sandbox transform. |
+| `identity-runtime.ts` | Per-identity reflection assembly: reservation store (trigger engine), worker runner, lazy OS-sandbox transform. Supplies the store's `createRunId` and its stale-reservation seams: `getRunDeadline` reads the adapter-owned `runs/<runId>/ledger.json`, and `onReclaim` logs why a reservation was taken back. `reconcile()` runs crash reconciliation first, then `reclaimStaleActive()` as the backstop. |
+| `reflection-run-id.ts` | Mints reflection run ids as `reflection-run-<epochMs>-<8 hex>`. A run id names a durable run directory and completion record, so it must be unique across processes and days: the previous per-process counter restarted at 1 each launch, re-minted a retired id, adopted that run's directory and inherited its terminal sentinels, which reported a failed run as the older run's success and stranded `active.lock`. Legacy counter-minted directories are tolerated, never reused. |
 | `prompt.ts` | Per-run compiled-memory injection via `before_agent_start`; composes the incoming prompt, sentinel-delimited block, (template,HEAD) cache. |
 | `tools.ts` | `memory` + `memory_apply_patch` ToolDefinitions over the core engines under the `memory-write` cross-process lock; execute-time activation gating. |
 | `journal-wiring.ts` | `agent_settled` branch-delta scan + `session_start` crash reconcile into per-session transcript journals (v3_assistant_steps cursor). |
@@ -44,6 +45,7 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 | `binding.ts` / `bindings/` | Binding entry record + renderer. |
 | `capabilities.ts` | `appendEntry`/`registerEntryRenderer` capability narrowing (`MemoryExtensionAPI`). |
 | `supervisor.ts` | Ref-counted module supervisor placeholder. |
+| Reservation lifecycle | One active run plus one pending, cross-process locked. A run settles through `settleReservationRun`, which completes the reservation, writes the completion record (the only thing that clears the footer spinner) and publishes `final.json`, then drops the spawn payload. Terminal sentinels are trusted only when FRESH (`finishedAt >= ledger.startedAt`) and matching on run id; a stale or foreign sentinel is ignored so the run finalizes normally instead of adopting an older run's outcome and advancing the journal cursor. A reservation is reclaimed only on proof: a launcher that is dead or pid-recycled past the 60s prelaunch grace, or a run past `deadlineAt` plus a 10 min finalization window, because `deadlineAt` is the supervisor's SIGKILL instant and the launcher still has git work to do after it. |
 
 ## Declared divergences from letta-code@a75f4d93e
 

@@ -5,8 +5,10 @@ import {
   readReflectionCompletion,
 } from "./completion"
 import { readReflectionHealth } from "./health"
+import { completeReservationIfActive } from "./reservation-release"
 import {
   readRunJson,
+  unlinkRunArtifact,
   updateRunLedger,
   writeRunJsonAtomic,
 } from "./run-artifacts"
@@ -51,9 +53,9 @@ export async function settleReservationRun(
   }
   let launch
   if (active?.runId === current.runId) {
-    const transition = await context.reservation.complete(current.runId, decision.outcome)
-    if (transition.launch !== undefined) context.launch?.(transition.launch)
-    launch = transition.launch
+    const transition = await completeReservationIfActive(context.reservation, current.runId, decision.outcome)
+    if (transition?.launch !== undefined) context.launch?.(transition.launch)
+    launch = transition?.launch
   }
 
   const healthBefore = await readReflectionHealth(completionsDir)
@@ -88,6 +90,10 @@ export async function settleReservationRun(
     finishedAt: finalizedAt,
     ...(decision.integrationSha === undefined ? {} : { integrationSha: decision.integrationSha }),
   })
+  // The spawn payload is a copy of the transcript window handed to the child and is the largest
+  // artifact a run leaves behind. Run directories are retained after they settle, so keeping the
+  // input alongside the result grows the identity's runtime dir without bounding it.
+  await unlinkRunArtifact(join(runDir, "transcript-payload.json"))
   return {
     runId: current.runId,
     outcome: decision.outcome,

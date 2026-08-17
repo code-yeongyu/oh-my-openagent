@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
-import { cleanupReflectionWorktree } from "@oh-my-opencode/memory-core"
+import {
+  cleanupReflectionWorktree,
+  type ReflectionOutcome,
+} from "@oh-my-opencode/memory-core"
 
 import {
   readRunJson,
@@ -13,7 +16,9 @@ import {
 import {
   withRunFinalizationClaim,
   type ClaimedRunResult,
+  type FinalizationTerminalResult,
 } from "./run-finalization-claim"
+import { completeReservationIfActive } from "./reservation-release"
 import { resolveFinalizationDecision } from "./run-finalization-git"
 import { settleReservationRun } from "./run-finalization-settlement"
 import { withRunTerminalGate } from "./run-terminal-gate"
@@ -45,8 +50,9 @@ export async function finalizeRecordedOutcome(
     runDir,
     ledger.runId,
     async () => finalizeClaimedOutcome(context, runDir, ledger.runId),
+    ledger,
   )
-  return claimedValue(claimed)
+  return releaseClaimed(context, claimed)
 }
 
 export async function failReservationRun(
@@ -74,8 +80,9 @@ export async function failReservationRun(
       await cleanupOrThrow(context, current)
       return settleReservationRun(context, runDir, current, decision)
     }),
+    ledger,
   )
-  return claimedValue(claimed)
+  return releaseClaimed(context, claimed)
 }
 
 export async function overrideFailedReservationRun(
@@ -99,8 +106,9 @@ export async function overrideFailedReservationRun(
       await cleanupOrThrow(context, current)
       return settleReservationRun(context, runDir, current, decision)
     }),
+    ledger,
   )
-  return claimedValue(claimed)
+  return releaseClaimed(context, claimed)
 }
 
 export async function abandonReservationRun(
@@ -139,8 +147,9 @@ export async function abandonReservationRun(
       }
       return { runId: precedence.ledger.runId, outcome: "abandoned_unknown" as const }
     }),
+    ledger,
   )
-  return claimedValue(claimed)
+  return releaseClaimed(context, claimed)
 }
 
 async function finalizeClaimedOutcome(
@@ -194,8 +203,25 @@ async function cleanupOrThrow(
   }
 }
 
-function claimedValue(
+// A terminal sentinel short-circuits finalization before settleReservationRun runs, so nothing
+// completes the reservation and active.lock survives its own run. That is reachable whenever a
+// settling process dies between writing final.json and completing, and it is what wedged the
+// status indicator when a colliding run id made an older run's final.json look like this one's.
+async function releaseClaimed(
+  context: RunFinalizationContext,
   claimed: ClaimedRunResult<ReservationRunResult | undefined>,
-): ReservationRunResult | undefined {
-  return claimed.status === "busy" ? undefined : claimed.value
+): Promise<ReservationRunResult | undefined> {
+  if (claimed.status === "busy") return undefined
+  if (claimed.status === "terminal") await releaseTerminalReservation(context, claimed.value)
+  return claimed.value
 }
+
+async function releaseTerminalReservation(
+  context: RunFinalizationContext,
+  terminal: FinalizationTerminalResult,
+): Promise<void> {
+  const outcome = terminal.outcome === "abandoned_unknown" ? "failed" : terminal.outcome
+  const transition = await completeReservationIfActive(context.reservation, terminal.runId, outcome)
+  if (transition?.launch !== undefined) context.launch?.(transition.launch)
+}
+

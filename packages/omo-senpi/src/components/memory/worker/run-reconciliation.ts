@@ -8,14 +8,17 @@ import {
   getProcessStartIdentity,
   discardReflectionWorktree,
   GitMemoryRepo,
+  RESERVATION_PRELAUNCH_GRACE_MS,
   type MemoryIdentity,
   type ProcessLiveness,
+  type ReflectionOutcome,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
 import {
   readRunJson,
   parseRunPrelaunchArtifact,
+  runArtifactIsFresh,
   runOutcomeMatchesLedger,
   type RunOutcome,
 } from "./run-artifacts"
@@ -26,6 +29,7 @@ import {
   type ReservationRunResult,
   type ReservationStatePort,
 } from "./run-finalization"
+import { completeReservationIfActive } from "./reservation-release"
 import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 import { waitForRunSentinel, type SentinelWaitResult } from "./run-sentinel"
@@ -61,15 +65,71 @@ export async function reconcileReflectionRuns(
   const prelaunch = await reconcilePrelaunch(context)
   if (prelaunch !== undefined) results.push(prelaunch)
   const runsDir = join(options.identity.paths.reflection, "runs")
+  const activeRunId = (await options.reservation.readState()).active?.runId
   for (const name of await directoryNames(runsDir)) {
     const runDir = join(runsDir, name)
-    if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) continue
     if (!existsSync(join(runDir, "ledger.json"))) continue
     const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
+    const sentinel = await readTerminalSentinel(runDir, ledger)
+    if (sentinel?.fresh === true) {
+      // A settled run normally leaves the reservation free. When it is still the active
+      // reservation, settlement stopped short of releasing it, and skipping here is what leaves
+      // the lock held and the status indicator spinning.
+      if (ledger.runId === activeRunId) {
+        const released = await releaseSettledActiveRun(context, ledger.runId, sentinel.outcome)
+        if (released !== undefined) results.push(released)
+      }
+      continue
+    }
+    // A sentinel older than this run belongs to a run that shared the directory under a colliding
+    // id. It must not decide this run's outcome, so the run is reconciled as if unfinished.
     const result = await reconcileRun(context, runDir, ledger)
     if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
   }
   return results
+}
+
+interface TerminalSentinel {
+  readonly outcome: ReflectionOutcome
+  readonly fresh: boolean
+}
+
+async function readTerminalSentinel(
+  runDir: string,
+  ledger: ReservationRunLedger,
+): Promise<TerminalSentinel | undefined> {
+  for (const [name, stamp] of [["final.json", "finishedAt"], ["abandoned.json", "abandonedAt"]] as const) {
+    const path = join(runDir, name)
+    if (!existsSync(path)) continue
+    const value = await readRunJson<Record<string, unknown>>(path)
+    if (value.runId !== ledger.runId) continue
+    const written = typeof value[stamp] === "string" ? value[stamp] : undefined
+    const outcome = isReflectionOutcome(value.outcome) ? value.outcome : "failed"
+    return { outcome, fresh: runArtifactIsFresh(ledger, written) }
+  }
+  return undefined
+}
+
+async function releaseSettledActiveRun(
+  context: ReconcileContext,
+  runId: string,
+  outcome: ReflectionOutcome,
+): Promise<ReflectionRunReconcileResult | undefined> {
+  const transition = await completeReservationIfActive(context.reservation, runId, outcome)
+  if (transition === undefined) return undefined
+  if (transition.launch !== undefined) context.launch?.(transition.launch)
+  return { runId, outcome }
+}
+
+function isReflectionOutcome(value: unknown): value is ReflectionOutcome {
+  return value === "merged"
+    || value === "no_changes"
+    || value === "parent_dirty"
+    || value === "dirty_uncommitted"
+    || value === "merge_conflict"
+    || value === "admin_tamper"
+    || value === "timed_out"
+    || value === "failed"
 }
 
 async function reconcilePrelaunch(context: ReconcileContext): Promise<ReflectionRunReconcileResult | undefined> {
@@ -79,7 +139,8 @@ async function reconcilePrelaunch(context: ReconcileContext): Promise<Reflection
   if (existsSync(join(runDir, "ledger.json"))) return undefined
   const prelaunchPath = join(runDir, "prelaunch.json")
   if (existsSync(runDir) && !existsSync(prelaunchPath)) return undefined
-  if (context.now() - Date.parse(active.reservedAt) <= 60_000 || active.launcherHostname !== context.hostname()) return undefined
+  if (context.now() - Date.parse(active.reservedAt) <= RESERVATION_PRELAUNCH_GRACE_MS
+    || active.launcherHostname !== context.hostname()) return undefined
   const liveness = (context.getPidLiveness ?? getPidLiveness)(active.launcherPid)
   let dead = liveness === "dead"
   if (!dead && liveness === "alive" && active.launcherProcessStart !== null && active.launcherProcessStart !== undefined) {
