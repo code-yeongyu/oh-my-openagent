@@ -4,6 +4,8 @@ import { rendererVisibleWidth, type TaskRecord, type TaskStatus } from "@oh-my-o
 
 import { backgroundWidgetRows, buildWidgetRows, formatTaskRow } from "./status-row-format"
 
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
+
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
     parent_session_id: "session-a",
@@ -45,8 +47,45 @@ describe("buildWidgetRows", () => {
     expect(rows[5]).toBe("+2 more")
   })
 
+  it("#given completed residents precede active tasks #when rows are capped #then active tasks render first", () => {
+    const completed = Array.from({ length: 5 }, (_, index) =>
+      record({ task_id: `st_done_${index}`, status: "completed" }),
+    )
+    const active = [
+      record({ task_id: "st_active_a", name: "active-a", status: "running" }),
+      record({ task_id: "st_active_b", name: "active-b", status: "pending" }),
+    ]
+
+    const rows = buildWidgetRows(
+      [...completed, ...active],
+      new Set(completed.map((task) => task.task_id)),
+    )
+
+    expect(rows[0]).toContain("active-a")
+    expect(rows[1]).toContain("active-b")
+    expect(rows.at(-1)).toBe("+2 more")
+  })
+
   it("#given only terminal tasks #when building rows #then no rows render", () => {
     expect(buildWidgetRows([record({ task_id: "st_done", status: "completed" })])).toHaveLength(0)
+  })
+
+  it("#given a completed resident task #when building rows #then its settled row remains discoverable", () => {
+    const rows = buildWidgetRows(
+      [record({ task_id: "st_done", name: "resident-check", status: "completed" })],
+      new Set(["st_done"]),
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("resident-check")
+    expect(rows[0]).toContain("completed")
+  })
+
+  it("#given an errored resident task #when building rows #then it remains hidden", () => {
+    expect(buildWidgetRows(
+      [record({ task_id: "st_error", status: "error" })],
+      new Set(["st_error"]),
+    )).toHaveLength(0)
   })
 
   it("#given an active task #when building a row #then useful identity and execution context remain", () => {
@@ -144,6 +183,55 @@ describe("backgroundWidgetRows", () => {
     expect(row).toContain("category:unspec")
     expect(row).toContain("running")
     expect(row).toEndWith("1m 0s")
+  })
+
+  it("#given completed residents precede active tasks #when background rows are capped #then active tasks render first", () => {
+    const completed = Array.from({ length: 5 }, (_, index) =>
+      record({ task_id: `st_done_${index}`, status: "completed" }),
+    )
+    const active = [
+      record({ task_id: "st_active_a", name: "active-a", status: "running" }),
+      record({ task_id: "st_active_b", name: "active-b", status: "pending" }),
+    ]
+
+    const rows = backgroundWidgetRows(
+      [...completed, ...active],
+      new Map(),
+      now,
+      undefined,
+      220,
+      new Set(completed.map((task) => task.task_id)),
+    )
+
+    expect(rows[0]).toContain("active-a")
+    expect(rows[1]).toContain("active-b")
+    expect(rows.at(-1)).toBe("+2 more")
+  })
+
+  it("#given a completed resident background task #when rows render #then it is settled without a spinner", () => {
+    const row = backgroundWidgetRows(
+      [record({ task_id: "st_done", name: "resident-check", status: "completed" })],
+      new Map(),
+      now,
+      undefined,
+      220,
+      new Set(["st_done"]),
+    )[0] ?? ""
+
+    expect(row).toContain("resident-check")
+    expect(row).toContain("completed")
+    expect(SPINNER_FRAMES).not.toContain(row[0])
+  })
+
+  it("#given a lost resident background task #when rows render #then it remains hidden", () => {
+    expect(backgroundWidgetRows(
+      [record({ task_id: "st_lost", status: "lost" })],
+      new Map(),
+      now,
+      undefined,
+      220,
+      new Set(["st_lost"]),
+    )).toHaveLength(0)
   })
 })
 

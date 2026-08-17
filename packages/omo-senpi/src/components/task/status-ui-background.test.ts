@@ -152,6 +152,7 @@ describe("createTaskStatusUi.background progress", () => {
     const manager: StatusUiManager = {
       list: () => listed([task]),
       wasBackground: () => true,
+      residentTaskIds: () => [task.task_id],
       subscribeChild: () => () => undefined,
     }
     const ui = fakeUi()
@@ -170,7 +171,7 @@ describe("createTaskStatusUi.background progress", () => {
 
     // then
     expect(active.size).toBe(0)
-    expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
+    expect(ui.widgetCalls.at(-1)?.content?.[0]).toContain("completed")
   })
 
   it("#given two background children #when latest events arrive #then rows show identity, model, stats, activity, and elapsed time", () => {

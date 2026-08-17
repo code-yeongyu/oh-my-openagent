@@ -33,6 +33,16 @@ export function isTerminal(status: TaskStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
+function widgetRecords(records: readonly TaskRecord[], residentTaskIds?: ReadonlySet<string>): TaskRecord[] {
+  const active: TaskRecord[] = []
+  const settled: TaskRecord[] = []
+  for (const record of records) {
+    if (!isTerminal(record.status)) active.push(record)
+    else if (record.status === "completed" && residentTaskIds?.has(record.task_id) === true) settled.push(record)
+  }
+  return [...active, ...settled]
+}
+
 function isSuspended(record: TaskRecord): boolean {
   return SUSPENDED_RESIDENCIES.has(record.residency_state)
 }
@@ -79,11 +89,11 @@ export function formatTaskRow(record: TaskRecord): string {
   return parts.join(" ")
 }
 
-export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
-  const active = records.filter((record) => !isTerminal(record.status))
-  if (active.length === 0) return []
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, true))
-  const overflow = active.length - MAX_WIDGET_ROWS
+export function buildWidgetRows(records: readonly TaskRecord[], residentTaskIds?: ReadonlySet<string>): string[] {
+  const visible = widgetRecords(records, residentTaskIds)
+  if (visible.length === 0) return []
+  const shown = visible.slice(0, MAX_WIDGET_ROWS).map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, true))
+  const overflow = visible.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)
   return shown
 }
@@ -160,16 +170,19 @@ export function backgroundWidgetRows(
   now: number,
   liveStats?: (taskId: string) => TaskRunStats | undefined,
   maxWidth = LIVE_WIDGET_LINE_MAX,
+  residentTaskIds?: ReadonlySet<string>,
 ): string[] {
-  const active = records.filter((record) => !isTerminal(record.status))
-  if (active.length === 0) return []
+  const visible = widgetRecords(records, residentTaskIds)
+  if (visible.length === 0) return []
   const boundedWidth = Number.isFinite(maxWidth) && maxWidth > 0
     ? Math.min(LIVE_WIDGET_LINE_MAX, Math.floor(maxWidth))
     : LIVE_WIDGET_LINE_MAX
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map((record) =>
-    formatLiveBackgroundRow(record, activity.get(record.task_id) ?? "running", now, boundedWidth, liveStats?.(record.task_id)),
+  const shown = visible.slice(0, MAX_WIDGET_ROWS).map((record) =>
+    record.status === "completed"
+      ? formatCompactTaskRow(record, boundedWidth, true)
+      : formatLiveBackgroundRow(record, activity.get(record.task_id) ?? "running", now, boundedWidth, liveStats?.(record.task_id)),
   )
-  const overflow = active.length - MAX_WIDGET_ROWS
+  const overflow = visible.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)
   return shown
 }
