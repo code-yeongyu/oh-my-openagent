@@ -1,6 +1,7 @@
 import type { PluginContext } from "./types"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
+import { markSubagentTypeInTurn } from "../features/background-agent/subagent-turn-hold-state"
 import { log, replaceToolArgs } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
@@ -27,7 +28,7 @@ function isPureSleepCommand(command: string): boolean {
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
-  backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
+  backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake" | "dropHeldTasks">
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
@@ -116,6 +117,14 @@ export function createToolExecuteBeforeHandler(args: {
       } else if (!subagentType && taskId) {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
         replaceToolArgs(output, { subagent_type: resolvedAgent ?? "continue" })
+      }
+      const normalizedSubagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
+      const mainSessionID = getMainSessionID()
+      if (input.sessionID === mainSessionID && normalizedSubagentType) {
+        markSubagentTypeInTurn(input.sessionID, normalizedSubagentType)
+        if (normalizedSubagentType.trim().toLowerCase() === "plan") {
+          await backgroundManager?.dropHeldTasks(mainSessionID)
+        }
       }
     }
 

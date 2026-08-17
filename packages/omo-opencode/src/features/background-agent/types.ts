@@ -53,6 +53,8 @@ export interface BackgroundTask {
   agent: string
   spawnDepth?: number
   status: BackgroundTaskStatus
+  held?: boolean
+  droppedReason?: string
   queuedAt?: Date
   startedAt?: Date
   completedAt?: Date

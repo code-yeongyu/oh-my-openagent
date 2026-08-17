@@ -9,6 +9,50 @@ const { executeBackgroundTask } = require("./background-task")
 const { __setTimingConfig, __resetTimingConfig } = require("./timing")
 const { SessionCategoryRegistry } = require("../../shared/session-category-registry")
 
+async function runCallOrderScenario(agentOrder: string[]): Promise<unknown> {
+  const tasks = new Map<string, { sessionId?: string; status: string; held?: boolean }>()
+  const manager = {
+    launch: async (input: { agent: string }) => {
+      const id = `bg_${input.agent}`
+      const held = input.agent === "explore" || input.agent === "librarian"
+      const task = {
+        id,
+        sessionId: held ? undefined : `ses_${input.agent}`,
+        description: input.agent,
+        agent: input.agent,
+        status: held ? "pending" : "running",
+        ...(held ? { held: true } : {}),
+      }
+      tasks.set(id, task)
+      return task
+    },
+    getTask: (taskID: string) => tasks.get(taskID),
+  }
+  return Promise.race([
+    Promise.all(agentOrder.map((agent, index) => executeBackgroundTask(
+      {
+        description: `${agent} call ${index}`,
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: `call_${agent}_${index}`,
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: `msg_${agent}_${index}` },
+      agent,
+      undefined,
+      undefined,
+      undefined,
+    ))),
+    new Promise<"timed_out">(resolve => setTimeout(() => resolve("timed_out"), 25)),
+  ])
+}
+
 describeFn("executeBackgroundTask output/session metadata compatibility", () => {
   beforeEachFn(() => {
     //#given - reduce waiting to keep tests fast
@@ -650,5 +694,129 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(result).not.toContain("to check.")
     expectFn(result).toContain("Do NOT call background_output now")
     expectFn(result).toContain("<system-reminder>")
+  })
+
+  testFn("returns an explicitly held pending launch without waiting for a session id", async () => {
+    //#given - the manager holds this task until the parent assistant turn finishes
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
+    const manager = {
+      launch: async () => ({
+        id: "bg_held",
+        sessionId: undefined,
+        description: "Held research",
+        agent: "explore",
+        status: "pending",
+        held: true,
+      }),
+      getTask: () => ({ sessionId: undefined, status: "pending", held: true }),
+    }
+
+    //#when
+    const result = await Promise.race([
+      executeBackgroundTask(
+        {
+          description: "Held research",
+          prompt: "check",
+          run_in_background: true,
+          load_skills: [],
+        },
+        {
+          sessionID: "ses_parent",
+          callID: "call_held",
+          metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
+          abort: new AbortController().signal,
+        },
+        { manager },
+        { sessionID: "ses_parent", messageID: "msg_held" },
+        "explore",
+        undefined,
+        undefined,
+        undefined,
+      ),
+      new Promise<"timed_out">(resolve => setTimeout(() => resolve("timed_out"), 10)),
+    ])
+
+    //#then - held task returns its stable background id and keeps session metadata absent
+    expectFn(result).not.toBe("timed_out")
+    expectFn(result).toContain("Background Task ID: bg_held")
+    expectFn(result).toContain("Status: pending")
+    expectFn(metadataCalls).toHaveLength(1)
+    expectFn("sessionId" in metadataCalls[0].metadata).toBe(false)
+    expectFn("held" in metadataCalls[0].metadata).toBe(false)
+    expectFn(result).not.toContain("held: true")
+  })
+
+  testFn("continues waiting for an ordinary pending launch to receive a session id", async () => {
+    //#given - ordinary pending work still starts through the session wait path
+    let sessionId: string | undefined
+    let settled = false
+    const manager = {
+      launch: async () => ({
+        id: "bg_ordinary_pending",
+        sessionId: undefined,
+        description: "Ordinary pending",
+        agent: "atlas",
+        status: "pending",
+      }),
+      getTask: () => ({ sessionId, status: sessionId ? "running" : "pending" }),
+    }
+
+    //#when
+    const run = executeBackgroundTask(
+      {
+        description: "Ordinary pending",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_ordinary_pending",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_ordinary_pending" },
+      "atlas",
+      undefined,
+      undefined,
+      undefined,
+    ).then(() => {
+      settled = true
+    })
+    await new Promise(resolve => setTimeout(resolve, 5))
+
+    //#then - ordinary pending launch does not settle before session startup completes
+    expectFn(settled).toBe(false)
+    sessionId = "ses_ordinary_pending"
+    await run
+    expectFn(settled).toBe(true)
+  })
+
+  testFn("settles research-before-plan call order without waiting for held sessions", async () => {
+    //#given - research calls are held before a plan call in one parent turn
+    const result = await runCallOrderScenario(["explore", "librarian", "plan"])
+
+    //#then - every sibling executor promise can settle before the parent finish event
+    expectFn(result).not.toBe("timed_out")
+    expectFn(result).toHaveLength(3)
+  })
+
+  testFn("settles plan-before-research call order without waiting for held sessions", async () => {
+    //#given - the plan call appears before held research calls
+    const result = await runCallOrderScenario(["plan", "explore", "librarian"])
+
+    //#then - call ordering does not restore the session-start wait deadlock
+    expectFn(result).not.toBe("timed_out")
+    expectFn(result).toHaveLength(3)
+  })
+
+  testFn("settles a no-plan research call without waiting for a held session", async () => {
+    //#given - no plan call exists to release the held research task
+    const result = await runCallOrderScenario(["explore", "librarian"])
+
+    //#then - both tools return their stable pending task outputs
+    expectFn(result).not.toBe("timed_out")
+    expectFn(result).toHaveLength(2)
   })
 })

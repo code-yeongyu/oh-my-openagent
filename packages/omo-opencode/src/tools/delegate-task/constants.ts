@@ -26,12 +26,18 @@ MANDATORY CONTEXT GATHERING PROTOCOL:
    - call_omo_agent(description="Explore codebase patterns", subagent_type="explore", run_in_background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
    - call_omo_agent(description="Research documentation", subagent_type="librarian", run_in_background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
 
-2. After gathering context, ALWAYS present:
+2. Capture Task IDs from background agent responses when they are available:
+   - If a response includes "Task ID: <task_id>", record the actual ID.
+   - Include Context Gathering Task IDs only when background agents were launched and actual Task IDs are available.
+   - Do NOT invent, guess, or fabricate Task IDs.
+   - Query those IDs with background_output when needed.
+
+3. After gathering context, ALWAYS present:
    - **User Request Summary**: Concise restatement of what the user is asking for
    - **Uncertainties**: List of unclear points, ambiguities, or assumptions you're making
    - **Clarifying Questions**: Specific questions to resolve the uncertainties
 
-3. ITERATE until ALL requirements are crystal clear:
+4. ITERATE until ALL requirements are crystal clear:
    - Do NOT proceed to planning until you have 100% clarity
    - Ask the user to confirm your understanding
    - Resolve every ambiguity before generating the work plan
@@ -157,6 +163,15 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 
 \`\`\`markdown
 # [Plan Title]
+
+## Context Gathering Task IDs
+
+Include this section only when background agents were launched during context gathering and their responses provided actual Task IDs.
+
+- **Explore Agent Task ID**: [actual Task ID, if available]
+- **Librarian Agent Task ID**: [actual Task ID, if available]
+
+Do NOT invent Task IDs. If no actual Task IDs are available, omit this section.
 
 ## Context
 [User request summary, interview findings, research results]

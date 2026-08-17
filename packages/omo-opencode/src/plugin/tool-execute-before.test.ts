@@ -2,8 +2,18 @@ const { afterEach, describe, expect, test } = require("bun:test")
 const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
 const { createToolRegistry } = require("./tool-registry")
 const { resetStorageClient } = require("../tools/session-manager/storage")
+const { _resetForTesting: resetClaudeCodeSessionState, setMainSession } = require("../features/claude-code-session-state")
+const {
+  clearAllTurnHoldStateForTesting,
+  hasPlanInCurrentTurn,
+} = require("../features/background-agent/subagent-turn-hold-state")
 
 describe("createToolExecuteBeforeHandler", () => {
+  afterEach(() => {
+    resetClaudeCodeSessionState()
+    clearAllTurnHoldStateForTesting()
+  })
+
   test("does not execute subagent question blocker hook for question tool", async () => {
     //#given
     const ctx = {
@@ -271,12 +281,136 @@ describe("createToolExecuteBeforeHandler", () => {
       //#then
       expect(output.args.subagent_type).toBe("oracle")
     })
+
+    test("records a plan launch only for the main session", async () => {
+      //#given
+      setMainSession("ses_main")
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const mainOutput = { args: { subagent_type: "plan", description: "Plan task" } as Record<string, unknown> }
+      const childOutput = { args: { subagent_type: "plan", description: "Child plan task" } as Record<string, unknown> }
+
+      //#when
+      await handler({ tool: "task", sessionID: "ses_main", callID: "call_main" }, mainOutput)
+      await handler({ tool: "task", sessionID: "ses_child", callID: "call_child" }, childOutput)
+
+      //#then
+      expect(hasPlanInCurrentTurn("ses_main")).toBe(true)
+      expect(hasPlanInCurrentTurn("ses_child")).toBe(false)
+    })
+
+    test("awaits dropping held tasks for a normalized main-session plan before returning", async () => {
+      //#given
+      setMainSession("ses_main")
+      let resolveDrop: (() => void) | undefined
+      let dropCalls = 0
+      let dropSettled = false
+      const backgroundManager = {
+        dropHeldTasks: async (sessionID: string) => {
+          expect(sessionID).toBe("ses_main")
+          dropCalls += 1
+          await new Promise<void>((resolve) => {
+            resolveDrop = resolve
+          })
+          dropSettled = true
+        },
+      }
+      const handler = createToolExecuteBeforeHandler({
+        ctx: createCtxWithSessionMessages(),
+        hooks: emptyHooks,
+        backgroundManager,
+      })
+      const run = handler(
+        { tool: "task", sessionID: "ses_main", callID: "call_main" },
+        { args: { subagent_type: "plan", description: "Plan task" } as Record<string, unknown> },
+      )
+
+      //#when
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      //#then
+      expect(dropCalls).toBe(1)
+      expect(dropSettled).toBe(false)
+      resolveDrop?.()
+      await run
+      expect(dropSettled).toBe(true)
+    })
+
+    test("does not drop main held tasks for a non-main plan", async () => {
+      //#given
+      setMainSession("ses_main")
+      let dropCalls = 0
+      const handler = createToolExecuteBeforeHandler({
+        ctx: createCtxWithSessionMessages(),
+        hooks: emptyHooks,
+        backgroundManager: { dropHeldTasks: async () => { dropCalls += 1 } },
+      })
+
+      //#when
+      await handler(
+        { tool: "task", sessionID: "ses_child", callID: "call_child" },
+        { args: { subagent_type: "plan", description: "Child plan task" } as Record<string, unknown> },
+      )
+
+      //#then
+      expect(dropCalls).toBe(0)
+      expect(hasPlanInCurrentTurn("ses_main")).toBe(false)
+      expect(hasPlanInCurrentTurn("ses_child")).toBe(false)
+    })
+
+    test("records main explore and librarian launches without dropping held tasks", async () => {
+      //#given
+      setMainSession("ses_main")
+      let dropCalls = 0
+      const handler = createToolExecuteBeforeHandler({
+        ctx: createCtxWithSessionMessages(),
+        hooks: emptyHooks,
+        backgroundManager: { dropHeldTasks: async () => { dropCalls += 1 } },
+      })
+
+      //#when
+      await handler(
+        { tool: "task", sessionID: "ses_main", callID: "call_explore" },
+        { args: { subagent_type: "explore", description: "Explore task" } as Record<string, unknown> },
+      )
+      await handler(
+        { tool: "task", sessionID: "ses_main", callID: "call_librarian" },
+        { args: { subagent_type: "librarian", description: "Librarian task" } as Record<string, unknown> },
+      )
+
+      //#then
+      expect(dropCalls).toBe(0)
+      expect(hasPlanInCurrentTurn("ses_main")).toBe(false)
+    })
+
+    test("propagates a held-task drop failure after recording a main-session plan", async () => {
+      //#given
+      setMainSession("ses_main")
+      const dropError = new Error("drop failed")
+      const handler = createToolExecuteBeforeHandler({
+        ctx: createCtxWithSessionMessages(),
+        hooks: emptyHooks,
+        backgroundManager: { dropHeldTasks: async () => { throw dropError } },
+      })
+
+      //#when
+      const run = handler(
+        { tool: "task", sessionID: "ses_main", callID: "call_main" },
+        { args: { subagent_type: "plan", description: "Plan task" } as Record<string, unknown> },
+      )
+
+      //#then
+      await expect(run).rejects.toBe(dropError)
+      expect(hasPlanInCurrentTurn("ses_main")).toBe(true)
+    })
   })
 })
 
 describe("createToolRegistry", () => {
   afterEach(() => {
     resetStorageClient()
+    resetClaudeCodeSessionState()
+    clearAllTurnHoldStateForTesting()
   })
 
   function createRegistryInput(overrides = {}) {

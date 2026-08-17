@@ -1,4 +1,5 @@
 /// <reference path="../../../../bun-test.d.ts" />
+import { tmpdir } from "node:os"
 import { describe, it, expect, afterEach, mock, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
@@ -6,6 +7,12 @@ import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { BackgroundManager } from "../features/background-agent/manager"
+import { clearBackgroundTaskRegistryForTesting } from "../features/background-agent/task-registry"
+import { clearAllTurnHoldStateForTesting, hasPlanInCurrentTurn, markSubagentTypeInTurn } from "../features/background-agent/subagent-turn-hold-state"
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
+import { _resetForTesting as resetProcessCleanupState } from "../features/background-agent/process-cleanup"
+import { _resetTaskToastManagerForTesting } from "../features/task-toast-manager/manager"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
@@ -81,6 +88,70 @@ async function waitUntil(predicate: () => boolean, timeoutMs: number = 500): Pro
 	}
 }
 
+function createHeldTaskEventFixture(): {
+  manager: BackgroundManager
+  eventHandler: ReturnType<typeof createEventHandler>
+  childSessionCreates: { count: number }
+} {
+  const childSessionCreates = { count: 0 }
+  const client = {
+    session: {
+      get: async () => ({ data: { directory: tmpdir() }, error: null }),
+      create: async () => {
+        childSessionCreates.count += 1
+        return { data: { id: `ses_child_${childSessionCreates.count}` }, error: null }
+      },
+      abort: async () => ({ data: {}, error: null }),
+      promptAsync: async () => ({}),
+    },
+  }
+  const manager = new BackgroundManager({
+    pluginContext: asPluginInput({ client, directory: tmpdir() }),
+  })
+  const eventHandler = createEventHandler({
+    ctx: asEventHandlerContext({ client, directory: tmpdir() }),
+    pluginConfig: asPluginConfig({}),
+    firstMessageVariantGate: {
+      markSessionCreated: () => {},
+      clear: () => {},
+    },
+    managers: createEventHandlerManagers({
+      backgroundManager: manager,
+      skillMcpManager: { disconnectSession: async () => {} },
+    }),
+    hooks: createEventHandlerHooks({}),
+  })
+  return { manager, eventHandler, childSessionCreates }
+}
+
+function createHeldTaskInput(parentSessionId: string): {
+  description: string
+  prompt: string
+  agent: string
+  parentSessionId: string
+  parentMessageId: string
+} {
+  return {
+    description: "explore task",
+    prompt: "gather context",
+    agent: "explore",
+    parentSessionId,
+    parentMessageId: "msg_parent",
+  }
+}
+
+async function finishAssistantTurn(eventHandler: ReturnType<typeof createEventHandler>, sessionID: string): Promise<void> {
+  await eventHandler(asEventHandlerInput({
+    event: {
+      type: "message.updated",
+      properties: {
+        sessionID,
+        info: { sessionID, role: "assistant", finish: true },
+      },
+    },
+  }))
+}
+
 function createIdleTrackingEventHandler(dispatchCalls: EventInput[]): ReturnType<typeof createEventHandler> {
 	return createEventHandler({
 		ctx: asEventHandlerContext({}),
@@ -146,6 +217,78 @@ async function flushMicrotasks(turns: number = 5): Promise<void> {
 afterEach(() => {
 	mock.restore()
 	_resetForTesting()
+	clearBackgroundTaskRegistryForTesting()
+	releaseAllPromptAsyncReservationsForTesting()
+	resetProcessCleanupState()
+	clearAllTurnHoldStateForTesting()
+	_resetTaskToastManagerForTesting()
+})
+
+describe("main-session held context tasks", () => {
+	it("releases held tasks when the main assistant turn finishes without a plan", async () => {
+		setMainSession("ses_main")
+		const { manager, eventHandler, childSessionCreates } = createHeldTaskEventFixture()
+		const task = await manager.launch(createHeldTaskInput("ses_main"))
+
+		await finishAssistantTurn(eventHandler, "ses_main")
+		await flushMicrotasks(10)
+
+		expect(childSessionCreates.count).toBe(1)
+		expect(manager.getTask(task.id)?.sessionId).toBe("ses_child_1")
+		await manager.shutdown()
+	})
+
+	it("drops held tasks when the main assistant turn includes a plan", async () => {
+		setMainSession("ses_main")
+		const { manager, eventHandler, childSessionCreates } = createHeldTaskEventFixture()
+		const task = await manager.launch(createHeldTaskInput("ses_main"))
+		markSubagentTypeInTurn("ses_main", "plan")
+
+		await finishAssistantTurn(eventHandler, "ses_main")
+
+		expect(childSessionCreates.count).toBe(0)
+		expect(manager.getTask(task.id)?.droppedReason).toBe("delegated_to_plan")
+		await manager.shutdown()
+	})
+
+	it("does not repeat release work on a duplicate finished assistant event", async () => {
+		setMainSession("ses_main")
+		const { manager, eventHandler, childSessionCreates } = createHeldTaskEventFixture()
+		await manager.launch(createHeldTaskInput("ses_main"))
+
+		await finishAssistantTurn(eventHandler, "ses_main")
+		await finishAssistantTurn(eventHandler, "ses_main")
+		await flushMicrotasks(10)
+
+		expect(childSessionCreates.count).toBe(1)
+		await manager.shutdown()
+	})
+
+	it("clears turn state after the main assistant turn finishes", async () => {
+		setMainSession("ses_main")
+		const { manager, eventHandler } = createHeldTaskEventFixture()
+		const task = await manager.launch(createHeldTaskInput("ses_main"))
+		markSubagentTypeInTurn("ses_main", "plan")
+
+		await finishAssistantTurn(eventHandler, "ses_main")
+		await manager.releaseHeldTasks("ses_main")
+
+		expect(hasPlanInCurrentTurn("ses_main")).toBe(false)
+		expect(manager.getTask(task.id)?.droppedReason).toBe("delegated_to_plan")
+		await manager.shutdown()
+	})
+
+	it("does not affect main held tasks when a child assistant turn finishes", async () => {
+		setMainSession("ses_main")
+		const { manager, eventHandler, childSessionCreates } = createHeldTaskEventFixture()
+		const task = await manager.launch(createHeldTaskInput("ses_main"))
+
+		await finishAssistantTurn(eventHandler, "ses_child")
+
+		expect(childSessionCreates.count).toBe(0)
+		expect(manager.getTask(task.id)?.status).toBe("pending")
+		await manager.shutdown()
+	})
 })
 
 describe("event error extraction", () => {
