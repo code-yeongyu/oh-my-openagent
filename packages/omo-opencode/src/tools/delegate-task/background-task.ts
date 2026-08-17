@@ -141,23 +141,25 @@ export async function executeBackgroundTask(
     // BackgroundManager.launch() returns immediately (pending) before the session exists,
     // so we must wait briefly for the session to be created to set metadata correctly.
     const timing = getTimingConfig()
-    let sessionId = await waitForBackgroundSessionStart({
-      taskId: task.id,
-      initialSessionId: task.sessionId,
-      manager,
-      timing,
-      abortSignal: ctx.abort,
-      onAbort: () => {
-        continueSessionSetup({
-          taskID: task.id,
-          manager,
-          timing,
-          fallbackChain,
-          category: args.category,
-          modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
-        })
-      },
-    })
+    let sessionId = task.held
+      ? task.sessionId
+      : await waitForBackgroundSessionStart({
+        taskId: task.id,
+        initialSessionId: task.sessionId,
+        manager,
+        timing,
+        abortSignal: ctx.abort,
+        onAbort: () => {
+          continueSessionSetup({
+            taskID: task.id,
+            manager,
+            timing,
+            fallbackChain,
+            category: args.category,
+            modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
+          })
+        },
+      })
 
     const updatedTask = typeof manager.getTask === "function"
       ? manager.getTask(task.id)

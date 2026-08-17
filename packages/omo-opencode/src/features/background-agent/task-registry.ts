@@ -61,6 +61,7 @@ function cloneRegisteredTask(task: BackgroundTask): BackgroundTask {
     spawnDepth: task.spawnDepth,
     sessionId: task.sessionId,
     status: task.status,
+    droppedReason: task.droppedReason,
     queuedAt: task.queuedAt,
     startedAt: task.startedAt,
     completedAt: task.completedAt,
@@ -106,7 +107,7 @@ export function archiveBackgroundTask(task: BackgroundTask): void {
   const registry = getRegistry()
   registry.activeTasks.delete(task.id)
   registry.completedTasks.delete(task.id)
-  if (!task.sessionId || !TERMINAL_TASK_STATUSES.has(task.status)) {
+  if ((!task.sessionId && !task.droppedReason) || !TERMINAL_TASK_STATUSES.has(task.status)) {
     return
   }
   registry.completedTasks.set(task.id, cloneRegisteredTask(task))

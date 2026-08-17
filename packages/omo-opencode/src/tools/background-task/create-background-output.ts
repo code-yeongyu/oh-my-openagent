@@ -8,7 +8,7 @@ import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
-import { formatTaskStatus } from "./task-status-format"
+import { formatTaskDroppedMessage, formatTaskStatus } from "./task-status-format"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { recordBackgroundOutputConsumption } from "../../shared/background-output-consumption"
@@ -170,6 +170,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         const isActive = isTaskActiveStatus(resolvedTask.status)
+        if (resolvedTask.droppedReason === "delegated_to_plan") {
+          return formatTaskDroppedMessage(resolvedTask)
+        }
         const fullSession = args.full_session ?? false
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)

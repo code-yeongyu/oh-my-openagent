@@ -32,7 +32,7 @@ import {
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
+import { clearSessionAgent, getMainSessionID, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -56,6 +56,7 @@ import {
 import { ConcurrencyManager } from "./concurrency"
 import {
   POLLING_INTERVAL_MS,
+  TASK_DROPPED_REASON_DELEGATED_TO_PLAN,
   type QueueItem,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
@@ -283,6 +284,8 @@ export class BackgroundManager {
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
   private readonly scheduledFlushSettledCounts = new Map<string, number>()
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
+  private heldItems: Map<string, { task: BackgroundTask; input: LaunchInput; attemptID: string; rawConcurrencyKey: string }> = new Map()
+  private heldTaskTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -439,7 +442,7 @@ export class BackgroundManager {
   }
 
   private archiveCompletedTask(task: BackgroundTask): void {
-    if (!task.sessionId) {
+    if (!task.sessionId && !task.droppedReason) {
       return
     }
     if (task.status === "running" || task.status === "pending") {
@@ -455,6 +458,7 @@ export class BackgroundManager {
       agent: task.agent,
       sessionId: task.sessionId,
       status: task.status,
+      droppedReason: task.droppedReason,
       queuedAt: task.queuedAt,
       startedAt: task.startedAt,
       completedAt: task.completedAt,
@@ -622,9 +626,30 @@ export class BackgroundManager {
         this.pendingByParent.set(input.parentSessionId, pending)
       }
 
-      // Add to queue
+      // Hold main-session context tasks until the assistant turn completes.
       const rawConcurrencyKey = this.getRawConcurrencyKeyFromInput(input)
       const key = this.concurrencyManager.getConcurrencyKey(rawConcurrencyKey)
+      if (this.isMainSessionExploreOrLibrarianAgent(input.parentSessionId, input.agent)) {
+        this.heldItems.set(task.id, { task, input, attemptID: firstAttempt.attemptId, rawConcurrencyKey })
+        const timeoutID = setTimeout(() => {
+          void this.releaseHeldTasks(input.parentSessionId).catch((error) => {
+            log("[background-agent] Error auto-releasing held task:", { taskId: task.id, error })
+          })
+        }, 180_000)
+        this.heldTaskTimeouts.set(task.id, timeoutID)
+        getTaskToastManager()?.addTask({
+          id: task.id,
+          description: input.description,
+          agent: input.agent,
+          isBackground: true,
+          status: "queued",
+          skills: input.skills,
+        })
+        spawnReservation.commit()
+        this.markPreStartDescendantReservation(task)
+        this.updateBackgroundTaskMarker(input.parentSessionId)
+        return { ...task, held: true }
+      }
       const queue = this.queuesByKey.get(key) ?? []
       queue.push({ task, input, attemptID: firstAttempt.attemptId, rawConcurrencyKey })
       this.queuesByKey.set(key, queue)
@@ -1187,6 +1212,79 @@ The fallback retry session is now created and can be inspected directly.
     return task.model
       ? `${task.model.providerID}/${task.model.modelID}`
       : task.agent
+  }
+
+  private isMainSessionExploreOrLibrarianAgent(parentSessionId: string, agent: string): boolean {
+    const mainSessionID = getMainSessionID()
+    if (!mainSessionID || mainSessionID !== parentSessionId) {
+      return false
+    }
+    const normalizedAgent = agent.toLowerCase()
+    return normalizedAgent === "explore" || normalizedAgent === "librarian"
+  }
+
+  async dropHeldTasks(sessionID: string): Promise<void> {
+    for (const [taskID, item] of Array.from(this.heldItems.entries())) {
+      if (item.task.parentSessionId !== sessionID) continue
+      const timeoutID = this.heldTaskTimeouts.get(taskID)
+      if (timeoutID) clearTimeout(timeoutID)
+      this.heldTaskTimeouts.delete(taskID)
+      item.task.status = "cancelled"
+      item.task.droppedReason = TASK_DROPPED_REASON_DELEGATED_TO_PLAN
+      item.task.completedAt = new Date()
+      this.heldItems.delete(taskID)
+      this.rollbackPreStartDescendantReservation(item.task)
+      this.cleanupPendingByParent(item.task)
+      removeTaskToastTracking(taskID)
+      this.taskHistory.record(item.task.parentSessionId, {
+        id: item.task.id,
+        agent: item.task.agent,
+        description: item.task.description,
+        status: "cancelled",
+        category: item.task.category,
+        completedAt: item.task.completedAt,
+      })
+      this.updateBackgroundTaskMarker(item.task.parentSessionId)
+      this.scheduleTaskRemoval(taskID)
+    }
+  }
+
+  private discardHeldTasksForSession(parentSessionID: string): void {
+    for (const [taskID, item] of Array.from(this.heldItems.entries())) {
+      if (item.task.parentSessionId !== parentSessionID) continue
+      const timeoutID = this.heldTaskTimeouts.get(taskID)
+      if (timeoutID) clearTimeout(timeoutID)
+      this.heldTaskTimeouts.delete(taskID)
+      this.heldItems.delete(taskID)
+      this.rollbackPreStartDescendantReservation(item.task)
+      this.cleanupPendingByParent(item.task)
+      removeTaskToastTracking(taskID)
+      this.clearNotificationsForTask(taskID)
+      this.removeTask(item.task)
+    }
+    this.updateBackgroundTaskMarker(parentSessionID)
+  }
+
+  async releaseHeldTasks(sessionID: string): Promise<void> {
+    for (const [taskID, item] of Array.from(this.heldItems.entries())) {
+      if (item.task.parentSessionId !== sessionID) continue
+      const timeoutID = this.heldTaskTimeouts.get(taskID)
+      if (timeoutID) clearTimeout(timeoutID)
+      this.heldTaskTimeouts.delete(taskID)
+      this.heldItems.delete(taskID)
+      const key = this.concurrencyManager.getConcurrencyKey(item.rawConcurrencyKey)
+      const queue = this.queuesByKey.get(key) ?? []
+      queue.push({
+        task: item.task,
+        input: item.input,
+        attemptID: item.attemptID,
+        rawConcurrencyKey: item.rawConcurrencyKey,
+      })
+      this.queuesByKey.set(key, queue)
+      void this.processKey(key).catch((error) => {
+        log("[background-agent] Error processing released held task:", { taskId: taskID, error })
+      })
+    }
   }
 
   /**
@@ -1853,6 +1951,7 @@ The fallback retry session is now created and can be inspected directly.
     if (event.type === "session.deleted") {
       const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
+      this.discardHeldTasksForSession(sessionID)
       this.clearSessionOutputObserved(sessionID)
       this.clearSessionTodoObservation(sessionID)
 
@@ -1889,6 +1988,7 @@ The fallback retry session is now created and can be inspected directly.
           void this.cancelTask(task.id, {
             source: "session.deleted",
             reason: "Session deleted",
+            skipNotification: true,
           }).then(() => {
             if (deletedSessionIDs.has(task.parentSessionId)) {
               this.pendingNotifications.delete(task.parentSessionId)
@@ -3176,6 +3276,11 @@ The task was re-queued on a fallback model after a retryable failure.
       clearTimeout(timer)
     }
     this.idleDeferralTimers.clear()
+    for (const timer of this.heldTaskTimeouts.values()) {
+      clearTimeout(timer)
+    }
+    this.heldTaskTimeouts.clear()
+    this.heldItems.clear()
 
     this.parentWakeNotifier.shutdown()
 

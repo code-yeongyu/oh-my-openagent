@@ -5,6 +5,7 @@ import type { Managers } from "../create-managers";
 import type { PluginContext } from "./types";
 
 import { getMainSessionID, subagentSessions, syncSubagentSessions } from "../features/claude-code-session-state";
+import { clearTurnState, hasPlanInCurrentTurn } from "../features/background-agent/subagent-turn-hold-state";
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../shared/event-session-id";
 import { log } from "../shared/logger";
@@ -152,6 +153,8 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.deleted") {
+      const deletedSessionID = resolveSessionEventID(props);
+      if (deletedSessionID) clearTurnState(deletedSessionID);
       await handleSessionDeletedEvent({
         props,
         tmuxIntegrationEnabled,
@@ -186,6 +189,23 @@ export function createEventHandler(args: {
       });
       if (state.sessionID && ((typeof state.info?.finish === "string" && state.info.finish.length > 0) || state.info?.finish === true)) {
         invalidateContextWindowUsageCache(pluginContext as PluginInput, state.sessionID);
+        const mainSessionID = getMainSessionID();
+        if (state.role === "assistant" && state.sessionID === mainSessionID && managers.backgroundManager) {
+          try {
+            if (hasPlanInCurrentTurn(state.sessionID)) {
+              await managers.backgroundManager.dropHeldTasks(state.sessionID);
+            } else {
+              await managers.backgroundManager.releaseHeldTasks(state.sessionID);
+            }
+          } catch (error) {
+            log("[event] Error processing held tasks on main session finish:", {
+              sessionID: state.sessionID,
+              error,
+            });
+          } finally {
+            clearTurnState(state.sessionID);
+          }
+        }
       }
       if (state.sessionID && state.role === "assistant") {
         try {
