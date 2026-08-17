@@ -18,8 +18,19 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Install actionlint
+        env:
+          # Anonymous raw.githubusercontent.com requests from shared runner IPs
+          # are throttled to HTTP 429. The authenticated contents API draws from
+          # the token quota instead, so the pinned installer fetch is stable.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.10/scripts/download-actionlint.bash)
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --header "Authorization: Bearer ${GITHUB_TOKEN}" \
+            --header "Accept: application/vnd.github.raw+json" \
+            --output download-actionlint.bash \
+            "https://api.github.com/repos/rhysd/actionlint/contents/scripts/download-actionlint.bash?ref=v1.7.10"
+          bash download-actionlint.bash 1.7.10
 
       - name: Run actionlint
         run: ./actionlint -color -shellcheck=""
