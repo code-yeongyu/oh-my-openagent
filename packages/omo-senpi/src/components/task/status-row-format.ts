@@ -35,12 +35,16 @@ export function isTerminal(status: TaskStatus): boolean {
 
 function widgetRecords(records: readonly TaskRecord[], residentTaskIds?: ReadonlySet<string>): TaskRecord[] {
   const active: TaskRecord[] = []
-  const settled: TaskRecord[] = []
+  let latestSettled: TaskRecord | undefined
   for (const record of records) {
     if (!isTerminal(record.status)) active.push(record)
-    else if (record.status === "completed" && residentTaskIds?.has(record.task_id) === true) settled.push(record)
+    else if (
+      record.status === "completed"
+      && residentTaskIds?.has(record.task_id) === true
+      && (latestSettled === undefined || record.updated_at >= latestSettled.updated_at)
+    ) latestSettled = record
   }
-  return [...active, ...settled]
+  return latestSettled === undefined ? active : [...active, latestSettled]
 }
 
 function isSuspended(record: TaskRecord): boolean {

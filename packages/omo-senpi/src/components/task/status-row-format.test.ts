@@ -47,7 +47,7 @@ describe("buildWidgetRows", () => {
     expect(rows[5]).toBe("+2 more")
   })
 
-  it("#given completed residents precede active tasks #when rows are capped #then active tasks render first", () => {
+  it("#given completed residents precede active tasks #when rows render #then active tasks precede only the latest completion", () => {
     const completed = Array.from({ length: 5 }, (_, index) =>
       record({ task_id: `st_done_${index}`, status: "completed" }),
     )
@@ -63,7 +63,8 @@ describe("buildWidgetRows", () => {
 
     expect(rows[0]).toContain("active-a")
     expect(rows[1]).toContain("active-b")
-    expect(rows.at(-1)).toBe("+2 more")
+    expect(rows).toHaveLength(3)
+    expect(rows[2]).toContain("st_done_4")
   })
 
   it("#given only terminal tasks #when building rows #then no rows render", () => {
@@ -79,6 +80,24 @@ describe("buildWidgetRows", () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]).toContain("resident-check")
     expect(rows[0]).toContain("completed")
+  })
+
+  it("#given thirty completed residents #when building rows #then only the latest completion remains", () => {
+    const completed = Array.from({ length: 30 }, (_, index) =>
+      record({
+        task_id: `st_done_${index}`,
+        name: `resident-${index}`,
+        status: "completed",
+        updated_at: `2026-07-07T00:00:${String(index + 1).padStart(2, "0")}.000Z`,
+      }),
+    )
+    const rows = buildWidgetRows(
+      completed,
+      new Set(completed.map((task) => task.task_id)),
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("resident-29")
   })
 
   it("#given an errored resident task #when building rows #then it remains hidden", () => {
@@ -185,7 +204,7 @@ describe("backgroundWidgetRows", () => {
     expect(row).toEndWith("1m 0s")
   })
 
-  it("#given completed residents precede active tasks #when background rows are capped #then active tasks render first", () => {
+  it("#given completed residents precede active tasks #when background rows render #then active tasks precede only the latest completion", () => {
     const completed = Array.from({ length: 5 }, (_, index) =>
       record({ task_id: `st_done_${index}`, status: "completed" }),
     )
@@ -205,7 +224,8 @@ describe("backgroundWidgetRows", () => {
 
     expect(rows[0]).toContain("active-a")
     expect(rows[1]).toContain("active-b")
-    expect(rows.at(-1)).toBe("+2 more")
+    expect(rows).toHaveLength(3)
+    expect(rows[2]).toContain("st_done_4")
   })
 
   it("#given a completed resident background task #when rows render #then it is settled without a spinner", () => {
@@ -221,6 +241,28 @@ describe("backgroundWidgetRows", () => {
     expect(row).toContain("resident-check")
     expect(row).toContain("completed")
     expect(SPINNER_FRAMES).not.toContain(row[0])
+  })
+
+  it("#given thirty completed resident background tasks #when rows render #then only the latest remains", () => {
+    const completed = Array.from({ length: 30 }, (_, index) =>
+      record({
+        task_id: `st_done_${index}`,
+        name: `resident-${index}`,
+        status: "completed",
+        updated_at: `2026-07-07T00:00:${String(index + 1).padStart(2, "0")}.000Z`,
+      }),
+    )
+    const rows = backgroundWidgetRows(
+      completed,
+      new Map(),
+      now,
+      undefined,
+      220,
+      new Set(completed.map((task) => task.task_id)),
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("resident-29")
   })
 
   it("#given a lost resident background task #when rows render #then it remains hidden", () => {
