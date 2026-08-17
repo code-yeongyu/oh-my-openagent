@@ -1,0 +1,39 @@
+{
+  "rule": "Preserved candidates are machine/runtime seams, never authored prose contracts.",
+  "category_summary": {
+    "machine-sentinel": {
+      "occurrences": 718,
+      "unique_fingerprints": 594
+    },
+    "parser-fixture": {
+      "occurrences": 213,
+      "unique_fingerprints": 187
+    },
+    "runtime-behavior": {
+      "occurrences": 473,
+      "unique_fingerprints": 416
+    },
+    "security-boundary": {
+      "occurrences": 67,
+      "unique_fingerprints": 51
+    },
+    "shipped-copy-equality": {
+      "occurrences": 121,
+      "unique_fingerprints": 109
+    },
+    "user-ui-error": {
+      "occurrences": 135,
+      "unique_fingerprints": 119
+    }
+  },
+  "source_files": [
+    "classification-proposals/codex.json",
+    "classification-proposals/core.json",
+    "classification-proposals/infra.json",
+    "classification-proposals/opencode.json",
+    "classification-proposals/scripts-tests.json",
+    "classification-proposals/senpi-shared.json",
+    "prompt-contract-classification-supplemental.json"
+  ],
+  "active_fingerprints": 1476
+}

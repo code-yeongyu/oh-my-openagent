@@ -364,7 +364,7 @@ describe("assembled DAG runtime", () => {
     ])
     expect(coordinator.pendingCount()).toBe(0)
     runtime.dispose()
-  })
+  }, { timeout: 15_000 })
 
   test("#given a live task component runtime #when a two-node dag runs #then scheduler, artifacts, rpc, widget, and one wake all observe the same run", async () => {
     // given

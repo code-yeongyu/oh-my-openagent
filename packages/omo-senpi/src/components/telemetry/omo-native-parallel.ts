@@ -19,15 +19,29 @@
  */
 
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { createEvalCellCorrelation } from "./eval-cell-correlation"
+import { isEvalToolName } from "./eval-classifier"
+import {
+  addEvalExecutionRollup,
+  EMPTY_EVAL_EXECUTION_ROLLUP,
+  parseEvalExecutionEvent,
+  REJECTED_EVAL_EXECUTION_ROLLUP,
+  SENPI_EVAL_EXECUTION_EVENT,
+  type EvalExecutionRollup,
+} from "./omo-native-eval"
 import { assembleWaves, type ToolExecutionObservation, type WaveAssembly } from "./wave-assembler"
 
 export type ParallelSessionSnapshot = {
   readonly assembly: WaveAssembly
+  readonly evalExecution: EvalExecutionRollup
+  readonly evalExecutionEventBusAvailable: boolean
   readonly measuredTurnDurationMsTotal: number
 }
 
 export type ParallelTelemetryRegistry = {
   readonly record: (sessionId: string, observation: ToolExecutionObservation) => void
+  readonly recordEvalExecution: (payload: unknown) => void
+  readonly setEvalExecutionEventBusAvailable: (available: boolean) => void
   readonly startTurn: (sessionId: string, atMs: number) => void
   readonly endTurn: (sessionId: string, atMs: number) => void
   readonly snapshot: (sessionId: string) => ParallelSessionSnapshot | undefined
@@ -41,6 +55,7 @@ export type OmoNativeParallelTelemetryOptions = {
 }
 
 type SessionState = {
+  evalExecution: EvalExecutionRollup
   observations: ToolExecutionObservation[]
   turnStartMs: number | undefined
   measuredTurnDurationMsTotal: number
@@ -48,19 +63,49 @@ type SessionState = {
 
 export function createParallelTelemetryRegistry(): ParallelTelemetryRegistry {
   const sessions = new Map<string, SessionState>()
+  const evalCells = createEvalCellCorrelation()
+  let evalExecutionEventBusAvailable = false
 
   const ensure = (sessionId: string): SessionState => {
     const existing = sessions.get(sessionId)
     if (existing !== undefined) return existing
-    const created: SessionState = { observations: [], turnStartMs: undefined, measuredTurnDurationMsTotal: 0 }
+    const created: SessionState = {
+      evalExecution: EMPTY_EVAL_EXECUTION_ROLLUP,
+      observations: [],
+      turnStartMs: undefined,
+      measuredTurnDurationMsTotal: 0,
+    }
     sessions.set(sessionId, created)
     return created
+  }
+
+  const clearSession = (sessionId: string): void => {
+    sessions.delete(sessionId)
+    evalCells.clearSession(sessionId)
   }
 
   return {
     record: (sessionId, observation) => {
       const state = observation.kind === "start" ? ensure(sessionId) : sessions.get(sessionId)
       state?.observations.push(observation)
+      if (observation.kind === "start" && isEvalToolName(observation.toolName)) {
+        evalCells.track(sessionId, observation.toolCallId)
+      }
+    },
+    recordEvalExecution: (payload) => {
+      const parsed = parseEvalExecutionEvent(payload)
+      if (parsed.kind === "ignored") return
+      const sessionId = evalCells.consume(parsed.cellId)
+      if (sessionId === undefined) return
+      const state = sessions.get(sessionId)
+      if (state === undefined) return
+      state.evalExecution = addEvalExecutionRollup(
+        state.evalExecution,
+        parsed.kind === "accepted" ? parsed.rollup : REJECTED_EVAL_EXECUTION_ROLLUP,
+      )
+    },
+    setEvalExecutionEventBusAvailable: (available) => {
+      evalExecutionEventBusAvailable = available
     },
     startTurn: (sessionId, atMs) => {
       ensure(sessionId).turnStartMs = atMs
@@ -79,12 +124,12 @@ export function createParallelTelemetryRegistry(): ParallelTelemetryRegistry {
       if (state === undefined) return undefined
       return {
         assembly: assembleWaves(state.observations),
+        evalExecution: state.evalExecution,
+        evalExecutionEventBusAvailable,
         measuredTurnDurationMsTotal: state.measuredTurnDurationMsTotal,
       }
     },
-    clear: (sessionId) => {
-      sessions.delete(sessionId)
-    },
+    clear: clearSession,
     size: () => sessions.size,
   }
 }
@@ -95,6 +140,9 @@ export function registerOmoNativeParallelTelemetry(
 ): ParallelTelemetryRegistry {
   const now = options.now ?? Date.now
   const registry = options.registry ?? createParallelTelemetryRegistry()
+  const eventBusAvailable = pi.events !== undefined
+  registry.setEvalExecutionEventBusAvailable(eventBusAvailable)
+  pi.events?.on(SENPI_EVAL_EXECUTION_EVENT, (payload) => registry.recordEvalExecution(payload))
 
   pi.on("tool_execution_start", (payload: unknown, eventContext: unknown): void => {
     const atMs = now()

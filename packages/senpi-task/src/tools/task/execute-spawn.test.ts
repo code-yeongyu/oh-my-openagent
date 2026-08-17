@@ -153,35 +153,6 @@ describe("buildTaskExecute spawn", () => {
     expect(captured?.execution_mode).toBe("process")
   })
 
-  test("#given load_skills #when spawning #then resolved SKILL.md content is prepended to the child prompt", async () => {
-    let captured: ManagerStartSpec | undefined
-    const manager = createFakeManager({
-      start: async (spec): Promise<StartResult> => {
-        captured = spec
-        return { kind: "started", task_id: "st_00000003", status: "running", name: "t" }
-      },
-    })
-    const deps = makeDeps(manager, {
-      loadSkills: (names) => ({
-        prepend: names.length > 0 ? "SKILL DIRECTIVE\n\n" : "",
-        resolved: names,
-        missing: [],
-      }),
-    })
-    const execute = buildTaskExecute(deps)
-
-    await execute(
-      "c",
-      { prompt: "do the thing", category: "quick", load_skills: ["reviewer"], run_in_background: true },
-      undefined,
-      undefined,
-      CTX,
-    )
-
-    expect(captured?.prompt.startsWith("SKILL DIRECTIVE")).toBe(true)
-    expect(captured?.prompt.endsWith("do the thing")).toBe(true)
-  })
-
   test("#given run_in_background falsy #when executed #then it composes start + waitFor and returns the final response inline", async () => {
     let waitForId: string | undefined
     const manager = createFakeManager({

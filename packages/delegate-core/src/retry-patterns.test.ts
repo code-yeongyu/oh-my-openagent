@@ -10,6 +10,11 @@ describe("delegate task retry contract", () => {
       errorType: "unknown_category",
       originalOutput: output,
     })
-    expect(error ? buildRetryGuidance(error) : "").toContain("**Available Options**: visual-engineering, ultrabrain")
+    const guidance = error ? buildRetryGuidance(error) : ""
+    const availableOptions = output.match(/Available: (.+)$/)?.[1]?.split(", ")
+
+    expect(guidance.length).toBeGreaterThan(0)
+    expect(availableOptions).toBeDefined()
+    expect(availableOptions?.every((option) => guidance.includes(option))).toBe(true)
   })
 })

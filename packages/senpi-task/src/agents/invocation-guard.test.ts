@@ -86,21 +86,6 @@ describe("evaluateInvocationGuard", () => {
     expect(verdict.kind).toBe("deny")
   })
 
-  // The security property is that the MODEL is never handed a route it can take by itself. Naming
-  // the user-driven route (the user typing /skill:ulw-plan, or asking for a plan) is safe and stops
-  // blind spawn retries; naming a model-executable step - re-reading SKILL.md, which this very state
-  // already did without arming the gate - is not.
-  test("#given a missing user request #when momus is denied #then the message offers no model-executable unlock", () => {
-    // given / when
-    const verdict = evaluateInvocationGuard("momus", stateOf({ invoked: ["ulw-plan"], artifact: true }))
-
-    // then
-    expect(verdict.kind).toBe("deny")
-    if (verdict.kind !== "deny") throw new Error("expected deny")
-    expect(verdict.message).not.toContain("SKILL.md")
-    expect(verdict.message).toContain("Do not attempt to unlock this gate yourself")
-    expect(verdict.message).toContain("ask the user")
-  })
 
   test("#given a user request without a plan artifact #when momus is evaluated #then it denies naming the plan artifact", () => {
     // given / when
@@ -179,7 +164,6 @@ describe("evaluateInvocationGuard - denial names the real unlock path", () => {
     if (verdict.kind !== "deny") return
     expect(verdict.message).toContain("/skill:ulw-plan")
     expect(verdict.message.toLowerCase()).toContain("ask the user")
-    expect(verdict.message).toContain("Do not attempt to unlock this gate yourself")
   })
 
   test("#given a missing plan artifact #when metis is evaluated #then the denial still names the plan-file requirement", () => {

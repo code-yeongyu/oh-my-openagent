@@ -136,7 +136,6 @@ describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
     //#when / #then
     expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("slop-squad")
     expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("team_create")
-    expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("Team Mode Protocol")
   })
 })
 
@@ -147,7 +146,6 @@ describe("loadBuiltinCommands - team mode gating for remove-ai-slops", () => {
 
     //#when / #then
     expect(commands["remove-ai-slops"].template).not.toContain("slop-squad")
-    expect(commands["remove-ai-slops"].template).not.toContain("Team Mode Protocol")
   })
 
   test("should include team mode addendum when teamModeEnabled is true", () => {
@@ -156,7 +154,6 @@ describe("loadBuiltinCommands - team mode gating for remove-ai-slops", () => {
 
     //#when / #then
     expect(commands["remove-ai-slops"].template).toContain("slop-squad")
-    expect(commands["remove-ai-slops"].template).toContain("Team Mode Protocol")
   })
 
   test("should default to team mode disabled when option is omitted", () => {
@@ -175,7 +172,6 @@ describe("REFACTOR_TEMPLATE", () => {
     //#when / #then
     expect(REFACTOR_TEMPLATE).not.toContain("refactor-squad")
     expect(REFACTOR_TEMPLATE).not.toContain("team_create")
-    expect(REFACTOR_TEMPLATE).not.toContain("Team Mode Protocol")
   })
 })
 
@@ -186,7 +182,6 @@ describe("loadBuiltinCommands - team mode gating for refactor", () => {
 
     //#when / #then
     expect(commands.refactor.template).not.toContain("refactor-squad")
-    expect(commands.refactor.template).not.toContain("Team Mode Protocol")
   })
 
   test("should include team mode addendum when teamModeEnabled is true", () => {
@@ -195,6 +190,5 @@ describe("loadBuiltinCommands - team mode gating for refactor", () => {
 
     //#when / #then
     expect(commands.refactor.template).toContain("refactor-squad")
-    expect(commands.refactor.template).toContain("Team Mode Protocol")
   })
 })

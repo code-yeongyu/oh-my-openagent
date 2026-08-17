@@ -1,0 +1,74 @@
+Engine completion seam characterization
+
+handle.ts registers durable + live journal subscriptions before rereading terminal state:
+119-    if (waiters.get(runId) === entry) entry.unsubscribers.add(unsubscribe)
+120-    else unsubscribe()
+121-  }
+122-
+123:  function register(runId: DagRunId, resolve: (result: DagRunResult) => void): void {
+124-    const existing = waiters.get(runId)
+125-    if (existing !== undefined) {
+126-      existing.resolvers.add(resolve)
+127-      return
+128-    }
+129-    const entry: RunWaiters = { resolvers: new Set([resolve]), unsubscribers: new Set() }
+130-    waiters.set(runId, entry)
+131-    const onJournalEvent = (): void => {
+132-      const current = store.readCheckpoint<DagRunRecordV1>(runId)
+133-      if (current === null || !TERMINAL_RUN_STATUSES.has(current.status)) return
+134-      settleWaiters(runId, projectResult(current, store, readOutput))
+135-    }
+136-    // The durable journal channel covers scheduler instances that are distinct from the adapter's
+137-    // live event subscription. Abandoning a wait promise drops neither subscription nor the run.
+138-    addSubscription(runId, entry, subscribeDagJournal(store, runId, onJournalEvent))
+139-    addSubscription(runId, entry, options.subscribe(runId, onJournalEvent))
+140-    // The run may have gone terminal between the ownership read and the subscription.
+141-    const now = store.readCheckpoint<DagRunRecordV1>(runId)
+142-    if (now !== null && TERMINAL_RUN_STATUSES.has(now.status)) {
+143-      settleWaiters(runId, projectResult(now, store, readOutput))
+144-    }
+145-  }
+146-
+147-  const surface: DagWaitSurface = {
+
+scheduler appends dag.run.completed only after all wave settlements:
+341-function resolveAdmissionIdle(context: SchedulerContext): void {
+342-  for (const resolve of context.admissionIdleWaiters) resolve()
+343-  context.admissionIdleWaiters.clear()
+344-}
+345-
+346:async function runWaves(context: SchedulerContext): Promise<DagRunRecordV1> {
+347-  if (context.journal.snapshot().status === "pending") {
+348-    context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
+349-  }
+350-
+351-  for (const wave of context.journal.snapshot().waves) {
+352-    if (context.cancellationStarted) return cancelledSnapshot(context)
+353-    applyDependentSkipCascade(context)
+354-    const runnable = wave.nodeIds.filter((nodeId) => isRunnable(context.journal.snapshot(), nodeId))
+355-    if (runnable.length === 0) continue
+356-
+357-    for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
+358-    context.journal.append(dagWaveStartedEvent({ waveIndex: wave.index, nodeIds: runnable }))
+359-    if (!await admitAndSettleWave(context, runnable)) return cancelledSnapshot(context)
+360-    context.journal.append(dagWaveCompletedEvent({ waveIndex: wave.index, nodeIds: runnable }))
+361-  }
+362-
+363-  applyDependentSkipCascade(context)
+364-  const snapshot = context.journal.snapshot()
+365-  const failed = primaryFailure(snapshot)
+366-  if (failed !== undefined) {
+367-    const error = failed.error ?? nodeError(failed.id, "start_failed", "DAG node failed", context.now)
+368-    context.journal.append(dagRunFailedEvent({ error, counts: countNodes(snapshot.nodes) }))
+369-  } else {
+370-    context.journal.append(dagRunCompletedEvent({ counts: countNodes(snapshot.nodes) }))
+371-  }
+372-  return context.journal.snapshot()
+373-}
+374-
+375-async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly DagNodeId[]): Promise<boolean> {
+376-  let awaitingAdmission = [...nodeIds]
+377-  const attached = new Map<DagNodeId, AttachedTask>()
+378-
+379-  while (awaitingAdmission.length > 0) {
+380-    if (context.cancellationStarted) return false

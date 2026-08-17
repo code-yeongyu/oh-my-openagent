@@ -125,8 +125,8 @@ You are starting an Atlas work session.
         output
       )
 
-      // then - output should be modified with context info
-      expect(output.parts[0].text).toContain("---")
+      // then - output should be modified with context info (idempotence-marker guarded)
+      expect(output.parts[0].text).toContain("<!-- omo-start-work-context -->")
     })
 
     test("should inject resume info when existing boulder state found", async () => {
@@ -154,8 +154,8 @@ You are starting an Atlas work session.
       )
 
       // then - should show resuming status
-      expect(output.parts[0].text).toContain("RESUMING")
       expect(output.parts[0].text).toContain("test-plan")
+      expect(readBoulderState(testDir)?.session_ids).toContain("opencode:session-123")
     })
 
     test("should prefer the plan most recently referenced in the current session", async () => {
@@ -197,10 +197,7 @@ You are starting an Atlas work session.
       )
 
       // then - should auto-select plan-b instead of prompting for multiple plans
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
       expect(output.parts[0].text).toContain("plan-b")
-      expect(output.parts[0].text).toContain("Most recently referenced plan in this session")
-      expect(output.parts[0].text).not.toContain("Multiple Plans Found")
 
       const state = readBoulderState(testDir)
       expect(state?.active_plan).toBe(planBPath)
@@ -253,7 +250,6 @@ You are starting an Atlas work session.
 
       // then - should select the session-preferred new plan, not resume the unrelated one
       expect(output.parts[0].text).toContain("new-plan")
-      expect(output.parts[0].text).not.toContain("RESUMING existing work")
 
       const state = readBoulderState(testDir)
       expect(state?.active_plan).toBe(newPlanPath)
@@ -379,9 +375,8 @@ You are starting an Atlas work session.
       )
 
       // then - should auto-select the incomplete plan, not ask user
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
       expect(output.parts[0].text).toContain("plan-incomplete")
-      expect(output.parts[0].text).not.toContain("Multiple Plans Found")
+      expect(readBoulderState(testDir)?.active_plan).toBe(plan2Path)
     })
 
     test("should wrap multiple plans message in system-reminder tag", async () => {
@@ -406,37 +401,10 @@ You are starting an Atlas work session.
         output
       )
 
-      // then - should use system-reminder tag format
+      // then - should use system-reminder tag format and ask for a decision without writing state
       expect(output.parts[0].text).toContain("<system-reminder>")
       expect(output.parts[0].text).toContain("</system-reminder>")
-      expect(output.parts[0].text).toContain("Multiple Plans Found")
-    })
-
-    test("should use 'ask user' prompt style for multiple plans", async () => {
-      // given - multiple incomplete plans
-      const plansDir = join(testDir, ".omo", "plans")
-      mkdirSync(plansDir, { recursive: true })
-
-      const plan1Path = join(plansDir, "plan-x.md")
-      writeFileSync(plan1Path, "# Plan X\n- [ ] Task 1")
-
-      const plan2Path = join(plansDir, "plan-y.md")
-      writeFileSync(plan2Path, "# Plan Y\n- [ ] Task 2")
-
-      const hook = createStartWorkHook(createMockPluginInput())
-      const output = {
-        parts: [{ type: "text", text: createStartWorkPrompt() }],
-      }
-
-      // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
-
-      // then - should prompt agent to ask user, not ask directly
-      expect(output.parts[0].text).toContain("Ask the user")
-      expect(output.parts[0].text).not.toContain("Which plan would you like to work on?")
+      expect(readBoulderState(testDir)).toBeNull()
     })
 
     test("should select explicitly specified plan name from user-request, ignoring existing boulder state", async () => {
@@ -479,8 +447,7 @@ You are starting an Atlas work session.
 
       // then - should select new-plan, NOT resume old-plan
       expect(output.parts[0].text).toContain("new-plan")
-      expect(output.parts[0].text).not.toContain("RESUMING")
-      expect(output.parts[0].text).not.toContain("old-plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(newPlanPath)
     })
 
     test("should strip ultrawork/ulw keywords from plan name argument", async () => {
@@ -509,7 +476,7 @@ You are starting an Atlas work session.
 
       // then - should find plan without ultrawork suffix
       expect(output.parts[0].text).toContain("my-feature-plan")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should strip ulw keyword from plan name argument", async () => {
@@ -538,7 +505,7 @@ You are starting an Atlas work session.
 
       // then - should find plan without ulw suffix
       expect(output.parts[0].text).toContain("api-refactor")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should match plan by partial name", async () => {
@@ -567,7 +534,7 @@ You are starting an Atlas work session.
 
       // then - should find plan by partial match
       expect(output.parts[0].text).toContain("2026-01-15-feature-implementation")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should match quoted human-readable plan names to slugged filenames", async () => {
@@ -596,7 +563,7 @@ You are starting an Atlas work session.
 
       // then
       expect(output.parts[0].text).toContain("my-feature-plan")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should match Korean plan names after Unicode-aware normalization", async () => {
@@ -625,7 +592,7 @@ You are starting an Atlas work session.
 
       // then
       expect(output.parts[0].text).toContain("결제-플로우")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should match Japanese plan names after Unicode-aware normalization", async () => {
@@ -654,7 +621,7 @@ You are starting an Atlas work session.
 
       // then
       expect(output.parts[0].text).toContain("支払い-フロー")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should keep ASCII plan name matching behavior unchanged", async () => {
@@ -683,7 +650,7 @@ You are starting an Atlas work session.
 
       // then
       expect(output.parts[0].text).toContain("checkout-flow")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
 
     test("should match mixed ASCII and non-ASCII plan names", async () => {
@@ -712,7 +679,7 @@ You are starting an Atlas work session.
 
       // then
       expect(output.parts[0].text).toContain("v2-결제-flow")
-      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(readBoulderState(testDir)?.active_plan).toBe(planPath)
     })
   })
 
@@ -1024,10 +991,8 @@ You are starting an Atlas work session.
       // when
       await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-      // then - no worktree instructions should appear
-      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
-      expect(output.parts[0].text).not.toContain("Worktree Active")
-      expect(output.parts[0].text).not.toContain("git worktree list --porcelain")
+      // then - no worktree instructions should appear and no worktree_path is stored
+      expect(readBoulderState(testDir)?.worktree_path).toBeUndefined()
     })
 
     test("should inject worktree path when --worktree flag is valid", async () => {
@@ -1045,11 +1010,9 @@ You are starting an Atlas work session.
       // when
       await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-      // then - strong worktree active instructions shown
-      expect(output.parts[0].text).toContain("Worktree Active")
+      // then - the validated worktree is surfaced and stored
       expect(output.parts[0].text).toContain("/validated/worktree")
-      expect(output.parts[0].text).toContain("subagent")
-      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
+      expect(readBoulderState(testDir)?.worktree_path).toBe("/validated/worktree")
     })
 
     test("should store worktree_path in boulder when --worktree is valid", async () => {
@@ -1090,8 +1053,6 @@ You are starting an Atlas work session.
       // then - worktree_path absent, setup instructions present
       const state = readBoulderState(testDir)
       expect(state?.worktree_path).toBeUndefined()
-      expect(output.parts[0].text).toContain("needs setup")
-      expect(output.parts[0].text).toContain("git worktree add /nonexistent/wt")
     })
 
     test("should update boulder worktree_path on resume when new --worktree given", async () => {
@@ -1143,11 +1104,8 @@ You are starting an Atlas work session.
       // when
       await hook["chat.message"]({ sessionID: "session-789" }, output)
 
-      // then - shows strong worktree active instructions
-      expect(output.parts[0].text).toContain("Worktree Active")
+      // then - shows the persisted worktree to the session
       expect(output.parts[0].text).toContain("/existing/wt")
-      expect(output.parts[0].text).toContain("subagent")
-      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
 
     test("should show worktree plan progress and path when the mirrored plan exists", async () => {
@@ -1176,9 +1134,10 @@ You are starting an Atlas work session.
         // when
         await hook["chat.message"]({ sessionID: "session-worktree-progress" }, output)
 
-        // then
+        // then - progress is computed from the worktree-mirrored plan (main plan is 0/1)
         expect(output.parts[0].text).toContain(worktreePlanPath)
-        expect(output.parts[0].text).toContain("1/2 tasks completed")
+        expect(output.parts[0].text).toContain("1/2")
+        expect(output.parts[0].text).not.toContain("0/1")
       } finally {
         rmSync(worktreeDir, { recursive: true, force: true })
       }

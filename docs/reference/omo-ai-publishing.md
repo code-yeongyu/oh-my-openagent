@@ -31,6 +31,8 @@ Installing works only with an explicit opt-in:
 npm i -g omo-ai@beta
 ```
 
+Repository beta releases are dispatched with `/publish <explicit-semver>`, for example `/publish 5.0.0-beta.9`. The command sends that exact value through the workflow's `version` input, records the returned workflow run ID, and follows only that run. Release notes compare a beta against the preceding beta in the same channel, and the GitHub release is created with prerelease metadata explicitly set.
+
 ## Trusted Publisher (MERGE GATE, currently UNVERIFIED)
 
 The npmjs.com Trusted Publisher entry for omo-ai is not confirmed saved. The WebAuthn-gated save failed 3 consecutive passkey attempts on 2026-08-03 ("Something went wrong"), so its persistence is unknown.

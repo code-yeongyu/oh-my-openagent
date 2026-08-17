@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, mock, setDefaultTimeout } from "bun:test"
-import { spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { _resetForTesting as resetClaudeSessionState } from "./packages/omo-opencode/src/features/claude-code-session-state/state"
@@ -13,30 +12,13 @@ import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-
 import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
+import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
 // out-of-band before `bun test`; mirror that here so fresh clones/worktrees pass too.
-function ensureVendoredLspDaemonBuilt(): void {
-  const packageDir = join(import.meta.dir, "packages", "lsp-daemon")
-  if (existsSync(join(packageDir, "dist", "cli.js"))) {
-    return
-  }
-  console.error("[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...")
-  const spawnOptions: Parameters<typeof spawnSync>[2] = {
-    cwd: packageDir,
-    stdio: ["ignore", "ignore", "inherit"],
-    timeout: 300_000,
-    shell: process.platform === "win32",
-  }
-  const install = spawnSync("npm", ["ci"], spawnOptions)
-  const build = install.status === 0 ? spawnSync("npm", ["run", "build"], spawnOptions) : install
-  if (build.status !== 0) {
-    console.error(
-      "[test-setup] lsp-daemon build failed; run `npm ci && npm run build` in packages/lsp-daemon (mirrors CI) before `bun test`",
-    )
-  }
-}
-ensureVendoredLspDaemonBuilt()
+await ensureVendoredLspDaemonBuilt({
+  packageDir: join(import.meta.dir, "packages", "lsp-daemon"),
+})
 
 // setDefaultTimeout is per-file when a TEST file calls it, but the preload runs before every file and
 // its value becomes the default each file starts from. CI runners need multiples of the local time for

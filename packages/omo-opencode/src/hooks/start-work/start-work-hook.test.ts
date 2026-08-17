@@ -9,6 +9,7 @@ import { readBoulderState, clearBoulderState } from "../../features/boulder-stat
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createStartWorkHook } from "./start-work-hook"
 import { START_WORK_TEMPLATE } from "../../features/builtin-commands/templates/start-work"
+import { createPrDeliveryBlock } from "./worktree-block"
 
 describe("start-work hook platform session ids", () => {
   let testDir: string
@@ -127,52 +128,54 @@ ${args}
     }
   })
 
-  test("#given --make-pr without worktree #when processing #then injected context instructs task-owned worktree and PR delivery", async () => {
-    // given
+  test.each([
+    { flag: "--make-pr", flags: { makePr: true, ship: false } },
+    { flag: "--ship", flags: { makePr: false, ship: true } },
+  ])("#given $flag #when processing #then the hook injects exactly that PR delivery branch", async ({ flag, flags }) => {
+    // given - the expected branch is pinned independently of the production
+    // parser: createPrDeliveryBlock only renders the shipped copy for flags
+    // the test itself chose, so a hook/parser branch flip cannot pass
+    const prompt = createStartWorkPromptWithArgs(`work ${flag}`)
+    const selectedBlock = createPrDeliveryBlock(flags, undefined)
+    const rejectedBlock = createPrDeliveryBlock(
+      { makePr: !flags.makePr, ship: !flags.ship },
+      undefined,
+    )
     const hook = createHookForDir(testDir)
-    const output = {
-      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work --make-pr") }],
-    }
+    const output = { parts: [{ type: "text", text: prompt }] }
 
     // when
-    await hook["chat.message"]({ sessionID: "pr-sess" }, output)
-    const injected = output.parts[0].text
+    await hook["chat.message"]({ sessionID: `delivery-${flag.slice(2)}` }, output)
 
-    // then
-    expect(injected).toContain("PR Delivery Mode")
-    expect(injected).toContain("git worktree add")
-    expect(injected).not.toContain("until the PR is MERGED")
+    // then - branch selection, hook integration, and persisted plan state agree
+    expect(output.parts[0].text).toContain(selectedBlock)
+    expect(output.parts[0].text).not.toContain(rejectedBlock)
+    expect(readBoulderState(testDir)).toMatchObject({
+      plan_name: "work",
+      worktree_path: undefined,
+    })
   })
 
-  test("#given --ship #when processing #then injected context includes the merge lifecycle", async () => {
-    // given
+  test("#given no delivery flags #when processing #then no PR delivery block is injected", async () => {
+    // given - a plain work request renders neither shipped delivery branch
+    const prompt = createStartWorkPromptWithArgs("work")
     const hook = createHookForDir(testDir)
-    const output = {
-      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work --ship") }],
-    }
-
-    // when
-    await hook["chat.message"]({ sessionID: "ship-sess" }, output)
-    const injected = output.parts[0].text
-
-    // then
-    expect(injected).toContain("PR Delivery Mode")
-    expect(injected).toContain("until the PR is MERGED")
-  })
-
-  test("#given plain start-work #when processing #then no PR delivery block is injected", async () => {
-    // given
-    const hook = createHookForDir(testDir)
-    const output = {
-      parts: [{ type: "text", text: createStartWorkPromptWithArgs("work") }],
-    }
+    const output = { parts: [{ type: "text", text: prompt }] }
 
     // when
     await hook["chat.message"]({ sessionID: "plain-sess" }, output)
-    const injected = output.parts[0].text
 
-    // then
-    expect(injected).not.toContain("PR Delivery Mode")
+    // then - neither branch's shipped block is present in the plain path
+    expect(output.parts[0].text).not.toContain(
+      createPrDeliveryBlock({ makePr: true, ship: false }, undefined),
+    )
+    expect(output.parts[0].text).not.toContain(
+      createPrDeliveryBlock({ makePr: false, ship: true }, undefined),
+    )
+    expect(readBoulderState(testDir)).toMatchObject({
+      plan_name: "work",
+      worktree_path: undefined,
+    })
   })
 
   test("#given --make-pr flag #when parsing plan name #then flag does not leak into boulder plan selection", async () => {
@@ -192,10 +195,10 @@ ${args}
 })
 
 describe("start-work template label matches the activated agent (#5499)", () => {
-  test("#given /start-work activates Atlas #when reading the shipped template header #then it announces an Atlas work session, not Sisyphus", () => {
-    // /start-work activates the atlas agent (see createStartWorkHook), so the
-    // shipped template header must not announce a stale 'Sisyphus work session' (#5499).
+  test("#given /start-work activates Atlas #when reading the shipped template header #then it carries the marker the hook gates on", () => {
+    // /start-work activates the atlas agent (see createStartWorkHook), and the
+    // hook only fires on messages containing this marker, so the shipped
+    // template must keep it (#5499).
     expect(START_WORK_TEMPLATE).toContain("You are starting an Atlas work session.")
-    expect(START_WORK_TEMPLATE).not.toContain("Sisyphus work session")
   })
 })

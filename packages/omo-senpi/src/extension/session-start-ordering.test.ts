@@ -81,9 +81,6 @@ describe("session_start component ordering", () => {
       }),
       expect.objectContaining({ triggerTurn: true, deliverAs: "followUp" }),
     )
-    const content = pi.messages[0]?.message["content"]
-    expect(typeof content).toBe("string")
-    expect(content).not.toContain("/skill:onboarding")
     const markerPath = join(getOmoNativeStateDir(process.env), "onboarding-completed")
     expect(statSync(markerPath).mtimeMs).toBeGreaterThanOrEqual(processStartTime)
     expect(select).not.toHaveBeenCalled()

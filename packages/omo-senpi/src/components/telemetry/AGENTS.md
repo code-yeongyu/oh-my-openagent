@@ -15,15 +15,18 @@ Senpi telemetry adapter over `@oh-my-opencode/telemetry-core` PostHog primitives
 | `omo-native-tools.ts` | `skill_loaded` (builtin skills only, path-checked against the shipped skills root), `delegation_started`, `feature_used` (deduped per session). |
 | `omo-native-turns.ts` | `turn_completed` from assistant `turn_end`: token and cost numbers, provider/model masked via `maskProviderAndModel`. |
 | `omo-native-parallel.ts` / `wave-assembler.ts` | Tool-execution concurrency observation. Waves are interval-graph connected components with `spanMs`, bounded by `MAX_TRACKED_CALLS` (2000). Timestamps are handler-entry stamps because Senpi tool events carry none. |
+| `omo-native-eval.ts` / `eval-cell-correlation.ts` | Strictly parses Senpi `senpi.eval.execution` v1 payloads into fixed scalar rollups and correlates `cellId` to the outer eval/session without retaining names, args, paths, or previews. Detached correlation survives the outer end and clears on event or session teardown. |
 | `omo-native-parallel-summary.ts` | `parallelism_summary`, exactly once per session at `session_shutdown`; owns its registration order versus the session client and registry teardown. |
 | `eval-classifier.ts` / `savings-math.ts` | Wave bucketing (`eval_only`/`non_eval`/`mixed`, never folded together) and span-based savings math (modeled vs labeled upper bound, negatives not clamped). |
+| `parallelism-schema.ts` | Privacy schema for `parallelism_summary`, including historical `parallelism_v1` and emitted `parallelism_v2` fixed fields. |
 | `schema-doc.test.ts` | Pins the generated schema block in `docs/reference/senpi-telemetry.md` against `OMO_NATIVE_EVENT_SCHEMAS`. |
 | `telemetry.test-support.ts` | Recorded transport factory, fixed clock, fake os provider for tests. |
 
 ## Event model
 
 - Legacy product: single event `omo_senpi_daily_active`, reason `session_start`. Distinct id is `sha256("omo-senpi:" + hostname)` (telemetry-core `machine-id.ts`); once-per-UTC-day dedupe lives in the state dir.
-- `omo-native` product: `daily_active`, `session_started`, `prompt_submitted`, `turn_completed`, `skill_loaded`, `delegation_started`, `feature_used`, `parallelism_summary`. Every event is schema-declared in `product-identity.ts`; properties outside the allowlist do not ship. Session ids are salted sha256 hashes, salt local to the machine.
+- `omo-native` product: `daily_active`, `session_started`, `prompt_submitted`, `turn_completed`, `skill_loaded`, `delegation_started`, `feature_used`, `parallelism_summary`. Every event is schema-declared from `product-identity.ts`; properties outside the allowlist do not ship. Session ids are salted sha256 hashes, salt local to the machine.
+- `parallelism_summary` remains one event per session. V2 adds eval event-bus availability, accepted/rejected execution counts, nested status/duration totals, outer eval wrapper counts, and mixed-wave direct counts. Existing non-eval wave and savings formulas are unchanged.
 - Free-form strings are masked to closed vocabularies: unknown providers/models/skills/agents become `custom` or are dropped. Numeric properties are bucketed where cardinality matters.
 
 ## Privacy and opt-out
@@ -43,4 +46,5 @@ Senpi telemetry adapter over `@oh-my-opencode/telemetry-core` PostHog primitives
 
 - Do not emit per-turn variants of session-scoped events (`parallelism_summary` is once per session by design).
 - Do not fold `mixed` waves into `non_eval` or clamp negative savings; both hide measurement anomalies.
+- Do not add eval-internal calls to top-level waves or infer nested concurrency/savings from aggregate duration sums; the producer event does not carry the required interval graph.
 - Do not add properties outside the declared schema, log raw session ids, or widen the timeout so telemetry can delay `session_start`.

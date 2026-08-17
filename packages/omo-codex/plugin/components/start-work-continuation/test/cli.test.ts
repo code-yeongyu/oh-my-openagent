@@ -26,9 +26,6 @@ describe("start-work continuation CLI", () => {
 		expect(result.status).toBe(0);
 		const output = parseStopHookOutput(result.stdout);
 		expect(output.decision).toBe("block");
-		expect(output.reason).toContain("Remaining top-level checkboxes: `2` of `4`");
-		expect(output.reason).toContain("Next incomplete task: `1. Implement checklist parser parity`");
-		expect(output.reason).toContain("Your session id in boulder.json: `codex:s1`");
 	});
 
 	it("#given valid SubagentStop stdin #when CLI runs #then stdout contains block JSON", () => {

@@ -20,7 +20,9 @@ async function createRepo(agentId = "agent-one") {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  for (const dir of tempDirs.splice(0)) {
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
+  }
 })
 
 describe("GitMemoryRepo", () => {

@@ -1,10 +1,12 @@
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
-import { detectShellType } from "../../shared"
+import { detectShellType } from "../../shared/shell-env"
 import { log } from "../../shared/logger"
 
 type OnCompleteHookDeps = {
   spawnWithWindowsHide: typeof spawnWithWindowsHide
   log: typeof log
+  platform?: NodeJS.Platform
+  env?: NodeJS.ProcessEnv
 }
 
 const defaultDeps: OnCompleteHookDeps = {
@@ -32,16 +34,20 @@ async function readOutput(
   }
 }
 
-function resolveHookShellCommand(command: string): string[] {
-  const shellType = detectShellType()
+function resolveHookShellCommand(
+  command: string,
+  platform: NodeJS.Platform,
+  env: NodeJS.ProcessEnv,
+): string[] {
+  const shellType = detectShellType(platform, env)
 
   switch (shellType) {
     case "powershell": {
-      const powershellExecutable = process.platform === "win32" ? "powershell.exe" : "pwsh"
+      const powershellExecutable = platform === "win32" ? "powershell.exe" : "pwsh"
       return [powershellExecutable, "-NoProfile", "-Command", command]
     }
     case "cmd":
-      return [process.env.ComSpec || "cmd.exe", "/d", "/s", "/c", command]
+      return [env.ComSpec || "cmd.exe", "/d", "/s", "/c", command]
     case "csh":
       return ["csh", "-c", command]
     case "unix":
@@ -67,10 +73,12 @@ export async function executeOnCompleteHook(options: {
   deps.log("Running on-complete hook", { command: trimmedCommand })
 
   try {
-    const shellCommand = resolveHookShellCommand(trimmedCommand)
+    const platform = deps.platform ?? process.platform
+    const env = deps.env ?? process.env
+    const shellCommand = resolveHookShellCommand(trimmedCommand, platform, env)
     const proc = deps.spawnWithWindowsHide(shellCommand, {
       env: {
-        ...process.env,
+        ...env,
         SESSION_ID: sessionId,
         EXIT_CODE: String(exitCode),
         DURATION_MS: String(durationMs),

@@ -613,51 +613,5 @@ describe("unstable-agent-babysitter hook", () => {
     }
   })
 
-  test("#given unstable task agent is a config key #when babysitter builds a reminder #then the reminder uses the canonical display name", async () => {
-    // given
-    setMainSession("main-1")
-    const promptCalls: Array<{ input: unknown }> = []
-    const ctx = createMockPluginInput({
-      messagesBySession: { "main-1": [], "bg-1": [] },
-      promptCalls,
-    })
-    const backgroundManager = createBackgroundManager([createTask({ agent: "sisyphus" })])
-    const hook = createUnstableAgentBabysitterHook(ctx, {
-      backgroundManager,
-      config: { timeout_ms: 120000 },
-    })
 
-    // when
-    await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
-
-    // then
-    const payload = promptCalls[0]?.input as { body?: { parts?: Array<{ text?: string }> } } | undefined
-    const text = payload?.body?.parts?.[0]?.text ?? ""
-    expect(text).toContain("Agent: Sisyphus - ultraworker")
-    expect(text).not.toContain("Agent: sisyphus")
-  })
-
-  test("#given unstable task agent is a legacy display name #when babysitter builds a reminder #then the reminder uses the current display name", async () => {
-    // given
-    setMainSession("main-1")
-    const promptCalls: Array<{ input: unknown }> = []
-    const ctx = createMockPluginInput({
-      messagesBySession: { "main-1": [], "bg-1": [] },
-      promptCalls,
-    })
-    const backgroundManager = createBackgroundManager([createTask({ agent: "Sisyphus (Ultraworker)" })])
-    const hook = createUnstableAgentBabysitterHook(ctx, {
-      backgroundManager,
-      config: { timeout_ms: 120000 },
-    })
-
-    // when
-    await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
-
-    // then
-    const payload = promptCalls[0]?.input as { body?: { parts?: Array<{ text?: string }> } } | undefined
-    const text = payload?.body?.parts?.[0]?.text ?? ""
-    expect(text).toContain("Agent: Sisyphus - ultraworker")
-    expect(text).not.toContain("Agent: Sisyphus (Ultraworker)")
-  })
 })

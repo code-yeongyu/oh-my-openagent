@@ -4,6 +4,14 @@ import { join } from "node:path"
 import type { ReflectionOutcome } from "@oh-my-opencode/memory-core"
 
 /**
+ * A trailing failure streak stops counting once its newest failure is older than this window.
+ * Pending completion delivery already expires after 7 days (COMPLETION_MAX_AGE_MS), so a streak
+ * whose newest failure is past this bound can no longer change: identities that stopped
+ * reflecting must not nag or badge forever off a frozen burst. A fresh failure resumes the count.
+ */
+export const REFLECTION_HEALTH_STALE_MS = 7 * 24 * 60 * 60_000
+
+/**
  * READ-ONLY derived health. This module must never write: no transcript entries, no notifications,
  * no filesystem mutations. The alerting side effects live in `./health-alert`.
  */
@@ -45,7 +53,7 @@ type HealthRecord = {
 
 export async function readReflectionHealth(
   completionsDir: string,
-  options: { readonly limit?: number } = {},
+  options: { readonly limit?: number; readonly now?: number } = {},
 ): Promise<ReflectionHealth> {
   let names: string[]
   try {
@@ -71,15 +79,21 @@ export async function readReflectionHealth(
     if (record.outcome === "merged" || record.outcome === "no_changes") break
     if (record.outcome === "failed") failuresBeforeSuccess.push(record)
   }
-  const recent = failuresBeforeSuccess.slice(0, 3).map(fingerprintOf)
+  const now = options.now ?? Date.now()
+  const newestFailureAt = failuresBeforeSuccess[0] === undefined
+    ? undefined
+    : Date.parse(failuresBeforeSuccess[0].finishedAt)
+  const stale = newestFailureAt !== undefined && Number.isFinite(newestFailureAt)
+    && now - newestFailureAt > REFLECTION_HEALTH_STALE_MS
+  const recent = (stale ? [] : failuresBeforeSuccess.slice(0, 3)).map(fingerprintOf)
   const dominant = dominantFingerprint(recent)
   const lastFailure = bounded.find((record) => record.outcome === "failed")
   const lastSuccess = bounded.find((record) => record.outcome === "merged" || record.outcome === "no_changes")
-  const streakSinceISO = failuresBeforeSuccess.at(-1)?.finishedAt
+  const streakSinceISO = stale ? undefined : failuresBeforeSuccess.at(-1)?.finishedAt
   const newest = bounded[0]
 
   return {
-    streak: failuresBeforeSuccess.length,
+    streak: stale ? 0 : failuresBeforeSuccess.length,
     fingerprint: dominant,
     ...(lastFailure === undefined
       ? {}

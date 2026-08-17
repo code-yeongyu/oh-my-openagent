@@ -54,15 +54,12 @@ function matchesCas(state, expected, clauses) {
 
 for (const surface of surfaces) {
 	test(`#given ${surface.name} #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest`, async () => {
-		const skill = await readFile(surface.skillPath, "utf8");
 		const workflow = await readFile(surface.workflowPath, "utf8");
 		const contract = readJsonContract(workflow, "ulw-plan-review-request-state-contract");
 
 		assert.equal(contract.transition, "replace");
 		assert.equal(contract.phase, "review_requested");
 		assert.deepEqual(contract.applies_when, ["explicit_review_modifier_before_complete_plan", "intent=unclear_and_nontrivial"]);
-		assert.match(skill, /Include `--review-required`[\s\S]{0,180}non-Trivial UNCLEAR/);
-		assert.match(workflow, /--draft-only/);
 		assert.equal(contract.atomic, true);
 		assert.equal(contract.review_required, true);
 		assert.equal(contract.plan_path, ".omo/plans/<slug>.md");

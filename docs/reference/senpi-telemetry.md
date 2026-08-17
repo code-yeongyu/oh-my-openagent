@@ -64,10 +64,24 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `$session_id` | `string` | - |
 | `parallelism_summary` | `clock_anomalies` | `number` | - |
 | `parallelism_summary` | `dropped_calls` | `number` | - |
+| `parallelism_summary` | `eval_execution_detached_count` | `number` | - |
+| `parallelism_summary` | `eval_execution_event_bus_available` | `boolean` | - |
+| `parallelism_summary` | `eval_execution_event_count` | `number` | - |
+| `parallelism_summary` | `eval_execution_event_rejected_count` | `number` | - |
+| `parallelism_summary` | `eval_execution_ok_count` | `number` | - |
+| `parallelism_summary` | `eval_nested_tool_call_count` | `number` | - |
+| `parallelism_summary` | `eval_nested_tool_call_error_count` | `number` | - |
+| `parallelism_summary` | `eval_nested_tool_call_ok_count` | `number` | - |
+| `parallelism_summary` | `eval_nested_tool_call_pending_count` | `number` | - |
 | `parallelism_summary` | `eval_only_duration_ms` | `number` | - |
 | `parallelism_summary` | `eval_only_waves` | `number` | - |
+| `parallelism_summary` | `eval_outer_joined_calls` | `number` | - |
+| `parallelism_summary` | `eval_tool_aggregate_truncated_execution_count` | `number` | - |
 | `parallelism_summary` | `incomplete_calls` | `number` | - |
+| `parallelism_summary` | `measured_eval_execution_duration_ms_sum` | `number` | - |
+| `parallelism_summary` | `measured_eval_nested_tool_duration_ms_sum` | `number` | - |
 | `parallelism_summary` | `measured_turn_duration_ms_total` | `number` | - |
+| `parallelism_summary` | `mixed_non_eval_joined_calls` | `number` | - |
 | `parallelism_summary` | `mixed_waves` | `number` | - |
 | `parallelism_summary` | `modeled_wallclock_saved_ms` | `number` | - |
 | `parallelism_summary` | `non_eval_joined_calls` | `number` | - |
@@ -75,9 +89,29 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `non_eval_wave_size_histogram` | `string` | - |
 | `parallelism_summary` | `non_eval_waves_multi` | `number` | - |
 | `parallelism_summary` | `non_eval_waves_total` | `number` | - |
-| `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1` |
+| `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1`, `parallelism_v2` |
 | `parallelism_summary` | `upper_bound_saved_ms` | `number` | - |
 <!-- END GENERATED SCHEMA -->
+
+### Parallelism v2 interpretation
+
+`parallelism_v2` consumes Senpi's in-process `senpi.eval.execution` event and
+adds fixed scalar rollups for eval-internal tool calls. The event's
+`toolCallCount` remains authoritative even when its enriched per-call detail
+array is capped. Tool names, arguments, result previews, paths, and aggregate
+map keys are discarded before the PostHog boundary.
+
+Top-level wave metrics and eval-internal calls remain separate populations.
+`eval_outer_joined_calls` counts top-level eval wrappers,
+`mixed_non_eval_joined_calls` counts direct non-eval calls in mixed waves, and
+`eval_nested_tool_call_count` counts tools executed inside eval cells. Nested
+durations are sums of per-call elapsed durations and may overlap, so they do
+not prove concurrency, wall-clock savings, or saved round trips.
+
+Historical `parallelism_v1` rows do not carry the new fields. On v2 rows,
+`eval_execution_event_bus_available` reports host bus availability, not proof
+that every producer emitted an event. Use the accepted and rejected event
+counts when evaluating rollout coverage.
 
 ### Reasoning tokens caveat
 

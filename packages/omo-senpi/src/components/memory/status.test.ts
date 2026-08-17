@@ -113,7 +113,7 @@ function segmentContext(input: {
         outcome: "failed",
         reason: "spawn_failed",
         detail: "boom",
-        finishedAt: new Date(Date.parse("2026-08-09T00:00:00.000Z") + index * 1000).toISOString(),
+        finishedAt: new Date(Date.now() - ((input.failures ?? 0) - index) * 60_000).toISOString(),
         delivery: { status: "consumed" },
       }),
     )

@@ -35,9 +35,10 @@ describe("lazycodex install surface", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-lazycodex-agents-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-lazycodex-agents-"))
+    const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -123,9 +124,10 @@ describe("lazycodex install surface", () => {
     await mkdir(join(marketplaceRoot, ".git"), { recursive: true })
     await writeFile(join(marketplaceRoot, ".git", "config"), "[remote \"origin\"]\n")
     await writeFile(join(marketplaceRoot, ".codex-marketplace-install.json"), '{"source_type":"git"}\n')
+    const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
     // when
-    const result = await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    const result = await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
     const pluginPath = result.installed[0]?.path
     if (pluginPath === undefined) {
       throw new Error("Codex installer did not report an installed plugin path")
@@ -149,9 +151,10 @@ describe("lazycodex install surface", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-clean-snapshot-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-clean-snapshot-"))
+    const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
     await rm(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"), { recursive: true, force: true })
     await rm(join(codexHome, "plugins", "cache", "sisyphuslabs"), { recursive: true, force: true })
 

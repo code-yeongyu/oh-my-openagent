@@ -68,7 +68,6 @@ describe("createOnboardingComponent", () => {
       content: expect.stringContaining("Read the onboarding skill at"),
       display: false,
     }, { triggerTurn: true, deliverAs: "followUp" })
-    expect(mock.sendMessage.mock.calls[0]?.[0]?.["content"]).not.toContain("/skill:onboarding")
     expect(mock.appendEntry).toHaveBeenCalledWith("omo-onboarding:started", {
       reason: "startup",
       forced: false,

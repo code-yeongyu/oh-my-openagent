@@ -1,0 +1,2 @@
+[2026-08-17T15:03:55.117Z] [live-server-route] registered {"directory":"<isolated-project>","hasServerUrl":true,"registrationCount":1}
+[2026-08-17T15:04:06.503Z] [live-server-route] dispatch via live listener {"sessionID":"<redacted-session-id>","source":"background-agent-parent-wake"}

@@ -719,7 +719,7 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
     expect(fixture.events(result.runId).filter((event) =>
       event.type === "dag.node.transitioned" && event.to === "failed",
     )).toHaveLength(0)
-  })
+  }, process.platform === "win32" ? 30_000 : 5_000)
 
   test("#given expired terminal artifacts and equally old live artifacts #when retention runs #then events, results, and skills are pruned only for the terminal run", () => {
     // given

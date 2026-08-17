@@ -45,8 +45,15 @@ describe("omo-ai published package shape", () => {
     })
 
     describe("#when the dependencies are audited", () => {
-      test("#then @code-yeongyu/senpi is the sole runtime dependency", () => {
-        expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@code-yeongyu/senpi"])
+      test("#then it declares exactly the engine and codemode parser runtime dependencies", () => {
+        expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
+          "@babel/parser",
+          "@code-yeongyu/senpi",
+        ])
+      })
+
+      test("#then the codemode parser dependency is exactly pinned", () => {
+        expect(manifest.dependencies?.["@babel/parser"]).toBe("8.0.4")
       })
 
       test("#then the senpi pin is exact with no range operator", () => {

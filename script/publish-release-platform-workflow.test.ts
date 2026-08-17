@@ -31,7 +31,7 @@ describe("release and platform publish workflows", () => {
     const platformUsesMetadata = workflow.includes("version: ${{ needs.release-metadata.outputs.version }}") &&
       workflow.includes("dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}")
     const mainWaitsForPlatform = workflow.includes(
-      "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+      "needs: [gate-reuse, test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
     ) &&
       workflow.includes("inputs.skip_platform == true || needs.publish-platform.result == 'success'")
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")

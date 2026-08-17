@@ -1,3 +1,27 @@
+## 2026-08-18 — Ship @babel/parser with omo-ai for bundled Senpi codemode
+
+`@code-yeongyu/senpi@2026.8.16` bundles the source-only
+`@code-yeongyu/senpi-codemode` extension but its bundled-dependency closure
+omits the Babel parser that `senpi-codemode/src/kernels/js/rewrite-imports.ts`
+imports at runtime. Clean `omo-ai` installs therefore logged a non-fatal
+`Failed to load extension ... Cannot find module '@babel/parser'` warning at
+boot and silently lost codemode/eval surfaces (verified on a real isolated
+`omo-ai@5.0.0-0.beta.8` install: 43 extensions loaded, `senpi-codemode`
+absent).
+
+`omo-ai` now declares `@babel/parser@8.0.4` as a direct exact-pinned runtime
+dependency. npm installs the full transitive Babel closure next to Senpi, so
+the bundled codemode extension resolves its import and loads enabled. This is
+a deliberately duplicative downstream compatibility dependency until Senpi
+publishes a complete bundle; remove it at the next Senpi pin bump only after
+isolated packed-install and RPC boot QA prove the upstream fix.
+
+## 2026-08-17 — Make explicit beta publication ownership-safe
+
+The synchronized `/publish` command and skill now accept an exact semantic version in addition to `patch`, `minor`, and `major`. Exact versions are dispatched through the workflow's `version` input, and the returned workflow run ID is the sole owner followed through release completion; latest-run inference is no longer part of the command.
+
+Prerelease changelogs now compare against the preceding release in the same channel, and GitHub releases explicitly carry prerelease metadata. Stable bump behavior remains unchanged. Senpi RPC model admission diagnostics also report the probed catalog size and child stderr tail while the launch-parity test keeps its process environment fixed at module load.
+
 ## 2026-08-16 — Track Senpi 2026.8.16 for the omo-ai beta line
 
 All active native Senpi pins now use `2026.8.16` across the root workspace,

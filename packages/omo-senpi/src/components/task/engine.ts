@@ -3,6 +3,7 @@ import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh
 import { log } from "@oh-my-opencode/utils"
 import {
   createCompletionNotifier,
+  createFsSkillLoader,
   createTaskLifecycle,
   parseExtensionEntries,
   createTaskManager,
@@ -14,6 +15,7 @@ import {
   type CompletionNotifier,
   type PersistedTaskEvent,
   type SpawnAdmission,
+  type SkillLoader,
   type TaskLifecycle,
   type TaskManager,
   type TaskRecord,
@@ -48,6 +50,7 @@ export interface TaskEngine {
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
   readonly stateDir: string
+  readonly loadSkills: SkillLoader
   readonly memberLiveness: TeamMemberLivenessNotifier
   readonly notifyOwnedMemberLiveness: (record: TaskRecord) => Promise<void>
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
@@ -62,6 +65,7 @@ export interface ComposeTaskEngineDeps {
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
+  readonly loadSkills?: SkillLoader
   // Per-execution-mode runner construction, injectable so tests can prove `execution_mode:"process"`
   // routes to the process (rpc) runner and not the in-process one. Defaults wire the real runners.
   readonly runnerFactories?: TaskRunnerFactories
@@ -80,6 +84,7 @@ export type { RunnerBuildContext, TaskRunnerFactories } from "./engine-runners"
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
   const runtime = new TaskRuntimeContext(deps.cwd)
+  const loadSkills = deps.loadSkills ?? createFsSkillLoader()
   const stateDir = {
     project_dir: deps.cwd,
     ...(settings.state_dir !== undefined && { task: { state_dir: settings.state_dir } }),
@@ -223,6 +228,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
+    loadSkills,
     memberLiveness,
     notifyOwnedMemberLiveness,
     appendTaskEvent,

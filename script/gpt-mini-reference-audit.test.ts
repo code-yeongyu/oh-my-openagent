@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { readFile, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
@@ -29,6 +30,7 @@ describe("GPT Mini reference audit", () => {
     const matches: string[] = []
     for (const file of files) {
       const path = `${REPOSITORY_ROOT}${file}`
+      if (!existsSync(path)) continue
       if (!(await stat(path)).isFile()) continue
       const content = await readFile(path, "utf8")
       if (content.toLowerCase().includes(OLD_MODEL_ID) || content.includes(OLD_DISPLAY_NAME)) {

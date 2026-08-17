@@ -28,6 +28,7 @@ export function expectedBinName(name: string): string {
 
 export async function createRepoWithBuiltComponentBins(
   input: {
+    readonly agentNames?: readonly string[]
     readonly includeBundledGitBashMcp?: boolean
     readonly includeComponentBins?: boolean
     readonly includeRootCliDist?: boolean
@@ -58,6 +59,16 @@ export async function createRepoWithBuiltComponentBins(
       : { name: "omo", version: "0.1.0" }
   await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify(pluginManifest))
   await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }))
+
+  if (input.agentNames !== undefined) {
+    const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
+    await mkdir(agentsRoot, { recursive: true })
+    await Promise.all(
+      input.agentNames.map((agentName) =>
+        writeFile(join(agentsRoot, `${agentName}.toml`), `name = "${agentName}"\n`, "utf8"),
+      ),
+    )
+  }
 
   if (input.includeBundledGitBashMcp === true) {
     await createBundledGitBashMcpFixture({ pluginRoot, repoRoot })

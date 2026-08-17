@@ -1,0 +1,96 @@
+REBASE
+
+  base=origin/dev
+  conflicts=0
+  divergence_after=0 behind / 4 ahead
+
+FINAL POST-REBASE ORDER
+
+  build
+  targeted tests
+  full typecheck
+  faithful Senpi compatibility
+  unsharded root tests
+  full Codex compatibility
+  generated artifact reconciliation
+
+OBSERVED
+
+Build:
+
+  exit=0
+
+Targeted:
+
+  34 pass
+  0 fail
+  Ran 34 tests across 5 files. [885.00ms]
+
+Typecheck:
+
+  exit=0
+
+Faithful Senpi:
+
+  extension build current
+  staged runtimes current
+  package creation succeeded
+  LSP roundtrip 5/5
+  adapter typecheck exit=0
+  full `packages/omo-senpi` exit=0
+
+Unsharded root:
+
+  13896 pass
+  0 fail
+  Ran 13908 tests across 1781 files. [283.81s]
+
+Codex:
+
+  25 test files / 97 tests passed
+  40 test files / 422 tests passed
+  codegraph: 78 pass, 0 fail
+  installer/package suite: 417 pass, 0 fail
+  Node compatibility suite: 519 pass, 0 fail
+  notice/license payload verification passed
+
+GENERATED ARTIFACT RECONCILIATION
+
+The final extra zero-diff assertion initially observed three build-generated
+Codex bundle body diffs:
+
+- `packages/omo-codex/plugin/components/codegraph/dist/cli.js`
+- `packages/omo-codex/plugin/components/codegraph/dist/serve.js`
+- `packages/omo-codex/scripts/install-dist/install-local.mjs`
+
+Repository source documents that Codex installer body bytes vary with the Bun
+bundler version and that the source digest, not body byte equality, is the
+freshness authority.
+
+Committed installer marker:
+
+  source=1d8359e77ebe41655f091cd2e455f320cde2f9c681f0651797c47d8fdfa2dd76
+  body=3cf0cc862585d91e62fe616c78b6caa3037958e8d11967d2be90ba618144ba5b
+
+Verification build marker:
+
+  source=1d8359e77ebe41655f091cd2e455f320cde2f9c681f0651797c47d8fdfa2dd76
+  body=3ebe53198af1a035e21991b814b41ddb4819c09cfde23b8864be33a92c636428
+
+The source digests match. The verification-generated body bytes were removed
+without adding unrelated artifacts to this PR.
+
+FINAL CLEAN STATE
+
+  generated_diff=0
+  branch=4 commits ahead of origin/dev
+  tracked_worktree_changes=0
+  pack_dir_removed=1
+
+WHY THIS IS ENOUGH
+
+Every required behavioral/build/test gate passed after rebasing onto the
+current base. The only nonzero monitor exit was the deliberately stricter
+byte-diff assertion against bundler-version-sensitive artifacts; source
+freshness and all shipped behavior passed, and the task worktree was returned
+to a clean tracked state.

@@ -45,13 +45,8 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   "ulw-loop": true,
   "ulw-research": true,
 }
-const sharedSkillNames = expectedSkillNames.filter(
-  (name) => !(name in CODEX_DERIVED_SKILL_NAMES) && !(name in NATIVE_SENPI_SKILL_NAMES),
-)
 const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
-const opencodeOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
-const compatibilitySectionHeading = "## Senpi Harness Tool Compatibility"
 
 function listDirectoryNames(path: string): string[] {
   if (!existsSync(path)) {
@@ -156,7 +151,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect(leaks).toEqual([])
   })
 
-  test("#given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization and carry no compatibility banner", () => {
+  test("#given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization", () => {
     for (const skillName of Object.keys(NATIVE_SENPI_SKILL_NAMES)) {
       const sourceFile = join(repoRoot, "packages", "omo-senpi", "skills", skillName, "SKILL.md")
       expect(existsSync(sourceFile), `${relative(repoRoot, sourceFile)} must exist`).toBe(true)
@@ -165,31 +160,7 @@ describe("OMO Senpi scoped skill sync", () => {
       const shippedPath = join(skillsRoot, skillName, "SKILL.md")
       const shipped = readFileSync(shippedPath, "utf8")
       expect(shipped, `${relative(repoRoot, shippedPath)} must ship the native source verbatim`).toBe(source)
-      expect(
-        shipped.includes(compatibilitySectionHeading),
-        `${skillName} is senpi-native and must not carry the compatibility banner`,
-      ).toBe(false)
     }
-  })
-
-  test("#given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example", () => {
-    const missing: string[] = []
-
-    for (const skillName of sharedSkillNames) {
-      const skillFile = join(skillsRoot, skillName, "SKILL.md")
-      if (!existsSync(skillFile)) continue
-
-      const content = readFileSync(skillFile, "utf8")
-      const firstExampleMatch = opencodeOrchestrationPattern.exec(content)
-      if (firstExampleMatch === null) continue
-
-      const sectionIndex = content.indexOf(compatibilitySectionHeading)
-      if (sectionIndex === -1 || sectionIndex > firstExampleMatch.index) {
-        missing.push(relative(repoRoot, skillFile))
-      }
-    }
-
-    expect(missing).toEqual([])
   })
 
   test("#given start-work skill #when inspected #then session ids reference senpi, not codex", () => {

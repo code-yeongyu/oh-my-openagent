@@ -51,8 +51,8 @@ const AVAILABLE_AGENTS: AvailableAgent[] = [
 					trigger: "Resolve cross-system tradeoffs",
 				},
 			],
-			useWhen: ["Complex architecture design"],
-			avoidWhen: ["Simple file operations"],
+			useWhen: ["SENTINEL_ORACLE_USE_CASE"],
+			avoidWhen: ["SENTINEL_ORACLE_AVOID_CASE"],
 		},
 	},
 	{
@@ -118,6 +118,26 @@ const AVAILABLE_CATEGORIES: AvailableCategory[] = [
 	},
 ];
 
+const HEPHAESTUS_DIRECT_AGENTS = new Set(["explore", "librarian", "oracle"]);
+
+/**
+ * Delegation rows are the machine-rendered `→ `agent`` tokens emitted by
+ * buildDelegationTable; agent names are the keys task() dispatches on.
+ * Extraction is scoped to the rendered `### Delegation Table:` section and
+ * deliberately unfiltered: every routed name the table renders, cataloged or
+ * not, must surface in the comparison set.
+ */
+function routedAgentNames(prompt: string): Set<string> {
+	const sectionStart = prompt.indexOf("### Delegation Table:")
+	if (sectionStart === -1) return new Set()
+	const nextHeading = prompt.indexOf("\n### ", sectionStart + 1)
+	const section =
+		nextHeading === -1
+			? prompt.slice(sectionStart)
+			: prompt.slice(sectionStart, nextHeading)
+	return new Set([...section.matchAll(/→ `([^`]+)`/g)].map((match) => match[1]));
+}
+
 const PROMPT_BUILDERS = [
 	{
 		name: "GPT-5.5",
@@ -129,20 +149,9 @@ const PROMPT_BUILDERS = [
 	},
 ] as const;
 
-function extractDelegationAgentNames(prompt: string): Set<string> {
-	const tableRows = prompt.match(
-		/### Delegation Table:\n\n(?<rows>(?:- .+\n?)*)/,
-	)?.groups?.rows;
-	return new Set(
-		[...(tableRows ?? "").matchAll(/→ `(?<agent>[^`]+)`/g)].flatMap(
-			(match) => (match.groups?.agent ? [match.groups.agent] : []),
-		),
-	);
-}
-
 for (const { name, build } of PROMPT_BUILDERS) {
-	describe(`${name} Hephaestus generated prompt`, () => {
-		test("renders exactly the direct-agent allowlist", () => {
+	describe(`${name} Hephaestus delegation routing`, () => {
+		test("routes delegation rows to exactly the direct-agent allowlist", () => {
 			// given: direct agents, planning agents, and an arbitrary future agent are available
 			const prompt = build(
 				AVAILABLE_AGENTS,
@@ -152,26 +161,32 @@ for (const { name, build } of PROMPT_BUILDERS) {
 				false,
 			);
 
-			// then: the rendered table contains the complete direct-agent set and nothing else
-			expect(extractDelegationAgentNames(prompt)).toEqual(
-				new Set(["explore", "librarian", "oracle"]),
-			);
+			// then: only the direct-agent set is routed, and no other name at all
+			expect(routedAgentNames(prompt)).toEqual(HEPHAESTUS_DIRECT_AGENTS);
 		});
 
-		test("preserves category and Oracle guidance outside the table", () => {
-			// given: the generated prompt includes category and Oracle inputs
-			const todoPrompt = build(
+		test("propagates Oracle routing inputs only while oracle is available", () => {
+			// given: the same catalog with and without the oracle agent
+			const withOracle = build(
 				AVAILABLE_AGENTS,
 				[],
 				AVAILABLE_SKILLS,
 				AVAILABLE_CATEGORIES,
 				false,
 			);
+			const withoutOracle = build(
+				AVAILABLE_AGENTS.filter((agent) => agent.name !== "oracle"),
+				[],
+				AVAILABLE_SKILLS,
+				AVAILABLE_CATEGORIES,
+				false,
+			);
 
-			// then: filtering the table does not remove separate delegation surfaces
-			expect(todoPrompt).toContain("### Category + Skills Delegation System");
-			expect(todoPrompt).toContain("`deep`");
-			expect(todoPrompt).toContain("<Oracle_Usage>");
+			// then: dynamic oracle metadata is rendered exactly when oracle is in the catalog
+			expect(withOracle).toContain("SENTINEL_ORACLE_USE_CASE");
+			expect(withOracle).toContain("SENTINEL_ORACLE_AVOID_CASE");
+			expect(withoutOracle).not.toContain("SENTINEL_ORACLE_USE_CASE");
+			expect(withoutOracle).not.toContain("SENTINEL_ORACLE_AVOID_CASE");
 		});
 
 		test("preserves the selected tracking tool", () => {
@@ -202,7 +217,7 @@ for (const { name, build } of PROMPT_BUILDERS) {
 }
 
 describe("planner delegation contracts", () => {
-	test("keeps Metis and Momus routes in Sisyphus", () => {
+	test("keeps every advisor route in Sisyphus", () => {
 		// given: the same agent catalog used to build Hephaestus prompts
 		const prompt = buildGpt55SisyphusPrompt(
 			"openai/gpt-5.5",
@@ -213,9 +228,9 @@ describe("planner delegation contracts", () => {
 			false,
 		);
 
-		// then: the orchestrator still advertises its planning specialists
-		expect(extractDelegationAgentNames(prompt)).toEqual(
-			new Set(["explore", "librarian", "oracle", "metis", "momus", "critic"]),
+		// then: the orchestrator routes to exactly its full planning specialist set
+		expect(routedAgentNames(prompt)).toEqual(
+			new Set(AVAILABLE_AGENTS.map((agent) => agent.name)),
 		);
 	});
 });

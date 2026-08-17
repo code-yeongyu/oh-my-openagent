@@ -1,8 +1,11 @@
 // Presentation tests for the memory transcript entries.
 //
-// Expectations here are LITERAL strings. They are deliberately NOT re-derived from
-// the constants/helpers the renderers use: a tautological expectation would keep a
-// corrupted glyph/colour table green.
+// The entry family mirrors senpi's own notice box (notice/box.ts +
+// goal/cache-warm-renderer.ts): a BOLD tone-coloured title, a dim forward-looking
+// "why" line, a visible quantitative "extra" line in a semantic tone, and a dim
+// expanded-only detail line. Expectations here are LITERAL strings. They are
+// deliberately NOT re-derived from the constants/helpers the renderers use: a
+// tautological expectation would keep a corrupted glyph/colour table green.
 import { describe, expect, test } from "bun:test"
 
 import type { ThemeColor } from "@code-yeongyu/senpi"
@@ -17,6 +20,13 @@ import {
   type ReflectionLaunchedEntry,
 } from "./completion"
 import { renderReflectionHealthEntry, type ReflectionHealthEntry } from "./health-alert"
+
+/** Senpi notice titles are bold; box.ts wraps the title in raw SGR bold on/off. */
+const BOLD = "\u001b[1m"
+const BOLD_OFF = "\u001b[22m"
+function bold(text: string): string {
+  return `${BOLD}${text}${BOLD_OFF}`
+}
 
 /** Marks colour/emphasis inline so assertions can see exactly what was applied. */
 const TAGGING_THEME = {
@@ -54,7 +64,7 @@ function recordingTheme(): {
   }
 }
 
-const WIDE = 100
+const WIDE = 120
 
 function launched(over: Partial<ReflectionLaunchedEntry> = {}): ReflectionLaunchedEntry {
   return {
@@ -102,14 +112,15 @@ function render(
 
 describe("memory reflection entry rendering", () => {
   describe("#given a launched reflection", () => {
-    test("#when it renders collapsed #then a titled notice replaces the key:value soup", () => {
+    test("#when it renders collapsed #then a bold title leads a senpi notice with a visible context line", () => {
       // when
       const lines = render(renderReflectionLaunchedEntry, launched())
 
       // then
       expect(lines).toEqual([
-        "◐ Memory reflection started · reflection-run-2",
-        "Triggered by step-count after 25 new steps.",
+        bold("◐ Memory reflection started · reflection-run-2"),
+        "The outcome lands in this transcript when the run settles - triggered by step-count after 25 new steps.",
+        "1 conversation · category quick",
       ])
     })
 
@@ -118,10 +129,18 @@ describe("memory reflection entry rendering", () => {
       const lines = render(renderReflectionLaunchedEntry, launched({ backlogSteps: 1 }))
 
       // then
-      expect(lines[1]).toBe("Triggered by step-count after 1 new step.")
+      expect(lines[1]).toBe("The outcome lands in this transcript when the run settles - triggered by step-count after 1 new step.")
     })
 
-    test("#when it renders expanded #then the detail row carries category model and identity", () => {
+    test("#when triggered manually #then the why line reads as a manual trigger", () => {
+      // when
+      const lines = render(renderReflectionLaunchedEntry, launched({ trigger: "manual" }))
+
+      // then
+      expect(lines[1]).toBe("The outcome lands in this transcript when the run settles - triggered manually after 25 new steps.")
+    })
+
+    test("#when it renders expanded #then the detail row carries identity started and trigger", () => {
       // when
       const lines = render(
         renderReflectionLaunchedEntry,
@@ -131,9 +150,10 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "◐ Memory reflection started · reflection-run-2",
-        "Triggered by step-count after 25 new steps.",
-        "category quick · model anthropic/claude-sonnet-4 · thinking high · identity project-a1b2c3d4",
+        bold("◐ Memory reflection started · reflection-run-2"),
+        "The outcome lands in this transcript when the run settles - triggered by step-count after 25 new steps.",
+        "1 conversation · category quick · model anthropic/claude-sonnet-4 · thinking high",
+        "trigger step-count · identity project-a1b2c3d4 · started 2026-08-13T09:00:00.000Z",
       ])
     })
 
@@ -145,7 +165,7 @@ describe("memory reflection entry rendering", () => {
       render(renderReflectionLaunchedEntry, launched(), { expanded: true, theme: recorder.theme })
 
       // then
-      expect(recorder.colors).toEqual(["accent", "dim", "dim"])
+      expect(recorder.colors).toEqual(["accent", "dim", "dim", "dim"])
       expect(recorder.italics).toHaveLength(1)
     })
   })
@@ -160,13 +180,45 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "● Memory reflection merged · reflection-run-2",
+        bold("● Memory reflection merged · reflection-run-2"),
         "Reflection merged its findings into memory.",
       ])
       expect(recorder.colors).toEqual(["success", "dim"])
     })
 
-    test("#when the outcome failed #then it reads as error with the cursor warning", () => {
+    test("#when merge metadata is present #then the payoff line is visible in success tone", () => {
+      // given
+      const recorder = recordingTheme()
+
+      // when
+      const lines = render(
+        renderReflectionCompletionEntry,
+        completion({ filesChanged: 3, mergedCommitSha: "9f2c1ab7d3e4f5a6", durationMs: 72_000 }),
+        { theme: recorder.theme },
+      )
+
+      // then
+      expect(lines).toEqual([
+        bold("● Memory reflection merged · reflection-run-2"),
+        "Reflection merged its findings into memory.",
+        "3 files changed · commit 9f2c1ab · took 1m12s",
+      ])
+      expect(recorder.colors).toEqual(["success", "dim", "success"])
+    })
+
+    test("#when merge metadata is present and expanded #then the detail row carries identity and trigger", () => {
+      // when
+      const lines = render(
+        renderReflectionCompletionEntry,
+        completion({ filesChanged: 3, mergedCommitSha: "9f2c1ab7d3e4f5a6", durationMs: 72_000 }),
+        { expanded: true },
+      )
+
+      // then
+      expect(lines[3]).toBe("category quick · identity project-a1b2c3d4 · trigger step-count")
+    })
+
+    test("#when the outcome failed #then it reads as error with the cursor warning and a visible reason", () => {
       // given
       const recorder = recordingTheme()
 
@@ -179,10 +231,34 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "✗ Memory reflection failed · reflection-run-2",
+        bold("✗ Memory reflection failed · reflection-run-2"),
         "Reflection did not finish; the transcript cursor was not advanced.",
+        "reason child_exit",
       ])
-      expect(recorder.colors).toEqual(["error", "dim"])
+      expect(recorder.colors).toEqual(["error", "dim", "error"])
+    })
+
+    test("#when a failure carries a reason and detail #then both appear on the visible payoff line", () => {
+      // when
+      const lines = render(
+        renderReflectionCompletionEntry,
+        completion({ outcome: "failed", reason: "child_exit", detail: "merge refused", durationMs: 4300 }),
+      )
+
+      // then
+      expect(lines[2]).toBe("took 4.3s · reason child_exit · merge refused")
+    })
+
+    test("#when a failure carries a reason and detail and is expanded #then the detail row carries identity", () => {
+      // when
+      const lines = render(
+        renderReflectionCompletionEntry,
+        completion({ outcome: "failed", reason: "child_exit", detail: "merge refused", durationMs: 4300 }),
+        { expanded: true },
+      )
+
+      // then
+      expect(lines[3]).toBe("category quick · identity project-a1b2c3d4 · trigger step-count")
     })
 
     test("#when the outcome timed out #then it reads as warning", () => {
@@ -195,7 +271,7 @@ describe("memory reflection entry rendering", () => {
       })
 
       // then
-      expect(lines[0]).toBe("⚠ Memory reflection timed out · reflection-run-2")
+      expect(lines[0]).toBe(bold("⚠ Memory reflection timed out · reflection-run-2"))
       expect(recorder.colors[0]).toBe("warning")
     })
 
@@ -205,33 +281,9 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "● Memory reflection no changes · reflection-run-2",
+        bold("● Memory reflection no changes · reflection-run-2"),
         "Reflection finished with nothing new worth keeping.",
       ])
-    })
-
-    test("#when merge metadata is present #then the expanded row shows files commit and duration", () => {
-      // when
-      const lines = render(
-        renderReflectionCompletionEntry,
-        completion({ filesChanged: 3, mergedCommitSha: "9f2c1ab7d3e4f5a6", durationMs: 72_000 }),
-        { expanded: true },
-      )
-
-      // then
-      expect(lines[2]).toBe("category quick · files 3 · commit 9f2c1ab · took 1m12s")
-    })
-
-    test("#when a failure carries a reason and detail #then both appear on the expanded row", () => {
-      // when
-      const lines = render(
-        renderReflectionCompletionEntry,
-        completion({ outcome: "failed", reason: "child_exit", detail: "merge refused", durationMs: 4300 }),
-        { expanded: true },
-      )
-
-      // then
-      expect(lines[2]).toBe("category quick · took 4.3s · reason child_exit · merge refused")
     })
 
     test("#when colour is applied #then the emphasis wraps the text rather than replacing it", () => {
@@ -240,7 +292,7 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "[success]● Memory reflection merged · reflection-run-2[/success]",
+        `[success]${bold("● Memory reflection merged · reflection-run-2")}[/success]`,
         "[dim]Reflection merged its findings into memory.[/dim]",
       ])
     })
@@ -256,7 +308,7 @@ describe("memory reflection entry rendering", () => {
       dominantFingerprint: "child_exit:merge refused",
     }
 
-    test("#when failures are present #then it warns with the attention count", () => {
+    test("#when failures are present #then it warns and surfaces the dominant fingerprint visibly", () => {
       // given
       const recorder = recordingTheme()
 
@@ -265,10 +317,11 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "⚠ Memory reflection · 7 older completions collapsed",
+        bold("⚠ Memory reflection · 7 older completions collapsed"),
         "Delivered while this session was away; 2 need attention.",
+        "most common child_exit:merge refused",
       ])
-      expect(recorder.colors[0]).toBe("warning")
+      expect(recorder.colors).toEqual(["warning", "dim", "warning"])
     })
 
     test("#when nothing failed #then it stays muted and says so", () => {
@@ -280,10 +333,10 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "● Memory reflection · 7 older completions collapsed",
+        bold("● Memory reflection · 7 older completions collapsed"),
         "Delivered while this session was away; none need attention.",
       ])
-      expect(recorder.colors[0]).toBe("muted")
+      expect(recorder.colors).toEqual(["muted", "dim"])
     })
 
     test("#when exactly one completion collapsed #then the noun is singular", () => {
@@ -291,7 +344,7 @@ describe("memory reflection entry rendering", () => {
       const lines = render(renderReflectionSummaryEntry, { ...summary, count: 1, failedCount: 0 })
 
       // then
-      expect(lines[0]).toBe("● Memory reflection · 1 older completion collapsed")
+      expect(lines[0]).toBe(bold("● Memory reflection · 1 older completion collapsed"))
     })
   })
 
@@ -307,7 +360,7 @@ describe("memory reflection entry rendering", () => {
       recommendation: "Commit or stash the memory worktree, then rerun /memory reflect.",
     }
 
-    test("#when the alert renders #then it is error toned and leads with the remediation", () => {
+    test("#when the alert renders #then it is error toned with a bold title and leads with the remediation", () => {
       // given
       const recorder = recordingTheme()
 
@@ -316,7 +369,7 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "✗ Memory reflection failing · 4 runs in a row",
+        bold("✗ Memory reflection failing · 4 runs in a row"),
         "Commit or stash the memory worktree, then rerun /memory reflect.",
         "reason child_exit · merge refused · since 2026-08-12T22:15:00.000Z · identity project-a1b2c3d4",
       ])
@@ -331,7 +384,7 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(lines).toEqual([
-        "✗ Memory reflection failed · reflection-run-2",
+        bold("✗ Memory reflection failed · reflection-run-2"),
         "Reflection did not finish; the transcript cursor was not ...",
       ])
     })
@@ -341,10 +394,10 @@ describe("memory reflection entry rendering", () => {
       const lines = render(renderReflectionCompletionEntry, completion({ runId: "reflection-run-with-an-extremely-long-identifier" }))
 
       // then
-      expect(lines[0]).toBe("● Memory reflection merged · reflection-run-with-an-ex...")
+      expect(lines[0]).toBe(bold("● Memory reflection merged · reflection-run-with-an-ex..."))
     })
 
-    test("#when coloured output is truncated #then no terminal reset leaks into the middle of the span", () => {
+    test("#when coloured output is truncated #then no terminal reset leaks into the middle of the why span", () => {
       // when
       const lines = render(renderReflectionCompletionEntry, completion({ outcome: "failed" }), {
         width: 60,
@@ -354,6 +407,16 @@ describe("memory reflection entry rendering", () => {
       // then
       expect(lines[1]).toBe("[dim]Reflection did not finish; the transcript cursor was not ...[/dim]")
       expect(lines[1]).not.toContain("\u001b")
+    })
+
+    test("#when the title is bolded at a narrow width #then the bold escapes wrap the whole fitted title", () => {
+      // when
+      const lines = render(renderReflectionCompletionEntry, completion({ outcome: "failed" }), { width: 60 })
+
+      // then
+      expect(lines[0]).toContain("\u001b[1m")
+      expect(lines[0]).toContain("\u001b[22m")
+      expect(lines[0].indexOf("\u001b[1m")).toBeLessThan(lines[0].indexOf("\u001b[22m"))
     })
 
     test("#when rendered at hostile widths #then no line ever exceeds the terminal width", () => {

@@ -62,7 +62,7 @@ describe("category routing policy", () => {
     // then
     expect(leadingChain).toEqual([
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-      { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
       {
         providers: ["deepseek"],
         model: "deepseek-v4-flash",

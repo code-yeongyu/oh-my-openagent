@@ -1,0 +1,48 @@
+WHAT WAS TESTED
+
+1. Pre-change provenance/policy surface (RED)
+   - Commands: rg over ATTRIBUTION.md for project-original/no-vendor wording; rg over engine/AGENTS.md for policy anchors.
+   - Behavior proved: the repository incorrectly classified engine/** as project-original and carried no upstream/version policy.
+   - Artifact: red-pre-change.txt
+
+2. Post-change provenance/policy surface (GREEN)
+   - Commands: rg for fivetaku/insane-search, a4e4ed797, pre-0.7.0, the six policy anchors, and the parent AGENTS.md link; git diff --check.
+   - Behavior proved: the engine is now accurately attributed and future sync work is governed by pin/KEEP/WANT/OUT-OF-SCOPE/sync rules.
+   - Artifact: green-post-change.txt
+
+3. Shared-skills machine-consumed gates
+   - Command: npm exec --yes --package=bun@1.3.12 -- bun test packages/shared-skills
+   - Behavior proved: packaging, de-personalization, upstream provenance, runtime pins, root-path resolution, materialization, and all adjacent shared-skills tests remain green.
+   - Artifact: shared-skills-tests.txt; post-rebase-verification.txt
+
+4. CI failure recovery after `dev` advanced
+   - Commands: compare the failed PR job with successful base CI; rebase onto `origin/dev`; run the shared-skills scope and `task-rpc-launch-parity.test.ts` under Bun 1.3.12.
+   - Behavior proved: the unrelated full-suite RPC failure was fixed by the base branch's per-process XDG isolation and does not reproduce on the rebased branch.
+   - Artifact: post-rebase-verification.txt
+
+WHAT WAS OBSERVED
+
+- RED: ATTRIBUTION.md placed engine/** under "Project-original content (no third-party source vendored)"; engine/AGENTS.md policy-anchor rg returned rc=1.
+- GREEN: ATTRIBUTION.md names https://github.com/fivetaku/insane-search, vendoring commit a4e4ed797, and the corrected 2026-06-21 pre-0.7.0 baseline. engine/AGENTS.md contains all six required policy anchors. Parent packages/shared-skills/AGENTS.md links to the policy.
+- Initial tests: 77 passed, 0 failed, 586 expect() calls across 14 files under Bun 1.3.12.
+- Rebased tests: shared-skills 81 passed, 0 failed, 593 expect() calls across 15 files; RPC parity 2 passed, 0 failed.
+- Evidence-bound rebased source tree: 3a193c39b7ba1696203f5e5866f7dd70534691a8
+
+WHY IT IS ENOUGH
+
+- This is a prose/knowledge-base correction, not runtime code. The faithful user-visible surface is the repository guidance that future agents read. RED/GREEN read-through proves the exact stale fact and missing policy changed.
+- The shared-skills suite exercises every machine consumer affected by these files, including the de-personalization and provenance gates. No OpenCode or Codex runtime hook/tool/feature/config component changed, so harness QA would not exercise a changed behavior.
+- Live upstream verification on 2026-08-17 showed main/HEAD remains 019ee16bbf471595f9b67b164e4a92208183af2d, and the upstream CHANGELOG dates 0.7.0 to 2026-06-22; therefore the 2026-06-21 imported snapshot is correctly labeled pre-0.7.0.
+- The failed Ubuntu root job named only `task-rpc-launch-parity.test.ts`, a file this PR does not touch. The identical test passed on base SHA `04ccd5943` and locally in isolation. Rebasing onto `dev` brought in `3b00103ff` (`test: isolate XDG data and cache dirs per test process`), after which both relevant scopes passed. This is the distinguishing evidence for full-suite environment contamination rather than a documentation regression.
+
+WHAT WAS OMITTED
+
+- No credentials, auth headers, environment dumps, private logs, or user data were captured.
+- The raw 340 KB source session transcript was not copied into evidence; only its verified, repository-relevant findings were recorded.
+- The first test attempt failed before collection because the fresh worktree lacked node_modules. It is retained as shared-skills-tests-setup-failure.txt for auditability; dependencies were then installed from the frozen lockfile with Bun 1.3.12 and the identical test scope passed.
+
+CLEANUP RECEIPT
+
+- Temporary upstream CHANGELOG file removed immediately after parsing (verified absent).
+- Dependency-install background session bash_4 exited 0; no server, tmux session, browser context, container, socket, or bound port was created.
+- Postinstall-generated tracked files outside this change were restored; git status contains only the intended documentation files before evidence staging.

@@ -242,7 +242,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 				permissionDecision: "deny",
 			},
 		});
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("token_budget");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("unlimited");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
@@ -258,7 +257,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 		// then
 		const parsed = JSON.parse(output);
 		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
 	});
 
@@ -272,7 +270,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 		// then
 		const parsed = JSON.parse(output);
 		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 	});
 
 	it("#given create_goal omits token_budget #when PreToolUse runs #then it stays silent", () => {

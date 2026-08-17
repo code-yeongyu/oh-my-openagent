@@ -73,10 +73,10 @@ describe("createPluginInterface - command.execute.before", () => {
 
     // then
     expect(pluginInterface["command.execute.before"]).toBeDefined()
-    expect(output.parts[0]?.text).toContain("Auto-Selected Plan")
-    expect(output.parts[0]?.text).toContain("boulder.json has been created")
+    expect(output.parts[0]?.text).toContain("<!-- omo-start-work-context -->")
     expect(getSessionAgent("ses-command-before")).toBe("sisyphus")
     expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    expect(readBoulderState(testDir)?.plan_name).toBe("worker-plan")
   })
 
   test("does not run start-work side effects for other native commands with session context", async () => {
@@ -119,7 +119,6 @@ describe("createPluginInterface - command.execute.before", () => {
     )
 
     // then
-    expect(output.parts[0]?.text).toContain("HANDOFF CONTEXT")
     expect(readBoulderState(testDir)).toBeNull()
     expect(getSessionAgent("ses-handoff")).toBe("prometheus")
   })
@@ -242,7 +241,6 @@ describe("createPluginInterface - goal native command smoke", () => {
     )
 
     // then
-    expect(output.parts[0]?.text).toContain("/goal <objective>")
     expect(setGoalCalls).toEqual([
       {
         sessionID: "ses-goal-native",

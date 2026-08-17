@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process"
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
 const publishWorkflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 const workflowsDir = new URL("../.github/workflows/", import.meta.url)
-const pinnedBunVersion = 'bun-version: "1.3.12"'
+const pinnedBunVersion = 'bun-version: "1.3.14"'
 const workflowPaths = readdirSync(workflowsDir)
   .filter((name) => name.endsWith(".yml") || name.endsWith(".yaml"))
   .map((name) => new URL(name, workflowsDir))
@@ -172,14 +172,14 @@ describe("test workflows", () => {
     const runsCodexCommand = codexCompatibilityJob.includes("run: bun run test:codex")
     const publishMainNeedsCodex =
       workflow.includes(
-        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+        "needs: [gate-reuse, test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
       ) &&
-      workflow.includes("needs.codex-compatibility.result == 'success'")
+      workflow.includes("contains(fromJSON('[\"success\",\"skipped\"]'), needs.codex-compatibility.result)")
     const publishPlatformNeedsCodex =
       workflow.includes(
-        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]",
+        "needs: [gate-reuse, test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]",
       ) &&
-      workflow.includes("needs.codex-compatibility.result == 'success'")
+      workflow.includes("contains(fromJSON('[\"success\",\"skipped\"]'), needs.codex-compatibility.result)")
 
     // #then
     expect(hasCodexMatrixJob, "publish workflow must expose a Codex compatibility job").toBe(true)
@@ -329,7 +329,7 @@ describe("test workflows", () => {
       const unpinnedBunLines = bunVersionLines.filter((line) => line !== pinnedBunVersion)
 
       // #then
-      expect(unpinnedBunLines, `${workflowPath.pathname} must pin Bun to 1.3.12`).toEqual([])
+      expect(unpinnedBunLines, `${workflowPath.pathname} must pin Bun to 1.3.14`).toEqual([])
     }
   })
 

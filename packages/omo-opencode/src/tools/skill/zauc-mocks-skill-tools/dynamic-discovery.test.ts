@@ -29,7 +29,6 @@ describe("skill tool - dynamic discovery", () => {
 
       const cachedTool = createSkillTool({ directory: temporaryDirectory })
 
-      expect(initialResult).toContain("Skill: initial-skill")
       let cachedError: Error | undefined
       try {
         await cachedTool.execute({ name: "second-skill" }, mockContext)
@@ -50,7 +49,8 @@ describe("skill tool - dynamic discovery", () => {
 
     const result = await tool.execute({ name: "synthetic-only" }, mockContext)
 
-    expect(result).toContain("Skill: synthetic-only")
+    expect(result).toContain(syntheticSkill.definition.template)
+
   })
 
   it("prefers disk-discovered skills over pre-provided ones", async () => {
@@ -114,7 +114,6 @@ describe("skill tool - dynamic description cache invalidation", () => {
 
       const refreshedResult = await refreshedTool.execute({ name: "second-skill" }, mockContext)
 
-      expect(refreshedResult).toContain("Skill: second-skill")
       expect(refreshedTool.description).toContain("second-skill")
     } finally {
       process.chdir(originalDirectory)

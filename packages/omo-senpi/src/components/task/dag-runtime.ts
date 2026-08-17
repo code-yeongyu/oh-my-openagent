@@ -90,10 +90,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   }
   const coreManager = createDagManager({
     store,
-    materializeSkills: (input) => createDagSkillMaterializer({
-      store,
-      cwd: deps.engine.runtime.cwd(),
-    })(input),
+    materializeSkills: (input) =>
+      createDagSkillMaterializer({ store, cwd: deps.engine.runtime.cwd(), loadSkills: deps.engine.loadSkills })(input),
     ...(dagSettings === undefined ? {} : { settings: dagSettings }),
   })
   const taskManager = admissionTaskManager(

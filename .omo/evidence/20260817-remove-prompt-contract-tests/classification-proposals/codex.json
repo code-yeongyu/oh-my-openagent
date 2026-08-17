@@ -1,0 +1,398 @@
+{
+  "version": 1,
+  "domain": "codex",
+  "rule": "Allow only machine-consumed fields and sentinels, real source/packaged equality, parser/runtime/security behavior, or user UI/error copy; forbid authored prompt, SKILL, rule, and TOML prose plus headings, order, negative wording, and length contracts.",
+  "candidate_occurrence_count": 45,
+  "candidate_fingerprint_count": 43,
+  "allowed": [
+    {
+      "fingerprint": "22c057adf95873dadf74eb94a64bad5d4bc352539d9261976c1334945af59607",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts that a recovered LSP diagnostic is returned to the user after the unavailable-extension cache clears; the diagnostic is user-visible error feedback, not authored agent instructions.",
+      "path": "packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts",
+      "line": 117,
+      "expected": "recovered markdown diagnostic"
+    },
+    {
+      "fingerprint": "ef8fcc66ddfedcbc6708b29a3c2d95b2a088b2517227de4e7aaadb5fff937fd3",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "BUNDLED_PERSONA_SENTINEL is fixture-only marker data used to prove that the selected bundled rule body crossed the runtime injection seam.",
+      "path": "packages/omo-codex/plugin/components/rules/test/bundled-rules.test.ts",
+      "line": 47,
+      "expected": "BUNDLED_PERSONA_SENTINEL"
+    },
+    {
+      "fingerprint": "7fed70fa4f2dbec50e4d2489722296e7ea3977d6f84b9d505610951a45c060cc",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Instructions from: is the stable delimiter emitted and re-read by transcript-rule-filter to detect already-injected rule records; this assertion covers deduplication state rather than rule prose.",
+      "path": "packages/omo-codex/plugin/components/rules/test/codex-hook-post-compact-dedup.test.ts",
+      "line": 23,
+      "expected": "Instructions from:"
+    },
+    {
+      "fingerprint": "4e64717861f1f8f5b440f5740e740fa883ced542e5e05b704aeebd5f91de3f43",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the machine-consumed hook commands read from the packaged hooks.json with the component CLI entrypoints, proving the shipped hook wiring invokes the real runtime commands.",
+      "path": "packages/omo-codex/plugin/components/rules/test/package-smoke.test.ts",
+      "line": 41,
+      "expected": "<expression:[ `node \"${pluginRoot}/dist/cli.js\" hook session-start`, `node \"${pluginRoot}/dist/cli.js\" hook user-prompt-submit`, `node \"${pluginRoot}/dist/cli.js\" hook post-tool-use`, `node \"${pluginRoot}/dist/cli.js\" hook post-compact`, ]>"
+    },
+    {
+      "fingerprint": "d989a8476bb9040953f87e1826a899b1de21911e36e78fb362c821a837862f66",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Pins malformed-frontmatter recovery: parseRule must preserve the complete malformed input as its body instead of dropping bytes while reporting a diagnostic.",
+      "path": "packages/omo-codex/plugin/components/rules/test/rules-engine-consumption.test.ts",
+      "line": 51,
+      "expected": "--- globs: [ --- Body"
+    },
+    {
+      "fingerprint": "962bec24d8725cd04e9cdee313eca389d9332007d6e4d5bb8a12e4a54b09d850",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "alwaysApply: true is a machine-consumed rule frontmatter field whose presence proves the bundled rule remains an unconditional parser input.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 71,
+      "expected": "alwaysApply: true"
+    },
+    {
+      "fingerprint": "04b33a296ca040fd0d7ab47b0e577c5a97762b7eba0c6d3b2d10efe4a5d23088",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "git_bash is the exact MCP tool identifier that the bundled Windows rule must reference; it is a machine-facing tool name rather than natural-language wording.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 90,
+      "expected": "git_bash"
+    },
+    {
+      "fingerprint": "3189855a8bab8d725054acb366d5e8f748f6f7ffce278a4b8051794ee3a462f4",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "OMO_CODEX_GIT_BASH_PATH is the runtime environment-variable identifier shared by installer and Git Bash execution surfaces.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 91,
+      "expected": "OMO_CODEX_GIT_BASH_PATH"
+    },
+    {
+      "fingerprint": "18c0eb4f043894e4ec1eb4e2b2a28ea84bee4caf701a8eb9d5eed1a573bacc82",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the bundled Codex directive file with the prompts-core Codex source, preventing the shipped runtime copy from drifting from its canonical source.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/directive-source.test.ts",
+      "line": 14,
+      "expected": "<expression:directive>"
+    },
+    {
+      "fingerprint": "0b8cd6007f9276a0f20281368a2a4bad6428657c58608655d9a1d286db0de2d1",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "The package build script is machine-executed metadata; its ordered sync, clean, and bundle commands determine whether the shipped CLI contains the generated directive.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/package-smoke.test.ts",
+      "line": 29,
+      "expected": "node scripts/sync-directive.mjs && node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js"
+    },
+    {
+      "fingerprint": "1926f6dd6169ca55cc52cc5c67163f11c5887b8cb0c0a7557e52743a1d8a9e80",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "directive.md is a packaged runtime filename required by the build and fallback loader, not a claim about the directive text.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/package-smoke.test.ts",
+      "line": 33,
+      "expected": "directive.md"
+    },
+    {
+      "fingerprint": "4ada660b47379398c398932b8e4cd50057d6744681be3de98d2eed8085818b98",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares the hook context with the pointer builder result, proving the existing-skill runtime branch returns the generated pointer for the supplied absolute path.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/skill-pointer.test.ts",
+      "line": 42,
+      "expected": "<expression:buildUltraworkSkillPointer(skillFilePath)>"
+    },
+    {
+      "fingerprint": "dbc0231144e9b99dafa09976fbc570181b860b26a53b31872faf9c7be8177fc0",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "create_goal is the exact registered tool identifier required in the compact pointer bootstrap and is machine-facing sentinel data.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/skill-pointer.test.ts",
+      "line": 45,
+      "expected": "create_goal"
+    },
+    {
+      "fingerprint": "774fac5aecd454b26b504fbb451a9fb6a52541a68141f85ab660aaeac53c280e",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Proves the missing-skill fallback returns the canonical ULTRAWORK_DIRECTIVE value rather than an independently authored duplicate.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/skill-pointer.test.ts",
+      "line": 57,
+      "expected": "<expression:ULTRAWORK_DIRECTIVE>"
+    },
+    {
+      "fingerprint": "8b7dca7a62d496cd3aa3a08e4ed404c6825b4adfdbddc718badf00bff3ce41aa",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Proves the null-skill fallback returns the canonical ULTRAWORK_DIRECTIVE value rather than an independently authored duplicate.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/skill-pointer.test.ts",
+      "line": 61,
+      "expected": "<expression:ULTRAWORK_DIRECTIVE>"
+    },
+    {
+      "fingerprint": "431fbaa89a6a20be1a8f0c89f2cf6cfb961deac5e37efb71b6746dca9818fa48",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "user_prompt_submit is a serialized steering-source enum value consumed by the CLI parser and ledger model.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/cli-steering.test.ts",
+      "line": 101,
+      "expected": "user_prompt_submit"
+    },
+    {
+      "fingerprint": "4667a3b69f5379590e3b351adec07fb8b44c2878906f91ecfe9935ee71cdfcb2",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "OMO_ULW_LOOP_STEER is the runtime sentinel that selects the structured steering parser.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts",
+      "line": 99,
+      "expected": "OMO_ULW_LOOP_STEER"
+    },
+    {
+      "fingerprint": "f435c8e064ab78899e31349e94e9d5a80e339d8c29168165acd8234da2500160",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "annotate_ledger is a machine-consumed steering kind token accepted by the parser and persisted in structured audit output.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts",
+      "line": 125,
+      "expected": "annotate_ledger"
+    },
+    {
+      "fingerprint": "8e22ca55428b905e252bddfc43b50e8876f4e7cab60181c82437e10ea71c118d",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "accepted is a structured steering result/status token used to prove the hook mutation succeeded, not authored instruction prose.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts",
+      "line": 138,
+      "expected": "accepted"
+    },
+    {
+      "fingerprint": "c307caa36eed8cf1f641636e88b1d59065e740696a4b4a1a494d7f77b055888b",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "directive.md is an npm package file entry needed by the standalone fallback runtime.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 73,
+      "expected": "directive.md"
+    },
+    {
+      "fingerprint": "a7de9004c490f9fe04f964848b9bee1f1a2d8cea7ef5df656f0748f065abad5e",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "hook user-prompt-submit is the machine-executed CLI subcommand in hooks.json and proves the packaged event is routed to the intended handler.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 94,
+      "expected": "hook user-prompt-submit"
+    },
+    {
+      "fingerprint": "8e1ee038a586ec7efda5c2a42c85a7693342f46a63186da71366105a202e20ad",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "name: ulw-loop is the machine-consumed SKILL frontmatter identity used by Codex skill discovery.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 123,
+      "expected": "/^---\\nname: ulw-loop\\n/m"
+    },
+    {
+      "fingerprint": "a450eff644264a1994650b348a629217a56f9f878fb71392926ab65c17e0d3c0",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "display_name is Codex skill-picker UI metadata; the asserted value is displayed to users rather than injected as agent instruction prose.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 129,
+      "expected": "display_name: \"(OmO) ulw-loop\""
+    },
+    {
+      "fingerprint": "6630426d2be75cbc8fe0e4f4c1d0035e5a55703a57e4c4ab0e81b7d9b698b373",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "short_description is Codex skill-picker UI copy used to present the skill to users.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 130,
+      "expected": "short_description: \"Goal-like ultrawork loop for systematic decomposition\""
+    },
+    {
+      "fingerprint": "eabfe7b671c4e07b4d17701c7e86246fecc0c59b5b6c446d7ef68ba59e838f18",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "search_terms is a machine-consumed Codex skill-discovery metadata field.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 137,
+      "expected": "search_terms:"
+    },
+    {
+      "fingerprint": "5666a06ac9965b952ef21714491fb7932a80c0f4945f64323deb6a896e740723",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "ulw-loop is the canonical machine-facing search alias for the skill discovery index.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 138,
+      "expected": "- \"ulw-loop\""
+    },
+    {
+      "fingerprint": "5819744c2af3098616bd8266893350059cfca2bd941c839ab2ff6f5e3b516129",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "user-prompt-submit is the implemented hook-channel CLI token documented by the component and consumed by command dispatch.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 201,
+      "expected": "user-prompt-submit"
+    },
+    {
+      "fingerprint": "9ea0eb0e7a71b0ce03bf9f436179dc4565b9ed5ac4f518ca8ea8fd4aaad941fe",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the ulw-loop bundled directive with the ultrawork component source so the standalone shipped fallback cannot drift.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/ultrawork-directive.test.ts",
+      "line": 63,
+      "expected": "<expression:ultraworkDirective>"
+    },
+    {
+      "fingerprint": "555e625a8543a5634d4caddf4879d9de508db03f4f5affc0f15133336e5606de",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the extracted ulw-loop pointer template with the ultrawork source template, proving the two runtime copies remain byte-identical.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/ultrawork-directive.test.ts",
+      "line": 110,
+      "expected": "<expression:ultraworkTemplate>"
+    },
+    {
+      "fingerprint": "82b0b8f615ee39c31932c9755c0431cbdc1554760788ae4a5b0d18608f0f4b9d",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "name: ulw-research is machine-consumed SKILL frontmatter proving post-install skill synchronization materialized the expected skill identity.",
+      "path": "packages/omo-codex/src/install/codex-cache-install.test.ts",
+      "line": 326,
+      "expected": "name: ulw-research"
+    },
+    {
+      "fingerprint": "d40db572eac38560292c951f5410773c24cf88cd21eb6702d2b1a7c5efa893b1",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "approval_policy = \"never\" is a machine-consumed Codex security setting written when explicit autonomous permissions are requested.",
+      "path": "packages/omo-codex/src/install/codex-config-toml.test.ts",
+      "line": 48,
+      "expected": "approval_policy = \"never\""
+    },
+    {
+      "fingerprint": "ec2f5b96d787c49dc8e09d86743621bd8b8d8889c3a8c63edec5b832107059c5",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "The version-stamped statusMessage is displayed by Codex while the hook runs and verifies packaged version rewriting of user-visible status copy.",
+      "path": "packages/omo-codex/src/install/install-codex-packaged.test.ts",
+      "line": 125,
+      "expected": "(OmO 4.5.12) Checking Ulw-Loop Steering"
+    },
+    {
+      "fingerprint": "ab6ba6ebc0ad2a4d04ad83b09232d900cdb1ed68e963c4d34871b1f447f34a39",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "frontend/SKILL.md is a packaged file-path invariant proving the installer retained the root skill while excluding nested reference skills.",
+      "path": "packages/omo-codex/src/install/install-codex.test.ts",
+      "line": 182,
+      "expected": "frontend/SKILL.md"
+    },
+    {
+      "fingerprint": "3c73ac5b0beab13d6015b0dafe0155ecc20056d4b378b7d6fa34d98d762589f9",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "approval_policy = \"never\" verifies the end-to-end installer writes the requested autonomous Codex security policy into config.toml.",
+      "path": "packages/omo-codex/src/install/install-codex.test.ts",
+      "line": 315,
+      "expected": "approval_policy = \"never\""
+    }
+  ],
+  "forbidden": [
+    {
+      "fingerprint": "b1499961de71c7ccf0b3f3d23f6e0a2d06ecc60470e7787b7c25ce2d1f2623e0",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording inside an authored bundled rule. The runtime does not parse shell: \"bash\" as a field here, so the prose prohibition must not be a test contract.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 77,
+      "expected": "shell: \"bash\""
+    },
+    {
+      "fingerprint": "d047e431963a221e6e76d93e02be3b1b2cf4ad4bb60da0ffde3716c76e4341dc",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the authored Windows rule wording by requiring the prose token WSL; this is not a parser, security check, or machine-consumed field.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 83,
+      "expected": "/WSL/i"
+    },
+    {
+      "fingerprint": "bd6799af553d230e29278556cba42f312010298fbaf859c7cd5fd4f3dafa7402",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the authored Windows rule wording by requiring the prose token System32; the exact instructional wording is not a runtime contract.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 84,
+      "expected": "/System32/i"
+    },
+    {
+      "fingerprint": "339df56d26c9ea04cc378b6ddb0d0268fbabfdb78b4e5f7b5975b95ca3e502e1",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins an example executable path embedded in authored rule prose. The rule body is model guidance and no runtime parser or launcher consumes this literal path.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "line": 92,
+      "expected": "C:\\Program Files\\Git\\bin\\bash.exe"
+    },
+    {
+      "fingerprint": "35fea9540400fd73330fb28329e4efa5d7f10dc3395dbe9e7a1d6a9a194ac373",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the full authored additionalContext instruction for a created thread. Thread-id extraction and hook JSON shape can be tested without contracting this prompt wording.",
+      "path": "packages/omo-codex/plugin/components/teammode/test/thread-title-hook.test.ts",
+      "line": 33,
+      "expected": "THREAD ID thread-123: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE."
+    },
+    {
+      "fingerprint": "b74feaaa120fc8fceb92ae50c77b86b0928f93e6e7cfd3fa8600329fae6f9feb",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the full authored additionalContext instruction for a JSON-string thread response; the relevant parser behavior does not require exact prompt prose.",
+      "path": "packages/omo-codex/plugin/components/teammode/test/thread-title-hook.test.ts",
+      "line": 63,
+      "expected": "THREAD ID 019ef350-ee78-72a3-bd5e-e40cebc3d814: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE."
+    },
+    {
+      "fingerprint": "d67cb9c90a280e0c7731e1a34f50656f8b689451b3ae22c3bace87f949b6c7f0",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the full authored pending-worktree instruction, including negative and ordered wording, instead of only the extracted identifier and runtime branch.",
+      "path": "packages/omo-codex/plugin/components/teammode/test/thread-title-hook.test.ts",
+      "line": 145,
+      "expected": "PENDING WORKTREE ID remote-control:env:test-worktree: WORKTREE THREAD IS NOT READY YET. DO NOT bind-thread OR SEND THE MEMBER BOOTSTRAP UNTIL A REAL THREAD ID EXISTS. THEN CALL codex_app.set_thread_title USING THE REAL TASK/ROLE."
+    },
+    {
+      "fingerprint": "8bd4cd0a610a33ab08d8ac2873d6e21036e333f03ac3c710edcc4c29456eb08d",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the authored Goal: heading inside a generated agent instruction. Advancement is already asserted through the structured next.goal id and plan state.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-continuation.test.ts",
+      "line": 34,
+      "expected": "Goal: G002"
+    },
+    {
+      "fingerprint": "7092befe1891b0a451d890b058595ee62c77494cc46578e216a1b4fe0182b672",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Use $ulw-loop is authored default-prompt prose in skill metadata, not a machine field or user-facing status/error string.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts",
+      "line": 131,
+      "expected": "Use $ulw-loop"
+    }
+  ]
+}

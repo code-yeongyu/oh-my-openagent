@@ -13,6 +13,7 @@ import {
   teamStorageBaseDir,
   toTeamCoreConfig,
   type LeadDeliveryJournal,
+  type SkillLoader,
   type TaskSendTeamRouting,
   type TeamToolsService,
 } from "@oh-my-opencode/senpi-task"
@@ -36,6 +37,7 @@ import { createSkillInvocationTracker, type SkillInvocationTracker } from "./ski
 import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
+import { createTaskSkillLoader } from "./task-skill-loader"
 
 const TASK_ENABLED_FLAG = "omo-task"
 
@@ -45,6 +47,7 @@ export interface TaskComponentOptions {
   // Project root the task engine anchors its state dir + omo.json load to. Defaults to the cwd the
   // host reports for THIS session; injectable so tests never write task state into the repo tree.
   readonly loadConfig?: typeof loadSenpiOmoConfig
+  readonly loadSkills?: SkillLoader
   readonly resolveCwd?: () => string
 }
 
@@ -73,11 +76,13 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 
       const cwd = options.resolveCwd?.() ?? sessionCwd(pi)
       const loaded = loadConfig({ cwd })
+      const loadSkills = options.loadSkills ?? createTaskSkillLoader()
 
       const engine = composeTaskEngine({
         pi,
         omoConfig: loaded.config,
         cwd,
+        loadSkills,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
       })
@@ -187,6 +192,7 @@ function registerTaskTools(
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
+      loadSkills: engine.loadSkills,
       resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })

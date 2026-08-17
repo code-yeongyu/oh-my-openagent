@@ -481,7 +481,7 @@ describe("Plan agent demote behavior", () => {
         plan: {
           name: "plan",
           mode: "primary",
-          prompt: "original plan prompt",
+          prompt: "user-plan-prompt-sentinel",
         },
       },
     }
@@ -518,7 +518,7 @@ describe("Plan agent demote behavior", () => {
         plan: {
           name: "plan",
           mode: "primary",
-          prompt: "original plan prompt",
+          prompt: "user-plan-prompt-sentinel",
         },
       },
     }
@@ -539,7 +539,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents[getAgentListDisplayName("prometheus")]).toBeUndefined()
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("primary")
-    expect(agents.plan.prompt).toBe("original plan prompt")
+    expect(agents.plan.prompt).toBe("user-plan-prompt-sentinel")
   })
 
   test("prometheus should have mode 'primary' like the other core agents", async () => {
@@ -783,7 +783,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-7",
-      default_agent: "  Custom Agent  ",
+      default_agent: "  omo-custom-agent-name  ",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -799,7 +799,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe("Custom Agent")
+    expect(config.default_agent).toBe("omo-custom-agent-name")
   })
 
   test("does not normalize configured default_agent when Sisyphus is disabled", async () => {
@@ -1118,7 +1118,7 @@ describe("Plan agent model inheritance from prometheus", () => {
         plan: {
           name: "plan",
           mode: "primary",
-          prompt: "original plan prompt",
+          prompt: "user-plan-prompt-sentinel",
         },
       },
     }
@@ -1757,14 +1757,14 @@ describe("Agent merge priority — project-local overrides global", () => {
       "my-custom-agent": {
         description: "(user) global version",
         mode: "subagent",
-        prompt: "I am the global agent",
+        prompt: "global-agent-prompt-sentinel",
       },
     })
     ;(unsafeTestValue(agentLoader.loadProjectAgents)).mockReturnValue({
       "my-custom-agent": {
         description: "(project) project version",
         mode: "subagent",
-        prompt: "I am the project agent",
+        prompt: "project-agent-prompt-sentinel",
       },
     })
 
@@ -1788,7 +1788,7 @@ describe("Agent merge priority — project-local overrides global", () => {
     // #then — project version wins
     const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
     expect(agentConfig["my-custom-agent"]?.description).toBe("(project) project version")
-    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the project agent")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("project-agent-prompt-sentinel")
   })
 
   test("opencode project agent overrides opencode global agent with same name", async () => {
@@ -1797,14 +1797,14 @@ describe("Agent merge priority — project-local overrides global", () => {
       "my-custom-agent": {
         description: "(opencode) global version",
         mode: "subagent",
-        prompt: "I am the opencode global agent",
+        prompt: "opencode-global-agent-prompt-sentinel",
       },
     })
     ;(unsafeTestValue(agentLoader.loadOpencodeProjectAgents)).mockReturnValue({
       "my-custom-agent": {
         description: "(opencode-project) project version",
         mode: "subagent",
-        prompt: "I am the opencode project agent",
+        prompt: "opencode-project-agent-prompt-sentinel",
       },
     })
 
@@ -1828,7 +1828,7 @@ describe("Agent merge priority — project-local overrides global", () => {
     // #then — opencode project version wins over opencode global
     const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
     expect(agentConfig["my-custom-agent"]?.description).toBe("(opencode-project) project version")
-    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the opencode project agent")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("opencode-project-agent-prompt-sentinel")
   })
 
   test("project Claude agent overrides opencode global agent with same name", async () => {
@@ -1837,14 +1837,14 @@ describe("Agent merge priority — project-local overrides global", () => {
       "my-custom-agent": {
         description: "(opencode) global version",
         mode: "subagent",
-        prompt: "I am the opencode global agent",
+        prompt: "opencode-global-agent-prompt-sentinel",
       },
     })
     ;(unsafeTestValue(agentLoader.loadProjectAgents)).mockReturnValue({
       "my-custom-agent": {
         description: "(project) project version",
         mode: "subagent",
-        prompt: "I am the project Claude agent",
+        prompt: "project-claude-agent-prompt-sentinel",
       },
     })
 
@@ -1868,7 +1868,7 @@ describe("Agent merge priority — project-local overrides global", () => {
     // #then — project-scope wins over global-scope regardless of format
     const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
     expect(agentConfig["my-custom-agent"]?.description).toBe("(project) project version")
-    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the project Claude agent")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("project-claude-agent-prompt-sentinel")
   })
 
   test("plugin agents have lowest priority — overridden by all other sources", async () => {
@@ -1880,7 +1880,7 @@ describe("Agent merge priority — project-local overrides global", () => {
         "my-custom-agent": {
           description: "plugin version",
           mode: "subagent",
-          prompt: "I am the plugin agent",
+          prompt: "plugin-agent-prompt-sentinel",
         },
       },
       mcpServers: {},
@@ -1892,7 +1892,7 @@ describe("Agent merge priority — project-local overrides global", () => {
       "my-custom-agent": {
         description: "(user) global version",
         mode: "subagent",
-        prompt: "I am the user agent",
+        prompt: "user-agent-prompt-sentinel",
       },
     })
 
@@ -1916,6 +1916,6 @@ describe("Agent merge priority — project-local overrides global", () => {
     // #then — user (global) agent overrides plugin agent
     const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
     expect(agentConfig["my-custom-agent"]?.description).toBe("(user) global version")
-    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the user agent")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("user-agent-prompt-sentinel")
   })
 })

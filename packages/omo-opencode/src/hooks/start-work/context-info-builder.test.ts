@@ -78,7 +78,6 @@ describe("buildStartWorkContextInfo", () => {
     // then
     expect(contextInfo).toContain("plan-alpha")
     expect(contextInfo).toContain("plan-beta")
-    expect(contextInfo).toContain("Use the Question tool")
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
 
@@ -101,10 +100,9 @@ describe("buildStartWorkContextInfo", () => {
       worktreeBlock: "",
     })
 
-    // then
-    expect(contextInfo).toContain("RESUMING existing work")
+    // then - the single active work is resumed: the current session is appended to it
     expect(contextInfo).toContain("single-active-plan")
-    expect(contextInfo).not.toContain("Use the Question tool")
+    expect(readBoulderState(testDirectory)?.session_ids).toContain("opencode:session-current")
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
 
@@ -163,9 +161,9 @@ describe("buildStartWorkContextInfo", () => {
     })
 
     // then
-    expect(contextInfo).toContain("Auto-Selected Plan")
     expect(contextInfo).toContain("cold-start-plan")
     expect(contextInfo).toContain(coldStartPlanPath)
+    expect(readBoulderState(testDirectory)?.active_plan).toBe(coldStartPlanPath)
     expect(existsSync(getBoulderFilePath(testDirectory))).toBe(true)
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
@@ -189,10 +187,8 @@ describe("buildStartWorkContextInfo", () => {
     })
 
     // then
-    expect(contextInfo).toContain("Auto-Selected Plan")
     expect(contextInfo).toContain("preferred-plan")
     expect(contextInfo).toContain(preferredPlanPath)
-    expect(contextInfo).toContain("Most recently referenced plan in this session")
     expect(contextInfo).not.toContain(ignoredPlanPath)
 
     const nextState = readBoulderState(testDirectory)
@@ -221,7 +217,6 @@ describe("buildStartWorkContextInfo", () => {
     })
 
     // then
-    expect(contextInfo).toContain("RESUMING existing work")
     expect(contextInfo).toContain("resume-existing-plan")
     expect(contextInfo).toContain("## Worktree\n/tmp/new-worktree")
     expect(contextInfo).toContain("session-current")
@@ -266,8 +261,7 @@ describe("buildStartWorkContextInfo", () => {
       worktreeBlock: "",
     })
 
-    // then
-    expect(contextInfo).toContain("Plan Already Complete")
+    // then - the completed plan is surfaced but the active work is left alone
     expect(contextInfo).toContain("completed-plan")
     const nextState = readBoulderState(testDirectory)
     expect(nextState?.active_work_id).toBe(activeWorkId)
@@ -294,11 +288,8 @@ describe("buildStartWorkContextInfo", () => {
       preferredPlanPath: stalePreferredPlanPath,
     })
 
-    // then
-    expect(contextInfo).toContain("RESUMING existing work")
+    // then - the active work resumes instead of the stale preferred plan
     expect(contextInfo).toContain("single-active-plan")
-    expect(contextInfo).not.toContain("No Plans Found")
-    expect(contextInfo).not.toContain("Auto-Selected Plan")
     expect(readBoulderState(testDirectory)?.active_plan).toBe(activePlanPath)
   })
 
@@ -320,11 +311,9 @@ describe("buildStartWorkContextInfo", () => {
     })
 
     // then
-    expect(contextInfo).toContain("Auto-Selected Plan")
     expect(contextInfo).toContain("full-site-audit-fix-plan")
     expect(contextInfo).toContain(actualPlanPath)
-    expect(contextInfo).toContain("Only incomplete plan available")
-    expect(contextInfo).not.toContain("Plan Not Found")
+    expect(readBoulderState(testDirectory)?.active_plan).toBe(actualPlanPath)
     expect(existsSync(getBoulderFilePath(testDirectory))).toBe(true)
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
@@ -347,11 +336,9 @@ describe("buildStartWorkContextInfo", () => {
       worktreeBlock: "",
     })
 
-    // then
-    expect(contextInfo).toContain("Plan Not Found")
+    // then - the candidates are surfaced for selection and no boulder state is written
     expect(contextInfo).toContain("first-candidate-plan")
     expect(contextInfo).toContain("second-candidate-plan")
-    expect(contextInfo).toContain("Ask the user which plan to work on")
     expect(existsSync(getBoulderFilePath(testDirectory))).toBe(false)
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })

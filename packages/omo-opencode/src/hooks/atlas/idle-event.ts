@@ -46,6 +46,11 @@ export async function handleAtlasSessionIdle(input: {
   }
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
+  if (sessionState.waitingForFinalWaveApproval) {
+    log(`[${HOOK_NAME}] Skipped: waiting for explicit final-wave approval`, { sessionID })
+    return
+  }
+
   if (progress.isComplete) {
     await handleCompletedBoulderIdle({ ctx, options, sessionID, sessionState, boulderState })
     return
@@ -76,11 +81,6 @@ export async function handleAtlasSessionIdle(input: {
   const now = Date.now()
   const activePlanPath = resolveBoulderPlanPath(ctx.directory, boulderState)
   resetStallStateForPlanChange(sessionState, activePlanPath)
-
-  if (sessionState.waitingForFinalWaveApproval) {
-    log(`[${HOOK_NAME}] Skipped: waiting for explicit final-wave approval`, { sessionID })
-    return
-  }
 
   if (sessionState.stalledContinuationReason) {
     log(`[${HOOK_NAME}] Skipped: boulder continuation stalled`, {

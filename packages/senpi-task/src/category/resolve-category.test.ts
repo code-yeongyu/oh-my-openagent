@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { BUILTIN_CATEGORY_DEFAULTS, resolveCategory } from "./index"
+import { BUILTIN_CATEGORY_DEFAULTS, BUILTIN_CATEGORY_REQUIRES_MODEL, resolveCategory } from "./index"
 
 type FakeModel = {
   readonly provider: string
@@ -79,7 +79,7 @@ describe("resolveCategory", () => {
           ultrabrain: {
             model: "anthropic/claude-opus-4-7",
             variant: "max",
-            prompt_append: "USER OVERLAY PROMPT",
+            prompt_append: "fixture-overlay",
           },
         },
       },
@@ -91,8 +91,8 @@ describe("resolveCategory", () => {
     expect(resolved.spec.provider).toBe("anthropic")
     expect(resolved.spec.modelId).toBe("claude-opus-4-7")
     expect(resolved.spec.variant).toBe("max")
-    expect(resolved.spec.prompt_append).toContain("DEEP LOGICAL REASONING")
-    expect(resolved.spec.prompt_append).toEndWith("\n\nUSER OVERLAY PROMPT")
+    expect(resolved.spec.prompt_append).not.toBe("fixture-overlay")
+    expect(resolved.spec.prompt_append).toEndWith("\n\nfixture-overlay")
   })
 
   test("#given a disabled omo category overlay #when resolved #then a disabled result explains the reason", () => {
@@ -253,19 +253,19 @@ describe("resolveCategory", () => {
 
   test("#given quick primary is unavailable and the quotio rung is available #when resolved #then delegate-core fallback chain reaches gpt-5.6-luna-fast", () => {
     // given
-    const models = registry([model("quotio-openai", "gpt-5.6-luna-fast")])
+    const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
 
     // when
     const result = resolveCategory("quick", {}, models)
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("quotio-openai")
+    expect(resolved.spec.provider).toBe("openai-codex")
     expect(resolved.spec.modelId).toBe("gpt-5.6-luna-fast")
     expect(resolved.spec.variant).toBe("low")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["quotio-openai"],
+      providers: ["openai-codex"],
       model: "gpt-5.6-luna-fast",
       variant: "low",
     })
@@ -422,7 +422,7 @@ describe("resolveCategory", () => {
             thinking: { type: "enabled", budgetTokens: 1024 },
             reasoningEffort: "medium",
             tools: { read: true, write: false },
-            prompt_append: "EXTRA QUICK CONTEXT",
+            prompt_append: "fixture-quick-overlay",
           },
         },
       },
@@ -437,8 +437,8 @@ describe("resolveCategory", () => {
     expect(resolved.spec.thinking).toEqual({ type: "enabled", budgetTokens: 1024 })
     expect(resolved.spec.reasoningEffort).toBe("medium")
     expect(resolved.spec.tools).toEqual({ read: true, write: false })
-    expect(resolved.spec.prompt_append).toContain("SMALL / QUICK")
-    expect(resolved.spec.prompt_append).toEndWith("\n\nEXTRA QUICK CONTEXT")
+    expect(resolved.spec.prompt_append).not.toBe("fixture-quick-overlay")
+    expect(resolved.spec.prompt_append).toEndWith("\n\nfixture-quick-overlay")
   })
 
   test("#given a custom category description #when resolved #then the resolved result preserves it", () => {
@@ -466,30 +466,28 @@ describe("resolveCategory", () => {
 })
 
 describe("builtin category defaults", () => {
-  test("#given ported builtin defaults #when snapshotted #then all nine category defaults stay pinned", () => {
+  test("#given ported builtin defaults #when inspected #then machine routing fields stay pinned without prose wording", () => {
     // given
     const defaults = BUILTIN_CATEGORY_DEFAULTS
 
-    // when
-    const snapshotSubject = defaults.map(({ config, description, name, promptAppend }) => ({
-      name,
-      config,
-      description,
-      promptAppend,
-    }))
-
-    // then
-    expect(JSON.stringify(snapshotSubject, null, 2)).toMatchSnapshot()
-    expect(defaults.map((entry) => entry.name)).toEqual([
-      "visual-engineering",
-      "artistry",
-      "ultrabrain",
-      "deep",
-      "quick",
-      "unspecified-low",
-      "architect",
-      "unspecified-high",
-      "writing",
+    // then: declared order plus each category's primary provider, model, and variant
+    expect(defaults.map(({ config, name }) => [name, config.model, config.variant])).toEqual([
+      ["visual-engineering", "anthropic/claude-opus-5", "max"],
+      ["artistry", "anthropic/claude-fable-5", "xhigh"],
+      ["ultrabrain", "openai/gpt-5.6-sol", "max"],
+      ["deep", "openai/gpt-5.6-sol", "medium"],
+      ["quick", "kimi-coding/kimi-for-coding-highspeed", undefined],
+      ["unspecified-low", "xai/grok-4.6", "xhigh"],
+      ["architect", "anthropic/claude-fable-5", "xhigh"],
+      ["unspecified-high", "kimi-coding/k3", "max"],
+      ["writing", "kimi-coding/k3", "low"],
     ])
+
+    // then: availability gating applies only to the model-gated builtins
+    expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
+      architect: "claude-fable-5",
+      ultrabrain: "gpt-5.6-sol",
+      deep: "gpt-5.6-sol",
+    })
   })
 })

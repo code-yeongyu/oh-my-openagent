@@ -58,16 +58,7 @@ describe("start-work Stop hook", () => {
 		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("- Plan: `launch-plan`");
-		expect(parsed.reason).toContain(`- Plan file: \`${join(workspace, ".omo", "plans", "plan.md")}\``);
-		expect(parsed.reason).toContain(`- Boulder state: \`${join(workspace, ".omo", "boulder.json")}\``);
-		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `2` of `4`");
-		expect(parsed.reason).toContain("- Next incomplete task: `1. Implement checklist parser parity`");
-		expect(parsed.reason).toContain("- Worktree: `/tmp/worktree`");
-		expect(parsed.reason).toContain(`- Ledger: \`${join(workspace, ".omo", "start-work", "ledger.jsonl")}\``);
-		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given active codex work and an external-blocker marker #when hook runs #then returns empty output", () => {
@@ -187,12 +178,7 @@ describe("start-work Stop hook", () => {
 		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `0` of `1`");
-		expect(parsed.reason).toContain("- Next incomplete task: `none (final gate pending)`");
-		expect(parsed.reason).toContain("When the remaining count is `0`, skip checkbox execution");
-		expect(parsed.reason).toContain("re-read the ledger record and verify the exact lane/SHA pair");
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {

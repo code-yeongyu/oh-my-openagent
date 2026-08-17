@@ -115,7 +115,7 @@ describe("memory rpc bridge", () => {
         steps_since_last_successful_reflection: 14,
         pending_compaction: true,
       })
-      await writeCompletion(context, failedCompletion("run-1", "2026-08-09T00:00:00.000Z"))
+      await writeCompletion(context, failedCompletion("run-1", minutesAgoISO(90)))
       const host = rpcHost()
       const bridge = createMemoryRpcBridge(host.pi, {
         resolveContext: () => context,
@@ -210,7 +210,7 @@ describe("memory rpc bridge", () => {
 
     test("#when the failure streak grows #then the changed health emits a fresh snapshot", async () => {
       const context = await contextFixture()
-      await writeCompletion(context, failedCompletion("run-1", "2026-08-09T00:00:00.000Z"))
+      await writeCompletion(context, failedCompletion("run-1", minutesAgoISO(90)))
       const host = rpcHost()
       const bridge = createMemoryRpcBridge(host.pi, {
         resolveContext: () => context,
@@ -220,7 +220,7 @@ describe("memory rpc bridge", () => {
 
       bridge.attach("session-1")
       await bridge.sync()
-      await writeCompletion(context, failedCompletion("run-2", "2026-08-09T01:00:00.000Z"))
+      await writeCompletion(context, failedCompletion("run-2", minutesAgoISO(60)))
       await bridge.sync()
 
       expect(host.emits).toHaveLength(2)
@@ -368,3 +368,7 @@ describe("memory rpc bridge", () => {
     })
   })
 })
+
+function minutesAgoISO(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString()
+}

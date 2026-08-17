@@ -10,6 +10,7 @@ import {
 import { CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task/agents-builtin"
 import { BUILTIN_CATEGORY_DEFAULTS } from "@oh-my-opencode/senpi-task/category-builtins"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { PARALLELISM_SUMMARY_SCHEMA } from "./parallelism-schema"
 
 export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9qcvcKtRNUWAn"
 
@@ -133,24 +134,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     "$session_id": STRING_PROPERTY,
     feature: enumProperty(["goal_tool", "team_create", "memory_tool"] as const),
   }),
-  parallelism_summary: Object.freeze({
-    "$session_id": STRING_PROPERTY,
-    clock_anomalies: NUMBER_PROPERTY,
-    dropped_calls: NUMBER_PROPERTY,
-    eval_only_duration_ms: NUMBER_PROPERTY,
-    eval_only_waves: NUMBER_PROPERTY,
-    incomplete_calls: NUMBER_PROPERTY,
-    measured_turn_duration_ms_total: NUMBER_PROPERTY,
-    mixed_waves: NUMBER_PROPERTY,
-    modeled_wallclock_saved_ms: NUMBER_PROPERTY,
-    non_eval_joined_calls: NUMBER_PROPERTY,
-    non_eval_saved_round_trips: NUMBER_PROPERTY,
-    non_eval_wave_size_histogram: STRING_PROPERTY,
-    non_eval_waves_multi: NUMBER_PROPERTY,
-    non_eval_waves_total: NUMBER_PROPERTY,
-    schema_kind: enumProperty(["parallelism_v1"] as const),
-    upper_bound_saved_ms: NUMBER_PROPERTY,
-  }),
+  parallelism_summary: PARALLELISM_SUMMARY_SCHEMA,
 } as const)
 
 export const OMO_NATIVE_PROPERTY_ALLOWLISTS = Object.freeze(Object.fromEntries(

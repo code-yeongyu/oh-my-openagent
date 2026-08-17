@@ -1,4 +1,5 @@
 import type { EntryRenderer } from "@code-yeongyu/senpi"
+import type { ReflectionTrigger } from "@oh-my-opencode/memory-core"
 import { normalizeRendererText } from "@oh-my-opencode/senpi-task/renderer-text"
 
 import {
@@ -31,17 +32,30 @@ export function reflectionLaunchedText(launched: ReflectionLaunchedEntry): strin
 export const renderReflectionLaunchedEntry: EntryRenderer<ReflectionLaunchedEntry> = (entry, options, theme) => {
   const launched = entry.data
   if (launched === undefined) return undefined
+  const conversations = launched.conversationIds.length
+  const model = optionalRendererText(launched.model)
+  const thinking = optionalRendererText(launched.thinking)
   return noticeComponent(
     {
       glyph: "◐",
       title: joinFields(["Memory reflection started", runLabel(launched.runId)]),
       tone: "accent",
-      why: `Triggered by ${normalizeRendererText(launched.trigger)} after ${launched.backlogSteps} new step${launched.backlogSteps === 1 ? "" : "s"}.`,
+      why: `The outcome lands in this transcript when the run settles - ${triggerPhrase(launched.trigger)} after ${launched.backlogSteps} new step${launched.backlogSteps === 1 ? "" : "s"}.`,
+      extra: [
+        {
+          text: joinFields([
+            `${conversations} conversation${conversations === 1 ? "" : "s"}`,
+            `category ${normalizeRendererText(launched.category)}`,
+            model === undefined ? undefined : `model ${model}`,
+            thinking === undefined ? undefined : `thinking ${thinking}`,
+          ]),
+          tone: "dim",
+        },
+      ],
       detail: joinFields([
-        `category ${normalizeRendererText(launched.category)}`,
-        optionalRendererText(launched.model) === undefined ? undefined : `model ${optionalRendererText(launched.model)}`,
-        optionalRendererText(launched.thinking) === undefined ? undefined : `thinking ${optionalRendererText(launched.thinking)}`,
+        `trigger ${normalizeRendererText(launched.trigger)}`,
         `identity ${normalizeRendererText(launched.identity)}`,
+        `started ${normalizeRendererText(launched.startedAt)}`,
       ]),
     },
     options,
@@ -49,24 +63,39 @@ export const renderReflectionLaunchedEntry: EntryRenderer<ReflectionLaunchedEntr
   )
 }
 
+function triggerPhrase(trigger: ReflectionTrigger): string {
+  return trigger === "manual" ? "triggered manually" : `triggered by ${normalizeRendererText(trigger)}`
+}
+
 export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletionRecord> = (entry, options, theme) => {
   const record = entry.data
   if (!record) return undefined
   const reason = optionalRendererText(record.reason)
   const detail = optionalRendererText(record.detail)
+  const model = optionalRendererText(record.model)
+  const thinking = optionalRendererText(record.thinking)
+  const payoff = joinFields([
+    record.filesChanged !== undefined && record.filesChanged > 0
+      ? `${record.filesChanged} file${record.filesChanged === 1 ? "" : "s"} changed`
+      : undefined,
+    record.mergedCommitSha === undefined ? undefined : `commit ${normalizeRendererText(record.mergedCommitSha).slice(0, 7)}`,
+    record.durationMs === undefined ? undefined : `took ${formatDuration(record.durationMs)}`,
+    reason === undefined ? undefined : `reason ${reason}`,
+    detail === undefined ? undefined : detailExcerpt(detail),
+  ])
   return noticeComponent(
     {
       glyph: outcomeGlyph(record.outcome),
       title: joinFields([`Memory reflection ${outcomeLabel(record.outcome)}`, runLabel(record.runId)]),
       tone: outcomeThemeColor(record.outcome),
       why: outcomeSummary(record.outcome),
+      extra: payoff.length === 0 ? [] : [{ text: payoff, tone: outcomeThemeColor(record.outcome) }],
       detail: joinFields([
         `category ${normalizeRendererText(record.category)}`,
-        record.filesChanged === undefined ? undefined : `files ${record.filesChanged}`,
-        record.mergedCommitSha === undefined ? undefined : `commit ${normalizeRendererText(record.mergedCommitSha).slice(0, 7)}`,
-        record.durationMs === undefined ? undefined : `took ${formatDuration(record.durationMs)}`,
-        reason === undefined ? undefined : `reason ${reason}`,
-        detail === undefined ? undefined : detailExcerpt(detail),
+        `identity ${normalizeRendererText(record.identity)}`,
+        `trigger ${normalizeRendererText(record.trigger)}`,
+        model === undefined ? undefined : `model ${model}`,
+        thinking === undefined ? undefined : `thinking ${thinking}`,
       ]),
     },
     options,
@@ -79,6 +108,7 @@ export const renderReflectionSummaryEntry: EntryRenderer<ReflectionCompletionSum
   if (!summary) return undefined
   const clean = summary.failedCount === 0
   const noun = `completion${summary.count === 1 ? "" : "s"}`
+  const fingerprint = optionalRendererText(summary.dominantFingerprint)
   return noticeComponent(
     {
       glyph: clean ? "●" : "⚠",
@@ -87,10 +117,8 @@ export const renderReflectionSummaryEntry: EntryRenderer<ReflectionCompletionSum
       why: clean
         ? "Delivered while this session was away; none need attention."
         : `Delivered while this session was away; ${summary.failedCount} need attention.`,
+      extra: clean || fingerprint === undefined ? [] : [{ text: `most common ${detailExcerpt(fingerprint)}`, tone: "warning" }],
       detail: joinFields([
-        optionalRendererText(summary.dominantFingerprint) === undefined
-          ? undefined
-          : `most common ${detailExcerpt(summary.dominantFingerprint)}`,
         optionalRendererText(summary.oldestISO) === undefined ? undefined : `oldest ${normalizeRendererText(summary.oldestISO)}`,
         optionalRendererText(summary.newestISO) === undefined ? undefined : `newest ${normalizeRendererText(summary.newestISO)}`,
       ]),

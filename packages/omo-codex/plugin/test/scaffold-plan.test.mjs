@@ -8,42 +8,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const scriptPath = join(root, "skills", "ulw-plan", "scripts", "scaffold-plan.mjs");
 const scriptUrl = pathToFileURL(scriptPath).href;
-const workflowPath = join(root, "skills", "ulw-plan", "references", "full-workflow.md");
-
-test("#given the scaffold script and the workflow reference #when compared #then every plan header the script emits is documented in full-workflow.md (no drift)", async () => {
-	// given
-	const { PLAN_SECTION_HEADERS } = await import(scriptUrl);
-	const workflow = await readFile(workflowPath, "utf8");
-
-	// then --- the script is the single source of the plan shape; the reference must document the same headers
-	assert.ok(PLAN_SECTION_HEADERS.length >= 6);
-	for (const header of PLAN_SECTION_HEADERS) {
-		assert.ok(workflow.includes(header), `full-workflow.md is missing plan header: ${header}`);
-	}
-});
-
-test("#given buildPlanSkeleton #when intent is unclear #then the human TL;DR leads the plan and surfaces the decisions veto block", async () => {
-	// given
-	const { buildPlanSkeleton, PLAN_SECTION_HEADERS } = await import(scriptUrl);
-	const plan = buildPlanSkeleton("demo", "unclear");
-
-	// then --- the human-readable summary is on top, above the AI detail
-	assert.ok(plan.indexOf("## TL;DR (For humans)") < plan.indexOf("## Scope"));
-	assert.match(plan, /Decisions I made for you/);
-	for (const header of PLAN_SECTION_HEADERS) {
-		assert.ok(plan.includes(header), `plan skeleton missing header: ${header}`);
-	}
-});
-
-test("#given buildPlanSkeleton #when intent is clear #then it surfaces a decisions-to-sanity-check block instead", async () => {
-	// given
-	const { buildPlanSkeleton } = await import(scriptUrl);
-	const plan = buildPlanSkeleton("demo", "clear");
-
-	// then
-	assert.match(plan, /Decisions to sanity-check/);
-	assert.doesNotMatch(plan, /Decisions I made for you/);
-});
 
 test("#given resolveSafeOmoPath #when the target escapes .omo or the workspace #then it is refused (the script never escapes .omo)", async () => {
 	// given

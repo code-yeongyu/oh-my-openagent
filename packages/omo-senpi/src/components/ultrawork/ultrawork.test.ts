@@ -401,20 +401,6 @@ describe("omo-senpi ultrawork component", () => {
     }
   })
 
-  it("#given synced senpi skill artifact #when description is read #then documents hidden injection instead of inviting a re-read", () => {
-    // given
-    const skillPath = resolve("packages/omo-senpi/plugin/skills/ultrawork/SKILL.md")
-    const skillContent = readFileSync(skillPath, "utf8")
-    const description = skillContent.match(/^description: (.*)$/m)?.[1] ?? ""
-
-    // then
-    expect(description).toContain("hidden")
-    expect(description).toContain("do not read this file again")
-    expect(description).not.toContain("injects the full directive inline")
-    expect(description.length).toBeLessThanOrEqual(1024)
-    expect(description).not.toContain("short bootstrap")
-    expect(description).not.toContain("Read the whole file")
-  })
 
   it("#given embedded directive #when inspected #then contains zero forbidden non-senpi tokens", () => {
     // then
@@ -423,11 +409,8 @@ describe("omo-senpi ultrawork component", () => {
     }
   })
 
-  it("#given embedded directive #when inspected #then keeps required ultrawork anchors", () => {
+  it("#given embedded directive #when inspected #then keeps one machine marker", () => {
     // then
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("ULTRAWORK MODE ENABLED!")
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/# Tier triage/i)
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/Evidence-driven|captured evidence|evidence/i)
     expect(markerCount(SENPI_ULTRAWORK_DIRECTIVE)).toBe(1)
   })
 
@@ -437,8 +420,6 @@ describe("omo-senpi ultrawork component", () => {
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("create_goal")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("`todo`")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("team_create")
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("# Parallel execution")
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("# Stop rules")
   })
 
   it("#given generated directive #when embed script runs check #then passes without drift", () => {

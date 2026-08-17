@@ -298,17 +298,19 @@ describe("LazyCodex publish workflow", () => {
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const publishIndex = workflow.indexOf("name: Publish lazycodex-ai")
     const smokeIndex = workflow.indexOf("name: Smoke test published lazycodex-ai")
-    const restoreIndex = workflow.indexOf("name: Restore package.json after lazycodex-ai publish attempt")
+    // The smoke moved out of publish-main into the post-publish-verify job, which runs after the release
+    // exists, so it is no longer bounded by the publish-main package restore step.
+    const postPublishVerifyIndex = workflow.indexOf("  post-publish-verify:")
     const smokeStep = sliceWorkflowSection(
       workflow,
       "      - name: Smoke test published lazycodex-ai",
-      "      - name: Restore package.json after lazycodex-ai publish attempt",
+      "      - name: Write job summary",
     )
 
     // #when
-    const smokeRunsAfterPublishBeforeRestore = publishIndex >= 0 &&
-      smokeIndex > publishIndex &&
-      restoreIndex > smokeIndex
+    const smokeRunsAfterPublishInPostVerifyJob = publishIndex >= 0 &&
+      postPublishVerifyIndex > publishIndex &&
+      smokeIndex > postPublishVerifyIndex
     const smokesReleaseVersion = smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"')
     const smokesStableLatestOnly = smokeStep.includes('if [ -z "$DIST_TAG" ]; then') &&
       smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
@@ -350,7 +352,10 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('if ! cmp -s "$scenario_root/omo.seeded" "$CODEX_LOCAL_BIN_DIR/omo"; then')
 
     // #then
-    expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
+    expect(
+      smokeRunsAfterPublishInPostVerifyJob,
+      "post-publish smoke must run after the lazycodex publish, inside the post-publish-verify job that cannot block the release",
+    ).toBe(true)
     expect(smokesReleaseVersion, "post-publish smoke must verify the exact release version").toBe(true)
     expect(smokesStableLatestOnly, "post-publish smoke must verify latest only for stable releases").toBe(true)
     expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)

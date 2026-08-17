@@ -47,7 +47,7 @@ export class GitMemoryRepo {
   async init(options: InitializeGitRepoOptions = {}): Promise<string> {
     await mkdir(this.dir, { recursive: true })
     if (!existsSync(join(this.dir, ".git"))) {
-      await this.git(["init"])
+      await withGitLockRetry(() => this.git(["init"]))
       await withGitLockRetry(() => this.git(["symbolic-ref", "HEAD", "refs/heads/main"]))
     }
 

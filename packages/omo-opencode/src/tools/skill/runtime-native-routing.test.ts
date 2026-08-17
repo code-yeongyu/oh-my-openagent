@@ -41,7 +41,6 @@ describe("skill tool runtime and native routing", () => {
     const result = await tool.execute({ name: "plugin-registered-skill" }, mockContext)
 
     expect(getLoadedSkills).toHaveBeenCalled()
-    expect(result).toContain("## Skill: plugin-registered-skill")
     expect(result).toContain("Runtime plugin body")
   })
 
@@ -66,7 +65,6 @@ describe("skill tool runtime and native routing", () => {
 
     const result = await tool.execute({ name: "base-skill" }, mockContext)
 
-    expect(result).toContain("## Skill: base-skill")
     expect(nativeAll).not.toHaveBeenCalled()
   })
 
@@ -91,7 +89,6 @@ describe("skill tool runtime and native routing", () => {
     const result = await tool.execute({ name: "user-normal-skill" }, mockContext)
 
     expect(nativeAll).toHaveBeenCalled()
-    expect(result).toContain("## Skill: user-normal-skill")
     expect(result).toContain("User normal skill body")
   })
 })

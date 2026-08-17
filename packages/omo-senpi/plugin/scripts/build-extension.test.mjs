@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { appendFile, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -8,31 +8,59 @@ import { buildExtension, checkExtensionCurrent, toPortableBuildPath } from "./bu
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
 const repoRoot = join(scriptDir, "..", "..", "..", "..")
-const tempRoots = []
+const perTestRoots = []
+let sharedBuildPromise = null
 
 setDefaultTimeout(30_000)
 
 afterEach(async () => {
-  await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(perTestRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-async function builtOutputs() {
+afterAll(async () => {
+  if (sharedBuildPromise === null) return
+  const shared = await sharedBuildPromise
+  await rm(shared.root, { recursive: true, force: true })
+})
+
+function outputPathsIn(root) {
+  return {
+    outputPath: join(root, "omo.js"),
+    taskOutputPath: join(root, "omo-task.js"),
+    memberOutputPath: join(root, "omo-member.js"),
+    memoryMcpOutputPath: join(root, "omo-memory-mcp.js"),
+    supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
+    advisorRuntimeOutputPath: join(root, "omo-init-deep-advisor.js"),
+  }
+}
+
+/**
+ * The esbuild pass dominates this file, so it runs once and every read-only assertion
+ * shares it. Cases that mutate an artifact copy the built tree instead of rebuilding,
+ * which keeps them isolated for a fraction of the cost.
+ */
+async function sharedOutputs() {
+  sharedBuildPromise ??= (async () => {
+    const root = await mkdtemp(join(repoRoot, ".build-extension-test-shared-"))
+    const paths = outputPathsIn(root)
+    const build = await buildExtension(paths)
+    return { root, ...paths, ...build }
+  })()
+  return sharedBuildPromise
+}
+
+async function mutableOutputs() {
+  const shared = await sharedOutputs()
   const root = await mkdtemp(join(repoRoot, ".build-extension-test-"))
-  tempRoots.push(root)
-  const outputPath = join(root, "omo.js")
-  const taskOutputPath = join(root, "omo-task.js")
-  const memberOutputPath = join(root, "omo-member.js")
-  const memoryMcpOutputPath = join(root, "omo-memory-mcp.js")
-  const supervisorOutputPath = join(root, "memory-run-supervisor.mjs")
-  const advisorRuntimeOutputPath = join(root, "omo-init-deep-advisor.js")
-  const build = await buildExtension({ outputPath, taskOutputPath, memberOutputPath, memoryMcpOutputPath, supervisorOutputPath, advisorRuntimeOutputPath })
-  return { root, outputPath, taskOutputPath, memberOutputPath, memoryMcpOutputPath, supervisorOutputPath, advisorRuntimeOutputPath, ...build }
+  perTestRoots.push(root)
+  await cp(shared.root, root, { recursive: true })
+  return { root, ...outputPathsIn(root), mainInputs: shared.mainInputs, taskInputs: shared.taskInputs }
 }
 
 describe("checkExtensionCurrent", () => {
   test("#given freshly built outputs #when the executable bundles are inspected #then the shebang stays the first bytes and the marker still parses", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await sharedOutputs()
 
     // when
     const mcp = await readFile(outputs.memoryMcpOutputPath, "utf8")
@@ -55,7 +83,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given an empty output directory #when extensions are built #then all runtime personas match their sources", async () => {
     // given / when
-    const outputs = await builtOutputs()
+    const outputs = await sharedOutputs()
     const personas = [
       ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
       ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
@@ -77,7 +105,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given current generated outputs with old mtimes #when checked #then freshness passes", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await mutableOutputs()
     const old = new Date(0)
     await Promise.all([
       utimes(outputs.outputPath, old, old),
@@ -94,7 +122,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given a missing supervisor artifact #when checked #then freshness reports that output", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await mutableOutputs()
     await rm(outputs.supervisorOutputPath)
 
     // when
@@ -106,7 +134,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given a stale supervisor artifact #when checked #then freshness reports that output", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await mutableOutputs()
     await appendFile(outputs.supervisorOutputPath, "\nchanged\n")
 
     // when
@@ -118,7 +146,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given changed generated bytes with future mtimes #when checked #then freshness fails", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await mutableOutputs()
     await appendFile(outputs.outputPath, "\nchanged\n")
     const future = new Date("2100-01-01T00:00:00.000Z")
     await utimes(outputs.outputPath, future, future)
@@ -132,7 +160,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given intact generated bytes with a stale source digest #when checked #then source reproduction fails", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await mutableOutputs()
     const artifact = await readFile(outputs.outputPath, "utf8")
     const newline = artifact.indexOf("\n")
     const [prefix, , bodyDigest] = artifact.slice(0, newline).split(":")
@@ -147,7 +175,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given freshly built outputs #when inspected #then normalization removes whitespace-only lines", async () => {
     // given
-    const outputs = await builtOutputs()
+    const outputs = await sharedOutputs()
 
     // when
     const main = await readFile(outputs.outputPath, "utf8")
@@ -164,7 +192,7 @@ describe("checkExtensionCurrent", () => {
 
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
     // given / when
-    const { mainInputs, taskInputs } = await builtOutputs()
+    const { mainInputs, taskInputs } = await sharedOutputs()
 
     // then
     expect(mainInputs.some((input) => input.endsWith("packages/senpi-task/src/runners/in-process/curated-readonly-bash.ts")))
@@ -174,7 +202,7 @@ describe("checkExtensionCurrent", () => {
   })
 
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
-    const outputs = await builtOutputs()
+    const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
     const task = await readFile(outputs.taskOutputPath, "utf8")
     const manifest = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"))

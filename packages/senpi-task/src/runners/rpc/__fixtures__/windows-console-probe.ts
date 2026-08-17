@@ -25,6 +25,7 @@ import {
 } from "./windows-console-probe-state"
 import { createWindowsModelAdmissionProbe } from "./windows-console-model-admission"
 
+const PROBE_STEP_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 15_000
 const SCRIPT_PATH = fileURLToPath(import.meta.url)
 const FAKE_CHILD_PATH = fileURLToPath(new URL("./fake-child.mjs", import.meta.url))
 const CONSOLE_HOST_PATH = fileURLToPath(new URL("./windows-console-host.ps1", import.meta.url))
@@ -51,7 +52,7 @@ async function runCase(mode: ProbeMode, root: string): Promise<ProbeCase> {
   const readyPath = join(root, `${mode}-ready.json`)
   const stopPath = join(root, `${mode}-stop`)
   const errorPath = join(root, `${mode}-error.txt`)
-  const ready = waitForFile(readyPath, AbortSignal.timeout(15_000))
+  const ready = waitForFile(readyPath, AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS))
   const parent = spawn(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", CONSOLE_HOST_PATH],
@@ -73,7 +74,7 @@ async function runCase(mode: ProbeMode, root: string): Promise<ProbeCase> {
       windowsHide: true,
     },
   )
-  const closed = once(parent, "close", { signal: AbortSignal.timeout(15_000) })
+  const closed = once(parent, "close", { signal: AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS) })
 
   let readyPayload: ParentReady | undefined
   let handle = 0

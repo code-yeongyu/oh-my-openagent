@@ -37,6 +37,17 @@ function useTemporaryAgentDir(): string {
   return root
 }
 
+// The stamped workspace version is the contract, not any single literal: the release pipeline
+// stamps this package.json on the release branch, so a pinned literal breaks every release cut.
+function readStampedWorkspaceVersion(): string {
+  const parsed: unknown = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"))
+  if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const version = Reflect.get(parsed, "version")
+    if (typeof version === "string") return version
+  }
+  throw new Error("packages/omo-senpi/package.json must expose a string version")
+}
+
 describe("OmO Native product identity", () => {
   test("#given the native product #when config is created #then identity derivation and effective geoip settings are fixed", () => {
     const config = createOmoNativeProductConfig()
@@ -45,7 +56,7 @@ describe("OmO Native product identity", () => {
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
     expect(config.machineIdPrefix).toBe("omo-senpi:")
-    expect(config.packageVersion).toBe("5.0.0-beta.7")
+    expect(config.packageVersion).toBe(readStampedWorkspaceVersion())
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip ?? false).toBe(false)
     expect(getTelemetryApiKey({ POSTHOG_API_KEY: "env-project-key" }, config.defaultApiKey)).toBe("env-project-key")
@@ -136,7 +147,7 @@ describe("OmO Native product identity", () => {
       expect(Object.isFrozen(properties)).toBe(true)
       for (const schema of Object.values(properties)) {
         expect(Object.isFrozen(schema)).toBe(true)
-        if (schema.values !== undefined) expect(Object.isFrozen(schema.values)).toBe(true)
+        if ("values" in schema) expect(Object.isFrozen(schema.values)).toBe(true)
       }
     }
     expect(Object.isFrozen(OMO_NATIVE_PROPERTY_ALLOWLISTS)).toBe(true)

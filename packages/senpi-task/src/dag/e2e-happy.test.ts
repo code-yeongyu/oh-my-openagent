@@ -319,7 +319,7 @@ describe("DAG happy-path end to end", () => {
     ])
     expect(Object.values(result.nodes).every((node) => node.state === "completed" && node.output.startsWith("output:"))).toBe(true)
     assertArtifacts(fixture, result.runId, input.key, input.nodes.map((node) => node.id))
-  })
+  }, process.platform === "win32" ? 15_000 : 5_000)
 
   test("#given a completed run key #when the identical definition starts again #then the same run is reused without a second run file or event", async () => {
     // given

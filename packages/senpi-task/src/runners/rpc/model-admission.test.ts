@@ -130,6 +130,20 @@ describe("RpcProcessRunner model admission", () => {
     expect(catalog.has("other/visible")).toBe(true)
   })
 
+  test("#given a compact provider/model identity line #when parsed #then the exact identity is visible", () => {
+    // given
+    const output = [
+      "provider                    model                                                     context  max-out  thinking  images",
+      "omo-mock/mock-1",
+    ].join("\n")
+
+    // when
+    const catalog = parseModelCatalog(output)
+
+    // then
+    expect(catalog.has("omo-mock/mock-1")).toBe(true)
+  })
+
   test("#given a model absent from the child profile #when started #then admission rejects before spawn", async () => {
     // given
     let admissionCalls = 0

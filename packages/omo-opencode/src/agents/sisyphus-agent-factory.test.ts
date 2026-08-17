@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createSisyphusAgent } from "./sisyphus";
+import {
+  resolveSisyphusPromptFamily,
+  type SisyphusPromptFamily,
+} from "./sisyphus-agent-factory";
 
 function permissionValue(
   permission: ReturnType<typeof createSisyphusAgent>["permission"],
@@ -31,64 +35,29 @@ describe("createSisyphusAgent", () => {
   });
 
   describe("#given routed native prompt models", () => {
-    test("#when creating agents #then selects each model family prompt", () => {
-      // given
-      const cases = [
-        {
-          model: "opencode-go/kimi-k3",
-          promptAnchors: ["running on Kimi K3", "<k3_calibration>"],
-        },
-        {
-          model: "moonshotai/kimi-k2.6",
-          promptAnchors: ["<re_entry_rule>", "<verification_loop>"],
-        },
-        {
-          model: "opencode-go/kimi-k2.7",
-          promptAnchors: ["running on Kimi K2.7", "<operating_rules>"],
-        },
-        {
-          model: "openai/gpt-5.5",
-          promptAnchors: ["## Validating your work", "## Task tracking"],
-        },
-        {
-          model: "openai/gpt-5.4",
-          promptAnchors: ["<execution_loop>", "<tasks>"],
-        },
-        {
-          model: "anthropic/claude-opus-4-7",
-          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-7"],
-        },
-        {
-          model: "anthropic/claude-opus-4-8",
-          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-8"],
-        },
-        {
-          model: "anthropic/claude-opus-5",
-          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-5"],
-        },
-        {
-          model: "anthropic/claude-fable-5",
-          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-fable-5"],
-        },
-        {
-          model: "xai/grok-4.6",
-          promptAnchors: ["running on Grok 4.6", "<grok_calibration>"],
-        },
-        {
-          model: "x-ai/grok-4.5",
-          promptAnchors: ["running on Grok 4.5", "<grok_calibration>"],
-        },
+    test("#when resolving prompt families #then maps each model id to the routed family", () => {
+      // given - aliases that intentionally share a family are represented explicitly
+      const cases: Array<[model: string, family: SisyphusPromptFamily]> = [
+        ["opencode-go/kimi-k3", "kimi-k3"],
+        ["moonshotai/kimi-k2.6", "kimi-k2-6"],
+        ["opencode-go/kimi-k2.7", "kimi-k2-7"],
+        ["openai/gpt-5.6-sol", "gpt-5-5"],
+        ["openai/gpt-5.5", "gpt-5-5"],
+        ["openai/gpt-5.4", "gpt-5-4"],
+        ["anthropic/claude-opus-4-7", "claude-opus-4-7"],
+        ["anthropic/claude-opus-4-8", "claude-opus-4-8"],
+        ["anthropic/claude-opus-5", "claude-opus-5"],
+        ["anthropic/claude-fable-5", "claude-fable-5"],
+        ["xai/grok-4.6", "grok-4"],
+        ["x-ai/grok-4.5", "grok-4"],
+        ["zai/glm-5.2", "glm-5-2"],
+        ["google/gemini-3.1-pro", "fallback"],
       ];
 
-      for (const { model, promptAnchors } of cases) {
-        // when
-        const agent = createSisyphusAgent(model);
-
-        // then
-        for (const promptAnchor of promptAnchors) {
-          expect(agent.prompt).toContain(promptAnchor);
-        }
-      }
+      // when / then
+      expect(cases.map(([model]) => resolveSisyphusPromptFamily(model))).toEqual(
+        cases.map(([, family]) => family),
+      );
     });
 
     test("#when selecting a tracking mode #then wires the matching tool contract", () => {
@@ -108,28 +77,6 @@ describe("createSisyphusAgent", () => {
         expect(todoAgent.prompt).not.toContain("task_create");
         expect(todoAgent.prompt).not.toContain("task_update");
       }
-    });
-  });
-
-  describe("#given Kimi K3 vs K2.7 vs K2.6 models", () => {
-    test("#when creating agents #then each Kimi generation routes to its own variant", () => {
-      // given
-      const k3Agent = createSisyphusAgent("opencode-go/kimi-k3");
-      const k27Agent = createSisyphusAgent("opencode-go/kimi-k2.7");
-      const k26Agent = createSisyphusAgent("opencode-go/kimi-k2.6");
-
-      // then
-      expect(k3Agent.prompt).toContain("running on Kimi K3");
-      expect(k3Agent.prompt).toContain("<k3_calibration>");
-      expect(k3Agent.prompt).not.toContain("running on Kimi K2.7");
-
-      expect(k27Agent.prompt).toContain("running on Kimi K2.7");
-      expect(k27Agent.prompt).not.toContain("Toggle RL");
-      expect(k27Agent.prompt).not.toContain("running on Kimi K3");
-
-      expect(k26Agent.prompt).toContain("Toggle RL");
-      expect(k26Agent.prompt).not.toContain("Kimi K2.7");
-      expect(k26Agent.prompt).not.toContain("running on Kimi K3");
     });
   });
 
@@ -179,9 +126,8 @@ describe("createSisyphusAgent", () => {
       // when
       const agent = createSisyphusAgent(model);
 
-      // then
-      expect(agent.prompt).toContain("running on GLM 5.2");
-      expect(agent.prompt).toContain("<glm_52_calibration>");
+      // then - glm routes to its own variant, not the default prompt
+      expect(agent.prompt).not.toBe(createSisyphusAgent("anthropic/claude-sonnet-4-6").prompt);
       expect(agent.thinking).toBeUndefined();
       expect(agent.reasoningEffort).toBeUndefined();
     });
@@ -196,8 +142,8 @@ describe("createSisyphusAgent", () => {
         // when
         const agent = createSisyphusAgent(model);
 
-        // then
-        expect(agent.prompt).toContain("<grok_calibration>");
+        // then - grok 4.5/4.6 route to the shared grok variant, not the default prompt
+        expect(agent.prompt).not.toBe(createSisyphusAgent("anthropic/claude-sonnet-4-6").prompt);
         expect(agent.reasoningEffort).toBe("high");
         expect(agent.thinking).toBeUndefined();
       }
@@ -206,34 +152,29 @@ describe("createSisyphusAgent", () => {
     test("#when creating agents for other grok ids #then keeps the fallback family", () => {
       // given
       const models = ["x-ai/grok-4.20", "xai/grok-4-1-fast-reasoning", "x-ai/grok-code-fast-1"];
+      const grokPrompt = createSisyphusAgent("xai/grok-4.6").prompt;
 
       for (const model of models) {
         // when
         const agent = createSisyphusAgent(model);
 
-        // then
-        expect(agent.prompt).not.toContain("<grok_calibration>");
+        // then - unrecognized grok ids fall back to the default family
+        expect(agent.prompt).not.toBe(grokPrompt);
         expect(agent.reasoningEffort).toBeUndefined();
       }
     });
   });
 
   describe("#given a Gemini model", () => {
-    test("#when creating the agent #then injects Gemini corrective anchors before constraints", () => {
+    test("#when creating the agent #then uses the Gemini-corrected prompt with thinking enabled", () => {
       // given
       const model = "google/gemini-3.1-pro";
 
       // when
       const agent = createSisyphusAgent(model);
-      const prompt = agent.prompt ?? "";
 
-      // then
-      expect(prompt).toContain("<TOOL_CALL_MANDATE>");
-      expect(prompt).toContain("<GEMINI_TOOL_GUIDE>");
-      expect(prompt).toContain("<GEMINI_DELEGATION_OVERRIDE>");
-      expect(prompt.indexOf("<GEMINI_DELEGATION_OVERRIDE>")).toBeLessThan(
-        prompt.indexOf("<Constraints>"),
-      );
+      // then - gemini routes to its own corrected variant, not the default prompt
+      expect(agent.prompt).not.toBe(createSisyphusAgent("anthropic/claude-sonnet-4-6").prompt);
       expect(agent.thinking).toEqual({
         type: "enabled",
         budgetTokens: 32000,

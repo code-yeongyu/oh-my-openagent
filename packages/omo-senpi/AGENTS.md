@@ -79,6 +79,8 @@ node packages/omo-senpi/scripts/qa/probe-continuation.mjs
 SENPI_BIN="$(command -v senpi)" node packages/omo-senpi/scripts/qa/task-e2e.mjs
 SENPI_BIN="$(command -v senpi)" node packages/omo-senpi/scripts/qa/team-e2e.mjs
 node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs --self-test
+node packages/omo-senpi/scripts/qa/task-load-skills-e2e.mjs --self-test
+SENPI_BIN="$(command -v senpi)" node packages/omo-senpi/scripts/qa/task-load-skills-e2e.mjs
 ```
 
 `drive.mjs` and the task/team live drivers create isolated Senpi agent directories and ignore caller `SENPI_CODING_AGENT_DIR`. If the Senpi binary is unavailable, the live drivers report `SKIP` or `FAIL` in final JSON instead of touching the real `~/.senpi/agent`.

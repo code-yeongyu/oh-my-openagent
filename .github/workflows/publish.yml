@@ -40,8 +40,68 @@ permissions:
   actions: write
 
 jobs:
+  gate-reuse:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      contents: read
+    outputs:
+      skip_gates: ${{ steps.reuse.outputs.skip_gates }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Determine whether release gates can be reused
+        id: reuse
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PREPARED_RELEASE_SHA" ]; then
+            echo "skip_gates=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping duplicate gates on the release preparation dispatch."
+            exit 0
+          fi
+
+          CHECK_RUNS="$(gh api --method GET \
+            "repos/${{ github.repository }}/commits/${PREPARED_RELEASE_SHA}/check-runs" \
+            -f per_page=100 \
+            -f filter=latest \
+            --paginate \
+            --slurp)"
+          REQUIRED_CHECKS='["test","typecheck","codex-compatibility (ubuntu-latest)","codex-compatibility (macos-latest)","codex-compatibility (windows-latest)"]'
+
+          if jq -e --argjson required "$REQUIRED_CHECKS" '
+            [.[].check_runs[] | select(.name as $name | $required | index($name))] as $runs
+            | (($runs | map(.name) | unique | sort) == ($required | sort))
+              and ($runs | all(.conclusion == "success"))
+          ' <<< "$CHECK_RUNS" >/dev/null; then
+            echo "skip_gates=true" >> "$GITHUB_OUTPUT"
+            echo "All required release gates already succeeded on ${PREPARED_RELEASE_SHA}."
+          else
+            echo "skip_gates=false" >> "$GITHUB_OUTPUT"
+            echo "Required release gates are missing, incomplete, or unsuccessful on ${PREPARED_RELEASE_SHA}."
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release gate reuse decision
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Skips duplicate gates on the preparation dispatch, which cannot publish.
+            - Reuses gates on a prepared SHA only when every required check run is successful.
+            - Fails closed when GitHub check-run state cannot be read.
+          JOB_SUMMARY_NEXT: Retry after GitHub check-run state is available, or fix any missing or unsuccessful release gate.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   test:
     runs-on: ubuntu-latest
+    needs: [gate-reuse]
+    if: needs.gate-reuse.outputs.skip_gates != 'true'
     steps:
       - uses: actions/checkout@v5
 
@@ -51,7 +111,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
@@ -81,6 +141,8 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    needs: [gate-reuse]
+    if: needs.gate-reuse.outputs.skip_gates != 'true'
     steps:
       - uses: actions/checkout@v5
 
@@ -90,7 +152,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
@@ -116,6 +178,8 @@ jobs:
 
   codex-compatibility:
     runs-on: ${{ matrix.os }}
+    needs: [gate-reuse]
+    if: needs.gate-reuse.outputs.skip_gates != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +193,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
@@ -368,13 +432,14 @@ jobs:
 
   prepare-release-state:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
+    needs: [gate-reuse, test, typecheck, codex-compatibility, preflight-trust, release-metadata]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
-      needs.test.result == 'success' &&
-      needs.typecheck.result == 'success' &&
-      needs.codex-compatibility.result == 'success' &&
+      needs.gate-reuse.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.test.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.typecheck.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.codex-compatibility.result) &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success'
     permissions:
@@ -393,7 +458,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -466,13 +531,35 @@ jobs:
           npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
+          # The version bump restamps OMO_SENPI_PACKAGE_VERSION inside the committed Senpi
+          # bundles; rebuild them so the release commit passes bundle-freshness CI.
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs
+
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git add package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add -f packages/omo-senpi/plugin/extensions
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
           git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
 
-          PR_NUMBER="$(gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
+          retry_gh_read() {
+            local description="$1"
+            shift
+            local output=""
+            for api_retry in 1 2 3 4 5; do
+              if output="$("$@" 2>&1)"; then
+                printf '%s' "$output"
+                return 0
+              fi
+              echo "${description}: retry ${api_retry}/5" >&2
+              echo "$output" >&2
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            echo "::error::${description} failed after 5 retries; GitHub API may be down." >&2
+            return 1
+          }
+
+          PR_NUMBER="$(retry_gh_read "List release-state PR" gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
           if [ -z "$PR_NUMBER" ]; then
             PR_URL="$(gh pr create --base "$BASE_REF" --head "$RELEASE_BRANCH" --title "release: v${VERSION}" --body "Automated release-state PR for v${VERSION}. This must merge before npm publication starts so protected-branch push failures cannot create a half-published release.")"
             PR_NUMBER="${PR_URL##*/}"
@@ -481,18 +568,18 @@ jobs:
           gh pr merge "$PR_NUMBER" --merge --auto --delete-branch=false
 
           for attempt in $(seq 1 120); do
-            PR_STATE="$(gh pr view "$PR_NUMBER" --json state --jq '.state')"
+            PR_STATE="$(retry_gh_read "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
-              RELEASE_SHA="$(gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              RELEASE_SHA="$(retry_gh_read "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
               echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
               echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
               exit 0
             fi
 
-            FAILURES="$(gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
+            FAILURES="$(retry_gh_read "Read release-state PR checks" gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
             if [ "$FAILURES" != "0" ]; then
               echo "::error::Release-state PR #${PR_NUMBER} has failing required checks; refusing to publish npm packages."
-              gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}'
+              retry_gh_read "Read failing release-state PR checks" gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}' || true
               exit 1
             fi
 
@@ -583,14 +670,19 @@ jobs:
 
   publish-main:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]
+    # post-publish-verify runs the published-package probes in a job that cannot block the release, so the
+    # lazycodex publish decision has to cross the job boundary as an output.
+    outputs:
+      lazycodex_publish_skipped: ${{ steps.check-lazycodex.outputs.skip }}
+    needs: [gate-reuse, test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha != '' &&
-      needs.test.result == 'success' &&
-      needs.typecheck.result == 'success' &&
-      needs.codex-compatibility.result == 'success' &&
+      needs.gate-reuse.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.test.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.typecheck.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.codex-compatibility.result) &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success' &&
@@ -606,7 +698,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - uses: actions/setup-node@v6
         with:
@@ -851,208 +943,6 @@ jobs:
         working-directory: packages/omo-native
         run: npm publish --ignore-scripts --access public --provenance --tag beta
 
-      - name: Wait for omo-ai registry readiness
-        env:
-          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
-          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
-        run: |
-          set -euo pipefail
-
-          for attempt in $(seq 1 5); do
-            IMMUTABLE_VERSION=$(npm view omo-ai@$OMO_AI_VERSION version 2>/dev/null || true)
-            BETA_READY=true
-            if [ "$ALREADY_PUBLISHED" != "true" ]; then
-              BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
-              [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
-            fi
-
-            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
-              echo "omo-ai@$OMO_AI_VERSION is ready"
-              break
-            fi
-
-            if [ "$attempt" = "5" ]; then
-              echo "::error::omo-ai@$OMO_AI_VERSION was not ready after 5 attempts"
-              exit 1
-            fi
-            echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/5)"
-            sleep 15
-          done
-
-      - name: Guard omo-ai dist-tags
-        env:
-          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
-          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
-        run: |
-          set -euo pipefail
-
-          LATEST_VERSION=$(npm view omo-ai dist-tags.latest 2>/dev/null || true)
-          if [ "$LATEST_VERSION" != "0.0.0-beta.0" ]; then
-            echo "::error::omo-ai latest must remain pinned to 0.0.0-beta.0, got ${LATEST_VERSION:-missing}. Remediate with: npm dist-tag add omo-ai@0.0.0-beta.0 latest"
-            exit 1
-          fi
-
-          if [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
-            if [ "$BETA_VERSION" != "$OMO_AI_VERSION" ]; then
-              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, expected $OMO_AI_VERSION"
-              exit 1
-            fi
-          fi
-
-      - name: Verify omo-ai live install
-        env:
-          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
-          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
-        run: |
-          set -euo pipefail
-
-          EXACT_VERIFIED=false
-          for attempt in $(seq 1 5); do
-            EXACT_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-exact-${attempt}.XXXXXX")
-            if npm i -g "omo-ai@$OMO_AI_VERSION" --prefix "$EXACT_PREFIX" &&
-               [ "$(jq -r '.version' "$EXACT_PREFIX/lib/node_modules/omo-ai/package.json")" = "$OMO_AI_VERSION" ] &&
-               "$EXACT_PREFIX/bin/omo" --version; then
-              EXACT_VERIFIED=true
-              rm -rf "$EXACT_PREFIX"
-              break
-            fi
-            rm -rf "$EXACT_PREFIX"
-            if [ "$attempt" != "5" ]; then
-              echo "Waiting for omo-ai@$OMO_AI_VERSION install propagation (attempt ${attempt}/5)"
-              sleep 15
-            fi
-          done
-          if [ "$EXACT_VERIFIED" != "true" ]; then
-            echo "::error::Exact-version live install failed for omo-ai@$OMO_AI_VERSION"
-            exit 1
-          fi
-
-          if [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-beta.XXXXXX")
-            npm i -g omo-ai@beta --prefix "$BETA_PREFIX"
-            BETA_INSTALLED_VERSION=$(jq -r '.version' "$BETA_PREFIX/lib/node_modules/omo-ai/package.json")
-            rm -rf "$BETA_PREFIX"
-            if [ "$BETA_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
-              echo "::error::omo-ai@beta installed $BETA_INSTALLED_VERSION, expected $OMO_AI_VERSION"
-              exit 1
-            fi
-          fi
-
-          BARE_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-bare.XXXXXX")
-          BARE_ERROR="$RUNNER_TEMP/omoai-bare-error.txt"
-          if npm i -g omo-ai --prefix "$BARE_PREFIX" 2>"$BARE_ERROR"; then
-            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-            echo "::error::Bare omo-ai install unexpectedly succeeded; the beta-only channel is broken"
-            exit 1
-          fi
-          if ! grep -q "ETARGET" "$BARE_ERROR"; then
-            cat "$BARE_ERROR" >&2
-            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-            echo "::error::Bare omo-ai install failed without the required ETARGET beta gate"
-            exit 1
-          fi
-          rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-
-      - name: Smoke test published lazycodex-ai
-        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
-        env:
-          OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
-          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
-        run: |
-          set -euo pipefail
-
-          # Upgrade simulation: an existing install carries a legacy `omo` wrapper in the
-          # Codex bin dir. A marker-bearing wrapper is ours and must be reclaimed by the
-          # install; an unmarked file is user-owned and must survive byte-identical.
-          simulate_legacy_omo_upgrade() {
-            package_spec="$1"
-            scenario_root="$2"
-            seeded_kind="$3"
-            (
-              export HOME="$scenario_root/home"
-              export CODEX_HOME="$scenario_root/codex"
-              export CODEX_LOCAL_BIN_DIR="$scenario_root/bin"
-              mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$scenario_root/cwd"
-              cd "$scenario_root/cwd"
-
-              if [ "$seeded_kind" = "marked" ]; then
-                printf '#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\nexit 0\n' > "$CODEX_LOCAL_BIN_DIR/omo"
-              else
-                printf '#!/bin/sh\n# user-owned omo, never generated by this installer\nexit 0\n' > "$CODEX_LOCAL_BIN_DIR/omo"
-              fi
-              chmod +x "$CODEX_LOCAL_BIN_DIR/omo"
-              cp "$CODEX_LOCAL_BIN_DIR/omo" "$scenario_root/omo.seeded"
-
-              npx -y "$package_spec" install --no-tui --codex-autonomous >/dev/null 2>&1 || return 1
-              [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] || return 1
-
-              if [ "$seeded_kind" = "marked" ]; then
-                if [ -e "$CODEX_LOCAL_BIN_DIR/omo" ]; then
-                  echo "::error::marker-bearing legacy omo wrapper survived the install"
-                  return 1
-                fi
-              else
-                if ! cmp -s "$scenario_root/omo.seeded" "$CODEX_LOCAL_BIN_DIR/omo"; then
-                  echo "::error::user-owned omo file was modified by the install"
-                  return 1
-                fi
-              fi
-            )
-          }
-
-          smoke_lazycodex_package() {
-            package_spec="$1"
-            for attempt in $(seq 1 12); do
-              SMOKE_DIR=$(mktemp -d)
-              export HOME="$SMOKE_DIR/home"
-              export CODEX_HOME="$SMOKE_DIR/codex"
-              export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"
-              mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
-              cd "$SMOKE_DIR/cwd"
-              expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"
-              expected_doctor_output_prefix="codex exec "
-              expected_doctor_hint="Use \$omo:lcx-doctor"
-
-              if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
-                 npx_doctor_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
-                 [ "$npx_install_output" = "$expected_install_output" ] &&
-                 case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac &&
-                 case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac &&
-                 case "$npx_doctor_output" in *"$expected_doctor_hint"*) true ;; *) false ;; esac &&
-                 case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac &&
-                 npx -y "$package_spec" install --no-tui --codex-autonomous &&
-                 [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] &&
-                 [ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ] &&
-                 omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1) &&
-                 [ "$omo_agent_toolkit_version_output" = "$OMO_VERSION" ] &&
-                 ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1) &&
-                 printf "%s" "$ulw_loop_output" | grep -q "ulw-loop" &&
-                 simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-marked" marked &&
-                 simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-unmarked" unmarked; then
-                echo "$npx_install_output"
-                echo "$npx_doctor_output"
-                echo "omo-agent-toolkit --version: $omo_agent_toolkit_version_output"
-                echo "omo-agent-toolkit ulw-loop: $ulw_loop_output"
-                cd "$GITHUB_WORKSPACE"
-                rm -rf "$SMOKE_DIR"
-                return 0
-              fi
-
-              cd "$GITHUB_WORKSPACE"
-              rm -rf "$SMOKE_DIR"
-              echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/12)"
-              sleep 10
-            done
-            echo "::error::Published LazyCodex smoke failed for ${package_spec}"
-            return 1
-          }
-
-          smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"
-          if [ -z "$DIST_TAG" ]; then
-            smoke_lazycodex_package "lazycodex-ai@latest"
-          fi
-
       - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
@@ -1074,15 +964,16 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-platform:
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]
+    needs: [gate-reuse, test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha != '' &&
       inputs.skip_platform != true &&
-      needs.test.result == 'success' &&
-      needs.typecheck.result == 'success' &&
-      needs.codex-compatibility.result == 'success' &&
+      needs.gate-reuse.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.test.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.typecheck.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.codex-compatibility.result) &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success'
@@ -1115,7 +1006,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -1223,8 +1114,12 @@ jobs:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          RELEASE_FLAGS=()
+          if [[ "$VERSION" == *"-"* ]]; then
+            RELEASE_FLAGS+=(--prerelease)
+          fi
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}" --title "v${VERSION}" --notes-file /tmp/changelog.md
 
       - name: Delete draft release
         run: gh release delete next --yes 2>/dev/null || true
@@ -1259,4 +1154,243 @@ jobs:
             - Syncs LazyCodex marketplace payload and creates GitHub releases.
             - Attempts the protected `master` mirror update after release.
           JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  post-publish-verify:
+    runs-on: ubuntu-latest
+    needs: [release-metadata, prepare-release-state, publish-main, release]
+    # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
+    # already public by this point, so blocking the release job on them could only produce the worst
+    # outcome: packages on npm with no GitHub release and no marketplace sync. A failure here is still a
+    # red job that must be investigated - it just cannot strand a published release.
+    if: >-
+      always() &&
+      inputs.prepared_release_sha != '' &&
+      needs.release-metadata.result == 'success' &&
+      needs.publish-main.result == 'success' &&
+      needs.release.result == 'success'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Wait for omo-ai registry readiness
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 5); do
+            IMMUTABLE_VERSION=$(npm view omo-ai@$OMO_AI_VERSION version 2>/dev/null || true)
+            BETA_READY=true
+            if [ "$ALREADY_PUBLISHED" != "true" ]; then
+              BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
+              [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
+            fi
+
+            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
+              echo "omo-ai@$OMO_AI_VERSION is ready"
+              break
+            fi
+
+            if [ "$attempt" = "5" ]; then
+              echo "::error::omo-ai@$OMO_AI_VERSION was not ready after 5 attempts"
+              exit 1
+            fi
+            echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/5)"
+            sleep 15
+          done
+
+      - name: Guard omo-ai dist-tags
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+        run: |
+          set -euo pipefail
+
+          LATEST_VERSION=$(npm view omo-ai dist-tags.latest 2>/dev/null || true)
+          if [ "$LATEST_VERSION" != "0.0.0-beta.0" ]; then
+            echo "::error::omo-ai latest must remain pinned to 0.0.0-beta.0, got ${LATEST_VERSION:-missing}. Remediate with: npm dist-tag add omo-ai@0.0.0-beta.0 latest"
+            exit 1
+          fi
+
+          if [ "$ALREADY_PUBLISHED" != "true" ]; then
+            BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
+            if [ "$BETA_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, expected $OMO_AI_VERSION"
+              exit 1
+            fi
+          fi
+
+      - name: Verify omo-ai live install
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+        run: |
+          set -euo pipefail
+
+          EXACT_VERIFIED=false
+          for attempt in $(seq 1 5); do
+            EXACT_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-exact-${attempt}.XXXXXX")
+            if npm i -g "omo-ai@$OMO_AI_VERSION" --prefix "$EXACT_PREFIX" &&
+               [ "$(jq -r '.version' "$EXACT_PREFIX/lib/node_modules/omo-ai/package.json")" = "$OMO_AI_VERSION" ] &&
+               "$EXACT_PREFIX/bin/omo" --version; then
+              EXACT_VERIFIED=true
+              rm -rf "$EXACT_PREFIX"
+              break
+            fi
+            rm -rf "$EXACT_PREFIX"
+            if [ "$attempt" != "5" ]; then
+              echo "Waiting for omo-ai@$OMO_AI_VERSION install propagation (attempt ${attempt}/5)"
+              sleep 15
+            fi
+          done
+          if [ "$EXACT_VERIFIED" != "true" ]; then
+            echo "::error::Exact-version live install failed for omo-ai@$OMO_AI_VERSION"
+            exit 1
+          fi
+
+          if [ "$ALREADY_PUBLISHED" != "true" ]; then
+            BETA_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-beta.XXXXXX")
+            npm i -g omo-ai@beta --prefix "$BETA_PREFIX"
+            BETA_INSTALLED_VERSION=$(jq -r '.version' "$BETA_PREFIX/lib/node_modules/omo-ai/package.json")
+            rm -rf "$BETA_PREFIX"
+            if [ "$BETA_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::omo-ai@beta installed $BETA_INSTALLED_VERSION, expected $OMO_AI_VERSION"
+              exit 1
+            fi
+          fi
+
+          BARE_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-bare.XXXXXX")
+          BARE_ERROR="$RUNNER_TEMP/omoai-bare-error.txt"
+          if npm i -g omo-ai --prefix "$BARE_PREFIX" 2>"$BARE_ERROR"; then
+            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
+            echo "::error::Bare omo-ai install unexpectedly succeeded; the beta-only channel is broken"
+            exit 1
+          fi
+          if ! grep -q "ETARGET" "$BARE_ERROR"; then
+            cat "$BARE_ERROR" >&2
+            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
+            echo "::error::Bare omo-ai install failed without the required ETARGET beta gate"
+            exit 1
+          fi
+          rm -rf "$BARE_PREFIX" "$BARE_ERROR"
+
+      - name: Smoke test published lazycodex-ai
+        if: inputs.publish_lazycodex == true && needs.publish-main.outputs.lazycodex_publish_skipped != 'true'
+        env:
+          OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
+        run: |
+          set -euo pipefail
+
+          # Upgrade simulation: an existing install carries a legacy `omo` wrapper in the
+          # Codex bin dir. A marker-bearing wrapper is ours and must be reclaimed by the
+          # install; an unmarked file is user-owned and must survive byte-identical.
+          simulate_legacy_omo_upgrade() {
+            package_spec="$1"
+            scenario_root="$2"
+            seeded_kind="$3"
+            (
+              export HOME="$scenario_root/home"
+              export CODEX_HOME="$scenario_root/codex"
+              export CODEX_LOCAL_BIN_DIR="$scenario_root/bin"
+              mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$scenario_root/cwd"
+              cd "$scenario_root/cwd"
+
+              if [ "$seeded_kind" = "marked" ]; then
+                printf '#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\nexit 0\n' > "$CODEX_LOCAL_BIN_DIR/omo"
+              else
+                printf '#!/bin/sh\n# user-owned omo, never generated by this installer\nexit 0\n' > "$CODEX_LOCAL_BIN_DIR/omo"
+              fi
+              chmod +x "$CODEX_LOCAL_BIN_DIR/omo"
+              cp "$CODEX_LOCAL_BIN_DIR/omo" "$scenario_root/omo.seeded"
+
+              npx -y "$package_spec" install --no-tui --codex-autonomous >/dev/null 2>&1 || return 1
+              [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] || return 1
+
+              if [ "$seeded_kind" = "marked" ]; then
+                if [ -e "$CODEX_LOCAL_BIN_DIR/omo" ]; then
+                  echo "::error::marker-bearing legacy omo wrapper survived the install"
+                  return 1
+                fi
+              else
+                if ! cmp -s "$scenario_root/omo.seeded" "$CODEX_LOCAL_BIN_DIR/omo"; then
+                  echo "::error::user-owned omo file was modified by the install"
+                  return 1
+                fi
+              fi
+            )
+          }
+
+          smoke_lazycodex_package() {
+            package_spec="$1"
+            for attempt in $(seq 1 12); do
+              SMOKE_DIR=$(mktemp -d)
+              export HOME="$SMOKE_DIR/home"
+              export CODEX_HOME="$SMOKE_DIR/codex"
+              export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"
+              mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
+              cd "$SMOKE_DIR/cwd"
+              expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"
+              expected_doctor_output_prefix="codex exec "
+              expected_doctor_hint="Use \$omo:lcx-doctor"
+
+              if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
+                 npx_doctor_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
+                 [ "$npx_install_output" = "$expected_install_output" ] &&
+                 case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac &&
+                 case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac &&
+                 case "$npx_doctor_output" in *"$expected_doctor_hint"*) true ;; *) false ;; esac &&
+                 case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac &&
+                 npx -y "$package_spec" install --no-tui --codex-autonomous &&
+                 [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] &&
+                 [ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ] &&
+                 omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1) &&
+                 [ "$omo_agent_toolkit_version_output" = "$OMO_VERSION" ] &&
+                 ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1) &&
+                 printf "%s" "$ulw_loop_output" | grep -q "ulw-loop" &&
+                 simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-marked" marked &&
+                 simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-unmarked" unmarked; then
+                echo "$npx_install_output"
+                echo "$npx_doctor_output"
+                echo "omo-agent-toolkit --version: $omo_agent_toolkit_version_output"
+                echo "omo-agent-toolkit ulw-loop: $ulw_loop_output"
+                cd "$GITHUB_WORKSPACE"
+                rm -rf "$SMOKE_DIR"
+                return 0
+              fi
+
+              cd "$GITHUB_WORKSPACE"
+              rm -rf "$SMOKE_DIR"
+              echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/12)"
+              sleep 10
+            done
+            echo "::error::Published LazyCodex smoke failed for ${package_spec}"
+            return 1
+          }
+
+          smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"
+          if [ -z "$DIST_TAG" ]; then
+            smoke_lazycodex_package "lazycodex-ai@latest"
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Post-publish verification
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Waits for omo-ai registry readiness and guards its dist-tags.
+            - Verifies the omo-ai live install and smoke-tests the published LazyCodex package.
+            - Runs after the GitHub release so propagation delays cannot strand a published release.
+          JOB_SUMMARY_NEXT: Investigate the failing registry probe; the release itself already exists.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

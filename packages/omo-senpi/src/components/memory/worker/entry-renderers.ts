@@ -108,10 +108,19 @@ export function outcomeSummary(outcome: string): string {
   }
 }
 
+/** Raw SGR bold on/off, mirroring senpi notice/box.ts title emphasis. */
+const BOLD = "\u001b[1m"
+const BOLD_OFF = "\u001b[22m"
+
+/** A visible notice line carrying its own tone, mirroring senpi's NoticeLine. */
+export type NoticeExtraLine = { readonly text: string; readonly tone?: ThemeColor }
+
 /**
- * Build a notice-shaped component: bold tone-coloured title, dim why line, and a
- * dim detail line gated behind the expanded flag. Truncation happens on the plain
- * text before colouring so ANSI sequences are never sliced.
+ * Build a notice-shaped component matching senpi notice/box.ts: a bold tone-coloured
+ * title, a dim "why" line, zero or more visible "extra" lines each with their own
+ * semantic tone, and a dim italic detail line gated behind the expanded flag.
+ * Truncation happens on the plain text before colouring and before the bold wrap,
+ * so ANSI sequences are never sliced.
  */
 export function noticeComponent(
   spec: {
@@ -119,6 +128,7 @@ export function noticeComponent(
     readonly title: string
     readonly tone: ThemeColor
     readonly why: string
+    readonly extra?: readonly NoticeExtraLine[]
     readonly detail?: string
   },
   options: { readonly expanded: boolean },
@@ -127,7 +137,11 @@ export function noticeComponent(
   return linesComponent((width: number): readonly string[] => {
     if (width <= 0) return [""]
     const title = fit(`${spec.glyph} ${spec.title}`, width)
-    const lines = [theme.fg(spec.tone, title), theme.fg("dim", fit(spec.why, width))]
+    const lines = [theme.fg(spec.tone, `${BOLD}${title}${BOLD_OFF}`), theme.fg("dim", fit(spec.why, width))]
+    for (const line of spec.extra ?? []) {
+      if (line.text.length === 0) continue
+      lines.push(theme.fg(line.tone ?? "dim", fit(line.text, width)))
+    }
     if (options.expanded && spec.detail !== undefined && spec.detail.length > 0) {
       lines.push(theme.italic(theme.fg("dim", fit(spec.detail, width))))
     }
