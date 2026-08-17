@@ -207,6 +207,7 @@ async function runSupervisedChild(input: {
 
   const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
     detached: true,
+    windowsHide: true,
     stdio: "ignore",
   })
   supervisor.unref()

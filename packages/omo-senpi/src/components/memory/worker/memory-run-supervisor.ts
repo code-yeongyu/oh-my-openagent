@@ -48,6 +48,7 @@ async function runChildBootstrap(runDir: string): Promise<void> {
     cwd: manifest.cwd,
     env: manifest.env,
     detached: false,
+    windowsHide: true,
     stdio: ["ignore", "inherit", "inherit"],
   })
   writeBootstrapStatus({ code: child.pid ?? null, signal: "MODEL_PID" })
@@ -98,6 +99,7 @@ async function runSupervisor(runDir: string): Promise<void> {
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
     detached: true,
+    windowsHide: true,
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
   })
   let childPid = bootstrap.pid
