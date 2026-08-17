@@ -9,6 +9,7 @@ const ALL_VARIANTS: Array<[string, string]> = [
   ["kimi-k2-7", getAtlasPrompt("opencode-go/kimi-k2.7")],
   ["kimi-k3", getAtlasPrompt("opencode-go/kimi-k3")],
   ["opus-4-7", getAtlasPrompt("anthropic/claude-opus-4-7")],
+  ["minimax", getAtlasPrompt("adacode/MiniMax-M3")],
 ]
 
 describe("Atlas prompts boulder-completion response", () => {

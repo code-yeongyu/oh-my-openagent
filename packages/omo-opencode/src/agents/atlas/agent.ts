@@ -11,7 +11,8 @@
  * 5. Kimi K2.7             → kimi-k2-7.md  (restrained, outcome-first; checked before generic kimi)
  * 6. Kimi K2.x family      → kimi.md       (Claude-family base + K2.6 thinking-mode calibration)
  * 7. GLM family            → glm.md        (GLM 5.2 calibration)
- * 8. Default (Claude 4.6 family: opus-4-6, sonnet-4-6, haiku-4-5, etc.) → default.md
+ * 8. MiniMax family        → minimax.md    (MiniMax-specific: think-block, parallel-swapping, sequential-propagation)
+ * 9. Default (Claude 4.6 family: opus-4-6, sonnet-4-6, haiku-4-5, etc.) → default.md
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
@@ -37,7 +38,7 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k2-7" | "opus-4-7" | "glm"
+export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k2-7" | "opus-4-7" | "glm" | "minimax"
 
 class AtlasPromptVariantError extends Error {
   readonly name = "AtlasPromptVariantError"

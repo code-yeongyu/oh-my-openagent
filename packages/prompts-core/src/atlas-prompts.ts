@@ -6,6 +6,7 @@ import gptPrompt from "../prompts/atlas/gpt.md"
 import kimiPrompt from "../prompts/atlas/kimi.md"
 import kimiK27Prompt from "../prompts/atlas/kimi-k2-7.md"
 import kimiK3Prompt from "../prompts/atlas/kimi-k3.md"
+import minimaxPrompt from "../prompts/atlas/minimax.md"
 import opus47Prompt from "../prompts/atlas/opus-4-7.md"
 
 export const atlasPromptVariants = {
@@ -43,6 +44,11 @@ export const atlasPromptVariants = {
     kind: "bundled",
     content: glmPrompt,
     filePath: "packages/prompts-core/prompts/atlas/glm.md",
+  },
+  minimax: {
+    kind: "bundled",
+    content: minimaxPrompt,
+    filePath: "packages/prompts-core/prompts/atlas/minimax.md",
   },
   default: {
     kind: "bundled",
