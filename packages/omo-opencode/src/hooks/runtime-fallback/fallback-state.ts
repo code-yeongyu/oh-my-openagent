@@ -8,6 +8,11 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
 
+type FallbackSelectionConfig = Pick<
+  Required<RuntimeFallbackConfig>,
+  "max_fallback_attempts" | "cooldown_seconds"
+>
+
 export const stringifyRuntimeModel = stringifyRuntimeFallbackModel
 export const stringifyRuntimeModelWithVariant = stringifyRuntimeFallbackModelWithVariant
 
@@ -63,7 +68,7 @@ export function prepareFallback(
   sessionID: string,
   state: FallbackState,
   fallbackModels: string[],
-  config: Required<RuntimeFallbackConfig>
+  config: FallbackSelectionConfig,
 ): FallbackResult {
   if (state.attemptCount >= config.max_fallback_attempts) {
     log(`[${HOOK_NAME}] Max fallback attempts reached`, { sessionID, attempts: state.attemptCount })

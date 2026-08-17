@@ -4,6 +4,7 @@ import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTest
 import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
+import { releaseFallbackDispatchLease, supersedeFallbackDispatchLease } from "./fallback-dispatch-lease"
 import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
@@ -244,5 +245,65 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
 
     // then
     expect(promptCalls.count).toBe(0)
+  })
+
+  test("#given an older fallback is waiting for session messages #when a provider retry signal supersedes it #then only the newer fallback prompt is dispatched", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-superseded-during-message-read"
+    const dispatchedModels: string[] = []
+    let releaseOlderMessages: ((value: unknown) => void) | undefined
+    let markOlderReadStarted: (() => void) | undefined
+    const olderReadStarted = new Promise<void>((resolve) => { markOlderReadStarted = resolve })
+    let messageReadCount = 0
+    const userMessages = {
+      data: [
+        {
+          info: { role: "user" },
+          parts: [{ type: "text", text: "retry this" }],
+        },
+      ],
+    }
+    deps.ctx.client.session.messages = async () => {
+      messageReadCount += 1
+      if (messageReadCount === 1) {
+        markOlderReadStarted?.()
+        return await new Promise<unknown>((resolve) => { releaseOlderMessages = resolve })
+      }
+      return userMessages
+    }
+    deps.ctx.client.session.promptAsync = async (input) => {
+      promptCalls.count += 1
+      dispatchedModels.push(`${input.body.model.providerID}/${input.body.model.modelID}`)
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+
+    // when
+    const olderRetry = helpers.autoRetryWithFallback(
+      sessionID,
+      "openai/gpt-older-fallback",
+      undefined,
+      "session.error",
+    )
+    await olderReadStarted
+    const newerLease = supersedeFallbackDispatchLease(deps, sessionID)
+    const newerRetry = helpers.autoRetryWithFallback(
+      sessionID,
+      "openai/gpt-newer-fallback",
+      undefined,
+      "session.status",
+      newerLease,
+    )
+    await newerRetry
+    releaseOlderMessages?.(userMessages)
+    const olderOutcome = await olderRetry
+    releaseFallbackDispatchLease(deps, sessionID, newerLease)
+
+    // then
+    expect(olderOutcome).toEqual({ accepted: false, status: "blocked", reason: "fallback dispatch superseded" })
+    expect(promptCalls.count).toBe(1)
+    expect(dispatchedModels).toEqual(["openai/gpt-newer-fallback"])
   })
 })

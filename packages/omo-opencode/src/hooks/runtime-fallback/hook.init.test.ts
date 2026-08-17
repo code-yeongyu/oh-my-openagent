@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
+import type { AutoRetryHelpers } from "./auto-retry"
+import type { FirstPromptWatchdog } from "./first-prompt-watchdog"
 import type { HookDeps, RuntimeFallbackInterval, RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
@@ -120,5 +122,33 @@ describe("createRuntimeFallbackHook initialization", () => {
 
     // then
     expect(setIntervalCalls).toBe(1)
+  })
+
+  test("#given a custom first-prompt watchdog timeout #when the hook factory initializes #then it passes the configured millisecond timeout to the watchdog", () => {
+    // given
+    let capturedWatchdogMs: number | undefined
+    const recordingWatchdogFactory = (
+      _deps: HookDeps,
+      _helpers: AutoRetryHelpers,
+      watchdogMs?: number,
+    ): FirstPromptWatchdog => {
+      capturedWatchdogMs = watchdogMs
+      return {
+        onUserMessage: () => {},
+        onAssistantProgress: () => {},
+        onSessionTerminal: () => {},
+        dispose: () => {},
+      }
+    }
+
+    // when
+    createRuntimeFallbackHook(
+      createMockContext(),
+      { config: { first_prompt_watchdog_seconds: 300 } },
+      { createFirstPromptWatchdog: recordingWatchdogFactory },
+    )
+
+    // then
+    expect(capturedWatchdogMs).toBe(300_000)
   })
 })

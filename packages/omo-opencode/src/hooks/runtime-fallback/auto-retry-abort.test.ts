@@ -101,6 +101,20 @@ describe("createAbortSessionRequest reservation release", () => {
     expect(getPromptReservation(sessionID)).toBeUndefined()
   })
 
+  test("#given the first-prompt watchdog aborts a silent session #when the abort completes #then the session is marked internally aborted so fallback dispatch bypasses the stale assistant gate", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog"
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    // when
+    await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+  })
+
   test("#given a session reserved by an unrelated user prompt #when the runtime-fallback abort fires #then the reservation is preserved (abort must not steal a foreground user turn)", async () => {
     // given
     const deps = createDeps()

@@ -1,5 +1,7 @@
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 
+type ResolvedRuntimeFallbackConfig = Required<Omit<RuntimeFallbackConfig, "first_prompt_watchdog_seconds">>
+
 export interface RuntimeFallbackInterval {
   unref: () => void
 }
@@ -79,7 +81,7 @@ export interface RuntimeFallbackHook {
 
 export interface HookDeps {
   ctx: RuntimeFallbackPluginInput
-  config: Required<RuntimeFallbackConfig>
+  config: ResolvedRuntimeFallbackConfig
   options: RuntimeFallbackOptions | undefined
   pluginConfig: OhMyOpenCodeConfig | undefined
   sessionStates: Map<string, FallbackState>
