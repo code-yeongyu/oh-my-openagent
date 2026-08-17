@@ -267,7 +267,7 @@ describe("resolveSpawnItems", () => {
     expect(result.error.code).toBe("empty_tasks")
   })
 
-  test("#given an item with both category and subagent_type w2val #when resolved #then returns an item_target error naming the index", () => {
+  test("#given an item with both category and subagent_type w2val #when resolved #then the batch is rejected naming the index", () => {
     // given
     const params = {
       category: "quick",
@@ -280,8 +280,8 @@ describe("resolveSpawnItems", () => {
     // then
     expect(result.kind).toBe("error")
     if (result.kind !== "error") throw new Error("expected error")
-    if (result.error.code !== "item_target") throw new Error("expected item_target error")
-    expect(result.error.index).toBe(1)
+    if (result.error.code !== "invalid_items") throw new Error("expected invalid_items error")
+    expect(result.error.rejected.map((entry) => entry.index)).toEqual([1])
     expect(result.error.message).toContain("1")
   })
 })
@@ -391,26 +391,31 @@ describe("resolveSpawnItems category+model exclusivity", () => {
     expect(result.error.message).toContain("omo.json")
   })
 
-  test("#given a top-level model inherited by a category item #then returns an item_target error", () => {
+  test("#given a top-level model inherited by a category item #then the batch is rejected for that index", () => {
     // given / when
     const result = resolveSpawnItems({ model: "openai/gpt-5.6-luna-fast", tasks: [{ prompt: "one", category: "quick" }] })
 
     // then
     expect(result.kind).toBe("error")
     if (result.kind !== "error") throw new Error("expected error")
-    expect(result.error.code).toBe("item_target")
-    expect(result.error.message).toContain("Task item 0")
+    if (result.error.code !== "invalid_items") throw new Error("expected invalid_items error")
+    expect(result.error.rejected).toEqual([
+      { index: 0, field: "category+model", reason: expect.stringContaining("omo.json") },
+    ])
+    expect(result.error.message).toContain("item 0")
   })
 
-  test("#given a top-level category and an item model #then returns an item_target error", () => {
+  test("#given a top-level category and an item model #then the batch is rejected for that index", () => {
     // given / when
     const result = resolveSpawnItems({ category: "quick", tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.6-luna-fast" }] })
 
     // then
     expect(result.kind).toBe("error")
     if (result.kind !== "error") throw new Error("expected error")
-    expect(result.error.code).toBe("item_target")
-    expect(result.error.message).toContain("Task item 1")
+    if (result.error.code !== "invalid_items") throw new Error("expected invalid_items error")
+    expect(result.error.rejected.map((entry) => entry.index)).toEqual([1])
+    expect(result.error.accepted).toBe(1)
+    expect(result.error.submitted).toBe(2)
   })
 
   test("#given subagent items inheriting a top-level model #then resolves ok with the model attached", () => {
