@@ -1,0 +1,39 @@
+=== CI RED: run 32020990147 / ubuntu test / job 95360460811 ===
+2026-08-17T10:43:52.5499808Z 55 |     // when
+2026-08-17T10:43:52.5500742Z 56 |     const admission = admit(makeSpec([mockProviderExtension]))
+2026-08-17T10:43:52.5501565Z 57 | 
+2026-08-17T10:43:52.5502094Z 58 |     // then
+2026-08-17T10:43:52.5502854Z 59 |     await expect(admission).resolves.toBeUndefined()
+2026-08-17T10:43:52.5504004Z                                           ^
+2026-08-17T10:43:52.5504714Z error: 
+2026-08-17T10:43:52.5505097Z 
+2026-08-17T10:43:52.5505512Z Expected promise that resolves
+2026-08-17T10:43:52.5506384Z Received promise that rejected: Promise { <rejected> }
+2026-08-17T10:43:52.5506988Z 
+2026-08-17T10:43:52.5508153Z       at <anonymous> (/home/runner/work/oh-my-openagent/oh-my-openagent/packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts:59:38)
+2026-08-17T10:43:52.5509666Z 
+2026-08-17T10:43:52.5540818Z ##[error]Expected promise that resolves
+Received promise that rejected: Promise { <rejected> }
+
+      at <anonymous> (/home/runner/work/oh-my-openagent/oh-my-openagent/packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts:59:38)
+2026-08-17T10:43:52.5554032Z (fail) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [2411.00ms]
+2026-08-17T10:43:54.9417279Z (pass) task RPC launch profile parity > #given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch [2392.00ms]
+2026-08-17T10:43:54.9418877Z 
+2026-08-17T10:43:54.9419659Z ##[endgroup]
+2026-08-17T10:43:54.9420217Z 
+2026-08-17T10:43:54.9421054Z ##[group]packages/omo-senpi/src/components/task/dag-viewer-client.test.ts:
+2026-08-17T10:43:55.2309426Z (pass) dag viewer reference consumer > #given a 200-event live run #when catch-up races live delivery #then application is gap-free and duplicate-free [283.00ms]
+2026-08-17T10:43:55.2310798Z 
+2026-08-17T10:43:55.2311584Z ##[endgroup]
+2026-08-17T10:43:55.2312042Z 
+2026-08-17T10:43:55.2312914Z ##[group]packages/omo-senpi/src/components/task/team-service-delete.test.ts:
+2026-08-17T10:43:55.2495368Z (pass) createTeamService team deletion boundary > #given canonical, foreign-owned, and uppercased run ids #when teams are deleted #then shape and ownership fences stay distinct [6.00ms]
+2026-08-17T10:43:55.2497318Z 
+
+2026-08-17T10:42:12.2427961Z (pass) suspend/revive lifecycle chaos model > #given the over_admit regression #when the invariant witness runs #then invariant 11 fails [1.00ms]
+2026-08-17T10:43:52.5554032Z (fail) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [2411.00ms]
+2026-08-17T10:45:59.0102418Z 1 tests failed:
+2026-08-17T10:45:59.0104117Z (fail) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [2411.00ms]
+2026-08-17T10:45:59.0105416Z  15700 pass
+2026-08-17T10:45:59.0106062Z  1 fail
+2026-08-17T10:45:59.0107065Z Ran 15744 tests across 2041 files. [412.11s]

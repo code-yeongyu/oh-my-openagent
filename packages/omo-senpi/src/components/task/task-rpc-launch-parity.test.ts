@@ -12,12 +12,14 @@ const agentDirs: string[] = []
 const mockProviderExtension = fileURLToPath(
   new URL("../../../scripts/qa/mock-provider/index.ts", import.meta.url),
 )
+const rootSuiteBaselineEnv: NodeJS.ProcessEnv = { ...process.env }
 
 function createAdmission() {
   const agentDir = mkdtempSync(join(tmpdir(), "omo-task-rpc-model-profile-"))
   agentDirs.push(agentDir)
   const parentEnv = {
-    ...process.env,
+    ...rootSuiteBaselineEnv,
+    OMO_DISABLE_POSTHOG: "true",
     OMO_CODING_AGENT_DIR: agentDir,
     SENPI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_DIR: agentDir,
@@ -56,7 +58,7 @@ describe("task RPC launch profile parity", () => {
     const admission = admit(makeSpec([mockProviderExtension]))
 
     // then
-    await expect(admission).resolves.toBeUndefined()
+    expect(await admission).toBeUndefined()
   }, 30_000)
 
   test("#given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch", async () => {

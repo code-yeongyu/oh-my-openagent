@@ -1,0 +1,23 @@
+=== RED (before pin edits) — 6 fail / 0 pass ===
+ATTRIBUTION CloakBrowser pin   [0.4.10] != [0.5.7]
+ATTRIBUTION agent-browser pin  [0.31.1] != [0.34.0]
+chrome-stealth CloakBrowser    [0.5.5]  != [0.5.7]
+chrome-stealth agent-browser   [0.33.2] != [0.34.0]
+stale strings surviving        [0.4.10,0.5.5,0.31.1,0.33.2] != []
+templates playwright range     ^1.61.1  != ^1.62.1
+
+=== GREEN (after pin edits) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/shared-skills/ultimate-browsing-runtime-pins.test.ts:
+(pass) ultimate-browsing Tier-2 runtime pins > #given the CloakBrowser pin > #then ATTRIBUTION.md pins the expected version [1.72ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the CloakBrowser pin > #then every chrome-stealth.md occurrence uses the same version [0.12ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the agent-browser pin > #then ATTRIBUTION.md pins the expected version [0.10ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the agent-browser pin > #then every chrome-stealth.md occurrence uses the same version [0.08ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the two documents together > #then no stale version string survives anywhere [0.07ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the Playwright template manifest > #then the playwright range lower bound is current [0.10ms]
+
+ 6 pass
+ 0 fail
+ 8 expect() calls
+Ran 6 tests across 1 file. [81.00ms]
