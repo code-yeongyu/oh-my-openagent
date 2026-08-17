@@ -5992,6 +5992,16 @@ var OmoTaskTeamSettingsSchema = object({
 var OmoTaskWarningsSchema = object({
   unavailable_categories: boolean2().default(true)
 }).strict();
+var OmoTaskDagSettingsSchema = object({
+  max_nodes_per_run: number2().int().positive().default(64),
+  max_runs_per_session: number2().int().positive().default(16),
+  subscriber_ring: number2().int().positive().default(1000),
+  heartbeat_ms: number2().int().positive().default(15000),
+  history_default_limit: number2().int().positive().default(256),
+  history_max_limit: number2().int().positive().default(1000),
+  retention_days: number2().int().positive().default(7),
+  max_prompt_bytes: number2().int().positive().default(262144)
+}).strict();
 var OmoTaskSettingsSchema = object({
   default_execution_mode: _enum(["in-process", "process"]).default("in-process"),
   default_concurrency: number2().int().positive().default(5),
@@ -6009,7 +6019,18 @@ var OmoTaskSettingsSchema = object({
     max_members: 8,
     max_parallel_members: 4,
     max_wall_clock_minutes: 120
-  })
+  }),
+  dag: OmoTaskDagSettingsSchema.optional()
+}).strict();
+var OmoTaskDagSettingsLayerSchema = object({
+  max_nodes_per_run: number2().int().positive().optional(),
+  max_runs_per_session: number2().int().positive().optional(),
+  subscriber_ring: number2().int().positive().optional(),
+  heartbeat_ms: number2().int().positive().optional(),
+  history_default_limit: number2().int().positive().optional(),
+  history_max_limit: number2().int().positive().optional(),
+  retention_days: number2().int().positive().optional(),
+  max_prompt_bytes: number2().int().positive().optional()
 }).strict();
 var OmoTaskWaitLayerSchema = object({
   min_ms: number2().int().positive().optional(),
@@ -6037,7 +6058,8 @@ var OmoTaskSettingsLayerSchema = object({
   resume_children: boolean2().optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
-  team: OmoTaskTeamSettingsLayerSchema.optional()
+  team: OmoTaskTeamSettingsLayerSchema.optional(),
+  dag: OmoTaskDagSettingsLayerSchema.optional()
 }).strict();
 function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism) {
   const record2 = record(string2(), unknown()).parse(input);
