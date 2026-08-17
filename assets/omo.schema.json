@@ -11044,6 +11044,9 @@
               "minimum": 10,
               "maximum": 9007199254740991
             },
+            "wakeOnEachCompletion": {
+              "type": "boolean"
+            },
             "circuitBreaker": {
               "type": "object",
               "properties": {
@@ -25658,6 +25661,9 @@
                     "type": "integer",
                     "minimum": 10,
                     "maximum": 9007199254740991
+                  },
+                  "wakeOnEachCompletion": {
+                    "type": "boolean"
                   },
                   "circuitBreaker": {
                     "type": "object",

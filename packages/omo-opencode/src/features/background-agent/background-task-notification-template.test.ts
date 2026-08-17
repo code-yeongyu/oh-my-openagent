@@ -58,6 +58,27 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
       // then
       expect(notification).toBe(expectedNotification)
     })
+
+    test("#when building the partial notification with wakeOnEachCompletion #then it promises per-completion notifications", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "task-1",
+          description: "Index repo",
+          status: "completed",
+        },
+        duration: "42s",
+        statusText: "COMPLETED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+        wakeOnEachCompletion: true,
+      })
+
+      // then
+      expect(notification).toContain("**1 task still in progress.** You will be notified as each task completes.")
+      expect(notification).not.toContain("You WILL be notified when ALL complete.")
+    })
   })
 
   describe("#given one task still running after a failed task notification", () => {

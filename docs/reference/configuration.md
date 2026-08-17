@@ -476,7 +476,8 @@ Control parallel agent execution and concurrency limits.
     "defaultConcurrency": 5,
     "staleTimeoutMs": 180000,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
-    "modelConcurrency": { "anthropic/claude-opus-5": 2 }
+    "modelConcurrency": { "anthropic/claude-opus-5": 2 },
+    "wakeOnEachCompletion": false
   }
 }
 ```
@@ -495,6 +496,7 @@ Control parallel agent execution and concurrency limits.
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
 | `maxToolCalls`              | `200`     | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled`, `maxToolCalls`, `consecutiveThreshold` |
+| `wakeOnEachCompletion`      | `false`   | Wake the parent session after each background task completes. By default the parent is only woken once all of its background tasks finish (or one fails); intermediate results are deposited into the transcript without triggering a turn. |
 
 Priority: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
 
