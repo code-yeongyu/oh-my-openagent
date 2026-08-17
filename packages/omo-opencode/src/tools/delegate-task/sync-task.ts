@@ -37,17 +37,30 @@ export async function executeSyncTask(
     spawnReservation = spawn.reservation
     const { spawnContext } = spawn
 
+    let effectiveCategoryModel = categoryModel
+
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
       agentToUse,
       description: args.description,
       defaultDirectory: directory,
       categoryModel,
+      fallbackChain,
     })
 
     if (!createSessionResult.ok) {
       spawnReservation?.rollback()
       return createSessionResult.error
+    }
+
+    // If session creation used a fallback model, update the effective model
+    // so the rest of the flow (prompt sending, metadata, toast) uses the working model.
+    if (createSessionResult.effectiveCategoryModel) {
+      effectiveCategoryModel = createSessionResult.effectiveCategoryModel
+      log("[executeSyncTask] Session created with fallback model", {
+        original: `${categoryModel?.providerID}/${categoryModel?.modelID}`,
+        fallback: `${effectiveCategoryModel.providerID}/${effectiveCategoryModel.modelID}`,
+      })
     }
 
     const sessionID = createSessionResult.sessionID
@@ -62,7 +75,7 @@ export async function executeSyncTask(
         sessionID: newSessionID,
         parentContext,
         agentToUse,
-        categoryModel,
+        categoryModel: effectiveCategoryModel,
         fallbackChain,
         systemContent,
       })
@@ -101,7 +114,7 @@ export async function executeSyncTask(
         modelInfo,
       })
     }
-    await publishSyncMetadata(sessionID, categoryModel, spawnContext.childDepth)
+    await publishSyncMetadata(sessionID, effectiveCategoryModel, spawnContext.childDepth)
 
     const setSyncSessionID = (currentSessionID: string): void => {
       syncSessionID = currentSessionID
@@ -121,7 +134,7 @@ export async function executeSyncTask(
         },
         parentContext,
         agentToUse,
-        categoryModel,
+        categoryModel: effectiveCategoryModel,
         fallbackChain,
         deps,
         sessionID,
