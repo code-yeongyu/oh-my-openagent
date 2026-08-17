@@ -185,7 +185,7 @@ describe("memory run supervisor IC-8 containment", () => {
           await waitForPath(join(runDir, `win32-graceful-${ledger.childPid}.json`))
         }
         await childExited
-        liveProcesses.delete(ledger.childPid)
+        untrackProcessGroup(ledger.childPid)
         if (process.platform === "win32") {
           expect(existsSync(join(runDir, `win32-graceful-${ledger.childPid}.json`))).toBe(false)
         }
