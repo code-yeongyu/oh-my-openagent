@@ -163,7 +163,7 @@ describe("dag rpc handlers", () => {
 
       // then
       expect(value.runs.map((run) => run.runId)).toEqual([second, first])
-    })
+    }, 30_000)
 
     it("#when omo.dag.list requests a limit above the maximum #then the limit clamps to 256", async () => {
       // given

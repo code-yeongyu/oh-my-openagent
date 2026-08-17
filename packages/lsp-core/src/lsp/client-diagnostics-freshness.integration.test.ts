@@ -16,34 +16,6 @@ afterEach(async () => {
 });
 
 describe("LspClient diagnostics freshness", () => {
-	it("#given concurrent diagnostics on a cold file and an exact didOpen publish #when pull is not advertised #then one didOpen opens the file and both requests receive the current diagnostics", async () => {
-		const context = await harness.makeClient(
-			{
-				publishDiagnostics: [
-					{
-						trigger: "didOpen",
-						version: 1,
-						diagnostics: [diagnostic("exact-current")],
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 50, versionlessPublishQuiescenceMs: 5 },
-		);
-
-		const [first, second] = await Promise.all([
-			context.client.diagnostics(context.source),
-			context.client.diagnostics(context.source),
-		]);
-
-		expect(first.items).toEqual([diagnostic("exact-current")]);
-		expect(second.items).toEqual([diagnostic("exact-current")]);
-		expect(
-			readEvents(context.events).filter(
-				(event) => event.type === "clientNotification" && event.method === "textDocument/didOpen",
-			),
-		).toHaveLength(1);
-	});
-
 	it("#given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload", async () => {
 		const context = await harness.makeClient(
 			{

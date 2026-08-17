@@ -123,6 +123,9 @@ describe("createMemoryComponent", () => {
       loadConfig: () => loadedMemoryConfig(memorySettings()),
       now: () => 123,
       resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
     }).register(pi, ctx)
 
     await pi.dispatch("session_start", {}, sessionContext({ notifications }))
@@ -145,7 +148,7 @@ describe("createMemoryComponent", () => {
     }])
     expect(existsSync(memoryHome)).toBe(false)
     expect(notifications).toEqual([])
-    await pi.dispatch("session_shutdown", {}, sessionContext())
+    memoryModuleSupervisor.release()
   })
 
   test("#given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding", async () => {
