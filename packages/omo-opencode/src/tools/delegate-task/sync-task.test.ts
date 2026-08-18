@@ -618,11 +618,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const { executeSyncTask } = require("./sync-task")
     const createdSessions: string[] = []
+    const createSessionInputs: Array<{ category?: string }> = []
     const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
     const polledSessions: string[] = []
 
     const deps = {
-      createSyncSession: async () => {
+      createSyncSession: async (_client: unknown, input: { category?: string }) => {
+        createSessionInputs.push(input)
         const sessionID = createdSessions.length === 0 ? "ses_first" : "ses_second"
         createdSessions.push(sessionID)
         return { ok: true as const, sessionID }
@@ -681,6 +683,9 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
 
     expect(createdSessions).toEqual(["ses_first", "ses_second"])
+    expect(createSessionInputs).toHaveLength(2)
+    expect(createSessionInputs[0]?.category).toBe("quick")
+    expect(createSessionInputs[1]?.category).toBe("quick")
     expect(polledSessions).toEqual(["ses_first", "ses_second"])
     expect(attemptedModels).toEqual([
       { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast", variant: undefined },

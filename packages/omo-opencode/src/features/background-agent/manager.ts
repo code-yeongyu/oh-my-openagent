@@ -760,7 +760,7 @@ export class BackgroundManager {
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionId,
-        title: `${input.description} (@${input.agent} subagent)`,
+        title: `${input.category ? `[${input.category}] ` : ""}${input.description} (@${input.agent} subagent)`,
         ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
         ...(input.model
           ? {
