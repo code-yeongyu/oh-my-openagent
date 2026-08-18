@@ -1,0 +1,40 @@
+WHAT WAS TESTED
+
+RED command, detached clean worktree at the recorded failing dev commit:
+
+  npm exec --yes --package=bun@1.3.12 -- bun install --frozen-lockfile --ignore-scripts
+  npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+
+RED OBSERVED
+
+  HEAD is now at 001d7ec11 Merge pull request #6947 from code-yeongyu/fix/quick-luna-fast-provider
+  sha=001d7ec117e76b461a6c97a1d2792f2683d94082
+  bun=1.3.12
+  omo-senpi extension build is not current: stale-output
+  output=/Volumes/mengmotaStorage/local-workspaces/omo-wt/qa-stale-bundle-001d7ec1/packages/omo-senpi/plugin/extensions/omo.js
+  exit=1
+
+GREEN command, implementation worktree at current dev:
+
+  npm exec --yes --package=bun@1.3.12 -- bun install --frozen-lockfile --ignore-scripts
+  npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+
+GREEN OBSERVED
+
+  bun install v1.3.12 (700fc117)
+  omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/test-process-stability-20260817/packages/omo-senpi/plugin/extensions/omo.js
+  exit=0
+
+WHY THIS IS ENOUGH
+
+The RED uses the exact merge commit that first introduced the stale generated artifact and the CI-pinned Bun version. The GREEN uses the current dev base of the task worktree and the same checker. This proves the original Ubuntu failure was a source/artifact mismatch and that current dev contains a fresh bundle before this PR changes unrelated test infrastructure.
+
+CLEANUP
+
+  git worktree remove --force /Volumes/mengmotaStorage/local-workspaces/omo-wt/qa-stale-bundle-001d7ec1
+  path_removed=1
+  registry_removed=1
+
+OMITTED
+
+Dependency installation progress noise was omitted. No tokens, credentials, environment dumps, or authentication headers were captured.

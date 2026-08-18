@@ -4,6 +4,7 @@ import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxSessionManager as TmuxSessionManagerType, TmuxUtilDeps } from './manager'
+import { TmuxPollingManager } from './polling-manager'
 import * as sharedModule from '../../shared'
 import * as sharedTmuxOriginal from '../../shared/tmux'
 
@@ -248,6 +249,7 @@ function getFailedReadinessSessions(manager: object): Map<string, { sessionId: s
 describe('TmuxSessionManager', () => {
   beforeEach(() => {
     mock.restore()
+    spyOn(TmuxPollingManager.prototype, 'startPolling').mockImplementation(() => {})
     registerModuleMocks()
     mockQueryWindowState.mockClear()
     mockPaneExists.mockClear()
@@ -1701,6 +1703,7 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
       expect(getTrackedSessions(manager).has('ses_wait')).toBe(true)
+      expect(Reflect.get(Reflect.get(manager, 'pollingManager'), 'pollInterval')).toBeUndefined()
     })
 
     test('#given readiness probe fails #when onSessionCreated runs #then it logs the structured error and does not spawn a pane', async () => {

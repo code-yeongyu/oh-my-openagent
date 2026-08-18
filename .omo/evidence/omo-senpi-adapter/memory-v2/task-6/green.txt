@@ -1,0 +1,62 @@
+=== GREEN: bun test packages/memory-core/src/compile packages/memory-core/src/seeds (todo 6 acceptance domains) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused [236.21ms]
+(pass) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [325.06ms]
+(pass) MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry [3229.28ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.16ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+(pass) compileMemoryBlock > #given nested committed memory #when compiled #then it matches the handcrafted Letta golden [235.69ms]
+(pass) compileMemoryBlock > #given a committed persona and identity #when compiled #then both render under <self> and identity stays out of the generic memory tier [237.45ms]
+(pass) compileMemoryBlock > #given only a committed identity #when compiled #then it renders under <self> without a persona [197.61ms]
+(pass) compileMemoryBlock > #given an empty committed repository #when compiled #then only metadata is emitted [168.41ms]
+(pass) compileMemoryBlock > #given only a committed persona #when compiled #then its description is omitted [203.76ms]
+(pass) compileMemoryBlock > #given nudge turns #when compiled #then metadata includes the behavioral nudge token and count only when requested [198.84ms]
+(pass) compileMemoryBlock > #given a dirty persona edit #when compiled #then only the committed HEAD body appears [201.04ms]
+(pass) compileMemoryBlock > #given a committed binary projection #when compiled #then its name appears without reading its blob [194.44ms]
+(pass) compileMemoryBlock > #given an unreadable committed system file #when compiled #then it is skipped best-effort [225.12ms]
+
+packages/memory-core/src/compile/render.test.ts:
+(pass) memory block sentinels > #given an identity and block #when marked #then the exact sentinel wrapper is returned [0.10ms]
+(pass) memory block sentinels > #given repeated legacy blocks #when replaced #then every matching region is transformed [0.16ms]
+(pass) memory block sentinels > #given no matching block #when replaced #then the sentinel block is appended [0.06ms]
+(pass) memory block sentinels > #given marked regions #when stripped #then only surrounding prompt content remains [0.08ms]
+
+packages/memory-core/src/seeds/seeds.test.ts:
+(pass) default memory seeds > #given the default block label constants > #then they are persona and human in order [6.61ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then it produces three files with expected paths and frontmatter [0.11ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the memory-discipline skill seed path is skills/memory-discipline/SKILL.md [0.05ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the memory-discipline skill frontmatter parses and its description starts with the trigger phrase [0.11ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then every seed file has valid frontmatter with a description [0.08ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona description is 'Persona - who I am' [0.07ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human description is 'Person - Human' [0.06ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona body mentions the memory directory and system projection [0.09ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona body has no letta branding [0.07ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona body has no emojis [0.13ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human seed frontmatter has kind: person and aliases [0.07ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human body is a card-format template (not empty, invites learning) [0.06ms]
+
+ 29 pass
+ 0 fail
+ 76 expect() calls
+Ran 29 tests across 4 files. [6.67s]
+
+=== GREEN: bun test packages/omo-senpi/src/components/memory/prompt.test.ts (template v2 cache key) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v2 soul template [0.47ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [175.95ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [177.32ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata [207.44ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [202.10ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [222.97ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [312.25ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [206.46ms]
+
+ 8 pass
+ 0 fail
+ 28 expect() calls
+Ran 8 tests across 1 file. [1.64s]

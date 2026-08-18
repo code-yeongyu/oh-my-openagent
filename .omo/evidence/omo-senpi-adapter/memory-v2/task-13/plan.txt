@@ -1,0 +1,11 @@
+Task 13 implementation plan
+
+1. RED: add pure machine tests for dream priorities, newest-wins ties, merged pending snapshots, and interleaving one-active invariants.
+2. RED: add reservation tests for durable launcher identity metadata, dream-state success-only updates, and dream request parsing.
+3. RED: add runner/reconciliation tests for canonical run ledgers, final sentinel ordering, outcome success gating, orphan integration, UNKNOWN abandonment, dead-supervisor/live-child handling, pre-launch recovery, and persisted merge policy.
+4. Implement the smallest machine and reservation changes that satisfy those tests.
+5. Extend the existing supervisor launch path and runner finalizer; do not add a parallel launcher or an onSpawn seam.
+6. Add deterministic reconciliation with injected now/liveness/process-identity/watch/signal seams and bounded event-first waits.
+7. Wire session-start reconciliation while preserving concurrent edits.
+8. Run diagnostics for every touched file, scoped tests once, package gate once, and record labelled GREEN evidence.
+9. Stage only explicit task-owned paths plus forced evidence files and create exactly one commit with the required subject.

@@ -76,7 +76,7 @@ function main() {
       timeout: 60_000,
     })
     const transcript = `${printRun.stdout}\n${printRun.stderr}`
-    if (transcript.includes("Continue the active omo ulw-loop run")) {
+    if (transcript.includes("Continue the active omo-agent-toolkit ulw-loop run")) {
       result = "PASS"
       continuationQaPath = "print"
       return print({ result, continuationQaPath, beforeDigest })
@@ -128,11 +128,11 @@ function main() {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const capture = spawnSync(tmuxBin, ["capture-pane", "-pt", tmuxSession, "-S", "-200"], { encoding: "utf8", timeout: 10_000 })
       captureText = capture.stdout
-      if (captureText.includes("Continue the active omo ulw-loop run")) break
+      if (captureText.includes("Continue the active omo-agent-toolkit ulw-loop run")) break
       wait(250)
     }
     continuationQaPath = "tmux"
-    result = captureText.includes("Continue the active omo ulw-loop run") ? "PASS" : "FAIL"
+    result = captureText.includes("Continue the active omo-agent-toolkit ulw-loop run") ? "PASS" : "FAIL"
     return print({ result, continuationQaPath, beforeDigest })
   } finally {
     if (tmuxBin !== null && tmuxSession !== null) {

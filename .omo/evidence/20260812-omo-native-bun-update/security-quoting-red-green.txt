@@ -1,0 +1,19 @@
+Security reviewer quoting delta
+
+RED before renderer change:
+
+- A POSIX path containing `$HOME` and a single quote received JSON double
+  quotes, leaving shell expansion active.
+- Windows paths were JSON-escaped, producing doubled backslashes that shell
+  users could not paste as a valid path.
+
+GREEN after renderer change:
+
+- POSIX paths are single-quoted with embedded quote escaping.
+- Windows paths are normalized to forward slashes and double-quoted.
+- Launcher suite: 32 pass, 0 fail.
+- OMO Native suite: 74 pass, 6 documented environment skips, 0 fail.
+- Full repository typecheck: PASS.
+
+The command remains display-only in OMO/Senpi. The delta makes the displayed
+guidance functionally correct when copied on both platform families.

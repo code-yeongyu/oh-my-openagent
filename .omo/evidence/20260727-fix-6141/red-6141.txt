@@ -1,0 +1,67 @@
+### RED capture - issue #6141 - 2026-07-27T05:28:51Z
+### branch: fix/6141-hephaestus-bedrock-model-id  base upstream/dev @ da2d4a916
+### product code UNMODIFIED (agent.ts diff vs base must be empty):
+### (empty above == no product change yet; only the test file was extended)
+
+=== bun test packages/omo-opencode/src/agents/hephaestus/agent.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-opencode\src\agents\hephaestus\agent.test.ts:
+21 | 
+22 |     // when
+23 |     const supported = bedrockModels.map((model) => isHephaestusSupportedModel(model));
+24 | 
+25 |     // then
+26 |     expect(supported).toEqual([true, true, true, true]);
+                           ^
+error: expect(received).toEqual(expected)
+
+  [
+-   true,
+-   true,
+-   true,
+-   true,
++   false,
++   false,
++   false,
++   false,
+  ]
+
+- Expected  - 4
++ Received  + 4
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\agents\hephaestus\agent.test.ts:26:23)
+(fail) isHephaestusSupportedModel with a hosted vendor prefix > #given Bedrock-hosted gpt-5 ids #when support is checked #then the vendor prefix is ignored [12.93ms]
+32 | 
+33 |     // when
+34 |     const supported = isHephaestusSupportedModel(model);
+35 | 
+36 |     // then
+37 |     expect(supported).toBe(true);
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\agents\hephaestus\agent.test.ts:37:23)
+(fail) isHephaestusSupportedModel with a hosted vendor prefix > #given a region-qualified Bedrock id #when support is checked #then every vendor segment is ignored [2.76ms]
+50 |   );
+51 | }
+52 | 
+53 | function assertHephaestusSupportedModel(model: string | undefined): void {
+54 |   if (!isHephaestusSupportedModel(model)) {
+55 |     throw new UnsupportedHephaestusModelError(model);
+                                                        ^
+UnsupportedHephaestusModelError: Hephaestus only supports GPT-5.3 Codex, GPT-5.4, GPT-5.5, and GPT-5.6 models; received amazon-bedrock/openai.gpt-5.4.
+      at assertHephaestusSupportedModel (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\agents\hephaestus\agent.ts:55:52)
+      at getHephaestusPromptSource (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\agents\hephaestus\agent.ts:62:3)
+      at map (1:11)
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\agents\hephaestus\agent.test.ts:84:35)
+(fail) getHephaestusPromptSource > #given Bedrock-hosted gpt-5 ids #when the prompt source is resolved #then the family-specific prompt is selected [1.68ms]
+
+ 33 pass
+ 3 fail
+ 94 expect() calls
+Ran 36 tests across 1 file. [1.54s]
+EXIT=1

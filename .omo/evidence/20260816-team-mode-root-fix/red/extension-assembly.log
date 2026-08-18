@@ -1,0 +1,20 @@
+Command:
+  bun test packages/omo-senpi/src/components/task/team-service.test.ts packages/senpi-task/src/team/runtime.test.ts packages/senpi-task/src/team/member-respawn.test.ts --bail
+
+Result:
+  RED (exit 1) before extension-assembly production changes.
+
+Observed:
+  The direct create path returned:
+
+    ["/tmp/mock-provider.ts", "/tmp/omo-member.js"]
+
+  Required canonical order:
+
+    ["/tmp/omo-member.js", "/tmp/mock-provider.ts"]
+
+  The persisted-member respawn positive control already returned member-first order.
+
+Why this is valid RED:
+  The assertion proves create and respawn apply different extension ordering to equivalent member launch input.
+  No syntax, import, fixture, timing, dependency, or setup failure occurred.

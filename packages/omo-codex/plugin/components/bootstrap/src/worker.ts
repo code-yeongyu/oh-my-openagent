@@ -167,6 +167,9 @@ export async function runBootstrapWorker(options: RunBootstrapWorkerOptions = {}
 	const platform = options.platform ?? process.platform;
 	const flags = parseWorkerFlags(options.argv ?? []);
 	const steps = options.steps ?? defaultWorkerSteps();
+	if (flags.only !== undefined && !steps.some((step) => step.name === flags.only)) {
+		throw new Error(`unknown --only flag value: ${flags.only}`);
+	}
 	const pluginRoot = resolvePluginRoot(env);
 	const pluginData = resolvePluginDataRoot(env);
 	const statePath = resolveBootstrapStatePath(pluginData);

@@ -5,6 +5,7 @@ export { resolvePromptCacheSafeWaitSeconds, waitForForegroundTask } from "./fore
 export type { ForegroundWaitInput, ForegroundWaitOptions, ForegroundWaitResult, ScheduleDeadline } from "./foreground-wait"
 export { TaskToolParams } from "./params"
 export type { TaskToolParamsStatic } from "./params"
+export { recordSummary } from "./result-details"
 export {
   excerptRendererPromptText,
   excerptRendererText,

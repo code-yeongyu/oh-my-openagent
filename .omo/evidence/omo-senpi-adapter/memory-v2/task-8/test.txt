@@ -1,0 +1,73 @@
+TASK 8 - Facts durable queue + settle enqueue + reconcile
+Commit subject: feat(memory): durable facts queue with crash reconcile
+
+WHAT WAS TESTED
+  1. memory-core facts queue (packages/memory-core/src/facts/queue.test.ts, 15 tests)
+     - enqueue publishes ONE queue file for a fresh journal delta, with the real cursor
+       fields (start/end_message_id, start_line, end_snapshot_line)
+     - duplicate settle on the same cursor publishes nothing (endpoint dedupe)
+     - a later settle starts STRICTLY AFTER the retained entry's endpoint
+     - the consumed.json watermark suppresses a re-enqueue of an already-consumed endpoint
+     - IC-6 filename: colon-free UTC stamp + sha256(conversationId).12 + sha256(endId).8,
+       Windows-legal, and two publications in the SAME millisecond stay collision-free
+     - two concurrent enqueue attempts -> exactly one entry (facts-queue lock domain)
+     - crash window: queue file landed but cursor write did not -> the RETAINED file still
+       anchors the next range (no overlapping republication)
+     - malformed queue file is ignored fail-closed rather than throwing
+     - markConsumed deletes the files and records the endpoint in consumed.json
+  2. omo-senpi facts wiring (packages/omo-senpi/src/components/memory/facts-wiring.test.ts, 7 tests)
+     - settle enqueues via the real TranscriptJournal; duplicate settle does not
+     - facts.enabled=false gates BOTH enqueue and reconcile
+     - session_start reconcile lists a leftover queue file as launchable after a crash
+     - a consumed batch leaves nothing to relaunch
+
+HOW WATERMARK MONOTONICITY WAS PROVEN DETERMINISTICALLY (no racing, no sleeps)
+  The dangerous interleaving is scripted EXPLICITLY, not raced:
+    batch A (through m2) is queued, then batch B (through m4) is queued;
+    B is marked consumed FIRST, then the older A is marked consumed LATE.
+  Assertions: enqueued_through_message_id stays "m4" after BOTH consumptions, and
+  consumed_through_message_id also stays "m4" - the late older batch never rolls either
+  watermark backward. A follow-up test then runs the NEXT settle and asserts the only
+  republished range is ["m5","m6"], i.e. nothing overlapping the retained newer entry.
+  Ordering frame: message ids are opaque and carry no lexical order, and a late batch's
+  OWN entry list does not contain the newer batch's endpoint, so positions inside one
+  batch cannot order two endpoints. Each watermark therefore persists the producing
+  batch's end_snapshot_line (journal length at publication, comparable across batches),
+  and an advance requires a STRICTLY greater boundary. Clocks are injected (no Date.now).
+
+WHAT WAS OBSERVED
+  RED (captured before implementation, red.txt):
+    facts queue core  -> 0 pass / 1 fail (Cannot find module './queue')
+    facts wiring      -> 0 pass / 1 fail (Cannot find module './facts-wiring')
+    Additionally, the first implementation FAILED the monotonicity test 14 pass / 1 fail
+    (consumed watermark regressed m4 -> m2), which is exactly the IC-6 hazard; the
+    snapshot-line ordering frame above is the fix.
+  GREEN:
+    green-facts-queue.txt        -> 15 pass / 0 fail (facts queue)
+    green-facts-wiring.txt       ->  7 pass / 0 fail (facts wiring)
+    green-affected-suites.txt    -> 38 pass / 0 fail (omo-senpi suites touching this change)
+                                    59 pass / 0 fail (memory-core suites touching this change)
+    green-memory-core-suite.txt  -> 375 pass / 0 fail, FULL memory-core package, ONE run
+  Typecheck: zero errors attributable to task-8 files in either package
+    (typecheck-and-baseline.txt).
+
+WHY IT IS ENOUGH
+  Every acceptance criterion of todo 8 has a matching behavioral test: one queue file per
+  new delta, no duplicate on the same cursor, exactly-one under concurrent enqueue (real
+  file lock, not a mock), and a leftover queue file listed for relaunch after a simulated
+  crash. The exactly-once story is tested at its seams - endpoint dedupe, consumed
+  watermark, retained-file anchoring across the cursor-write crash window - and the
+  monotonic enqueue watermark is proven by an explicit interleaving rather than timing.
+
+WHAT WAS OMITTED
+  - No wiring.ts call-site registration. Todo 8 scopes the settle/reconcile wiring to the
+    NEW components/memory/facts-wiring.ts module; the launch half (queue relaunch,
+    batch-trailer check, no_facts terminal, final.json) is todo 9's stated OWNERSHIP.
+    Publishing queue files from the live event loop before todo 9 can drain them would
+    accumulate undrained work. wiring.ts is also being edited concurrently by todo 3.
+  - No live-senpi driver QA: this todo adds no user-visible surface yet (nothing spawns
+    or renders until todo 9 lands the extractor child). Package suites + typecheck are
+    the honest gate at this layer.
+  - Pre-existing failures on pristine origin/dev (8 in packages/omo-senpi, incl. the
+    OMO_BIN ulw-loop test named in the brief) are recorded in typecheck-and-baseline.txt
+    and are NOT from this change; no failing test name contains "facts".

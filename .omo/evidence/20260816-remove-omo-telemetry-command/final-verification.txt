@@ -1,0 +1,52 @@
+# Final scoped verification and self-review
+
+## Commands run (all exit 0)
+
+1. bun test (CI Bun 1.3.12): packages/omo-senpi/src/components/telemetry +
+   packages/omo-senpi/src/omo-native-capture-path.audit.test.ts +
+   script/qa/omo-native-telemetry-qa.test.ts
+   - 74 tests pass, 0 fail (72 telemetry+audit + 2 QA allowlist source).
+2. bun run --cwd packages/omo-senpi typecheck: tsgo --noEmit, clean.
+3. node packages/omo-senpi/plugin/scripts/build-extension.mjs --check:
+   extension build current.
+4. git diff --check: no whitespace errors.
+5. Bundle token audit on plugin/extensions/omo.js:
+   commandToken=false, historyToken=false, noticeToken=true.
+
+## LSP diagnostics (through .local-ignore/lsp-worktrees bridge)
+
+- omo-native-notice.ts: 0 errors
+- omo-native-component.ts: 0 errors
+- omo-native-notice.test.ts: 0 errors
+- omo-native-component.test.ts: 0 errors
+- telemetry/index.ts: 0 errors
+
+## Pure LOC (changed extant TS files, all under 250 ceiling)
+
+- omo-native-notice.ts: 118
+- omo-native-component.ts: 168
+- omo-native-notice.test.ts: 134
+- omo-native-component.test.ts: 199
+- telemetry/index.ts: 139
+
+## Self-review
+
+- Tier LIGHT held: focused deletion inside one existing component plus its tests,
+  docs, and regenerated bundle. No new module, integration, schema, concurrency
+  boundary, auth surface, or cross-domain abstraction was introduced.
+- Criterion 1 (command + history removal): pinned by focused RED->GREEN tests,
+  bundle token audit, and the real xterm.js TUI run where /omo-telemetry fell
+  through to the ordinary prompt path with no handler output.
+- Criterion 2 (disclosure + controls): pinned by mutation proof (3 control tests
+  fail when the gate is bypassed, 9/9 green restored), full scoped suite,
+  disclosure notice visible in the real TUI, enabled run captured 2 requests on
+  the local server, OMO_DISABLE_POSTHOG=1 run captured 0, neither wrote history.
+- No mocks weakened, no tests skipped, no lint suppressed.
+
+## Unrelated observations (not caused by this change)
+
+- script/qa/omo-native-telemetry-qa.mjs currently rejects on current origin/dev
+  behavior: 2 real prompt_submitted events instead of its expected 3. Pre-existing
+  driver strictness; no assertion changed by this task.
+- npm ci in packages/lsp-daemon reports 2 high-severity audit findings.
+  Pre-existing; no dependency versions changed by this task.

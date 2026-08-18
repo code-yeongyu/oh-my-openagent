@@ -4,13 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdirSync, writeFileSync } from "node:fs"
-import {
-	clearSkillCache,
-	resolveSkillContent,
-	resolveMultipleSkills,
-	resolveSkillContentAsync,
-	resolveMultipleSkillsAsync,
-} from "./skill-content"
+import { gitMasterSkill, playwrightSkill } from "../builtin-skills/skills/index"
+import { clearSkillCache, resolveMultipleSkillsAsync } from "./skill-content"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
@@ -50,14 +45,22 @@ describe("resolveMultipleSkillsAsync", () => {
 		// given: builtin skill names
 		const skillNames = ["playwright", "git-master"]
 
-		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		// when: resolving multiple skills async without git-master transformations
+		const result = await resolveMultipleSkillsAsync(skillNames, {
+			directory: testConfigDir,
+			gitMasterConfig: {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "",
+			},
+		})
 
-		// then: all builtin skills resolved
-		expect(result.resolved.size).toBe(2)
+		// then: all builtin skills resolve to their source templates in request order
+		expect([...result.resolved.entries()]).toEqual([
+			["playwright", playwrightSkill.template],
+			["git-master", gitMasterSkill.template],
+		])
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
-		expect(result.resolved.get("git-master")).toContain("Git Master Agent")
 	})
 
 	it("should handle partial success with non-existent skills async", async () => {
@@ -67,10 +70,9 @@ describe("resolveMultipleSkillsAsync", () => {
 		// when: resolving multiple skills async
 		const result = await resolveMultipleSkillsAsync(skillNames)
 
-		// then: existing skills resolved, non-existing in notFound
-		expect(result.resolved.size).toBe(1)
+		// then: the existing skill resolves to its source template and the missing skill is reported
+		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
 		expect(result.notFound).toEqual(["nonexistent-skill-12345"])
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should treat disabled skills as not found async", async () => {
@@ -81,9 +83,8 @@ describe("resolveMultipleSkillsAsync", () => {
 		// #when: resolving multiple skills async with disabled one
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// #then: frontend in notFound, playwright resolved
-		expect(result.resolved.size).toBe(1)
-		expect(result.resolved.has("playwright")).toBe(true)
+		// #then: frontend in notFound, playwright resolves to its source template
+		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
 		expect(result.notFound).toEqual(["frontend"])
 	})
 
@@ -238,16 +239,18 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("resolves nested skill by unique short name in mixed batch", async () => {
 		// given: nested skill and builtin skill
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "short name resolved")
+		const nestedTemplate = "FIXTURE_SYSTEMATIC_DEBUGGING_TEMPLATE"
+		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", nestedTemplate)
 
 		// when: mixing short name with full builtin name
 		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
 
-		// then: both resolved
-		expect(result.resolved.size).toBe(2)
+		// then: both resolve exactly and preserve request order
+		expect([...result.resolved.entries()]).toEqual([
+			["systematic-debugging", nestedTemplate],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("systematic-debugging")).toContain("short name resolved")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("does not resolve ambiguous short name in batch", async () => {
@@ -258,25 +261,27 @@ describe("resolveMultipleSkillsAsync", () => {
 		// when: resolving ambiguous short name with builtin
 		const result = await resolveMultipleSkillsAsync(["nested-debug", "playwright"])
 
-		// then: ambiguous short name not found, playwright resolved
-		expect(result.resolved.size).toBe(1)
-		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.notFound).toContain("nested-debug")
+		// then: ambiguous short name is absent and playwright resolves to its source template
+		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
+		expect(result.notFound).toEqual(["nested-debug"])
 	})
 
 	it("prefers exact match over short name in batch", async () => {
 		// given: an exact skill and a nested skill with same base name
 		const exactDir = join(testConfigDir, "skills", "debugging")
 		mkdirSync(exactDir, { recursive: true })
-		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
-		createNestedSkill(testConfigDir, "toolkit", "debugging", "nested content")
+		const exactTemplate = "FIXTURE_EXACT_DEBUGGING_TEMPLATE"
+		writeFileSync(join(exactDir, "SKILL.md"), `---\nname: debugging\ndescription: exact debugging\n---\n${exactTemplate}`)
+		createNestedSkill(testConfigDir, "toolkit", "debugging", "FIXTURE_NESTED_DEBUGGING_TEMPLATE")
 
 		// when: resolving "debugging" in batch
 		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
 
-		// then: exact match wins
-		expect(result.resolved.size).toBe(2)
+		// then: exact match wins and request order is preserved
+		expect([...result.resolved.entries()]).toEqual([
+			["debugging", exactTemplate],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("debugging")).toContain("exact match content")
 	})
 })

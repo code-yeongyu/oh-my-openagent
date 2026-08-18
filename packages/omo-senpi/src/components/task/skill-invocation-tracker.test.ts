@@ -287,3 +287,247 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
     expect(tracker.stateFor("sess-a").hasPlanArtifact()).toBe(false)
   })
 })
+
+describe("createSkillInvocationTracker - own-words plan request", () => {
+  // The ulw-plan SKILL.md contract (both editions) activates the workflow when the user says
+  // ulw-plan/ulw plan/-skill:ulw-plan OR "asks in their own words for a work plan before coding".
+  // The final clause had no implementation, so users who asked plainly got metis/momus denied.
+  const OWN_WORDS: readonly string[] = [
+    "plan this before coding",
+    "make a plan first",
+    "\uacc4\ud68d\ubd80\ud130 \uc138\uc6cc\uc918",
+    "\uc791\uc5c5 \uacc4\ud68d\uc744 \uba3c\uc800 \uc138\uc6b0\uc790",
+    "before you code, write a work plan",
+  ]
+
+  for (const text of OWN_WORDS) {
+    test(`#given the user asks in their own words (${text}) #when the input arrives #then it counts as a user request`, async () => {
+      // given
+      const pi = new FakeExtensionAPI()
+      const tracker = createSkillInvocationTracker(pi)
+
+      // when
+      await pi.dispatch("input", { type: "input", text, source: "interactive" }, CTX_A)
+
+      // then
+      expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
+    })
+  }
+
+  test("#given an ordinary work instruction with no plan request #when the input arrives #then no user request is recorded", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    for (const text of ["fix the login bug", "\ubc84\uadf8 \uace0\uccd0\uc918", "run the tests and report", "what does this function do?"]) {
+      await pi.dispatch("input", { type: "input", text, source: "interactive" }, CTX_A)
+    }
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+  })
+
+  // A pasted transcript that MENTIONS plan-writing as a noun ("\uacc4\ud68d \uc791\uc131\uae4c\uc9c0\ub9cc \ud5c8\uac00") is not a
+  // request to plan. Found by auditing the matcher against 687 real user messages: it was the only
+  // false positive, and it armed the gate off the agent's own quoted output.
+  test("#given a pasted transcript merely mentioning plan writing #when the input arrives #then no user request is recorded", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: "\uc2b9\uc778\uc740 \uacc4\ud68d \uc791\uc131\uae4c\uc9c0\ub9cc \ud5c8\uac00\ud558\ub294 \uac83\uc774\uace0, \uc2e4\ud589\uc740 \ubcc4\ub3c4\ub85c /start-work\ub85c \uc2dc\uc791\ud569\ub2c8\ub2e4",
+        source: "interactive",
+      },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+  })
+
+  test("#given an explicit korean request to write the plan #when the input arrives #then it counts as a user request", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch("input", { type: "input", text: "\uacc4\ud68d \uc791\uc131\ud574\uc918", source: "interactive" }, CTX_A)
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
+  })
+
+  test("#given a plan request inside an injected ultrawork block #when the input arrives #then no user request is recorded", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      { type: "input", text: "<ultrawork-mode>\nmake a plan first, then execute\n</ultrawork-mode>\nfix the bug", source: "interactive" },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+  })
+})
+
+describe("createSkillInvocationTracker - expanded skill block channel", () => {
+  // senpi expands `-skill:ulw-plan` into an `<skill name="..." location="...">` block BEFORE the
+  // input event fires, so the raw "-skill:" prefix never reaches this handler in practice. Arming
+  // must key off the NAME ATTRIBUTE, never an incidental substring in some other skill's body.
+  test("#given an expanded ulw-plan skill block #when the input arrives #then it counts as invocation and user request", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: '<skill name="ulw-plan" location="/Users/u/.bun/install/global/node_modules/omo-ai/plugin/skills/ulw-plan/SKILL.md"> References are relative to the skill dir.',
+        source: "interactive",
+      },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
+    expect(tracker.stateFor("sess-a").hasInvoked("ulw-plan")).toBe(true)
+  })
+
+  test("#given an expanded block for an unrelated skill whose body mentions ulw-plan #when it arrives #then the gate is not armed", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: '<skill name="review-work" location="/skills/review-work/SKILL.md"> Pairs with ulw-plan for planning.',
+        source: "interactive",
+      },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+    expect(tracker.stateFor("sess-a").hasInvoked("ulw-plan")).toBe(false)
+    expect(tracker.stateFor("sess-a").hasInvoked("review-work")).toBe(true)
+  })
+
+  // Real senpi expansion is `<skill name="X" ...>...body...</skill>` FOLLOWED BY the user's own
+  // typed text. Recording the block name must not swallow that trailing text, or invoking any other
+  // skill in the same message would hide a genuine plan request sitting right after it.
+  test("#given another skill block followed by an own-words plan request #when it arrives #then both are recorded", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: '<skill name="review-work" location="/s/review-work/SKILL.md">\nreview the finished work.\n</skill>\n\nmake a plan first',
+        source: "interactive",
+      },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasInvoked("review-work")).toBe(true)
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
+  })
+
+  test("#given an unrelated skill block whose body mentions ulw-plan and no trailing request #when it arrives #then the gate stays closed", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: '<skill name="review-work" location="/s/review-work/SKILL.md">\nPairs with ulw-plan. Run ulw plan first.\n</skill>\n\nreview the diff',
+        source: "interactive",
+      },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+  })
+
+  test("#given an expanded start-work skill block #when it arrives #then start-work counts as invoked for the forbids check", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      { type: "input", text: '<skill name="start-work" location="/skills/start-work/SKILL.md"> Execute the plan.', source: "interactive" },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasInvoked("start-work")).toBe(true)
+  })
+})
+
+describe("createSkillInvocationTracker - agent-manufacturable sources stay closed", () => {
+  // senpi marks extension-injected text with source "extension" (agent-session emitInput call sites).
+  // An extension is code the model can drive, so that channel must never arm a security gate.
+  test("#given an extension-sourced input naming ulw-plan #when it arrives #then no user request is recorded", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch("input", { type: "input", text: "ulw-plan please", source: "extension" }, CTX_A)
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+  })
+
+  test("#given an extension-sourced expanded skill block #when it arrives #then the gate is not armed", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch(
+      "input",
+      { type: "input", text: '<skill name="ulw-plan" location="/skills/ulw-plan/SKILL.md">', source: "extension" },
+      CTX_A,
+    )
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
+  })
+
+  test("#given an interactive input with no explicit source #when it arrives #then it is treated as user input", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const tracker = createSkillInvocationTracker(pi)
+
+    // when
+    await pi.dispatch("input", { text: "ulw plan for the refactor" }, CTX_A)
+
+    // then
+    expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
+  })
+})

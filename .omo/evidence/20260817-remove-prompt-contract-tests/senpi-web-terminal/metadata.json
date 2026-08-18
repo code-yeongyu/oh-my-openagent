@@ -1,0 +1,27 @@
+{
+  "title": "Senpi local OMO extension prompt-contract QA",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "redacted command"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 120,
+    "rows": 32
+  },
+  "cleanup": "pty pid <redacted-pid> killed",
+  "files": {
+    "png": "terminal.png",
+    "text": "terminal.txt",
+    "ansi": "terminal-ansi.txt",
+    "metadata": "metadata.json"
+  }
+}

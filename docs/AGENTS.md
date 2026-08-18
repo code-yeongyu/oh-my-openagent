@@ -1,10 +1,10 @@
 # docs/ — User-Facing Documentation
 
-**Generated:** 2026-07-17 / 7d664b96b
+**Generated:** 2026-08-10 / 38d268995
 
 ## OVERVIEW
 
-~26 Markdown files across 6 subdirectories (guide, reference, examples, legal, templates, troubleshooting) + root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](../packages/web) consumes some of these (via `web-deploy.yml` triggers).
+27 tracked Markdown files across 6 subdirectories (guide, reference, examples, legal, templates, troubleshooting) + root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](../packages/web) consumes some of these (via `web-deploy.yml` triggers).
 
 ## WHERE TO LOOK
 
@@ -34,6 +34,7 @@
 | Sample configs | [docs/examples/](examples) (default, coding-focused, planning-focused) |
 | Privacy & ToS | [docs/legal/](legal) |
 | Manifesto | [docs/manifesto.md](manifesto.md) |
+| Refreshing the model-capabilities cache | [docs/model-capabilities-maintenance.md](model-capabilities-maintenance.md) |
 | Ollama troubleshooting | [docs/troubleshooting/ollama.md](troubleshooting/ollama.md) |
 | Copyable project rules template | [docs/templates/AGENTS.md.example](templates/AGENTS.md.example) |
 

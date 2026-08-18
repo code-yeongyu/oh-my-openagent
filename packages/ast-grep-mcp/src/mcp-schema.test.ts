@@ -54,8 +54,8 @@ describe("ast_grep scan descriptor: rule-source exclusivity", () => {
   it("#given the scan schema #when inspected #then it publishes the ruleFile XOR inlineRules oneOf", () => {
     const schema = schemaOf("scan");
     expect(schema.oneOf).toEqual([
-      { required: ["ruleFile"], not: { required: ["inlineRules"] } },
-      { required: ["inlineRules"], not: { required: ["ruleFile"] } },
+      { type: "object", required: ["ruleFile"], not: { required: ["inlineRules"] } },
+      { type: "object", required: ["inlineRules"], not: { required: ["ruleFile"] } },
     ]);
     expect(schema.required).toEqual(["paths"]);
   });

@@ -1,0 +1,27 @@
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:5 char:6
++ $a = bun test packages/model-core 2>&1 | Out-String
++      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 337 pass
+ 0 fail
+ 1229 expect() calls
+Ran 337 tests across 32 files. [969.00ms]
+
+=== plugin-handlers ===
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:8 char:6
++ $b = bun test packages/omo-opencode/src/plugin-handlers 2>&1 | Out-St ...
++      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 228 pass
+ 0 fail
+ 573 expect() calls
+Ran 228 tests across 18 files. [1382.00ms]
+

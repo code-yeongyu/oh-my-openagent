@@ -217,7 +217,7 @@ describe("TaskManager start failure security", () => {
   test.each([
     ["depth-exceeded", "In-process child depth limit exceeded."],
     ["session-create-failed", "In-process child session creation failed."],
-    ["child-prompt-failed", "In-process child prompt failed to start."],
+    ["child-prompt-failed", "Child prompt failed to start."],
   ] satisfies readonly (readonly [RunnerFailure["kind"], string])[])(
     "#given a %s RunnerError containing secrets #when a named subagent start fails #then its stable classification preserves the resolved context",
     async (kind, publicMessage) => {

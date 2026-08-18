@@ -9,7 +9,7 @@ export {
   isCategoryChainViable,
   isCategoryGateSatisfied,
 } from "./builtins"
-export { resolveCategory } from "./resolver"
+export { resolveAvailableCategoryNames, resolveCategory } from "./resolver"
 export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,

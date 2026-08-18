@@ -1,0 +1,34 @@
+# Validation GREEN
+
+## What was tested
+
+```bash
+bun test packages/memory-core/src/
+bun run --cwd packages/memory-core typecheck
+bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts
+bun test script/agents-md-dev-env.test.ts
+git diff --check
+```
+
+## What was observed
+
+- memory-core: 319 tests passed, 0 failed, across 36 files.
+- memory-core typecheck: `tsgo --noEmit -p tsconfig.json` exited 0.
+- markdown local-link audit: 16 tests passed, 0 failed; every checked-in local
+  target exists and no maintainer-local path was found.
+- AGENTS dev-environment audit: 4 tests passed, 0 failed.
+- `git diff --check`: no output.
+
+## Why it is enough
+
+The package suite and typecheck prove the documented commands and invariants
+still match a green package. The markdown audit proves the new ancestor link
+resolves and the new guide contains no machine-local link. The AGENTS audit
+protects the existing root instruction contract, and `git diff --check` catches
+formatting defects.
+
+## What was omitted
+
+No OpenCode or Codex runtime QA was run because this change adds package-local
+documentation and does not alter either adapter, hook, tool registry, prompt
+runtime, installer, or shipped machine-consumed configuration.

@@ -1,0 +1,58 @@
+PR #6500 live Codex app-server QA - 2026-07-31
+CORRECTED 2026-08-03 - see the CORRECTION section at the bottom.
+
+WHAT WAS TESTED
+
+1. Canonical driver self-test with the installed native Codex binary:
+   CODEX_BIN=<native-codex.exe> \
+   bash .agents/skills/codex-qa/scripts/app-server-drive.sh --self-test
+2. Canonical local-plugin app-server case:
+   CODEX_BIN=<native-codex.exe> \
+   bash .agents/skills/codex-qa/scripts/app-server-drive.sh --plugin
+
+WHAT WAS OBSERVED
+
+- The self-test returned `ok: true`, `turnStatus: completed`, and the expected
+  local mock-model text: `Hello from the codex-qa mock model.`
+- The plugin case returned `ok: true` and completed a real `codex app-server`
+  turn against the locally installed PR plugin.
+- First-party hook notifications included successful `hook/started` and
+  `hook/completed` pairs for `sessionStart` and `userPromptSubmit`; the driver
+  reported no missing or failed hooks.
+- The plugin hook summary reported `pluginHook: true`.
+- The local mock model handled the turn; no provider API or credential was
+  used.
+- The canonical driver reported the real `~/.codex/config.toml` unchanged
+  before and after both cases.
+
+WHY IT IS ENOUGH
+
+These two cases prove the reviewed local plugin installs and participates in a
+real first-party Codex turn under an isolated `CODEX_HOME`. They do NOT by
+themselves prove the changed Stop hook executed - that proof is in
+`app-server-plugin-expect-stop-20260803.txt`.
+
+WHAT WAS OMITTED
+
+The absolute native Codex binary path, temporary sandbox paths, raw environment
+dumps, credentials, tokens, auth headers, and private configuration were
+redacted or summarized.
+
+CORRECTION - 2026-08-03
+
+An earlier revision of this file listed a third case invoked as
+`EXPECT=stop ... app-server-drive.sh --plugin` and claimed that run "required
+`stop` as an expected hook". That claim was wrong and has been removed.
+
+`app-server-drive.sh` sets `MODE="--self-test"; PROMPT=""; EXPECT=""; KEEP=0`
+at line 57 and populates `EXPECT` only from the `--expect` flag at line 62,
+falling back to `sessionStart,userPromptSubmit` at line 72. An exported
+`EXPECT` environment variable is therefore discarded, so that run asserted only
+the two default events and could not have enforced `stop`.
+
+The case has been rerun correctly with `--plugin --expect stop`. The exact
+captured output is committed as
+`app-server-plugin-expect-stop-20260803.raw.txt`, summarized in
+`app-server-plugin-expect-stop-20260803.txt`. Thanks to the review for catching
+this; the conclusion now rests on an invocation that actually enforces the
+assertion.

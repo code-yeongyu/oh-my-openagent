@@ -1,0 +1,47 @@
+Dependency contract:
+- Target: @code-yeongyu/senpi 2026.8.11-4.
+- All four package surfaces current.
+- No stale 2026.8.11-2 Senpi-family lock entries.
+
+Focused and package verification:
+- OMO Senpi: 56 pass, 0 fail.
+- senpi-task: PASS.
+- OMO Native pin-focused files: 17 pass, 0 fail.
+- OMO Native package: 71 pass, 0 fail, 6 environment skips.
+- OMO Native payload: 494 packed paths, 0 offenders, 7,039,403 bytes.
+- OMO Native isolated version/help/bad-input terminal scenarios: PASS.
+
+Build and type verification:
+- Bun version used for generated/build gates: 1.3.12.
+- Full root build: exit 0, `build: all steps completed`.
+- Full root typecheck: exit 0.
+- Senpi plugin payload: 32 required artifacts present.
+- Required generated Senpi and Codex artifacts retained.
+
+Codex verification:
+- Focused generated installer version test: PASS.
+- Codex QA common self-check: PASS.
+- Isolated installer verification: PASS.
+- Real ~/.codex/config.toml unchanged.
+- Hermetic `test:codex`: 519 pass, 0 fail.
+
+Final stable root suite:
+- 14,427 pass.
+- 11 skip.
+- 0 fail.
+- 1 snapshot.
+- 83,846 expect() calls.
+- 14,438 tests across 1,865 files.
+- Duration: 330.89s.
+
+Cleanup:
+- xterm PTYs killed by the QA harness.
+- Isolated terminal HOME/XDG/Senpi sandbox removed.
+- Temporary LSP symlink removed.
+- Codex QA isolated homes auto-removed.
+- Mock model terminated.
+- No matching build/test/web-terminal QA process remains.
+- `git diff --check`: clean.
+
+Verification result: PASS.
+

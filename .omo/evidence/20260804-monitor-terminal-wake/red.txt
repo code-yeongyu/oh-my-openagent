@@ -1,0 +1,71 @@
+# fix reverted, regression test kept
+$ bun test packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts
+bun test v1.3.14-canary.1 (0d9b296a)
+
+packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts:
+109 | 
+110 |     harness.injector.queueBatch(createRecord(), createBatch(1, false))
+111 |     await harness.injector.flushMonitor("mon_1")
+112 | 
+113 |     expect(harness.calls).toHaveLength(1)
+114 |     expect(harness.calls[0]?.input.body.noReply).toBe(false)
+                                                       ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/tmp/opencode/oh-my-openagent/packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts:114:50)
+(fail) monitor terminal batch parent wake > terminal batch dispatches as a reply-producing prompt [1.64ms]
+134 |     expect(harness.calls).toHaveLength(0)
+135 | 
+136 |     harness.advance(60_000)
+137 |     await harness.injector.flushMonitor("mon_1")
+138 | 
+139 |     expect(harness.calls).toHaveLength(1)
+                                ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/tmp/opencode/oh-my-openagent/packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts:139:27)
+(fail) monitor terminal batch parent wake > terminal batch over the active defer ceiling dispatches while the parent is busy [0.17ms]
+183 |   test("allowEmpty emits a zero-line batch so the exit envelope still reaches the parent", () => {
+184 |     const { batcher, batches } = createBatcher()
+185 | 
+186 |     batcher.flushNow({ allowEmpty: true })
+187 | 
+188 |     expect(batches).toHaveLength(1)
+                          ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/tmp/opencode/oh-my-openagent/packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts:188:21)
+(fail) terminal batch is produced even when the buffer is already drained > allowEmpty emits a zero-line batch so the exit envelope still reaches the parent [0.08ms]
+195 | 
+196 |     batcher.push({ stream: "stdout", seq: 1, text: "QA_BUILD_LINE" })
+197 |     batcher.flushNow()
+198 |     batcher.flushNow({ allowEmpty: true })
+199 | 
+200 |     expect(batches.map((b) => b.batchSeq)).toEqual([1, 2])
+                                                 ^
+error: expect(received).toEqual(expected)
+
+@@ -2,3 +2,3 @@
+    1,
+-   2,
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/tmp/opencode/oh-my-openagent/packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts:200:44)
+(fail) terminal batch is produced even when the buffer is already drained > allowEmpty after a drained buffer keeps batchSeq monotonic [0.15ms]
+
+ 4 pass
+ 4 fail
+ 12 expect() calls
+Ran 8 tests across 1 file. [112.00ms]

@@ -10,6 +10,8 @@ import {
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGrok45Model,
+  isGrok46Model,
   isKimiK2Model,
   isKimiK27Model,
   isKimiK3Model,
@@ -131,6 +133,30 @@ describe("model family detectors", () => {
     expect(isClaudeFableOrMythosModel("anthropic/claude-opus-4-8")).toBe(false)
     expect(isClaudeFableOrMythosModel("anthropic/claude-sonnet-4-6")).toBe(false)
     expect(isClaudeFableOrMythosModel("openai/gpt-5.5")).toBe(false)
+  })
+
+  test("#given Grok 4.5 model ids #then detects Grok 4.5 only", () => {
+    expect(isGrok45Model("xai/grok-4.5")).toBe(true)
+    expect(isGrok45Model("x-ai/grok-4.5")).toBe(true)
+    expect(isGrok45Model("grok-4-5")).toBe(true)
+    expect(isGrok45Model("openrouter/grok-4.5-fast")).toBe(true)
+    expect(isGrok45Model("xai/grok-4.6")).toBe(false)
+    expect(isGrok45Model("xai/grok-4")).toBe(false)
+    expect(isGrok45Model("x-ai/grok-4.20")).toBe(false)
+    expect(isGrok45Model("xai/grok-4-1-fast-reasoning")).toBe(false)
+    expect(isGrok45Model("x-ai/grok-code-fast-1")).toBe(false)
+  })
+
+  test("#given Grok 4.6 model ids #then detects Grok 4.6 only", () => {
+    expect(isGrok46Model("xai/grok-4.6")).toBe(true)
+    expect(isGrok46Model("x-ai/grok-4.6")).toBe(true)
+    expect(isGrok46Model("grok-4-6")).toBe(true)
+    expect(isGrok46Model("openrouter/grok-4.6-fast")).toBe(true)
+    expect(isGrok46Model("xai/grok-4.5")).toBe(false)
+    expect(isGrok46Model("xai/grok-4")).toBe(false)
+    expect(isGrok46Model("x-ai/grok-4.20")).toBe(false)
+    expect(isGrok46Model("xai/grok-4-1-fast-reasoning")).toBe(false)
+    expect(isGrok46Model("x-ai/grok-code-fast-1")).toBe(false)
   })
 
   test("#given MiniMax model ids #then detects MiniMax family only", () => {

@@ -1,0 +1,24 @@
+WHAT WAS TESTED
+Command:
+  cd packages/shared-skills/skills/coding-agent-sessions
+  uv run --with pytest pytest scripts/tests/test_pi_family_scanners.py -vv
+
+WHAT WAS OBSERVED
+Exit code: 0
+Result: 6 passed in 0.02s
+
+Passing coverage:
+- Platform and alias registration.
+- Existing product home stores.
+- Current `.omo` plus legacy `.senpi` stores.
+- Same-ID overlap deduplication.
+- Profile and XDG roots.
+- Cross-platform store isolation.
+
+WHY IT IS ENOUGH
+This is the complete pi-family scanner regression file, including the two new
+tests and every adjacent existing root/isolation test.
+
+WHAT WAS OMITTED
+Repeated pytest environment headers were summarized. No secrets or private
+session contents were captured.

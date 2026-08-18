@@ -1,0 +1,50 @@
+WHAT CHANGED
+
+`packages/omo-opencode/src/cli/run/on-complete-hook.test.ts` now snapshots and
+restores all shell indicators used by `detectShellType()` and clears the Unix
+shell indicators in fixtures that intend to model pure Windows PowerShell or
+cmd environments:
+
+- `BASH_VERSION`
+- `MSYSTEM`
+- `WSL_DISTRO_NAME`
+
+GREEN COMMAND 1
+
+  MSYSTEM=MINGW64 BASH_VERSION=5.2 WSL_DISTRO_NAME= \
+    npm exec --yes --package=bun@1.3.12 -- \
+    bun test packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+GREEN OBSERVED 1
+
+  10 pass
+  0 fail
+  Ran 10 tests across 1 file. [144.00ms]
+
+GREEN COMMAND 2
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+GREEN OBSERVED 2
+
+  10 pass
+  0 fail
+  Ran 10 tests across 1 file. [102.00ms]
+
+WHY THIS IS ENOUGH
+
+The first command reproduces the Git Bash environment that caused the live
+Windows CI failure and now passes. The second proves the fixture change does
+not regress the normal local environment. Production shell detection remains
+unchanged and retains its existing Git Bash behavior.
+
+CLEANUP
+
+No process, server, tmux session, port, or temporary worktree was created by
+these focused test runs. Bun exited normally after each command.
+
+OMITTED
+
+Routine passing assertion lines were summarized by the runner totals. No
+secret-bearing output was captured.

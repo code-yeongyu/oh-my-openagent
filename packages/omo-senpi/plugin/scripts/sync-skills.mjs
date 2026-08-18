@@ -2,6 +2,8 @@
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { createNativeSkillSources } from "./native-skill-sources.mjs"
+import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = dirname(dirname(pluginRoot))
@@ -16,40 +18,7 @@ const skillSources = [
 ]
 const componentSkillNames = new Set(skillSources.map(({ name }) => name))
 
-// Senpi-native skills authored directly against the omo-senpi tool surface (not ported from Codex or
-// the shared pool). They ship verbatim aside from blank-line normalization: no edition rewrite, no
-// section stripping, and no Senpi-compatibility banner (they already speak native Senpi tools).
-const nativeSkillsRoot = join(repoRoot, "omo-senpi", "skills")
-const nativeSkillSources = [
-  {
-    name: "give-me-tips",
-    source: join(nativeSkillsRoot, "give-me-tips"),
-  },
-  {
-    name: "hyperplan",
-    source: join(nativeSkillsRoot, "hyperplan"),
-  },
-  {
-    name: "init-deep",
-    source: join(nativeSkillsRoot, "init-deep"),
-  },
-  {
-    name: "ultrawork",
-    source: join(nativeSkillsRoot, "ultrawork"),
-  },
-  {
-    // Senpi-local override of the shared ulw-plan (omo-opencode consumes the shared file, so the
-    // ast-grep/LSP-first rewrite cannot land there). Seeded from the fully senpi-adapted bundle
-    // output, so it already carries the review-policy overlays and compatibility banner verbatim.
-    name: "ulw-plan",
-    source: join(nativeSkillsRoot, "ulw-plan"),
-  },
-  {
-    name: "ulw-research",
-    source: join(nativeSkillsRoot, "ulw-research"),
-  },
-]
-const nativeSkillNames = new Set(nativeSkillSources.map(({ name }) => name))
+const { sources: nativeSkillSources, names: nativeSkillNames } = createNativeSkillSources(repoRoot)
 
 const textExtensions = new Set([".md", ".yaml", ".yml", ".json", ".txt"])
 const sectionHeadingsToStrip = new Set([
@@ -71,29 +40,6 @@ const ignoredSkillSourceDirNames = new Set([
   "__pycache__",
 ])
 const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json", "openai.yaml"])
-
-const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
-
-export const senpiHarnessToolCompatibility = `## Senpi Harness Tool Compatibility
-
-This skill may include examples copied from the OpenCode harness. In Senpi, do not call OpenCode-only tools such as \`call_omo_agent(...)\`, \`task(...)\`, \`background_output(...)\`, or \`team_*(...)\` literally. Translate those examples to Senpi native tools:
-
-| OpenCode example | Senpi tool to use |
-| --- | --- |
-| \`call_omo_agent(subagent_type="explore", ...)\` | \`task\` tool with \`subagent_type: "explore"\` |
-| \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with \`subagent_type: "librarian"\` |
-| worker/implementation \`task(...)\` | \`task\` tool with \`category\` from the delegation router (\`quick\`, \`unspecified-low\`, \`unspecified-high\`, \`deep\`, \`ultrabrain\`, \`visual-engineering\`, \`writing\`, \`git\`); honor the plan's \`Recommended task executor category:\` line |
-| final-review / gate-reviewer \`task(...)\` | fresh \`task\` with \`category: "unspecified-high"\` (or \`"deep"\`) and an adversarial-verifier prompt; \`momus\`/\`metis\` are plan-gated curated reviewers, spawnable only while the plan gate is open |
-| \`background_output(task_id="...")\` | \`task_output\` tool with the task id |
-| \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, ...); send with \`task_send\`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
-
-If a code block below conflicts with this section, this section wins.
-
-`
-
-const senpiCompatibilityEndMarkers = [
-  "If a code block below conflicts with this section, this section wins.\n\n",
-]
 
 function isTextFile(path) {
   return textExtensions.has(extname(path))
@@ -238,57 +184,6 @@ function insertAfterFrontmatter(content, section) {
   if (!content.startsWith("---\n") || frontmatterEnd === -1) return `${section}${content}`
   const insertAt = frontmatterEnd + "\n---\n".length
   return `${content.slice(0, insertAt)}\n${section}${content.slice(insertAt)}`
-}
-
-function findSenpiCompatibilitySectionEnd(content, searchStart) {
-  const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g
-  structuralEndPattern.lastIndex = searchStart
-  const structuralEnd = structuralEndPattern.exec(content)
-  if (structuralEnd) return structuralEnd.index + 1
-
-  const knownEndMarker = senpiCompatibilityEndMarkers.find((marker) => content.indexOf(marker, searchStart) !== -1)
-  if (knownEndMarker === undefined) return content.length
-
-  return content.indexOf(knownEndMarker, searchStart) + knownEndMarker.length
-}
-
-function removeSenpiCompatibilityGuidance(content) {
-  const heading = "## Senpi Harness Tool Compatibility"
-  let withoutGuidance = content
-
-  while (true) {
-    const start = withoutGuidance.indexOf(heading)
-    if (start === -1) return withoutGuidance
-
-    const end = findSenpiCompatibilitySectionEnd(withoutGuidance, start + heading.length)
-    withoutGuidance = `${withoutGuidance.slice(0, start)}${withoutGuidance.slice(end)}`
-  }
-}
-
-function hasKnownGeneratedSenpiCompatibilityGuidance(content, compatibilityIndex) {
-  return senpiCompatibilityEndMarkers.some((marker) => content.indexOf(marker, compatibilityIndex) !== -1)
-}
-
-export function insertSenpiCompatibilityGuidance(content) {
-  if (!opencodeOnlyOrchestrationPattern.test(content)) return content
-  const firstExampleIndex = content.search(opencodeOnlyOrchestrationPattern)
-  const compatibilityIndex = content.indexOf("## Senpi Harness Tool Compatibility")
-  if (
-    compatibilityIndex !== -1 &&
-    compatibilityIndex < firstExampleIndex &&
-    !hasKnownGeneratedSenpiCompatibilityGuidance(content, compatibilityIndex)
-  ) {
-    return content
-  }
-
-  const contentWithoutGuidance = removeSenpiCompatibilityGuidance(content)
-
-  const frontmatterMatch = contentWithoutGuidance.match(/^---\n[\s\S]*?\n---\n+/)
-  if (!frontmatterMatch) {
-    return `${senpiHarnessToolCompatibility}${contentWithoutGuidance}`
-  }
-
-  return `${frontmatterMatch[0]}${senpiHarnessToolCompatibility}${contentWithoutGuidance.slice(frontmatterMatch[0].length)}`
 }
 
 function applySharedTierAdaptation(skillName, content) {

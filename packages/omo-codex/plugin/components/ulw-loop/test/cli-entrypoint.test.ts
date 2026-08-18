@@ -96,7 +96,7 @@ describe("dist/cli.js entrypoint dispatch", () => {
 
 		expect(result.code).toBe(0);
 		expect(result.stdout).toContain("Usage:");
-		expect(result.stdout).toContain("omo ulw-loop <subcommand>");
+		expect(result.stdout).toContain("omo-agent-toolkit ulw-loop <subcommand>");
 	});
 
 	it("#given a command outside the ulw-loop vocabulary #when invoked with 'frobnicate' #then fails as unknown command", async () => {

@@ -1,0 +1,6 @@
+/omo-telemetry{Enter}omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: 'ast-grep',
+  entry: '/Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/packages/omo-senpi/plugin/runtim
+e/ast-grep-mcp/cli.js'
+}
+⠋ Loading senpi… extensions & models

@@ -154,7 +154,7 @@ describe("build-binaries", () => {
         env: {
           ...process.env,
           BUN_BINARY: join(tempDir, "missing-bun"),
-          OMO_INVOCATION_NAME: "omo",
+          OMO_INVOCATION_NAME: "omo-agent-toolkit",
           OMO_WRAPPER_PACKAGE_ROOT: tempDir,
         },
       });

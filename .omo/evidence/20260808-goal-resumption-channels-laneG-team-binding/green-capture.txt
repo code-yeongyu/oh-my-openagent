@@ -1,0 +1,18 @@
+MUTATION REVERTED: git checkout -- packages/omo-senpi/src/components/task/resumption-channel-emitter.ts
+
+$ bun test packages/omo-senpi/src/components/task/resumption-channel-emitter.test.ts
+
+bun test v1.4.0-canary.1 (45eda514f)
+
+packages/omo-senpi/src/components/task/resumption-channel-emitter.test.ts:
+(pass) createResumptionChannelEmitter > #given a background child #when it spawns and then reaches a terminal state #then snapshots transition from one channel to zero [0.74ms]
+(pass) createResumptionChannelEmitter > #given a foreground owned team member #when the snapshot is emitted #then the member counts as active [0.10ms]
+(pass) createResumptionChannelEmitter > #given a foreground owned team member resolved through the real ownership helper #when the session snapshot is emitted #then the member counts as active [3.15ms]
+(pass) createResumptionChannelEmitter > #given an active child count of one #when a store mutation preserves that count #then no duplicate snapshot is emitted [0.10ms]
+(pass) createResumptionChannelEmitter > #given an ExtensionAPI without events #when the emitter lifecycle is driven #then registration and emissions are harmless no-ops [0.09ms]
+(pass) createResumptionChannelEmitter > #given the local event contract #when the literal is inspected #then it exactly matches the harness event name [0.04ms]
+
+ 6 pass
+ 0 fail
+ 7 expect() calls
+Ran 6 tests across 1 file. [642.00ms]

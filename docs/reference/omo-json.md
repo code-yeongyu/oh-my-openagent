@@ -2,7 +2,7 @@
 
 `omo.json` (or `omo.jsonc`) is the single harness-spanning configuration surface owned by [`@oh-my-opencode/omo-config-core`](../../packages/omo-config-core/AGENTS.md). It is the only config file read by the OpenCode plugin, by the Senpi adapter (task, codegraph, config-watch), and by the Codex codegraph loader. The legacy OpenCode-family files (`oh-my-openagent.json[c]` / `oh-my-opencode.json[c]`) and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration from legacy files](#migration-from-legacy-files)).
 
-Files may be JSONC: `//` comments and trailing commas are allowed. Every schema object is `.strict()`, so unknown keys are rejected and reported as a diagnostic rather than silently ignored.
+Files may be JSONC: `//` comments and trailing commas are allowed. Strict typed blocks reject unknown keys and report a diagnostic rather than silently ignoring them. The `[opencode]` block is intentionally a freeform record so it can carry the full plugin configuration.
 
 ## File locations and precedence
 
@@ -14,7 +14,7 @@ The loader resolves layers in `resolveOmoConfigPaths` and folds them lowest-to-h
 Merge rules (`loader/merge.ts`):
 
 - Plain objects deep-merge recursively.
-- Scalars and arrays replace the lower layer wholesale.
+- Scalars and arrays replace the lower layer wholesale, except `codegraph.excluded_roots`, which unions and deduplicates entries across layers.
 - `__proto__`, `prototype`, and `constructor` keys are stripped from both merge keys and nested values (prototype-pollution guard).
 
 Safety and failure handling:
@@ -64,7 +64,7 @@ No default profiles ship. A profile exists only when you write one under `profil
     "deep": {
       "description": "Deep analysis",
       "model": "anthropic/claude",
-      "reasoningEffort": "high"
+      "reasoning": "high"
     }
   },
   "agents": {
@@ -100,6 +100,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "task": {},           // task engine settings
   "teams": {},          // record<string, TeamSpec>
   "models": {},         // record<string, ModelCatalogEntry>, shared model catalog
+  "telemetry": { "enabled": true }, // Senpi telemetry, enabled by default
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[senpi]": {},        // Senpi-only overrides, typed base keys
   "[codex]": {},        // Codex-only overrides, typed base keys
@@ -113,13 +114,29 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[senpi]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `codegraph`, `task`, `teams`, `models`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[senpi]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `codegraph`, `task`, `teams`, `models`, `memory`, `telemetry`), so a harness-specific override stays schema-checked.
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
 
+### `telemetry` (Senpi harness)
+
+The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to Senpi and is separate from `codegraph.telemetry`.
+
+```jsonc
+{
+  "[senpi]": {
+    "telemetry": {
+      "enabled": false
+    }
+  }
+}
+```
+
+The block may also appear at the shared top level or in profile layers and follows the normal resolution order. Because typed config objects are strict, an older `@oh-my-opencode/omo-config-core` version that predates this key rejects a file containing `telemetry` instead of ignoring it. See [Mixed-version compatibility](#mixed-version-compatibility) before sharing one config across versions.
+
 ### `models` (shared catalog)
 
-A record of short name to catalog entry (`schema/model-catalog.ts`). Each entry is `{ model, reasoning?, temperature?, top_p?, max_tokens?, provider_options? }` and must be `.strict()`-clean:
+A record of short name to catalog entry (`schema/model-catalog.ts`). The canonical strict shape is `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs remain accepted and are normalized to `reasoning`; other tuning fields are not catalog-entry keys.
 
 ```jsonc
 {
@@ -152,6 +169,8 @@ A record of agent name to definition (`schema/agent.ts`).
 | `background` | boolean | |
 | `max_depth` | int >= 0 | |
 | `allowed_subagents` | string[] | |
+| `disallowed_tools` | string[] | |
+| `max_turns` | int >= 0 | |
 | `temperature` | number 0..2 | |
 | `disable` | boolean | |
 
@@ -163,28 +182,6 @@ Deprecated keys accepted for back-compat and rewritten by migration:
 | `reasoningEffort` | `reasoning` | `none` normalizes to `off`. |
 | `textVerbosity` | `provider_options.textVerbosity` | Provider-native passthrough. |
 | `fallback_models` | `models` | Ordered model list. |
-
-#### Builtin agents
-
-### `agents`
-
-A record of agent name to definition (`schema/agent.ts`).
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `description` | string | |
-| `prompt` | string | |
-| `model` | string | |
-| `models` | model entries | fallback chain; each entry is a bare string or `{ model, variant?, reasoningEffort? }` (see [fallback models](#fallback-models)) |
-| `variant` | string | default variant for this agent's models; a per-entry `variant` overrides it |
-| `reasoningEffort` | `none \| minimal \| low \| medium \| high \| xhigh \| max` | default effort for this agent's models; a per-entry `reasoningEffort` overrides it |
-| `tools` | record<string, boolean> | |
-| `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
-| `background` | boolean | |
-| `max_depth` | int >= 0 | |
-| `allowed_subagents` | string[] | |
-| `temperature` | number 0..2 | |
-| `disable` | boolean | |
 
 #### Builtin agents
 
@@ -236,7 +233,7 @@ CodeGraph MCP settings (`schema/codegraph.ts`), read by all three harnesses. Def
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `daemon` | boolean | `true` | When `true`, the pin is omitted so upstream CodeGraph may use its shared daemon. When `false`, the managed MCP environment pins `CODEGRAPH_NO_DAEMON=1`, so each Senpi session uses its own in-process CodeGraph server. |
+| `daemon` | boolean | `true` | Applies to Codex and OpenCode. When `true`, the pin is omitted so upstream CodeGraph may use its shared daemon. When `false`, the managed MCP environment pins `CODEGRAPH_NO_DAEMON=1`. Senpi does not support this setting. |
 
 `OMO_CODEGRAPH_DAEMON` overrides `codegraph.daemon`, which overrides the default: **environment > config > default (`true`)**. The environment values `1`, `true`, and `yes` select daemon mode; `0`, `false`, and `no` select no-daemon mode. An unset, empty, or unrecognized value defers to `codegraph.daemon`.
 
@@ -250,7 +247,7 @@ CodeGraph MCP settings (`schema/codegraph.ts`), read by all three harnesses. Def
 
 ### `task`
 
-Task engine settings; every field has a default, so the whole object is optional (`schema/task.ts`).
+Task engine settings. The whole object is optional, but `provider_concurrency`, `model_concurrency`, `state_dir`, and `reattach_on_reconcile` are optional and remain unset when omitted (`schema/task.ts`).
 
 | Field | Type | Default |
 |-------|------|---------|
@@ -259,9 +256,12 @@ Task engine settings; every field has a default, so the whole object is optional
 | `provider_concurrency` | record<string, positive int> | unset |
 | `model_concurrency` | record<string, positive int> | unset |
 | `max_depth` | int >= 0 | `1` |
-| `residency_max_children` | positive int | `8` |
+| `residency_max_children` | positive int or `"unlimited"` | effective default `max(8, availableParallelism() * 3)` |
 | `ttl_ms` | positive int | `86400000` (24h) |
-| `state_dir` | string | unset (defaults to `<project>/.omo/senpi-task`) |
+| `state_dir` | string | unset (runtime uses `<project>/.omo/senpi-task`) |
+| `reattach_on_reconcile` | boolean | unset |
+| `resume_children` | boolean | `true` |
+| `warnings.unavailable_categories` | boolean | `true` |
 | `wait.min_ms` | positive int | `5000` |
 | `wait.default_ms` | positive int | `60000` |
 | `wait.max_ms` | positive int | `600000` |
@@ -345,9 +345,10 @@ The migration engine rewrites the persisted config in place, and doctor reports 
   },
   "categories": {
     "deep": {
-      "model": "anthropic/claude-opus-5",
-      "reasoningEffort": "high",
-      "fallback_models": ["anthropic/claude-sonnet-4-5"]
+      "models": [
+        { "model": "anthropic/claude-opus-5", "reasoning": "high" },
+        "anthropic/claude-sonnet-4-5"
+      ]
     }
   },
   "agents": {
@@ -374,7 +375,7 @@ Before the unification, the OpenCode plugin read a walked `oh-my-openagent.json[
 
 - The legacy OpenCode user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy `profiles/<name>/` directory becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; project `.opencode/` files import into that project's `.omo/omo.jsonc`.
 - `~/.omo/config.jsonc` imports its shared `codegraph` settings and its `[opencode]` / `[codex]` blocks; a legacy `[omo]` block maps to `[senpi]`.
-- No-clobber: a value already present in the target wins, and skipped legacy values surface as diagnostics. Legacy migration history is preserved under `legacy_migrations`, and applied migrations are marked in the target's `_migrations` array (`2026-07-opencode-config-unification` for the `oh-my-*` files, `2026-07-codex-config-jsonc` for `~/.omo/config.jsonc`).
+- No-clobber: a value already present in the target wins, and skipped legacy values surface as diagnostics. Legacy migration history is preserved under `legacy_migrations`, and applied migrations are marked in the target's `_migrations` array (`2026-07-opencode-config-unification` for the `oh-my-*` files, `2026-07-codex-config-jsonc` for `~/.omo/config.jsonc`, and `2026-08-reasoning-unification` for persisted model and reasoning fields).
 - Sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`).
 - Triggers: OpenCode plugin startup, Senpi startup, and install run both migration groups; Codex startup runs only the `config.jsonc` group; `oh-my-openagent config migrate` runs both on demand (`--dry-run`, `--json`).
 

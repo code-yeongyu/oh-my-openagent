@@ -69,6 +69,13 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         reason: outcome.reason,
         suggestion: outcome.suggestion,
       })
+    case "one_shot_agent":
+      return toolResult(outcome.message, {
+        kind: "one_shot_agent",
+        task_id: outcome.task_id,
+        agent: outcome.agent,
+        message: outcome.message,
+      })
     case "scope_denied":
       return toolResult(outcome.reason, {
         kind: "scope_denied",

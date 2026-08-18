@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { AGENT_INTERACTION_POLICIES } from "../../agents"
 import type { SendInput, SendOutcome } from "../../steering"
-import { baseSpec, cleanupProjects, makeManager } from "../../manager/__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "../../manager/__fixtures__/manager-fakes"
 import { createMemberScopedTaskSendTool, createTaskSendTool, runTaskSend } from "./send"
 import type { TeamToolsService } from "../team/types"
 import type { SendManager } from "./types"
@@ -140,5 +141,68 @@ describe("runTaskSend", () => {
     const result = await runTaskSend(manager, { to: started.task_id, message: "revive?" }, "p1")
 
     expect(result.details.kind).toBe("not_continuable")
+  })
+})
+
+describe("runTaskSend one-shot agent refusal", () => {
+  test("#given a running momus child #when task_send targets it #then the send is refused with the registry reminder and nothing is delivered", async () => {
+    // given
+    const inProcess = new FakeRunner()
+    const { manager } = makeManager({ inProcess })
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "momus" }))
+    if (started.kind !== "started") throw new Error("expected started")
+
+    // when
+    const result = await runTaskSend(manager, { to: started.task_id, message: "please reconsider" }, "p1")
+
+    // then
+    expect(result.details.kind).toBe("one_shot_agent")
+    if (result.details.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
+    expect(result.details.task_id).toBe(started.task_id)
+    expect(result.details.agent).toBe("momus")
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(text).toContain("<system-reminder>")
+    expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual([])
+    expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
+  })
+
+  test("#given a completed resident momus child #when task_send targets it #then the send is refused with the registry reminder and no revive occurs", async () => {
+    // given
+    const inProcess = new FakeRunner()
+    const { manager, store } = makeManager({ inProcess })
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "momus" }))
+    if (started.kind !== "started") throw new Error("expected started")
+    inProcess.handles.get(started.task_id)?.settle({ status: "completed", finalResponse: "review done" })
+    await flush()
+    expect(store.load(started.task_id)?.status).toBe("completed")
+
+    // when
+    const result = await runTaskSend(manager, { to: started.task_id, message: "another round?" }, "p1")
+
+    // then
+    expect(result.details.kind).toBe("one_shot_agent")
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
+    expect(store.load(started.task_id)?.status).toBe("completed")
+  })
+
+  test("#given a completed resident non-momus child #when task_send targets it #then it still revives (regression guard)", async () => {
+    // given
+    const inProcess = new FakeRunner()
+    const { manager, store } = makeManager({ inProcess })
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "explore" }))
+    if (started.kind !== "started") throw new Error("expected started")
+    inProcess.handles.get(started.task_id)?.settle({ status: "completed", finalResponse: "first pass" })
+    await flush()
+    expect(store.load(started.task_id)?.status).toBe("completed")
+
+    // when
+    const result = await runTaskSend(manager, { to: started.task_id, message: "second pass" }, "p1")
+
+    // then
+    expect(result.details.kind).toBe("revived")
+    expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual(["second pass"])
   })
 })

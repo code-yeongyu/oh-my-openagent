@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { availableParallelism, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
@@ -83,7 +83,8 @@ const EXPECTED_CONFIG = {
     default_concurrency: 5,
     default_execution_mode: "in-process",
     max_depth: 1,
-    residency_max_children: 8,
+    residency_max_children: Math.max(8, availableParallelism() * 3),
+    resume_children: true,
     team: {
       max_members: 8,
       max_parallel_members: 4,

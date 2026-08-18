@@ -1,0 +1,54 @@
+POST-REBASE VALIDATION
+
+Base: origin/dev at ed723a3901fd6c14ea55b21aa8afcac28a87b6d7
+
+Automated gates:
+
+- bun run typecheck: exit 0 across root, script, and every package.
+- bun run build: exit 0; all build steps completed.
+- bun run test:codex: exit 0; final Node section 492 passed, 0 failed.
+- bun test: exit 0; 15,613 passed, 7 existing platform/TUI skips, 0 failed,
+  131,764 assertions, 2,048 files.
+- Senpi extension and staged LSP, ast-grep, and agent-toolkit runtimes:
+  current under CI Bun 1.3.12.
+- Prompt scanner: 2,297 tracked tests, 1,910 candidates, 1,910 allowed,
+  0 unclassified, 0 forbidden, 0 stale.
+- Prompt scanner regression suite: 15 passed.
+- StyleGallery routing suite after removing its prose-only test: 3 passed.
+- Codex installer version and bundle freshness: 3 passed.
+
+Baseline repair:
+
+- Current dev manifests were version 5.0.0-beta.8 while the committed generated
+  Codex installer embedded 5.0.0-beta.7.
+- The focused version test failed in isolation before regeneration.
+- bun run build:codex-install refreshed only
+  packages/omo-codex/scripts/install-dist/install-local.mjs.
+- The version and bundle-freshness tests then passed 3/3.
+
+Real-surface QA:
+
+- OpenCode serve/wake probe: RESULT=FIXED; terminal_stops=1;
+  child_task_sessions=1; route_live_dispatch=true; real DB count unchanged
+  (exact count redacted).
+- Codex app-server: mock turn completed; hook/completed observed for
+  sessionStart, userPromptSubmit, and stop; real config hash unchanged.
+- Codex installer verification: plugin cache 5.0.0-beta.8 present;
+  omo@sisyphuslabs enabled; 10 component bins and agent TOMLs linked in the
+  isolated home; real config hash unchanged.
+- Senpi CLI: PASS; ultraworkInjected=true; commentChecker=PASS;
+  realSenpiUntouched=true.
+
+QA retry disclosure:
+
+The first Codex installer verification was launched concurrently with the
+app-server QA, and both attempted to build the same plugin tree. It failed
+while reading a concurrently rewritten JSON file. The app-server run completed
+successfully, and the installer verification was rerun alone and passed. The
+serial rerun is the authoritative installer result.
+
+Cleanup:
+
+All QA helpers removed their isolated homes, mock processes, and temporary
+state. Raw credentials, environment dumps, authorization headers, and private
+logs were not captured.

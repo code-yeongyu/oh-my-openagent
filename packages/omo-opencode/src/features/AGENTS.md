@@ -1,6 +1,6 @@
-# src/features/ — 22 Feature Modules
+# src/features/ — 23 Feature Modules
 
-**Generated:** 2026-06-08
+**Generated:** 2026-08-07
 
 ## OVERVIEW
 
@@ -31,6 +31,8 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 | **claude-tasks** | MEDIUM | yes | Sisyphus task schema + atomic file storage + OpenCode todo API sync |
 | **task-toast-manager** | MEDIUM | no | Task progress notifications |
 | **claude-code-session-state** | LOW | no | Subagent session state tracking |
+| **monitor** | MEDIUM | no | `monitor_*` tools backend: managed watcher processes, line filtering, ring buffer, batched output injection (gated on `monitor.enabled`) |
+| **tui-sidebar** | MEDIUM | no | TUI sidebar snapshot builder + mirror manager (roster/state derivers rendered into the OpenCode TUI; gated on `tui.sidebar.enabled`) |
 
 ## KEY MODULES
 

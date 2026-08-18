@@ -125,25 +125,26 @@ export async function withEnvAsync<T>(patch: Record<string, string | undefined>,
   return withEnv(patch, run)
 }
 
-export function createTempOmoBin(stdout = activeStatus()): { dir: string; bin: string; cleanup: () => void } {
+export function createTempOmoBin(stdout = activeStatus(), name = "omo"): { dir: string; bin: string; cleanup: () => void } {
   const nodeExecutable = resolveNodeExecutable()
   const dir = mkdtempSync(join(tmpdir(), "omo-senpi-ulw-loop-"))
-  const bin = join(dir, process.platform === "win32" ? "omo.cmd" : "omo")
-  const runner = join(dir, "omo-runner.cjs")
+  const bin = join(dir, process.platform === "win32" ? `${name}.cmd` : name)
+  const runner = join(dir, `${name}-runner.cjs`)
   writeFileSync(
     runner,
     [
       "const { realpathSync, writeFileSync } = require('node:fs')",
       `writeFileSync(${JSON.stringify(join(dir, "cwd.txt"))}, realpathSync(process.cwd()))`,
       `writeFileSync(${JSON.stringify(join(dir, "runtime.json"))}, JSON.stringify({ bunVersion: process.versions.bun ?? null }))`,
+      `writeFileSync(${JSON.stringify(join(dir, "argv.json"))}, JSON.stringify(process.argv.slice(2)))`,
       `process.stdout.write(${JSON.stringify(`${stdout}\n`)})`,
       "",
     ].join("\n"),
   )
   const script =
     process.platform === "win32"
-      ? `@echo off\r\n"${nodeExecutable}" "${runner}"\r\n`
-      : `#!/bin/sh\n'${nodeExecutable.replace(/'/g, "'\\''")}' '${runner.replace(/'/g, "'\\''")}'\n`
+      ? `@echo off\r\n"${nodeExecutable}" "${runner}" %*\r\n`
+      : `#!/bin/sh\n'${nodeExecutable.replace(/'/g, "'\\''")}' '${runner.replace(/'/g, "'\\''")}' "$@"\n`
   writeFileSync(bin, script)
   chmodSync(bin, 0o755)
   return {
@@ -155,6 +156,34 @@ export function createTempOmoBin(stdout = activeStatus()): { dir: string; bin: s
 
 export function readRealCwd(dir: string): string {
   return realpathSync(readFileSync(join(dir, "cwd.txt"), "utf8").trim())
+}
+
+export function readRunnerArgv(dir: string): string[] {
+  return JSON.parse(readFileSync(join(dir, "argv.json"), "utf8")) as string[]
+}
+
+export function createTempStderrFloodScript(
+  byteCount: number,
+  stdout = activeStatus(),
+): { dir: string; script: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), "omo-senpi-ulw-loop-flood-"))
+  const script = join(dir, "flood.js")
+  writeFileSync(
+    script,
+    [
+      `const total = ${byteCount}`,
+      'const chunk = Buffer.alloc(64 * 1024, "x")',
+      "let remaining = total",
+      "while (remaining > 0) {",
+      "  const slice = chunk.subarray(0, Math.min(chunk.length, remaining))",
+      "  process.stderr.write(slice)",
+      "  remaining -= slice.length",
+      "}",
+      `process.stdout.write(${JSON.stringify(`${stdout}\n`)})`,
+      "",
+    ].join("\n"),
+  )
+  return { dir, script, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
 export function readRunnerRuntime(dir: string): { bunVersion: string | null } {

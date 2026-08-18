@@ -19,21 +19,32 @@ export async function checkCodexRuntimeWrapper(deps: CodexRuntimeWrapperDoctorDe
   const codexHome = resolve(deps.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"))
   const binDir = resolveCodexInstallerBinDir({ binDir: deps.binDir, codexHome, env: process.env })
   const platform = deps.platform ?? process.platform
-  const wrapperPath = join(binDir, platform === "win32" ? "omo.cmd" : "omo")
-  const wrapper = await readRuntimeWrapper(wrapperPath)
+  const wrapperPath = join(binDir, platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit")
+  const legacyWrapperPath = join(binDir, platform === "win32" ? "omo.cmd" : "omo")
+  const [wrapper, legacyWrapper] = await Promise.all([readRuntimeWrapper(wrapperPath), readRuntimeWrapper(legacyWrapperPath)])
   const issues: DoctorIssue[] = []
 
   if (wrapper?.includes(RUNTIME_WRAPPER_MARKER) === true) {
     const targetPath = parseRuntimeTargetPath(wrapper)
     if (targetPath !== null && !existsSync(targetPath)) {
       issues.push({
-        title: "omo runtime wrapper target is missing",
-        description: `Generated omo runtime wrapper at ${wrapperPath} points to missing target ${targetPath}.`,
+        title: "omo-agent-toolkit runtime wrapper target is missing",
+        description: `Generated omo-agent-toolkit runtime wrapper at ${wrapperPath} points to missing target ${targetPath}.`,
         fix: `Run: ${REINSTALL_COMMAND}`,
         severity: "warning",
         affects: ["ulw-loop"],
       })
     }
+  }
+
+  if (legacyWrapper?.includes(RUNTIME_WRAPPER_MARKER) === true) {
+    issues.push({
+      title: "Legacy omo runtime wrapper is still installed",
+      description: `Generated legacy omo runtime wrapper remains at ${legacyWrapperPath} and may execute an outdated cached CLI.`,
+      fix: `Run: ${REINSTALL_COMMAND}`,
+      severity: "warning",
+      affects: ["version routing"],
+    })
   }
 
   return {

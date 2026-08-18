@@ -1,0 +1,6 @@
+(pass) run finalization publication races > #given attempt two and a stale attempt-one outcome #when current attempt is confirmed dead #then stale outcome is ignored [330.38ms]
+
+ 590 pass
+ 0 fail
+ 1646 expect() calls
+Ran 590 tests across 99 files. [88.48s]

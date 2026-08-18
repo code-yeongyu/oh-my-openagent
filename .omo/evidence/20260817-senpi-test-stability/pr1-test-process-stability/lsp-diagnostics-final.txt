@@ -1,0 +1,19 @@
+FINAL LSP DIAGNOSTICS
+
+  test-setup.ts: 0 diagnostics
+  script/ensure-vendored-lsp-daemon.ts: 0 diagnostics
+  script/ensure-vendored-lsp-daemon.test.ts: 0 diagnostics
+  script/fixtures/vendored-lsp-build-owner.ts: 0 diagnostics
+  packages/omo-opencode/src/cli/run/on-complete-hook.test.ts: 0 diagnostics
+  packages/omo-senpi/src/components/onboarding/state.test.ts: 0 diagnostics
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts: 0 diagnostics
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-harness.ts: 0 diagnostics
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-exit-resources.ts: 0 diagnostics
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-process-groups.ts: 0 diagnostics
+
+Temporary bridge:
+
+  created for final diagnostics
+  removed after diagnostics
+  bridge_remaining=0
+

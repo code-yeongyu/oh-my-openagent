@@ -1,0 +1,29 @@
+Focused GREEN:
+  bun test \
+    packages/senpi-task/src/team/member-revival.test.ts \
+    packages/senpi-task/src/lifecycle/reconcile.test.ts \
+    packages/senpi-task/src/lifecycle/reconcile-revival.test.ts \
+    packages/omo-senpi/src/components/task/member-liveness.test.ts \
+    packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts
+
+Result:
+  65 pass
+  0 fail
+  211 expectations
+
+Observed behavior:
+  - a normal session shutdown still pre-suspends resident members for revival;
+  - an unsuspended resident with a dead process is treated as a crash when reattach is disabled;
+  - non-terminal records transition to lost as before;
+  - immutable terminal turn status remains completed, while the later process death is recorded with
+    `killed:true`, an abnormal reason, `reconcile_lost`, and disposed residency;
+  - liveness reports that process death with `lastKnownState:"completed"`;
+  - suspended `persisted_only` and `rpc_detached` records remain exempt from false death messages;
+  - restart scanning re-observes terminal records even when reconciliation has no outcome.
+
+Typechecks:
+  packages/senpi-task: exit 0
+  packages/omo-senpi: exit 0
+
+LSP:
+  reconcile-crashed-resident.ts: 0 diagnostics

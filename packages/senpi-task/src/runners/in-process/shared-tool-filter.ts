@@ -2,15 +2,15 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 
 // The shared-MCP-client mechanism: sharedParentTools are the parent extension's own
 // registered ToolDefinitions (same process, same execute closures, same client instances).
-// The task/team tool family is excluded so a child cannot spawn or coordinate its own
-// task/team graph; memberScopedTools (merged afterwards) are the ONLY sanctioned bypass.
+// The task/team tool family and lead-only DAG orchestrator are excluded so a child cannot spawn
+// or coordinate its own graph; memberScopedTools (merged afterwards) are the ONLY sanctioned bypass.
 
 export type SharedToolFilterOptions = {
   readonly uiOnlyToolNames?: Iterable<string>
 }
 
 export function isTaskOrTeamFamilyTool(name: string): boolean {
-  return name === "task" || name.startsWith("task_") || name.startsWith("team_")
+  return name === "dag" || name === "task" || name.startsWith("task_") || name.startsWith("team_")
 }
 
 export function filterSharedParentTools(

@@ -161,19 +161,10 @@ export function buildDraft(slug, intent, { reviewRequired = false } = {}) {
 plan_path: .omo/plans/${slug}.md
 plan_sha256: null
 review_round_id: null
+review_round_limit: 5
 pending-action: write and review .omo/plans/${slug}.md
 review:
   momus:
-    status: pending
-    workspace_root: null
-    runtime_home: null
-    target: .omo/plans/${slug}.md
-    round_id: null
-    plan_sha256: null
-    launch_id: null
-    session: null
-    result: null
-  independent:
     status: pending
     workspace_root: null
     runtime_home: null
@@ -254,7 +245,7 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
 ## Verification strategy
 > Zero human intervention - all verification is agent-executed.
 - Test decision: <TDD | tests-after | none> + framework
-- Evidence: <attemptDir>/task-<N>-${slug}.<ext> (attemptDir = currentAttemptDir from 'omo ulw-loop status --json', .omo/evidence/ulw/<session>/<goalId>/a<attempt>; outside ulw-loop use .omo/evidence/)
+- Evidence: <attemptDir>/task-<N>-${slug}.<ext> (attemptDir = currentAttemptDir from 'omo-agent-toolkit ulw-loop status --json', .omo/evidence/ulw/<session>/<goalId>/a<attempt>; outside ulw-loop use .omo/evidence/)
 
 ## Execution strategy
 ### Parallel execution waves

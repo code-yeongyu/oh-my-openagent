@@ -150,7 +150,7 @@ This is NOT a default choice - it's for genuinely unclassifiable moderate-effort
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).
+THIS CATEGORY USES GROK 4.6 (xhigh).
 
 **PROVIDE CLEAR STRUCTURE:**
 1. MUST DO: Enumerate required actions explicitly
@@ -182,7 +182,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "unspecified-low",
-    config: { model: "openai/gpt-5.6-luna", variant: "xhigh" },
+    config: { model: "xai/grok-4.6", variant: "xhigh" },
     description: "Tasks that don't fit other categories, low effort required",
     promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },

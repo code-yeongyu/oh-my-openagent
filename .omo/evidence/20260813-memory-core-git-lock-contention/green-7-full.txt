@@ -1,0 +1,13 @@
+mc
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.10ms]
+
+ 489 pass
+ 0 fail
+ 4098 expect() calls
+Ran 489 tests across 60 files. [76.58s]
+
+comp
+613 pass
+ 0 fail
+ 1724 expect() calls
+Ran 613 tests across 101 files. [91.41s]

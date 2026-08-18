@@ -126,6 +126,12 @@ exactly `objective`; do not include `status`. Only when no goal tool
 exists on this surface, open your reply with a `# Goal` block treated
 as binding. Goals are unlimited; never invent a numeric budget or
 limit.
+Check `get_goal` first: continue a matching active goal instead of
+duplicating one; surface a conflicting one. Write the objective
+outcome-first: the concrete thing that will be TRUE when done (an
+outcome, never an activity), the named deliverable surfaces, and
+explicit scope bounds — a vague objective produces vague criteria,
+and vague criteria cannot be proven.
 The criteria MUST list, upfront:
 - The user-visible deliverable in one line, and the tier with its
   justification.

@@ -36,10 +36,8 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		// then
 		const parsed = parseBlockOutput(output);
 		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("너는 방금 작업을 완료했다고 보고했고, 그건 거짓말이다.");
 		expect(parsed.reason).toContain(".omo/evidence/");
 		expect(parsed.reason).toContain("EVIDENCE_RECORDED: <path>");
-		expect(parsed.reason).not.toContain("2번째");
 	});
 
 	it("#given a prior blocked stop #when lazycodex executor stops again #then escalates the attempt count", () => {
@@ -51,8 +49,9 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		const output = runSubagentStopHook(createInput(cwd), nodeFileSystem);
 
 		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toContain("2번째");
+		expect(parseBlockOutput(output).decision).toBe("block");
+		const statePath = join(cwd, ".omo", "lazycodex-executor-verify", "sess.1-agent_1.json");
+		expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({ attempts: 2 });
 	});
 
 	it("#given turn_id is omitted #when lazycodex executor stops #then the hook still parses the payload", () => {
@@ -392,19 +391,6 @@ describe("tier worker receipt enforcement", () => {
 			expect(matcher.test("lazycodex-executor")).toBe(false);
 			expect(matcher.test("explorer")).toBe(false);
 			expect(matcher.test("lazycodex-gate-reviewer")).toBe(false);
-		}
-	});
-
-	it("#given the tier worker TOMLs #when inspected #then each instructs the EVIDENCE_RECORDED receipt line", () => {
-		for (const tier of ["low", "medium", "high"]) {
-			// when
-			const toml = readFileSync(
-				new URL(`../../ultrawork/agents/lazycodex-worker-${tier}.toml`, import.meta.url),
-				"utf8",
-			);
-
-			// then
-			expect(toml).toContain("EVIDENCE_RECORDED: <path>");
 		}
 	});
 });

@@ -18,6 +18,10 @@ const PROJECT_RULES_ENV = {
 	CODEX_RULES_MAX_RULE_CHARS: "30000",
 };
 
+// Runtime sentinel: the rules hook emits and re-greps this marker when
+// deduplicating injected rules against the transcript (transcript-rule-filter.ts).
+const INSTRUCTIONS_FROM = "Instructions from: ";
+
 afterEach(() => {
 	for (const directory of tempDirectories.splice(0)) {
 		rmSync(directory, { recursive: true, force: true });
@@ -46,15 +50,13 @@ describe("codex rules post-compaction context budget", () => {
 		});
 
 		// then
-		expect(firstContext).toContain(`Instructions from: ${path.join(root, "CONTEXT.md")}`);
-		expect(firstContext).toContain("Project rule");
-		expect(firstContext).toContain("[Truncated. Full:");
+		expect(firstContext).toContain(`${INSTRUCTIONS_FROM}${path.join(root, "CONTEXT.md")}`);
+		expect(firstContext).toContain("CTX_OVERSIZE_SENTINEL");
+		expect(firstContext).not.toContain("CTX_TAIL_SENTINEL");
 		expect(firstContext.length).toBeLessThan(31_000);
 		const recoveryContext = readAdditionalContext(output);
-		expect(recoveryContext).toContain("MUST READ");
-		expect(recoveryContext).toContain("NO EXCUSES");
 		expect(recoveryContext).toContain(path.join(root, "CONTEXT.md"));
-		expect(recoveryContext).not.toContain("Project rule");
+		expect(recoveryContext).not.toContain("CTX_OVERSIZE_SENTINEL");
 		expect(recoveryContext.length).toBeLessThan(2_000);
 	});
 });
@@ -66,7 +68,7 @@ function makeOversizedProject(): { root: string; pluginData: string } {
 	writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fixture" }));
 	writeFileSync(path.join(root, "AGENTS.md"), "Project AGENTS.md should stay Codex-native.");
 	writeFileSync(path.join(root, "CLAUDE.md"), "Project CLAUDE.md should stay outside rules hook context.");
-	writeFileSync(path.join(root, "CONTEXT.md"), `Project rule\n${"A".repeat(30_000)}`);
+	writeFileSync(path.join(root, "CONTEXT.md"), `CTX_OVERSIZE_SENTINEL\n${"A".repeat(30_000)}\nCTX_TAIL_SENTINEL`);
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),

@@ -194,7 +194,7 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 ### Goal Registration (BINDING)
 
-When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation: the full objective, the scenario contract below, and one line "I'll stop right away when <the exact observable state that ends this run>". Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
+When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation. Check `get_goal` first: continue a matching active goal instead of duplicating it; surface a conflicting one. Pass exactly `objective`, written outcome-first: the concrete thing that will be TRUE when done (an outcome, never an activity like "investigate X"), the named deliverable surfaces, the scenario contract below as success criteria (each a binary observable that CAN fail), explicit scope bounds, and one line "I'll stop right away when <the exact observable state that ends this run>". Never invent a budget or deadline the user did not state. Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
 
 ### Pre-Implementation: Scenario Contract (BINDING)
 

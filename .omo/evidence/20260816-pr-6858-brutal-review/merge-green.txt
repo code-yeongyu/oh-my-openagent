@@ -1,0 +1,33 @@
+Rebase command:
+git rebase origin/dev
+
+Conflict:
+packages/omo-senpi/plugin/extensions/omo-task.js
+
+Resolution:
+- Preserve current `origin/dev` source and generated content.
+- Preserve the replayed `windowsHide: true` source/test change.
+- Regenerate the minified artifact with the official Bun 1.3.12 build.
+- Never hand-edit the generated conflict.
+
+Post-resolution verification:
+- Canonical conflict marker scan: zero matches.
+- `git diff --check`: exit 0.
+- `git ls-files -u`: empty.
+- `bun test packages/senpi-task/src/runners`: 118 pass, 0 fail.
+- `bun run --cwd packages/senpi-task typecheck`: exit 0.
+- Changed source/test LSP diagnostics: no diagnostics.
+- `build-extension.mjs --check` with Bun 1.3.12: current.
+
+Post-rebase branch:
+f3ded857b ci: retrigger checks
+8205ab0fa docs(evidence): align Senpi QA records
+31f070ecf docs(evidence): record Senpi package gate
+5bef4d7a3 fix(senpi-task): hide RPC child windows on Windows
+038ed0cbb origin/dev
+
+Merge-tree GREEN:
+git merge-tree --write-tree HEAD origin/dev
+d08fcbada09c8ed8118609a58f455c13d1c9d359
+
+The command exited 0 with no conflicts.

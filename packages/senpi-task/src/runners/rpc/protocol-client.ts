@@ -123,7 +123,7 @@ export class RpcProtocolClient {
       this.stderrBuffer = (this.stderrBuffer + chunk).slice(-STDERR_BUFFER_CAP)
     })
     this.child.once("error", (error) => this.finalize(error))
-    this.child.once("exit", () => this.finalize())
+    this.child.once("close", () => this.finalize())
   }
 
   private ingest(chunk: string): void {

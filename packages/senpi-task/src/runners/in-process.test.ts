@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import { createReadToolDefinition, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
 
 import { InProcessRunner, RunnerError } from "./in-process"
@@ -90,10 +94,19 @@ function createFakeSession(sessionId = "child-session-1"): FakeSessionControls {
   }
 }
 
+const tmpSessionDirs: string[] = []
+
+function makeSessionDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "senpi-task-in-process-"))
+  tmpSessionDirs.push(dir)
+  return dir
+}
+
 function baseSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
   return {
     taskId: "task-1",
     cwd: process.cwd(),
+    sessionDir: makeSessionDir(),
     depth: 0,
     parentSessionId: "parent-1",
     rootSessionId: "root-1",
@@ -111,6 +124,9 @@ describe("InProcessRunner", () => {
   afterEach(() => {
     unhandled.length = 0
     process.off("unhandledRejection", onUnhandled)
+    while (tmpSessionDirs.length > 0) {
+      rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true })
+    }
   })
 
   test("#given a running child #when steered while the prompt is in flight #then the fake session receives it", async () => {
@@ -257,7 +273,7 @@ describe("InProcessRunner", () => {
     expect((captured?.customTools ?? []).some((tool) => tool.name === "bash")).toBe(false)
   })
 
-  test("#given a started child #when the session is constructed #then an in-memory session manager is used", async () => {
+  test("#given a started child #when the session is constructed #then a persisted session manager rooted at the spec session dir is used", async () => {
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
@@ -267,11 +283,13 @@ describe("InProcessRunner", () => {
       },
     })
 
-    const handle = await runner.start(baseSpec())
+    const spec = baseSpec()
+    const handle = await runner.start(spec)
     fake.resolvePrompt()
     await handle.waitForIdle()
 
-    expect(captured?.sessionManager?.isPersisted()).toBe(false)
+    expect(captured?.sessionManager?.isPersisted()).toBe(true)
+    expect(captured?.sessionManager?.getSessionDir()).toBe(spec.sessionDir)
     expect(captured?.resourceLoader?.getExtensions().extensions).toHaveLength(0)
   })
 

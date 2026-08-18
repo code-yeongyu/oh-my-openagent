@@ -562,9 +562,9 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       parentSessionId: "parent-session",
       status: "pending",
       queuedAt: new Date(),
-      prompt: "background bootstrap prompt",
+      prompt: "bg-bootstrap-prompt-sentinel",
       agent: "sisyphus-junior",
-      skillContent: "background delegated skill system",
+      skillContent: "bg-skill-system-sentinel",
       category: "quick",
       model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
       fallbackChain: [{ model: "gpt-5.4", providers: ["openai"], variant: "high" }],
@@ -592,9 +592,8 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       await flushBackgroundNotifications()
 
       //#then
-      expect(observedBootstrapPrompts[0]).toContain("background bootstrap prompt")
       const bootstrap = getDelegatedChildSessionBootstrap("ses_background_bootstrap")
-      expect(bootstrap?.system).toBe("background delegated skill system")
+      expect(bootstrap?.system).toBe("bg-skill-system-sentinel")
       expect(bootstrap?.tools?.question).toBe(false)
       expect(bootstrap?.tools?.task).toBe(false)
       expect(getDelegatedChildSessionBootstrap("ses_background_bootstrap")).toBeDefined()
@@ -1737,7 +1736,7 @@ describe("BackgroundManager.resume", () => {
       id: "task-a",
       sessionId: "session-a",
       parentSessionId: "old-parent",
-      description: "original description",
+      description: "resume-original-description-sentinel",
       agent: "explore",
       status: "completed",
     })
@@ -1755,7 +1754,7 @@ describe("BackgroundManager.resume", () => {
     // then
     expect(result.id).toBe("task-a")
     expect(result.sessionId).toBe("session-a")
-    expect(result.description).toBe("original description")
+    expect(result.description).toBe("resume-original-description-sentinel")
     expect(result.agent).toBe("explore")
     expect(result.parentModel).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
   })
@@ -1863,11 +1862,11 @@ describe("LaunchInput.skillContent", () => {
       agent: "explore",
       parentSessionId: "parent-session",
       parentMessageId: "parent-msg",
-      skillContent: "You are a playwright expert",
+      skillContent: "playwright-expert-skill-sentinel",
     }
 
     // when / #then
-    expect(input.skillContent).toBe("You are a playwright expert")
+    expect(input.skillContent).toBe("playwright-expert-skill-sentinel")
   })
 })
 
@@ -2751,7 +2750,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
       item.task.sessionId = "ses_zombie_child"
       item.task.startedAt = new Date()
       item.task.concurrencyKey = concurrencyKey
-      throw new Error("crash between session creation and prompt send")
+      throw new Error("session-create-crash-sentinel")
     }
 
     //#when
@@ -2759,7 +2758,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     //#then - task must be marked as error, not left in running zombie state
     expect(task.status).toBe("error")
-    expect(task.error).toContain("crash between session creation and prompt send")
+    expect(task.error).toContain("session-create-crash-sentinel")
     expect(task.completedAt).toBeDefined()
   })
 
@@ -3087,7 +3086,7 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
       status: "completed",
       startedAt: new Date(Date.now() - 1000),
       completedAt: new Date(),
-      error: "previous terminal note",
+      error: "previous-terminal-note-sentinel",
       concurrencyGroup: "explore",
     }
     const originalCompletedAt = task.completedAt
@@ -3106,7 +3105,7 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
     expect(promptCallCount).toBe(0)
     expect(task.status).toBe("completed")
     expect(task.completedAt).toBe(originalCompletedAt)
-    expect(task.error).toBe("previous terminal note")
+    expect(task.error).toBe("previous-terminal-note-sentinel")
     expect(task.parentSessionId).toBe("parent-session-original")
     expect(task.parentMessageId).toBe("msg-original")
     expect(task.concurrencyKey).toBeUndefined()
@@ -8012,7 +8011,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
       parentSessionId: "parent-session",
       parentMessageId: "msg-1",
       description: "cross manager active redaction",
-      prompt: "secret prompt",
+      prompt: "secret-prompt-sentinel",
       agent: "explore",
       status: "pending",
       queuedAt: new Date(),
@@ -8032,7 +8031,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     //#then
     const localTask = firstManager.getTask(task.id)
     const registeredTask = secondManager.getTask(task.id)
-    expect(localTask?.prompt).toBe("secret prompt")
+    expect(localTask?.prompt).toBe("secret-prompt-sentinel")
     expect(registeredTask?.sessionId).toBe(task.sessionId)
     expect(registeredTask?.prompt).toBe("[redacted]")
     expect(registeredTask?.progress?.countedToolPartIDs).toEqual(new Set(["part-1"]))

@@ -1,0 +1,46 @@
+RED — Team Mode runtime root cause (criterion 1)
+
+Command (exactly as specified in the success criteria):
+  bun test packages/senpi-task/src/team packages/senpi-task/src/runners/rpc packages/omo-senpi/src/components/task
+
+The regressions were written failing-first per increment; the per-increment RED captures are in the
+sibling logs (member-boundary.log, extension-assembly.log, model-admission.log,
+rpc-terminal-outcomes.log, restart-liveness.log, completed-resident-crash.log).
+
+This file records the AUTHORITATIVE mutation proof on the final reconciled tree: each production fix
+was reverted in isolation and the criterion command re-run, proving the suite genuinely fails for the
+named root cause rather than passing vacuously. The tree was restored byte-identically after each.
+
+--- Mutation A: remove the member-process early return (packages/omo-senpi/src/components/task/index.ts)
+1 tests failed:
+(fail) omo-senpi task component wiring > #given an explicit team member process #when the task component registers #then no lead task surface is wired
+ 477 pass / 1 fail
+
+--- Mutation B: remove member identity stripping (packages/senpi-task/src/runners/rpc/spawn.ts)
+1 tests failed:
+(fail) buildRpcSpawn spawn strategy > #given a generic child spawned by a member #when building #then member identity and extension do not leak
+ 477 pass / 1 fail
+
+--- Mutation C: bypass the canonical assembly rule (packages/senpi-task/src/team/spawn-members.ts)
+2 tests failed:
+(fail) createTeam > #given a member extension launch config #when a team member starts #then extension and durable identity env reach the manager spec
+(fail) createTeamService lead messaging > #given main and provider extensions #when a team member starts #then member tools load before inherited OMO extensions
+ 476 pass / 2 fail
+
+--- Mutation D: synthesize empty success instead of terminalizing (packages/senpi-task/src/runners/rpc/handle.ts)
+(fail) RpcProcessRunner > #given prior assistant text #when a revived turn produces no output #then the stale text cannot become a fresh success
+(fail) rpc turn outcome user abort classification > ... the tracked outcome is cancelled
+(fail) rpc turn outcome user abort classification > ... stays a turn failure
+(fail) rpc turn outcome user abort classification > ... the stale abort no longer cancels it
+
+--- Mutation E: trust the untrusted messages field (packages/senpi-task/src/runners/rpc/turn-outcome.ts)
+(fail) agentEndOutcome hostile wire payloads > ... messages field is absent ... degrades to a terminal error instead of throwing
+(fail) agentEndOutcome hostile wire payloads > ... messages field is not an array ...
+(fail) agentEndOutcome hostile wire payloads > ... a malformed agent_end that also reports aborted ...
+(fail) createRpcChildHandle terminal turn observation > ... text and failure fields are retained
+
+GREEN (unmutated tree, same command):
+ 478 pass
+ 0 fail
+ 1200 expect() calls
+Ran 478 tests across 86 files.

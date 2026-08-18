@@ -1,0 +1,15 @@
+Focused Windows production-routing command:
+
+bun test packages/omo-senpi/scripts/qa/task-rpc-e2e.windows.test.ts --bail
+
+Full Windows Senpi surface:
+
+bun run test:senpi
+
+Expected log sentinel:
+
+WINDOWS_TASK_RPC_E2E
+
+Production driver:
+
+packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs

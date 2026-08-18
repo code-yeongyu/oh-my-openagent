@@ -26,7 +26,7 @@ Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `refer
 |---------|---------|
 | `/get-unpublished-changes` | Compare HEAD with the latest published npm version and list unpublished changes. |
 | `/omomomo` | Easter-egg command — about oh-my-opencode. |
-| `/publish` | Publish via GitHub Actions workflow. Argument: `<patch|minor|major>`. |
+| `/publish` | Publish via GitHub Actions workflow. Argument: `<patch|minor|major|explicit-semver>`. |
 | `/remove-deadcode` | Remove unused code with LSP-verified safety + atomic commits. |
 | `/security-research` | Run the Team Mode security-research audit with 3 vulnerability hunters and 2 PoC engineers. |
 

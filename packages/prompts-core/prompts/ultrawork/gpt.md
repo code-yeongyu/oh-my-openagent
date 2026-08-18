@@ -118,7 +118,7 @@ At start, run `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)` and echo 
 
 ## GOAL REGISTRATION
 
-When a `create_goal` tool exists, register the run's goal with it before implementation: the objective, the scenario contract, and the WHEN TO STOP line. No tool → record the same contract in the notepad and treat it as binding.
+When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, outcome-first: the concrete outcome that will be true (never an activity), named deliverable surfaces, the scenario contract as criteria that can fail, scope bounds, and the WHEN TO STOP line. No invented budgets or deadlines. No tool → record the same contract in the notepad and treat it as binding.
 
 ## TODO DISCIPLINE
 

@@ -1,0 +1,36 @@
+Surface: built OMO Native launcher backed by pinned Senpi 2026.8.11-4
+
+Initial xterm capture:
+- Used the host environment.
+- `omo --version` showed the correct engine.
+- `omo --help` stopped at `sibling credentials detected`.
+- Result: FAIL due host-state contamination, not product behavior.
+- PTY cleanup: pid 27475 killed.
+
+Isolated xterm capture:
+- Fresh HOME, XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, XDG_STATE_HOME, and SENPI_CODING_AGENT_DIR.
+- Telemetry disabled with OMO_DISABLE_POSTHOG=1 and DO_NOT_TRACK=1.
+- Command rendered through the real xterm.js browser terminal:
+  `node packages/omo-native/bin/omo.js --version && node packages/omo-native/bin/omo.js --help`
+- Version observable:
+  `omo 5.0.0-0.beta.5 (engine: senpi 2026.8.11-4)`
+- Help observable:
+  branded `omo` usage and commands, including install/remove/update/list/config/app-server.
+- Screenshot: `terminal-smoke-isolated/terminal.png`
+- Transcript: `terminal-smoke-isolated/terminal.txt`
+- Metadata: `terminal-smoke-isolated/metadata.json`
+- PTY cleanup: pid 34595 killed.
+
+Bad-input scenario:
+- Command: isolated `node packages/omo-native/bin/omo.js install`
+- Observable: exit code 1 with:
+  `Missing install source.`
+  `Usage: omo install <source> [-l] [--approve|--no-approve]`
+- PASS.
+
+Sandbox cleanup:
+- Removed `/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-beta6-terminal-qa.XXXXXX.VWyTd9Ou6S`.
+- Verified path absent.
+
+Overall terminal scenario: PASS.
+

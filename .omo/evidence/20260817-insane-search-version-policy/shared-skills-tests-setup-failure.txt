@@ -1,0 +1,105 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/shared-skills/materialize-frontend-refs.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '@opencode-ai/sdk' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/docs-insane-search-version-policy/packages/omo-opencode/src/shared/live-server-route.ts'
+-------------------------------
+
+
+packages/shared-skills/upstreams.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/depersonalization-gate.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/ultimate-browsing-runtime-pins.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/provenance-gate.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/frontend-thirdparty-manifest.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/shared-skills-root-path.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/visual-qa/scripts/png-decode.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/visual-qa/scripts/tui-grid.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/visual-qa/scripts/east-asian-width.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/visual-qa/scripts/ansi.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/visual-qa/scripts/image-diff.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/visual-qa/scripts/cli.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+ 0 pass
+ 14 fail
+ 14 errors
+Ran 14 tests across 14 files. [24.00ms]

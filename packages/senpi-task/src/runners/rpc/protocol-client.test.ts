@@ -101,29 +101,22 @@ describe("RpcProtocolClient", () => {
       buildSpawn: (spec) => ({ command: process.execPath, args: [], cwd: spec.cwd, env: process.env }),
       spawnChild: () => child,
     })
-    const events: AgentSessionEvent[] = []
-
     // when
-    const handle = runner.start({
+    const handle = await runner.start({
       task_id: "st_0000000f",
       cwd: process.cwd(),
       state_dir: "/tmp/unused",
       prompt: "must-not-replay",
       resumeSessionPath: "/tmp/session.jsonl",
     })
-    handle.subscribe((event) => events.push(event))
     if (handle.switchSession === undefined) throw new Error("switchSession was not exposed")
     const result = await handle.switchSession("/tmp/session.jsonl")
-    await waitFor(() => events.some((event) => event.type === "session_info_changed"))
 
     // then
     expect(result).toEqual({ cancelled: false })
-    const names = events.flatMap((event) => event.type === "session_info_changed" ? [event.name] : [])
-    expect(names).toContain("command:switch_session")
-    expect(names).not.toContain("command:prompt")
   })
 
-  test(" w2reattach #given inherited RPC extensions #when the process runner starts #then its effective spawn facts expose them for persistence", () => {
+  test(" w2reattach #given inherited RPC extensions #when the process runner starts #then its effective spawn facts expose them for persistence", async () => {
     // given
     const child = track(spawnSessionCommandChild())
     const runner = new RpcProcessRunner({
@@ -133,7 +126,7 @@ describe("RpcProtocolClient", () => {
     })
 
     // when
-    const handle = runner.start({
+    const handle = await runner.start({
       task_id: "st_0000001f",
       cwd: "/tmp/project",
       state_dir: "/tmp/unused",

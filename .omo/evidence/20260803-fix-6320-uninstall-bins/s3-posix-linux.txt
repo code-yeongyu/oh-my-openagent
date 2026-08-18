@@ -1,0 +1,8 @@
+uname=Linux  bun=1.3.12
+== running codex-cleanup.test.ts on Linux (S3 posix symlink test now executes) ==
+(pass) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files [16.54ms]
+(pass) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones [14.84ms]
+(pass) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw [13.26ms]
+ 14 pass
+ 0 fail
+

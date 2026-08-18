@@ -1,0 +1,134 @@
+=== RED: bun test packages/memory-core/src/compile (identity placement branch, before render change) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused [233.41ms]
+67 |     // then
+68 |     expect(templateChanged).not.toBe(first)
+69 |     expect(headChanged).not.toBe(templateChanged)
+70 |     expect(headChanged).toContain("second")
+71 |     expect(ticks).toBe(3)
+72 |     expect(cache.size).toBe(2)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/cache.test.ts:72:24)
+(fail) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [353.31ms]
+(pass) MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry [1337.62ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.18ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+(pass) compileMemoryBlock > #given nested committed memory #when compiled #then it matches the handcrafted Letta golden [238.87ms]
+80 |       previousMessageCount: 2,
+81 |       clock: () => NOW,
+82 |     })
+83 | 
+84 |     // then
+85 |     expect(normalizeReminder(block)).toBe(await fixture("persona-identity"))
+                                          ^
+error: expect(received).toBe(expected)
+
+  "<reminder/>
+  
+  <self>
+  <projection>$MEMORY_DIR/system/persona.md</projection>
+  I am a careful coding agent.
+- <projection>$MEMORY_DIR/system/identity.md</projection>
+- - Name: Archivist
+- - Creature: red fox
+- - Vibe: quiet collector
+- - Emoji: :fox:
+  </self>
+  
+  <memory>
+  <facts>
+    <projection>$MEMORY_DIR/system/facts.md</projection>
+    <description>Stable facts</description>
+    The project uses Bun.
+  </facts>
++ <identity>
++   <projection>$MEMORY_DIR/system/identity.md</projection>
++   <description>Identity card</description>
++   - Name: Archivist
++ - Creature: red fox
++ - Vibe: quiet collector
++ - Emoji: :fox:
++ </identity>
+  </memory>
+  
+  <memory_metadata>
+  - AGENT_ID: persona-identity-agent
+  - CONVERSATION_ID: persona-identity-conversation
+  - System prompt last recompiled: 2026-05-04 12:00:00 AM UTC+0000
+  - 2 previous messages between you and the user are stored in recall memory
+  </memory_metadata>"
+
+- Expected  - 5
++ Received  + 8
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/compile.test.ts:85:38)
+(fail) compileMemoryBlock > #given a committed persona and identity #when compiled #then both render under <self> and identity stays out of the generic memory tier [225.01ms]
+ 99 |       previousMessageCount: 0,
+100 |       clock: () => NOW,
+101 |     })
+102 | 
+103 |     // then
+104 |     expect(block).toContain("<self>")
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<self>"
+Received: "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).\n\n<memory>\n<identity>\n  <projection>$MEMORY_DIR/system/identity.md</projection>\n  <description>Identity card</description>\n  - Name: Archivist\n</identity>\n</memory>\n\n<memory_metadata>\n- AGENT_ID: identity-agent\n- CONVERSATION_ID: identity-conversation\n- System prompt last recompiled: 2026-05-04 12:00:00 AM UTC+0000\n- 0 previous messages between you and the user are stored in recall memory\n</memory_metadata>"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/compile.test.ts:104:19)
+(fail) compileMemoryBlock > #given only a committed identity #when compiled #then it renders under <self> without a persona [213.82ms]
+(pass) compileMemoryBlock > #given an empty committed repository #when compiled #then only metadata is emitted [174.17ms]
+(pass) compileMemoryBlock > #given only a committed persona #when compiled #then its description is omitted [220.96ms]
+(pass) compileMemoryBlock > #given a dirty persona edit #when compiled #then only the committed HEAD body appears [209.23ms]
+(pass) compileMemoryBlock > #given a committed binary projection #when compiled #then its name appears without reading its blob [195.95ms]
+(pass) compileMemoryBlock > #given an unreadable committed system file #when compiled #then it is skipped best-effort [218.06ms]
+
+packages/memory-core/src/compile/render.test.ts:
+(pass) memory block sentinels > #given an identity and block #when marked #then the exact sentinel wrapper is returned [0.10ms]
+(pass) memory block sentinels > #given repeated legacy blocks #when replaced #then every matching region is transformed [0.16ms]
+(pass) memory block sentinels > #given no matching block #when replaced #then the sentinel block is appended [0.05ms]
+(pass) memory block sentinels > #given marked regions #when stripped #then only surrounding prompt content remains [0.07ms]
+
+ 13 pass
+ 3 fail
+ 30 expect() calls
+Ran 16 tests across 3 files. [3.71s]
+
+=== RED: bun test packages/omo-senpi/src/components/memory/prompt.test.ts (template v2 cache key, before bump) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+88 |   return createMemoryPromptHandler({ resolveContext: () => context, createRepo: () => repo })
+89 | }
+90 | 
+91 | describe("MEMORY_PROMPT_TEMPLATE", () => {
+92 |   test("#given the compiled-block cache key #when the template id is read #then it is the v2 soul template", () => {
+93 |     expect(MEMORY_PROMPT_TEMPLATE).toBe("omo-senpi:before_agent_start:v2")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "omo-senpi:before_agent_start:v2"
+Received: "omo-senpi:before_agent_start:v1"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/prompt.test.ts:93:36)
+(fail) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v2 soul template [0.59ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [188.83ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [186.86ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata [216.34ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [201.15ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [216.18ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [344.52ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [232.38ms]
+
+ 7 pass
+ 1 fail
+ 28 expect() calls
+Ran 8 tests across 1 file. [1.67s]

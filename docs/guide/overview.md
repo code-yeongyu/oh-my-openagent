@@ -101,7 +101,7 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. Opus 5 for orchestration and visual work. GPT-5.6 Sol for deep reasoning. Kimi high-speed for quick tasks. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` starts with Claude Opus 5 max, then Kimi K3 and GLM 5.2. `ultrabrain` prefers GPT-5.6 Sol xhigh, while `deep` uses GPT-5.6 Sol medium. `artistry` starts with Claude Fable 5, `quick` with Kimi high-speed, `unspecified-low` with GPT-5.6 Luna, and both `unspecified-high` and `writing` with Kimi K3. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` starts with Claude Opus 5 max, then Kimi K3 and GLM 5.2. `ultrabrain` prefers GPT-5.6 Sol xhigh, while `deep` uses GPT-5.6 Sol medium. `artistry` starts with Claude Fable 5, `quick` with Kimi high-speed, `unspecified-low` with Grok 4.6, and both `unspecified-high` and `writing` with Kimi K3. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -168,7 +168,7 @@ You can override specific agents or categories in your config:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K3 work best
@@ -205,7 +205,7 @@ You can override specific agents or categories in your config:
     "quick": { "model": "kimi-for-coding/kimi-for-coding-highspeed" },
 
     // Low-effort fallback: GPT-5.6 Luna
-    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
+    "unspecified-low": { "model": "xai/grok-4.6", "variant": "xhigh" },
 
     // High-effort fallback: Kimi K3, then Opus 5
     "unspecified-high": { "model": "kimi-for-coding/kimi-k3", "variant": "max" },
@@ -228,7 +228,7 @@ You can override specific agents or categories in your config:
 
 - GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain`; the `deep` category uses it at medium effort
 - GPT-5.6 Terra — balanced mid-tier; preferred for Momus (high) and available as an explicit override elsewhere
-- GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
+- Grok 4.6 — default for the `unspecified-low` category (xhigh)
 - GPT-5.6 Sol override paths — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT 5.6 Luna Fast — fast and cheap utility fallback after the Kimi high-speed quick default
 
@@ -252,13 +252,13 @@ Oh My OpenAgent turns that into a coordinated team:
 
 **Hash-anchored edits.** Claude Code's edit tool fails when the model can't reproduce lines exactly. OmO's `LINE#ID` content hashing validates every edit before applying. Grok Code Fast 1 went from 6.7% to 68.3% success rate just from this change.
 
-**IntentGate.** Claude Code takes your prompt and runs. OmO classifies your true intent first — research, implementation, investigation, fix — then routes accordingly. Fewer misinterpretations, better results.
+**IntentGate.** Claude Code takes your prompt and runs. OmO uses regex detectors for explicit mode keywords: `ultrawork`/`ulw`, the Team Mode spellings, `hyperplan`, and the adjacent hyperplan-ultrawork combo. Matching text injects the corresponding mode prompt.
 
 **LSP + AST tools.** Workspace-level rename, go-to-definition, find-references, pre-build diagnostics, AST-aware code rewrites. IDE precision that vanilla Claude Code doesn't have.
 
 **Skills with embedded MCPs.** Each skill brings its own MCP servers, scoped to the task. Context window stays clean instead of bloating with every tool.
 
-**Discipline enforcement.** Todo enforcer yanks idle agents back to work. Comment checker strips AI slop. Goal holds a persistent per-session objective and re-injects a continuation prompt on every idle until a completion audit confirms the work is done. The system doesn't let the agent slack off.
+**Discipline enforcement.** Todo enforcer yanks idle agents back to work. Comment checker strips AI slop. Goal is opt-in: `goal.enabled` and `goal.auto_start` both default to `false`. When enabled and started, it holds a persistent per-session objective and re-injects a continuation prompt on idle until a completion audit confirms the work is done.
 
 **The fundamental advantage.** Models have different temperaments. Claude thinks deeply. GPT reasons architecturally. Gemini visualizes. Haiku moves fast. Single-model tools force you to pick one personality for all tasks. Oh My OpenAgent leverages them all, routing by task type. This isn't a temporary hack — it's the only architecture that makes sense as models specialize further. The gap between multi-model orchestration and single-model limitation widens every month. We're betting on that future.
 
@@ -266,11 +266,9 @@ Oh My OpenAgent turns that into a coordinated team:
 
 ## IntentGate
 
-Before acting on any request, Sisyphus classifies your true intent.
+IntentGate is a regex-based mode keyword injector. It detects `ultrawork` or `ulw`, `team mode`/`team-mode`/`team_mode`/`teammode`, `hyperplan`, and the adjacent hyperplan-ultrawork combo, then adds the matching mode instructions.
 
-Are you asking for research? Implementation? Investigation? A fix? The Intent Gate figures out what you actually want, not just the literal words you typed. This means the agent understands context, nuance, and the real goal behind your request.
-
-Claude Code doesn't have this. It takes your prompt and runs. Oh My OpenAgent thinks first, then acts.
+It does not semantically classify requests as research, implementation, investigation, or fixes. Prompts without those explicit mode keywords continue without IntentGate mode injection.
 
 ---
 

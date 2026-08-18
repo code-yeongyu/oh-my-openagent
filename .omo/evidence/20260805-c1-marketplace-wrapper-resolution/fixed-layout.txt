@@ -1,0 +1,16 @@
+$ ls plugins/omo/dist/cli/index.js plugins/omo/skills/ast-grep/
+/tmp/omo-6395-mkt-2o5YGp/fixed/plugins/omo/dist/cli/index.js
+agents
+install.ps1
+install.sh
+LICENSE
+README.md
+references
+scripts
+SKILL.md
+SOURCE
+tests
+
+probe list compiled into the installed bundle:
+SKILLS_PROBE_SPECIFIERS = ["./skills/", "../skills/", "../../skills/"]
+"../../skills/"

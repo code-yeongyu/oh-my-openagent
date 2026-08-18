@@ -65,7 +65,7 @@
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
 
-    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
+    "unspecified-low": { "model": "xai/grok-4.6", "variant": "xhigh" },
 
     // High-effort planning tasks: maximum reasoning
     "unspecified-high": {

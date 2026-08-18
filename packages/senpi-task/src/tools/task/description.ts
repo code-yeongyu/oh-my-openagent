@@ -34,6 +34,10 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
     gatedAgents.length === 0
       ? ""
       : `\n  Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and start-work was never invoked): ${gatedAgents.map((agent) => agent.name).join(", ")}`
+  const momusNotice =
+    gatedAgents.length === 0
+      ? ""
+      : "\n  momus is one-shot: spawn it, read task_output, optionally task_cancel; task_send is always refused. The harness replaces the momus spawn prompt with the canonical plan-review contract (one .omo/plans/*.md path only) - any other prompt content is discarded, so pass the plan path and nothing else."
   return `Spawn one child task or fan out a batch.
 
 Choose exactly one input form:
@@ -44,7 +48,7 @@ Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO N
 
 - category routes through Sisyphus-Junior. Available categories:
 ${renderList(categories)}
-- subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}
+- subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}${momusNotice}
 
 Blank provider padding is normalized automatically; do not add filler values.
 load_skills prepends named skills. run_in_background=true returns task ids for parallel work; false waits for results.

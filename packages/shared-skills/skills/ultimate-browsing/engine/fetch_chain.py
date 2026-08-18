@@ -40,6 +40,7 @@ def fetch(
     timeout: int = 25,
     max_attempts: int = 12,
     enable_playwright: bool = True,   # hook left for executor module
+    allow_surrogate_proxy: bool = False,  # opt-in: kind=proxy registry entries
 ) -> FetchResult:
     """Fetch `url` using the generic grid.
 
@@ -175,73 +176,110 @@ def fetch(
                     if att.verdict in (Verdict.STRONG_OK.value, Verdict.WEAK_OK.value):
                         return _build_result(resp, att, trace, profile_used=profile_id)
 
-    # -------- Phase 3: Playwright fallback (profile-driven order) -----------
-    if enable_playwright:
-        try:
-            from .executor import run_playwright_fallback  # lazy import
-            # Honour profile's `fallback_when_challenge` list — iterate the
-            # caller-declared order instead of capability-inferred single pick.
-            fb_profile = load_profile(profile_used or "unknown_challenge", profiles=profiles)
-            fb_order = fb_profile.get("fallback_when_challenge") or ["playwright_real_chrome"]
-            pw_attempt = None
-            pw_content = ""
-            for fb_name in fb_order:
-                if fb_name == "curl_grid_exhaust":
-                    # Already performed in Phase 2; nothing more to do here.
-                    continue
-                pw_attempt, pw_content = run_playwright_fallback(
+    # -------- Phase 2.5 + 3: fallback ladder (profile-driven order) ---------
+    # Surrogate routes are NOT browser work, so they run even when the caller
+    # disabled Playwright; only browser executors honour `enable_playwright`.
+    try:
+        # Honour profile's `fallback_when_challenge` list — iterate the
+        # caller-declared order instead of capability-inferred single pick.
+        fb_profile = load_profile(profile_used or "unknown_challenge", profiles=profiles)
+        fb_order = fb_profile.get("fallback_when_challenge") or ["playwright_real_chrome"]
+        pw_attempt = None
+        pw_content = ""
+        for fb_name in fb_order:
+            if fb_name == "curl_grid_exhaust":
+                # Already performed in Phase 2; nothing more to do here.
+                continue
+            if fb_name.startswith("surrogate_"):
+                # Phase 2.5: archive/reader/proxy routes serving a copy of
+                # the target. Cheaper than a browser; provenance-labeled.
+                from . import surrogate as surrogate_mod
+                s_atts, s_meta, s_content = surrogate_mod.run_surrogate(
                     url,
-                    profile_id=profile_used or "unknown_challenge",
+                    registry=surrogate_mod.load_surrogates(),
+                    allow_proxy=allow_surrogate_proxy,
+                    timeout=timeout,
                     success_selectors=success_selectors,
-                    device_class=device_class,
-                    force_executor=fb_name,
                 )
-                trace.append(pw_attempt)
-                if pw_attempt.verdict in (Verdict.STRONG_OK.value, Verdict.WEAK_OK.value):
+                trace.extend(s_atts)
+                s_att = s_atts[-1]
+                if s_att.verdict in (Verdict.STRONG_OK.value, Verdict.WEAK_OK.value):
                     return FetchResult(
                         ok=True,
-                        content=pw_content,
-                        final_url=pw_attempt.url,
-                        verdict=pw_attempt.verdict,
+                        content=s_content,
+                        final_url=s_att.url,
+                        verdict=s_att.verdict,
                         profile_used=profile_used,
                         trace=trace,
-                        summary=f"Playwright fallback succeeded via {fb_name}",
+                        summary=(
+                            f"surrogate {s_meta.get('surrogate')} succeeded"
+                            f" (provenance={s_meta.get('provenance')}"
+                            + (f" snapshot_ts={s_meta.get('snapshot_timestamp')})" if s_meta.get('snapshot_timestamp') else ")")
+                        ),
+                        provenance=str(s_meta.get("provenance", "live")),
+                        snapshot_timestamp=s_meta.get("snapshot_timestamp"),
+                        trust=str(s_meta.get("trust", "origin")),
                     )
-            # Synthesize a placeholder if no iteration ran (empty list).
-            if pw_attempt is None:
-                pw_attempt = Attempt(
-                    phase="fallback",
-                    executor="none",
-                    url=url,
-                    url_transform="original",
-                    impersonate=None,
-                    referer="",
-                    verdict=Verdict.UNKNOWN.value,
-                    error="profile has empty fallback_when_challenge",
+                continue
+            if not enable_playwright:
+                continue
+            from .executor import run_playwright_fallback  # lazy import
+            pw_attempt, pw_content = run_playwright_fallback(
+                url,
+                profile_id=profile_used or "unknown_challenge",
+                success_selectors=success_selectors,
+                device_class=device_class,
+                force_executor=fb_name,
+            )
+            trace.append(pw_attempt)
+            if pw_attempt.verdict in (Verdict.STRONG_OK.value, Verdict.WEAK_OK.value):
+                return FetchResult(
+                    ok=True,
+                    content=pw_content,
+                    final_url=pw_attempt.url,
+                    verdict=pw_attempt.verdict,
+                    profile_used=profile_used,
+                    trace=trace,
+                    summary=f"Playwright fallback succeeded via {fb_name}",
                 )
-                trace.append(pw_attempt)
-        except ImportError:
-            trace.append(Attempt(
+        # Synthesize a placeholder only when the profile genuinely offers no
+        # fallback route. Entries skipped because the caller disabled the
+        # browser are a caller choice, not a profile defect — no trace noise.
+        actionable = [n for n in fb_order if n != "curl_grid_exhaust"]
+        if pw_attempt is None and not actionable:
+            pw_attempt = Attempt(
                 phase="fallback",
-                executor="playwright",
+                executor="none",
                 url=url,
                 url_transform="original",
                 impersonate=None,
                 referer="",
                 verdict=Verdict.UNKNOWN.value,
-                error="executor module not available",
-            ))
-        except (RuntimeError, OSError) as e:
-            trace.append(Attempt(
-                phase="fallback",
-                executor="playwright",
-                url=url,
-                url_transform="original",
-                impersonate=None,
-                referer="",
-                verdict=Verdict.UNKNOWN.value,
-                error=f"{type(e).__name__}:{str(e)[:200]}",
-            ))
+                error="profile has empty fallback_when_challenge",
+            )
+            trace.append(pw_attempt)
+    except ImportError:
+        trace.append(Attempt(
+            phase="fallback",
+            executor="playwright",
+            url=url,
+            url_transform="original",
+            impersonate=None,
+            referer="",
+            verdict=Verdict.UNKNOWN.value,
+            error="executor module not available",
+        ))
+    except (RuntimeError, OSError) as e:
+        trace.append(Attempt(
+            phase="fallback",
+            executor="playwright",
+            url=url,
+            url_transform="original",
+            impersonate=None,
+            referer="",
+            verdict=Verdict.UNKNOWN.value,
+            error=f"{type(e).__name__}:{str(e)[:200]}",
+        ))
 
     # -------- Give up, return best we have ----------------------------------
     summary = format_summary(trace, profile_used)

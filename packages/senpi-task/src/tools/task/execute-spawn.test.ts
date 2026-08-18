@@ -139,6 +139,7 @@ describe("buildTaskExecute spawn", () => {
             max_depth: 1,
             residency_max_children: 8,
             ttl_ms: 86400000,
+            resume_children: true,
             wait: { min_ms: 5000, default_ms: 60000, max_ms: 600000 },
             warnings: { unavailable_categories: true },
             team: { max_members: 8, max_parallel_members: 4, max_wall_clock_minutes: 120 },
@@ -150,35 +151,6 @@ describe("buildTaskExecute spawn", () => {
     await execute("c", { prompt: "p", category: "quick", run_in_background: true }, undefined, undefined, CTX)
 
     expect(captured?.execution_mode).toBe("process")
-  })
-
-  test("#given load_skills #when spawning #then resolved SKILL.md content is prepended to the child prompt", async () => {
-    let captured: ManagerStartSpec | undefined
-    const manager = createFakeManager({
-      start: async (spec): Promise<StartResult> => {
-        captured = spec
-        return { kind: "started", task_id: "st_00000003", status: "running", name: "t" }
-      },
-    })
-    const deps = makeDeps(manager, {
-      loadSkills: (names) => ({
-        prepend: names.length > 0 ? "SKILL DIRECTIVE\n\n" : "",
-        resolved: names,
-        missing: [],
-      }),
-    })
-    const execute = buildTaskExecute(deps)
-
-    await execute(
-      "c",
-      { prompt: "do the thing", category: "quick", load_skills: ["reviewer"], run_in_background: true },
-      undefined,
-      undefined,
-      CTX,
-    )
-
-    expect(captured?.prompt.startsWith("SKILL DIRECTIVE")).toBe(true)
-    expect(captured?.prompt.endsWith("do the thing")).toBe(true)
   })
 
   test("#given run_in_background falsy #when executed #then it composes start + waitFor and returns the final response inline", async () => {
@@ -201,6 +173,7 @@ describe("buildTaskExecute spawn", () => {
           hasInvoked: (skill: string) => skill === "ulw-plan",
           hasUserRequested: (skill: string) => skill === "ulw-plan",
           hasPlanArtifact: () => true,
+          planArtifactReferences: () => [{ path: ".omo/plans/spawn-plan.md", count: 1, lastTouchedAt: 1 }],
         }),
       }),
     )

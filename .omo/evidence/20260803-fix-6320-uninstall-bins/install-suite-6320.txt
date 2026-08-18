@@ -1,0 +1,119 @@
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:4 char:8
++ $log = bun test packages/omo-codex/src/install/ 2>&1 | Out-String
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-codex\src\install\codex-cache-install.test.ts:
+(fail) codex-cache install > #given npm creates workspace bin shims in the cache #when caching plugin #then 
+plugin-owned shims are removed [5010.11ms]
+  ^ this test timed out after 5000ms.
+
+packages\omo-codex\src\install\codex-cache-mcp-manifest.context7.test.ts:
+(fail) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has dangling api-key flag #when 
+rewriting #then drops blank auth flag [5014.03ms]
+  ^ this test timed out after 5000ms.
+
+packages\omo-codex\src\install\codex-cache-security.test.ts:
+(fail) codex-cache security boundaries > #given a package bin name with path traversal #when linking cached plugin 
+bins #then the installer rejects it [5010.94ms]
+  ^ this test timed out after 5000ms.
+
+packages\omo-codex\src\install\codex-cache.test.ts:
+(fail) codex-cache > rewrites cached package file dependencies that point outside the plugin cache back to the source 
+package [5012.23ms]
+  ^ this test timed out after 5000ms.
+(fail) codex-cache > #given stale sparkshell guidance in component prompt surfaces #when caching plugin #then cache 
+promotion is rejected [5009.93ms]
+  ^ this test timed out after 5000ms.
+(fail) codex-cache > #given source plugin has built component runtimes #when caching plugin #then component dist files 
+are preserved for hooks [5008.39ms]
+  ^ this test timed out after 5000ms.
+(fail) codex-cache > #given packaged root CLI runtimes #when caching omo plugin #then root dist is materialized into 
+the plugin cache [5011.54ms]
+  ^ this test timed out after 5000ms.
+
+packages\omo-codex\src\install\codex-project-local-cleanup.test.ts:
+201 |       startDirectory: projectDirectory,
+202 |       codexHome,
+203 |     })
+204 | 
+205 |     // then
+206 |     expect(result.configPath).toBeNull()
+                                    ^
+error: expect(received).toBeNull()
+
+Received: "C:\\Users\\pss\\.codex\\config.toml"
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\omo-codex\src\install\codex-project-local-cleanup.test.ts:206:31)
+(fail) codex project-local cleanup > #given no project-local config and CODEX_HOME in the parent chain #when repairing 
+#then does not treat global Codex home as project state [14.68ms]
+
+packages\omo-codex\src\install\install-codex-git-bash-hooks.test.ts:
+(fail) install-codex Git Bash hooks > #given simulated Windows Codex install #when installing omo #then enables 
+git_bash MCP and trusts shell hooks [5019.98ms]
+  ^ this test timed out after 5000ms.
+(fail) install-codex Git Bash hooks > #given simulated Linux Codex install #when installing omo #then keeps git_bash 
+MCP disabled without registering shell reminder hooks [5011.87ms]
+  ^ this test timed out after 5000ms.
+
+packages\omo-codex\src\install\install-codex-git-bash-preflight.test.ts:
+(fail) install-codex Git Bash preflight > #given non-Windows install #when running installer #then winget is never 
+called [60009.10ms]
+  ^ this test timed out after 60000ms.
+(fail) install-codex Git Bash preflight > #given Windows env override in installer options #when no custom resolver is 
+provided #then default resolver uses it [60021.12ms]
+  ^ this test timed out after 60000ms.
+
+packages\omo-codex\src\install\install-codex-legacy-agent-purge.test.ts:
+(fail) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing 
+omo #then purges only managed legacy reviewer artifacts [20018.02ms]
+  ^ this test timed out after 20000ms.
+(fail) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo 
+#then preserves the unproven user TOML [20010.90ms]
+  ^ this test timed out after 20000ms.
+
+packages\omo-codex\src\install\install-codex-mcp-manifest.test.ts:
+(fail) install-codex MCP manifest > #given codex installer #when installing omo #then caches research MCPs without 
+ast-grep MCP [30005.51ms]
+  ^ this test timed out after 30000ms.
+
+packages\omo-codex\src\install\install-codex-packaged.test.ts:
+(fail) #given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that 
+platform [5017.68ms]
+  ^ this test timed out after 5000ms.
+
+packages\omo-codex\src\install\install-codex-project-local-cleanup.test.ts:
+126 |       gitBashResolver: resolveTestGitBash,
+127 |       runCommand: async () => undefined,
+128 |     })
+129 | 
+130 |     // then
+131 |     expect(result.projectCleanup.configPath).toBeNull()
+                                                   ^
+error: expect(received).toBeNull()
+
+Received: "C:\\Users\\pss\\.codex\\config.toml"
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\omo-codex\src\install\install-codex-project-local-cleanup.test.ts:131:46)
+(fail) install-codex project-local cleanup > #given only global CODEX_HOME config under a parent directory #when 
+installing Codex Light #then project cleanup leaves it to the global config updater [4949.82ms]
+killed 1 dangling process
+
+packages\omo-codex\src\install\install-codex-reasoning.test.ts:
+(fail) #given a canonical reasoning level #when the Codex installer runs #then config.toml carries the mapped 
+model_reasoning_effort [5015.23ms]
+  ^ this test timed out after 5000ms.
+
+ 241 pass
+ 8 skip
+ 18 fail
+ 959 expect() calls
+Ran 267 tests across 48 files. [623.19s]
+
+
+EXIT=1

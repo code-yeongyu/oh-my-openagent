@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseRule } from "@oh-my-opencode/rules-engine/engine";
 import { afterEach, describe, expect, it } from "vitest";
-
 import {
 	type CodexPostCompactInput,
 	type CodexPostToolUseInput,
@@ -19,6 +20,10 @@ const PROJECT_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: "CONTEXT.md,.omo/rules",
 };
 const SESSION_ID = "session-post-compact-directive";
+
+// Runtime sentinel: the rules hook emits and re-greps this marker when
+// deduplicating injected rules against the transcript (transcript-rule-filter.ts).
+const INSTRUCTIONS_FROM = "Instructions from: ";
 
 afterEach(() => {
 	for (const directory of tempDirectories.splice(0)) {
@@ -48,10 +53,8 @@ describe("codex rules post-compaction read directive", () => {
 		});
 
 		// then
-		expect(dynamicOutput).toContain("TypeScript rule");
+		expect(dynamicOutput).toContain("TS_RULE_SENTINEL");
 		const context = readAdditionalContext(output);
-		expect(context).toContain("MUST READ");
-		expect(context).toContain("NO EXCUSES");
 		expect(context).toContain("CONTEXT.md");
 		expect(context).toContain(".omo/rules/typescript.md");
 		expect(context).not.toContain("A".repeat(50));
@@ -125,9 +128,9 @@ describe("codex rules post-compaction read directive", () => {
 
 		// then
 		const context = readAdditionalContext(output);
-		expect(context).toContain("You are Hephaestus");
-		expect(context).not.toContain("[Truncated. Full:");
-		expect(context).toContain("MUST READ");
+		const bundledRulePath = fileURLToPath(new URL("../bundled-rules/hephaestus/gpt-5.5.md", import.meta.url));
+		expect(context).toContain(`${INSTRUCTIONS_FROM}${bundledRulePath}`);
+		expect(context).toContain(parseRule(readFileSync(bundledRulePath, "utf8")).body.trim());
 		expect(context).toContain("CONTEXT.md");
 	});
 });
@@ -141,7 +144,7 @@ function makeProject(): { root: string; pluginData: string } {
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),
-		["---", 'globs: "**/*.ts"', "---", "", `TypeScript rule\n${"B".repeat(2_000)}`].join("\n"),
+		["---", 'globs: "**/*.ts"', "---", "", `TS_RULE_SENTINEL\n${"B".repeat(2_000)}`].join("\n"),
 	);
 	mkdirSync(path.join(root, "src"), { recursive: true });
 	writeFileSync(path.join(root, "src", "app.ts"), "export const app = 1;\n");

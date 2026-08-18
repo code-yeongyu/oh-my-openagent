@@ -45,10 +45,6 @@ describe("ensureNotepadScaffold", () => {
     const issues = readFileSync(join(notepadDir, "issues.md"), "utf8")
     const problems = readFileSync(join(notepadDir, "problems.md"), "utf8")
 
-    expect(learnings).toContain("# Learnings \u2014 alpha")
-    expect(decisions).toContain("# Decisions \u2014 alpha")
-    expect(issues).toContain("# Issues \u2014 alpha")
-    expect(problems).toContain("# Problems \u2014 alpha")
 
     expect(learnings).toContain("Auto-scaffolded by /start-work")
     expect(decisions).toContain("Auto-scaffolded by /start-work")
@@ -130,8 +126,6 @@ describe("ensureNotepadScaffold", () => {
     const issues = readFileSync(join(notepadDir, "issues.md"), "utf8")
     const problems = readFileSync(join(notepadDir, "problems.md"), "utf8")
 
-    expect(issues).toContain("# Issues \u2014 alpha")
-    expect(problems).toContain("# Problems \u2014 alpha")
 
     expect(result.created).toEqual(["issues.md", "problems.md"])
     expect(result.skipped).toEqual(["learnings.md", "decisions.md"])

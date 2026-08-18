@@ -178,4 +178,63 @@ describe("withLspClient", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	it("#given a relative file below a nested workspace #when callback runs #then callback receives the resolved file path", async () => {
+		// given
+		const previousUserConfig = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
+		const root = mkdtempSync(join(tmpdir(), "lsp-client-wrapper-resolved-path-"));
+		const nestedWorkspace = join(root, "parent", "nested");
+		const filePath = join(nestedWorkspace, "src", "fixture.cbpath");
+		const relativeFilePath = join("parent", "nested", "src", "fixture.cbpath");
+		const userConfig = join(root, "user-lsp.json");
+		const pathsSeen: Array<string | undefined> = [];
+		const clients: FakeLspClient[] = [];
+
+		mkdirSync(join(nestedWorkspace, "src"), { recursive: true });
+		writeFileSync(join(nestedWorkspace, "package.json"), "{}");
+		writeFileSync(filePath, "const value = 1;\n");
+		writeFileSync(
+			userConfig,
+			JSON.stringify({
+				lsp: {
+					callbackPath: {
+						command: [process.execPath],
+						extensions: [".cbpath"],
+					},
+				},
+			}),
+		);
+		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
+
+		const manager = new LspManager({
+			clientFactory: (workspaceRoot: string, server: ResolvedServer): LspClient => {
+				const client = new FakeLspClient(workspaceRoot, server);
+				clients.push(client);
+				return client;
+			},
+		});
+
+		try {
+			// when
+			const context = createStandaloneMcpRequestContext({ cwd: root });
+			await runWithRequestContext(context, () =>
+				withLspClient(
+					relativeFilePath,
+					async (_client, _workspaceRoot, resolvedFilePath) => {
+						pathsSeen.push(resolvedFilePath);
+					},
+					"diagnostics",
+					{ manager },
+				),
+			);
+
+			// then
+			expect(pathsSeen).toEqual([realpathSync(filePath)]);
+			expect(clients[0]?.stopCallCount).toBe(0);
+		} finally {
+			restoreEnv("LSP_TOOLS_MCP_USER_CONFIG", previousUserConfig);
+			await manager.stopAll();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

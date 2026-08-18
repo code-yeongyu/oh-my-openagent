@@ -8,12 +8,15 @@ import type { CheckResult, DoctorIssue } from "../framework/types"
 const CANONICAL_REPLACEMENT = new Map([
   ["variant", "reasoning"],
   ["reasoningEffort", "reasoning"],
-  ["thinking", "reasoning"],
+  ["thinking", 'reasoning: "off" or provider_options.thinking'],
   ["textVerbosity", "provider_options.textVerbosity"],
   ["fallback_models", "models"],
 ])
 
 const TUNING_CONTAINERS = new Set(["agents", "categories", "models"])
+// Canonical migration output nests provider-native keys (thinking, textVerbosity) under these
+// containers; their children must never be re-flagged as deprecated top-level keys.
+const PASSTHROUGH_CONTAINERS = new Set(["provider_options", "providerOptions"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -32,7 +35,7 @@ function collectIssues(configPath: string, value: unknown, prefix: string): Doct
     const replacement = CANONICAL_REPLACEMENT.get(key)
     if (replacement !== undefined) {
       issues.push({
-        title: "Deprecated reasoning config key",
+        title: "Deprecated config key",
         description: `${configPath}: ${path}`,
         fix: `Replace ${key} with ${replacement}, or run: oh-my-openagent config migrate`,
         severity: "warning",
@@ -41,6 +44,7 @@ function collectIssues(configPath: string, value: unknown, prefix: string): Doct
       continue
     }
     if (!isRecord(child)) continue
+    if (PASSTHROUGH_CONTAINERS.has(key)) continue
     // A profile only scopes overrides; its own name is not part of the key path users edit.
     if (prefix.length === 0 && key === "profiles") {
       for (const profile of Object.values(child)) {
@@ -48,6 +52,7 @@ function collectIssues(configPath: string, value: unknown, prefix: string): Doct
       }
       continue
     }
+    if (key === "[opencode]") continue
     if (TUNING_CONTAINERS.has(key) || isHarnessBlock(key) || prefix.length > 0) {
       issues.push(...collectIssues(configPath, child, path))
     }
@@ -77,8 +82,8 @@ export async function checkDeprecatedReasoningKeys(): Promise<CheckResult> {
     name: CHECK_NAMES[CHECK_IDS.CONFIG],
     status: issues.length > 0 ? "warn" : "pass",
     message: issues.length > 0
-      ? `${issues.length} deprecated reasoning key(s) found`
-      : "No deprecated reasoning keys found",
+      ? `${issues.length} deprecated config key(s) found`
+      : "No deprecated config keys found",
     ...(scanned.length > 0 ? { details: scanned.map((path) => `Scanned: ${path}`) } : {}),
     issues,
   }

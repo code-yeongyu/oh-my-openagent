@@ -36,6 +36,24 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     expect(readEvents(store, "st_0000000a")).toContain("destroyed")
   })
 
+  test("#given an in-process DAG resident #when cancel-destroyed without abort #then it disposes without creating an abort promise", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000007", status: "cancelled", residency_state: "resident" })
+    const registry = new FakeRegistry()
+    const order: CallLog = []
+    registry.add(fakeHandle("st_00000007", "in-process", order, { abortRejects: true }))
+    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+
+    // when
+    await lifecycle.destroyResidentTask("st_00000007", "cancel_without_abort")
+
+    // then
+    expect(order).toEqual(["dispose:st_00000007"])
+    expect(store.load("st_00000007")?.residency_state).toBe("disposed")
+    expect(registry.forgotten).toContain("st_00000007")
+  })
+
   test("#given an in-process resident whose abort rejects #when cancel-destroyed #then dispose still runs and it ends disposed", async () => {
     // given
     const store = tempStore()

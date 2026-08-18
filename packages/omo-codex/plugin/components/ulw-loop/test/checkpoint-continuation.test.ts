@@ -31,7 +31,6 @@ describe("checkpointAndContinue", () => {
 		});
 
 		expect(result.next).toMatchObject({ resumed: false, goal: { id: "G002", status: "in_progress" } });
-		expect(result.next && "instruction" in result.next ? result.next.instruction.text : "").toContain("Goal: G002");
 		expect((await readUlwLoopPlan(repo)).activeGoalId).toBe("G002");
 	});
 

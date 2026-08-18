@@ -37,7 +37,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  it("injects BOULDER COMPLETE prompt once per work with substituted elapsed and task breakdown", async () => {
+  it("sends one completion nudge per work with substituted elapsed time and task breakdown", async () => {
     // given
     const planPath = join(testDirectory, "plan.md")
     writeFileSync(planPath, "## TODOs\n- [x] 1. Parse input\n- [x] 2. Save output\n")
@@ -137,10 +137,12 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(promptAsyncMock).toHaveBeenCalledTimes(1)
 
     const promptText = promptRequests[0]?.body?.parts?.[0]?.text ?? ""
-    expect(promptText).toContain("BOULDER COMPLETE")
-    expect(promptText).toContain("Total elapsed: 1m 5s")
-    expect(promptText).toContain("- 1 Parse input: 1m 1s")
-    expect(promptText).toContain("- 2 Save output: 4s")
+    expect(promptText).toContain(work.plan_name)
+    expect(promptText).not.toContain("{PLAN_NAME}")
+    expect(promptText).toContain("1m 5s")
+    expect(promptText).toContain("1m 1s")
+    expect(promptText).toContain("4s")
+    expect(promptText.indexOf("Parse input")).toBeLessThan(promptText.indexOf("Save output"))
     expect(promptText).not.toContain("{ELAPSED_HUMAN}")
     expect(promptRequests[0]?.body?.noReply).toBeUndefined()
     expect(promptRequests[0]?.body?.parts?.[0]?.synthetic).toBe(true)

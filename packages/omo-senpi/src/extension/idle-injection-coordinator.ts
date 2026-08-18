@@ -1,4 +1,4 @@
-export type IdleInjectionSource = "task-completion" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation"
+export type IdleInjectionSource = "task-completion" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run"
 
 export interface IdleInjection {
   // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
@@ -34,19 +34,20 @@ export interface IdleInjectionCoordinatorOptions {
   readonly scheduleFlush?: FlushScheduler
 }
 
-// Deterministic order: task completions are announced before the ulw-loop continuation nudge so the
-// parent sees "what finished" before "keep going".
+// Deterministic order: task completions are announced first and DAG run summaries last, so a mixed
+// flush leads with the most immediate child completion context.
 const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
   "task-completion": 0,
   "team-message": 1,
   "team-liveness": 2,
   "boulder-continuation": 3,
   "ulw-continuation": 4,
+  "dag-run": 5,
 }
 
 /**
  * The single injection queue for the parent session. EVERY delivered notification (task completions,
- * team lead-messages, the ulw-loop continuation) enqueues here; a deferred flush collapses everything
+ * team lead-messages, DAG run summaries, the ulw-loop continuation) enqueues here; a deferred flush collapses everything
  * that became ready within the batch window into exactly ONE injection, steered into the running turn
  * at the next tool-call boundary (unconditional batched-steer contract: N ready notifications never
  * produce N separate injections). comment-checker's tool_result transform is intentionally NOT routed

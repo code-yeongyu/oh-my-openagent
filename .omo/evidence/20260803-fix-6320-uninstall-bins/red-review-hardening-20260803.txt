@@ -1,0 +1,63 @@
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:4 char:8
++ $log = bun test packages/omo-codex/src/install/codex-cleanup.test.ts  ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-codex\src\install\codex-cleanup.test.ts:
+(fail) codex cleanup > #given managed config and missing install manifests #when cleanup runs #then removes orphaned 
+managed agent links [5020.34ms]
+  ^ this test timed out after 5000ms.
+(fail) codex cleanup > #given provisioned runtime binaries and bootstrap plugin data #when cleanup runs #then removes 
+only the managed subtrees [5011.31ms]
+  ^ this test timed out after 5000ms.
+520 |       projectDirectory,
+521 |       now: () => new Date("2026-06-01T00:00:00Z"),
+522 |     })
+523 | 
+524 |     // then
+525 |     expect(result.removedBinLinks).toEqual([])
+                                         ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "C:\Users\pss\AppData\Local\Temp\omo-codex-cleanup-rootguard-bin-pdnlHs\omo.cmd",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-codex\src\install\codex-cleanup.test.ts:525:36)
+(fail) codex cleanup > #given a codex home resolving to a filesystem root #when cleanup runs #then no bin link is 
+scanned or removed [80.72ms]
+549 |       projectDirectory: codexHome,
+550 |       now: () => new Date("2026-06-01T00:00:00Z"),
+551 |     })
+552 | 
+553 |     // then: the installer-created name goes; a copy, an unknown name, and a markerless same-name stay
+554 |     expect(result.removedBinLinks).toEqual([managedBin])
+                                         ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,4 @@
+  [
++   "C:\Users\pss\AppData\Local\Temp\omo-codex-cleanup-copy-bin-dxjogk\omo-mine.cmd",
++   "C:\Users\pss\AppData\Local\Temp\omo-codex-cleanup-copy-bin-dxjogk\omo.backup",
+    "C:\Users\pss\AppData\Local\Temp\omo-codex-cleanup-copy-bin-dxjogk\omo.cmd",
+
+- Expected  - 0
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-codex\src\install\codex-cleanup.test.ts:554:36)
+(fail) codex cleanup > #given a user copy of a generated wrapper #when cleanup runs #then only installer bin names are 
+removed [77.41ms]
+
+ 11 pass
+ 2 skip
+ 4 fail
+ 63 expect() calls
+Ran 17 tests across 1 file. [11.88s]
+

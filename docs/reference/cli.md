@@ -11,10 +11,19 @@ Plugin registration inside `opencode.json` prefers `oh-my-openagent`.
 
 All published packages expose the same compiled CLI with these bin entries:
 
-- `oh-my-openagent` (preferred name)
+- `omo-agent-toolkit` (short name, recommended in docs and prompts)
+- `oh-my-openagent` (preferred package-matching name)
 - `oh-my-opencode` (legacy compatibility name)
-- `omo` (short alias, recommended in docs and prompts)
-- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex`; any explicit `--platform` value must be `codex`)
+- `lazycodex` (Light edition shortcut; install defaults to `--platform=codex`)
+- `lazycodex-ai` (Light edition shortcut; install defaults to `--platform=codex`)
+
+The former `omo` bin was removed from these packages in this major release. The name now belongs to the senpi-native edition:
+
+| Bin | Package | Channel | What it is |
+| --- | --- | --- | --- |
+| `omo` | `omo-ai` | npm beta channel only (`npm i -g omo-ai@beta`) | Launches the pinned senpi release with the full OMO extension loaded. A bare `npm i -g omo-ai` fails by design; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
+
+The `omo-agent-toolkit` npm bin stays with the wrapper packages above; `omo-ai` never declares it.
 
 ## Basic Usage
 
@@ -30,12 +39,14 @@ bunx oh-my-opencode
 
 | Command | Description |
 | --- | --- |
-| `install` | Interactive setup wizard |
+| `install` / `setup` | Interactive setup wizard |
 | `uninstall` / `cleanup` | Remove managed Codex Light state |
 | `doctor` | Installation health diagnostics |
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
+| `config migrate` | Migrate legacy OMO configuration into the unified config |
+| `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
 | `boulder` | Inspect Sisyphus boulder work-state (active plan, per-task timers, session lineage) |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
@@ -66,12 +77,15 @@ bunx oh-my-openagent install
 | `--zai-coding-plan <value>` | Z.ai Coding Plan subscription: `no`, `yes` (Ultimate only) |
 | `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` (Ultimate only) |
 | `--opencode-go <value>` | OpenCode Go subscription: `no`, `yes` (Ultimate only) |
+| `--bailian-coding-plan <value>` | Bailian Coding Plan subscription: `no`, `yes` (Ultimate only) |
+| `--minimax-cn-coding-plan <value>` | MiniMax Coding Plan through minimaxi.com: `no`, `yes` (Ultimate only) |
+| `--minimax-coding-plan <value>` | MiniMax Coding Plan through minimax.io: `no`, `yes` (Ultimate only) |
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
 | `--codex-autonomous` | Configure Codex with `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` when installing Light or Both |
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
-When using the `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. `lazycodex-ai` is only the npm/bin alias; `lazycodex` is the marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
+When using either the `lazycodex` or `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. These are npm bin aliases. The separate LazyCodex repository identity does not change the Codex config, which uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
 
 Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected platform includes Codex.
 
@@ -80,7 +94,7 @@ Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` i
 Anonymous telemetry uses PostHog with a hashed installation identifier. Two streams exist:
 
 - `omo_daily_active`: fired by the main plugin when it loads (`reason: "plugin_loaded"`) and by `oh-my-openagent run` (`reason: "run_started"`).
-- `omo_codex_daily_active`: fired by `omo install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
+- `omo_codex_daily_active`: fired by `omo-agent-toolkit install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
 
 Opt-out env vars:
 
@@ -101,14 +115,14 @@ Removes managed Codex Light state. `cleanup` remains available as a backward-com
 
 ```bash
 npx lazycodex-ai uninstall
-omo uninstall --platform=codex
+omo-agent-toolkit uninstall --platform=codex
 ```
 
 ### Options
 
 | Option | Description |
 | --- | --- |
-| `--platform codex` | Required when using the shared `omo` CLI unless `OMO_INVOCATION_NAME` is `lazycodex-ai` |
+| `--platform codex` | Required when using the shared `omo-agent-toolkit` CLI unless `OMO_INVOCATION_NAME` is `lazycodex` or `lazycodex-ai` |
 | `--codex-home <path>` | Codex home to clean, defaulting to `CODEX_HOME` or `~/.codex` |
 | `--project <path>` | Project directory to inspect for project-local legacy Codex artifacts |
 | `--json` | Output structured JSON result |
@@ -119,7 +133,7 @@ The command removes the managed `sisyphuslabs` plugin cache and marketplace snap
 
 ## doctor
 
-Diagnoses your environment and configuration. Checks are grouped into four categories: **System**, **Config**, **Tools**, and **Models**.
+Diagnoses your environment and configuration. OpenCode checks are grouped as **System**, **Config**, **TUI Plugin**, **Deprecated Reasoning Keys**, **Tools**, **Models**, **Telemetry**, and **Team Mode**. The Codex target runs a separate set of Codex checks.
 
 ### Usage
 
@@ -134,6 +148,7 @@ bunx oh-my-openagent doctor
 | `--status` | Show compact system dashboard |
 | `--verbose` | Show detailed diagnostic information |
 | `--json` | Output results in JSON format |
+| `--platform <opencode|codex>` | Select the doctor target platform |
 
 ### Notes
 

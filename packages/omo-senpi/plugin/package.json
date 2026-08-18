@@ -1,9 +1,12 @@
 {
   "name": "@code-yeongyu/omo-senpi",
-  "version": "4.19.4",
+  "version": "5.0.0-beta.9",
   "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
+  "imports": {
+    "#omo-task-runtime": "./extensions/omo-task.js"
+  },
   "keywords": [
     "pi-package",
     "senpi",

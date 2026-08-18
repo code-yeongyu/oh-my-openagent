@@ -1,6 +1,13 @@
 import { execFile } from "node:child_process"
 
-import { defineTool, type ToolDefinition } from "@code-yeongyu/senpi"
+import {
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
+  defineTool,
+  formatSize,
+  truncateHead,
+  type ToolDefinition,
+} from "@code-yeongyu/senpi"
 import { Type, type Static } from "typebox"
 
 const CurlProgram = Type.Literal("curl")
@@ -29,6 +36,13 @@ export type CuratedReadonlyCommand = {
   readonly program: "curl" | "gh"
   readonly args: readonly string[]
 }
+
+type CuratedReadonlyExecutor = (
+  command: CuratedReadonlyCommand,
+  cwd: string,
+  timeoutSeconds: number,
+  signal: AbortSignal | undefined,
+) => Promise<string>
 
 const CURL_BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
   "-f", "--fail", "--fail-with-body", "-I", "--head", "-L", "--location",
@@ -63,6 +77,7 @@ export function planCuratedReadonlyCommand(request: CuratedReadonlyRequest): Cur
 
 export function createCuratedReadonlyBashTool(
   cwd: string,
+  executor: CuratedReadonlyExecutor = executeCommand,
 ): ToolDefinition {
   return defineTool({
     name: "bash",
@@ -72,10 +87,59 @@ export function createCuratedReadonlyBashTool(
     parameters: CuratedReadonlyBashParams,
     execute: async (_toolCallId, input, signal) => {
       const command = planCuratedReadonlyCommand(input)
-      const text = await executeCommand(command, cwd, input.timeout_seconds ?? 30, signal)
-      return { content: [{ type: "text", text }], details: undefined }
+      try {
+        const text = await executor(command, cwd, input.timeout_seconds ?? 30, signal)
+        return { content: [{ type: "text", text: capResultText(text) }], details: undefined }
+      } catch (error) {
+        if (!(error instanceof CuratedReadonlyCommandError)) throw error
+        throw new CuratedReadonlyCommandError(capResultText(error.message), { cause: error })
+      }
     },
   })
+}
+
+function capResultText(text: string): string {
+  const boundary = truncateHead(text, { maxBytes: DEFAULT_MAX_BYTES, maxLines: DEFAULT_MAX_LINES })
+  if (!boundary.truncated) return text
+
+  // Curated retrievals need the response head, including for one-line JSON that truncateHead cannot partially retain.
+  let notice = buildTruncationNotice(boundary.truncatedBy, "", boundary.totalLines, boundary.totalBytes)
+  let content = ""
+  for (let pass = 0; pass < 4; pass += 1) {
+    const contentBytes = DEFAULT_MAX_BYTES - Buffer.byteLength(`\n${notice}`)
+    const truncation = truncateHead(text, { maxBytes: contentBytes, maxLines: DEFAULT_MAX_LINES - 1 })
+    content = truncation.firstLineExceedsLimit ? truncateUtf8Prefix(text, contentBytes) : truncation.content
+    const nextNotice = buildTruncationNotice(boundary.truncatedBy, content, boundary.totalLines, boundary.totalBytes)
+    if (Buffer.byteLength(nextNotice) === Buffer.byteLength(notice)) {
+      notice = nextNotice
+      break
+    }
+    notice = nextNotice
+  }
+  return `${content}\n${notice}`
+}
+
+function buildTruncationNotice(
+  truncatedBy: "bytes" | "lines" | null,
+  content: string,
+  totalLines: number,
+  totalBytes: number,
+): string {
+  const shown = truncatedBy === "lines"
+    ? `${countLines(content)} of ${totalLines} lines`
+    : `${formatSize(Buffer.byteLength(content))} of ${formatSize(totalBytes)}`
+  return `[truncated: ${shown}. Narrow the request before retrying.]`
+}
+
+function countLines(text: string): number {
+  return text.length === 0 ? 0 : text.split("\n").length
+}
+
+function truncateUtf8Prefix(text: string, maxBytes: number): string {
+  const bytes = Buffer.from(text)
+  let end = Math.min(maxBytes, bytes.length)
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end -= 1
+  return bytes.subarray(0, end).toString("utf8")
 }
 
 function isReadonlyCurl(args: readonly string[]): boolean {

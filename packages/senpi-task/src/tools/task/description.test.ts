@@ -34,7 +34,6 @@ describe("buildTaskToolDescription", () => {
 
     // then
     expect(description).toContain("EITHER category OR subagent_type")
-    expect(description).toContain("DO NOT provide both")
   })
 
   test("#given the description #when built #then it describes spawn-only task and task_send continuation", () => {
@@ -98,7 +97,6 @@ describe("buildTaskToolDescription category+model exclusivity", () => {
     const description = buildTaskToolDescription({ omoConfig: config, agents })
 
     // then
-    expect(description).toContain("NEVER combine model with category")
     expect(description).toContain("omo.json")
     expect(description).toContain("subagent_type")
   })

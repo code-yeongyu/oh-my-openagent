@@ -10,7 +10,67 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  ci-mode:
+    runs-on: ubuntu-latest
+    outputs:
+      generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
+      web_only: ${{ steps.classify.outputs.web_only }}
+      run_heavy: ${{ steps.classify.outputs.run_heavy }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Classify CI mode
+        id: classify
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
+        run: |
+          set -euo pipefail
+
+          PATHS_FILE="$RUNNER_TEMP/ci-changed-paths"
+          DIFF_AVAILABLE=true
+          if [ -z "$BASE_SHA" ] ||
+             [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] ||
+             ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null ||
+             ! git diff --name-only -z "$BASE_SHA" "$GITHUB_SHA" > "$PATHS_FILE"; then
+            DIFF_AVAILABLE=false
+            : > "$PATHS_FILE"
+          fi
+
+          MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
+
+          MODE_JSON="$(node script/ci-fast-path.mjs \
+            --event "$GITHUB_EVENT_NAME" \
+            --message "$HEAD_COMMIT_MESSAGE" \
+            --diff-available "$DIFF_AVAILABLE" \
+            --merge-parents "$MERGE_PARENTS" \
+            < "$PATHS_FILE")"
+
+          jq -r '"generated_release_push=\(.generatedReleasePush)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          jq -r '"web_only=\(.webOnly)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          jq -r '"run_heavy=\(.runHeavy)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          jq . <<< "$MODE_JSON"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: CI execution mode
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Generated release push: `${{ steps.classify.outputs.generated_release_push || 'unknown' }}`.
+            - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
+            - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
+          JOB_SUMMARY_NEXT: Classification failures default to heavy validation; inspect the changed-path diff and event metadata.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   # Block PRs targeting master branch (comment + auto-close, then fail the check)
   block-master-pr:
     runs-on: ubuntu-latest
@@ -74,87 +134,125 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   test:
+    needs: [ci-mode]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+            shard: "1/2"
+          - os: windows-latest
+            shard: "2/2"
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.3.12"
+          # Test legs run 1.3.14: the Windows partition was validated under it
+          # and 1.3.12 hangs on windows-latest in the ast-grep install-script
+          # timeout race.
+          bun-version: "1.3.14"
+
 
       - uses: actions/cache@v5
+        if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile
+
+      - name: Remove stale self-package test copies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run script/remove-stale-self-package-tests.ts
 
       # The full install runs the root `prepare` (`bun run build`), whose
       # `build:lsp-daemon` step already runs `npm ci && npm run build` in
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Run vendored lsp-daemon tests
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: npm test
         working-directory: packages/lsp-daemon
 
+      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
+      # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
-        run: bun test
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows'
+        run: bun --config=bunfig.root.toml test
+
+      - name: Run tests
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2'
+        run: bun test packages/omo-opencode packages/memory-core
+
+      - name: Run tests
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '2/2'
+        shell: pwsh
+        run: |
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/omo-native/test/payload.test.ts packages/omo-codex/src/install/install-codex.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bun --config=bunfig.win2.parallel.toml test --parallel
 
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Root test suite (${{ matrix.os }})
+          JOB_SUMMARY_TITLE: Root test suite (${{ matrix.os }}${{ matrix.shard && format(', shard {0}', matrix.shard) || '' }})
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs the full root `bun test` suite on `${{ matrix.os }}`.
+            - Runs all non-Senpi root tests on Linux and macOS via bunfig.root.toml.
+            - Splits Windows by measured package groups so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   typecheck:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    needs: [ci-mode]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - uses: actions/cache@v5
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Type check
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run typecheck
 
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: TypeScript checks (${{ matrix.os }})
+          JOB_SUMMARY_TITLE: TypeScript checks (ubuntu-latest)
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages required by the workspace.
@@ -163,47 +261,85 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   codex-compatibility:
+    needs: [ci-mode]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            suite: full
+          - os: macos-latest
+            suite: platform
+          - os: windows-latest
+            suite: platform
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - uses: actions/cache@v5
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Run Codex compatibility tests
+      - name: Run full Codex compatibility suite
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full'
         run: bun run test:codex
+
+      - name: Build Codex platform smoke prerequisites
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform'
+        run: |
+          bun run build:codex-install
+          bun run build:git-bash-mcp
+          bun run build:lsp-tools-mcp
+          bun run build:lsp-daemon
+          npm --prefix packages/omo-codex/plugin ci
+          bun run --cwd packages/omo-codex/plugin build
+
+      - name: Run Codex platform smoke tests (.mjs via node --test)
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform'
+        run: >-
+          node --test
+          packages/omo-codex/scripts/install-local.test.mjs
+          packages/omo-codex/scripts/install-local-entrypoint.test.mjs
+          packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs
+          packages/omo-codex/scripts/install-cli-args.test.mjs
+          packages/omo-codex/plugin/test/node-install-surface.test.mjs
+          packages/omo-codex/plugin/test/install-time-build-runtime.test.mjs
+
+      - name: Run Codex platform smoke tests (.ts via bun test)
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform'
+        run: bun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts
 
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Codex compatibility (${{ matrix.os }})
+          JOB_SUMMARY_TITLE: Codex compatibility (${{ matrix.os }}, ${{ matrix.suite }})
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the MCP runtimes needed by the Codex adapter.
-            - Runs the hermetic `bun run test:codex` gate.
-            - Covers Linux, macOS, and Windows compatibility.
+            - Runs the full hermetic Codex gate on Linux and platform-specific installer/path/shell smoke tests on macOS and Windows.
+            - Preserves Linux, macOS, and Windows platform compatibility coverage without duplicating platform-neutral tests.
           JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   senpi-compatibility:
+    needs: [ci-mode]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -213,32 +349,41 @@ jobs:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - uses: actions/cache@v5
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Remove stale self-package test copies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run script/remove-stale-self-package-tests.ts
 
       # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
       # which are backslash-separated on Windows, so the source digest is platform-dependent and
       # a committed artifact can never match on every OS. One platform is enough to catch drift.
       - name: Verify committed Senpi plugin bundle is current
-        if: matrix.os == 'ubuntu-latest'
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
           set -euo pipefail
           node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
 
       - name: Run Senpi compatibility tests
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -265,18 +410,22 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   lazycodex-published-smoke:
+    needs: [ci-mode]
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Run published lazycodex-ai smoke commands
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         env:
           HOME: ${{ runner.temp }}/lazycodex-published-smoke/home
           CODEX_HOME: ${{ runner.temp }}/lazycodex-published-smoke/codex
@@ -328,6 +477,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   build:
+    needs: [ci-mode]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -337,26 +487,32 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - uses: actions/cache@v5
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run build
 
       - name: Verify build output
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: |
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
 
       - name: Verify dist bundle tests
+        if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
 
       - name: Write job summary
@@ -372,9 +528,61 @@ jobs:
           JOB_SUMMARY_NEXT: Fix the first failing build prerequisite before debugging downstream dist checks.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  omo-ai-payload-check:
+    needs: [ci-mode]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          bun-version: "1.3.14"
+
+      - uses: actions/cache@v5
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Build omo-native
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run build:omo-native
+
+      - name: Verify omo-ai payload
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: node script/verify-omo-ai-payload.mjs
+
+      - name: Dry-run publish
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: npm publish --dry-run --ignore-scripts --tag beta
+        working-directory: packages/omo-native
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: omo-ai payload check
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the omo-native package.
+            - Verifies the omo-ai tarball payload whitelist.
+            - Runs `npm publish --dry-run` to confirm publishability without publishing.
+          JOB_SUMMARY_NEXT: Inspect the failing build, payload verifier, or dry-run publish step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   auto-commit-schema:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]
+    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -385,12 +593,12 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -424,8 +632,11 @@ jobs:
 
   draft-release:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/dev' &&
+      needs.ci-mode.outputs.run_heavy == 'true'
     permissions:
       contents: write
     steps:
@@ -437,7 +648,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.3.14"
 
       - name: Generate release notes
         id: notes

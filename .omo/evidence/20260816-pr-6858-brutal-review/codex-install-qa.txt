@@ -1,0 +1,23 @@
+Codex installer real-surface QA
+Captured: 2026-08-16
+
+COMMAND:
+cd .agents/skills/codex-qa
+bash scripts/install-verify.sh --self-test
+
+SURFACE:
+The local worktree's Codex Light installer was installed into a throwaway isolated CODEX_HOME.
+
+OBSERVED:
+PASS: plugin cache present (5.0.0-beta.7)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (10 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged
+PASS: install-verify
+
+WHY SUFFICIENT:
+The only Codex-side repair changes installer test fixture ownership. This QA drove the real local installer against an isolated home, proved the payload and config landed, and proved the user's real Codex config was unchanged.
+
+OMITTED:
+The real config digest is not repeated here. No config contents, provider tokens, auth headers, or environment dumps were captured.

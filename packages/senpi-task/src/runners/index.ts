@@ -32,8 +32,15 @@ export type {
   RunnerErrorFacts,
   TerminateOptions,
 } from "./types"
-export { buildChildArgs, buildRpcSpawn, detectBunBinary, resolveChildSessionDir, resolveSenpiExecutable } from "./rpc/spawn"
-export type { RpcSpawnDescriptor, RpcSpawnRuntime } from "./rpc/spawn"
+export {
+  buildChildArgs,
+  buildRpcSpawn,
+  detectBunBinary,
+  resolveChildSessionDir,
+  resolveSenpiExecutable,
+  resolveSenpiLauncher,
+} from "./rpc/spawn"
+export type { RpcSpawnDescriptor, RpcSpawnRuntime, SenpiLauncher } from "./rpc/spawn"
 export { parseExtensionEntries } from "./rpc/parent-extensions"
 export { classifyChildExit, mapExitOutcomeToError, tailStderr } from "./rpc/exit-mapping"
 export type { ChildExitInput } from "./rpc/exit-mapping"

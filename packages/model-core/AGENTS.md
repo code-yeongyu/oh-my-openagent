@@ -1,6 +1,6 @@
 # model-core - Model Resolution (Core)
 
-**Generated:** 2026-07-17 (7d664b96b)
+**Generated:** 2026-08-10 (38d268995)
 
 ## OVERVIEW
 
@@ -10,14 +10,16 @@ Harness-neutral model resolution core (`@oh-my-opencode/model-core`). Resolves w
 
 | File | Role |
 |------|------|
-| `model-resolver.ts` | Entry: `resolveModel()`, `resolveModelWithFallback()`, `normalizeFallbackModels()` |
+| `model-resolver.ts` | Entry: `resolveModel()`, `resolveModelWithFallback()`, `normalizeFallbackModels()`, `flattenToFallbackModelStrings()` |
 | `model-resolution-pipeline.ts` | `resolveModelPipeline()` - 6-step resolution with logging hooks for testing |
 | `provider-cache.ts` | `ProviderCache` DI interface: `readConnectedProvidersCache()`, `findProviderModelMetadata()` |
-| `model-availability.ts` | `fuzzyMatchModel()` - exact, then shortest prefix match against `availableModels` |
+| `model-availability.ts` | `fuzzyMatchModel()` - exact, then exact model-ID, then shortest **substring** match against `availableModels` (not prefix) |
 | `agent-model-requirements.ts` | Hardcoded `AGENT_MODEL_REQUIREMENTS` fallback chains (11 agents) |
 | `category-model-requirements.ts` | Hardcoded `CATEGORY_MODEL_REQUIREMENTS` fallback chains (8 categories) |
 | `provider-model-id-transform.ts` | Provider-specific ID transforms (Vercel sub-provider inference, Claude version dots, Gemini preview suffixes) |
-| `model-capabilities/index.ts` | Capability queries against bundled snapshot + runtime readers |
+| `model-capabilities/index.ts` | `getModelCapabilities()` - 4-source priority: runtime metadata -> runtime snapshot -> bundled snapshot -> heuristic family; alias canonicalization, suffix/prefix-tolerant lookup candidates, `resolutionMode` diagnostics |
+| `model-capability-heuristics.ts` | `HEURISTIC_MODEL_FAMILY_REGISTRY` + `detectHeuristicModelFamily()` - pattern-based family detection when no snapshot entry exists |
+| `model-settings-compatibility.ts` | `resolveCompatibleModelSettings()` - clamps variant/reasoningEffort/temperature/topP/maxTokens/thinking against family + metadata caps, with change reasons |
 | `model-capability-aliases.ts` | `resolveModelIDAlias(modelID, providerID?)` canonicalizes exact + pattern aliases; OpenAI GPT-5.6 fast service-tier alias scoped to `openai` and the `vercel` subprovider |
 | `model-family-detectors.ts` | Family predicates (`isGptModel`, `isClaudeOpus47OrLaterModel`, `isClaudeFableOrMythosModel`, `isKimiK3Model`, `isGeminiModel`, ...) |
 | `runtime-fallback-*.ts` | Error classification, auto-retry signals, and runtime fallback model selection |
@@ -40,4 +42,7 @@ resolveModelPipeline(request, providerCache)
 - **Two resolution APIs:** `resolveModel()` for simple 3-tier fallback; `resolveModelWithFallback()` for full pipeline with `ExtendedModelResolutionInput`.
 - **`connected-providers-cache.ts`** exports no-op defaults. Adapters override via the `ProviderCache` parameter.
 - **39 source files.** Barrel `index.ts` re-exports ~27 public modules. Tests co-located as `*.test.ts`.
+- **Capability lookup is suffix-tolerant.** Each model ID expands to up to 4 candidate forms (full, provider-prefix-stripped, variant-suffix-stripped, both), tried most-specific first, so `:high` / `(high)` requests still hit a provider's bare model entry.
+- **Snapshot lookup prefers provider-specific keys.** `anthropic/claude-opus-4.8` wins over a bare `claude-opus-4.8` entry when both exist.
+- **Metadata beats family caps.** In `resolveCompatibleModelSettings()`, family `reasoningEffortAliases` are applied first, then explicit `capabilities.*` metadata, then heuristic family caps; an unknown family drops the value with `unknown-model-family`.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md)

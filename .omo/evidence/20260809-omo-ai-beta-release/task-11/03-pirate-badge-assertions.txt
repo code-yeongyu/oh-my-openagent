@@ -1,0 +1,14 @@
+# Scenario 03 - packaged omo help inside a real pty; pirate badge absence with positive controls
+raw_capture=/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/.omo/evidence/20260809-omo-ai-beta-release/task-11/03-pirate-badge-pty.raw
+plain_capture=/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/.omo/evidence/20260809-omo-ai-beta-release/task-11/03-pirate-badge-pty.txt
+raw_size_bytes=12965
+plain_size_bytes=12893
++ positive controls proving the pty capture rendered the packaged help surface
+capture_launcher_banner_control=PASS
+capture_usage_control=PASS
+capture_extension_footer_control=PASS
+capture_help_footer_control=PASS
++ negative assertion: OmO Native absent
+pirate_badge_absent=PASS
+scenario_03=PASS
+cleanup_receipt=pty command exited in scenario 03; no child process remains; isolated prefix removed in 09-cleanup-receipts.txt

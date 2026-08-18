@@ -1,0 +1,11 @@
+SURFACE_QA_CLEANUP=PASS
+
+Removed and verified absent:
+
+- isolated Bun `HOME` / `BUN_INSTALL` prefix and polluted caller fixture;
+- isolated npm prefix;
+- packed tarball directory;
+- focused RED/GREEN temporary transcripts;
+- unknown-layout fixture, removed by trap;
+- remote `mengmotaMac` fixtures, removed earlier;
+- Bunshin client, closed after remote QA.

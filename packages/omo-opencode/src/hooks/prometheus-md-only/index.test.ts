@@ -246,10 +246,7 @@ describe("prometheus-md-only", () => {
       await hook["tool.execute.before"](input, output)
 
       // then
-      expect(output.message).toContain("PROMETHEUS MANDATORY WORKFLOW REMINDER")
-      expect(output.message).toContain("INTERVIEW")
-      expect(output.message).toContain("METIS CONSULTATION")
-      expect(output.message).toContain("MOMUS REVIEW")
+      expect(output.message).toContain(SYSTEM_DIRECTIVE_PREFIX)
     })
 
     test("should NOT inject workflow reminder for .omo/drafts/", async () => {
@@ -415,7 +412,6 @@ describe("prometheus-md-only", () => {
       // then — XML tag used, not bracket directive (#4036)
       expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
       expect(output.args.prompt).not.toContain("[SYSTEM DIRECTIVE:")
-      expect(output.args.prompt).toContain("DO NOT modify any files")
     })
 
     test("should inject planning warning when Prometheus calls task (research)", async () => {
@@ -874,35 +870,5 @@ describe("prometheus-md-only", () => {
          hook["tool.execute.before"](input, output)
        ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
      })
-  })
-
-  describe("blocked-write guidance message", () => {
-    test("#given prometheus writes product code #when the hook blocks #then the error routes to plan todos, never to subagent implementation", async () => {
-      //#given
-      setupMessageStorage(TEST_SESSION_ID, "prometheus")
-      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-      const input = {
-        tool: "Write",
-        sessionID: TEST_SESSION_ID,
-        callID: "call-guidance",
-      }
-      const output = {
-        args: { filePath: "/path/to/file.ts" },
-      }
-
-      //#when
-      let blockedMessage = ""
-      try {
-        await hook["tool.execute.before"](input, output)
-      } catch (error) {
-        blockedMessage = error instanceof Error ? error.message : String(error)
-      }
-
-      //#then
-      expect(blockedMessage).toContain("delegated implementation is still implementation")
-      expect(blockedMessage).toContain("Record the intended change as a todo in the plan")
-      expect(blockedMessage).not.toContain("Use task() to delegate implementation")
-      expect(blockedMessage).not.toContain("APOLOGIZE")
-    })
   })
 })

@@ -4,6 +4,17 @@ import { classifyPathEnvironment } from "../../shared/classify-path-environment"
 import { clearAllSkips, recordFsyncSkip } from "../../shared/fsync-skip-tracker"
 import { createFsyncSkipWarningHook } from "./index"
 
+/**
+ * The hook drains skips with a strict `timestamp > startTimestamp` comparison against `Date.now()`.
+ * A fixed sleep can return within the same millisecond on a loaded runner, so the recorded skip is
+ * not "after" the start and the assertion fails by timing luck. Waiting for the clock to actually
+ * advance makes the boundary deterministic.
+ */
+async function advanceClockPastNow(): Promise<void> {
+  const start = Date.now()
+  while (Date.now() <= start) await Bun.sleep(1)
+}
+
 describe("createFsyncSkipWarningHook", () => {
   beforeEach(() => {
     clearAllSkips()
@@ -15,7 +26,7 @@ describe("createFsyncSkipWarningHook", () => {
     const output = { args: {} as Record<string, unknown> }
 
     await hook["tool.execute.before"](input, output)
-    await Bun.sleep(2)
+    await advanceClockPastNow()
 
     recordFsyncSkip({
       filePath: "/tmp/a",
@@ -38,7 +49,7 @@ describe("createFsyncSkipWarningHook", () => {
     const afterOutput = { title: "ok", output: "base", metadata: {} as Record<string, unknown> }
 
     await hook["tool.execute.before"](input, beforeOutput)
-    await Bun.sleep(2)
+    await advanceClockPastNow()
 
     recordFsyncSkip({
       filePath: "/Users/x/OneDrive/a",
@@ -74,9 +85,9 @@ describe("createFsyncSkipWarningHook", () => {
     const inputB = { tool: "write", sessionID: "ses1", callID: "call-B" }
 
     await hook["tool.execute.before"](inputA, beforeOutput)
-    await Bun.sleep(2)
+    await advanceClockPastNow()
     await hook["tool.execute.before"](inputB, beforeOutput)
-    await Bun.sleep(2)
+    await advanceClockPastNow()
 
     recordFsyncSkip({
       filePath: "/tmp/a",

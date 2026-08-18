@@ -2,7 +2,7 @@
 
 import { describe, expect, it, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
@@ -16,7 +16,75 @@ async function createRepoFixture(): Promise<{ repoRoot: string; binDir: string; 
 }
 
 describe("linkRootRuntimeBin runtime wrapper parity", () => {
-  it("#given posix platform #when writing the omo runtime wrapper #then embeds the node fallback chain", async () => {
+  it("#given posix platform #when writing the canonical runtime wrapper #then uses the new name, marker, and edition exports", async () => {
+    // given
+    const fixture = await createRepoFixture()
+
+    // when
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    expect(link).not.toBeNull()
+    expect(link?.name).toBe("omo-agent-toolkit")
+    expect(link?.path).toBe(join(fixture.binDir, "omo-agent-toolkit"))
+    const wrapper = await readFile(link?.path ?? "", "utf8")
+    expect(wrapper).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
+    expect(wrapper).toContain("export OMO_INVOCATION_NAME=omo-agent-toolkit")
+    expect(wrapper).toContain("export OMO_EDITION=codex")
+    await expect(lstat(join(fixture.binDir, "omo"))).rejects.toThrow()
+  })
+
+  it("#given a marker-bearing legacy omo wrapper #when writing the canonical wrapper #then deletes the legacy wrapper", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    await writeFile(join(fixture.binDir, "omo"), "#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\n")
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    await expect(lstat(join(fixture.binDir, "omo"))).rejects.toThrow()
+    expect(await readFile(join(fixture.binDir, "omo-agent-toolkit"), "utf8")).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
+  })
+
+  it("#given an unmarked user-owned omo #when writing the canonical wrapper twice #then preserves omo byte-identical and remains idempotent", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    const legacyPath = join(fixture.binDir, "omo")
+    const canonicalPath = join(fixture.binDir, "omo-agent-toolkit")
+    const userContent = Buffer.from("#!/bin/sh\nprintf 'user-owned omo\\n'\n")
+    await mkdir(fixture.binDir, { recursive: true })
+    await writeFile(legacyPath, userContent)
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+    const firstCanonical = await readFile(canonicalPath)
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    expect(await readFile(legacyPath)).toEqual(userContent)
+    expect(await readFile(canonicalPath)).toEqual(firstCanonical)
+  })
+
+  it("#given win32 platform #when writing the canonical runtime wrapper #then uses the new name and environment exports", async () => {
+    // given
+    const fixture = await createRepoFixture()
+
+    // when
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+
+    // then
+    expect(link?.name).toBe("omo-agent-toolkit")
+    expect(link?.path).toBe(join(fixture.binDir, "omo-agent-toolkit.cmd"))
+    const wrapper = await readFile(link?.path ?? "", "utf8")
+    expect(wrapper).toContain("rem OMO_GENERATED_RUNTIME_WRAPPER")
+    expect(wrapper).toContain('set "OMO_INVOCATION_NAME=omo-agent-toolkit"')
+    expect(wrapper).toContain('set "OMO_EDITION=codex"')
+    await expect(lstat(join(fixture.binDir, "omo.cmd"))).rejects.toThrow()
+  })
+
+  it("#given posix platform #when writing the omo-agent-toolkit runtime wrapper #then embeds the node fallback chain", async () => {
     // given
     const fixture = await createRepoFixture()
 
@@ -97,7 +165,7 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
 
     // then
     expect(exitCode).toBe(1)
-    expect(stderr).toContain(`omo: runtime target missing at ${join(fixture.repoRoot, "dist", "cli", "index.js")}`)
+    expect(stderr).toContain(`omo-agent-toolkit: runtime target missing at ${join(fixture.repoRoot, "dist", "cli", "index.js")}`)
     expect(stderr).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
   })
 
@@ -153,5 +221,52 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     if (link === null) throw new Error("expected runtime wrapper link")
     const wrapper = await readFile(link.path, "utf8")
     expect(wrapper).toMatch(/"[^"\r\n]*omo-ulw-loop\.cmd" ulw-loop %\*/)
+  })
+})
+
+describe("legacy omo reclamation across link kinds", () => {
+  it("#given bin/omo is a symlink resolving to a marker-bearing wrapper #when writing the canonical wrapper #then removes the symlink and keeps its target", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    const target = join(fixture.repoRoot, "generated-wrapper.sh")
+    await writeFile(target, "#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\necho stale\n")
+    await symlink(target, join(fixture.binDir, "omo"))
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    await expect(lstat(join(fixture.binDir, "omo"))).rejects.toThrow()
+    expect(await readFile(target, "utf8")).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
+  })
+
+  it("#given bin/omo is a symlink to an unmarked user file #when writing the canonical wrapper #then preserves the symlink", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    const target = join(fixture.repoRoot, "my-own-script.sh")
+    await writeFile(target, "#!/bin/sh\necho mine\n")
+    await symlink(target, join(fixture.binDir, "omo"))
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    const entry = await lstat(join(fixture.binDir, "omo"))
+    expect(entry.isSymbolicLink()).toBe(true)
+  })
+
+  it("#given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    await symlink(join(fixture.repoRoot, "missing-target.sh"), join(fixture.binDir, "omo"))
+
+    // when
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    expect(link?.name).toBe("omo-agent-toolkit")
   })
 })

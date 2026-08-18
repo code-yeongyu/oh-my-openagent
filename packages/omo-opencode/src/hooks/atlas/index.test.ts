@@ -16,6 +16,7 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
 } from "../../shared/prompt-async-gate"
 import { DEFAULT_SESSION_STATUS_TIMEOUT_MS } from "../../shared/session-idle-settle"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import type { AtlasHookOptions, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
@@ -160,9 +161,10 @@ describe("atlas hook", () => {
       writeBoulderState(TEST_DIR, state)
 
       const hook = createTestAtlasHook(createMockPluginInput())
+      const originalOutput = "Task completed successfully"
       const output = {
         title: "Sisyphus Task",
-        output: "Task completed successfully",
+        output: originalOutput,
         metadata: {},
       }
 
@@ -173,7 +175,7 @@ describe("atlas hook", () => {
       )
 
       // then - output unchanged because caller is not orchestrator
-      expect(output.output).toBe("Task completed successfully")
+      expect(output.output).toBe(originalOutput)
       
       cleanupMessageStorage(sessionID)
     })
@@ -184,9 +186,10 @@ describe("atlas hook", () => {
        setupMessageStorage(sessionID, "atlas")
       
       const hook = createTestAtlasHook(createMockPluginInput())
+      const originalOutput = "Task completed successfully"
       const output = {
         title: "Sisyphus Task",
-        output: "Task completed successfully",
+        output: originalOutput,
         metadata: {},
       }
 
@@ -197,9 +200,8 @@ describe("atlas hook", () => {
       )
 
       // then - standalone verification reminder appended
-      expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("LYING")
-      expect(output.output).toContain("PHASE 1")
+      expect(output.output).toContain(originalOutput)
+      expect(output.output).toContain("<system-reminder>")
       
       cleanupMessageStorage(sessionID)
     })
@@ -221,9 +223,10 @@ describe("atlas hook", () => {
       writeBoulderState(TEST_DIR, state)
 
       const hook = createTestAtlasHook(createMockPluginInput())
+      const originalOutput = "Task completed successfully"
       const output = {
         title: "Sisyphus Task",
-        output: "Task completed successfully",
+        output: originalOutput,
         metadata: {},
       }
 
@@ -234,11 +237,9 @@ describe("atlas hook", () => {
       )
 
       // then - output should be transformed (original output preserved for debugging)
-      expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("SUBAGENT WORK COMPLETED")
+      expect(output.output).toContain(originalOutput)
       expect(output.output).toContain("test-plan")
-      expect(output.output).toContain("LYING")
-      expect(output.output).toContain("PHASE 1")
+      expect(output.output).toContain("<system-reminder>")
       
       cleanupMessageStorage(sessionID)
     })
@@ -282,7 +283,6 @@ session_id: ses_subagent_abc
       )
 
       // then - output is transformed but metadata is preserved
-      expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.metadata.sessionId).toBe("ses_subagent_abc")
       expect(output.metadata.agent).toBe("sisyphus-junior")
       expect(output.metadata.category).toBe("quick")
@@ -319,7 +319,6 @@ session_id: ses_standalone_def
       )
 
       // then - standalone verification appended but metadata preserved
-      expect(output.output).toContain("LYING")
       expect(output.metadata.sessionId).toBe("ses_standalone_def")
       expect(output.metadata.agent).toBe("sisyphus-junior")
       expect(output.metadata.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
@@ -358,7 +357,6 @@ session_id: ses_standalone_def
       )
 
       // then - output transformed even when complete (shows 2/2 done)
-      expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("2/2 done")
       expect(output.output).toContain("0 remaining")
       
@@ -544,10 +542,7 @@ session_id: ses_standalone_def
         output
       )
 
-      // then - should include verification instructions and task_id guidance
-      expect(output.output).toContain("LYING")
-      expect(output.output).toContain("PHASE 1")
-      expect(output.output).toContain("PHASE 2")
+      // then - should include resume guidance keyed on the task tool's parameter
       expect(output.output).toContain("task_id")
       
       cleanupMessageStorage(sessionID)
@@ -963,92 +958,6 @@ session_id: ses_untrusted_999
       cleanupMessageStorage(sessionID)
     })
 
-    describe("completion gate output ordering", () => {
-      const COMPLETION_GATE_SESSION = "completion-gate-order-test"
-
-      beforeEach(() => {
-        setupMessageStorage(COMPLETION_GATE_SESSION, "atlas")
-      })
-
-      afterEach(() => {
-        cleanupMessageStorage(COMPLETION_GATE_SESSION)
-      })
-
-      test("should include completion gate before Subagent Response in transformed boulder output", async () => {
-        // given - Atlas caller with boulder state
-        const planPath = join(TEST_DIR, "test-plan.md")
-        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
-
-        const state: BoulderState = {
-          active_plan: planPath,
-          started_at: "2026-01-02T10:00:00Z",
-          session_ids: ["session-1"],
-          plan_name: "test-plan",
-        }
-        writeBoulderState(TEST_DIR, state)
-
-        const hook = createTestAtlasHook(createMockPluginInput())
-        const output = {
-          title: "Sisyphus Task",
-          output: "Task completed successfully",
-          metadata: {},
-        }
-
-        // when
-        await hook["tool.execute.after"](
-          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
-          output
-        )
-
-        // then - completion gate should appear BEFORE Subagent Response
-        const subagentResponseIndex = output.output.indexOf("**Subagent Response:**")
-        const completionGateIndex = output.output.indexOf("COMPLETION GATE")
-
-        expect(completionGateIndex).toBeGreaterThanOrEqual(0)
-        expect(subagentResponseIndex).toBeGreaterThanOrEqual(0)
-        expect(completionGateIndex).toBeLessThan(subagentResponseIndex)
-      })
-
-      test("should include completion gate before verification phase text", async () => {
-        // given - Atlas caller with boulder state
-        const planPath = join(TEST_DIR, "test-plan.md")
-        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
-
-        const state: BoulderState = {
-          active_plan: planPath,
-          started_at: "2026-01-02T10:00:00Z",
-          session_ids: ["session-1"],
-          plan_name: "test-plan",
-        }
-        writeBoulderState(TEST_DIR, state)
-
-        const hook = createTestAtlasHook(createMockPluginInput())
-        const output = {
-          title: "Sisyphus Task",
-          output: "Task completed successfully",
-          metadata: {},
-        }
-
-        // when
-        await hook["tool.execute.after"](
-          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
-          output
-        )
-
-        // then - completion gate should appear BEFORE verification phase text
-        const completionGateIndex = output.output.indexOf("COMPLETION GATE")
-        const lyingIndex = output.output.indexOf("LYING")
-        const phase1Index = output.output.indexOf("PHASE 1")
-
-        expect(completionGateIndex).toBeGreaterThanOrEqual(0)
-        expect(lyingIndex).toBeGreaterThanOrEqual(0)
-        expect(completionGateIndex).toBeLessThan(lyingIndex)
-        if (phase1Index !== -1) {
-          expect(completionGateIndex).toBeLessThan(phase1Index)
-        }
-      })
-    })
-
     describe("Write/Edit tool direct work reminder", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 
@@ -1076,9 +985,7 @@ session_id: ses_untrusted_999
         )
 
         // then
-        expect(output.output).toContain("DELEGATION REQUIRED")
-        expect(output.output).toContain("task")
-        expect(output.output).toContain("task")
+        expect(output.output).toContain(SYSTEM_DIRECTIVE_PREFIX)
       })
 
       test("should append delegation reminder when orchestrator edits outside .omo/", async () => {
@@ -1097,7 +1004,7 @@ session_id: ses_untrusted_999
         )
 
         // then
-        expect(output.output).toContain("DELEGATION REQUIRED")
+        expect(output.output).toContain(SYSTEM_DIRECTIVE_PREFIX)
       })
 
       test("should NOT append reminder when orchestrator writes inside .omo/", async () => {
@@ -1118,7 +1025,7 @@ session_id: ses_untrusted_999
 
         // then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        expect(output.output).not.toContain(SYSTEM_DIRECTIVE_PREFIX)
       })
 
       test("should NOT append reminder when non-orchestrator writes outside .omo/", async () => {
@@ -1142,7 +1049,7 @@ session_id: ses_untrusted_999
 
         // then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        expect(output.output).not.toContain(SYSTEM_DIRECTIVE_PREFIX)
         
         cleanupMessageStorage(nonOrchestratorSession)
       })
@@ -1206,7 +1113,7 @@ session_id: ses_untrusted_999
 
           // then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain(SYSTEM_DIRECTIVE_PREFIX)
         })
 
         test("should NOT append reminder when orchestrator writes inside .omo with mixed separators", async () => {
@@ -1227,7 +1134,7 @@ session_id: ses_untrusted_999
 
           // then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain(SYSTEM_DIRECTIVE_PREFIX)
         })
 
         test("should NOT append reminder for absolute Windows path inside .omo\\", async () => {
@@ -1248,7 +1155,7 @@ session_id: ses_untrusted_999
 
           // then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain(SYSTEM_DIRECTIVE_PREFIX)
         })
 
         test("should append reminder for Windows path outside .omo\\", async () => {
@@ -1267,7 +1174,7 @@ session_id: ses_untrusted_999
           )
 
           // then
-          expect(output.output).toContain("DELEGATION REQUIRED")
+          expect(output.output).toContain(SYSTEM_DIRECTIVE_PREFIX)
         })
       })
     })
@@ -1322,8 +1229,6 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
-      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
-      expect(callArgs.body.parts[0].text).toContain("2 remaining")
     }, { timeout: 10_000 })
 
     test("should inject continuation when idle event carries session id in info", async () => {
@@ -1354,8 +1259,6 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
-      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
-      expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
     test("should settle idle before injecting boulder continuation", async () => {
@@ -1498,7 +1401,6 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
-      expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
     test("should inject completion nudge when boulder plan is complete", async () => {
@@ -1634,8 +1536,6 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
-      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
-      expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
     test("#given boulder retried a runtime error #when stale idle follows #then no delayed duplicate retry is scheduled", async () => {
@@ -1856,35 +1756,6 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalled()
     })
 
-    test("should include plan progress in continuation prompt", async () => {
-      // given - boulder state with specific progress
-      const planPath = join(TEST_DIR, "progress-plan.md")
-      writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2\n- [ ] Task 3\n- [ ] Task 4")
-
-      const state: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: [MAIN_SESSION_ID],
-        plan_name: "progress-plan",
-      }
-      writeBoulderState(TEST_DIR, state)
-
-      const mockInput = createMockPluginInput()
-      const hook = createTestAtlasHook(mockInput)
-
-      // when
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
-      })
-
-      // then - should include progress
-      const callArgs = mockInput._promptMock.mock.calls[0][0]
-      expect(callArgs.body.parts[0].text).toContain("2/4 completed")
-      expect(callArgs.body.parts[0].text).toContain("2 remaining")
-    })
 
     test("should include preferred reuse session in continuation prompt for current top-level task", async () => {
       // given - boulder state with tracked preferred session
@@ -1924,39 +1795,7 @@ session_id: ses_untrusted_999
 
       // then
       const callArgs = mockInput._promptMock.mock.calls[0][0]
-      expect(callArgs.body.parts[0].text).toContain("Preferred reuse session for current top-level plan task")
       expect(callArgs.body.parts[0].text).toContain("ses_auth_flow_123")
-    })
-
-    test("#given blocked-task continuation #when prompt is built #then it requires a plan edit to mark the task blocked", async () => {
-      // given - boulder state with an incomplete externally blockable task
-      const planPath = join(TEST_DIR, "blocked-plan.md")
-      writeFileSync(planPath, "# Plan\n- [ ] Wait for external credentials")
-
-      writeBoulderState(TEST_DIR, {
-        active_plan: planPath,
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: [MAIN_SESSION_ID],
-        plan_name: "blocked-plan",
-      })
-
-      const mockInput = createMockPluginInput()
-      const hook = createTestAtlasHook(mockInput)
-
-      // when
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
-      })
-
-      // then - prompt enforces the behavioral invariant instead of allowing text-only blocker reports
-      const callArgs = mockInput._promptMock.mock.calls[0][0]
-      const promptText = callArgs.body.parts[0].text
-      expect(promptText).toContain("- [~]")
-      expect(promptText).toMatch(/edit the plan file/i)
-      expect(promptText).toMatch(/text-only explanation.*not progress/i)
     })
 
     test("#given continuation emits text without tool progress #when three continuation iterations repeat #then Atlas stalls instead of looping", async () => {

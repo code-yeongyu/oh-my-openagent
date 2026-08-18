@@ -1,0 +1,24 @@
+# Node-load QA: published beta.1 vs worktree-fixed extension
+
+## What was tested
+The senpi extension loaded under plain Node through senpi's actual loader (jiti), driven via the omo
+launcher in print mode inside a sandbox (throwaway HOME / SENPI_CODING_AGENT_DIR / XDG_DATA_HOME), with
+--provider/--model forcing the load path into the expected auth error. Same runtime, same sandbox shape
+for both cases.
+
+## What was observed
+
+### A. published beta.1 extension (~/.local/lib/node_modules/omo-ai/plugin) - reproduces the crash
+Warning: Failed to load extension "/Users/yeongyu/.local/lib/node_modules/omo-ai/plugin/extensions/omo.js": Failed to load extension: The "path" argument must be of type string. Received undefined
+No API key found for anthropic.
+
+### B. worktree-built fixed extension (packages/omo-senpi/plugin) - loads cleanly
+No API key found for anthropic.
+
+## Why it is enough
+The exact failure path reported by the user (load warning with "The path argument must be of type
+string. Received undefined") reproduces against the published artifact and is ABSENT against the fixed
+build through the identical loader, node binary, and sandbox. The remaining auth error is the expected
+post-load behavior proving the extension load itself completed.
+## Omitted
+None beyond the throwaway sandbox paths; no secrets involved.

@@ -231,6 +231,6 @@ describe("createCategoryUnavailableWarningPlanner", () => {
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.category).toBe("quick")
     expect(result.error.attempted_chain).toBeDefined()
-    expect(result.error.missing_providers).toContain("quotio-openai")
+    expect(result.error.missing_providers).toContain("openai-codex")
   })
 })

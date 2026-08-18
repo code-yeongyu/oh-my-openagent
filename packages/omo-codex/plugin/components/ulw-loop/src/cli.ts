@@ -5,7 +5,7 @@ import { runSpawnGuardCli } from "./spawn-guard.js";
 import { runStopResumeHookCli } from "./stop-resume-hook.js";
 
 const TOP_LEVEL_HELP =
-	"Usage:\n  omo ulw-loop <subcommand> [args]\n  omo hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)\n  omo help | --help | -h                          (this message)\n\nRun `omo ulw-loop help` for ulw-loop subcommands.\n";
+	"Usage:\n  omo-agent-toolkit ulw-loop <subcommand> [args]\n  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)\n  omo-agent-toolkit help | --help | -h                          (this message)\n\nRun `omo-agent-toolkit ulw-loop help` for ulw-loop subcommands.\n";
 
 async function main(): Promise<number> {
 	const argv = process.argv.slice(2);

@@ -1,0 +1,39 @@
+{
+  "emit-migrate": [],
+  "test-expectation": [],
+  "input-compat-preserve": [
+    "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/src/steering.ts: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts: omo ulw-loop",
+    "packages/omo-codex/scripts/install-config.test.mjs: omo install",
+    "packages/omo-codex/scripts/install-delegated-command.test.mjs: omo doctor",
+    "packages/omo-codex/scripts/install-local-entrypoint.test.mjs: omo doctor",
+    "packages/omo-codex/src/install/codex-config-toml.test.ts: omo install",
+    "packages/omo-codex/src/install/lazycodex-routing.test.ts: omo install",
+    "packages/omo-opencode/src/cli/install-platform-resolution.test.ts: omo cleanup",
+    "packages/omo-opencode/src/cli/install-platform-resolution.test.ts: omo install",
+    "script/lazycodex-published-smoke-workflow.test.ts: omo doctor x2",
+    "script/lazycodex-published-smoke-workflow.test.ts: omo install x3",
+    "script/publish-lazycodex-workflow.test.ts: omo install"
+  ],
+  "docs": [
+    ".agents/skills/codex-qa/SKILL.md: omo get-local-version",
+    ".github/workflows/publish.yml: /bin/omo",
+    "AGENTS.md: omo doctor",
+    "CLAUDE.md: omo doctor",
+    "packages/omo-codex/README.md: omo get-local-version",
+    "packages/omo-native/AGENTS.md: omo doctor",
+    "packages/omo-native/bin/lib/agent-dir.js: omo doctor",
+    "packages/omo-native/test/doctor.test.ts: omo doctor x2",
+    "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts: omo doctor",
+    "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts: omo doctor",
+    "packages/omo-opencode/src/cli/doctor/checks/tools.ts: omo doctor",
+    "packages/omo-senpi/plugin/README.md: omo install",
+    "packages/utils/src/codegraph-workspace.test.ts: =omo",
+    "script/install-codex-dev.ts: omo get-local-version",
+    "script/omo-ai-publish-shape.test.ts: /bin/omo",
+    "script/qa/codex-marketplace-e2e.sh: =omo"
+  ]
+}

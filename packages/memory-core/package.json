@@ -1,0 +1,16 @@
+{
+  "name": "@oh-my-opencode/memory-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-neutral agent memory engine: git-backed MemFS, memory tools, prompt compiler, reflection state machine, and transcript search for oh-my-openagent.",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/"
+  }
+}

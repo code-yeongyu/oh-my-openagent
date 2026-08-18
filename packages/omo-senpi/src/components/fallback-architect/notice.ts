@@ -1,5 +1,5 @@
 import type { MessageRenderer } from "@code-yeongyu/senpi"
-import { linesComponent } from "@oh-my-opencode/senpi-task"
+import { linesComponent } from "@oh-my-opencode/senpi-task/task-renderers"
 
 /**
  * User-visible upgrade notice emitted alongside the hidden fallback-architect directive.

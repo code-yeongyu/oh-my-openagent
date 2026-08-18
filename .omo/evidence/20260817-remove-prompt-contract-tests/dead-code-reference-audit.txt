@@ -1,0 +1,54 @@
+Dead-code reference audit - 2026-08-17
+
+Scope: fallout from the nine tests currently deleted relative to HEAD.
+Search exclusions: .git, node_modules, generated dist/build outputs. Deleted tests are absent from the working tree.
+
+REMOVE packages/omo-codex/plugin/test/aggregate-plugin-fixture.mjs:82 findInvalidSpawnAgentRoleParameters
+- Definition: exported function at line 82.
+- Worktree text search: definition only; zero live references.
+- LSP semantic check on the same repository revision: declaration only.
+- Former exclusive consumer: deleted aggregate-skills.test.mjs.
+
+REMOVE packages/omo-codex/plugin/test/aggregate-plugin-fixture.mjs:86 findSpawnAgentCallsWithoutForkContextFalse
+- Definition: exported function at line 86.
+- Worktree text search: definition only; zero live references.
+- LSP semantic check on the same repository revision: declaration only.
+- Former exclusive consumer: deleted aggregate-skills.test.mjs.
+
+REMOVE packages/omo-opencode/src/agents/atlas/agent.ts:67 getAtlasPrompt
+- Definition: exported function at line 67.
+- Worktree text search: definition only; zero live references.
+- LSP semantic check on the same repository revision: declaration only.
+- Former exclusive consumers: deleted atlas-prompt.test.ts and prompt-checkbox-enforcement.test.ts.
+- Not barrel-exported: atlas/index.ts exports createAtlasAgent, atlasPromptMetadata, AtlasPromptSource, and OrchestratorContext only.
+
+REMOVE packages/omo-opencode/src/hooks/atlas/system-reminder-templates.ts:112 VERIFICATION_REMINDER_GEMINI
+- Definition: exported constant at line 112.
+- Worktree text search: definition only; zero live references.
+- LSP semantic check on the same repository revision: declaration only.
+- Former exclusive consumer: deleted system-reminder-templates.test.ts.
+- Not barrel-exported or package-exported.
+
+REMOVE packages/omo-opencode/src/tools/call-omo-agent/background-agent-executor.ts (entire file)
+- Definition: executeBackgroundAgent exported at line 12; all remaining declarations/imports are file-local dependencies.
+- Worktree text/import search: file and definition only; zero live references.
+- LSP semantic check on executeBackgroundAgent: declaration only.
+- Former exclusive consumer: deleted background-agent-executor.test.ts.
+- Live background path is background-executor.ts -> executeBackground, imported by tools.ts; no barrel/package export names the dead file.
+
+KEEP packages/omo-codex/plugin/scripts/sync-skills.mjs codexHarnessToolCompatibility
+- Live runtime references in insertCodexCompatibilityGuidance and live scanner-focused sync-skills-codex-compatibility.test.mjs references.
+
+KEEP packages/omo-codex/plugin/scripts/sync-skills.mjs insertCodexCompatibilityGuidance
+- Live runtime call from skill synchronization plus live scanner-focused test references.
+
+KEEP packages/omo-senpi/src/components/task/usage-guidance.ts TASK_USAGE_GUIDANCE
+- Live import and injection in components/task/event-bridge.ts.
+
+NO SOURCE CANDIDATE for ulw-plan-scope-contract.test.mjs or project-skill-tool-references.test.ts
+- Their setup/helpers/constants were local to the deleted test files.
+
+NO ADDITIONAL EXCLUSIVE SUPPORT FALLOUT
+- listSkillFiles remains referenced by live sync-skills tests.
+- aggregate-plugin-fixture root/readJson/exists/hook-manifest helpers remain referenced by live aggregate tests.
+- Local helpers in deleted tests (patternFromParts, readSkill, readSharedSkill, continuation-rule helpers, __repoRootFrom/readProjectSkill) were defined inside those deleted files and require no external cleanup.

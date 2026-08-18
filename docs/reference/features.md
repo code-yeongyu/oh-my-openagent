@@ -13,8 +13,8 @@ The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi r
 | **sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5.2` → `opencode/big-pickle` |
 | **hephaestus** | `gpt-5.6-sol` | `openai\|github-copilot\|vercel\|opencode/gpt-5.6-sol (medium)` |
 | **oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|vercel/glm-5.2` |
-| **librarian** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **explore** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **librarian** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **explore** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **multimodal-looker** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (low)` → `opencode-go\|vercel/kimi-k3` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
 | **prometheus** | `claude-fable-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (max)` |
 | **metis** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (high)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (low)` |
@@ -40,8 +40,7 @@ Ask @explore for the policy on this feature
 | librarian         | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent)            |
 | explore           | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent)            |
 | multimodal-looker | Allowlist: `read` only                                                                  |
-| atlas             | Cannot delegate (blocked: task, call_omo_agent)                                         |
-| momus             | Cannot write, edit, or delegate (blocked: write, edit, task)                            |
+| momus             | Cannot write or edit (blocked: write, edit); `task` is not denied                       |
 
 ### Instruction Files vs Enforcement
 
@@ -125,7 +124,7 @@ When running inside tmux:
 - Auto-cleanup when agents complete
 - **Stable agent ordering**: core-agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas, and can be customized with `agent_order`
 
-When running inside cmux (`cmux omo`), the same pane integration is routed through cmux's tmux compatibility command. OMO detects the cmux environment from `CMUX_SOCKET_PATH` or a cmux-provided `TMUX` value, so `tmux.enabled` can create cmux panes even when a real `tmux` binary is not installed.
+When running inside cmux (`cmux omo-agent-toolkit`), the same pane integration is routed through cmux's tmux compatibility command. OMO detects the cmux environment from `CMUX_SOCKET_PATH` or a cmux-provided `TMUX` value, so `tmux.enabled` can create cmux panes even when a real `tmux` binary is not installed.
 
 Customize agent models, prompts, and permissions in the `[opencode]` block of `~/.omo/omo.jsonc`.
 
@@ -138,10 +137,10 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 ### Architecture Snapshot (current)
 
 - **Feature modules**: `packages/omo-opencode/src/features/` has 23 modules.
-- **Tool system**: `packages/omo-opencode/src/tools/` has 15 tool directories that produce **20 to 39 tools** depending on config gates.
-- **Hook system**: 5-tier composition is **54 base hooks**. With team mode it becomes **61** (extra tool guard + transforms + direct team session event handlers).
-- **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
-- **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
+- **Tool system**: `packages/omo-opencode/src/tools/` has 14 tool-producing directories plus a shared helper directory. The registry exposes **12 to 38 tools** depending on config gates. The 8 LSP aliases are served by the built-in `lsp` MCP, not by the tool registry.
+- **Hook system**: the 5-tier composers define **58 slots** (Session 24 + Tool Guard 18 + Transform 7 + Continuation 7 + Skill 2). Default config activates about 50-51; the maximum is 62 when the 4 direct Team Mode event handlers are included.
+- **MCP system**: 3 tiers: built-in MCPs with 3 remote servers (`websearch`, `context7`, `grep_app`) plus local stdio `lsp` and `codegraph`, `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter. `codegraph` can be disabled with `codegraph.enabled: false`.
+- **Managers and controllers**: startup creates TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler, and ModelFallbackControllerAccessor fields, plus optional TuiStateMirror and MonitorManager fields.
 - **Config pipeline**: 6 phases in order: provider, plugin-components, agents, tools, MCPs, commands.
 - **Canonical core agent order**: Sisyphus, Hephaestus, Prometheus, Atlas.
 - **OpenClaw**: bidirectional integrations for Discord, Telegram, HTTP, and shell with reply listener daemon.
@@ -166,7 +165,7 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `deep`               | `openai/gpt-5.6-sol` (medium)   | Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
 | `artistry`           | `anthropic/claude-fable-5` (xhigh) | Highly creative/artistic tasks, novel ideas                                                                                 |
 | `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks - single file changes, typo fixes, simple modifications                                                  |
-| `unspecified-low`    | `openai/gpt-5.6-luna` (xhigh)   | Tasks that don't fit other categories, low effort required                                                                  |
+| `unspecified-low`    | `xai/grok-4.6` (xhigh)          | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `kimi-for-coding/kimi-k3` (max) | Tasks that don't fit other categories, high effort required                                                               |
 | `writing`            | `kimi-for-coding/kimi-k3` (low) | Documentation, prose, technical writing                                                                                     |
 
@@ -191,19 +190,24 @@ You can define custom categories in the `[opencode]` block of the unified config
 | ------------------- | ------- | --------------------------------------------------------------------------- |
 | `description`       | string  | Human-readable description of the category's purpose. Shown in task prompt. |
 | `model`             | string  | AI model ID to use (e.g., `anthropic/claude-opus-5`)                        |
-| `fallback_models`   | string\|array | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
-| `variant`           | string  | Model variant (e.g., `max`, `xhigh`)                                        |
+| `models`            | array   | Ordered model chain; the first entry is the primary model and the rest are fallbacks. Entries are strings or objects with per-model settings |
+| `reasoning`         | string  | Canonical reasoning level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `auto`) |
+| `fallback_models`   | string\|array | Deprecated: use `models`. Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
+| `variant`           | string  | Deprecated: use `reasoning`. Model variant (e.g., `max`, `xhigh`)           |
 | `temperature`       | number  | Creativity level (0.0 ~ 2.0). Lower is more deterministic.                  |
 | `top_p`             | number  | Nucleus sampling parameter (0.0 ~ 1.0)                                      |
 | `prompt_append`     | string  | Content to append to system prompt when this category is selected           |
-| `thinking`          | object  | Thinking model configuration (`{ type: "enabled", budgetTokens: 16000 }`)   |
-| `reasoningEffort`   | string  | Reasoning effort level (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`) |
+| `thinking`          | object  | Deprecated: use `reasoning` plus provider options. Thinking model configuration (`{ type: "enabled", budgetTokens: 16000 }`) |
+| `reasoningEffort`   | string  | Deprecated: use `reasoning`. Reasoning effort level (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`) |
 | `textVerbosity`     | string  | Text verbosity level (`low`, `medium`, `high`)                              |
+| `provider_options`  | object  | Provider-specific request options passed through to the harness             |
+| `max_tokens`        | number  | Maximum response token count (positive integer)                             |
+| `maxTokens`         | number  | Deprecated: use `max_tokens`. Maximum response token count                  |
 | `tools`             | object  | Tool usage control (disable with `{ "tool_name": false }`)                  |
-| `maxTokens`         | number  | Maximum response token count                                                |
 | `max_prompt_tokens` | number  | Maximum prompt tokens for delegated tasks                                   |
 | `is_unstable_agent` | boolean | Mark agent as unstable - forces background mode for monitoring              |
 | `disable`           | boolean | Disable this category and exclude it from task delegation                   |
+| `warn_unavailable`  | boolean | Suppress or emit unavailable-chain warnings for this category               |
 
 #### Example Configuration
 
@@ -327,33 +331,13 @@ Commands are slash-triggered workflows that execute predefined templates.
 
 | Command              | Description                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------ |
-| `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
 | `/goal`              | Set, show, pause, resume, or clear the active thread goal                                  |
 | `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
 | `/start-work`        | Start Atlas work session from Prometheus plan                                              |
 | `/stop-continuation` | Stop all continuation mechanisms (todo continuation, Goal, boulder) for this session       |
+| `/remove-ai-slops`   | Remove AI-generated code smells from branch changes and review the result                   |
 | `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
-
-### /init-deep
-
-**Purpose**: Generate hierarchical AGENTS.md files throughout your project
-
-**Usage**:
-
-```
-/init-deep [--create-new] [--max-depth=N]
-```
-
-Creates directory-specific context files that agents automatically read:
-
-```
-project/
-├── AGENTS.md                        # Project-wide context
-├── packages/omo-opencode/src/
-│   ├── AGENTS.md                    # src-specific context
-│   └── components/
-│       └── AGENTS.md                # Component-specific context
-```
+| `/hyperplan`         | Run adversarial multi-agent planning through Team Mode                                      |
 
 ### /goal
 
@@ -403,7 +387,7 @@ project/
 
 ### /ulw-loop
 
-The `/ulw-loop` slash command has been removed; continuous goal pursuit is now handled by `/goal`. The `omo ulw-loop` CLI subcommand remains as a passthrough to the Codex LazyCodex ulw-loop CLI.
+The `/ulw-loop` slash command has been removed; continuous goal pursuit is now handled by `/goal`. The `omo-agent-toolkit ulw-loop` CLI subcommand remains as a passthrough to the Codex LazyCodex ulw-loop CLI.
 
 ### /refactor
 
@@ -465,6 +449,12 @@ Load custom commands from:
 Skill sets provide specialized workflows with embedded MCP servers and detailed instructions. They are automatically activated by matching task intent, so you do not need to study or preload everything before working. When you want to force one deliberately, call it by name in the prompt, slash command, or `load_skills` list.
 
 ### Built-in Skill Sets
+
+The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`, `frontend`, `git-master`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
+
+#### init-deep
+
+`init-deep` is a built-in skill, not a built-in command. Invoke it through the `skill` surface or load it by name. It generates hierarchical `AGENTS.md` files throughout the project and supports `--create-new` and `--max-depth=N` arguments.
 
 | Skill set              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -644,7 +634,7 @@ When delegating, **clear and specific** prompts are essential. Include these 7 e
 
 ## Tools
 
-Tool registration is config-gated. `packages/omo-opencode/src/tools/` has 15 directories, and exposed tools range from **20 minimum to 39 maximum**.
+Tool registration is config-gated. The registry exposes **12 to 38 tools**.
 
 ### Code Search Tools
 
@@ -663,14 +653,18 @@ Hashline IDs use characters from `ZPMQVRWSNKTXJBYH`.
 
 ### LSP Tools (IDE Features for Agents)
 
+All 8 aliases below are served by the built-in `lsp` MCP rather than the native tool registry.
+
 | Tool                    | Description                                 |
 | ----------------------- | ------------------------------------------- |
+| **lsp_status**          | List configured and active LSP servers      |
 | **lsp_diagnostics**     | Get errors/warnings before build            |
 | **lsp_prepare_rename**  | Validate rename operation                   |
 | **lsp_rename**          | Rename symbol across workspace              |
 | **lsp_goto_definition** | Jump to symbol definition                   |
 | **lsp_find_references** | Find all usages across workspace            |
 | **lsp_symbols**         | Get file outline or workspace symbol search |
+| **lsp_install_decision** | Record allow/decline decisions for missing LSP installation |
 
 ### AST-Grep Skill
 
@@ -761,6 +755,8 @@ interface Task {
   blockedBy: string[]; // Tasks blocking this
   owner?: string; // Agent name
   metadata?: Record<string, unknown>;
+  repoURL?: string;
+  parentID?: string;
   threadID: string; // Session ID (auto-set)
 }
 ```
@@ -793,7 +789,7 @@ TaskUpdate({ id: "T-002", status: "completed" });
 // T-003 now unblocked
 ```
 
-**Storage**: Tasks are stored as JSON files in `.omo/tasks/`.
+**Storage**: By default, tasks are stored as JSON files under the OpenCode config directory at `tasks/<list-id>`. Override the directory with `sisyphus.tasks.storage_path`.
 
 **Difference from TodoWrite**:
 
@@ -829,7 +825,7 @@ interactive_bash(tmux_command="capture-pane -p -t dev-app")
 
 - Commands are tmux subcommands (no `tmux` prefix)
 - Use for interactive apps that need persistent sessions
-- One-shot commands should use regular `Bash` tool with `&`
+- Use the managed background-session or Monitor mechanism (`monitor_start`) for one-shot commands that must continue in the background; do not rely on shell `&` as the managed contract
 
 ## Hooks
 
@@ -838,12 +834,12 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 Current composition counts:
 
 - Session: 24
-- Tool Guard: 16
-- Transform: 5
+- Tool Guard: 18 (17 non-Team slots plus `teamToolGating`)
+- Transform: 7
 - Continuation: 7
 - Skill: 2
-- Total base: 54
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `packages/omo-opencode/src/plugin/event.ts` = 61
+- Total composed slots: 58
+- About 50-51 are active with default config; the maximum is 62 when the 4 direct Team Mode event handlers are included
 
 ### Hook Events
 
@@ -878,14 +874,14 @@ Current composition counts:
 | **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
-| **category-skill-reminder** | Event + PostToolUse | Reminds agents about available category skills for delegation.                                                                                              |
+| **category-skill-reminder** | PostToolUse + Message Transform + Event | Reminds agents about available category skills for delegation.                                                                                              |
 
 #### Quality & Safety
 
 | Hook                            | Event                    | Description                                                                               |
 | ------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- |
 | **comment-checker**             | PostToolUse              | Runs `@code-yeongyu/comment-checker` to block AI-slop comment patterns. Bypass options: `// @allow` for a line, `// comment-checker-disable-file` at file top. |
-| **thinking-block-validator**    | Transform                | Validates thinking blocks to prevent API errors.                                          |
+| **tool-pair-validator**         | Message Transform        | Validates tool call/result pairs during chat message transformation.                       |
 | **edit-error-recovery**         | PostToolUse + Event      | Recovers from edit tool failures.                                                         |
 | **write-existing-file-guard**   | PreToolUse               | Prevents accidental overwrites of existing files without reading them first.              |
 | **hashline-read-enhancer**      | PostToolUse              | Enhances read output with hash-anchored line markers for the hashline edit tool.          |
@@ -936,7 +932,7 @@ Current composition counts:
 
 | Hook                         | Event               | Description                                             |
 | ---------------------------- | ------------------- | ------------------------------------------------------- |
-| **claude-code-hooks**        | All                 | Executes hooks from Claude Code's settings.json.        |
+| **claude-code-hooks**        | Message + PreToolUse + PostToolUse | Executes supported Claude Code hook handlers for `chat.message` and `tool.execute.before`/`tool.execute.after`; it does not run on every OMO hook event. |
 | **atlas**                    | Multiple            | Main orchestration logic for todo-driven work sessions. |
 | **interactive-bash-session** | PostToolUse + Event | Manages tmux sessions for interactive CLI.              |
 | **non-interactive-env**      | PreToolUse          | Handles non-interactive environment constraints.        |
@@ -1013,7 +1009,7 @@ The three tiers of MCP servers and where they come from:
 
 | Tier | Source | Visible in `opencode mcp list`? |
 | ---- | ------ | ------------------------------- |
-| 1 — Built-in | Injected at runtime by oh-my-openagent (`websearch`, `context7`, `grep_app`) | No |
+| 1 — Built-in | Injected at runtime by oh-my-openagent (`websearch`, `context7`, `grep_app`, `lsp`, `codegraph`) | No |
 | 2 — Claude Code `.mcp.json` | Loaded from `.mcp.json` files and merged in by oh-my-openagent at runtime | No |
 | 3 — Skill-embedded | Declared in `SKILL.md` frontmatter, spun up on demand per session | No |
 | — Native OpenCode | Configured directly in `opencode.json` under the `mcp` key, without the plugin | Yes |
@@ -1034,6 +1030,7 @@ The three tiers of MCP servers and where they come from:
 | **context7**  | Official documentation lookup for any library/framework                                       |
 | **grep_app**  | Ultra-fast code search across public GitHub repos. Great for finding implementation examples. |
 | **lsp**       | Local LSP tools for diagnostics, symbols, references, and renames                             |
+| **codegraph** | Local code graph stdio server; enabled unless `codegraph.enabled` is `false`                  |
 
 ### Skill-Embedded MCPs
 

@@ -29,7 +29,7 @@ const COMPANION_PLUGIN_KEY = "codex@openai-codex"
 const DEFAULT_PLUGIN_VERSION = "0.1.0"
 const COMPANION_LIFECYCLE_EVENTS = new Set(["session_start", "stop"])
 const CODEX_BIN_NAMES = [
-  "omo",
+  "omo-agent-toolkit",
   "omo-rules",
   "omo-lsp",
   "omo-comment-checker",
@@ -120,11 +120,11 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
       affects: ["version reporting"],
     })
   }
-  if (summary.pluginRoot !== null && !summary.linkedBins.includes("omo")) {
+  if (summary.pluginRoot !== null && !summary.linkedBins.includes("omo-agent-toolkit")) {
     issues.push({
-      title: "omo runtime command is not linked",
+      title: "omo-agent-toolkit runtime command is not linked",
       description:
-        "The omo runtime wrapper is missing from the installer bin directory, so `omo ulw-loop` fails in Codex sessions. lazycodex-ai 4.8.0/4.8.1 installs removed the legacy omo bin without writing a replacement.",
+        "The omo-agent-toolkit runtime wrapper is missing from the installer bin directory, so `omo-agent-toolkit ulw-loop` fails in Codex sessions. Reinstall LazyCodex to write the canonical wrapper.",
       fix: "Run: npx lazycodex-ai@latest install",
       severity: "error",
       affects: ["ulw-loop"],

@@ -17,6 +17,7 @@ export const designOriginals = [
 	"layout-skill.md",
 	"lazyweb.md",
 	"react-dev-tooling-skill.md",
+	"stylegallery.md",
 ];
 
 export const brandStems = [

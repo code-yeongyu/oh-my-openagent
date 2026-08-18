@@ -1,0 +1,71 @@
+PR #6485: why this branch no longer regenerates the Senpi bundles - 2026-08-03
+
+WHAT WAS TESTED
+
+An earlier revision of this branch carried a commit
+`chore: refresh Senpi bundles after dev merge`, regenerating
+`packages/omo-senpi/plugin/extensions/omo.js` and `omo-member.js`. Those two
+generated files were the ONLY paths that conflicted with `dev`
+(`git merge-tree` reported conflicts on exactly those two and clean merges for
+every source file), and `dev` regenerates them frequently, so the branch went
+red-conflicted repeatedly.
+
+Before assuming the regeneration was required, I checked whether this PR's
+source files are actually inputs to that bundle, using CI's exact toolchain
+(Linux, node v24.18.0, bun 1.3.12, `bun install --frozen-lockfile
+--ignore-scripts`) so the result is not the circular local-toolchain answer.
+`senpi-compatibility (ubuntu-latest)` is the job that runs
+`node packages/omo-senpi/plugin/scripts/build-extension.mjs --check`.
+
+Cases, all at the current merge commit with the bundles left exactly as `dev`
+has them:
+
+  baseline   `build-extension.mjs --check`
+  control A  append one exported constant to
+             `packages/omo-senpi/src/components/task/status-row-format.ts`
+             (a file that IS bundled), then `--check`
+  control B  append one exported constant to
+             `packages/model-core/src/model-settings-compatibility.ts`
+             (a file THIS PR changes), then `--check`
+  restore    revert both, then `--check`
+
+WHAT WAS OBSERVED
+
+  baseline   exit 0  "omo-senpi extension build is current"
+  control A  exit 1  "omo-senpi extension build is not current: stale-output"
+  control B  exit 0  "omo-senpi extension build is current"
+  restore    exit 0, worktree clean (0 dirty entries)
+
+WHY IT IS ENOUGH
+
+Control A is the negative control: it proves `--check` is a real gate that does
+fail when a genuine bundle input changes, so the passing results are not a
+vacuous "always green".
+
+The mechanism matches the observation. `checkExtensionCurrent()` compares
+artifacts through `artifactsMatch()`, which requires
+`current.sourceDigest === expected.sourceDigest`, and `digestBuildSources()`
+builds that digest by hashing the CONTENT of every path in the bundler's
+`metadata.inputs`. A changed file therefore invalidates the digest if and only
+if it is a bundle input. Control B changes a file this PR touches and the digest
+still matches, so `packages/model-core/src/model-settings-compatibility.ts` is
+not among the bundle's inputs. The rebuilt bundle likewise contains zero
+occurrences of `supportsTemperature`.
+
+So this PR does not need to regenerate the Senpi bundles, and the earlier
+regeneration commit was churn that produced the only conflict with `dev` while
+proving nothing. The branch now carries `dev`'s bundles byte for byte
+(`git diff upstream/dev -- packages/omo-senpi/plugin/extensions` is empty),
+which removes both the conflict and about 200 lines of generated diff.
+
+Worth recording for the next person: `artifactsMatch()` does NOT compare the
+two bodies, only the source digest plus the file's own body-digest
+self-consistency. Two bundles built on different platforms can therefore differ
+byte for byte and both pass. A Windows build still fails, because it resolves a
+different input SET and so a different source digest; that is a separate
+failure from body bytes.
+
+WHAT WAS OMITTED
+
+Absolute sandbox paths were left as printed by the tools; no credentials,
+tokens, env dumps, or private configuration appear in this record.

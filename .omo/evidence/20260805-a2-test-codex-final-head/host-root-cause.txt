@@ -1,0 +1,9 @@
+Host root cause for the two failing lsp-tools-mcp cases:
+
+$ command -v typescript-language-server
+/c/Users/pss/AppData/Roaming/npm/typescript-language-server
+
+The test asserts the spawn command is the BARE shim name 'typescript-language-server.cmd'.
+This host has the language server installed globally, so the resolver returns an ABSOLUTE
+path and the equality fails. A CI runner has no global install, which is why
+codex-compatibility is green there on all three operating systems.

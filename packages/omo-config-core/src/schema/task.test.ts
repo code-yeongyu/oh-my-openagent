@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { OmoTaskSettingsSchema, type OmoTaskSettings } from "./task"
+import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema, type OmoTaskSettings } from "./task"
 
 describe("OmoTaskSettingsSchema warnings", () => {
   test("#given no warning suppression override #when task settings parse #then unavailable categories warnings default on", () => {
@@ -60,5 +60,155 @@ describe("OmoTaskSettingsSchema reattach", () => {
 
     // then
     expect(parsed.reattach_on_reconcile).toBe(false)
+  })
+})
+
+describe("OmoTaskSettingsSchema resume_children", () => {
+  test("#given no resume_children key #when task settings parse #then resume_children defaults to true", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.resume_children).toBe(true)
+  })
+
+  test("#given resume_children explicitly false #when task settings parse #then the false override is preserved", () => {
+    // given
+    const input = { resume_children: false }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.resume_children).toBe(false)
+  })
+
+  test("#given resume_children explicitly true #when task settings parse #then true is preserved", () => {
+    // given
+    const input = { resume_children: true }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.resume_children).toBe(true)
+  })
+
+  test("#given resume_children with non-boolean value #when task settings parse #then validation fails", () => {
+    // given
+    const input = { resume_children: "yes" }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected parsing to fail")
+    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("resume_children")
+  })
+})
+
+describe("OmoTaskSettingsSchema dag block", () => {
+  test("#given no dag overrides #when task settings parse #then the dag block fills every documented default", () => {
+    // given
+    const input = { dag: {} }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.dag).toEqual({
+      max_nodes_per_run: 64,
+      max_runs_per_session: 16,
+      subscriber_ring: 1000,
+      heartbeat_ms: 15000,
+      history_default_limit: 256,
+      history_max_limit: 1000,
+      retention_days: 7,
+      max_prompt_bytes: 262144,
+    })
+  })
+
+  test("#given the dag block is omitted entirely #when task settings parse #then dag stays absent rather than materializing", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.dag).toBeUndefined()
+  })
+
+  test("#given a partial dag override #when task settings parse #then the override wins and siblings keep defaults", () => {
+    // given
+    const input = { dag: { max_nodes_per_run: 8, heartbeat_ms: 500 } }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.dag?.max_nodes_per_run).toBe(8)
+    expect(parsed.dag?.heartbeat_ms).toBe(500)
+    expect(parsed.dag?.subscriber_ring).toBe(1000)
+  })
+
+  test("#given an unknown key inside the dag block #when task settings parse #then the strict schema rejects it", () => {
+    // given
+    const input = { dag: { max_nodes_per_run: 8, wat: true } }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected an unknown dag key to fail")
+    const issue = result.error.issues.find((candidate) => candidate.path.join(".") === "dag")
+    expect(issue?.code).toBe("unrecognized_keys")
+    expect(issue !== undefined && issue.code === "unrecognized_keys" ? issue.keys : []).toEqual(["wat"])
+  })
+
+  test("#given a non-positive dag bound #when task settings parse #then validation fails at the nested path", () => {
+    // given
+    const input = { dag: { max_nodes_per_run: 0 } }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected a non-positive dag bound to fail")
+    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("dag.max_nodes_per_run")
+  })
+})
+
+describe("OmoTaskSettingsLayerSchema dag block", () => {
+  test("#given a partial dag layer #when the layer parses #then no defaults are injected", () => {
+    // given
+    const input = { dag: { heartbeat_ms: 500 } }
+
+    // when
+    const parsed = OmoTaskSettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed.dag).toEqual({ heartbeat_ms: 500 })
+  })
+
+  test("#given an unknown key inside a dag layer #when the layer parses #then the strict schema rejects it", () => {
+    // given
+    const input = { dag: { nope: 1 } }
+
+    // when
+    const result = OmoTaskSettingsLayerSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected an unknown dag layer key to fail")
+    const issue = result.error.issues.find((candidate) => candidate.path.join(".") === "dag")
+    expect(issue?.code).toBe("unrecognized_keys")
+    expect(issue !== undefined && issue.code === "unrecognized_keys" ? issue.keys : []).toEqual(["nope"])
   })
 })

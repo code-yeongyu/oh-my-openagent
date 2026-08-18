@@ -59,13 +59,12 @@ function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
 }
 
 describe("task engine builtin agent overlay", () => {
-  test("#given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas", () => {
+  test("#given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present", () => {
     // given / when
     const engine = composeIn(tempProject())
 
     // then
     expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus"])
-    expect(engine.agents["explore"]?.prompt).toContain("codebase search specialist")
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
   })
 

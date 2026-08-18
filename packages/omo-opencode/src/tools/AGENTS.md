@@ -58,7 +58,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `deep` | openai/gpt-5.6-sol (variant: medium) | openai-categories.ts | Autonomous multi-step problem-solving |
 | `artistry` | anthropic/claude-fable-5 (variant: xhigh) | google-categories.ts | Creative / unconventional approaches |
 | `quick` | kimi-for-coding/kimi-for-coding-highspeed | openai-categories.ts | Trivial single-file changes |
-| `unspecified-low` | openai/gpt-5.6-luna (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
+| `unspecified-low` | xai/grok-4.6 (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
 | `unspecified-high` | kimi-for-coding/kimi-k3 (variant: max) | anthropic-categories.ts | High effort fallback |
 | `writing` | kimi-for-coding/kimi-k3 (variant: low) | kimi-categories.ts | Documentation, prose |
 

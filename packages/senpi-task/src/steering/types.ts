@@ -2,7 +2,7 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 
-export type DestructionCause = "cancel" | "fallback_handoff"
+export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -46,6 +46,9 @@ export type SendOutcome =
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
+  // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is
+  // the registry's sendDenialReminder, surfaced to the caller verbatim.
+  | { readonly kind: "one_shot_agent"; readonly task_id: string; readonly agent: string; readonly message: string }
   | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string; readonly suggestion: string }
 
@@ -53,6 +56,10 @@ export type InterruptOutcome =
   | { readonly kind: "interrupted"; readonly task_id: string; readonly previous_status: TaskStatus }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
+
+export type CancelOptions = {
+  readonly abort?: "request" | "skip"
+}
 
 export type CancelOutcome =
   | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }
@@ -62,7 +69,7 @@ export type CancelOutcome =
 export type SteeringEngine = {
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
-  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
+  cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.
   notifyStarted(taskId: string): Promise<void>
   // Called by the manager when a task is forgotten (destroyed/evicted/failed to launch) so buffered

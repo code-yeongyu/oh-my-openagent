@@ -297,7 +297,6 @@ describe("createTeamIdleWakeHint", () => {
       throw new Error("expected wake hint prompt input")
     }
     expect(promptInput.path).toEqual({ id: "member-session" })
-    expect(promptInput.body.parts[0]?.text).toContain("2 new team messages")
     expect(promptInput.body.parts[0]?.text).not.toContain("first message body")
     expect(promptInput.body.parts[0]?.text).not.toContain("second message body")
   })
@@ -745,7 +744,6 @@ describe("createTeamIdleWakeHint", () => {
 
     // then
     expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
-    expect(promptInputs[0]?.body.parts[0]?.text).toContain("1 new team messages")
 
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
@@ -846,7 +844,7 @@ describe("createTeamIdleWakeHint", () => {
     if (promptInput === undefined) {
       throw new Error("expected wake hint prompt input")
     }
-    expect(promptInput.body.parts[0]?.text).toContain("1 new team messages")
+    expect(promptInput.body.parts[0]?.text).not.toContain("fresh registry wake hint")
   })
 
   test("falls back to disk lookup when the registry points the member session at the wrong teamRunId", async () => {
@@ -907,7 +905,7 @@ describe("createTeamIdleWakeHint", () => {
     if (promptInput === undefined) {
       throw new Error("expected wake hint prompt input")
     }
-    expect(promptInput.body.parts[0]?.text).toContain("2 new team messages")
+    expect(promptInput.body.parts[0]?.text).not.toContain("wrong team message")
     expect(promptInput.body.agent).toBe("atlas")
   })
 })

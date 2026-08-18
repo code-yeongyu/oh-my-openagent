@@ -58,16 +58,112 @@ describe("start-work Stop hook", () => {
 		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("- Plan: `launch-plan`");
-		expect(parsed.reason).toContain(`- Plan file: \`${join(workspace, ".omo", "plans", "plan.md")}\``);
-		expect(parsed.reason).toContain(`- Boulder state: \`${join(workspace, ".omo", "boulder.json")}\``);
-		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `2` of `4`");
-		expect(parsed.reason).toContain("- Next incomplete task: `1. Implement checklist parser parity`");
-		expect(parsed.reason).toContain("- Worktree: `/tmp/worktree`");
-		expect(parsed.reason).toContain(`- Ledger: \`${join(workspace, ".omo", "start-work", "ledger.jsonl")}\``);
-		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given active codex work and an external-blocker marker #when hook runs #then returns empty output", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: SCAFFOLD_PLAN_MARKDOWN,
+		});
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(workspace),
+			last_assistant_message: [
+				"<start-work-blocked-external>",
+				"Blocker: the staging deploy credential is missing.",
+				"Resume when a valid credential is provisioned.",
+			].join("\n"),
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given ultrawork opener then external-blocker marker #when hook runs #then returns empty output", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: SCAFFOLD_PLAN_MARKDOWN,
+		});
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(workspace),
+			last_assistant_message: [
+				"ULTRAWORK MODE ENABLED!",
+				"<start-work-blocked-external>",
+				"Blocker: the staging deploy credential is missing.",
+			].join("\n"),
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given the external-blocker marker with no stated blocker #when hook runs #then still returns block JSON", () => {
+		// given: a bare marker, which is what a quoted echo or untrusted text would produce.
+		// directive.md requires the blocker and the resume condition, so the marker alone must not
+		// skip the continuation guard.
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: SCAFFOLD_PLAN_MARKDOWN,
+		});
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(workspace),
+			last_assistant_message: "<start-work-blocked-external>",
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).not.toBe("");
+	});
+
+	it("#given the ultrawork opener and a bare marker #when hook runs #then still returns block JSON", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: SCAFFOLD_PLAN_MARKDOWN,
+		});
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(workspace),
+			last_assistant_message: ["ULTRAWORK MODE ENABLED!", "<start-work-blocked-external>", "   "].join("\n"),
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).not.toBe("");
+	});
+
+	it("#given the external-blocker marker below the first line #when hook runs #then still returns block JSON", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: SCAFFOLD_PLAN_MARKDOWN,
+		});
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(workspace),
+			last_assistant_message: ["Next turn I may need to emit", "<start-work-blocked-external>"].join("\n"),
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate", () => {
@@ -82,12 +178,7 @@ describe("start-work Stop hook", () => {
 		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `0` of `1`");
-		expect(parsed.reason).toContain("- Next incomplete task: `none (final gate pending)`");
-		expect(parsed.reason).toContain("When the remaining count is `0`, skip checkbox execution");
-		expect(parsed.reason).toContain("re-read the ledger record and verify the exact lane/SHA pair");
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {

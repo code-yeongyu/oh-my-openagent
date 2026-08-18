@@ -1,5 +1,5 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { hasActiveArchitectCategory } from "./architect-gate"
+import { hasActiveArchitectCategory, type GateRegistry } from "./architect-gate"
 import {
   formatModelSelector,
   isFableFiveModel,
@@ -25,7 +25,7 @@ type FallbackArchitectInputResult = { action: "continue" }
 
 export interface FallbackArchitectComponentOptions {
   /** Injectable so tests can decide the gate without depending on the developer's own omo.json. */
-  hasArchitectCategory?: (cwd: string) => boolean
+  hasArchitectCategory?: (cwd: string, registry?: GateRegistry) => boolean
 }
 
 interface FallbackArchitectState {
@@ -41,7 +41,8 @@ interface FallbackArchitectState {
 export function createFallbackArchitectComponent(
   options: FallbackArchitectComponentOptions = {},
 ): OmoSenpiComponent {
-  const hasArchitectCategory = options.hasArchitectCategory ?? ((cwd: string) => hasActiveArchitectCategory(cwd))
+  const hasArchitectCategory =
+    options.hasArchitectCategory ?? ((cwd: string, registry?: GateRegistry) => hasActiveArchitectCategory(cwd, { registry }))
 
   return {
     name: "fallback-architect",
@@ -72,7 +73,7 @@ export function createFallbackArchitectComponent(
         if (!isFableFiveModel(payload.previousModel) || !state.refusalPending) return
 
         const cwd = extractCwd(eventCtx) ?? process.cwd()
-        if (!hasArchitectCategory(cwd)) {
+        if (!hasArchitectCategory(cwd, extractRegistry(eventCtx))) {
           ctx.logger.info("omo-senpi fallback-architect skipped", { reason: "architect-category-inactive" })
           state.refusalPending = false
           return
@@ -133,4 +134,14 @@ function isUserSourcedInput(payload: unknown): payload is Record<string, unknown
 function extractCwd(eventCtx: unknown): string | undefined {
   if (isRecord(eventCtx) && typeof eventCtx["cwd"] === "string") return eventCtx["cwd"]
   return undefined
+}
+
+// Senpi's ExtensionContext.modelRegistry satisfies the port structurally; untyped contexts (tests,
+// older hosts) simply yield undefined and the gate keeps its config-only behavior.
+function extractRegistry(eventCtx: unknown): GateRegistry | undefined {
+  if (!isRecord(eventCtx)) return undefined
+  const registry = eventCtx["modelRegistry"]
+  if (!isRecord(registry)) return undefined
+  if (typeof registry["getAvailable"] !== "function" || typeof registry["find"] !== "function") return undefined
+  return registry as unknown as GateRegistry
 }

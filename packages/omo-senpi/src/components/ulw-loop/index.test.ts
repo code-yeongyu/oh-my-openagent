@@ -50,7 +50,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     if (!isTransformResult(transformed)) throw new Error("expected transform result")
     expect(transformed.text).toContain("continue")
     expect(transformed.text).toContain("<omo-senpi-ulw-loop>")
-    expect(transformed.text).toContain("omo ulw-loop status --json")
+    expect(transformed.text).toContain("omo-agent-toolkit ulw-loop status --json")
   })
 
   it("#given active incomplete ulw-loop status #when idle user input arrives #then typed text is unchanged", async () => {
@@ -75,7 +75,7 @@ describe("omo-senpi ulw-loop continuation", () => {
       {
         message: {
           customType: "omo-senpi:ulw-continuation",
-          content: expect.stringContaining("Continue the active omo ulw-loop run"),
+          content: expect.stringContaining("Continue the active omo-agent-toolkit ulw-loop run"),
           display: false,
         },
         options: { triggerTurn: true, deliverAs: "followUp" },

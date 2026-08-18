@@ -113,9 +113,9 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 
 describe("buildCodexGoalInstruction per_story mode", () => {
 	it("uses the goal's own objective for create_goal", () => {
-		const goal = makeGoal({ objective: "Build the auth service" });
+		const goal = makeGoal({ objective: "per-story-objective-sentinel" });
 		const { text } = buildCodexGoalInstruction({ plan: makePlan({ codexGoalMode: "per_story" }), goal });
-		expect(text).toContain("Build the auth service");
+		expect(text).toContain("per-story-objective-sentinel");
 	});
 });
 

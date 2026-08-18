@@ -7,14 +7,14 @@ const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
 const CONTINUATION_LIMIT = 8
 const STEERING_REMINDER = [
   "<omo-senpi-ulw-loop>",
-  "An active omo ulw-loop run is present in this working directory.",
-  "Before continuing, inspect `omo ulw-loop status --json` and use the existing .omo/ulw-loop ledger as the source of truth.",
+  "An active omo-agent-toolkit ulw-loop run is present in this working directory.",
+  "Before continuing, inspect `omo-agent-toolkit ulw-loop status --json` and use the existing .omo/ulw-loop ledger as the source of truth.",
   "Continue the current ulw-loop story with evidence-bound execution; do not start unrelated work until the active run is complete or checkpointed.",
   "</omo-senpi-ulw-loop>",
 ].join("\n")
 const CONTINUATION_PROMPT = [
-  "Continue the active omo ulw-loop run.",
-  "Run `omo ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.",
+  "Continue the active omo-agent-toolkit ulw-loop run.",
+  "Run `omo-agent-toolkit ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.",
 ].join("\n")
 
 export interface UlwLoopComponentOptions {

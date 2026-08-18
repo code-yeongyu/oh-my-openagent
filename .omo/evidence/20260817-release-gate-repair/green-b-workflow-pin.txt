@@ -1,0 +1,34 @@
+NEW FILE:
+bun test v1.3.12 (700fc117)
+
+script/publish-release-bundle-rebuild.test.ts:
+(pass) test workflows > rebuilds version-stamped Senpi bundles into the release commit [12.41ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [394.00ms]
+
+
+OLD FILE:
+bun test v1.3.12 (700fc117)
+
+script/publish-workflow.test.ts:
+(pass) test workflows > use pure bun test for workflows [31.48ms]
+(pass) test workflows > prepares vendored lsp-tools-mcp before publish workflow tests and typecheck [0.23ms]
+(pass) test workflows > builds publish-main from the prepared release SHA [0.22ms]
+(pass) test workflows > dispatches a source-pinned publish run before provenance-bearing release operations [0.34ms]
+(pass) test workflows > runs Codex compatibility checks before publish jobs [0.25ms]
+(pass) test workflows > exercise root checks across linux macos and windows [0.14ms]
+(pass) test workflows > runs codex compatibility checks on every supported os without serializing build [0.07ms]
+(pass) test workflows > runs Codex compatibility tests with Node available for the self-built MCP runtimes [0.17ms]
+(pass) test workflows > sets up Bun before vendored lsp-tools-mcp builds in publish workflow jobs [0.27ms]
+(pass) test workflows > builds bundled MCP runtimes before Codex compatibility tests [0.19ms]
+(pass) test workflows > runs Git Bash installer regressions in Codex compatibility checks [0.21ms]
+(pass) test workflows > tracks the nested Codex plugin lockfile used by npm ci [25.48ms]
+(pass) test workflows > pins every workflow Bun setup to the tested runtime [0.88ms]
+
+ 13 pass
+ 0 fail
+ 66 expect() calls
+Ran 13 tests across 1 file. [491.00ms]

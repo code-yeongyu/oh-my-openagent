@@ -1,0 +1,31 @@
+bun test v1.3.12 (700fc117)
+
+script/test-fast.test.ts:
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] opencode-memory: exit 0
+[test-fast] root-rest: exit 0
+[test-fast] senpi: exit 0
+15 |     // when
+16 |     const exit = await runTestFast(spawnGroup)
+17 |
+18 |     // then
+19 |     expect(testFastGroups().length).toBe(3)
+20 |     expect(order.indexOf("start:senpi")).toBeLessThan(
+                                              ^
+error: expect(received).toBeLessThan(expected)
+
+Expected: < 1
+Received: 4
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/local-test-path-groups-20260817-ulw/script/test-fast.test.ts:20:42)
+(fail) runTestFast > #given three fixed test groups #when the runner starts #then every group is launched before any exit is released [3.29ms]
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] opencode-memory: exit 0
+[test-fast] root-rest: exit 3
+[test-fast] senpi: exit 0
+(pass) runTestFast > #given one nonzero group exit #when the runner aggregates #then the combined exit is 1 [0.15ms]
+
+ 1 pass
+ 1 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [97.00ms]

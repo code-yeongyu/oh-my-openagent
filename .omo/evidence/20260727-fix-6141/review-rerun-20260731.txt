@@ -1,0 +1,52 @@
+PR #6375 review rerun - 2026-07-31
+
+WHAT WAS TESTED
+
+1. Hardened evidence driver:
+   bash .omo/evidence/20260727-fix-6141/live-driver.sh \
+     /tmp/pr6375-live-after-asserted-final.txt true
+2. Focused regression suite:
+   bun test packages/omo-opencode/src/agents/hephaestus/agent.test.ts
+3. Package typecheck:
+   bunx tsgo --noEmit -p packages/omo-opencode
+4. Real OpenCode database isolation:
+   sqlite3 "$(opencode db path)" "SELECT count(*) FROM session;"
+   was run immediately before and after the driver.
+
+WHAT WAS OBSERVED
+
+- The driver built `dist/index.js` from the current source before invoking
+  OpenCode and recorded the successful bundle followed by `EXIT=0`.
+- The driver's `true` expectation argument made the run fail unless
+  Hephaestus was present in the resolved agent map.
+- The exact output is committed as
+  `live-driver-after-asserted-20260731.txt`.
+- Every path reported by `opencode debug paths`, including `tmp`, was inside
+  the throwaway `omo-6141-*` sandbox.
+- `opencode debug config` exited 0 and reported:
+  `HEPHAESTUS REGISTERED : true`
+- The resolved model was:
+  `amazon-bedrock/openai.gpt-5.4`
+- The real OpenCode session count was unchanged:
+  `2821 before -> 2821 after`
+- The focused suite passed:
+  `31 pass, 0 fail`
+- The package typecheck exited 0 with no diagnostics.
+- As a negative control, the first rerun after merging current `upstream/dev`
+  encountered a stale dependency graph. The hardened driver stopped at the
+  failed build with exit 1 and did not continue to OpenCode, proving it no
+  longer reports success from stale `dist/` output.
+
+WHY IT IS ENOUGH
+
+The real OpenCode CLI loaded the freshly built local plugin in a sandbox and
+exposed the resolved agent map through `opencode debug config`. That surface
+directly proves the affected registration behavior. The unchanged real
+session count proves the run did not add sessions to the host database. The
+focused tests and package typecheck cover regression and static correctness.
+
+WHAT WAS OMITTED
+
+Raw environment dumps, config contents, credentials, and tokens were not
+captured. The temporary sandbox path is summarized because the directory was
+deleted when the driver exited.

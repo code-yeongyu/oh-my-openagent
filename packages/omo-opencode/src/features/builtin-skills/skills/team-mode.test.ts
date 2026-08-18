@@ -45,54 +45,29 @@ describe("teamModeSkill gating", () => {
     expect(skill.mcpConfig).toBeUndefined()
   })
 
-  test("team-mode skill body keeps required keywords", () => {
+  test("team-mode skill exposes runtime tool markers", () => {
     // given
     const body = teamModeSkill.template
 
     // when
-    const keywords = [
-      "TeamSpec",
-      "member",
-      "category",
-      "subagent_type",
-      "sisyphus",
-      "atlas",
-      "hephaestus",
-      "oracle",
-      "eligible",
-    ]
-
-    // then
-    for (const keyword of keywords) {
-      expect(body).toContain(keyword)
-    }
-  })
-
-  test("team-mode skill separates lead-only and member-safe tools", () => {
-    // given
-    const body = teamModeSkill.template
-
-    // when
-    const leadOnlyTools = ["team_create", "team_delete", "team_shutdown_request"]
-    const universalTools = [
+    const toolNames = [
+      "team_create",
+      "team_delete",
+      "team_shutdown_request",
+      "team_approve_shutdown",
+      "team_reject_shutdown",
       "team_send_message",
       "team_task_create",
       "team_task_list",
       "team_task_update",
       "team_task_get",
       "team_status",
+      "team_list",
     ]
 
     // then
-    expect(body).toContain("## Lead-only tools")
-    expect(body).toContain("## Universal team-run tools")
-    expect(body).toContain("## Global query tool")
-    for (const toolName of leadOnlyTools) {
+    for (const toolName of toolNames) {
       expect(body).toContain(toolName)
     }
-    for (const toolName of universalTools) {
-      expect(body).toContain(toolName)
-    }
-    expect(body).not.toContain("team_shutdown_request - ask the lead to wind down")
   })
 })

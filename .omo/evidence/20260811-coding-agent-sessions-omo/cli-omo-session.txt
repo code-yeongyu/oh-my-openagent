@@ -1,0 +1,36 @@
+WHAT WAS TESTED
+Fixture:
+  <isolated-home>/.omo/agent/sessions/-tmp-omo/
+    2026-08-11T00-00-00-000Z_omo-only.jsonl
+
+Command:
+  cd packages/shared-skills/skills/coding-agent-sessions
+  env -u XDG_DATA_HOME \
+    HOME=<isolated-home> \
+    UV_CACHE_DIR=<isolated-home>/.uv-cache \
+    uv run python scripts/find-agent-sessions.py \
+      list --platform senpi --query omo-only --limit 10
+
+WHAT WAS OBSERVED
+Exit code: 0
+
+Parsed result:
+  status: PASS
+  count: 1
+  id: omo-only
+  platform: senpi
+  cwd: /tmp/omo
+  first_user_message: isolated omo sentinel
+  path: <isolated-home>/.omo/agent/sessions/-tmp-omo/
+        2026-08-11T00-00-00-000Z_omo-only.jsonl
+
+WHY IT IS ENOUGH
+This drives the actual shipped Python CLI entry point with the exact requested
+`list --platform senpi --query omo-only --limit 10` surface. The isolated HOME
+contains no legacy store or unrelated sessions, so the single result proves
+automatic discovery from `.omo/agent/sessions` and correct Senpi labeling.
+
+WHAT WAS OMITTED
+The random isolated-home suffix was retained only in the private execution log
+and summarized here. No real user session store, credentials, or private
+transcript was read.

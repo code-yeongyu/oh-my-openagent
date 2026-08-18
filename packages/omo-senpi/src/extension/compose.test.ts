@@ -137,6 +137,7 @@ describe("composeOmoSenpiExtension", () => {
       userMessages: [],
       messageRenderers: [],
       mcpServers: [],
+      rpcEvents: [],
       on(event, handler) {
         this.handlers.push({ event, handler })
       },

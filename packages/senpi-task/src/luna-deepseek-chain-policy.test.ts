@@ -21,7 +21,7 @@ describe("Senpi Luna and DeepSeek chain policy", () => {
     const quick = CATEGORY_FALLBACK_CHAINS["quick"]
 
     expect(quick?.slice(1, 3)).toEqual([
-      { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
       DEEPSEEK_OFF,
     ])
   })

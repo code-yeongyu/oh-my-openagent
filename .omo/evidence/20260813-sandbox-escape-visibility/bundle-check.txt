@@ -1,0 +1,29 @@
+Senpi LSP runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-memory-sandbox-escape-visibility/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+runtime dist not built locally; skipping freshness check: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-memory-sandbox-escape-visibility/packages/ast-grep-mcp/dist/cli.js
+runtime dist not built locally; skipping freshness check: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-memory-sandbox-escape-visibility/packages/omo-codex/plugin/components/ulw-loop/dist/cli.js
+Bundled 734 modules in 34ms
+
+  omo.js  0.77 MB  (entry point)
+
+Bundled 599 modules in 22ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 12ms
+
+  omo-member.js  117.79 KB  (entry point)
+
+Bundled 87 modules in 6ms
+
+  omo-memory-mcp.js  68.54 KB  (entry point)
+
+Bundled 83 modules in 5ms
+
+  memory-run-supervisor.mjs  17.37 KB  (entry point)
+
+Bundled 96 modules in 7ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-memory-sandbox-escape-visibility/packages/omo-senpi/plugin/extensions/omo.js
+EXIT=0

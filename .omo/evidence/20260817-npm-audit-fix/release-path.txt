@@ -1,0 +1,33 @@
+All commands ran in:
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-npm-audit-remediation
+
+packages/lsp-tools-mcp
+- npm ci: exit 0
+- npm run build: exit 0
+- npm test: exit 0
+- npm run typecheck: exit 0
+
+packages/lsp-daemon
+- npm ci: exit 0
+- npm run build: exit 0
+- npm test: exit 0
+- npm run typecheck: exit 0
+- npm run smoke:client-package: exit 0
+
+packages/omo-codex/plugin
+- npm ci: exit 0
+- initial npm test: exit 1 because generated skill copies were absent in the
+  fresh worktree
+- bun install --frozen-lockfile at repository root: exit 0
+- npm run build: exit 0 and materialized the documented generated assets
+- npm test: exit 0
+
+Interpretation:
+The fixed locks are accepted by frozen installs, both Node-targeted packages
+build and test successfully, and the Codex plugin build/test path succeeds
+after its documented root-workspace materialization precondition.
+
+Generated-file note:
+The root install/build regenerated tracked bundles unrelated to this lockfile
+change. They are deliberately excluded from the commit; only the three
+package-lock.json files and reviewer-readable evidence are in scope.

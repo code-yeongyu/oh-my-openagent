@@ -16,22 +16,6 @@ const EXPECTED_TOOL_ALLOWLIST = [
   "lsp_symbols",
 ] as const
 
-const FORBIDDEN_PROMPT_TOKENS = [
-  "call_omo_agent",
-  "background_output",
-  "context7",
-  "todowrite",
-  "todoread",
-  "websearch",
-  "webfetch",
-  "ast-grep",
-  "ast_grep_helper",
-  "sg --pattern",
-  "gh repo clone",
-  "npm view",
-  "git log",
-  "git blame",
-] as const
 
 describe("builtin curated agents", () => {
   test("#given the builtin defaults #when listing names sorted #then exactly the 4 curated agents are present", () => {
@@ -60,15 +44,6 @@ describe("builtin curated agents", () => {
     }
   })
 
-  test("#given every builtin definition #when inspecting prompts #then each is non-empty and names only available capabilities", () => {
-    for (const definition of BUILTIN_AGENT_DEFAULTS) {
-      expect(typeof definition.prompt).toBe("string")
-      expect(definition.prompt?.length).toBeGreaterThan(0)
-      for (const token of FORBIDDEN_PROMPT_TOKENS) {
-        expect(definition.prompt?.toLowerCase()).not.toContain(token)
-      }
-    }
-  })
 
   test("#given every builtin definition #when inspecting tool rules #then exactly the 9 literal allow-true rules are present", () => {
     for (const definition of BUILTIN_AGENT_DEFAULTS) {

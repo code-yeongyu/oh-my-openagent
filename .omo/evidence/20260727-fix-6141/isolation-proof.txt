@@ -1,0 +1,33 @@
+### ISOLATION PROOF - issue #6141 - 2026-07-27T06:27:29Z
+
+The live driver redirects HOME / USERPROFILE / APPDATA / LOCALAPPDATA, every
+XDG_* var, and TMPDIR / TEMP / TMP into a mktemp sandbox that is removed on
+exit. 'opencode debug paths' in both rerun captures shows
+data/config/cache/state/tmp resolving INSIDE that sandbox, which is the direct
+proof that the real opencode state was never touched.
+
+real user config : /c/Users/pss/.config/opencode/opencode.json
+  sha256 before  : 6e5e0ad761baddb45c5b3da80887c7c613a0e0f44bd92cad95acfc7ea977d76f
+  sha256 after   : 6e5e0ad761baddb45c5b3da80887c7c613a0e0f44bd92cad95acfc7ea977d76f
+real opencode db : C:\Users\pss\.local\share\opencode\opencode.db
+  sha256 before  : \177e07bc6ebe02350f2d5409a61f341ff95db96d9ba5b90c8a581cc24a3dee19
+  sha256 after   : \4765ae21aa32f3b803d222b2099eaf0508934b007c9fb6bc35778ef57695cec7
+
+required session-count comparison, recorded 2026-07-30 initial audit:
+  command         : sqlite3 "$REAL_OPENCODE_DB" 'SELECT count(*) FROM session;'
+  count before    : 2799
+  count after     : 2799
+  observed result : unchanged
+
+required session-count comparison, recorded 2026-07-30 temp-isolation rerun:
+  command         : sqlite3 "C:\Users\pss\.local\share\opencode\opencode.db" 'SELECT count(*) FROM session;'
+  count before    : 2818
+  count after     : 2818
+  observed result : unchanged
+
+NOTE: the first db digest differs because the original QA was run from inside a
+live opencode session that continuously writes to its own database. The
+authoritative rerun evidence is the unchanged session count above plus the
+'opencode debug paths' block in each capture: every path, including tmp, is under
+the sandbox temp dir, so the driver could not have read or written the real
+database or host temp directory.

@@ -1,0 +1,11 @@
+Where does the Codex-only stop marker '<start-work-blocked-external>' live after the fix?
+
+shared source        packages/shared-skills/skills/start-work/SKILL.md                      : 0
+Senpi generated      packages/omo-senpi/plugin/skills/start-work/SKILL.md                   : 0
+0
+Codex generated      packages/omo-codex/plugin/skills/start-work/SKILL.md                   : 0
+0
+Codex Stop directive packages/omo-codex/plugin/components/start-work-continuation/directive.md : 1
+
+Only the Codex Stop-hook directive carries it, and codex-hook.ts is the only code that
+greps for it. OpenCode and Senpi no longer receive a contract neither of them implements.

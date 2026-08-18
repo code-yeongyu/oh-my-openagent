@@ -75,10 +75,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   quick: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-      { providers: ["quotio-openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
       { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "off" },
       {
-        providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go", "vercel"],
+        providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "vercel"],
         model: "qwen3.6-flash",
         variant: "low",
       },
@@ -94,6 +94,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "unspecified-low": {
     fallbackChain: [
+      {
+        providers: ["xai", "github-copilot", "opencode", "vercel"],
+        model: "grok-4.6",
+        variant: "xhigh",
+      },
       {
         providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.6-terra",

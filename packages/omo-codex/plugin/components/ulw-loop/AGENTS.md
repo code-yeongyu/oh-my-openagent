@@ -39,7 +39,7 @@ Conventions for human contributors and AI agents working on this repository.
 
 - Repo artifacts live under `.omo/ulw-loop/` paths.
 - Environment variables use the `OMO_ULW_LOOP_*` prefix.
-- CLI commands use the `omo ulw-loop` form.
+- CLI commands use the `omo-agent-toolkit ulw-loop` form.
 - Do not use any alternate legacy CLI alias anywhere.
 
 ## Build and Hooks

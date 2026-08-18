@@ -11,7 +11,7 @@ describe("#given a steering command without --kind", () => {
 
 			expect(action).toThrow(/Allowed --kind values:/);
 			expect(action).toThrow(/annotate_ledger/);
-			expect(action).toThrow(/omo ulw-loop steer --kind annotate_ledger/);
+			expect(action).toThrow(/omo-agent-toolkit ulw-loop steer --kind annotate_ledger/);
 		});
 	});
 });

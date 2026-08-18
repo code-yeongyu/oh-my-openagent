@@ -1,0 +1,237 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/mcp/memory-server.test.ts:
+(pass) omo-memory MCP server > #given initialize #then server info and tool capabilities are returned [0.90ms]
+(pass) omo-memory MCP server > #given tools/list #then exactly the two memory tools are exposed [0.12ms]
+(pass) omo-memory MCP server > #given a fresh project #when create then str_replace run through tools/call #then the memory repo records them [914.61ms]
+(pass) omo-memory MCP server > #given injected provenance for a non-auto identity #when an MCP memory call runs #then it writes that bound repo with durable turn trailers [323.50ms]
+165 |     )
+166 | 
+167 |     // then
+168 |     expect((result?.result as { isError?: boolean } | undefined)?.isError).toBeFalsy()
+169 |     const key = createHash("sha256").update("call-receipt-1").digest("hex").slice(0, 32)
+170 |     const receipt = JSON.parse(readFileSync(join(paths.toolReceipts, `${key}.json`), "utf8")) as Record<string, unknown>
+                                     ^
+ENOENT: no such file or directory, open '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-mcp-kNneeI/memory-home/agents/receipt-agent-deadbeef/runtime/tool-receipts/61f1b848e0221d4ded9a60ad0fd2958b.json'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-mcp-kNneeI/memory-home/agents/receipt-agent-deadbeef/runtime/tool-receipts/61f1b848e0221d4ded9a60ad0fd2958b.json",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/mcp/memory-server.test.ts:170:32)
+(fail) omo-memory MCP server > #given injected provenance with a toolCallId #when an MCP memory call commits #then an out-of-band receipt lands under runtime/tool-receipts [254.00ms]
+(pass) omo-memory MCP server > #given no injected toolCallId #when an MCP memory call commits #then no receipt is written [669.07ms]
+(pass) omo-memory MCP server > #given a failing MCP memory call with a toolCallId #when the call errors #then no receipt is written [180.59ms]
+(pass) omo-memory MCP server > #given an unknown tool name #when called #then an error result is returned [0.26ms]
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v2 soul template [0.12ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [193.37ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [197.07ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata [229.38ms]
+(pass) createMemoryPromptHandler > #given nudge state at the threshold #when before_agent_start compiles #then the memory metadata carries the behavioral nudge token [230.04ms]
+178 | 
+179 |     // when
+180 |     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 2))
+181 | 
+182 |     // then
+183 |     expect(result?.systemPrompt).toContain(MEMORY_SOUL_METADATA_TOKEN)
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Soul updated by"
+Received: "BASE PROMPT\n\n<!-- senpi-memory:prompt-agent:begin -->\nReminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).\n\n<self>\n<projection>$MEMORY_DIR/system/persona.md</projection>\nfirst\n</self>\n\n<memory_metadata>\n- AGENT_ID: prompt-agent\n- CONVERSATION_ID: session-1\n- System prompt last recompiled: 2026-08-10 07:59:37 AM UTC+0000\n- 2 previous messages between you and the user are stored in recall memory\n</memory_metadata>\n<!-- senpi-memory:prompt-agent:end -->"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/prompt.test.ts:183:34)
+(fail) createMemoryPromptHandler > #given a reflection soul notice #when before_agent_start compiles #then the memory metadata carries the soul token and short sha [247.63ms]
+209 |     const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 1))
+210 |     const second = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 1))
+211 |     const third = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 1))
+212 | 
+213 |     // then
+214 |     expect(first?.systemPrompt).toContain(MEMORY_SOUL_METADATA_TOKEN)
+                                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Soul updated by"
+Received: "BASE PROMPT\n\n<!-- senpi-memory:prompt-agent:begin -->\nReminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).\n\n<self>\n<projection>$MEMORY_DIR/system/persona.md</projection>\nevolved\n</self>\n\n<memory_metadata>\n- AGENT_ID: prompt-agent\n- CONVERSATION_ID: session-1\n- System prompt last recompiled: 2026-08-10 07:59:37 AM UTC+0000\n- 1 previous messages between you and the user are stored in recall memory\n</memory_metadata>\n<!-- senpi-memory:prompt-agent:end -->"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/prompt.test.ts:214:33)
+(fail) createMemoryPromptHandler > #given an out-of-band soul commit #when the prompt compiles repeatedly at the same HEAD #then the soul line appears exactly once [386.84ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [243.57ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [271.33ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [391.60ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [255.86ms]
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+(pass) createMemoryNudgeWiring > #given a fresh session #when two interactive inputs are accepted while extension and rejected inputs occur #then only the accepted interactive turns reach the threshold [227.61ms]
+(pass) createMemoryNudgeWiring > #given a durable accepted-turn record and contaminated branch users #when a session resumes #then hydration uses only the durable baseline [201.01ms]
+(pass) createMemoryNudgeWiring > #given one durable accepted turn and a second admitted input awaiting its started disposition #when the prompt compiles #then the projected accepted turn reaches the threshold [198.81ms]
+(pass) createMemoryNudgeWiring > #given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history [169.16ms]
+(pass) createMemoryNudgeWiring > #given a threshold nudge #when an in-band memory commit lands #then the next compile state self-clears and disabled settings remain quiet [290.37ms]
+217 | 
+218 |     // when
+219 |     await pi.dispatch("tool_call", call, ctx)
+220 | 
+221 |     // then
+222 |     expect(call.input).toEqual({
+                             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "provenance": {
+      "identityId": "named-agent",
+      "repoPath": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-nudge-R8BdEb/agents/named-agent/repo",
+      "sessionId": "session-tool",
+-     "toolCallId": "call-1",
+      "userTurns": 5,
+    },
+    "reason": "save",
+  }
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:222:24)
+(fail) createMemoryNudgeWiring > #given a bound non-auto identity #when a memory MCP tool call starts #then unforgeable identity and accepted-turn provenance are injected in place [188.25ms]
+255 | 
+256 |     // when
+257 |     await pi.dispatch("tool_call", call, ctx)
+258 | 
+259 |     // then
+260 |     expect(call.input["provenance"]).toEqual({
+                                           ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "identityId": "named-agent",
+-   "repoPath": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-nudge-7qH3BM/agents/named-agent/repo",
+-   "sessionId": "session-mcp-call",
+-   "toolCallId": "call-mcp-1",
+-   "userTurns": 4,
+- }
++ undefined
+
+- Expected  - 7
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:260:38)
+(fail) createMemoryNudgeWiring > #given a bound identity #when an MCP-surface memory tool call starts #then provenance is injected under the catalog tool names [180.20ms]
+
+packages/omo-senpi/src/components/memory/tools.test.ts:
+(pass) memory tool registration > #given a context resolver #when registerMemoryTools runs #then both tools are captured with sequential execution and prompt metadata [0.29ms]
+(pass) memory tool registration > #given the memory tool description #when inspected #then it documents omo identity, frontmatter rules, and result strings [0.07ms]
+(pass) memory tool activation > #given no bound identity #when either tool executes #then an actionable initialization error is returned [0.22ms]
+(pass) memory tool activation > #given a resolver that binds after registration #when the tool executes #then activation follows binding [260.89ms]
+(pass) memory tool execution > #given a bound identity #when memory create executes #then the engine commits and reports the short sha [321.97ms]
+(pass) memory tool execution > #given a bound identity #when memory_apply_patch executes #then the patch is applied and committed [366.71ms]
+(pass) memory tool execution > #given a bound identity #when the engine rejects the change #then the memory error maps to an error result [262.38ms]
+(pass) memory tool execution > #given a bound identity #when memory_apply_patch receives a malformed patch #then the parse error maps to an error result [196.36ms]
+(pass) memory tool execution > #given the writer lock is held #when a tool executes #then the contention surfaces as an error result [249.41ms]
+(pass) memory tool execution > #given concurrent executions #when both commit #then they serialize through the writer lock [420.37ms]
+(pass) memory tool execution > #given no repo exists yet #when the memory tool executes #then it lazily initializes with hooks and seeds [755.12ms]
+326 |       file_text: "v2 soul",
+327 |     })
+328 | 
+329 |     // then
+330 |     expect(result.isError).toBeUndefined()
+331 |     expect(commits).toEqual([{
+                          ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "affectedPaths": [
+-       "system/persona.md",
+-     ],
+-     "sha": "04189babb2e52d5c448806d1ee057fd7c0bad639",
+-     "subject": "rewrite the persona",
+-   },
+- ]
++ []
+
+- Expected  - 9
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/tools.test.ts:331:21)
+(fail) memory tool onCommit seam > #given a bound identity #when memory create commits #then onCommit receives the sha, first-line subject, and affected paths [270.62ms]
+355 |     // when
+356 |     const result = await applyPatchTool.execute("call-2", { reason: "rename", input })
+357 | 
+358 |     // then
+359 |     expect(result.isError).toBeUndefined()
+360 |     expect(commits).toHaveLength(1)
+                          ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/tools.test.ts:360:21)
+(fail) memory tool onCommit seam > #given a bound identity #when memory_apply_patch commits #then onCommit receives the commit metadata [333.42ms]
+(pass) memory tool onCommit seam > #given an engine rejection #when the tool executes #then onCommit is not called [179.26ms]
+
+packages/omo-senpi/src/components/memory/soul-notice.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './soul-notice' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/soul-notice.test.ts'
+-------------------------------
+
+
+packages/omo-senpi/src/components/memory/commands/doctor.test.ts:
+(pass) /doctor > #given a healthy repository #when doctor runs #then every deterministic check passes [536.50ms]
+93 | 
+94 |     // when
+95 |     const text = await invoke(pi, "doctor", "", ctx)
+96 | 
+97 |     // then
+98 |     expect(text).toContain("[warn] soul-seed")
+                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[warn] soul-seed"
+Received: "# Memory doctor: test-identity\n\n[ok] repository: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-commands-OyJWEP/agents/test-identity/repo\n[ok] frontmatter: 1 memory file valid\n[ok] persona: system/persona.md present\n[ok] locks: no lock directory yet\n[ok] worktrees: no reflection worktrees\n[ok] tokens: ~245 tokens in system/ (warn at 30000)\n[info] skills: scanned 0 skill files"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/commands/doctor.test.ts:98:18)
+(fail) /doctor > #given a persona still equal to the v1 seed #when doctor runs #then a soul-seed advisory is reported [533.58ms]
+104 | 
+105 |     // when
+106 |     const text = await invoke(pi, "doctor", "", ctx)
+107 | 
+108 |     // then
+109 |     expect(text).toContain("[ok] soul-seed")
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[ok] soul-seed"
+Received: "# Memory doctor: test-identity\n\n[ok] repository: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-commands-Bo5cWV/agents/test-identity/repo\n[ok] frontmatter: 1 memory file valid\n[ok] persona: system/persona.md present\n[ok] locks: no lock directory yet\n[ok] worktrees: no reflection worktrees\n[ok] tokens: ~11 tokens in system/ (warn at 30000)\n[info] skills: scanned 0 skill files"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/commands/doctor.test.ts:109:18)
+(fail) /doctor > #given a persona that diverged from the v1 seed #when doctor runs #then no soul-seed advisory fires [540.39ms]
+(pass) /doctor > #given no repository #when doctor runs #then the repository check fails with an actionable hint [0.42ms]
+(pass) /doctor > #given a memory file with invalid frontmatter #when doctor runs #then the sweep fails and names the file [542.18ms]
+(pass) /doctor > #given a missing persona file #when doctor runs #then a persona warning is reported [501.55ms]
+(pass) /doctor > #given a lock owned by a dead pid #when doctor runs #then the stale lock is reported with its path [529.55ms]
+(pass) /doctor > #given a lock owned by a live pid #when doctor runs #then no stale lock is reported [539.39ms]
+(pass) /doctor > #given an unregistered worktree directory #when doctor runs #then the orphan is reported [557.91ms]
+(pass) /doctor > #given a system estimate over the warn threshold #when doctor runs #then a token advisory is reported [564.76ms]
+(pass) /doctor > #given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix [528.57ms]
+(pass) /doctor > #given an unbound session #when doctor runs #then an actionable error is returned [0.17ms]
+
+10 tests failed:
+(fail) omo-memory MCP server > #given injected provenance with a toolCallId #when an MCP memory call commits #then an out-of-band receipt lands under runtime/tool-receipts [254.00ms]
+(fail) createMemoryPromptHandler > #given a reflection soul notice #when before_agent_start compiles #then the memory metadata carries the soul token and short sha [247.63ms]
+(fail) createMemoryPromptHandler > #given an out-of-band soul commit #when the prompt compiles repeatedly at the same HEAD #then the soul line appears exactly once [386.84ms]
+(fail) createMemoryNudgeWiring > #given a bound non-auto identity #when a memory MCP tool call starts #then unforgeable identity and accepted-turn provenance are injected in place [188.25ms]
+(fail) createMemoryNudgeWiring > #given a bound identity #when an MCP-surface memory tool call starts #then provenance is injected under the catalog tool names [180.20ms]
+(fail) memory tool onCommit seam > #given a bound identity #when memory create commits #then onCommit receives the sha, first-line subject, and affected paths [270.62ms]
+(fail) memory tool onCommit seam > #given a bound identity #when memory_apply_patch commits #then onCommit receives the commit metadata [333.42ms]
+(fail) /doctor > #given a persona still equal to the v1 seed #when doctor runs #then a soul-seed advisory is reported [533.58ms]
+(fail) /doctor > #given a persona that diverged from the v1 seed #when doctor runs #then no soul-seed advisory fires [540.39ms]
+
+ 43 pass
+ 10 fail
+ 1 error
+ 157 expect() calls
+Ran 53 tests across 6 files. [15.57s]

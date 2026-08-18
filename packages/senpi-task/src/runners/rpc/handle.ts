@@ -2,11 +2,19 @@ import type { ChildProcess } from "node:child_process"
 import type { RpcResponse, RpcSessionState } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
-import type { ChildEventListener, ChildExitOutcome, RpcChildHandle, TerminateOptions } from "../types"
+import type { RunnerOutcome } from "../in-process/child-handle"
+import type {
+  ChildEventListener,
+  ChildExitOutcome,
+  RpcChildHandle,
+  RpcTerminalAssistantMessage,
+  TerminateOptions,
+} from "../types"
 import { RpcCommandError } from "./errors"
 import { classifyChildExit } from "./exit-mapping"
 import type { RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
+import { agentEndOutcome, exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
 
 export type CreateRpcChildHandleOptions = {
   readonly client: RpcProtocolClient
@@ -16,29 +24,49 @@ export type CreateRpcChildHandleOptions = {
   readonly now: () => number
 }
 
+export type TrackedRpcChildHandle = RpcChildHandle & {
+  startInitialPrompt(text: string): Promise<void>
+}
+
 /**
  * Assemble the steerable RpcChildHandle over a protocol client: steer/followUp/
  * abort mapping, event fan-out, idle + exit awaiting, final-text tracking, and
  * a get_state liveness heartbeat (records lastSeen only). terminate() delegates
  * to the single-writer terminate module.
  */
-export function createRpcChildHandle(options: CreateRpcChildHandleOptions): RpcChildHandle {
+export function createRpcChildHandle(options: CreateRpcChildHandleOptions): TrackedRpcChildHandle {
   const { client, child, taskId, heartbeatIntervalMs, now } = options
   const idleWaiters: Array<() => void> = []
+  const outcomeWaiters: Array<(settled: RunnerOutcome) => void> = []
   const exitWaiters: Array<(outcome: ChildExitOutcome) => void> = []
   let reachedIdle = false
   let sessionId: string | undefined
   let finalText: string | undefined
+  let turnBaseline: string | undefined
+  let turnOutcome: RunnerOutcome | undefined
+  let terminalAssistantMessage: RpcTerminalAssistantMessage | undefined
+  let abortedByUser = false
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
 
+  const settleTurn = (settled: RunnerOutcome): void => {
+    if (turnOutcome !== undefined) return
+    turnOutcome = settled
+    reachedIdle = true
+    flush(idleWaiters)
+    for (const waiter of outcomeWaiters.splice(0)) waiter(settled)
+  }
+
   client.onEvent((event) => {
     if (event.type === "message_end") {
-      finalText = extractAssistantText(event.message) ?? finalText
+      const terminal = extractTerminalAssistantMessage(event.message)
+      if (terminal !== undefined) {
+        terminalAssistantMessage = terminal
+        finalText = terminal.text ?? finalText
+      }
     }
     if (event.type === "agent_end" && event.willRetry === false) {
-      reachedIdle = true
-      flush(idleWaiters)
+      settleTurn(abortedByUser ? { status: "cancelled" } : agentEndOutcome(event, turnBaseline, finalText))
     }
   })
 
@@ -60,24 +88,43 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): RpcC
     outcome = built
     clearInterval(heartbeat)
     flush(idleWaiters)
+    if (turnOutcome === undefined) settleTurn(exitTurnOutcome(built, finalText))
     for (const waiter of exitWaiters.splice(0)) {
       waiter(built)
     }
   }
 
   child.once("error", (error) => settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })))
-  child.once("exit", (code, signal) => settleExit(classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })))
+  child.once("close", (code, signal) => settleExit(classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })))
 
   const runCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
     const response = await client.send(command)
     assertOk(response, label)
   }
 
-  // Reviving an idle resident child starts a fresh turn: clear the consumed idle flag so waitForIdle
-  // re-arms for the next agent_end instead of resolving immediately from the prior turn.
-  const rearmIdleAfterRevive = (): void => {
-    if (reachedIdle && outcome === undefined) {
+  const beginTurn = (): void => {
+    if (outcome !== undefined) return
+    if (reachedIdle || turnOutcome !== undefined) {
       reachedIdle = false
+      turnOutcome = undefined
+    }
+    terminalAssistantMessage = undefined
+    abortedByUser = false
+    turnBaseline = finalText
+  }
+
+  const runPrompt = async (text: string, streamingBehavior?: "followUp"): Promise<void> => {
+    beginTurn()
+    try {
+      await runCommand(
+        streamingBehavior === undefined
+          ? { type: "prompt", message: text }
+          : { type: "prompt", message: text, streamingBehavior },
+        "prompt",
+      )
+    } catch (error) {
+      settleTurn(promptFailureOutcome(error))
+      throw error
     }
   }
 
@@ -89,16 +136,27 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): RpcC
     get pid() {
       return child.pid ?? undefined
     },
-    steer: (text) => runCommand({ type: "steer", message: text }, "steer"),
-    followUp: async (text) => {
-      await runCommand({ type: "prompt", message: text, streamingBehavior: "followUp" }, "prompt")
-      rearmIdleAfterRevive()
+    steer: (text) => {
+      beginTurn()
+      return runCommand({ type: "steer", message: text }, "steer")
     },
-    abort: () => runCommand({ type: "abort" }, "abort"),
+    followUp: (text) => runPrompt(text, "followUp"),
+    abort: () => {
+      abortedByUser = true
+      return runCommand({ type: "abort" }, "abort")
+    },
     subscribe: (listener: ChildEventListener) => client.onEvent(listener),
     waitForIdle: () =>
       reachedIdle || outcome ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)),
+    waitForOutcome: () =>
+      turnOutcome !== undefined
+        ? Promise.resolve(turnOutcome)
+        : outcome === undefined
+          ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
+          : Promise.resolve(exitTurnOutcome(outcome, finalText)),
     lastAssistantText: () => finalText,
+    terminalAssistantMessage: () => terminalAssistantMessage,
+    wasAbortedByUser: () => abortedByUser,
     lastSeen: () => lastSeenAt,
     exitOutcome: () => outcome,
     waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
@@ -108,6 +166,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): RpcC
       return Promise.resolve()
     },
     terminate: (terminateOptions?: TerminateOptions) => terminateRpcChild(child, terminateOptions),
+    startInitialPrompt: (text) => runPrompt(text),
   }
 }
 
@@ -131,21 +190,16 @@ function readSessionId(response: RpcResponse): string | undefined {
   return state.sessionId
 }
 
-function extractAssistantText(message: unknown): string | undefined {
-  if (!isRecord(message) || message.role !== "assistant" || !Array.isArray(message.content)) {
-    return undefined
+function extractTerminalAssistantMessage(message: unknown): RpcTerminalAssistantMessage | undefined {
+  if (typeof message !== "object" || message === null) return undefined
+  const record = message as Record<string, unknown>
+  if (record.role !== "assistant") return undefined
+  const text = extractAssistantText(record)
+  const stopReason = typeof record.stopReason === "string" ? record.stopReason : undefined
+  const errorMessage = typeof record.errorMessage === "string" ? record.errorMessage : undefined
+  return {
+    ...(text === undefined ? {} : { text }),
+    ...(stopReason === undefined ? {} : { stopReason }),
+    ...(errorMessage === undefined ? {} : { errorMessage }),
   }
-  const text = message.content
-    .filter((part: unknown): part is { type: "text"; text: string } => isTextPart(part))
-    .map((part) => part.text)
-    .join("")
-  return text.length > 0 ? text : undefined
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
-
-function isTextPart(part: unknown): part is { type: "text"; text: string } {
-  return isRecord(part) && part.type === "text" && typeof part.text === "string"
 }

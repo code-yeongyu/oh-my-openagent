@@ -62,8 +62,10 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 	});
 
 	assert.equal(result.installed.length, 1);
-	const wrapper = await readFile(join(codexHome, "bin", "omo"), "utf8");
+	const wrapper = await readFile(join(codexHome, "bin", "omo-agent-toolkit"), "utf8");
 	assert.match(wrapper, /OMO_GENERATED_RUNTIME_WRAPPER/);
+	assert.match(wrapper, /export OMO_INVOCATION_NAME=omo-agent-toolkit/);
+	assert.match(wrapper, /export OMO_EDITION=codex/);
 	assert.match(
 		wrapper,
 		new RegExp(escapeRegExp(escapePosixDoubleQuoted(toPosixPath(join(repoRoot, "dist", "cli", "index.js"))))),
@@ -98,9 +100,10 @@ test("#given repoRoot without root CLI dist #when installing locally #then warns
 
 	const cliPath = join(repoRoot, "dist", "cli", "index.js");
 	assert.ok(
-		logs.some((line) => line.includes("omo runtime wrapper") && line.includes(cliPath)),
+		logs.some((line) => line.includes("omo-agent-toolkit runtime wrapper") && line.includes(cliPath)),
 		`expected a warning naming the missing ${cliPath}; got:\n${logs.join("\n")}`,
 	);
+	await assert.rejects(readFile(join(codexHome, "bin", "omo-agent-toolkit"), "utf8"));
 	await assert.rejects(readFile(join(codexHome, "bin", "omo"), "utf8"));
 });
 

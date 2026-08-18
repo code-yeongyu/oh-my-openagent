@@ -1,0 +1,116 @@
++------------------------------------------------------------+
+| TERMINAL WIDTH 60                                          |
++------------------------------------------------------------+
+
+  reflection-launched [collapsed]
+  [36m◐ Memory reflection started · reflection-run-2[0m
+  [2mTriggered by step-count after 25 new steps.[0m
+
+  reflection-launched [expanded]
+  [36m◐ Memory reflection started · reflection-run-2[0m
+  [2mTriggered by step-count after 25 new steps.[0m
+  [3m[2mcategory quick · model anthropic/claude-sonnet-4 · thinki...[0m[0m
+
+  reflection-completion (merged) [collapsed]
+  [32m● Memory reflection merged · reflection-run-2[0m
+  [2mReflection merged its findings into memory.[0m
+
+  reflection-completion (merged) [expanded]
+  [32m● Memory reflection merged · reflection-run-2[0m
+  [2mReflection merged its findings into memory.[0m
+  [3m[2mcategory quick · files 3 · commit 9f2c1ab · took 1m12s[0m[0m
+
+  reflection-completion (failed) [collapsed]
+  [31m✗ Memory reflection failed · reflection-run-2[0m
+  [2mReflection did not finish; the transcript cursor was not ...[0m
+
+  reflection-completion (failed) [expanded]
+  [31m✗ Memory reflection failed · reflection-run-2[0m
+  [2mReflection did not finish; the transcript cursor was not ...[0m
+  [3m[2mcategory quick · took 4.3s · reason child_exit · worktree...[0m[0m
+
+  reflection-completion (timed out) [collapsed]
+  [33m⚠ Memory reflection timed out · reflection-run-2[0m
+  [2mReflection hit its deadline; the transcript cursor was no...[0m
+
+  reflection-completion (timed out) [expanded]
+  [33m⚠ Memory reflection timed out · reflection-run-2[0m
+  [2mReflection hit its deadline; the transcript cursor was no...[0m
+  [3m[2mcategory quick · took 10m00s · reason deadline_exceeded[0m[0m
+
+  reflection-summary [collapsed]
+  [33m⚠ Memory reflection · 7 older completions collapsed[0m
+  [2mDelivered while this session was away; 2 need attention.[0m
+
+  reflection-summary [expanded]
+  [33m⚠ Memory reflection · 7 older completions collapsed[0m
+  [2mDelivered while this session was away; 2 need attention.[0m
+  [3m[2mmost common child_exit:worktree merge refused because mem...[0m[0m
+
+  senpi-memory.health [collapsed]
+  [31m✗ Memory reflection failing · 4 runs in a row[0m
+  [2mCommit or stash the memory worktree, then rerun /memory r...[0m
+
+  senpi-memory.health [expanded]
+  [31m✗ Memory reflection failing · 4 runs in a row[0m
+  [2mCommit or stash the memory worktree, then rerun /memory r...[0m
+  [3m[2mreason child_exit · worktree merge refused because memory...[0m[0m
+
++----------------------------------------------------------------------------------------------------+
+| TERMINAL WIDTH 100                                                                                 |
++----------------------------------------------------------------------------------------------------+
+
+  reflection-launched [collapsed]
+  [36m◐ Memory reflection started · reflection-run-2[0m
+  [2mTriggered by step-count after 25 new steps.[0m
+
+  reflection-launched [expanded]
+  [36m◐ Memory reflection started · reflection-run-2[0m
+  [2mTriggered by step-count after 25 new steps.[0m
+  [3m[2mcategory quick · model anthropic/claude-sonnet-4 · thinking high · identity project-a1b2c3d4[0m[0m
+
+  reflection-completion (merged) [collapsed]
+  [32m● Memory reflection merged · reflection-run-2[0m
+  [2mReflection merged its findings into memory.[0m
+
+  reflection-completion (merged) [expanded]
+  [32m● Memory reflection merged · reflection-run-2[0m
+  [2mReflection merged its findings into memory.[0m
+  [3m[2mcategory quick · files 3 · commit 9f2c1ab · took 1m12s[0m[0m
+
+  reflection-completion (failed) [collapsed]
+  [31m✗ Memory reflection failed · reflection-run-2[0m
+  [2mReflection did not finish; the transcript cursor was not advanced.[0m
+
+  reflection-completion (failed) [expanded]
+  [31m✗ Memory reflection failed · reflection-run-2[0m
+  [2mReflection did not finish; the transcript cursor was not advanced.[0m
+  [3m[2mcategory quick · took 4.3s · reason child_exit · worktree merge refused because memory had uncomm...[0m[0m
+
+  reflection-completion (timed out) [collapsed]
+  [33m⚠ Memory reflection timed out · reflection-run-2[0m
+  [2mReflection hit its deadline; the transcript cursor was not advanced.[0m
+
+  reflection-completion (timed out) [expanded]
+  [33m⚠ Memory reflection timed out · reflection-run-2[0m
+  [2mReflection hit its deadline; the transcript cursor was not advanced.[0m
+  [3m[2mcategory quick · took 10m00s · reason deadline_exceeded[0m[0m
+
+  reflection-summary [collapsed]
+  [33m⚠ Memory reflection · 7 older completions collapsed[0m
+  [2mDelivered while this session was away; 2 need attention.[0m
+
+  reflection-summary [expanded]
+  [33m⚠ Memory reflection · 7 older completions collapsed[0m
+  [2mDelivered while this session was away; 2 need attention.[0m
+  [3m[2mmost common child_exit:worktree merge refused because memory was dirty · oldest 2026-08-11T04:00:...[0m[0m
+
+  senpi-memory.health [collapsed]
+  [31m✗ Memory reflection failing · 4 runs in a row[0m
+  [2mCommit or stash the memory worktree, then rerun /memory reflect.[0m
+
+  senpi-memory.health [expanded]
+  [31m✗ Memory reflection failing · 4 runs in a row[0m
+  [2mCommit or stash the memory worktree, then rerun /memory reflect.[0m
+  [3m[2mreason child_exit · worktree merge refused because memory had uncommitted changes · since 2026-08...[0m[0m
+

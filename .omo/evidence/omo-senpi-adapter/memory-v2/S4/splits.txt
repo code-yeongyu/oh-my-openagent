@@ -1,0 +1,68 @@
+Test-suite split evidence
+=========================
+
+Pure LOC rule
+-------------
+Non-blank, non-line-comment source lines. Baseline values are the task's pre-split measurements.
+
+Before
+------
+292 packages/memory-core/src/compile/compile.test.ts
+292 packages/omo-senpi/src/components/memory/tools.test.ts
+256 packages/omo-senpi/src/components/memory/commands/people.test.ts
+
+After
+-----
+116 packages/memory-core/src/compile/compile.test.ts
+ 42 packages/memory-core/src/compile/compile-metadata.test.ts
+ 56 packages/memory-core/src/compile/compile-projections.test.ts
+ 92 packages/memory-core/src/compile/compile.test-support.ts
+
+ 60 packages/omo-senpi/src/components/memory/tools.test.ts
+108 packages/omo-senpi/src/components/memory/tools-operations.test.ts
+ 57 packages/omo-senpi/src/components/memory/tools-apply-patch.test.ts
+ 39 packages/omo-senpi/src/components/memory/tools-locking.test.ts
+ 55 packages/omo-senpi/src/components/memory/tools.test-support.ts
+
+ 73 packages/omo-senpi/src/components/memory/commands/people.test.ts
+ 46 packages/omo-senpi/src/components/memory/commands/people-selection.test.ts
+ 55 packages/omo-senpi/src/components/memory/commands/people-ask.test.ts
+ 28 packages/omo-senpi/src/components/memory/commands/people-gate.test.ts
+ 68 packages/omo-senpi/src/components/memory/commands/people.test-support.ts
+
+Behavior preservation
+---------------------
+Compared all test blocks from HEAD versions of the three original files against all resulting test files by test title and byte content:
+old tests: 37; new tests: 37
+missing: 0; extra: 0; changed bodies: 0
+all test bodies preserved byte-for-byte
+
+Verification output
+-------------------
+$ bun run --cwd packages/memory-core typecheck
+$ tsgo --noEmit -p tsconfig.json
+(exit 0)
+
+$ bun run --cwd packages/omo-senpi typecheck
+$ tsgo --noEmit -p tsconfig.json
+(exit 0)
+
+$ bun test packages/memory-core
+ 418 pass
+ 0 fail
+ 3721 expect() calls
+Ran 418 tests across 55 files. [52.72s]
+
+$ bun test packages/omo-senpi
+1 tests failed:
+(fail) omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored [0.29ms]
+
+ 1078 pass
+ 1 fail
+ 3045 expect() calls
+Ran 1079 tests across 173 files. [91.44s]
+
+The sole omo-senpi failure is the task-declared pre-existing ulw-loop OMO_BIN failure and is outside this change. The initially concurrent package run also transiently failed one runner deadline test under load; an isolated diagnostic run passed 4/4, and the final non-concurrent full omo-senpi run passed that test and retained only the declared pre-existing failure.
+
+$ git diff --check
+(exit 0)

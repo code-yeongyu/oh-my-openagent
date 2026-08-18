@@ -16,6 +16,18 @@ const LEGACY_CODEX_COMPONENT_BINS = [
 
 type LegacyCodexComponent = (typeof LEGACY_CODEX_COMPONENT_BINS)[number]["component"]
 
+export const LEGACY_CODEX_COMPONENT_BIN_NAMES: readonly string[] = LEGACY_CODEX_COMPONENT_BINS.map(
+  (entry) => entry.name,
+)
+
+// Legacy installs used an arbitrary marketplace segment under plugins/cache, which the
+// current-layout matcher deliberately rejects. Uninstall reuses this recognizer for the
+// closed set of legacy bin names so those commands do not survive on PATH.
+export function isLegacyCodexBinTarget(binName: string, target: string): boolean {
+  const entry = LEGACY_CODEX_COMPONENT_BINS.find((candidate) => candidate.name === binName)
+  return entry !== undefined && isManagedLegacyComponentTarget(target, entry.component)
+}
+
 export async function removeLegacyCodexComponentBins(binDir: string, platform: LinkPlatform): Promise<void> {
   for (const entry of LEGACY_CODEX_COMPONENT_BINS) {
     const linkPath = join(binDir, platform === "win32" ? `${entry.name}.cmd` : entry.name)
