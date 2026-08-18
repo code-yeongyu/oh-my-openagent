@@ -2,6 +2,7 @@ import { getModelResolutionInfoWithOverrides } from "../../cli/doctor/checks/mod
 import type { OmoConfig } from "../../cli/doctor/checks/model-resolution-types"
 import type { OhMyOpenCodeConfig } from "../../config"
 import { validatePluginConfig } from "../../config/validate"
+import { AGENT_NAME_MAP } from "../../shared/migration"
 import type { RosterRow } from "./state-types"
 
 type ResolutionEntry = {
@@ -65,11 +66,19 @@ function toModelResolutionConfig(config: OhMyOpenCodeConfig): OmoConfig {
   return { agents, categories }
 }
 
+function normalizeAgentName(name: string): string {
+  return (AGENT_NAME_MAP[name.toLowerCase()] ?? AGENT_NAME_MAP[name] ?? name).toLowerCase()
+}
+
 export function resolveRoster(directory: string): RosterRow[] {
   try {
     const config = validatePluginConfig(directory).config
     const resolution = getModelResolutionInfoWithOverrides(toModelResolutionConfig(config))
-    return [...resolution.agents, ...resolution.categories]
+    const disabledAgentNames = new Set((config.disabled_agents ?? []).map(normalizeAgentName))
+    const enabledAgents = resolution.agents.filter(
+      (entry) => !disabledAgentNames.has(normalizeAgentName(entry.name)),
+    )
+    return [...enabledAgents, ...resolution.categories]
       .map(toRosterRow)
       .sort((left, right) => left.label.localeCompare(right.label))
   } catch (error) {

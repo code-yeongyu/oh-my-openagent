@@ -91,6 +91,27 @@ describe("resolveRoster", () => {
     })
   })
 
+  it("#given disabled agent aliases #when resolving roster #then it omits only those agents", () => {
+    withIsolatedConfig("disabled-agents", (root) => {
+      // given
+      const project = join(root, "project")
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          disabled_agents: ["Sisyphus", "Hephaestus (Deep Agent)"],
+        },
+      })
+
+      // when
+      const rows = resolveRoster(project)
+
+      // then
+      expect(rows.some((row) => row.label === "sisyphus")).toBe(false)
+      expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
+      expect(rows.some((row) => row.label === "oracle")).toBe(true)
+      expect(rows.some((row) => row.label === "deep")).toBe(true)
+    })
+  })
+
   it("#given malformed config #when resolving roster #then it still returns resolver rows", () => {
     withIsolatedConfig("malformed", (root) => {
       // given
