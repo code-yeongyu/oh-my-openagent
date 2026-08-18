@@ -1,0 +1,24 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/skills-sync.test.ts:
+(pass) OMO Senpi scoped skill sync > #given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen [8.84ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 20 roots exist with valid names [0.85ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [7.00ms]
+(pass) OMO Senpi scoped skill sync > #given codex-derived and native skill roots #when scanned #then no Codex or multi-agent harness guidance survives [2.91ms]
+(pass) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization and carry no compatibility banner [2.31ms]
+(pass) OMO Senpi scoped skill sync > #given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example [1.04ms]
+(pass) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.17ms]
+(pass) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom [0.62ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [4.47ms]
+(pass) OMO Senpi scoped skill sync > #given ported orchestration skills #when scanned #then no foreign-harness delegation guidance survives [1.20ms]
+(pass) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.09ms]
+
+packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts:
+(pass) shared builtin skill extraction > #given extracted builtin skill markdown #when compared to TS sources #then bodies and metadata stay byte-equivalent [9.44ms]
+(pass) shared builtin skill extraction > #given checked-in frontend builtin skill artifact #when compared to shared source #then it stays byte-equivalent [0.56ms]
+(pass) shared builtin skill extraction > #given shared skill frontmatter #when parsed for Codex #then metadata is valid and budgeted [13.19ms]
+
+ 14 pass
+ 0 fail
+ 199 expect() calls
+Ran 14 tests across 2 files. [1.88s]
