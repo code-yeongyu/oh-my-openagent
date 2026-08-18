@@ -33,7 +33,7 @@ export type KeywordDetector = {
 export const KEYWORD_DETECTORS: KeywordDetector[] = [
   {
     type: "ultrawork",
-    pattern: /\b(ultrawork|ulw)\b/i,
+    pattern: /\b(?:ultrawork|ulw(?!-(?:plan|research)))\b/i,
     message: getUltraworkMessage,
   },
   {
