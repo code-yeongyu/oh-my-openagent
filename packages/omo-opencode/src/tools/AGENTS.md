@@ -47,7 +47,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `team_status` | Full team run status (members, tasks, mailbox) |
 | `team_list` | List declared + active teams |
 
-## DELEGATION CATEGORIES (built-in 8)
+## DELEGATION CATEGORIES (built-in 9)
 
 `task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains live in [`packages/model-core/src/category-model-requirements.ts`](../../../model-core/src/category-model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
@@ -60,7 +60,8 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `quick` | kimi-for-coding/kimi-for-coding-highspeed | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | xai/grok-4.6 (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
 | `unspecified-high` | kimi-for-coding/kimi-k3 (variant: max) | anthropic-categories.ts | High effort fallback |
-| `writing` | kimi-for-coding/kimi-k3 (variant: low) | kimi-categories.ts | Documentation, prose |
+| `writing` | kimi-for-coding/kimi-k3 (variant: low) | kimi-categories.ts | Technical documentation, READMEs, API docs |
+| `non-coding-writing` | kimi-for-coding/kimi-k3 (variant: low) | kimi-categories.ts | Reports, official documents, policy, creative, and product prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 

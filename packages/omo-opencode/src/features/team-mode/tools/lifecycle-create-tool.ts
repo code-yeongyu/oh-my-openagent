@@ -21,7 +21,7 @@ import {
 const TeamCreateInlineMemberToolSchema = tool.schema.object({
   name: tool.schema.string().optional().describe("Member name, kebab-case or natural text; normalized before team creation."),
   kind: tool.schema.enum(["category", "subagent_type"]).optional().describe("Member kind. Use category for category-routed workers, or subagent_type for a specific eligible agent."),
-  category: tool.schema.string().optional().describe("Required for category members unless a fallback category can be inferred. Examples: quick, unspecified-low, unspecified-high, deep, ultrabrain, visual-engineering, writing, artistry, git, data-analysis."),
+  category: tool.schema.string().optional().describe("Required for category members unless a fallback category can be inferred. Examples: quick, unspecified-low, unspecified-high, deep, ultrabrain, visual-engineering, writing, non-coding-writing, artistry, git, data-analysis."),
   subagent_type: tool.schema.string().optional().describe("Required for subagent_type members. Eligible examples: sisyphus, atlas, sisyphus-junior."),
   prompt: tool.schema.string().optional().describe("Task prompt for this member. Category members need a concrete work prompt."),
   systemPrompt: tool.schema.string().optional().describe("Legacy alias for prompt; normalized before team creation."),

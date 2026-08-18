@@ -196,6 +196,16 @@ describe("sisyphus-task", () => {
       expect(category.model).toBe("kimi-for-coding/k3")
       expect(category.variant).toBe("max")
     })
+
+    test("non-coding-writing category uses Kimi K3 low as prose primary", () => {
+      // given
+      const category = DEFAULT_CATEGORIES["non-coding-writing"]
+
+      // when / #then
+      expect(category).toBeDefined()
+      expect(category.model).toBe("kimi-for-coding/k3")
+      expect(category.variant).toBe("low")
+    })
   })
 
   describe("CATEGORY_DESCRIPTIONS", () => {
@@ -3685,7 +3695,7 @@ describe("sisyphus-task", () => {
       const availableCategories = [
         {
           name: "writing",
-          description: "Documentation, prose, technical writing",
+          description: "Technical documentation, READMEs, API docs, docstrings, and developer guides",
           model: "kimi-for-coding/k3",
         },
       ]

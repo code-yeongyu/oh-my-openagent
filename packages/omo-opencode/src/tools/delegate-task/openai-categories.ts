@@ -129,7 +129,7 @@ You are working on tasks that don't fit specific categories but require moderate
 
 <Selection_Gate>
 BEFORE selecting this category, VERIFY ALL conditions:
-1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
+1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (technical docs), non-coding-writing (prose-first documents)
 2. Task requires more than trivial effort but is NOT system-wide
 3. Scope is contained within a few files/modules
 
