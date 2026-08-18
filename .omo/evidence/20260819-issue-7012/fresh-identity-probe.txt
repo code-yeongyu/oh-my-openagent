@@ -1,0 +1,24 @@
+Command:
+npx --yes bun@1.3.12 .omo/evidence/20260819-issue-7012/fresh-identity-probe.mts
+
+Observed (exit 0):
+{
+  "status": "pass",
+  "xdgDataHomeExistedBeforeRepoInit": false,
+  "runtimeDirsExistedBefore": false,
+  "runtimeDirsExistAfter": true,
+  "forcedLinuxSandboxWasSandboxed": true,
+  "hasCanonicalReflectionSessionsGrant": true,
+  "allTouchedPathsWithinSandbox": true,
+  "realUserHomeReadOrWritten": false,
+  "cleanup": {
+    "temporarySandboxRemoved": true,
+    "xdgEnvironmentRestored": true,
+    "spawnedProcesses": 0
+  }
+}
+
+The driver starts with a non-existent temporary XDG data home, initializes only the identity repository, invokes the production identity runtime's first lazy sandbox path, and then forces the production path-sandbox builder through its Linux canonicalization branch. It proves reflection-sessions was materialized and granted canonically without touching the real user home.
+
+Sanitization:
+The temporary directory name and all host paths are omitted. No credentials or environment values are recorded.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -16,6 +16,58 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
+  test(
+    "#given a fresh identity with no runtime directories #when the first reflection sandbox is constructed #then identity runtime directories exist before use",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-fresh-"))
+      roots.push(root)
+      const paths = buildIdentityPaths(root, "agent-fresh")
+      await mkdir(paths.repo, { recursive: true })
+      const identity = createMemoryIdentityContext({
+        identity: "agent-fresh",
+        identityPaths: paths,
+        binding: { identity: "agent-fresh", repoPathHash: "hash", boundAt: 1 },
+      })
+      const runtime = createIdentityRuntime(identity, {
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        resolveModelRegistry: () => undefined,
+        resolveAgentDir: () => root,
+      })
+      const sandbox = (runtime.runner as unknown as { options: { sandbox: ReflectionSandbox } }).options.sandbox
+
+      // when
+      await sandbox({
+        runId: "reflection-run-fresh",
+        attempt: 1,
+        hardDeadlineAt: Date.now() + 10_000,
+        category: "quick",
+        conversationIds: ["conversation-a"],
+        model: "fixture/model",
+        command: process.execPath,
+        args: [],
+        cwd: paths.worktrees,
+        env: { PATH: process.env.PATH ?? "" },
+        detached: true,
+        paths: {
+          sessionDir: paths.reflectionSessions,
+          worktree: paths.worktrees,
+          gitCommonDir: paths.repo,
+          transcript: join(paths.transcripts, "transcript.json"),
+          persona: join(paths.reflectionSessions, "persona.md"),
+          prompt: join(paths.reflectionSessions, "prompt.md"),
+        },
+      })
+
+      // then
+      expect(existsSync(paths.reflectionSessions)).toBe(true)
+      expect(existsSync(paths.worktrees)).toBe(true)
+      expect(existsSync(paths.transcripts)).toBe(true)
+    },
+    30_000,
+  )
+
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger",
     async () => {

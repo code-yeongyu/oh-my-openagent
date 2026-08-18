@@ -1,0 +1,17 @@
+Senpi package typecheck:
+npx --yes bun@1.3.12 run --cwd packages/omo-senpi typecheck
+
+Observed: exit 0 (`tsgo --noEmit -p tsconfig.json`).
+
+Targeted production-entry build:
+npx --yes bun@1.3.12 build packages/omo-senpi/src/components/memory/identity-runtime.ts --target=node --format=esm --packages=external --outfile=.omo/evidence/20260819-issue-7012/identity-runtime-build.mjs
+
+Observed: exit 0; 56 modules bundled in 32 ms; output size 143,310 bytes. The temporary build product was removed after the successful build (`BUILD_ARTIFACT_REMOVED=True`).
+
+Broader diagnostic sweep:
+npx --yes bun@1.3.12 test packages/omo-senpi/src/components/memory
+
+Observed before the sweep was stopped: the changed identity-runtime test and all reached reflection/sandbox tests passed. Two unrelated diagnostics failed outside the touched paths: a Windows symlink setup raised EPERM in guard.test.ts, and memory-usage-wiring.test.ts did not persist its expected fixture entry even when rerun alone. These diagnostics are reported but are not used to claim the scoped gate passed.
+
+Sanitization:
+No credentials, environment dumps, or user-home paths are included.

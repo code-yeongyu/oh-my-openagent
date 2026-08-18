@@ -1,0 +1,30 @@
+Focused regression command:
+npx --yes bun@1.3.12 test packages/omo-senpi/src/components/memory/identity-runtime.test.ts --test-name-pattern "fresh identity"
+
+Observed after production fix (exit 0):
+- 1 pass
+- 4 filtered out
+- 0 fail
+- 3 expect() calls
+- The fresh-identity test passed and confirmed reflection-sessions, worktrees, and transcripts exist after the first lazy sandbox invocation.
+
+Related focused command:
+npx --yes bun@1.3.12 test packages/omo-senpi/src/components/memory/identity-runtime.test.ts packages/omo-senpi/src/components/memory/context.test.ts
+
+Observed (exit 0):
+- 3 pass
+- 4 platform skips (real sandbox tests are Darwin/Linux-only)
+- 0 fail
+- 17 expect() calls
+
+Sandbox regression command:
+npx --yes bun@1.3.12 test packages/omo-senpi/src/components/memory/sandbox.test.ts packages/omo-senpi/src/components/memory/sandbox-facts.test.ts packages/omo-senpi/src/components/memory/sandbox-lock-invariants.test.ts
+
+Observed (exit 0):
+- 17 pass
+- 6 platform skips
+- 0 fail
+- 49 expect() calls
+
+Sanitization:
+No credentials, environment dumps, or user-home paths are included.

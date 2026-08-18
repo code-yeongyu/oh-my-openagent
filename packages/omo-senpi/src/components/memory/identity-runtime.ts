@@ -12,7 +12,7 @@ import type { SenpiModelRegistryPort, SenpiModelPort } from "@oh-my-opencode/sen
 import type { ComponentLogger } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import type { MemoryIdentityContext } from "./context"
+import { ensureIdentityRuntimeDirs, type MemoryIdentityContext } from "./context"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import {
   resolveAgentReflectionSettings,
@@ -78,8 +78,9 @@ export function createIdentityRuntime(
 
   let builtSandbox: SandboxTransform | undefined
   const resolveAgentDir = deps.resolveAgentDir ?? (() => resolveAgentHome({ env: process.env }))
-  const lazySandbox = (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs => {
+  const lazySandbox = async (spawnArgs: ReflectionSpawnArgs): Promise<ReflectionSpawnArgs> => {
     if (builtSandbox === undefined) {
+      await ensureIdentityRuntimeDirs(identity.identityPaths)
       builtSandbox = buildSandboxTransform({
         policy: reflection.sandbox as SandboxPolicy,
         worktreeDir: identity.identityPaths.worktrees,
