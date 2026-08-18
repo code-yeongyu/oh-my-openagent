@@ -116,7 +116,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   ]
   const launch = input.senpiCommand === undefined
     ? resolveSenpiLaunch(input.env)
-    : { command: input.senpiCommand, prefixArgs: [] }
+    : { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
   return {
     runId: input.run.runId,
     attempt: input.attempt ?? 1,
