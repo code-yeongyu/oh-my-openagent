@@ -155,6 +155,9 @@ export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnIn
   if (parentSessionFile === undefined) {
     throw new Error("fork-mode reflection requires the parent session file")
   }
+  const launch = input.senpiCommand === undefined
+    ? resolveSenpiLaunch(input.env)
+    : { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
   const args = [
     "-p",
     "--fork", parentSessionFile,
@@ -166,7 +169,8 @@ export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnIn
   return {
     ...base,
     fork: { parentSessionFile },
-    args,
+    command: launch.command,
+    args: [...launch.prefixArgs, ...args],
     cwd: input.parentCwd ?? base.cwd,
   }
 }
