@@ -2,6 +2,7 @@ import { loadSenpiOmoConfig } from "../config-resolution"
 import {
   TEAM_LEAD_SENTINEL,
   buildLeadTeamTools,
+  createCallDshAgentTool,
   createLeadDeliveryJournal,
   createTaskCancelTool,
   createTaskOutputTool,
@@ -12,6 +13,7 @@ import {
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
+  DshRunner,
   type LeadDeliveryJournal,
   type SkillLoader,
   type TaskSendTeamRouting,
@@ -200,6 +202,9 @@ function registerTaskTools(
       loadSkills: engine.loadSkills,
       resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
+  })
+  pi.registerTool({
+    ...createCallDshAgentTool({ runner: new DshRunner() }),
   })
   pi.registerTool({
     ...createTaskSendTool({

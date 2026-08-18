@@ -36,6 +36,14 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 
 `task` is spawn-only. It accepts either one `prompt` or a non-empty `tasks:[...]` batch; synchronous batches aggregate every child result, while background batches return item ids and queue positions. Steer, resident-session revival, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child status/transcript peeks go through `task_output`.
 
+### Standalone spawn tool (1, host-gated)
+
+| Tool | Factory | File |
+|------|---------|------|
+| `call_dsh_agent` | `createCallDshAgentTool` | `tools/dsh-agent/tool.ts` (`CALL_DSH_AGENT_TOOL_NAME`) |
+
+`call_dsh_agent` is a one-shot DeepSeek Harness executor, independent of the task state machine: it spawns `dsh --profile headless` (or an ACP server child) per run, forwards the prompt, and returns the committed text, with an optional deterministic verification gate (`verify`). The runner and its primitives live in `runners/dsh/` (`DshRunner` wraps `runDshAcpAgent`/`runDshHeadless`/`runVerificationGate`/`resolveDshAuth`). Auth resolution: explicit `DEEPSEEK_*` env wins, then the engine credential accessor (`getApiKeyForProvider`), then the native `<agentDir>/auth.json` (`type: "api_key"`, legacy `"api"` also accepted). It is registered alongside the task/team family by the host (omo-senpi registers it in the task component) and never touches the record store.
+
 ### Team tools (6, lead-only)
 
 `buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`. Child/member sessions never receive the lead family. Each process member loads the bundled member extension in-child and receives only team-scoped `task_send`; lead mail is steered into the resident member's running turn. It never receives lead lifecycle or tasklist tools.

@@ -106,6 +106,8 @@ export {
   isTaskOrTeamFamilyTool,
   mergeChildCustomTools,
 } from "./runners"
+export { DshRunner } from "./runners"
+export type { DshRunRequest, DshRunOutcome, DshRunnerOptions } from "./runners"
 export type {
   ChildHandle,
   ChildSession,
@@ -508,3 +510,6 @@ export type {
 } from "./team"
 
 export * from "./tools/team"
+export { CALL_DSH_AGENT_TOOL_NAME, createCallDshAgentTool } from "./tools/dsh-agent"
+export { CallDshAgentParams } from "./tools/dsh-agent"
+export type { CallDshAgentDeps, CallDshAgentDetails, CallDshAgentParamsStatic } from "./tools/dsh-agent"
