@@ -26,7 +26,7 @@ type TimerHandle = ReturnType<typeof setTimeout> | number
 // The manager read-seam the footer/widget need: a session-scoped task list. Matches TaskManager.list.
 export interface StatusUiManager {
   list(scope: ListScope): readonly ListedTask[]
-  // The public live-handle seam. Optional preserves the narrow list-only seam used by legacy tests.
+  // The public live-handle seams. Optional preserves the narrow list-only seam used by legacy tests.
   residentTaskIds?(): readonly string[]
   wasBackground?(taskId: string): boolean
   subscribeChild?(taskId: string, listener: (event: ManagedChildEvent) => void): () => void

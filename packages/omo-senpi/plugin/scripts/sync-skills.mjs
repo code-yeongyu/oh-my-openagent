@@ -4,6 +4,7 @@ import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createNativeSkillSources } from "./native-skill-sources.mjs"
 import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
+import { applySenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = dirname(dirname(pluginRoot))
@@ -187,7 +188,7 @@ function insertAfterFrontmatter(content, section) {
 }
 
 function applySharedTierAdaptation(skillName, content) {
-  let adapted = content
+  let adapted = applySenpiSkillRosterOverlay(skillName, content)
   if (skillName === "start-work") {
     adapted = applyStartWorkOverlay(adapted)
   }

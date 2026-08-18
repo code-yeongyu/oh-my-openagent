@@ -59,6 +59,40 @@ describe("runMemoryModelAttempts", () => {
     expect(result.candidate.model).toBe("builtin/fallback")
   })
 
+  test("#given a provider cooldown 503 #when a fallback exists #then it retries the fallback instead of failing the run", async () => {
+    // given
+    const attempted: string[] = []
+
+    // when
+    const result = await runMemoryModelAttempts(candidates, async (candidate) => {
+      attempted.push(candidate.model)
+      return candidate.model === "extension-only/primary"
+        ? child({ stderr: '503: {"message":"All providers are temporarily cooling down"}' })
+        : child({ code: 0 })
+    })
+
+    // then
+    expect(attempted).toEqual(["extension-only/primary", "builtin/fallback"])
+    expect(result.candidate.model).toBe("builtin/fallback")
+    expect(result.child.code).toBe(0)
+  })
+
+  test("#given a billing exhaustion failure #when a fallback exists #then it does not burn the chain", async () => {
+    // given
+    const attempted: string[] = []
+
+    // when
+    const result = await runMemoryModelAttempts(candidates, async (candidate) => {
+      attempted.push(candidate.model)
+      return child({ stderr: "Error: quota exceeded for this organization" })
+    })
+
+    // then
+    expect(attempted).toEqual(["extension-only/primary"])
+    expect(result.candidate.model).toBe("extension-only/primary")
+    expect(result.child.code).toBe(1)
+  })
+
   test("#given every candidate has a retryable model or auth miss #when the chain is exhausted #then every candidate and cause are carried by a typed signal", async () => {
     // given
     const allMissing: MemoryModelChain = [

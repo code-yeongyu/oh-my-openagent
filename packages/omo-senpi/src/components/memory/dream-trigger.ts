@@ -1,7 +1,7 @@
-// Dream trigger wiring (plan todo 12): opportunistic dream launches from idle, shutdown, and
-// manual origins. Automatic origins (idle, shutdown) pass three gates - dream.enabled,
-// min_hours_between since the last completed dream, and the unreflected-volume floor - while the
-// manual origin bypasses all three (letta manual-unconditional parity); todo 14 owns the manual
+// Dream trigger wiring (plan todo 12): opportunistic dream launches from idle, shutdown,
+// pressure, and manual origins. Transcript-driven automatic origins (idle, shutdown) pass three
+// gates - dream.enabled, min_hours_between, and the unreflected-volume floor. Pressure shares the
+// first two gates but bypasses transcript volume, while manual bypasses all three; todo 14 owns the manual
 // call site, this module ships the bypass path. The idle detector is an in-extension timer armed
 // on agent_settled, reset by input/agent_start/session_compact, and cancelled by
 // session_shutdown/session_abort; it fires only while the host still reports idle with no pending
@@ -83,6 +83,8 @@ export interface DreamTriggerWiring {
   shutdownEvaluator(): ShutdownEvaluator
   /** Manual entrypoint for todo 14's /dream. Bypasses every automatic gate. */
   requestManualDream(request?: ManualDreamRequest): Promise<DreamFireOutcome>
+  /** Status-refresh entrypoint for system-token pressure; bypasses idle and transcript-volume gates. */
+  requestPressureDream(sessionId: string): Promise<DreamFireOutcome>
   /** Resolves once every fire started so far has finished. */
   whenIdle(): Promise<void>
 }
@@ -92,7 +94,7 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
   const scheduler = options.scheduler ?? defaultScheduler
   const timers = new Map<string, { readonly handle: unknown; readonly eventCtx: unknown }>()
   const inFlight = new Set<Promise<void>>()
-  const launch = (session: DreamTriggerSession, origin: "idle" | "shutdown" | "manual", request: ManualDreamRequest & {
+  const launch = (session: DreamTriggerSession, origin: "idle" | "shutdown" | "manual" | "pressure", request: ManualDreamRequest & {
     readonly signal?: AbortSignal
     readonly deadlineAt?: number
   }) =>
@@ -176,6 +178,12 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
       const session = options.resolveActiveSession()
       if (session === undefined) return { fired: false, rejection: "no_session" }
       return launch(session, "manual", request)
+    },
+
+    async requestPressureDream(sessionId: string): Promise<DreamFireOutcome> {
+      const session = options.resolveSessionById(sessionId)
+      if (session === undefined) return { fired: false, rejection: "no_session" }
+      return launch(session, "pressure", {})
     },
 
     async whenIdle(): Promise<void> {

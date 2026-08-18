@@ -1,0 +1,44 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/status-row-format.test.ts:
+(pass) buildWidgetRows > #given active and completed records #when selecting rows #then only resident team members follow active rows before the cap [1.39ms]
+(pass) buildWidgetRows > #given an active task #when building a row #then useful identity and execution context remain [0.16ms]
+(pass) buildWidgetRows > #given a 137-column active task #when building its widget row #then it remains one physical line [0.18ms]
+(pass) task_summary identity > #given a record with a task_summary #when building the widget row #then the summary leads over name and description [0.12ms]
+(pass) task_summary identity > #given a record with a task_summary #when formatting the full row #then the summary is the identity [4.15ms]
+(pass) backgroundWidgetRows > #given a wide terminal #when a live task row renders #then the longer summary and adjacent metadata remain visible [1.13ms]
+(pass) backgroundWidgetRows > #given a narrow terminal #when a live task row renders #then it stays on one bounded physical line [0.23ms]
+(pass) suspended residency labeling > #given a persisted_only record #when formatting a full row #then the status shows suspended [0.09ms]
+(pass) suspended residency labeling > #given an rpc_detached record #when formatting a full row #then the status shows suspended [0.07ms]
+(pass) suspended residency labeling > #given a resident record #when formatting a full row #then the status label is unchanged (regression pin) [0.07ms]
+(pass) suspended residency labeling > #given a persisted_only record #when building a widget row #then it contains suspended [0.09ms]
+(pass) suspended residency labeling > #given an rpc_detached record #when building a widget row #then it contains suspended [0.09ms]
+(pass) suspended residency labeling > #given a persisted_only record #when building a background widget row #then it contains suspended [0.15ms]
+(pass) formatTaskRow > #given resolved category metadata #when formatting #then the unified target carries the model and effort [0.08ms]
+(pass) formatTaskRow > #given a description #when formatting #then the human label leads [0.08ms]
+(pass) formatTaskRow > #given no resolved model #when formatting #then raw model remains [0.07ms]
+(pass) formatTaskRow > #given empty resolved detail labels #when formatting #then they are omitted [0.08ms]
+(pass) formatTaskRow > #given matching reasoning and variant #when formatting #then the effort renders once inside the target [0.08ms]
+(pass) formatTaskRow > #given malformed running progress #when formatting #then the excerpt is width-safe [0.13ms]
+
+packages/omo-senpi/src/components/task/status-ui-background.test.ts:
+(pass) createTaskStatusUi.background progress > #given a completed resident team member #when syncing #then its settled row remains without a refresh timer [0.46ms]
+(pass) createTaskStatusUi.background progress > #given an idle parent with a running background task #when time advances quietly #then live status refreshes [0.39ms]
+(pass) createTaskStatusUi.background progress > #given a live refresh timer #when the final background task completes #then the timer stops [0.20ms]
+(pass) createTaskStatusUi.background progress > #given two background children #when latest events arrive #then rows show identity, model, stats, activity, and elapsed time [0.57ms]
+
+packages/omo-senpi/src/components/task/status-ui.test.ts:
+(pass) createTaskStatusUi.syncNow > #given a list-only manager #when a static running row renders #then no animation timer starts [0.31ms]
+(pass) createTaskStatusUi.syncNow > #given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session [0.12ms]
+(pass) createTaskStatusUi.syncNow > #given controls across a stale malformed running record #when syncing #then rows sanitize controls without damaging CJK [0.18ms]
+(pass) createTaskStatusUi.syncNow > #given no captured ui context #when syncing #then it is a no-op [0.06ms]
+(pass) createTaskStatusUi.syncNow > #given a non-tui mode #when syncing #then UI is skipped [0.07ms]
+(pass) createTaskStatusUi.syncNow > #given a completed non-resident team record #when syncing #then the stale widget row is cleared [0.07ms]
+(pass) createTaskStatusUi.scheduleSync > #given a just-started background child #when scheduling #then it subscribes before debounce fires [0.10ms]
+(pass) createTaskStatusUi.scheduleSync > #given several rapid schedule calls #when debounce fires #then syncNow runs once [0.12ms]
+(pass) createTaskStatusUi.scheduleSync > #given a pending debounce #when disposed #then the timer clears without rendering [0.10ms]
+
+ 32 pass
+ 0 fail
+ 105 expect() calls
+Ran 32 tests across 3 files. [857.00ms]

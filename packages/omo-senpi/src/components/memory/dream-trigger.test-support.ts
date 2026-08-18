@@ -78,6 +78,7 @@ export interface Fixture {
   readonly eventCtx: unknown
   readonly wiring: ReturnType<typeof createDreamTriggerWiring>
   readonly identity: MemoryIdentity
+  readonly session: DreamTriggerSession
 }
 
 export async function fixture(options: {
@@ -138,7 +139,7 @@ export async function fixture(options: {
   })
   const pi = new FakeExtensionAPI()
   wiring.register(pi)
-  return { pi, scheduler, store, launches, idleState, eventCtx, wiring, identity }
+  return { pi, scheduler, store, launches, idleState, eventCtx, wiring, identity, session }
 }
 
 export async function writeConversation(transcriptsDir: string, conversationId: string, text: string): Promise<void> {

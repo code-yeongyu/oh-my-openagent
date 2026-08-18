@@ -1,0 +1,8 @@
+(pass) createTaskStatusUi.scheduleSync > #given a just-started background child #when scheduling #then it subscribes before debounce fires [0.12ms]
+(pass) createTaskStatusUi.scheduleSync > #given several rapid schedule calls #when debounce fires #then syncNow runs once [0.15ms]
+(pass) createTaskStatusUi.scheduleSync > #given a pending debounce #when disposed #then the timer clears without rendering [0.10ms]
+
+ 370 pass
+ 0 fail
+ 1031 expect() calls
+Ran 370 tests across 54 files. [22.52s]

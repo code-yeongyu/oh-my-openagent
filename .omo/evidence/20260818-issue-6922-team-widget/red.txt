@@ -1,0 +1,15 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/status-row-format.test.ts:
+44 |     const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
+45 |     const stale = record({ task_id: "st_stale", name: "team:12345678-1234-1234-1234-123456789abc:stale", task_summary: "stale member", status: "completed" })
+46 |     const active = Array.from({ length: 4 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
+47 |     const rows = buildWidgetRows([alpha, ordinary, stale, ...active, beta], new Set([alpha.task_id, beta.task_id, ordinary.task_id]))
+48 |     expect(rows.slice(0, 4).every((row) => row.includes("running"))).toBe(true)
+49 |     expect(rows[4]).toContain("settled alpha")
+                         ^
+error: Received value must be an array type, or both received and expected values must be strings.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-6922-team-widget/packages/omo-senpi/src/components/task/status-row-format.test.ts:49:21)
+(fail) buildWidgetRows > #given active and completed records #when selecting rows #then only resident team members follow active rows before the cap [1.29ms]
+Ran 1 test across 1 file. [1290.00ms]
+Bailed out after 1 failure

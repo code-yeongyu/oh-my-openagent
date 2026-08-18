@@ -48,8 +48,24 @@ export type DagSchedulerOptions = {
   readonly executionMode?: Omit<DagExecutionModeSources, "route">
   readonly ancestry?: { readonly depth: number }
   readonly subscriberRing?: number
+  readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly now?: () => number
 }
+
+// Harness-injected gate for agent-routed nodes, evaluated once per admission before startOwned:
+// the dag path must honor the same spawn restrictions (plan gate, prompt contracts) as direct
+// task spawns instead of bypassing them through the scheduler.
+export type DagNodeSpawnPolicyVerdict =
+  | { readonly kind: "allow" }
+  | { readonly kind: "deny"; readonly message: string }
+  | { readonly kind: "force"; readonly prompt: string }
+
+export type DagNodeSpawnPolicy = (node: {
+  readonly nodeId: DagNodeId
+  readonly subagentType: string
+  readonly prompt: string
+  readonly parentSessionId: string
+}) => DagNodeSpawnPolicyVerdict
 
 export type DagScheduler = {
   readonly run: () => Promise<DagRunRecordV1>
@@ -96,6 +112,7 @@ type SchedulerContext = {
   readonly definitionNodes: ReadonlyMap<DagNodeId, DagPersistedNode>
   readonly executionMode?: Omit<DagExecutionModeSources, "route">
   readonly ancestry?: { readonly depth: number }
+  readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly now: () => number
   readonly pendingErrors: Map<DagNodeId, DagNodeError>
   readonly pendingTerminalResults: Map<DagNodeId, PendingTerminalResult>
@@ -135,6 +152,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     definitionNodes: new Map(options.initialRecord.definition.nodes.map((node) => [node.id as DagNodeId, node])),
     ...(options.executionMode === undefined ? {} : { executionMode: options.executionMode }),
     ...(options.ancestry === undefined ? {} : { ancestry: options.ancestry }),
+    ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     now,
     pendingErrors,
     pendingTerminalResults,
@@ -545,7 +563,7 @@ function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSp
   const node = nodeById(record, nodeId)
   const persisted = context.definitionNodes.get(nodeId)
   if (persisted === undefined) throw new Error(`missing persisted definition for DAG node "${nodeId}"`)
-  return {
+  const spec: ManagerStartSpec = {
     prompt: persisted.effectivePrompt,
     ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
     parent_session_id: record.parentSessionId,
@@ -567,6 +585,19 @@ function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSp
     ...(persisted.description === undefined ? {} : { description: persisted.description }),
     run_in_background: true,
   }
+  if (node.route.kind !== "category" && context.nodeSpawnPolicy !== undefined) {
+    const verdict = context.nodeSpawnPolicy({
+      nodeId,
+      subagentType: node.route.agent,
+      prompt: spec.prompt,
+      parentSessionId: record.parentSessionId,
+    })
+    if (verdict.kind === "deny") {
+      throw new Error(`DAG node "${nodeId}" denied by spawn policy: ${verdict.message}`)
+    }
+    if (verdict.kind === "force") return { ...spec, prompt: verdict.prompt }
+  }
+  return spec
 }
 
 function owner(context: SchedulerContext, nodeId: DagNodeId) {

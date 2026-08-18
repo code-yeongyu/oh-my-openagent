@@ -84,9 +84,9 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
     const runBlock = job.slice(job.indexOf("      - name: Run tests"))
 
-    expect(runBlock).toContain('if: runner.os != \'Windows\'')
-    expect(runBlock).toContain("if: matrix.shard == '1/2'")
-    expect(runBlock).toContain("if: matrix.shard == '2/2'")
+    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows'")
+    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2'")
+    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '2/2'")
     expect(runBlock).not.toContain("shell: bash\n        run: |")
     expect(job).toContain("timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}")
   })
@@ -97,6 +97,6 @@ describe("root test CI partition", () => {
     const cacheEnd = job.indexOf("      - name: Install dependencies", cacheStart)
     const cacheStep = job.slice(cacheStart, cacheEnd)
 
-    expect(cacheStep).toContain("if: runner.os != 'Windows'")
+    expect(cacheStep).toContain("if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true'")
   })
 })

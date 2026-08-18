@@ -1,0 +1,26 @@
+Probe: validatePluginConfig with TOP-LEVEL agents.*.permission (omo.jsonc user layer)
+
+$ bun run pipeline-probe (packages/omo-opencode, config: {agents:{sisyphus:{permission:{task:"ask"}},...}})
+valid: false
+messages: [
+  "../../../../../tmp/omo-6990-probe-home/.omo/omo.jsonc: Invalid omo config at /tmp/omo-6990-probe-home/.omo/omo.jsonc: agents.sisyphus, agents.atlas, agents.hephaestus, agents.prometheus"
+]
+agents: undefined
+=> The strict shared schema (packages/omo-config-core/src/schema/agent.ts, OmoAgentDefInputSchema .strict(), no permission key) rejects it; the whole agents section is dropped with a diagnostic.
+
+Probe: validatePluginConfig with [opencode] harness block (same permission values)
+
+$ bun run pipeline-probe (config: {"[opencode]":{agents:{sisyphus:{permission:{task:"ask"}},...}}})
+valid: true
+messages: []
+agents perms: {"sisyphus":{"task":"ask"},"hephaestus":{"task":"ask"},"prometheus":{"task":"ask"},"atlas":{"task":"ask"}}
+=> The harness block is freeform to the core schema and validates against the plugin's AgentOverridesSchema, which accepts permission.task as the ask|allow|deny enum.
+
+Probe: plugin schema directly
+
+$ bun run schema-probe (OhMyOpenCodeConfigSchema.safeParse({agents:{sisyphus:{permission:{task:"ask"}}}}))
+success: true
+parsed agents.sisyphus: {"sisyphus":{"permission":{"task":"ask"}}}}
+
+Runtime serve log (top-level form) for reference:
+[config-migration] legacy configuration changes were not applied: Migration validation failed for <sandbox>/home/.omo/omo.jsonc: agents.sisyphus: Unrecognized key: "permission"

@@ -1,5 +1,8 @@
 export function reflectionRemediation(reason: string | undefined, detail: string | undefined): string {
   const combined = `${reason ?? ""} ${detail ?? ""}`.toLowerCase()
+  if (combined.includes("budget_not_met")) {
+    return "run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET"
+  }
   // Pre-spawn resolution failure: no child ever ran, so never point at child-stderr.log here.
   if (combined.includes("category_unavailable") || combined.includes("could not resolve a usable model")) {
     return "no connected provider offers a model for the memory reflection category; run /login <provider>, or pin categories.<category>.model (or memory.reflection.category) in omo.json"

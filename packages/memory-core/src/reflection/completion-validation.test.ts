@@ -4,6 +4,7 @@ import { readFile, rm, writeFile, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
+import { validateDreamTokenBudget } from "./completion-validation"
 import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree"
 
 const roots: string[] = []
@@ -23,6 +24,33 @@ afterEach(async () => {
 })
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+
+describe("dream token budget completion validation", () => {
+  it("#given a pressure dream whose merged system estimate remains at target #when validated #then budget_not_met is recorded", () => {
+    expect(validateDreamTokenBudget({ origin: "pressure", totalTokens: 80, targetTokens: 80 })).toEqual({
+      status: "budget_not_met",
+      totalTokens: 80,
+      targetTokens: 80,
+      detail: "Committed system/ estimate is 80 tokens; pressure dream target is below 80 tokens",
+    })
+  })
+
+  it("#given a pressure dream below target #when validated #then the estimate is clean", () => {
+    expect(validateDreamTokenBudget({ origin: "pressure", totalTokens: 79, targetTokens: 80 })).toEqual({
+      status: "valid",
+      totalTokens: 79,
+      targetTokens: 80,
+    })
+  })
+
+  it("#given a non-pressure dream above target #when validated #then the estimate is reported without failing", () => {
+    expect(validateDreamTokenBudget({ origin: "manual", totalTokens: 120, targetTokens: 80 })).toEqual({
+      status: "valid",
+      totalTokens: 120,
+      targetTokens: 80,
+    })
+  })
+})
 
 describe("reflection completion validation", () => {
   it("#given an uncommitted worktree edit #when finalized #then it reports dirty_uncommitted and cleans up", async () => {

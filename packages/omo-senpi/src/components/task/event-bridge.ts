@@ -4,7 +4,7 @@ import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
-import { wireReloadGuard } from "./reload-guard"
+import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge } from "./task-rpc-bridge"
@@ -16,6 +16,8 @@ type EventBridgeState = {
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
+  // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
+  readonly dagReloadSource?: ReloadGuardDagSource
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -35,7 +37,7 @@ export function wireEventBridge(
   const guidanceGuard = createOncePerSessionGuard()
   const taskRpc = wireTaskRpcBridge(pi, engine)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
-  wireReloadGuard(pi, engine.manager)
+  wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))

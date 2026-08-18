@@ -375,3 +375,57 @@ describe("dag tool cancel action", () => {
     expect(cancelled).toEqual([])
   })
 })
+
+describe("dag tool start warnings", () => {
+  test("#given a definition violating the node prompt contract #when start runs #then the run starts AND the result carries advisory warnings", async () => {
+    // given
+    const { manager } = fixture()
+    const violating = definition({
+      nodes: [
+        { id: "plan", prompt: "draft the plan", category: "quick" },
+        { id: "build", prompt: "build it", category: "quick", dependsOn: ["plan"] },
+      ],
+    })
+
+    // when
+    const result = await runDagTool(deps(manager), { action: "start", definition: violating })
+
+    // then
+    expect(result.details.kind).toBe("started")
+    if (result.details.kind !== "started") throw new Error("Expected start to succeed with warnings")
+    expect(result.details.warnings).toBeDefined()
+    expect(result.details.warnings?.some((warning) => warning.includes('"plan"') && warning.includes("TASK:"))).toBe(true)
+    expect(result.details.warnings?.some((warning) => warning.includes("verification"))).toBe(true)
+    const text = result.content[0]
+    if (text?.type !== "text") throw new Error("Expected text content")
+    expect(text.text).toContain("warning")
+  })
+
+  test("#given a contract-complete definition #when start runs #then warnings are empty", async () => {
+    // given
+    const { manager } = fixture()
+    const compliant = definition({
+      nodes: [
+        {
+          id: "plan",
+          prompt: "TASK: draft the plan. DELIVERABLE: plan.md. SCOPE: write plan.md only. VERIFY: test -f plan.md. STOP WHEN: plan.md exists.",
+          category: "quick",
+        },
+        {
+          id: "verify",
+          prompt: "TASK: verify the plan. DELIVERABLE: verification transcript. SCOPE: read-only. VERIFY: bun test. STOP WHEN: tests pass.",
+          category: "quick",
+          dependsOn: ["plan"],
+        },
+      ],
+    })
+
+    // when
+    const result = await runDagTool(deps(manager), { action: "start", definition: compliant })
+
+    // then
+    expect(result.details.kind).toBe("started")
+    if (result.details.kind !== "started") throw new Error("Expected start to succeed")
+    expect(result.details.warnings).toEqual([])
+  })
+})

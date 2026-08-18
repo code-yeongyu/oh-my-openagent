@@ -11,6 +11,7 @@ import {
   type ReflectionCompletionSummary,
   type ReflectionLaunchedEntry,
 } from "./completion-contracts"
+import { reflectionRemediation } from "./remediation"
 import {
   detailExcerpt,
   joinFields,
@@ -74,6 +75,9 @@ export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletion
   const detail = optionalRendererText(record.detail)
   const model = optionalRendererText(record.model)
   const thinking = optionalRendererText(record.thinking)
+  const budgetRemediation = record.reason === "budget_not_met"
+    ? reflectionRemediation(record.reason, record.detail)
+    : undefined
   const payoff = joinFields([
     record.filesChanged !== undefined && record.filesChanged > 0
       ? `${record.filesChanged} file${record.filesChanged === 1 ? "" : "s"} changed`
@@ -82,6 +86,7 @@ export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletion
     record.durationMs === undefined ? undefined : `took ${formatDuration(record.durationMs)}`,
     reason === undefined ? undefined : `reason ${reason}`,
     detail === undefined ? undefined : detailExcerpt(detail),
+    budgetRemediation,
   ])
   return noticeComponent(
     {

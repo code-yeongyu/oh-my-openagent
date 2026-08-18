@@ -234,6 +234,28 @@ describe("SenpiSubprocessRunner integration", () => {
     await assertWorktreesClean(item)
   }, 60_000)
 
+  test("#given the primary model's providers are all cooling down #when the child dies with a 503 #then reflection relaunches on the next candidate and merges", async () => {
+    // given
+    const item = await harness({ childMode: "provider-cooldown" })
+
+    // when
+    const result = await item.runner.launch(item.run)
+
+    // then
+    expect(result.outcome).toBe("merged")
+    expect(item.spawnCalls.map((spawn) => spawn.args[spawn.args.indexOf("--model") + 1])).toEqual([
+      "extension-only/primary",
+      "kimi-coding/fallback",
+    ])
+    expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
+    expect(result.completion).toMatchObject({
+      model: "kimi-coding/fallback",
+      thinking: "minimal",
+      outcome: "merged",
+    })
+    await assertWorktreesClean(item)
+  }, 60_000)
+
   test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then only the fresh verdict fails closed", async () => {
     // given
     const item = await harness({

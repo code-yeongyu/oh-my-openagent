@@ -1,0 +1,37 @@
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   bun@1.3.14 (postinstall: node install.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+npm notice
+npm notice New major version of npm available! 11.16.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+runtime dist not built locally; skipping freshness check: /work/packages/lsp-daemon/dist
+runtime dist not built locally; skipping freshness check: /work/packages/ast-grep-mcp/dist/cli.js
+runtime dist not built locally; skipping freshness check: /work/packages/omo-codex/plugin/components/ulw-loop/dist/cli.js
+Bundled 783 modules in 43ms
+
+  omo.js  1.19 MB  (entry point)
+
+Bundled 641 modules in 33ms
+
+  omo-task.js  0.86 MB  (entry point)
+
+Bundled 280 modules in 17ms
+
+  omo-member.js  173.24 KB  (entry point)
+
+Bundled 94 modules in 9ms
+
+  omo-memory-mcp.js  96.53 KB  (entry point)
+
+Bundled 90 modules in 8ms
+
+  memory-run-supervisor.mjs  25.98 KB  (entry point)
+
+Bundled 97 modules in 12ms
+
+  omo-init-deep-advisor.js  64.27 KB  (entry point)
+
+omo-senpi extension build is current: /work/packages/omo-senpi/plugin/extensions/omo.js

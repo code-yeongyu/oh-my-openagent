@@ -4,7 +4,7 @@ import { join } from "node:path"
 import type { DreamOrigin } from "@oh-my-opencode/memory-core"
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
-/** Unreflected-volume floor for automatic dream origins, in UTF-8 bytes (plan todo 24). */
+/** Unreflected-volume floor for transcript-driven automatic dream origins, in UTF-8 bytes (plan todo 24). */
 export const DREAM_VOLUME_GATE_BYTES = 8192
 
 export interface DreamTriggerSettings {
@@ -53,10 +53,10 @@ export interface DreamGateProbe {
 }
 
 /**
- * The single dream gate evaluation. Manual origin bypasses all three automatic gates; idle and
- * shutdown origins must pass dream.enabled, the min_hours_between spacing (strictly greater),
- * and the unreflected-volume floor (strictly greater than 8192 bytes). Shutdown additionally
- * requires shutdown_launch.
+ * The single dream gate evaluation. Manual bypasses every automatic gate. Pressure applies
+ * dream.enabled and the shared min_hours_between spacing, but not transcript volume. Idle and
+ * shutdown additionally require unreflected volume strictly greater than 8192 bytes, while
+ * shutdown also requires shutdown_launch.
  */
 export async function evaluateDreamGates(
   origin: DreamOrigin,
@@ -70,7 +70,7 @@ export async function evaluateDreamGates(
   if (lastDreamAtMs !== null && probe.nowMs - lastDreamAtMs <= settings.minHoursBetween * 3_600_000) {
     return { allowed: false, rejection: "too_soon" }
   }
-  if ((await probe.unreflectedBytes()) <= DREAM_VOLUME_GATE_BYTES) {
+  if (origin !== "pressure" && (await probe.unreflectedBytes()) <= DREAM_VOLUME_GATE_BYTES) {
     return { allowed: false, rejection: "insufficient_volume" }
   }
   return { allowed: true }

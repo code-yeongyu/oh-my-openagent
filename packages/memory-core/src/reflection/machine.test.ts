@@ -37,7 +37,7 @@ function machine(steps = 0, stepCount: number | undefined = 5): MachineState {
 function request(
   trigger: ReflectionRequest["trigger"],
   conversations = ["conversation-a"],
-  origin?: "manual" | "idle" | "shutdown",
+  origin?: "manual" | "idle" | "shutdown" | "pressure",
 ): ReflectionRequest {
   return {
     trigger,

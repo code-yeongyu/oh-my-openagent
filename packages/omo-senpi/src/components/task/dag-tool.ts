@@ -2,6 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { Type, type Static } from "typebox"
 
 import { validateTaskTarget, type TaskTargetErrorCode } from "@oh-my-opencode/senpi-task"
+import { lintDagDefinitionNodes } from "./dag-lint"
 import {
   DagManagerError,
   type DagCompileError,
@@ -80,7 +81,13 @@ export type DagToolError = {
 }
 
 export type DagToolDetails =
-  | { readonly kind: "started"; readonly run_id: string; readonly reused: boolean; readonly snapshot: DagRunSnapshot }
+  | {
+      readonly kind: "started"
+      readonly run_id: string
+      readonly reused: boolean
+      readonly snapshot: DagRunSnapshot
+      readonly warnings?: readonly string[]
+    }
   | { readonly kind: "attached"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "snapshot"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "waited"; readonly run_id: string; readonly result: DagRunResult }
@@ -196,17 +203,23 @@ async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<Dag
       { nodes: nodeErrors },
     )
   }
+  const warnings = lintDagDefinitionNodes(input.nodes)
   const result = await deps.manager.start({
     definition: toDefinition(input),
     parentSessionId: deps.parentSessionId(),
     rootSessionId: deps.rootSessionId(),
   })
   const verb = result.reused ? "Reused" : "Started"
-  return toolResult(`${verb} dag run ${result.snapshot.runId} (${result.snapshot.counts.total} nodes).`, {
+  const warningText =
+    warnings.length === 0
+      ? ""
+      : ` Advisory warnings (fix the definition and re-start under a new key to clear them): ${warnings.join(" | ")}`
+  return toolResult(`${verb} dag run ${result.snapshot.runId} (${result.snapshot.counts.total} nodes).${warningText}`, {
     kind: "started",
     run_id: result.snapshot.runId,
     reused: result.reused,
     snapshot: result.snapshot,
+    warnings,
   })
 }
 

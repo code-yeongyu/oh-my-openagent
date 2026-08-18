@@ -28,6 +28,7 @@ export interface DagWakeRunEvent {
   readonly type: string
   readonly counts?: DagWakeNodeCounts
   readonly error?: DagWakeFailure
+  readonly reason?: string
 }
 
 export interface DagWakeRun {
@@ -61,6 +62,11 @@ const TERMINAL_EVENT_STATUSES = {
 
 type DagWakeStatus = (typeof TERMINAL_EVENT_STATUSES)[keyof typeof TERMINAL_EVENT_STATUSES]
 
+// A pause is NOT terminal but it IS user-visible: recovery's pauseRunsForShutdown suspends every
+// in-flight run when the session shuts down (reload included), so the main session must be told its
+// DAG stopped mid-flight instead of silently discovering it later.
+const PAUSED_EVENT_TYPE = "dag.run.paused"
+
 export function createDagWake(deps: DagWakeDeps): DagWake {
   const buffered = new Map<string, Map<string, IdleInjection>>()
 
@@ -78,9 +84,8 @@ export function createDagWake(deps: DagWakeDeps): DagWake {
 
   return {
     onRunEvent(run, event) {
-      const status = terminalStatus(event.type)
-      if (status === undefined || event.counts === undefined) return
-      const injection = buildInjection(run, status, event.counts, event.error)
+      const injection = buildRunInjection(run, event)
+      if (injection === undefined) return
       const parentState = deps.parentState()
       if (parentState.kind === "compacting"
         || parentState.kind === "session_switching"
@@ -106,6 +111,30 @@ export function createDagWake(deps: DagWakeDeps): DagWake {
 
 function terminalStatus(type: string): DagWakeStatus | undefined {
   return TERMINAL_EVENT_STATUSES[type as keyof typeof TERMINAL_EVENT_STATUSES]
+}
+
+function buildRunInjection(run: DagWakeRun, event: DagWakeRunEvent): IdleInjection | undefined {
+  if (event.type === PAUSED_EVENT_TYPE) return buildPausedInjection(run, event.reason)
+  const status = terminalStatus(event.type)
+  if (status === undefined || event.counts === undefined) return undefined
+  return buildInjection(run, status, event.counts, event.error)
+}
+
+function buildPausedInjection(run: DagWakeRun, reason: string | undefined): IdleInjection {
+  const cause = reason === undefined ? "" : ` (${reason})`
+  return {
+    key: `dag-run:${run.runId}`,
+    source: "dag-run",
+    customType: DAG_WAKE_MESSAGE_TYPE,
+    content: `DAG "${run.name}" paused${cause}: it will resume when the session restarts.`,
+    display: false,
+    details: {
+      runId: run.runId,
+      name: run.name,
+      status: "paused",
+      ...(reason === undefined ? {} : { reason }),
+    },
+  }
 }
 
 function buildInjection(

@@ -1,8 +1,9 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { PLAN_GATED_AGENT_NAMES, type AgentDefinition } from "../../agents"
+import { CATEGORY_CALLER_GUIDANCE } from "../../category"
 import { listTaskAgents, listTaskCategories } from "./categories"
-import type { TaskAgentInfo, TaskCategoryInfo } from "./types"
+import type { TaskCategoryInfo } from "./types"
 
 export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
 
@@ -19,9 +20,13 @@ type DescriptionInput = {
   readonly agents: Readonly<Record<string, AgentDefinition>>
 }
 
-function renderList(entries: readonly (TaskCategoryInfo | TaskAgentInfo)[]): string {
+function renderCategoryList(entries: readonly TaskCategoryInfo[]): string {
   if (entries.length === 0) return "  (none configured)"
-  return entries.map((entry) => (entry.description ? `  - ${entry.name}: ${entry.description}` : `  - ${entry.name}`)).join("\n")
+  return entries.map((entry) => {
+    const categoryLine = entry.description ? `  - ${entry.name}: ${entry.description}` : `  - ${entry.name}`
+    const callerGuidance = CATEGORY_CALLER_GUIDANCE[entry.name]?.replaceAll("\n", "\n    ")
+    return callerGuidance ? `${categoryLine}\n    ${callerGuidance}` : categoryLine
+  }).join("\n")
 }
 
 export function buildTaskToolDescription(input: DescriptionInput): string {
@@ -47,7 +52,7 @@ Choose exactly one input form:
 Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO NOT provide both.
 
 - category routes through Sisyphus-Junior. Available categories:
-${renderList(categories)}
+${renderCategoryList(categories)}
 - subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}${momusNotice}
 
 Blank provider padding is normalized automatically; do not add filler values.

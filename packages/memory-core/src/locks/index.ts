@@ -11,6 +11,7 @@ export {
   factsQueueLockPath,
   factsRunsLockPath,
   memoryWriterLockPath,
+  memoryUsageLockPath,
   noticeLockPath,
   reflectionSchedulerLockPath,
   runFinalizationLockPath,

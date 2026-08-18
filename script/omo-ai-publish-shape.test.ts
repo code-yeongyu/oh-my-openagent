@@ -128,7 +128,7 @@ describe("omo-ai publish workflow shape", () => {
   })
 
   test("stamps omo-native in both release paths and stages its manifest", () => {
-    const prepare = namedStep("prepare-release-state", "Prepare and merge release state before publishing")
+    const prepare = namedStep("prepare-release-state", "Prepare release state (generation)")
     const update = namedStep("publish-main", "Update version")
     const stampLine = `jq --arg v "$OMO_AI_VERSION" '.version = $v' packages/omo-native/package.json > tmp.json && mv tmp.json packages/omo-native/package.json`
 

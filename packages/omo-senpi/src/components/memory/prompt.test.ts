@@ -15,10 +15,12 @@ import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import {
   MEMORY_NUDGE_METADATA_TOKEN,
+  MEMORY_PRESSURE_METADATA_TOKEN,
   MEMORY_PROMPT_TEMPLATE,
   MEMORY_SOUL_METADATA_TOKEN,
   createMemoryPromptHandler,
 } from "./prompt"
+import { MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 import { realpathSync } from "node:fs"
 
 const IDENTITY = "prompt-agent"
@@ -70,6 +72,11 @@ async function fixture(personaBody = "first"): Promise<{ repo: CountingRepo; con
     binding: createMemoryBinding({ identity: IDENTITY, repoPath: repo.dir, boundAt: 0 }),
   })
   return { repo, context }
+}
+
+async function fixtureAtSystemTokens(tokens: number): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
+  const header = "---\ndescription: Persona\n---\n"
+  return fixture("A".repeat(tokens * 4 - Buffer.byteLength(header, "utf8") - 1))
 }
 
 function eventContext(sessionId: string, branchLength: number): unknown {
@@ -181,6 +188,64 @@ describe("createMemoryPromptHandler", () => {
     expect(afterThreshold?.message?.content).toContain("12 previous messages")
     expect(afterThreshold?.message?.content).toContain(MEMORY_NUDGE_METADATA_TOKEN)
     expect(afterThreshold?.message?.content).toContain(MEMORY_SOUL_METADATA_TOKEN)
+  }, 30_000)
+
+  test("#given committed system memory below the soft threshold #when before_agent_start compiles #then the block stays byte-identical to the pre-pressure format", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveCompileWarnTokens: () => 30_000,
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 0))
+
+    // then
+    expect(result?.systemPrompt).toBe([
+      "BASE PROMPT",
+      "",
+      `<!-- senpi-memory:${IDENTITY}:begin -->`,
+      "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).",
+      "",
+      "<self>",
+      "<projection>$MEMORY_DIR/system/persona.md</projection>",
+      "first",
+      "</self>",
+      "",
+      "<memory_metadata>",
+      `- AGENT_ID: ${IDENTITY}`,
+      "</memory_metadata>",
+      `<!-- senpi-memory:${IDENTITY}:end -->`,
+    ].join("\n"))
+    expect(result?.systemPrompt).not.toContain(MEMORY_PRESSURE_METADATA_TOKEN)
+  }, 30_000)
+
+  test("#given committed system memory exactly at floor eighty percent of the advisory #when before_agent_start compiles #then one actionable pressure line carries N M and P", async () => {
+    // given
+    const advisory = 30_000
+    const boundary = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * advisory)
+    const { repo, context } = await fixtureAtSystemTokens(boundary)
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveCompileWarnTokens: () => advisory,
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", 0))
+
+    // then
+    expect(boundary).toBe(24_000)
+    const pressureLines = result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
+    expect(pressureLines).toHaveLength(1)
+    expect(pressureLines[0]).toContain("24000/30000")
+    expect(pressureLines[0]).toContain("80%")
+    expect(pressureLines[0]).toMatch(/trim|demote/)
+    expect(result?.systemPrompt).toContain("A".repeat(1_000))
   }, 30_000)
 
   test("#given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token", async () => {

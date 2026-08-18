@@ -1,0 +1,65 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v3 stable template [0.52ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [247.75ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [284.95ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a stable sentinel block and recall metadata arrives late [294.35ms]
+(pass) createMemoryPromptHandler > #given the same identity and HEAD across sessions and turns #when volatile notices change #then the system block stays byte-identical and notices travel as a late message [317.02ms]
+(pass) createMemoryPromptHandler > #given committed system memory below the soft threshold #when before_agent_start compiles #then the block stays byte-identical to the pre-pressure format [263.07ms]
+(pass) createMemoryPromptHandler > #given committed system memory exactly at floor eighty percent of the advisory #when before_agent_start compiles #then one actionable pressure line carries N M and P [265.24ms]
+(pass) createMemoryPromptHandler > #given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token [231.42ms]
+(pass) createMemoryPromptHandler > #given a reflection soul notice #when before_agent_start compiles #then the late message carries the soul token and short sha [232.65ms]
+(pass) createMemoryPromptHandler > #given an out-of-band soul commit #when the prompt compiles repeatedly at the same HEAD #then the soul line appears exactly once [401.91ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [228.10ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [237.29ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [330.14ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [231.93ms]
+
+packages/omo-senpi/src/components/memory/status.test.ts:
+(pass) refreshMemoryStatus segments > #given a dirty memory worktree #when refresh runs #then the footer carries the dirty marker [0.98ms]
+(pass) refreshMemoryStatus segments > #given a clean worktree with a backlog of fourteen steps #when refresh runs #then the backlog segment renders [0.83ms]
+(pass) refreshMemoryStatus segments > #given a zero backlog #when refresh runs #then no backlog segment renders [0.73ms]
+(pass) refreshMemoryStatus segments > #given three consecutive reflection failures #when refresh runs #then the streak badge renders [1.34ms]
+(pass) refreshMemoryStatus segments > #given only two consecutive failures #when refresh runs #then no streak badge renders [0.90ms]
+(pass) refreshMemoryStatus segments > #given dirty, backlog, and streak all present #when refresh runs #then segments render in fixed order [1.31ms]
+(pass) refreshMemoryStatus segments > #given an assembled line over sixty characters #when refresh runs #then segments drop right to left until it fits [1.46ms]
+(pass) refreshMemoryStatus segments > #given a base line already past the width budget #when refresh runs #then every segment drops [1.54ms]
+(pass) refreshMemoryStatus segments > #given a repo with no HEAD #when refresh runs #then no git status work happens [0.88ms]
+(pass) refreshMemoryStatus segments > #given footer rendering disabled #when refresh runs #then no git status call happens [0.67ms]
+(pass) refreshMemoryStatus segments > #given a future commit timestamp with dirty state #when refresh runs #then the future-age guard still suppresses the footer [0.21ms]
+(pass) refreshMemoryStatus segments > #given git status throws #when refresh runs #then the base footer still renders [0.25ms]
+(pass) refreshMemoryStatus > #given a committed HEAD ninety seconds old #when refresh runs #then footer shows system-clock-relative age [0.17ms]
+(pass) refreshMemoryStatus > #given committed HEAD ages across display buckets #when refresh runs #then compact labels follow the system clock [0.25ms]
+(pass) refreshMemoryStatus > #given system markdown under the advisory threshold #when refresh runs #then no advisory notify fires [247.37ms]
+(pass) refreshMemoryStatus > #given system markdown at or above the advisory threshold #when refresh runs #then one warning notify fires with token estimate [259.50ms]
+(pass) refreshMemoryStatus > #given footer rendering disabled at session bind #when memory is oversized #then advisory fires without a footer [0.21ms]
+(pass) refreshMemoryStatus > #given advisory checking disabled after first memory use #when memory is oversized #then footer renders without another warning [0.21ms]
+(pass) refreshMemoryStatus > #given an already-notified session #when refresh runs again over threshold #then no second notify fires [250.19ms]
+(pass) refreshMemoryStatus > #given a repo with no HEAD #when refresh runs #then no footer or advisory appears [1.13ms]
+(pass) refreshMemoryStatus > #given a committed HEAD without a readable commit timestamp #when refresh runs #then no footer appears [0.19ms]
+(pass) refreshMemoryStatus > #given a commit timestamp later than the system clock #when refresh runs #then no footer appears [0.14ms]
+(pass) refreshMemoryStatus > #given system files with non-system markdown excluded #when refresh estimates tokens #then only system/**/*.md counts [274.07ms]
+
+packages/omo-senpi/src/components/memory/wiring.test.ts:
+(pass) memory pressure compile wiring > #given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next real compile refresh adds pressure metadata without truncating memory [492.33ms]
+(pass) memory footer wiring > #given committed memory bound without a visible footer #when memory tools return #then only the first result shows relative age [13.42ms]
+(pass) memory footer wiring > #given a completed first-use attempt #when a new session starts #then the once-only footer gate resets [14.07ms]
+(pass) memory footer wiring > #given bind reconciliation is pending #when a footer publishes #then bind completion does not erase it [12.55ms]
+(pass) memory footer wiring > #given a failed first memory result #when a later call succeeds #then the footer waits for success [9.17ms]
+(pass) memory wiring reflection completion delivery > #given a pending completion and a bound session with a real UI callback > #when afterBind drains the identity completion directory > #then the callback receives the completion notification payload and level [3.80ms]
+(pass) memory wiring reflection policy > #given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts [0.68ms]
+(pass) memory wiring reflection policy > #given the memory block is absent #when an automatic settle arrives #then schema-default reflection remains enabled [0.69ms]
+(pass) memory footer live wiring > #given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints [5.03ms]
+(pass) memory footer live wiring > #given a spinner animating mid-session #when the session shuts down #then the animation interval is released [13.01ms]
+
+packages/omo-senpi/src/components/memory/compaction-survival.test.ts:
+(pass) compaction survival + trigger integration > #given a bound session with committed memory #when an accepted compaction settles successfully #then exactly one reflection launches and the sentinel block survives byte-identical [406.27ms]
+(pass) compaction survival + trigger integration > #given a bound session #when compaction is rejected #then no flag is recorded and settle launches nothing [214.97ms]
+(pass) compaction survival + trigger integration > #given compaction accepted mid-run #when the retried turn chain settles #then exactly one launch fires across all settles [218.05ms]
+(pass) compaction survival + trigger integration > #given two consecutive accepted compactions #when the run settles #then the flag is consumed once with exactly one launch [226.59ms]
+
+ 51 pass
+ 0 fail
+ 161 expect() calls
+Ran 51 tests across 4 files. [7.03s]

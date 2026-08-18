@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
+import { BUILTIN_AGENTS, DEFAULT_CATEGORIES } from "@oh-my-opencode/senpi-task"
 import { BUILTIN_SKILL_NAMES } from "./components/telemetry/product-identity"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
@@ -9,6 +10,7 @@ const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
 const expectedSkillNames = [
   "ast-grep",
   "coding-agent-sessions",
+  "dag-library",
   "data-scientist",
   "debugging",
   "frontend",
@@ -36,6 +38,7 @@ const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
 // Skills authored directly against the omo-senpi tool surface. They already speak native Senpi tools,
 // so they carry no OpenCode examples and need no "Senpi Harness Tool Compatibility" translation banner.
 const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
+  "dag-library": true,
   "give-me-tips": true,
   hyperplan: true,
   "init-deep": true,
@@ -47,6 +50,7 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
 }
 const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
+const taskTargetPattern = /\b(subagent_type|category)["']?\s*[=:]\s*["']([a-z0-9-]+)["']/g
 
 function listDirectoryNames(path: string): string[] {
   if (!existsSync(path)) {
@@ -101,7 +105,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 23 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 24 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
@@ -206,6 +210,27 @@ describe("OMO Senpi scoped skill sync", () => {
     }
 
     expect(leaks).toEqual([])
+  })
+
+  test("#given shipped task examples #when targets are scanned #then every agent and category exists in Senpi", () => {
+    const allowedTargets = {
+      subagent_type: new Set(Object.keys(BUILTIN_AGENTS)),
+      category: new Set(Object.keys(DEFAULT_CATEGORIES)),
+    }
+    const invalidTargets: string[] = []
+
+    for (const file of listFiles(skillsRoot).filter((path) => path.endsWith(".md"))) {
+      const content = readFileSync(file, "utf8")
+      for (const match of content.matchAll(taskTargetPattern)) {
+        const kind = match[1] as keyof typeof allowedTargets
+        const target = match[2]
+        if (target !== undefined && !allowedTargets[kind].has(target)) {
+          invalidTargets.push(`${relative(repoRoot, file)}: ${kind}=${target}`)
+        }
+      }
+    }
+
+    expect(invalidTargets).toEqual([])
   })
 
   test("#given frontend skill #when inspected #then materialized design references exist", () => {

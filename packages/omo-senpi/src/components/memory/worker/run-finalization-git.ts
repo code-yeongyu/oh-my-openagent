@@ -9,11 +9,13 @@ import {
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
   validateCompletion,
+  validateDreamTokenBudget,
   withLock,
   type ReflectionOutcome,
   type ValidatedReflectionTip,
 } from "@oh-my-opencode/memory-core"
 
+import { estimateSystemTokens } from "../commands/tokens"
 import {
   readRunJson,
   readRunTextTail,
@@ -104,7 +106,8 @@ export async function resolveFinalizationDecision(
     if (ledger.mergePolicy === "auto") {
       const legacy = await probeLegacyAutoRunReceipt(worktree, ledger.runId)
       if (legacy.status === "integrated") {
-        const decision = { outcome: "merged" as const, integrationSha: legacy.integrationSha }
+        const budget = await validateIntegratedDreamBudget(context, ledger)
+        const decision = { outcome: "merged" as const, integrationSha: legacy.integrationSha, ...budget }
         await checkpointIntegrated(ledgerPath, decision)
         await cleanupOrThrow(context, ledger)
         return decision
@@ -129,7 +132,8 @@ export async function resolveFinalizationDecision(
     validatedTipSha: validated.tipSha,
   })
   if (probe.status === "integrated") {
-    const decision = { outcome: "merged" as const, integrationSha: probe.integrationSha }
+    const budget = await validateIntegratedDreamBudget(context, ledger)
+    const decision = { outcome: "merged" as const, integrationSha: probe.integrationSha, ...budget }
     await checkpointIntegrated(ledgerPath, decision)
     await cleanupOrThrow(context, ledger)
     return decision
@@ -146,10 +150,14 @@ export async function resolveFinalizationDecision(
     validated,
     withWriterLock: (operation) => writerLock(context, operation),
   })
+  const budget = integrated.outcome === "merged"
+    ? await validateIntegratedDreamBudget(context, ledger)
+    : {}
   const decision: DurableFinalizationDecision = {
     outcome: integrated.outcome,
     ...(integrated.detail === undefined ? {} : { detail: integrated.detail }),
     ...(integrated.integrationSha === undefined ? {} : { integrationSha: integrated.integrationSha }),
+    ...budget,
   }
   if (decision.outcome === "merged") await checkpointIntegrated(ledgerPath, decision)
   else await checkpointDecision(ledgerPath, decision)
@@ -187,8 +195,29 @@ async function checkpointIntegrated(path: string, decision: DurableFinalizationD
   await updateRunLedger(path, {
     finalizePhase: "integrated",
     finalizeOutcome: decision.outcome,
+    ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
+    ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
     integrationSha: decision.integrationSha,
   })
+}
+
+async function validateIntegratedDreamBudget(
+  context: RunFinalizationContext,
+  ledger: ReservationRunLedger,
+): Promise<Pick<DurableFinalizationDecision, "reason" | "detail">> {
+  if (ledger.kind !== "dream" || ledger.origin === undefined || ledger.systemTokenTarget === undefined) return {}
+  const estimate = await estimateSystemTokens(context.identity.paths.repo)
+  const validation = validateDreamTokenBudget({
+    origin: ledger.origin,
+    totalTokens: estimate.totalTokens,
+    targetTokens: ledger.systemTokenTarget,
+  })
+  if (validation.status === "budget_not_met") {
+    return { reason: "budget_not_met", detail: validation.detail }
+  }
+  return {
+    detail: `Committed system/ estimate is ${validation.totalTokens} tokens; dream target is below ${validation.targetTokens} tokens`,
+  }
 }
 
 async function cleanupOrThrow(

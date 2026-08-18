@@ -25,7 +25,13 @@ export interface MemoryReflectionLiveWiring {
   currentSession(): ReflectionLiveSession | undefined
   registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined): void
   attach(sessionId: string): void
-  bind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void>
+  bind(
+    pi: SenpiExtensionAPI,
+    sessionId: string,
+    identity: MemoryIdentityContext,
+    eventCtx: unknown,
+    requestPressureDream: () => void,
+  ): Promise<void>
   onReflectionLaunched(identity: string, run: ReservedRun): Promise<void>
   onLiveReflectionCompleted(identity: string, runId: string): Promise<void>
   onSettled(sessionId: string, eventCtx: unknown): Promise<void>
@@ -86,7 +92,7 @@ export function createMemoryReflectionLiveWiring(
     attach(sessionId): void {
       rpcBridge.current?.attach(sessionId)
     },
-    async bind(pi, sessionId, identity, eventCtx): Promise<void> {
+    async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
       const ui = readUi(eventCtx)
       const api = createReflectionCompletionApi(pi)
       liveSession.current = api === undefined
@@ -97,7 +103,7 @@ export function createMemoryReflectionLiveWiring(
             ...(ui === undefined ? {} : { ui }),
             ...(options.logger === undefined ? {} : { logger: options.logger }),
           }
-      refreshInitialStatus(options, sessionId, identity, ui)
+      refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
       if (liveSession.current !== undefined) {
         try {
           await drainCompletions(identity, liveSession.current, activeRuns.settle, healthAlertOnce)
@@ -144,6 +150,7 @@ function refreshInitialStatus(
   sessionId: string,
   identity: MemoryIdentityContext,
   ui: StatusUi | undefined,
+  requestPressureDream: () => void,
 ): void {
   if (ui === undefined) return
   const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
@@ -152,6 +159,7 @@ function refreshInitialStatus(
     ui,
     compileWarnTokens: settings.compile_warn_tokens,
     alreadyNotified: false,
+    requestPressureDream,
     sessionId,
   }).catch(() => {})
 }

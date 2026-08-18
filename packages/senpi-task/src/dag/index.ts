@@ -122,7 +122,7 @@ export { resolveDagNodeExecutionMode } from "./execution-mode"
 export type { DagExecutionModeSources } from "./execution-mode"
 
 export { applyDagSchedulerEvent, createDagScheduler } from "./scheduler"
-export type { DagScheduler, DagSchedulerOptions } from "./scheduler"
+export type { DagNodeSpawnPolicy, DagNodeSpawnPolicyVerdict, DagScheduler, DagSchedulerOptions } from "./scheduler"
 
 export { persistDagNodeResult, readDagNodeResult } from "./results"
 export type {

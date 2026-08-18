@@ -22,6 +22,18 @@ describe("dream persona asset", () => {
     expect(loaded).toBe(source)
     expect(packaged).toBe(source)
   })
+
+  it("#given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded", () => {
+    const { sections } = loadDreamPersona()
+
+    expect(sections.some((section) => section.heading === "System Token Budget Contract")).toBe(true)
+  })
+
+  it("#given the dream persona #when parsed as sections #then the memory-usage ledger input is documented", () => {
+    const { markdown } = loadDreamPersona()
+
+    expect(markdown).toContain("$MEMORY_USAGE_PATH")
+  })
 })
 
 describe("reflection persona asset", () => {

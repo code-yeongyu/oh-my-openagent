@@ -17,7 +17,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import type { DagPersistedNode, DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
-import { applyDagSchedulerEvent, createDagScheduler } from "./scheduler"
+import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagRunEvent, DagRunId } from "./types"
 
@@ -45,6 +45,7 @@ export type DagRecoveryOptions = {
   readonly isProcessAlive?: (pid: number) => boolean
   readonly now?: () => number
   readonly subscriberRing?: number
+  readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly stopAdmission?: (runId: DagRunId) => void
   readonly reattach?: (runId: DagRunId, taskId: string) => void
 }
@@ -59,6 +60,7 @@ type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager"
   readonly isProcessAlive: (pid: number) => boolean
   readonly now: () => number
   readonly subscriberRing?: number
+  readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly stopAdmission?: (runId: DagRunId) => void
   readonly reattach?: (runId: DagRunId, taskId: string) => void
 }
@@ -79,6 +81,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
     now: options.now ?? Date.now,
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
+    ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     ...(options.stopAdmission === undefined ? {} : { stopAdmission: options.stopAdmission }),
     ...(options.reattach === undefined ? {} : { reattach: options.reattach }),
   }
@@ -154,6 +157,7 @@ async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRe
       taskManager: context.taskManager,
       initialRecord: journal.snapshot(),
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
+      ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
       now: context.now,
     })
     const record = await scheduler.run()

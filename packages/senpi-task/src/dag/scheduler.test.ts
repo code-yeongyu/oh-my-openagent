@@ -11,7 +11,7 @@ import type { DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagWaitSurface } from "./handle"
 import type { DagExecutionModeSources } from "./execution-mode"
-import { createDagScheduler } from "./scheduler"
+import { createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
 
@@ -298,6 +298,7 @@ function schedulerFixture(
   taskManager: FakeTaskManager,
   executionMode?: Omit<DagExecutionModeSources, "route">,
   subscriberRing?: number,
+  nodeSpawnPolicy?: DagNodeSpawnPolicy,
 ) {
   const baseStore = createDagFileStore({ project_dir: tempProject() })
   let runLockDepth = 0
@@ -331,6 +332,7 @@ function schedulerFixture(
     initialRecord,
     ...(executionMode === undefined ? {} : { executionMode }),
     ...(subscriberRing === undefined ? {} : { subscriberRing }),
+    ...(nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy }),
     now: () => eventTime++,
   })
   const events = (): readonly DagRunEvent[] => store.readEvents(runId, 0, { limit: 100 }).events
@@ -877,5 +879,62 @@ describe("DAG scheduler strict wave barrier", () => {
     expect(manager.residencyDenials.length).toBeGreaterThan(0)
     expect(manager.maxResidents).toBe(2)
     expect(result.nodes.every((entry) => entry.state === "completed")).toBe(true)
+  })
+})
+
+describe("DAG scheduler node spawn policy", () => {
+  test("#given a policy that denies an agent-routed node #when the wave admits #then the node fails with the denial message and startOwned is never called", async () => {
+    // given
+    const manager = new FakeTaskManager()
+    const { scheduler } = schedulerFixture(
+      definition([{ id: "review", prompt: "review the plan", subagent_type: "momus" }]),
+      manager,
+      undefined,
+      undefined,
+      () => ({ kind: "deny" as const, message: "momus requires a plan gate" }),
+    )
+
+    // when
+    const result = await scheduler.run()
+
+    // then
+    expect(result.nodes[0]?.state).toBe("failed")
+    expect(result.nodes[0]?.error?.message).toContain("momus requires a plan gate")
+    expect(manager.attempts).toEqual([])
+  })
+
+  test("#given a policy that forces the prompt #when the node starts #then the child receives the forced prompt", async () => {
+    // given
+    const manager = new FakeTaskManager()
+    const canonical = "Review the work plan at .omo/plans/x.md for contradictions and blocking issues."
+    const { scheduler } = schedulerFixture(
+      definition([{ id: "review", prompt: "caller wording", subagent_type: "momus" }]),
+      manager,
+      undefined,
+      undefined,
+      () => ({ kind: "force" as const, prompt: canonical }),
+    )
+
+    // when
+    await scheduler.run()
+
+    // then
+    expect(manager.startedSpecs[0]?.prompt).toBe(canonical)
+  })
+
+  test("#given category-routed nodes #when the wave admits #then the policy is never consulted", async () => {
+    // given
+    const manager = new FakeTaskManager()
+    let calls = 0
+    const { scheduler } = schedulerFixture(definition([node("plain")]), manager, undefined, undefined, () => {
+      calls += 1
+      return { kind: "allow" as const }
+    })
+
+    // when
+    await scheduler.run()
+
+    // then
+    expect(calls).toBe(0)
   })
 })

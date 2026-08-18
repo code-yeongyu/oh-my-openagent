@@ -60,7 +60,7 @@ export const KNOWN_PROVIDERS = Object.freeze(Object.keys(KNOWN_MODELS) as KnownP
 export const CURATED_AGENTS = Object.freeze([...CURATED_READONLY_AGENT_NAMES])
 export const BUILTIN_CATEGORY_NAMES = Object.freeze(BUILTIN_CATEGORY_DEFAULTS.map(({ name }) => name))
 export const BUILTIN_SKILL_NAMES = Object.freeze([
-  "ast-grep", "coding-agent-sessions", "data-scientist", "debugging", "frontend", "git-master",
+  "ast-grep", "coding-agent-sessions", "dag-library", "data-scientist", "debugging", "frontend", "git-master",
   "give-me-tips", "hyperplan", "init-deep", "lsp-setup", "mass-ulw", "onboarding", "programming", "refactor",
   "remove-ai-slops",
   "review-work", "start-work", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",

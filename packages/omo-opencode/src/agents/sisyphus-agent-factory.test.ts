@@ -165,6 +165,38 @@ describe("createSisyphusAgent", () => {
     });
   });
 
+  describe("#given fallback-family Sisyphus models", () => {
+    test("#when baking prompts for Gemini vs MiniMax #then the fallback family is not prompt-uniform", () => {
+      // given - both models resolve to the broad fallback family
+      const geminiModel = "google/gemini-3.1-pro";
+      const minimaxModel = "minimax-coding-plan/MiniMax-M3";
+      expect(resolveSisyphusPromptFamily(geminiModel)).toBe("fallback");
+      expect(resolveSisyphusPromptFamily(minimaxModel)).toBe("fallback");
+
+      // when
+      const geminiPrompt = createSisyphusAgent(geminiModel).prompt;
+      const minimaxPrompt = createSisyphusAgent(minimaxModel).prompt;
+
+      // then - Gemini fallback overrides are baked in; MiniMax bakes the plain body
+      expect(geminiPrompt).toContain("TOOL_CALL_MANDATE");
+      expect(minimaxPrompt).not.toContain("TOOL_CALL_MANDATE");
+      expect(geminiPrompt).not.toBe(minimaxPrompt);
+    });
+
+    test("#when baking prompts for DeepSeek vs MiniMax #then the plain fallback bodies are identical", () => {
+      // given - neither model triggers fallback overrides
+      const deepseekModel = "deepseek/deepseek-v4-pro";
+      const minimaxModel = "minimax-coding-plan/MiniMax-M3";
+
+      // when
+      const deepseekPrompt = createSisyphusAgent(deepseekModel).prompt;
+      const minimaxPrompt = createSisyphusAgent(minimaxModel).prompt;
+
+      // then - genuine no-op swaps are detectable by prompt equality (#6966)
+      expect(deepseekPrompt).toBe(minimaxPrompt);
+    });
+  });
+
   describe("#given a Gemini model", () => {
     test("#when creating the agent #then uses the Gemini-corrected prompt with thinking enabled", () => {
       // given

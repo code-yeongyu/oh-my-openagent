@@ -32,6 +32,10 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = buildCategoryRecord
   (definition) => definition.description
 )
 
+export const CATEGORY_CALLER_GUIDANCE: Record<string, string | undefined> = buildCategoryRecord(
+  (definition) => definition.callerGuidance
+)
+
 export const CATEGORY_PROMPT_APPEND_RESOLVERS: Record<string, (model: string | undefined) => string> = Object.fromEntries(
   BUILTIN_CATEGORIES
     .filter((definition) => definition.resolvePromptAppend !== undefined)

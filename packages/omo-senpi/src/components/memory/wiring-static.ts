@@ -16,6 +16,7 @@ import type { createMemoryNudgeWiring } from "./nudge-wiring"
 import { registerPalaceCommand } from "./palace/command"
 import { registerMemorySkillsScope } from "./skills-scope"
 import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
+import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
 import type { createSoulNoticeWiring } from "./soul-notice"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
@@ -49,6 +50,7 @@ export function registerMemoryStatic(input: {
   readonly lastEventCtx: { current?: unknown }
   readonly activeSession: { current?: string }
   readonly skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> }
+  readonly memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> }
   /** Fires at the manual reflection launch site so the footer animates while the run is in flight. */
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
@@ -60,7 +62,7 @@ export function registerMemoryStatic(input: {
     pi, ctx, options, promptCache, nudgeWiring, soulNoticeWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
-    activeSession, skillsUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
+    activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
   } = input
   const api = completionApi(pi)
   if (api !== undefined) {
@@ -76,6 +78,7 @@ export function registerMemoryStatic(input: {
     resolveContext,
     cache: promptCache,
     searchExposure: () => toolExposure === "search",
+    resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = resolveContext(sessionId)
@@ -134,6 +137,15 @@ export function registerMemoryStatic(input: {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   skillsUsageTrackersRef.current = skillsUsageTrackers
+  const memoryUsageTrackers = registerMemoryUsage(pi, {
+    resolveContext: (eventContext) => {
+      const sessionId = sessionIdFrom(eventContext)
+      return sessionId === undefined ? undefined : resolveContext(sessionId)
+    },
+    resolveCwd: options.cwd,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+  memoryUsageTrackersRef.current = memoryUsageTrackers
   registerPalaceCommand(
     pi,
     () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),

@@ -194,7 +194,16 @@ function configuredFallbackModels(
   )
   if (selectedIndex === -1) return []
 
-  return configured.slice(selectedIndex + 1).flatMap((entry): readonly ReflectionModelCandidate[] => {
+  // Every OTHER configured rung is a candidate, not only the rungs below the selected one. The
+  // category selects against the availability SNAPSHOT while `find` is the direct lookup that
+  // survives a stale snapshot, so an earlier rung skipped at selection time is routinely still
+  // usable - and when the snapshot picks the LAST rung (the real-world case) the downstream-only
+  // slice left reflection with no fallback at all. Ordering keeps chain priority: continue below
+  // the selection first, then wrap to the rungs above it. The child-side preflight probe remains
+  // the authority on what the discovery-disabled child can actually see.
+  const ordered = [...configured.slice(selectedIndex + 1), ...configured.slice(0, selectedIndex)]
+
+  return ordered.flatMap((entry): readonly ReflectionModelCandidate[] => {
     const selector = typeof entry === "string" ? entry : entry.model
     const separatorIndex = selector.indexOf("/")
     if (separatorIndex <= 0 || separatorIndex === selector.length - 1) return []

@@ -37,6 +37,13 @@ describe("reflectionRemediation", () => {
     })
   })
 
+  describe("#given a pressure dream budget warning", () => {
+    test("#when remediated #then it tells the next run to trim system memory below the supplied target", () => {
+      expect(reflectionRemediation("budget_not_met", "Committed system/ estimate is 90 tokens; pressure dream target is below 80 tokens"))
+        .toBe("run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET")
+    })
+  })
+
   describe("#given the pre-existing failure taxonomies", () => {
     test("#when the child could not see the model #then the category/model hint is kept", () => {
       expect(reflectionRemediation("child_exit", "Model not found: apitopia/kimi")).toContain("memory.reflection")

@@ -87,6 +87,8 @@ export async function runReflectionChild(
       deadlineAt: prepared.hardDeadlineAt + graceMs,
       mergePolicy: metadata.mergePolicy,
       ...(metadata.targetDoc === undefined ? {} : { targetDoc: metadata.targetDoc }),
+      ...(metadata.systemTokenBudget === undefined ? {} : { systemTokenBudget: metadata.systemTokenBudget }),
+      ...(metadata.systemTokenTarget === undefined ? {} : { systemTokenTarget: metadata.systemTokenTarget }),
       worktreeDir: metadata.worktree.dir,
       worktreeBranch: metadata.worktree.branch,
       baseSha: metadata.worktree.baseSha,

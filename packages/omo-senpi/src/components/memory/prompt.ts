@@ -7,10 +7,12 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
+import { estimateSystemTokens, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 
 export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v3"
 export const MEMORY_NOTICE_CUSTOM_TYPE = "omo-memory:notice"
 export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory save"
+export const MEMORY_PRESSURE_METADATA_TOKEN = "memory pressure:"
 export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
 
 // Injected ONLY under the opt-in search exposure: pointing the agent at tool_search while the tools
@@ -28,6 +30,7 @@ export interface MemoryPromptInjectionOptions {
   readonly createRepo?: (context: MemoryIdentityContext) => GitMemoryRepo
   readonly cache?: MemoryBlockCache
   readonly searchExposure?: () => boolean
+  readonly resolveCompileWarnTokens?: (identity: string) => number
   readonly resolveNudgeTurns?: (
     repo: GitMemoryRepo,
     sessionId: string,
@@ -64,7 +67,12 @@ export function createMemoryPromptHandler(
     const block = await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, {
       agentId: context.identity,
     })
-    const composed = options.searchExposure?.() === true ? `${block}\n\n${MEMORY_TOOL_DISCOVERY_NOTE}` : block
+    const pressureBlock = await addMemoryPressureMetadata(
+      block,
+      repo,
+      options.resolveCompileWarnTokens?.(context.identity),
+    )
+    const composed = options.searchExposure?.() === true ? `${pressureBlock}\n\n${MEMORY_TOOL_DISCOVERY_NOTE}` : pressureBlock
     return {
       systemPrompt: replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, composed)),
       message: {
@@ -74,6 +82,24 @@ export function createMemoryPromptHandler(
       },
     }
   }
+}
+
+async function addMemoryPressureMetadata(
+  block: string,
+  repo: GitMemoryRepo,
+  compileWarnTokens: number | undefined,
+): Promise<string> {
+  if (compileWarnTokens === undefined) return block
+  const head = await repo.head()
+  if (head === null) return block
+  const estimate = await estimateSystemTokens(repo, head)
+  const softThreshold = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * compileWarnTokens)
+  if (estimate < softThreshold) return block
+  const percentage = Math.floor((estimate / compileWarnTokens) * 100)
+  const line = `- ${MEMORY_PRESSURE_METADATA_TOKEN} system/ ~${estimate}/${compileWarnTokens} tokens (${percentage}% of advisory); trim or demote stale system/ blocks via the memory tool or run /dream`
+  const metadataEnd = block.lastIndexOf("</memory_metadata>")
+  if (metadataEnd < 0) return `${block}\n${line}`
+  return `${block.slice(0, metadataEnd)}${line}\n${block.slice(metadataEnd)}`
 }
 
 function renderMemoryNotice(

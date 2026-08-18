@@ -11,8 +11,10 @@ export interface ReflectionSpawnPaths {
   readonly persona: string
   readonly prompt: string
   readonly skillsUsage?: string
+  readonly memoryUsage?: string
   readonly dreamState?: string
   readonly dreamPolicy?: string
+  readonly systemTokens?: string
   readonly dreamTarget?: string
 }
 
@@ -37,9 +39,11 @@ export interface ReflectionSpawnArgs {
   readonly nextAttempt?: RunAttempt
   readonly kind?: "reflection" | "dream"
   readonly trigger?: ReservedRun["request"]["trigger"]
-  readonly origin?: "manual" | "idle" | "shutdown"
+  readonly origin?: "manual" | "idle" | "shutdown" | "pressure"
   readonly mergePolicy?: "auto" | "integration"
   readonly targetDoc?: string
+  readonly systemTokenBudget?: number
+  readonly systemTokenTarget?: number
   readonly worktree?: ReflectionWorktree
   readonly command: string
   readonly args: readonly string[]
@@ -114,8 +118,11 @@ export interface PrepareReflectionSpawnInput {
   readonly env: NodeJS.ProcessEnv
   readonly mergePolicy: "auto" | "integration"
   readonly skillsUsageSource: string
+  readonly memoryUsageSource: string
   readonly dreamStateSource: string
   readonly peoplePolicy: DreamPeoplePolicy
+  readonly systemTokenBudget?: number
+  readonly systemTokenTarget?: number
   readonly senpiCommand?: string
   readonly chmodFile?: (path: string, mode: number) => Promise<void>
 }

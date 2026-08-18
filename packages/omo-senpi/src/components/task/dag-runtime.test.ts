@@ -843,3 +843,65 @@ describe("assembled DAG runtime", () => {
     secondRuntime.dispose()
   })
 })
+
+describe("dag runtime node spawn policy", () => {
+  test("#given a runtime with a denying node spawn policy #when an agent-routed node is admitted #then the node fails with the denial and no child starts", async () => {
+    // given
+    const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-runtime-policy-"))
+    cleanupRoots.push(cwd)
+    const runner = new ScriptedRunner()
+    const runnerFactories: TaskRunnerFactories = {
+      inProcess: () => runner,
+      process: () => runner,
+    }
+    const pi = new FakeExtensionAPI()
+    const engine = composeTaskEngine({
+      pi,
+      omoConfig: loadOmoConfig({ cwd }).config,
+      cwd,
+      sharedParentTools: () => [],
+      runnerFactories,
+    })
+    engine.runtime.captureFrom({
+      mode: "tui",
+      ui: fakeUi([]),
+      sessionManager: { getSessionId: () => "session-dag" },
+    })
+    const runtime = createDagRuntime({
+      pi,
+      engine,
+      logger: logger(),
+      nodeSpawnPolicy: () => ({ kind: "deny", message: "momus requires a plan gate" }),
+    })
+    runtime.attach()
+
+    // when
+    const started = await runDagTool(
+      {
+        manager: runtime.manager,
+        parentSessionId: () => "session-dag",
+        rootSessionId: () => "session-dag",
+        wait: runtime.wait,
+        cancel: runtime.cancel,
+      },
+      {
+        action: "start",
+        definition: {
+          key: "policy-denied",
+          name: "policy denied",
+          nodes: [{ id: "review", prompt: "review the plan", subagent_type: "momus", model: "omo-mock/mock-1" }],
+        },
+      },
+    )
+    if (started.details.kind !== "started") throw new Error("expected dag start")
+    const result = await runtime.wait(started.details.run_id as DagRunId, "session-dag")
+
+    // then
+    expect(result.status).toBe("failed")
+    const review = result.nodes.review
+    if (review?.state !== "failed") throw new Error("expected the denied node to fail")
+    expect(review.error.message).toContain("momus requires a plan gate")
+    expect(runner.handles).toHaveLength(0)
+    runtime.dispose()
+  })
+})

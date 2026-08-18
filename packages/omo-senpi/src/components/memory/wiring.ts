@@ -8,6 +8,7 @@ import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
 import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } from "./shutdown-drain"
 import { type SkillsUsageTracker } from "./skills-usage"
+import { type MemoryUsageTracker } from "./memory-usage"
 import { createSoulNoticeWiring } from "./soul-notice"
 import { branchEntryCount } from "./wiring-context"
 import {
@@ -26,6 +27,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
   const skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> } = { current: new Map() }
+  const memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> } = { current: new Map() }
   const reflectionLive = createMemoryReflectionLiveWiring(options, activeSession, lastEventCtx)
   const runtimeWiring = createMemoryRuntimeWiring(
     options,
@@ -60,6 +62,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
     for (const tracker of skillsUsageTrackersRef.current.values()) {
+      if (signal?.aborted === true) return
+      await tracker.flush(signal)
+    }
+    for (const tracker of memoryUsageTrackersRef.current.values()) {
       if (signal?.aborted === true) return
       await tracker.flush(signal)
     }
@@ -128,6 +134,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         lastEventCtx,
         activeSession,
         skillsUsageTrackersRef,
+        memoryUsageTrackersRef,
         onReflectionLaunch: reflectionLive.onReflectionLaunched,
         onSettled: reflectionLive.onSettled,
         onMemoryWrite: reflectionLive.syncRpc,
@@ -144,7 +151,17 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
       factsWiringFor(identity).reconcileExtractor()
-      await reflectionLive.bind(pi, sessionId, identity, eventCtx)
+      await reflectionLive.bind(
+        pi,
+        sessionId,
+        identity,
+        eventCtx,
+        () => {
+          void dreamTriggerWiring.requestPressureDream(sessionId).catch((error: unknown) => {
+            options.logger?.warn("omo-senpi memory pressure dream trigger failed", { error: describe(error) })
+          })
+        },
+      )
     },
 
     async flushSkillsUsage(): Promise<void> {
@@ -164,6 +181,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       reflectionLive.clearStatus(eventCtx)
     },
   }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function buildDreamTriggerWiring(

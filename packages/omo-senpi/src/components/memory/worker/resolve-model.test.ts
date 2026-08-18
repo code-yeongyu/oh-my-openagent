@@ -120,6 +120,42 @@ describe("resolveReflectionModel", () => {
     })
   })
 
+  test("#given the LAST canonical rung is selected #when earlier rungs are still findable #then they remain reflection fallbacks", () => {
+    // given: the availability snapshot only lists the last rung, so the category selects it, while
+    // find() (the direct lookup that beats a stale snapshot) still locates the earlier rung.
+    const earlier: SenpiModelPort = { provider: "extension-only", id: "primary" }
+    const selected: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
+    const snapshotRegistry = {
+      getAvailable: () => [selected],
+      find: (provider: string, modelId: string) =>
+        [earlier, selected].find((candidate) =>
+          candidate.provider === provider && candidate.id === modelId
+        ),
+    }
+    const config: OmoConfig = {
+      categories: {
+        quick: {
+          models: [
+            { model: "extension-only/primary", reasoning: "off" },
+            { model: "omo-mock/mock-1", reasoning: "minimal" },
+          ],
+        },
+      },
+    }
+
+    // when
+    const result = resolveReflectionModel("quick", config, snapshotRegistry)
+
+    // then
+    expect(result).toEqual({
+      kind: "resolved",
+      category: "quick",
+      model: "omo-mock/mock-1",
+      thinking: "minimal",
+      fallbacks: [{ model: "extension-only/primary", thinking: "off" }],
+    })
+  })
+
   test("#given legacy fallback_models and a stale availability snapshot #when find locates the chain #then reflection preserves every fallback", () => {
     // given
     const primary: SenpiModelPort = { provider: "extension-only", id: "primary" }

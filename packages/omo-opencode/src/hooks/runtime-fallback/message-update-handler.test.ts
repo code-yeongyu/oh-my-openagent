@@ -187,3 +187,49 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
   })
 })
+
+
+describe('Internal abort suppression guard (Layer-2)', () => {
+  it('#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early and PRESERVES sessionAwaitingFallbackResult (internal abort suppressed)', async () => {
+    // given: omo fallback in flight; assistant message with no visible content (omo own abort)
+    const sessionID = 'session-internal-guard'
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, 'test')
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID) // fallback result pending
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when: assistant message update with NO error (the abort omo itself caused)
+    await handler({ sessionID, info: { role: 'assistant', model: 'openai/gpt-5.4' } })
+
+    // then: sessionAwaitingFallbackResult is PRESERVED (guard returns early, doesn't clear it)
+    // and no abort/dispatch happens — the internal abort is silently suppressed
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(operations).toEqual([])
+  })
+})
+
+
+describe('Internal abort suppression guard (Layer-2)', () => {
+  it('#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early PRESERVING sessionStatusRetryKeys (internal abort suppressed, visible-response path skipped)', async () => {
+    // given: omo fallback in flight; assistant message with no visible content (omo own abort)
+    const sessionID = 'session-internal-guard'
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, 'test')
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionStatusRetryKeys.set(sessionID, 'retry-key-1') // marker that visible-path would clear
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when: assistant message update with NO error (the abort omo itself caused)
+    await handler({ sessionID, info: { role: 'assistant', model: 'openai/gpt-5.4' } })
+
+    // then: guard returns early — sessionStatusRetryKeys is PRESERVED (visible-path skipped)
+    // sessionAwaitingFallbackResult is also PRESERVED
+    expect(deps.sessionStatusRetryKeys.get(sessionID)).toBe('retry-key-1')
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(operations).toEqual([])
+  })
+})

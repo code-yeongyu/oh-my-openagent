@@ -235,7 +235,7 @@ function isReflectionRequest(value: unknown): value is ReflectionRequest {
   return (
     (request.trigger === "manual" || request.trigger === "compaction" || request.trigger === "step-count" || request.trigger === "dream") &&
     (request.trigger === "dream"
-      ? request.origin === "manual" || request.origin === "idle" || request.origin === "shutdown"
+      ? request.origin === "manual" || request.origin === "idle" || request.origin === "shutdown" || request.origin === "pressure"
       : request.origin === undefined) &&
     Array.isArray(request.conversationIds) && request.conversationIds.every((id) => typeof id === "string") &&
     Array.isArray(request.snapshots) &&

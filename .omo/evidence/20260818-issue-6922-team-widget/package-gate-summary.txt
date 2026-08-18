@@ -1,0 +1,8 @@
+1 tests skipped:
+(skip) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child
+
+ 1911 pass
+ 1 skip
+ 0 fail
+ 5442 expect() calls
+Ran 1912 tests across 279 files. [226.87s]

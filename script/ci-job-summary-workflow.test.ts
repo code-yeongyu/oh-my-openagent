@@ -16,6 +16,7 @@ const workflowExpectations = [
   {
     path: ".github/workflows/ci.yml",
     jobs: [
+      "ci-mode",
       "block-master-pr",
       "test",
       "typecheck",
@@ -36,9 +37,6 @@ const workflowExpectations = [
     path: ".github/workflows/publish.yml",
     jobs: [
       "gate-reuse",
-      "test",
-      "typecheck",
-      "codex-compatibility",
       "preflight-trust",
       "release-metadata",
       "prepare-release-state",

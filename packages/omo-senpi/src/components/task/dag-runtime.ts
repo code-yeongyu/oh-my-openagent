@@ -12,6 +12,7 @@ import {
   createDagRecovery,
   createDagWaitSurface,
   type DagFileStore,
+  type DagNodeSpawnPolicy,
   type DagManager,
   type DagRunEvent,
   type DagRunId,
@@ -54,6 +55,7 @@ export interface DagRuntimeDeps {
   readonly pi: SenpiExtensionAPI
   readonly engine: TaskEngine
   readonly logger: ComponentLogger
+  readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly coordinator?: IdleInjectionCoordinator
   readonly bridgeTimers?: DagBridgeTimers
   readonly statusUiTimers?: DagStatusUiTimers
@@ -128,6 +130,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       taskManager,
       initialRecord,
       executionMode: { agents: deps.engine.agents, config: deps.engine.omoConfig },
+      ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
       ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     })
     const created: { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } = { scheduler }
@@ -265,9 +268,34 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ? undefined
     : createDagWake({ coordinator: deps.coordinator, parentState: () => deps.engine.runtime.parentState() })
   const terminalWakeSeq = new Map<DagRunId, number>()
+  const pausedWakeSeq = new Map<DagRunId, number>()
+
+  // A pause is not terminal (the run stays live in the wake source and resumes next session), but it
+  // must still reach the parent: a reload/shutdown suspends in-flight runs, and without this the
+  // session is never told its DAG stopped. Dedupe keys are separate so a pause and a later terminal
+  // never suppress one another.
+  const notifyPaused = (event: DagRunEvent & { readonly type: "dag.run.paused" }): void => {
+    if ((pausedWakeSeq.get(event.runId) ?? 0) >= event.seq) return
+    pausedWakeSeq.set(event.runId, event.seq)
+    const record = baseStore.readCheckpoint<DagRunRecordV1>(event.runId)
+    if (record === null || record.parentSessionId !== activeSessionId) return
+    wake?.onRunEvent(
+      { runId: record.runId, name: record.name, parentSessionId: record.parentSessionId },
+      {
+        runId: event.runId,
+        seq: event.seq,
+        type: event.type,
+        ...(event.reason === undefined ? {} : { reason: event.reason }),
+      },
+    )
+  }
 
   const onEvent = (event: DagRunEvent): void => {
     if (event.type === "dag.run.started") wakeSource.onRunStart(event.runId)
+    if (event.type === "dag.run.paused") {
+      notifyPaused(event)
+      return
+    }
     if (event.type !== "dag.run.completed" && event.type !== "dag.run.failed" && event.type !== "dag.run.cancelled") return
     wakeSource.onRunTerminal(event.runId)
     if ((terminalWakeSeq.get(event.runId) ?? 0) >= event.seq) return
@@ -289,6 +317,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const recovery = createDagRecovery({
     store,
     taskManager,
+    ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     stopAdmission: (runId) => stoppedAdmissions.add(runId),
     reattach: (runId, taskId) => {

@@ -200,4 +200,60 @@ describe("dag wake", () => {
       "task st_1 completed\n\nDAG \"release-pipeline\" completed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)",
     )
   })
+
+  it("#given a run paused by session shutdown and an idle parent #when the pause event arrives #then one steer tells the main session the dag was paused", async () => {
+    // given
+    const harness = createHarness({ kind: "idle" })
+
+    // when
+    harness.wake.onRunEvent(run(), event("dag.run.paused", "dag_1", { reason: "session_shutdown" }))
+    await Promise.resolve()
+
+    // then
+    expect(harness.delivered).toHaveLength(1)
+    expect(harness.delivered[0]?.options).toEqual({ deliverAs: "steer" })
+    expect(harness.delivered[0]?.message.content).toBe(
+      "DAG \"release-pipeline\" paused (session_shutdown): it will resume when the session restarts.",
+    )
+    expect(harness.delivered[0]?.message.details).toEqual([{
+      customType: DAG_WAKE_MESSAGE_TYPE,
+      details: { runId: "dag_1", name: "release-pipeline", status: "paused", reason: "session_shutdown" },
+    }])
+  })
+
+  it("#given a pause during session shutdown #when the session starts again #then the buffered pause notice is redelivered", async () => {
+    // given
+    const harness = createHarness({ kind: "session_shutdown" })
+
+    // when
+    harness.wake.onRunEvent(run(), event("dag.run.paused", "dag_1", { reason: "session_shutdown" }))
+
+    // then the shutdown window buffers instead of dropping it
+    expect(harness.wake.bufferedCount(SESSION_ID)).toBe(1)
+    expect(harness.delivered).toHaveLength(0)
+
+    // when the same session comes back
+    harness.setParentState({ kind: "idle" })
+    harness.wake.onSessionStart(SESSION_ID)
+    await Promise.resolve()
+
+    // then
+    expect(harness.wake.bufferedCount(SESSION_ID)).toBe(0)
+    expect(harness.delivered).toHaveLength(1)
+    expect(harness.delivered[0]?.message.content).toContain("DAG \"release-pipeline\" paused")
+  })
+
+  it("#given a pause with no reason #when the event arrives #then the summary omits the reason clause", async () => {
+    // given
+    const harness = createHarness({ kind: "idle" })
+
+    // when
+    harness.wake.onRunEvent(run(), event("dag.run.paused"))
+    await Promise.resolve()
+
+    // then
+    expect(harness.delivered[0]?.message.content).toBe(
+      "DAG \"release-pipeline\" paused: it will resume when the session restarts.",
+    )
+  })
 })
