@@ -32,12 +32,12 @@ function writeBoulderJson(root: string, content: unknown): void {
   writeFileSync(join(root, ".omo", "boulder.json"), JSON.stringify(content))
 }
 
-function createLogger(): ComponentContext["logger"] & { entries: unknown[] } {
-  const entries: unknown[] = []
+function createLogger(): ComponentContext["logger"] & { entries: { level: string; message: string; details?: unknown }[] } {
+  const entries: { level: string; message: string; details?: unknown }[] = []
   return {
-    info: (_message: string, details?: unknown) => entries.push({ level: "info", details }),
-    warn: (_message: string, details?: unknown) => entries.push({ level: "warn", details }),
-    error: (_message: string, details?: unknown) => entries.push({ level: "error", details }),
+    info: (message: string, details?: unknown) => entries.push({ level: "info", message, details }),
+    warn: (message: string, details?: unknown) => entries.push({ level: "warn", message, details }),
+    error: (message: string, details?: unknown) => entries.push({ level: "error", message, details }),
     entries,
   }
 }
@@ -293,7 +293,151 @@ describe("omo-senpi start-work-continuation", () => {
     expect(delivered[0]).toContain("[Status: 0/1")
   })
 
-  it("#given identical boulder signature twice #when agent_end repeats #then second is suppressed", async () => {
+  // Case A: No-progress same-signature recovery allows bounded retry instead of permanent instant stall
+  it("#given active work #when agent_end repeats with identical signature #then allows bounded recovery retry", async () => {
+    const root = createTempWorkspace()
+    writePlan(root, "t", "## TODOs\n- [ ] 1. Task one\n")
+    writeBoulderJson(root, {
+      schema_version: 2,
+      active_work_id: "w1",
+      works: {
+        w1: {
+          work_id: "w1",
+          active_plan: ".omo/plans/t.md",
+          plan_name: "t",
+          session_ids: ["senpi:qa-s1"],
+          status: "active",
+          started_at: "2026-07-17T00:00:00Z",
+          updated_at: "2026-07-17T01:00:00Z",
+        },
+      },
+    })
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+    const { coordinator, delivered } = makeCoordinator()
+    await createStartWorkContinuationComponent({ maxSameSignatureRetries: 1 }).register(pi, {
+      logger,
+      config: { getFlag: () => false },
+      idleCoordinator: coordinator,
+    })
+
+    // Turn 1: initial continuation
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(delivered).toHaveLength(1)
+
+    // Turn 2: same signature (no progress yet) -> bounded retry continuation is emitted
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(delivered).toHaveLength(2)
+
+    // Verify structured logging
+    const scheduledEntries = logger.entries.filter((e) => e.message === "omo-senpi start-work-continuation scheduled")
+    expect(scheduledEntries).toHaveLength(2)
+    expect(scheduledEntries[1]?.details).toMatchObject({
+      isSameSignatureRetry: true,
+      sameSignatureRetries: 1,
+    })
+  })
+
+  // Case B: Retry remains strictly bounded when repeatedly producing no progress
+  it("#given no progress on signature S #when retry limit is reached #then stops with retry-budget-exhausted", async () => {
+    const root = createTempWorkspace()
+    writePlan(root, "t", "## TODOs\n- [ ] 1. Task one\n")
+    writeBoulderJson(root, {
+      schema_version: 2,
+      active_work_id: "w1",
+      works: {
+        w1: {
+          work_id: "w1",
+          active_plan: ".omo/plans/t.md",
+          plan_name: "t",
+          session_ids: ["senpi:qa-s1"],
+          status: "active",
+          started_at: "2026-07-17T00:00:00Z",
+          updated_at: "2026-07-17T01:00:00Z",
+        },
+      },
+    })
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+    const { coordinator, delivered } = makeCoordinator()
+    await createStartWorkContinuationComponent({ maxSameSignatureRetries: 2 }).register(pi, {
+      logger,
+      config: { getFlag: () => false },
+      idleCoordinator: coordinator,
+    })
+
+    // 1 initial + 2 retries = 3 continuations
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")) // initial (1)
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")) // retry 1 (2)
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")) // retry 2 (3)
+    expect(delivered).toHaveLength(3)
+
+    // 4th turn: retry budget exhausted -> suppressed
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(delivered).toHaveLength(3)
+
+    const exhausted = logger.entries.find(
+      (e) => e.message === "omo-senpi start-work-continuation skipped" && (e.details as any)?.reason === "retry-budget-exhausted",
+    )
+    expect(exhausted).toBeDefined()
+    expect(exhausted?.details).toMatchObject({
+      reason: "retry-budget-exhausted",
+      retries: 2,
+      maxRetries: 2,
+    })
+  })
+
+  // Case C: Normal plan/checklist advancement clears stale retry state
+  it("#given signature changes from S to S2 #when agent_end fires #then retry budget is reset for S2", async () => {
+    const root = createTempWorkspace()
+    writePlan(root, "t", "## TODOs\n- [ ] 1. Task one\n- [ ] 2. Task two\n")
+    const baseState = {
+      schema_version: 2,
+      active_work_id: "w1",
+      works: {
+        w1: {
+          work_id: "w1",
+          active_plan: ".omo/plans/t.md",
+          plan_name: "t",
+          session_ids: ["senpi:qa-s1"],
+          status: "active",
+          started_at: "2026-07-17T00:00:00Z",
+          updated_at: "2026-07-17T01:00:00Z",
+        },
+      },
+    }
+    writeBoulderJson(root, baseState)
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+    const { coordinator, delivered } = makeCoordinator()
+    await createStartWorkContinuationComponent({ maxSameSignatureRetries: 1 }).register(pi, {
+      logger,
+      config: { getFlag: () => false },
+      idleCoordinator: coordinator,
+    })
+
+    // S: initial (1) + retry (2)
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(delivered).toHaveLength(2)
+
+    // Now advance plan to S2 (1 task completed, updated_at changed)
+    writePlan(root, "t", "## TODOs\n- [x] 1. Task one\n- [ ] 2. Task two\n")
+    const updatedState = structuredClone(baseState)
+    updatedState.works.w1.updated_at = "2026-07-17T02:00:00Z"
+    writeBoulderJson(root, updatedState)
+
+    // S2: should successfully deliver and have fresh retry budget
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")) // S2 initial (3)
+    expect(delivered).toHaveLength(3)
+
+    // S2 retry: should also work because retry budget was re-armed
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")) // S2 retry (4)
+    expect(delivered).toHaveLength(4)
+  })
+
+  // Case D: User intervention resets continuation counter and retry budget
+  it("#given exhausted retry budget #when user input arrives #then state resets and continuation resumes", async () => {
     const root = createTempWorkspace()
     writePlan(root, "t", "## TODOs\n- [ ] 1. Task one\n")
     writeBoulderJson(root, {
@@ -313,18 +457,27 @@ describe("omo-senpi start-work-continuation", () => {
     })
     const pi = new FakeExtensionAPI()
     const { coordinator, delivered } = makeCoordinator()
-    await createStartWorkContinuationComponent().register(pi, {
+    await createStartWorkContinuationComponent({ maxSameSignatureRetries: 1 }).register(pi, {
       logger: createLogger(),
       config: { getFlag: () => false },
       idleCoordinator: coordinator,
     })
 
+    // S: initial (1) + retry (2) -> exhausted
     await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
     await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1")) // exhausted
+    expect(delivered).toHaveLength(2)
 
-    expect(delivered).toHaveLength(1)
+    // User inputs something
+    await pi.dispatch("input", { type: "input", text: "please continue with task 1", source: "user" }, eventCtx(root, "qa-s1"))
+
+    // Continuation should resume immediately on next agent_end
+    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root, "qa-s1"))
+    expect(delivered).toHaveLength(3)
   })
 
+  // Case E: Overall continuation cap enforcement
   it("#given 9 consecutive agent_end events with changing signature #when cap is 8 #then only 8 injections are delivered", async () => {
     const root = createTempWorkspace()
     writePlan(root, "t", "## TODOs\n- [ ] 1. Task one\n")
@@ -353,7 +506,6 @@ describe("omo-senpi start-work-continuation", () => {
     })
 
     for (let i = 0; i < 9; i++) {
-      // Vary the signature each iteration so stale-signature suppression does not mask the cap.
       const varied = structuredClone(baseState)
       varied.works.w1.updated_at = `2026-07-17T01:00:0${i}Z`
       writeBoulderJson(root, varied)

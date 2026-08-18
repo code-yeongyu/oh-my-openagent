@@ -4,10 +4,14 @@ import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../
 import { findContinuableBoulderWork } from "./boulder-eligibility"
 
 export interface StartWorkContinuationComponentOptions {
-  // none yet; retained for future DI seams
+  // Max retries for the same plan/checklist signature when no observable progress occurs
+  readonly maxSameSignatureRetries?: number
+  // Total consecutive automatic continuations before pausing for user steering
+  readonly continuationLimit?: number
 }
 
-const CONTINUATION_LIMIT = 8
+const DEFAULT_CONTINUATION_LIMIT = 8
+const DEFAULT_MAX_SAME_SIGNATURE_RETRIES = 1
 
 const START_WORK_STEERING_REMINDER = [
   "<omo-senpi-start-work>",
@@ -29,14 +33,18 @@ interface SessionManagerLike {
 }
 
 export function createStartWorkContinuationComponent(
-  _options: StartWorkContinuationComponentOptions = {},
+  options: StartWorkContinuationComponentOptions = {},
 ): OmoSenpiComponent {
+  const continuationLimit = options.continuationLimit ?? DEFAULT_CONTINUATION_LIMIT
+  const maxSameSignatureRetries = options.maxSameSignatureRetries ?? DEFAULT_MAX_SAME_SIGNATURE_RETRIES
+
   return {
     name: "start-work-continuation",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       const state = {
         consecutiveContinuations: 0,
         lastSignature: undefined as string | undefined,
+        sameSignatureRetries: 0,
       }
 
       pi.on("input", async (payload, eventCtx) => {
@@ -45,6 +53,7 @@ export function createStartWorkContinuationComponent(
 
         state.consecutiveContinuations = 0
         state.lastSignature = undefined
+        state.sameSignatureRetries = 0
         if (payload.streamingBehavior === undefined) return { action: "continue" }
 
         const sessionId = extractSessionId(eventCtx)
@@ -62,10 +71,11 @@ export function createStartWorkContinuationComponent(
       })
 
       pi.on("agent_end", async (_payload, eventCtx) => {
-        if (state.consecutiveContinuations >= CONTINUATION_LIMIT) {
+        if (state.consecutiveContinuations >= continuationLimit) {
           ctx.logger.info("omo-senpi start-work-continuation skipped", {
             reason: "continuation-cap-reached",
             count: state.consecutiveContinuations,
+            limit: continuationLimit,
           })
           return
         }
@@ -80,19 +90,41 @@ export function createStartWorkContinuationComponent(
         const continuable = findContinuableBoulderWork(cwd, sessionId)
         if (!continuable) {
           state.lastSignature = undefined
+          state.sameSignatureRetries = 0
           ctx.logger.info("omo-senpi start-work-continuation skipped", { reason: "not-continuable" })
           return
         }
 
         const { work, planPath, checklist } = continuable
         const signature = `${work.work_id}:${work.updated_at ?? work.started_at}:${checklist.completed}/${checklist.total}`
+
+        let isSameSignatureRetry = false
         if (state.lastSignature === signature) {
-          ctx.logger.info("omo-senpi start-work-continuation skipped", { reason: "stale-signature" })
-          return
+          if (state.sameSignatureRetries >= maxSameSignatureRetries) {
+            ctx.logger.info("omo-senpi start-work-continuation skipped", {
+              reason: "retry-budget-exhausted",
+              signature,
+              retries: state.sameSignatureRetries,
+              maxRetries: maxSameSignatureRetries,
+            })
+            return
+          }
+          isSameSignatureRetry = true
+          state.sameSignatureRetries += 1
+        } else {
+          // Progress observed / signature changed
+          state.lastSignature = signature
+          state.sameSignatureRetries = 0
         }
 
-        state.lastSignature = signature
         state.consecutiveContinuations += 1
+
+        ctx.logger.info("omo-senpi start-work-continuation scheduled", {
+          signature,
+          consecutiveContinuations: state.consecutiveContinuations,
+          isSameSignatureRetry,
+          sameSignatureRetries: state.sameSignatureRetries,
+        })
 
         const content = renderDirective({
           planName: work.plan_name,
@@ -104,7 +136,12 @@ export function createStartWorkContinuationComponent(
           sessionId: `senpi:${sessionId}`,
         })
 
-        deliverContinuation(pi, ctx, content)
+        deliverContinuation(pi, ctx, content, () => {
+          ctx.logger.info("omo-senpi start-work-continuation delivered", {
+            signature,
+            consecutiveContinuations: state.consecutiveContinuations,
+          })
+        })
       })
     },
   }
@@ -112,7 +149,12 @@ export function createStartWorkContinuationComponent(
 
 const START_WORK_CONTINUATION_INJECTION_KEY = "omo-senpi-start-work-continuation"
 
-function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext, content: string): void {
+function deliverContinuation(
+  pi: SenpiExtensionAPI,
+  ctx: ComponentContext,
+  content: string,
+  onDelivered?: () => void,
+): void {
   if (ctx.idleCoordinator !== undefined) {
     ctx.idleCoordinator.enqueue({
       key: START_WORK_CONTINUATION_INJECTION_KEY,
@@ -120,6 +162,7 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext, conte
       customType: "omo-senpi:start-work-continuation",
       content,
       display: false,
+      onFlushed: onDelivered,
     })
     ctx.idleCoordinator.scheduleFlush()
     return
@@ -132,6 +175,7 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext, conte
     },
     { triggerTurn: true, deliverAs: "followUp" },
   )
+  onDelivered?.()
 }
 
 interface DirectiveState {
