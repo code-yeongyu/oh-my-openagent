@@ -90,6 +90,13 @@ export async function killSenpiHost(child, terminate = killProcessGroup) {
   return terminate(child.pid)
 }
 
+export function externalTerminationMatchesPlatformFacts(record, platform, terminationInjected) {
+  if (!terminationInjected) return false
+  if (record?.status !== "error") return false
+  if (record.killed === true) return true
+  return platform === "win32" && record.error_message === "RPC child exited with code 1"
+}
+
 function waitForChildClose(child, timeoutMs) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
   return new Promise((resolve, reject) => {
@@ -117,19 +124,21 @@ export async function runKillCheck(senpiBin) {
   try {
     const running = await pollRecord(stateDir, (r) => r.name === "pk" && runningRpcChild(r), 40_000)
     if (running === undefined) {
-      return { check: "kill_marks_error_killed_true", verdict: "FAIL", reason: "no running rpc child appeared to kill" }
+      return { check: "external_termination_records_platform_facts", verdict: "FAIL", reason: "no running rpc child appeared to kill" }
     }
+    let terminationInjected = false
     try {
-      process.kill(running.pid, "SIGKILL")
+      terminationInjected = process.kill(running.pid, "SIGKILL")
     } catch {
-      // already gone counts as killed
+      // A child that exited before the injection cannot prove external termination.
     }
-    const errored = await pollRecord(stateDir, (r) => r.task_id === running.task_id && r.status === "error" && r.killed === true, 15_000)
+    const errored = await pollRecord(stateDir, (r) => r.task_id === running.task_id && r.status === "error", 15_000)
+    const matchesPlatformFacts = externalTerminationMatchesPlatformFacts(errored, process.platform, terminationInjected)
     return {
-      check: "kill_marks_error_killed_true",
-      verdict: errored ? "PASS" : "FAIL",
-      ...(errored ? {} : { reason: "kill did not yield status=error killed:true" }),
-      facts: { pid: running.pid, killed: errored?.killed ?? false, error_excerpt: (errored?.error_message ?? "").slice(0, 120) },
+      check: "external_termination_records_platform_facts",
+      verdict: matchesPlatformFacts ? "PASS" : "FAIL",
+      ...(matchesPlatformFacts ? {} : { reason: terminationInjected ? "external termination did not yield platform-appropriate error facts" : "rpc child exited before external termination could be injected" }),
+      facts: { pid: running.pid, terminationInjected, killed: errored?.killed ?? false, error_excerpt: (errored?.error_message ?? "").slice(0, 120) },
     }
   } finally {
     await cleanupSenpiHost(parent)

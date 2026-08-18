@@ -154,6 +154,7 @@ test.skipIf(!isWin32)(
     const payload = parsed as DriverPayload
     const route = check(payload, "process_mode_routes_to_rpc_runner")
     const spawnProof = check(payload, "spawn_process_pid_and_session_jsonl")
+    const externalTermination = check(payload, "external_termination_records_platform_facts")
     const leakProof = check(payload, "no_leaked_rpc_child_pids")
 
     // then
@@ -163,6 +164,7 @@ test.skipIf(!isWin32)(
     expect(route?.facts?.pid).toBeGreaterThan(0)
     expect(spawnProof?.verdict).toBe("PASS")
     expect(spawnProof?.facts?.sessionJsonl).toBe(true)
+    expect(externalTermination?.verdict).toBe("PASS")
     expect(payload.realCredentialsUntouched).toBe(true)
     expect(payload.wholeDirDigestStable).toBe(true)
     expect(leakProof?.verdict).toBe("PASS")
