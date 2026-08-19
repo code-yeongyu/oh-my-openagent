@@ -1,5 +1,5 @@
 // allow: SIZE_OK - the scheduler acceptance matrix keeps wave ordering, failure continuation, queue reporting, and residency batching in one fake-manager fixture.
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -14,6 +14,13 @@ import type { DagExecutionModeSources } from "./execution-mode"
 import { createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+
+// bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
+// setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
+// the built-in 5000ms. These wave/residency cases drive a fake manager plus a real file store,
+// which overshoots 5s on a windows runner and times out the whole barrier suite. Set the floor
+// here, where Bun does honour it.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 const cleanupRoots: string[] = []
 const runId = "run-scheduler" as DagRunId

@@ -53,9 +53,26 @@ function writeScript(sandbox, parentSteps, childSteps) {
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ parentSteps, childSteps }, null, 2)}\n`)
 }
 
+// Every scenario gets a brand-new agent dir, and SENPI_CODING_AGENT_DIR is what omo resolves its
+// omo-native state dir from, so onboarding wins its once-per-install claim on EVERY run and fires a
+// triggerTurn message from session_start. That turn starts before print mode issues the harness
+// prompt, so print mode's bare prompt hits an already-streaming session, senpi rejects it with
+// "Agent is already processing", and the host exits 1 having persisted no task record. Pre-claiming
+// the marker keeps the scripted scenario in control of the first turn, as it is for a real user who
+// already onboarded.
+function claimOnboardingMarker(agentDir) {
+  const stateDir = join(agentDir, "omo-senpi", "omo-native")
+  mkdirSync(stateDir, { recursive: true })
+  writeFileSync(
+    join(stateDir, "onboarding-completed"),
+    `${JSON.stringify({ completedAt: new Date().toISOString(), version: 1 })}\n`,
+  )
+}
+
 export function prepareScenarioSandbox(projectConfig = PROJECT_OMO_CONFIG) {
   const sandbox = createSandbox()
   seedSandbox(sandbox)
+  claimOnboardingMarker(sandbox.agentDir)
   const sessionDir = join(sandbox.root, "sessions")
   mkdirSync(sessionDir, { recursive: true })
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })

@@ -3,7 +3,14 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { emitReflectionHealthAlert, REFLECTION_HEALTH_ENTRY_TYPE } from "./health-alert"
+import type { ThemeColor } from "@code-yeongyu/senpi"
+
+import {
+  emitReflectionHealthAlert,
+  REFLECTION_HEALTH_ENTRY_TYPE,
+  renderReflectionHealthEntry,
+  type ReflectionHealthEntry,
+} from "./health-alert"
 import { CapturedCompletionApi } from "./runner.test-support"
 
 const roots: string[] = []
@@ -133,6 +140,52 @@ describe("reflection health alert", () => {
     // then
     expect([...seen]).toEqual(["session-a:child_exit:stable", "session-b:child_exit:stable"])
     expect(second.api.entries.filter((entry) => entry.customType === REFLECTION_HEALTH_ENTRY_TYPE)).toHaveLength(1)
+  })
+})
+
+const BOLD = "\u001b[1m"
+const BOLD_OFF = "\u001b[22m"
+function bold(text: string): string {
+  return `${BOLD}${text}${BOLD_OFF}`
+}
+
+const PLAIN_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  italic: (text: string) => text,
+}
+
+const HEALTH: ReflectionHealthEntry = {
+  schemaVersion: 1,
+  identity: "project-a1b2c3d4",
+  streak: 4,
+  fingerprint: "child_exit:merge refused",
+  lastReason: "child_exit",
+  lastDetail: "merge refused",
+  sinceISO: "2026-08-12T22:15:00.000Z",
+  recommendation: "run /login <provider>",
+}
+
+describe("renderReflectionHealthEntry house notice contract", () => {
+  test("#given a fragment recommendation #when it renders collapsed #then the why line is a dimmable full sentence and detail is omitted", () => {
+    // when
+    const component = renderReflectionHealthEntry({ data: HEALTH } as never, { expanded: false }, PLAIN_THEME as never)
+
+    // then
+    expect(component).toBeDefined()
+    expect(component!.render(120)).toEqual([
+      bold("✗ Memory reflection failing · 4 runs in a row"),
+      "Run /login <provider>.",
+    ])
+  })
+
+  test("#when it renders expanded #then the detail row carries reason since and identity", () => {
+    // when
+    const component = renderReflectionHealthEntry({ data: HEALTH } as never, { expanded: true }, PLAIN_THEME as never)
+
+    // then
+    expect(component!.render(120)[2]).toBe(
+      "reason child_exit · merge refused · since 2026-08-12T22:15:00.000Z · identity project-a1b2c3d4",
+    )
   })
 })
 

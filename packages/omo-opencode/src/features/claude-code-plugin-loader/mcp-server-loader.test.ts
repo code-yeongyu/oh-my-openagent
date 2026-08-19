@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, setDefaultTimeout } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -9,6 +9,12 @@ const PROJECT_DIR = join(TEST_DIR, "project")
 const PROJECT_SUBDIRECTORY = join(PROJECT_DIR, "packages", "app")
 const PLUGIN_DIR = join(TEST_DIR, "plugin")
 const MCP_CONFIG_PATH = join(PLUGIN_DIR, "mcp.json")
+
+// Bun honours a preload's setDefaultTimeout only for the FIRST test file of a run, so this file
+// falls back to the built-in 5000ms. That budget covers the beforeEach/afterEach hooks too - and a
+// hook timeout ignores a test's own `}, N)` argument - so the windows runner timed the hooks out
+// while building the plugin fixture tree. Set the floor here, where Bun does honour it.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 describe("loadPluginMcpServers", () => {
   beforeEach(() => {

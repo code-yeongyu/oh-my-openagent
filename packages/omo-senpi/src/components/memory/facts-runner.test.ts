@@ -65,7 +65,7 @@ describe("quick-pinned facts launch", () => {
     expect(factsResult.status).toBe("failed")
     expect(surfaces).toEqual(["reflection", "facts"])
     await rm(reflection.root, { recursive: true, force: true })
-  }, 30_000)
+  }, 90_000)
 
   test("#given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit", async () => {
     // given
@@ -100,7 +100,7 @@ describe("quick-pinned facts launch", () => {
     expect(ledger.applyRecovery.paths.map((entry: { path: string }) => entry.path)).toEqual(
       [...ledger.applyRecovery.paths].map((entry: { path: string }) => entry.path).sort(),
     )
-  }, 30_000)
+  }, 90_000)
 
   test("#given an extension-only quick primary and a child-visible fallback #when facts extraction launches #then it retries and commits with the fallback", async () => {
     // given
@@ -111,6 +111,10 @@ describe("quick-pinned facts launch", () => {
     const base = runnerOptions(root, identity, queue, "model-fallback")
     const runner = new FactsExtractorRunner({
       ...base,
+      // The shared deadline must cover the preflight probe plus both attempts (~7 cold bun
+      // spawns); the 10s default fires mid-attempt on a loaded windows-latest runner, and a
+      // timeout is a non-retryable miss so the fallback never launches.
+      deadlineMs: 45_000,
       sandbox: (args) => {
         const modelIndex = args.args.indexOf("--model")
         attempted.push(args.args[modelIndex + 1] ?? "missing")
@@ -134,7 +138,7 @@ describe("quick-pinned facts launch", () => {
     expect(attemptNumbers).toEqual([1, 2])
     expect(new Set(deadlines).size).toBe(1)
     expect(await queue.listPending()).toHaveLength(0)
-  }, 30_000)
+  }, 60_000)
 
   test("#given facts attempt two has a stale attempt-one outcome #when reconciled before the shared deadline #then the retry remains active", async () => {
     // given

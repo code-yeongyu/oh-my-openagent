@@ -188,7 +188,9 @@ describe("/doctor", () => {
     const { identity, pi, ctx } = await harness()
     const completions = join(identity.identityPaths.reflection, "completions")
     await mkdir(completions, { recursive: true })
+    const failureBaseMs = Date.now() - 3 * 60 * 60_000
     for (let index = 0; index < 3; index += 1) {
+      const startedAtMs = failureBaseMs + index * 60_000
       await writeFile(join(completions, `run-${index}.json`), `${JSON.stringify({
         schemaVersion: 1,
         runId: `run-${index}`,
@@ -199,8 +201,8 @@ describe("/doctor", () => {
         outcome: "failed",
         reason: "model-not-found",
         detail: "configured model unavailable",
-        startedAt: `2026-08-12T0${index}:00:00.000Z`,
-        finishedAt: `2026-08-12T0${index}:01:00.000Z`,
+        startedAt: new Date(startedAtMs).toISOString(),
+        finishedAt: new Date(startedAtMs + 60_000).toISOString(),
         delivery: { status: index === 2 ? "pending" : "consumed" },
       })}\n`)
     }

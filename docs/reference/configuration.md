@@ -697,6 +697,12 @@ Records about individuals, stored as cards with an observation ledger.
 | ------------------ | ------- | ------------------------------------------------------ |
 | `soul.edit_notice` | `true`  | Surface a notice when the persona or identity changes   |
 
+#### Write Notice
+
+| Option                  | Default | Description                                                        |
+| ----------------------- | ------- | ------------------------------------------------------------------ |
+| `write_notice.enabled`  | `true`  | Render memory writes as a notice row instead of the plain commit line |
+
 #### Sync and Search
 
 | Option           | Default | Description                                    |

@@ -39,6 +39,7 @@ export interface PeopleAskOptions {
   readonly registry: SenpiModelRegistryPort<SenpiModelPort> | undefined
   readonly env?: NodeJS.ProcessEnv
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
   readonly deadlineMs?: number
 }
 
@@ -96,7 +97,7 @@ export function createPeopleAskRunner(options: PeopleAskOptions): PeopleAskRunne
     ]
     const launch = options.senpiCommand === undefined
       ? resolveSenpiLaunch(env)
-      : { command: options.senpiCommand, prefixArgs: [] }
+      : { command: options.senpiCommand, prefixArgs: options.senpiPrefixArgs ?? [] }
     const answer = await runChild(
       launch.command,
       [...launch.prefixArgs, ...args],

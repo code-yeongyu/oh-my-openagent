@@ -70,7 +70,10 @@ async function makeRun(options: {
     args: [childFixture, options.mode, runDir],
     cwd: runDir,
     env: { ...process.env },
-    hardDeadlineAt: options.hardDeadlineAt ?? Date.now() + 10_000,
+    // Non-deadline runs get a load-tolerant budget: cold bun spawns plus fsync'd identity
+    // writes overshoot 10s on a loaded windows-latest runner, and the supervisor records
+    // timedOut from the deadline instant being reached even when the child exited cleanly.
+    hardDeadlineAt: options.hardDeadlineAt ?? Date.now() + 45_000,
     terminationGraceMs: options.terminationGraceMs ?? 1_000,
     maxOutputBytes: 65_536,
     stdoutPath: join(runDir, "child-stdout.log"),

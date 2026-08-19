@@ -81,6 +81,14 @@ export const OmoMemorySoulSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
+// Write notice (memory / memory_apply_patch tool-result row)
+// ---------------------------------------------------------------------------
+
+export const OmoMemoryWriteNoticeSchema = z.object({
+  enabled: z.boolean().default(true),
+}).strict()
+
+// ---------------------------------------------------------------------------
 // Layer (deep-partial) variants
 // ---------------------------------------------------------------------------
 
@@ -136,6 +144,10 @@ export const OmoMemorySoulLayerSchema = z.object({
   edit_notice: z.boolean().optional(),
 }).strict()
 
+export const OmoMemoryWriteNoticeLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+}).strict()
+
 // ---------------------------------------------------------------------------
 // Per-agent overrides (layer-shaped)
 // ---------------------------------------------------------------------------
@@ -149,6 +161,7 @@ export const OmoMemoryAgentOverridesSchema = z.object({
   dream: OmoMemoryDreamLayerSchema.optional(),
   people: OmoMemoryPeopleLayerSchema.optional(),
   soul: OmoMemorySoulLayerSchema.optional(),
+  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
@@ -184,6 +197,7 @@ export const OmoMemorySettingsSchema = z.object({
   }),
   people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
   soul: OmoMemorySoulSchema.default({ edit_notice: true }),
+  write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
   sync: OmoMemorySyncSchema.default({ enabled: true }),
   search: OmoMemorySearchSchema.default({ enabled: true }),
   compile_warn_tokens: z.number().int().positive().default(30000),
@@ -200,6 +214,7 @@ export const OmoMemorySettingsLayerSchema = z.object({
   dream: OmoMemoryDreamLayerSchema.optional(),
   people: OmoMemoryPeopleLayerSchema.optional(),
   soul: OmoMemorySoulLayerSchema.optional(),
+  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
@@ -219,6 +234,7 @@ export type OmoMemoryFacts = z.infer<typeof OmoMemoryFactsSchema>
 export type OmoMemoryDream = z.infer<typeof OmoMemoryDreamSchema>
 export type OmoMemoryPeople = z.infer<typeof OmoMemoryPeopleSchema>
 export type OmoMemorySoul = z.infer<typeof OmoMemorySoulSchema>
+export type OmoMemoryWriteNotice = z.infer<typeof OmoMemoryWriteNoticeSchema>
 export type OmoMemoryAgentOverrides = z.infer<typeof OmoMemoryAgentOverridesSchema>
 export type OmoMemorySettings = z.infer<typeof OmoMemorySettingsSchema>
 export type OmoMemorySettingsLayer = z.infer<typeof OmoMemorySettingsLayerSchema>

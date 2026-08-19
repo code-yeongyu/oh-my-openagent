@@ -17,7 +17,7 @@ import type {
   ReflectionSpawnArgs,
   ReflectionSpawnPaths,
 } from "./spawn-types"
-import { resolveSenpiLaunch } from "./senpi-command"
+import { resolveMemoryChildLaunch, resolveSenpiLaunch } from "./senpi-command"
 
 export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
   const sessionDir = join(input.reflectionSessionsDir, safeRunId(input.run.runId))
@@ -117,9 +117,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${prompt}`,
   ]
-  const launch = input.senpiCommand === undefined
-    ? resolveSenpiLaunch(input.env)
-    : { command: input.senpiCommand, prefixArgs: [] }
+  const launch = resolveMemoryChildLaunch(input)
   return {
     runId: input.run.runId,
     attempt: input.attempt ?? 1,
@@ -158,7 +156,10 @@ export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnIn
   if (parentSessionFile === undefined) {
     throw new Error("fork-mode reflection requires the parent session file")
   }
+  // Fork mode replaces the sandboxed argv wholesale, so it must re-apply the launch prefix the
+  // base spawn resolved: without it the child is the bare interpreter and dies on senpi flags.
   const args = [
+    ...resolveMemoryChildLaunch(input).prefixArgs,
     "-p",
     "--fork", parentSessionFile,
     "--session-dir", base.paths.sessionDir,

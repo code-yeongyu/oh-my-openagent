@@ -4,7 +4,7 @@ import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -15,6 +15,7 @@ import {
   type MemoryRpcGitRepo,
   type MemoryRpcSnapshot,
 } from "./memory-rpc-bridge"
+import { createMemoryRpcGitRepo } from "./memory-rpc-snapshot-state"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -364,6 +365,39 @@ describe("memory rpc bridge", () => {
 
       const snapshot = host.emits[0]?.data as MemoryRpcSnapshot
       expect(snapshot.repo).toEqual({ dirty: false, dirtyPaths: 0, systemTokensEstimate: 0 })
+      bridge.dispose()
+    })
+  })
+
+  describe("#given a real two-commit memory repo", () => {
+    test("#when the bridge syncs #then the snapshot carries size and timeline fields at schemaVersion 1", async () => {
+      const context = await contextFixture()
+      const dir = context.identityPaths.repo
+      const gitRepo = new GitMemoryRepo({ dir, agentId: "omo-memory-rpc" })
+      await gitRepo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "first\n" }] })
+      await writeFile(join(dir, "system/persona.md"), "second entry body\n", "utf8")
+      await gitRepo.commitWrite(["system/persona.md"], "memory: second entry", {
+        agentId: "omo-memory-rpc",
+        authorName: "Omo Agent",
+      })
+      const log = await gitRepo.log({ limit: 2 })
+      const host = rpcHost()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: createMemoryRpcGitRepo,
+      })
+
+      bridge.attach("session-1")
+      await bridge.sync()
+
+      const snapshot = host.emits[0]?.data as MemoryRpcSnapshot
+      expect(snapshot.schemaVersion).toBe(1)
+      expect(snapshot.repo.fileCount).toBe(1)
+      expect(snapshot.repo.totalBytes).toBe(Buffer.byteLength("second entry body\n", "utf8"))
+      expect(snapshot.repo.systemBytes).toBe(snapshot.repo.totalBytes)
+      expect(snapshot.repo.entriesToday).toBe(2)
+      expect(snapshot.repo.previousEntryAtISO).toBe(log[1]!.committedAt)
       bridge.dispose()
     })
   })

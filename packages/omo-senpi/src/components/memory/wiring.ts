@@ -9,7 +9,7 @@ import { registerMemoryFilesystemPolicy } from "./policy-guard"
 import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } from "./shutdown-drain"
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
-import { createSoulNoticeWiring } from "./soul-notice"
+import { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import { branchEntryCount } from "./wiring-context"
 import {
   createMemoryReflectionLiveWiring,
@@ -51,12 +51,23 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       }
     },
   })
-  const soulNoticeWiring = createSoulNoticeWiring({
+  const noticeWiring = createMemoryNoticeWiring({
     resolveContext,
     resolveEditNotice: (identity) => {
       const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
       const override = settings.agents[identity]?.soul
       return override?.edit_notice ?? settings.soul.edit_notice
+    },
+    resolveWriteNotice: (identity) => {
+      // Presentation must never depend on config health, matching the direct surface's gate:
+      // an unreadable config keeps the default on.
+      try {
+        const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+        const override = settings.agents[identity]?.write_notice
+        return override?.enabled ?? settings.write_notice.enabled
+      } catch {
+        return true
+      }
     },
   })
 
@@ -121,7 +132,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         options,
         promptCache,
         nudgeWiring,
-        soulNoticeWiring,
+        noticeWiring,
         dreamTriggerWiring,
         completionApi: createReflectionCompletionApi,
         resolveContext,

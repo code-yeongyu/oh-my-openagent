@@ -189,11 +189,11 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
       },
       required: ["paths"],
       // Exactly one explicit rule source per call (ub §11): ruleFile XOR inlineRules.
-      // Advertised so a client sees the contract before the parser rejects the call.
-      oneOf: [
-        { type: "object", required: ["ruleFile"], not: { required: ["inlineRules"] } },
-        { type: "object", required: ["inlineRules"], not: { required: ["ruleFile"] } },
-      ],
+      // The contract is published in both property descriptions and enforced by
+      // parseScanInput, NOT by a schema-level oneOf/not: Cursor's AgentService gateway
+      // cannot convert JSON-Schema composition keywords to protobuf and kills the entire
+      // run with a wrapped `resource_exhausted` when it meets one. Same reasoning as the
+      // byte budgets above — the parser stays authoritative, the schema stays portable.
       additionalProperties: false,
     },
   },

@@ -346,6 +346,26 @@ describe("memory reflection entry rendering", () => {
       // then
       expect(lines[0]).toBe(bold("● Memory reflection · 1 older completion collapsed"))
     })
+
+    test("#when it renders collapsed #then the time range stays off the notice", () => {
+      // when
+      const lines = render(renderReflectionSummaryEntry, summary)
+
+      // then
+      expect(lines).toEqual([
+        bold("⚠ Memory reflection · 7 older completions collapsed"),
+        "Delivered while this session was away; 2 need attention.",
+        "most common child_exit:merge refused",
+      ])
+    })
+
+    test("#when it renders expanded #then the detail row carries the time range", () => {
+      // when
+      const lines = render(renderReflectionSummaryEntry, summary, { expanded: true })
+
+      // then
+      expect(lines[3]).toBe("oldest 2026-08-11T04:00:00.000Z · newest 2026-08-13T08:00:00.000Z")
+    })
   })
 
   describe("#given a reflection failure streak", () => {
@@ -374,6 +394,25 @@ describe("memory reflection entry rendering", () => {
         "reason child_exit · merge refused · since 2026-08-12T22:15:00.000Z · identity project-a1b2c3d4",
       ])
       expect(recorder.colors).toEqual(["error", "dim", "dim"])
+    })
+
+    test("#when the alert renders collapsed #then the detail row is omitted", () => {
+      // when
+      const lines = render(renderReflectionHealthEntry, health)
+
+      // then
+      expect(lines).toEqual([
+        bold("✗ Memory reflection failing · 4 runs in a row"),
+        "Commit or stash the memory worktree, then rerun /memory reflect.",
+      ])
+    })
+
+    test("#when the recommendation is a fragment #then the why line is a full sentence", () => {
+      // when
+      const lines = render(renderReflectionHealthEntry, { ...health, recommendation: "run /login <provider>" })
+
+      // then
+      expect(lines[1]).toBe("Run /login <provider>.")
     })
   })
 

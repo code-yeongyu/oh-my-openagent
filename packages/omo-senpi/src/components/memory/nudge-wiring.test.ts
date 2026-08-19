@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
 
+import type { ThemeColor } from "@code-yeongyu/senpi"
 import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryBinding } from "./binding"
@@ -12,6 +13,8 @@ import { MemoryFakeExtensionAPI, type SessionEntryFixture } from "./memory.test-
 import {
   ACCEPTED_TURNS_ENTRY_TYPE,
   createMemoryNudgeWiring,
+  renderAcceptedTurnsEntry,
+  type AcceptedTurnsRecord,
 } from "./nudge-wiring"
 
 const roots: string[] = []
@@ -266,4 +269,108 @@ describe("createMemoryNudgeWiring", () => {
       toolCallId: "call-mcp-1",
     })
   }, 30_000)
+})
+
+const BOLD = "\u001b[1m"
+const BOLD_OFF = "\u001b[22m"
+function bold(text: string): string {
+  return `${BOLD}${text}${BOLD_OFF}`
+}
+
+const PLAIN_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  italic: (text: string) => text,
+}
+
+function recordingTheme(): {
+  readonly theme: { fg: (color: ThemeColor, text: string) => string; italic: (text: string) => string }
+  readonly colors: ThemeColor[]
+  readonly italics: string[]
+} {
+  const colors: ThemeColor[] = []
+  const italics: string[] = []
+  return {
+    theme: {
+      fg: (color: ThemeColor, text: string) => {
+        colors.push(color)
+        return text
+      },
+      italic: (text: string) => {
+        italics.push(text)
+        return text
+      },
+    },
+    colors,
+    italics,
+  }
+}
+
+function acceptedTurns(over: Partial<AcceptedTurnsRecord> = {}): AcceptedTurnsRecord {
+  return {
+    version: 1,
+    sessionId: "session-1",
+    priorUserTurns: 8,
+    sessionBaselineTurns: 6,
+    ...over,
+  }
+}
+
+describe("renderAcceptedTurnsEntry", () => {
+  test("#given an accepted-turns record #when it renders collapsed #then a muted notice leads with the turn count", () => {
+    // when
+    const lines = renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: false }, PLAIN_THEME as never)!.render(120)
+
+    // then
+    expect(lines).toEqual([
+      bold("· Memory accepted turns · 8 turns"),
+      "This session has recorded 8 accepted user turns.",
+      "baseline 6",
+    ])
+  })
+
+  test("#given a single accepted turn #when it renders #then the turn noun is singular", () => {
+    // when
+    const lines = renderAcceptedTurnsEntry(
+      { data: acceptedTurns({ priorUserTurns: 1, sessionBaselineTurns: 0 }) } as never,
+      { expanded: false },
+      PLAIN_THEME as never,
+    )!.render(120)
+
+    // then
+    expect(lines[0]).toBe(bold("· Memory accepted turns · 1 turn"))
+    expect(lines[1]).toBe("This session has recorded 1 accepted user turn.")
+  })
+
+  test("#when it renders expanded #then the detail row carries the session id", () => {
+    // when
+    const lines = renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, PLAIN_THEME as never)!.render(120)
+
+    // then
+    expect(lines).toEqual([
+      bold("· Memory accepted turns · 8 turns"),
+      "This session has recorded 8 accepted user turns.",
+      "baseline 6",
+      "session session-1",
+    ])
+  })
+
+  test("#when it renders collapsed #then the session id stays off the notice", () => {
+    // when
+    const lines = renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: false }, PLAIN_THEME as never)!.render(120)
+
+    // then
+    expect(lines).not.toContain("session session-1")
+  })
+
+  test("#when coloured #then the title is muted and the secondary rows are dim", () => {
+    // given
+    const recorder = recordingTheme()
+
+    // when
+    renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, recorder.theme as never)!.render(120)
+
+    // then
+    expect(recorder.colors).toEqual(["muted", "dim", "dim", "dim"])
+    expect(recorder.italics).toHaveLength(1)
+  })
 })

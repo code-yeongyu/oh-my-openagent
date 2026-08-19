@@ -1,0 +1,31 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/memory-usage-wiring.test.ts:
+(pass) registerMemoryUsage > #given a read tool targeting reference/project/foo.md #when dispatched then flushed #then foo.md.count is 1 [23.57ms]
+(pass) registerMemoryUsage > #given a read tool targeting system/persona.md #when dispatched then flushed #then ledger is empty (system excluded) [112.73ms]
+(pass) registerMemoryUsage > #given a read tool targeting .tmp/scratch.md #when dispatched then flushed #then ledger is empty (.tmp excluded) [18.92ms]
+(pass) registerMemoryUsage > #given a write tool targeting reference/project/foo.md #when dispatched then flushed #then ledger is empty (only read tools tracked) [8.78ms]
+(pass) registerMemoryUsage > #given a read tool targeting a path outside the repo #when dispatched then flushed #then ledger is empty [8.20ms]
+
+packages/omo-senpi/src/components/memory/commands/doctor.test.ts:
+(pass) /doctor > #given a healthy repository #when doctor runs #then every deterministic check passes [602.22ms]
+(pass) /doctor > #given a persona still equal to the v1 seed #when doctor runs #then a soul-seed advisory is reported [542.68ms]
+(pass) /doctor > #given a persona that diverged from the v1 seed #when doctor runs #then no soul-seed advisory fires [530.33ms]
+(pass) /doctor > #given no repository #when doctor runs #then the repository check fails with an actionable hint [0.71ms]
+(pass) /doctor > #given a memory file with invalid frontmatter #when doctor runs #then the sweep fails and names the file [558.63ms]
+(pass) /doctor > #given a missing persona file #when doctor runs #then a persona warning is reported [521.60ms]
+(pass) /doctor > #given a lock owned by a dead pid #when doctor runs #then the stale lock is reported with its path [531.81ms]
+(pass) /doctor > #given a lock owned by a live pid #when doctor runs #then no stale lock is reported [528.60ms]
+(pass) /doctor > #given repeated model-not-found reflection failures #when doctor runs #then reflection health and remediation are reported [541.30ms]
+(pass) /doctor > #given an abandoned reservation run #when doctor runs #then manual-disposal paths are reported [537.79ms]
+(pass) /doctor > #given an unregistered worktree directory #when doctor runs #then the orphan is reported [646.07ms]
+(pass) /doctor > #given a system estimate over the warn threshold #when doctor runs #then a token advisory is reported [620.62ms]
+(pass) /doctor > #given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix [659.24ms]
+(pass) /doctor > #given parked facts batches #when doctor runs #then one bounded advisory line names /facts retry [1234.38ms]
+(pass) /doctor > #given no facts failures #when doctor runs #then no facts advisory line is rendered [684.39ms]
+(pass) /doctor > #given an unbound session #when doctor runs #then an actionable error is returned [0.24ms]
+
+ 21 pass
+ 0 fail
+ 44 expect() calls
+Ran 21 tests across 2 files. [11.11s]
