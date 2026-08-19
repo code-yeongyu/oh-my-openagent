@@ -10,7 +10,7 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { createTask } from "../team-tasklist/store"
 import { createTaskInput } from "../team-tasklist/test-support"
 import { getInboxDir, getTasksDir, resolveBaseDir } from "../team-registry/paths"
-import { createRuntimeState, saveRuntimeState } from "../team-state-store/store"
+import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "../team-state-store/store"
 import { aggregateStatus } from "./status"
 
 async function createTemporaryBaseDir(): Promise<string> {
@@ -139,5 +139,31 @@ describe("aggregateStatus", () => {
     expect(result.concurrency.runningOnSameModel).toBe(5)
     expect(result.concurrency.queuedOnSameModel).toBe(3)
     expect(result.concurrency.teamRunIdSpecific).toBe(4)
+  })
+
+  test("reports idleDurationMs for idle members with a lastActiveAt timestamp", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const teamRunId = await seedRuntimeState(baseDir, "team-delta", "lead-4", ["session-idle"])
+    const lastActiveAt = Date.now() - 5_000
+    const updatedRuntimeState = {
+      ...(await loadRuntimeState(teamRunId, config)),
+      members: (await loadRuntimeState(teamRunId, config)).members.map((member) =>
+        member.name === "member-1" ? { ...member, status: "idle" as const, lastActiveAt } : member,
+      ),
+    }
+    await saveRuntimeState(updatedRuntimeState, config)
+
+    // when
+    const result = await aggregateStatus(teamRunId, config)
+
+    // then
+    const idleMember = result.members.find((member) => member.name === "member-1")
+    expect(idleMember?.status).toBe("idle")
+    expect(idleMember?.lastActiveAt).toBe(lastActiveAt)
+    expect(idleMember?.idleDurationMs).toBeGreaterThanOrEqual(5_000)
+    expect(result.members.find((member) => member.name === "member-2")?.idleDurationMs).toBeUndefined()
   })
 })

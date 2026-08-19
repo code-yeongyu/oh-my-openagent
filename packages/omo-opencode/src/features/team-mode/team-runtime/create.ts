@@ -2,7 +2,7 @@ import { access, mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { QUESTION_DENIED_SESSION_PERMISSION } from "../../../shared/question-denied-session-permission"
+import { QUESTION_DENIED_SESSION_PERMISSION, READ_ONLY_SESSION_PERMISSION, READ_ONLY_STRICT_SESSION_PERMISSION } from "../../../shared/question-denied-session-permission"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { BackgroundTask } from "../../background-agent/types"
 import type { BackgroundManager } from "../../background-agent/manager"
@@ -103,7 +103,7 @@ function buildMemberPrompt(
   const promptLines = [`Team: ${spec.name}`, `TeamRunId: ${teamRunId}`, `Member: ${member.name}`]
   if (worktreePath) promptLines.push(`Worktree: ${worktreePath}`)
   if (member.prompt) promptLines.push(member.prompt)
-  promptLines.push(buildTeammateCommunicationAddendum(config))
+  promptLines.push(buildTeammateCommunicationAddendum(config, member.readOnly))
   return promptLines.join("\n")
 }
 
@@ -204,7 +204,11 @@ export async function createTeamRun(
             fallbackChain: resolvedMember.fallbackChain,
             skillContent: resolvedMember.systemContent,
             category: member.kind === "category" ? member.category : undefined,
-            sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+            sessionPermission: member.readOnly === "strict"
+              ? READ_ONLY_STRICT_SESSION_PERMISSION
+              : member.readOnly
+                ? READ_ONLY_SESSION_PERMISSION
+                : QUESTION_DENIED_SESSION_PERMISSION,
             onSessionCreated: async (sessionId) => {
               registerTeamSession(sessionId, {
                 teamRunId: runtimeState.teamRunId,
