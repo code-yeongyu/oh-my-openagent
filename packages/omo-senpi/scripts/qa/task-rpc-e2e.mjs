@@ -8,7 +8,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { digestDirectory } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
 const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, liveRecordRpcChildPids, recordRpcChildPids, sleep } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
-const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck } =
+const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck, summarizeDriveFailure } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-scenarios.mjs")).href)
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 
@@ -47,6 +47,7 @@ async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
   const checks = []
   const a = driveSenpi(senpiBin, sandbox, sessionDir, SCENARIO_A_STEPS)
   const aEvents = parseEvents(a.stdout)
+  const childDiagnostic = summarizeDriveFailure(a)
   const routing = analyzeRpcRouting(readRecords(stateDir))
   checks.push({ check: "process_mode_routes_to_rpc_runner", verdict: routing.routed ? "PASS" : "FAIL", ...(routing.reason && { reason: routing.reason }), facts: routing.facts })
   const spawn = analyzeSpawn(readRecords(stateDir), stateDir)
@@ -74,7 +75,7 @@ async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
   killProcessTree(stateDir)
   const leakedPids = await waitForRecordedPidsToExit(stateDir)
   checks.push({ check: "no_leaked_rpc_child_pids", verdict: leakedPids.length === 0 ? "PASS" : "FAIL", ...(leakedPids.length > 0 && { reason: `leaked pids ${leakedPids.join(",")}` }), facts: { leakedPids } })
-  return { checks, leakedPids, spawnPass: spawn.pass, routed: routing.routed }
+  return { checks, leakedPids, spawnPass: spawn.pass, routed: routing.routed, childDiagnostic }
 }
 
 async function waitForRecordedPidsToExit(stateDir, timeoutMs = 5_000) {
@@ -99,7 +100,7 @@ async function main() {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
   let payload
   try {
-    const { checks, leakedPids, spawnPass, routed } = await runChecks(senpiBin, sandbox, sessionDir, stateDir)
+    const { checks, leakedPids, spawnPass, routed, childDiagnostic } = await runChecks(senpiBin, sandbox, sessionDir, stateDir)
     const afterCreds = digestCredentialFiles(realSenpiAgentDir)
     const wholeDirDigestStable = beforeWholeDir === digestDirectory(realSenpiAgentDir)
     const realCredentialsUntouched = beforeCreds === afterCreds
@@ -120,12 +121,13 @@ async function main() {
       sandboxAgentDir: sandbox.agentDir,
       sandboxCwd: sandbox.cwd,
       wiringFixed: routed,
+      ...(childDiagnostic === undefined ? {} : { childDiagnostic }),
       ...(spawnPass
         ? {}
         : {
             productGap: routed
               ? "execution_mode:'process' routes to the rpc runner, but no real detached child spawned with a pid + child session JSONL. Expected after the spawn-strategy fix: buildRpcSpawn must spawn the senpi EXECUTABLE ('<exe> --mode rpc'), not require.resolve('@code-yeongyu/senpi/rpc-entry') which senpi's loader alias hijacks; and RpcRunnerSpec must thread the model + the parent's -e extensions so a keyless mock child can run."
-              : "execution_mode:'process' did not reach the rpc runner - the process slot still aliases the in-process runner. Fix engine.ts runners.process to createRpcManagedRunner(new RpcProcessRunner()).",
+              : "execution_mode:'process' produced no usable task record. NOTE: this branch does NOT prove a runner-wiring defect - it also fires when the sandbox state dir holds zero task records (analyzeRpcRouting returns reason 'no task record persisted'), i.e. the child never persisted anything. Read `childDiagnostic` (child exit status/signal/stderr) and the routing `reason` before touching runner wiring; DEFAULT_RUNNER_FACTORIES.process already builds createRpcManagedRunner(new RpcProcessRunner()).",
           }),
     }
   } finally {

@@ -63,6 +63,20 @@ export function prepareScenarioSandbox(projectConfig = PROJECT_OMO_CONFIG) {
   return { sandbox, sessionDir, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
 }
 
+// When the driver reports "no task record persisted" the child's own exit status and stderr are the only
+// evidence that explains WHY nothing was written, and spawnSync already collects both. Returning undefined
+// for a clean run keeps passing payloads byte-identical; a failed run carries the diagnostic instead of
+// discarding it, which is what made the windows-latest failures in #6976 undiagnosable across repeated reruns.
+export function summarizeDriveFailure(run) {
+  if (run.status === 0 && run.signal === null) return undefined
+  return {
+    childExitStatus: run.status,
+    childSignal: run.signal,
+    childStderrExcerpt: run.stderr.trim().slice(0, 2000),
+    childStdoutBytes: run.stdout.length,
+  }
+}
+
 export function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, childSteps = CHILD_STEPS_COMPLETE, prompt = "run the rpc-process task e2e") {
   writeScript(sandbox, parentSteps, childSteps)
   const run = spawnSync(senpiBin, childArgv(sessionDir, prompt), {
