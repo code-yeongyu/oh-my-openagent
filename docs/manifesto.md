@@ -201,3 +201,5 @@ That's the goal.
 
 - [Overview](./guide/overview.md)
 - [Orchestration Guide](./guide/orchestration.md)
+
+<!-- scratch marker for ubuntu-first CI skip-path proof; branch deleted after capture -->
