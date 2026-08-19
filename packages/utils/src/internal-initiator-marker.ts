@@ -102,6 +102,23 @@ export function createInternalAgentTextPart(text: string): {
   }
 }
 
+/**
+ * Same as createInternalAgentTextPart, plus a hint asking the client to render
+ * the text as markdown instead of printing it verbatim. Notifications we post
+ * back into a parent session are written in markdown, so without the hint a TUI
+ * that renders only assistant output shows the raw markup to the user.
+ */
+export function createRenderedInternalAgentTextPart(text: string): {
+  type: "text"
+  text: string
+  metadata: { render: "markdown" }
+} {
+  return {
+    ...createInternalAgentTextPart(text),
+    metadata: { render: "markdown" },
+  }
+}
+
 export function createInternalAgentContinuationTextPart(text: string): {
   type: "text"
   text: string

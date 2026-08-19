@@ -1,5 +1,5 @@
 import {
-  createInternalAgentTextPart,
+  createRenderedInternalAgentTextPart,
   isAmbiguousPostDispatchPromptFailure,
   log,
   withInternalNoReplyMarker,
@@ -52,8 +52,8 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
           ...input.latestWake.promptContext,
           parts: [
             input.forceNoReply === true || !input.latestWake.shouldReply
-              ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
-              : createInternalAgentTextPart(notificationContent),
+              ? withInternalNoReplyMarker(createRenderedInternalAgentTextPart(notificationContent))
+              : createRenderedInternalAgentTextPart(notificationContent),
           ],
         },
         query: { directory: input.directory },
