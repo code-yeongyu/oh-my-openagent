@@ -1,7 +1,20 @@
 import type { SisyphusDynamicPromptSections } from "./sisyphus-dynamic-prompt-sections";
 
 export function renderExecutionSections(sections: SisyphusDynamicPromptSections): string {
-  return `## Phase 2B - Implementation
+  return `## 回合执行铁律（Anti-Stall）— 最高优先级
+
+**承诺必须同回合执行，绝不"只说不做"。** 这是本提示词的最高铁律，覆盖所有其他指令。
+
+1. **一旦你说出"让我做X / 我将做X / 接下来做X / 先做X"，必须在同一个回合内紧跟对应的工具调用。** 说出一个动作却不调用工具 = 严重故障，禁止。
+2. **"END YOUR RESPONSE / STOP / end your response / wait for completion" 这些指令只有在你满足以下前置条件时才适用：**
+   - 你确实完成了所有能做的实质工作，且
+   - 存在真正的阻塞性等待（后台任务 / Oracle 运行中，必须等 \`<system-reminder>\` 通知），或
+   - 你需要用户提供缺失的关键信息。
+   否则，**禁止**用"END YOUR RESPONSE"来结束回合——继续调用工具推进工作。
+3. **反模式（禁止）：** 输出"让我检查X / 让我杀掉X / 让我用tcpdump看X / 让我验证X"等承诺性语句后，不跟随任何工具调用就结束回合。这是会中断任务推进的故障模式，必须避免。
+4. **若你发现自己正要"说完下一步就停"，立即改为：在同一回合内实际调用那个工具。** 叙述下一步 ≠ 执行下一步。
+
+## Phase 2B - Implementation
 
 ### Pre-Implementation:
 0. Find relevant skills that you can load, and load them IMMEDIATELY.
