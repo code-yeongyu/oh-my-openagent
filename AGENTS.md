@@ -25,7 +25,15 @@
 - Platform launcher packages are generated. Change `script/build-binaries.ts`, never their generated launcher files.
 - Generated Codex and Senpi plugin artifacts must be changed through their source/build scripts, not edited in place. Read the adapter guide first.
 
+## INITIALIZATION FLOW
+
+Despite its directory name, `packages/omo-opencode/src/testing/create-plugin-module.ts` contains production initialization. Its `serverPlugin()` owns the staged flow: startup shims and config context, conflict/auth/config setup, runtime integrations, managers/tools/hooks/interface composition, then compaction and disposal wiring. Treat `serverPlugin()` as the sole ordering authority; the adapter's [`INITIALIZATION (7 STEPS)`](packages/omo-opencode/src/AGENTS.md#initialization-7-steps) section is orientation only, while [`src/testing/AGENTS.md`](packages/omo-opencode/src/testing/AGENTS.md) documents the DI and testing constraints.
+
 ## High-Risk Invariants
+
+Instruction files are prompt context, not deterministic permission boundaries. Put hard boundaries in OMO permissions, tool allowlists, host permission gates, repository protections, and review gates; OMO does not consume `AGENTOWNERS.yml`. See [`docs/reference/features.md`](docs/reference/features.md#instruction-files-vs-enforcement).
+
+### Internal message injection is dangerous
 
 - Treat `session.prompt` and `session.promptAsync` as writes to shared OpenCode session state. Production calls belong only in `packages/omo-opencode/src/shared/prompt-async-gate.ts`; other routes must use `dispatchInternalPrompt` or the established gate abstraction.
 - New internal-prompt routes need route-specific duplicate-dispatch tests. Never use a zero post-dispatch hold or a raw-prompt fallback when session identity is absent.
@@ -47,7 +55,7 @@ Every user-ordered repository patch follows this sequence:
 
 Do not commit, push, publish, or modify shared infrastructure unless the user authorized the external side effect. Never force-push, amend, or use destructive git recovery without explicit approval.
 
-## QA And Evidence
+## STOP. QA IS MANDATORY
 
 Typechecks and unit tests are necessary but do not prove harness behavior.
 
@@ -58,6 +66,10 @@ Typechecks and unit tests are necessary but do not prove harness behavior.
 - Each evidence directory must state what was tested, what behavior it proves, what was observed, why coverage is sufficient, isolation proof, residual risk, and what secret-bearing material was omitted or redacted.
 
 No evidence file means no harness QA and therefore no commit or push for a harness-connected change.
+
+## CODEX LIGHT EDITION
+
+`packages/omo-codex/` is the Codex Light adapter. The live npm package/bin is `lazycodex-ai`; `lazycodex` is a root-bin and repository identity, not an npm package; Codex sees marketplace `sisyphuslabs` and plugin `omo` as `omo@sisyphuslabs`. The main package also exposes `omo-agent-toolkit`; bare `omo` belongs to the beta native `omo-ai` package, not this package family. Keep implementation detail in [`packages/omo-codex/AGENTS.md`](packages/omo-codex/AGENTS.md). `.github/workflows/publish.yml` controls the npm alias through `publish_lazycodex` and syncs the marketplace repository only when `dist_tag == ''` (a stable release).
 
 ## Tests And Commands
 
@@ -72,7 +84,7 @@ bun run test:codex    # full Codex compatibility gate
 bun run test:senpi    # Senpi build, typecheck, and package tests
 ```
 
-- Root tests must pass together in one plain `bun test` run. Do not hide state leaks with ordering, retries, `.only`, `.skip`, or process isolation.
+- Locally, `bun test` runs configured root discovery including `packages/omo-senpi/**`. Non-Windows root-test CI runs one `bun --config=bunfig.root.toml test` pass, which excludes that adapter; Windows CI intentionally partitions the root tests as declared in `.github/workflows/ci.yml`. Do not invent additional ordering, retries, `.only`, `.skip`, or process isolation to hide state leaks.
 - `test-setup.ts` creates a hermetic HOME, resets shared state, and may build missing vendored LSP output. Account for that before diagnosing environment-dependent failures.
 - `bunfig.toml` excludes Web, vendored LSP projects, Codex plugin suites, generated scripts, and upstream skill trees. Run their declared package or CI commands when touched.
 - Event tests subscribe before triggering and use timeouts only as circuit breakers. Do not synchronize tests with arbitrary sleeps.
@@ -92,7 +104,7 @@ bun run test:senpi    # Senpi build, typecheck, and package tests
 
 `script/agent/setup.sh` is the single source of truth for bootstrap. `script/agent/cleanup.sh` removes regenerable state; `script/agent/cleanup-hook.sh` is the non-blocking Claude shutdown launcher. `.env.example` is the credential template. `script/agent/qa-sandbox.sh` creates throwaway XDG and `CODEX_HOME` state for QA.
 
-The canonical per-user agent state directory is `~/.omo/agent`. Resolve it through `canonicalAgentDir()` or the adapter-side `resolveAgentHome()`; do not compose a private default. Explicit `OMO_CODING_AGENT_DIR` and supported legacy overrides still win.
+For the branded `omo-ai` distribution, `canonicalAgentDir()` owns the `~/.omo/agent` default. Senpi's compatibility resolver gives `OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR`, then `PI_CODING_AGENT_DIR` precedence; absent an override, it detects `settings.json` under `~/.omo/agent`, then flat `~/.omo`, and otherwise uses `~/.senpi/agent`. Do not compose another default.
 
 Committed harness wiring delegates to that shared setup:
 
