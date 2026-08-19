@@ -1,0 +1,10 @@
+surface=real opencode serve + /config + /event
+plugin_uri=file:///Users/yuriy/Desktop/localdev/oh-my-openagent-wt/fix-process-cleanup-listener-types/dist/index.js
+health={"healthy":true,"version":"1.18.18"}
+configured_plugins=["file:///Users/yuriy/Desktop/localdev/oh-my-openagent-wt/fix-process-cleanup-listener-types/dist/index.js"]
+agent_keys=["Hephaestus - Deep Agent","Metis - Plan Consultant","Momus - Plan Critic","Prometheus - Plan Builder","Sisyphus - ultraworker","Sisyphus-Junior","build","explore","librarian","multimodal-looker","oracle","plan"]
+local_plugin_added_sisyphus=true
+server_connected_events=1
+live_db_session_count_before=5492
+live_db_session_count_after=5492
+live_db_unchanged=true
