@@ -46,10 +46,26 @@ bunx oh-my-opencode
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
 | `config migrate` | Migrate legacy OMO configuration into the unified config |
+| `profile list\|current\|use <name>\|clear` | Inspect or update the persisted user-level profile selection |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
 | `boulder` | Inspect Sisyphus boulder work-state (active plan, per-task timers, session lineage) |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
+
+---
+
+## profile
+
+Lists named profiles, reports the effective selection, persists a selection in `~/.omo/omo.jsonc`, or clears only that persisted selection:
+
+```bash
+omo-agent-toolkit profile list
+omo-agent-toolkit profile current
+omo-agent-toolkit profile use gpt
+omo-agent-toolkit profile clear
+```
+
+Activation precedence is explicit loader profile, `OMO_PROFILE`, `OCX_PROFILE`, `OPENCODE_CONFIG_DIR` ending in `profiles/<name>`, then persisted `active_profile`. Environment activation remains effective after `profile clear`. `profile use` accepts only profiles defined in the user config; project-only and unknown names fail without changing it. Writes preserve JSONC comments.
 
 ---
 

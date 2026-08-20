@@ -42,16 +42,20 @@ After the file layers merge, each harness resolves its own view out of the merge
 3. **`profiles.<name>`** for the active profile.
 4. **`profiles.<name>.[harness]`** for the active profile.
 
-Schema defaults apply once at the very end, after all four layers fold. Control keys (`profiles`, `[opencode]`, `[senpi]`, `[codex]`) never leak into the resolved view. Activating a profile that does not exist yields a `profile` diagnostic and the base configuration.
+Schema defaults apply once at the very end, after all four layers fold. Control keys (`active_profile`, `profiles`, `[opencode]`, `[senpi]`, `[codex]`) never leak into the resolved view. Activating a profile that does not exist yields a `profile` diagnostic and the base configuration.
 
 ### Profile activation
 
 The active profile name comes from (`resolveOmoProfileName`), highest priority first:
 
-1. `OMO_PROFILE`
-2. `OCX_PROFILE` (set by `ocx oc -p <name>`)
-3. An `OPENCODE_CONFIG_DIR` whose lexical tail is `profiles/<name>`
-4. None (no profile layer applied)
+1. An explicit loader profile
+2. `OMO_PROFILE`
+3. `OCX_PROFILE` (set by `ocx oc -p <name>`)
+4. An `OPENCODE_CONFIG_DIR` whose lexical tail is `profiles/<name>`
+5. `active_profile` in the user config at `~/.omo/omo.jsonc`
+6. None (no profile layer applied)
+
+Persist a user-defined selection with `omo-agent-toolkit profile use <name>` and remove it with `omo-agent-toolkit profile clear`. The command rejects profiles defined only in a project so it cannot turn repository-local configuration into a global user preference. Project-level `active_profile` values are ignored with a diagnostic so a repository cannot select a user's profile.
 
 No default profiles ship. A profile exists only when you write one under `profiles.<name>` or the migration derives one from a legacy OpenCode profile directory.
 
@@ -94,6 +98,7 @@ No default profiles ship. A profile exists only when you write one under `profil
 ```jsonc
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json", // optional editor pointer
+  "active_profile": "gpt", // optional user-level persisted selector
   "categories": {},     // record<string, CategoryConfig>
   "agents": {},         // record<string, AgentDef>
   "codegraph": {},      // CodeGraph MCP settings

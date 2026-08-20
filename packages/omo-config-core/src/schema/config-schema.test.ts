@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { OmoConfigSchema } from "../index"
+import { OmoConfigLayerSchema, OmoConfigSchema } from "../index"
 
 describe("omo config schema", () => {
   test("#given a full omo config #when parsed #then task defaults and deprecated category keys normalize", () => {
@@ -90,6 +90,25 @@ describe("omo config schema", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("#given empty profile selectors or names #when parsed #then both root and layer schemas reject them", () => {
+    // given
+    const invalidConfigs = [
+      { active_profile: "" },
+      { active_profile: "   " },
+      { profiles: { "": {} } },
+      { profiles: { "  \t": {} } },
+    ]
+
+    // when
+    const results = invalidConfigs.flatMap((config) => [
+      OmoConfigSchema.safeParse(config),
+      OmoConfigLayerSchema.safeParse(config),
+    ])
+
+    // then
+    expect(results.every((result) => !result.success)).toBe(true)
   })
 
   test("#given a wrong typed codegraph daemon setting #when parsed #then the issue path identifies the bad field", () => {

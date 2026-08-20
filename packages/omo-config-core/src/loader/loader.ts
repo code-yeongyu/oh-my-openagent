@@ -3,7 +3,12 @@ import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
 import { OmoCodegraphSettingsSchema, OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
-import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
+import {
+  ignoredProjectProfileDiagnostics,
+  readPersistedOmoProfileFromLayers,
+  resolveOmoConfigView,
+  resolveOmoProfileName,
+} from "./resolution"
 import {
   DEFAULT_READ_FILE_SYSTEM,
   type LoadOmoConfigOptions,
@@ -48,6 +53,7 @@ function stripResolutionControlKeys(config: OmoConfig): OmoConfig {
     "[codex]": _codex,
     "[opencode]": _opencode,
     "[senpi]": _senpi,
+    active_profile: _activeProfile,
     profiles: _profiles,
     ...resolved
   } = config
@@ -153,8 +159,11 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     }
   }
 
+  const persistedProfile = readPersistedOmoProfileFromLayers(layers)
+  diagnostics.push(...ignoredProjectProfileDiagnostics(persistedProfile.ignoredPaths))
   const requestedProfile = resolveOmoProfileName({
     ...(options.env === undefined ? {} : { env: options.env }),
+    ...(persistedProfile.persisted === undefined ? {} : { persisted: persistedProfile.persisted }),
     ...(options.profile === undefined ? {} : { profile: options.profile }),
   })
   const resolved = resolveOmoConfigView({
