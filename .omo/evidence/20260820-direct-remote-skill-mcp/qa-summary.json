@@ -1,0 +1,10 @@
+{
+  "opencodeExitCode": 0,
+  "opencodeSignal": null,
+  "modelCalls": 4,
+  "pingCalls": 1,
+  "skillToolCompleted": true,
+  "skillMcpToolCompleted": true,
+  "remoteResultObserved": true,
+  "isolatedConfigRoot": "/var/folders/60/fdpnp43s2kd3vgzys5mp3zjc0000gn/T/omo-direct-remote-qa-5fLneQ/sandbox/config"
+}
