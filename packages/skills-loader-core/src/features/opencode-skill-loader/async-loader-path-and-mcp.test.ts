@@ -157,5 +157,23 @@ Path skill.
       expect(config?.direct).toBeDefined()
       expect(config?.direct?.command).toBe("direct-cmd")
     })
+
+    it("loads a remote server from the direct Amp format", async () => {
+      // given
+      mkdirSync(SKILLS_DIR, { recursive: true })
+      const mcpJson = {
+        remote: {
+          url: "https://example.com/mcp"
+        }
+      }
+      writeFileSync(join(SKILLS_DIR, "mcp.json"), JSON.stringify(mcpJson))
+
+      // when
+      const { loadMcpJsonFromDirAsync } = await import("./async-loader")
+      const config = await loadMcpJsonFromDirAsync(SKILLS_DIR)
+
+      // then
+      expect(config?.remote?.url).toBe("https://example.com/mcp")
+    })
   })
 })
