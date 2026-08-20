@@ -1,0 +1,42 @@
+# MUTATION RED — setDefaultTimeout(1) forced per-file in both suites
+# Proves the tests fail with bun's timeout wording when the per-file budget is too low,
+# i.e. the failure mode is governed by the per-file default, not by an assertion.
+# Command: bun test packages/senpi-task/src/team/runtime-delete.test.ts packages/senpi-task/src/dag/e2e-failure.test.ts
+
+(fail) DAG failure, crash, and policy end to end > #given two failures whose completion order opposes graph order #when the real engine runs #then siblings and independent branches finish, dependents skip, and graph order selects the primary failure [59.16ms]
+(fail) DAG failure, crash, and policy end to end > #given a crash after an owned task spawns but before task attachment #when a fresh manager resumes #then startOwned recovers the existing task and spawn count remains exactly one [14.24ms]
+  ^ this test timed out after 1ms.
+(fail) DAG failure, crash, and policy end to end > #given an existing run key #when its prompt changes #then definition_conflict leaves the original checkpoint, events, and task count untouched [17.10ms]
+  ^ this test timed out after 1ms.
+(fail) DAG failure, crash, and policy end to end > #given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent [15.48ms]
+(fail) DAG failure, crash, and policy end to end > #given inherited rpc extensions #when DAG and non-DAG children spawn #then only the DAG child omits the leading omo-senpi entry [16.50ms]
+  ^ this test timed out after 1ms.
+(fail) DAG failure, crash, and policy end to end > #given a missing requested skill #when the real run starts #then a missing_skill diagnostic is retained and the node still completes [14.99ms]
+  ^ this test timed out after 1ms.
+(fail) DAG failure, crash, and policy end to end > #given a corrupt trailing JSONL fragment #when the store reopens #then the tail is discarded, diagnosed, and earlier events remain authoritative [16.63ms]
+(fail) DAG failure, crash, and policy end to end > #given a SIGKILL at a randomized fsync-backed mutation boundary #when the store reopens #then the checkpoint is whole and every journaled event replays [5.40ms]
+  ^ this test timed out after 1ms.
+(fail) DAG failure, crash, and policy end to end > #given a wave wider than residency_max_children #when admission frees slots in batches #then every node completes without a residency failure [49.65ms]
+(fail) DAG failure, crash, and policy end to end > #given expired terminal artifacts and equally old live artifacts #when retention runs #then events, results, and skills are pruned only for the terminal run [4.76ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given an active team #when deleted #then all member tasks are cancelled and the runtime dir is removed [3.42ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given a team still in creating #when deleted #then an invalid-state error is thrown [1.48ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given an already-deleted team #when deleted again #then it is a no-op [1.51ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given a completed resident member #when deleted #then cancellation stays noop while lifecycle destroys it and the runtime is removed [1.75ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given a member sidecar points at a foreign task #when deleted #then that task is untouched [1.49ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given a completed resident member already disposed #when deleted #then destruction is not repeated [1.59ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given a completed resident member revives between residency checks #when deleted #then destruction is skipped [1.46ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given a resident member cancellation is in flight #when deleted #then deletion does not race its destruction [1.55ms]
+  ^ this test timed out after 1ms.
+(fail) deleteTeam > #given two delete calls for one team #when invoked concurrently #then they share one cancellation and one destruction [1.48ms]
+  ^ this test timed out after 1ms.
+ 0 pass
+ 19 fail
+Ran 19 tests across 2 files. [1013.00ms]

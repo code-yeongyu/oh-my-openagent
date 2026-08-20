@@ -225,14 +225,12 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
         error: error instanceof Error ? error.message : String(error),
       })
     }
-    if (pluginConfig.tui?.sidebar?.enabled !== false) {
-      try {
-        ensureTuiPluginEntry()
-      } catch (error) {
-        deps.log("[tui-sidebar] tui.json self-heal failed", {
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
+    try {
+      ensureTuiPluginEntry()
+    } catch (error) {
+      deps.log("[tui] tui.json self-heal failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
     deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: input.client })
     deps.setLiveParentWakeRoutingDisabled(pluginConfig.experimental?.disable_live_parent_wake_routing === true)

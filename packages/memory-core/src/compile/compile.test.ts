@@ -32,7 +32,9 @@ describe("compileMemoryBlock", () => {
     expect(block).not.toContain("EXTERNAL_BODY_SENTINEL")
     expect(block).not.toContain("BINARY_BODY_SENTINEL")
     expect(block).not.toContain("SKILL_BODY_SENTINEL")
-  })
+    // Loaded Windows runners push these git fixtures past the 5s default; the work stays
+    // deterministic (~230ms locally), so only the ceiling moves.
+  }, 30_000)
 
   it("#given a committed persona and identity #when compiled #then both projection paths share the self section and metadata remains structured", async () => {
     // given

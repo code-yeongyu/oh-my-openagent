@@ -1,3 +1,36 @@
+## 2026-08-19 — Follow the Senpi 2026.8.19 host contract
+
+**What changed.** The adapter peer and development dependency now require Senpi
+`2026.8.19`, and the task engine's peer and development pins move with it.
+`packages/omo-senpi/package.json`, `packages/senpi-task/package.json`,
+`packages/omo-native/package.json`, the root `package.json` development pin,
+and the workspace `bun.lock` advance together, along with the
+`packages/omo-native/bin/lib/provider-map.json` provenance stamp and the
+`packages/omo-senpi/src/package-shape.test.ts` /
+`packages/omo-native/test/package-shape.test.ts` /
+`packages/omo-native/test/senpi-pin.test.ts` expectations.
+
+**Why.** The 2026.8.19 host stops implicit fallback expansion from routing
+through provider lanes that are guaranteed to refuse: a registered provider can
+declare itself ineligible, and the cursor-cli-oauth lane does so while its
+`--force` acknowledgement is missing or its kill switch is set. It also stops
+auto-compaction from being starved when a provider reports a small context
+while the local transcript keeps growing, and it detects the
+`com.apple.quarantine` attribute on shipped native PTY prebuilds before
+`dlopen()`, so macOS degrades to the pipe fallback instead of blocking the
+process on a Gatekeeper dialog. The release additionally carries the `/loop`
+scheduled-prompt builtin, memory and mass-ulw tip rotation, and the upstream
+`badlogic/pi-mono` main@`59a71b23` sync.
+
+**Why an extension could not handle it.** These are host-version pins. The
+adapter cannot express a required Senpi runtime version from inside an
+extension; the manifests are the contract the installer and the workspace
+resolver read.
+
+**Expected merge conflict zones.** The adapter and task manifests, the
+`omo-native` manifest and its pin tests, the workspace lockfile, package-shape
+expectations, and the provider-map provenance comment.
+
 ## 2026-08-18 — Follow the Senpi 2026.8.18-3 host contract
 
 The adapter peer and development dependency now require Senpi `2026.8.18-3`,

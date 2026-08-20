@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import { homedir, tmpdir } from "os"
 import { SkillsConfigSchema } from "../../config/skills"
 import { discoverConfigSourceSkills, normalizePathForGlob } from "./config-source-discovery"
 
-const TEST_DIR = join(tmpdir(), `config-source-discovery-test-${Date.now()}`)
+// mkdtempSync, never a Date.now()-derived name: consecutive Date.now() calls in one
+// process return the same millisecond, so sibling suites collided on one directory and
+// each teardown removed the other's live fixture. On Windows, removing an in-use tree
+// blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+let TEST_DIR = ""
 
 function writeSkill(path: string, name: string, description: string): void {
   mkdirSync(path, { recursive: true })
@@ -17,7 +21,7 @@ function writeSkill(path: string, name: string, description: string): void {
 
 describe("config source discovery", () => {
   beforeEach(() => {
-    mkdirSync(TEST_DIR, { recursive: true })
+    TEST_DIR = mkdtempSync(join(tmpdir(), "config-source-discovery-test-"))
   })
 
   afterEach(() => {

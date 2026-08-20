@@ -1,6 +1,6 @@
 {
   "name": "omo-ai",
-  "version": "5.0.0-0.beta.11",
+  "version": "5.0.0-0.beta.12",
   "type": "module",
   "description": "omo native edition - the senpi-based OMO harness. Beta channel only: npm i -g omo-ai@beta",
   "bin": {
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@babel/parser": "8.0.4",
-    "@code-yeongyu/senpi": "2026.8.18-3"
+    "@code-yeongyu/senpi": "2026.8.19"
   },
   "repository": {
     "type": "git",

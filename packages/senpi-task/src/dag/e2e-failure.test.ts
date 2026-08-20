@@ -1,5 +1,5 @@
 // allow: SIZE_OK - one end-to-end suite proves failure, crash recovery, child policy, durability, admission, and retention across the assembled DAG engine.
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { randomInt } from "node:crypto"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
@@ -46,6 +46,13 @@ import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagSkillMaterializer } from "./skills"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunEvent, DagRunId } from "./types"
+
+// bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
+// setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
+// the built-in 5000ms. This suite assembles the real DAG manager, scheduler, and fsync-backed file
+// store over temp dirs, so single cases overshoot 5s on a loaded windows runner (observed: 10796ms
+// and 8638ms). Set the floor here, where Bun does honour it.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 const cleanupRoots: string[] = []
 const parentSessionId = "session-e2e-failure-parent"

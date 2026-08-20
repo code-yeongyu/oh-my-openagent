@@ -16,6 +16,7 @@
 | Picking the right model per agent | [docs/guide/agent-model-matching.md](guide/agent-model-matching.md) |
 | Team Mode (opt-in multi-agent) | [docs/guide/team-mode.md](guide/team-mode.md) |
 | Senpi task delegation and teams | [docs/guide/senpi-task.md](guide/senpi-task.md) |
+| Temporary BTW side conversations | [docs/guide/btw.md](guide/btw.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |

@@ -1,5 +1,6 @@
 import type { PluginContext } from "./types"
 
+import { isTrackedBtwSideSession } from "../features/btw-side"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { log, replaceToolArgs } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
@@ -13,6 +14,19 @@ const BACKGROUND_WAIT_BLOCK_MESSAGE = [
   "End this response now and wait for the <system-reminder> completion notification.",
   "After that reminder arrives, call background_output with the task_id from the launch result.",
 ].join(" ")
+
+const BTW_DELEGATION_TOOLS = new Set([
+  "task",
+  "call_omo_agent",
+  "team_create",
+  "team_send_message",
+  "team_task_create",
+  "team_task_update",
+  "team_shutdown_request",
+  "team_approve_shutdown",
+  "team_reject_shutdown",
+  "team_delete",
+])
 
 function isPureSleepCommand(command: string): boolean {
   const commandLines = command
@@ -46,6 +60,14 @@ export function createToolExecuteBeforeHandler(args: {
         callID: input.callID,
       })
       input.tool = stripped
+    }
+
+    const normalizedToolName = input.tool.toLowerCase()
+    if (
+      BTW_DELEGATION_TOOLS.has(normalizedToolName) &&
+      isTrackedBtwSideSession(input.sessionID)
+    ) {
+      throw new Error("BTW side conversations cannot delegate work.")
     }
 
     if (input.tool.toLowerCase() === "bash" && typeof output.args.command === "string") {
@@ -87,7 +109,6 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.compactionTodoPreserver?.["tool.execute.before"]?.(input, output)
     await hooks.teamToolGating?.["tool.execute.before"]?.(input, output)
 
-    const normalizedToolName = input.tool.toLowerCase()
     if (
       normalizedToolName === "question"
       || normalizedToolName === "ask_user_question"

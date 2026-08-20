@@ -1,0 +1,25 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/btw-side/tui-parent-validator.test.ts:
+(pass) createBtwParentValidator > #given a persisted side #when its parent is remote or deleted during lookup #then only an existing parent validates [8.69ms]
+65 |     const initiallyValid = await validator.exists("ses_parent")
+66 |     const validAfterRemoteDeletion = await validator.exists("ses_parent")
+67 |
+68 |     // then
+69 |     expect(initiallyValid).toBe(true)
+70 |     expect(validAfterRemoteDeletion).toBe(false)
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/senpi-st_01a01d17/packages/omo-opencode/src/features/btw-side/tui-parent-validator.test.ts:70:38)
+(fail) createBtwParentValidator > #given a remotely deleted parent #when a persisted side is adopted again #then it revalidates instead of trusting a prior success [1.86ms]
+
+ 1 pass
+ 1 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [435.00ms]
+
+exit_status=1

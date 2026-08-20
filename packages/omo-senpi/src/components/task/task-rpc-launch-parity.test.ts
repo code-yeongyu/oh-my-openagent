@@ -9,6 +9,15 @@ import type { RpcRunnerSpec } from "@oh-my-opencode/senpi-task"
 import { createRpcModelAdmission } from "@oh-my-opencode/senpi-task/rpc-model-admission"
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
+/**
+ * Admission spends up to PROBE_TIMEOUT_MS (20s) per catalog probe, and it now costs two of them
+ * whenever the first exit-0 listing omits the requested model, so both live cases are budgeted for
+ * two full probes plus the child's cold start. The confirming probe deliberately keeps the full
+ * probe budget: it is the probe that decides a rejection, so starving it would time out on exactly
+ * the slow-but-complete listings this admission path exists to admit.
+ */
+const ADMISSION_TEST_TIMEOUT_MS = 60_000
+
 const agentDirs: string[] = []
 const mockProviderExtension = fileURLToPath(
   new URL("../../../scripts/qa/mock-provider/index.ts", import.meta.url),
@@ -92,7 +101,7 @@ describe("task RPC launch profile parity", () => {
 
     // then
     expect(await admission).toBeUndefined()
-  }, 30_000)
+  }, ADMISSION_TEST_TIMEOUT_MS)
 
   test("#given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch", async () => {
     // given
@@ -108,5 +117,5 @@ describe("task RPC launch profile parity", () => {
         message: expect.stringMatching(/omo-mock\/mock-1.*probed catalog has/),
       },
     })
-  }, 30_000)
+  }, ADMISSION_TEST_TIMEOUT_MS)
 })

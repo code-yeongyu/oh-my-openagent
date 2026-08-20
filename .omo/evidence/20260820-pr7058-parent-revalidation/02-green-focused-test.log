@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/btw-side/tui-parent-validator.test.ts:
+(pass) createBtwParentValidator > #given a persisted side #when its parent is remote or deleted during lookup #then only an existing parent validates [1.10ms]
+(pass) createBtwParentValidator > #given a remotely deleted parent #when a persisted side is adopted again #then it revalidates instead of trusting a prior success [0.55ms]
+
+ 2 pass
+ 0 fail
+ 7 expect() calls
+Ran 2 tests across 1 file. [287.00ms]
