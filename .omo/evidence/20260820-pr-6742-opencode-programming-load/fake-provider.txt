@@ -1,0 +1,8 @@
+auxiliary_request_without_skill_tool=true
+tool_names=apply_patch,background_cancel,background_output,bash,context7_query-docs,context7_resolve-library-id,glob,grep,grep_app_searchGitHub,interactive_bash,list_mcp_resource_templates,list_mcp_resources,look_at,lsp_diagnostics,lsp_find_references,lsp_goto_definition,lsp_install_decision,lsp_prepare_rename,lsp_rename,lsp_status,lsp_symbols,read,read_mcp_resource,session_info,session_list,session_read,session_search,skill,skill_mcp,task,todowrite,webfetch,websearch_web_search_exa
+skill_tool_present=true
+served_description=Use for writing/editing .py .pyi .rs .ts .tsx .mts .cts .go files or requested reviews of them; not for read-only citation, grep, or non-review analysis. One philosophy: strict types, modern stacks (Pydantic v2 / serde+thiserror / Zod / gin+sqlc+pgx+slog), modern toolchains (uv+basedpyright+ruff / cargo+clippy+miri / Bun+Biome+tsc / gofumpt+golangci-lint v2+nilaway+go-race), parse-don't-validate, exhaustive match, typed errors, no any/unwrap/panic, 250 LOC ceiling, TDD, consumer-routed logging. Routes to references/{python,rust,typescript,rust-ub,go}/ + references/logging.md. Triggers: write/edit Python/Rust/TypeScript/Go code, new project, gin server, bubbletea TUI, CJK IME, connect-go RPC, sqlc pgx, branded ids, exhaustive match, unsafe Rust, miri, oversized file, refactor, TDD, e2e test, logging, log levels, structured logging, observability, arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like, zerocopy, packed struct.
+description_prefix_match=true
+legacy_trigger_present=false
+description_length=1005
+tool_output_returned=true

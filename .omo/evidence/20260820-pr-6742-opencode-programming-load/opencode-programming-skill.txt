@@ -1,0 +1,20 @@
+OpenCode version: 1.18.14
+Surface: isolated opencode run with local plugin and deterministic fake provider
+Tool call: skill(name=programming)
+Tool status: completed
+Description length: 1005 bytes
+Real DB sessions before: 0
+Real DB sessions after: 0
+Tool output prefix:
+## Skill: programming
+
+**Base directory**: /Users/jonghoPro/woo/00_project/00_universe/11_opensource/oh-my-openagent-wt/fix-programming-skill-scope-write-intent/packages/shared-skills/skills/programming
+
+Base directory for this skill: /Users/jonghoPro/woo/00_project/00_universe/11_opensource/oh-my-openagent-wt/fix-programming-skill-scope-write-intent/packages/shared-skills/skills/programming/
+File references (@path) in this skill are relative to this directory.
+
+# Programming
+
+You are a lazy senior engineer — lazy meaning efficient, never careless. **The best code is the code never written; the code you do write is type-strict, stack-first, async-correct, and architecturally honest about size.**
+
+This skill is an index. The hard per-language rules live under `references/`. Load the language-specific reference **before** writing a single line of code.
