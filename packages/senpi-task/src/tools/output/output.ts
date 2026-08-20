@@ -30,8 +30,8 @@ const DEFAULT_TAIL_LINES = 60
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
-  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns the record snapshot plus the final response once terminal.",
-  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker). Completion notifications already include the final result.",
+  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns one record snapshot per observed progress state, then a short no_progress result until the task changes.",
+  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker). These explicit transcript modes do not consume the status peek. Completion notifications already include the final result.",
   "READ-ONLY: this never revives, steers, or otherwise touches the child. A lost task returns a status view with a lost explanation and pid/session-dir breadcrumbs.",
   "Only the current session's children are visible.",
 ].join(" ")
@@ -41,6 +41,15 @@ export function runTaskOutput(
   params: TaskOutputInput,
   callerSessionId: string | undefined,
 ): Promise<TaskOutputToolResult> {
+  return runTaskOutputWithStatusReads(deps, params, callerSessionId)
+}
+
+function runTaskOutputWithStatusReads(
+  deps: TaskOutputDeps,
+  params: TaskOutputInput,
+  callerSessionId: string | undefined,
+  statusReads?: Map<string, string>,
+): Promise<TaskOutputToolResult> {
   if (hasLegacyBlockingParam(params)) return Promise.resolve(invalidArguments(BLOCKING_REMOVED_GUIDANCE))
 
   const idOrName = params.task_id ?? params.name
@@ -49,6 +58,19 @@ export function runTaskOutput(
   const candidates = scopedCandidates(deps.manager.list.bind(deps.manager), callerSessionId)
   const record = resolveTarget(candidates, idOrName)
   if (record === undefined) return Promise.resolve(notFound(candidates, idOrName))
+
+  const mode = params.mode ?? "status"
+  if (statusReads !== undefined && callerSessionId !== undefined && (mode === "status" || record.status === "lost")) {
+    const key = JSON.stringify([callerSessionId, record.task_id])
+    const fingerprint = JSON.stringify([
+      record.status,
+      record.residency_state,
+      record.updated_at,
+      record.notification.run_epoch,
+    ])
+    if (statusReads.get(key) === fingerprint) return Promise.resolve(noProgress(record))
+    statusReads.set(key, fingerprint)
+  }
 
   return Promise.resolve(outputForRecord(deps, record, params))
 }
@@ -127,14 +149,26 @@ function invalidArguments(reason: string): TaskOutputToolResult {
   return toolResult(reason, { kind: "invalid_arguments", reason })
 }
 
+function noProgress(record: TaskRecord): TaskOutputToolResult {
+  const reason = `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+  return toolResult(reason, {
+    kind: "no_progress",
+    task_id: record.task_id,
+    status: record.status,
+    reason,
+  })
+}
+
 export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> {
   const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
+  const statusReads = new Map<string, string>()
   return {
     name: "task_output",
     label: "Task Output",
     description: DESCRIPTION,
     parameters: TaskOutputParams,
-    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx)),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) =>
+      runTaskOutputWithStatusReads(deps, params, resolveCaller(ctx), statusReads),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
   }
