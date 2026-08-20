@@ -65,6 +65,7 @@ const server = http.createServer(async (request, response) => {
     append(`served_description=${metadataDescription}`)
     append(`description_prefix_match=${metadataDescription.startsWith(expectedPrefix)}`)
     append(`legacy_trigger_present=${description.includes(legacyTrigger)}`)
+    append(`trigger_context_marker=${metadataDescription.includes("Write/review:")}`)
     append(`description_length=${Buffer.byteLength(metadataDescription, "utf8")}`)
     sendSse(response, toolCallEvents(requestCount, "skill", "call_programming", { name: "programming" }))
     return

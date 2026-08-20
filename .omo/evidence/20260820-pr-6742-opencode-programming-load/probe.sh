@@ -106,6 +106,12 @@ else
   oqa_fail 'advertised skill-tool metadata contains the legacy overbroad trigger' || true
   failures=$((failures + 1))
 fi
+if grep -Fxq 'trigger_context_marker=true' "$FAKE_LOG"; then
+  oqa_pass 'advertised topic triggers are explicitly scoped to write/review intent'
+else
+  oqa_fail 'advertised topic triggers are not scoped to write/review intent' || true
+  failures=$((failures + 1))
+fi
 if test -n "$description_length" && test "$description_length" -le 1024; then
   oqa_pass "programming description is within 1024 bytes ($description_length)"
 else

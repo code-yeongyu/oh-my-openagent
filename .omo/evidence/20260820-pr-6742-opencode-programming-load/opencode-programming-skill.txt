@@ -2,7 +2,7 @@ OpenCode version: 1.18.14
 Surface: isolated opencode run with local plugin and deterministic fake provider
 Tool call: skill(name=programming)
 Tool status: completed
-Description length: 1005 bytes
+Description length: 1009 bytes
 Real DB sessions before: 0
 Real DB sessions after: 0
 Tool output prefix:
