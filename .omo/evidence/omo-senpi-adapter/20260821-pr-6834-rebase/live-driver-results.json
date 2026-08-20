@@ -1,0 +1,35 @@
+{
+  "selfTest": "PASS",
+  "runs": [
+    {
+      "bundle": "rebased-branch",
+      "result": "FAIL",
+      "ultraworkInjected": false,
+      "commentChecker": "PASS",
+      "realSenpiUntouched": true,
+      "providedSenpiCodingAgentDir": "unset",
+      "sandboxAgentDir": "/tmp/omo-senpi-qa-yvmKF0/agent",
+      "sandboxCwd": "/tmp/omo-senpi-qa-yvmKF0/project"
+    },
+    {
+      "bundle": "origin-dev",
+      "result": "FAIL",
+      "ultraworkInjected": true,
+      "commentChecker": "FAIL",
+      "realSenpiUntouched": true,
+      "providedSenpiCodingAgentDir": "unset",
+      "sandboxAgentDir": "/tmp/omo-senpi-qa-xvcC6f/agent",
+      "sandboxCwd": "/tmp/omo-senpi-qa-xvcC6f/project"
+    },
+    {
+      "bundle": "rebased-branch",
+      "result": "FAIL",
+      "ultraworkInjected": true,
+      "commentChecker": "FAIL",
+      "realSenpiUntouched": true,
+      "providedSenpiCodingAgentDir": "unset",
+      "sandboxAgentDir": "/tmp/omo-senpi-qa-yJYdhj/agent",
+      "sandboxCwd": "/tmp/omo-senpi-qa-yJYdhj/project"
+    }
+  ]
+}
