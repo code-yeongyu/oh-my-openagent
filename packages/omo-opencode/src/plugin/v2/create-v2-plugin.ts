@@ -2,6 +2,7 @@ import { appendFileSync } from "node:fs"
 import { isRecord } from "@oh-my-opencode/utils"
 import { log } from "../../shared/logger"
 import type { V2BusEvent, V2Plugin, V2PluginContext, V2Registration } from "./types"
+import { dispatchV2EventToV1Names, type V1EventDispatch } from "./event-names"
 
 const PLUGIN_ID = "oh-my-openagent"
 
@@ -40,10 +41,14 @@ function sanitizeBeforeEvent(event: { tool: string; input: unknown }): void {
   }
 }
 
-async function pumpEvents(stream: AsyncIterable<V2BusEvent>): Promise<void> {
+async function pumpEvents(
+  stream: AsyncIterable<V2BusEvent>,
+  onV1Event?: V1EventDispatch,
+): Promise<void> {
   try {
     for await (const event of stream) {
       log("[v2-event]", { type: event.type })
+      if (onV1Event) dispatchV2EventToV1Names(event, onV1Event)
     }
   } catch (error) {
     log("[v2-event] stream terminated", { error: String(error) })
@@ -67,7 +72,11 @@ async function registerDomain(domain: string, register: () => Promise<void>): Pr
  * function exports and hybrid exports are silently ignored), so this factory
  * exists separately from the v1 `serverPlugin()` function module.
  */
-export function createV2PluginModule(): V2Plugin {
+export interface V2PluginModuleOptions {
+  onV1Event?: V1EventDispatch
+}
+
+export function createV2PluginModule(options: V2PluginModuleOptions = {}): V2Plugin {
   return {
     id: PLUGIN_ID,
     setup: async (context: V2PluginContext) => {
@@ -93,7 +102,7 @@ export function createV2PluginModule(): V2Plugin {
 
       await registerDomain("event", async () => {
         const stream = context.event.subscribe()
-        void pumpEvents(stream)
+        void pumpEvents(stream, options.onV1Event)
       })
 
       log("[v2-setup] oh-my-openagent v2 plugin initialized", {

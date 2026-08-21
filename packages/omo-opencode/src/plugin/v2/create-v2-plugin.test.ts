@@ -140,3 +140,33 @@ describe("create-v2-plugin", () => {
     })
   })
 })
+
+describe("#given an event router callback", () => {
+  test("dispatches mapped v1 names for streamed v2 events", async () => {
+    // given
+    const seen: Array<[string, string]> = []
+    const context = createContextStub({
+      event: {
+        subscribe: () => ({
+          [Symbol.asyncIterator]: async function* () {
+            yield { id: "1", created: 1, type: "session.execution.succeeded" }
+            yield { id: "2", created: 2, type: "session.tool.called" }
+            yield { id: "3", created: 3, type: "session.created" }
+          },
+        }),
+      } as unknown as V2PluginContext["event"],
+    })
+    const plugin = createV2PluginModule({
+      onV1Event: (v1Name, event) => {
+        seen.push([v1Name, event.type])
+      },
+    })
+    await plugin.setup(context)
+    // when
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    // then
+    expect(seen).toContainEqual(["session.idle", "session.execution.succeeded"])
+    expect(seen).toContainEqual(["session.created", "session.created"])
+    expect(seen.find(([v1Name]) => v1Name === "session.error")).toBeUndefined()
+  })
+})
