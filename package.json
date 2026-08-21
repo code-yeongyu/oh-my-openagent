@@ -108,6 +108,7 @@
   },
   "scripts": {
     "build": "bun run script/build.ts",
+    "build:v2": "bun build packages/omo-opencode/src/plugin/v2/entry.ts --outfile dist/v2/index.js --target bun --format esm",
     "build:cli-node": "bun run script/build-cli-node.ts",
     "build:codex-install": "bun run script/build-codex-install.ts",
     "install:codex-dev": "bun run script/build-codex-install.ts && bun run script/install-codex-dev.ts",
