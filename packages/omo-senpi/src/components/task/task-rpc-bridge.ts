@@ -35,6 +35,7 @@ export function wireTaskRpcBridge(
   engine: TaskEngine,
 ): TaskRpcBridge {
   const subscriptions = new Map<string, () => void>()
+  const outputStatusReads = new Map<string, string>()
   const liveProgress = new Map<string, TaskLiveProgressSnapshot>()
   let activeSessionId: string | undefined
   let lastSnapshot: string | undefined
@@ -129,7 +130,7 @@ export function wireTaskRpcBridge(
     emit(selection)
   }
 
-  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId))
+  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId), outputStatusReads)
 
   return {
     attach() {
@@ -152,6 +153,7 @@ function registerTaskHandlers(
   pi: SenpiExtensionAPI,
   engine: TaskEngine,
   currentSessionId: () => string | undefined,
+  outputStatusReads: Map<string, string>,
 ): void {
   const handle = pi.rpc?.handle
   if (handle === undefined) return
@@ -179,7 +181,7 @@ function registerTaskHandlers(
     const input = parseTaskOutput(data)
     if ("error" in input) return invalidArguments(input.error)
     return boundedTaskOutput((
-      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId)
+      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId, outputStatusReads)
     ).details)
   })
 }

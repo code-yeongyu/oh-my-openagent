@@ -9,6 +9,7 @@ describe("event-bridge session_start recovery chain", () => {
   it("#given a resumed session with a revived record #when session_start fires #then the chain runs in the planned order with the session id threaded", async () => {
     const revived = { task_id: "task-revived" } as TaskRecord
     const { pi, order, reconcileCalls, notifyCalls, livenessCalls, resumptionCalls } = wireHarness("parent-session", {
+      mode: "json",
       outcomes: [
         { task_id: "task-revived", kind: "resumed" },
         { task_id: "task-gone", kind: "resumed" },
@@ -40,6 +41,14 @@ describe("event-bridge session_start recovery chain", () => {
 
   it("#given an interactive TUI session start #when session_start fires #then owed completions redeliver as idle", async () => {
     const { pi, notifyCalls } = wireHarness("parent-session", { mode: "tui" })
+
+    await pi.dispatch("session_start", {}, {})
+
+    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" } }])
+  })
+
+  it("#given a runtime that omits mode #when session_start fires #then it is treated as interactive and redelivers as idle", async () => {
+    const { pi, notifyCalls } = wireHarness("parent-session")
 
     await pi.dispatch("session_start", {}, {})
 

@@ -68,7 +68,7 @@ export function wireEventBridge(
       // An idle wake here marks the agent busy, and the CLI prompt then throws
       // "already processing" without streamingBehavior. Buffer only in print mode;
       // interactive TUI starts are actually idle and must redeliver immediately.
-      const printMode = engine.runtime.mode() !== "tui"
+      const printMode = engine.runtime.mode() === "json"
       printRecoverySessionId = printMode ? sessionId : undefined
       engine.notifier.reconcileUnnotifiedNotifications({
         sessionId,

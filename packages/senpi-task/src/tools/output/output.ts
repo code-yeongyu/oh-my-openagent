@@ -41,14 +41,6 @@ export function runTaskOutput(
   deps: TaskOutputDeps,
   params: TaskOutputInput,
   callerSessionId: string | undefined,
-): Promise<TaskOutputToolResult> {
-  return runTaskOutputWithStatusReads(deps, params, callerSessionId)
-}
-
-function runTaskOutputWithStatusReads(
-  deps: TaskOutputDeps,
-  params: TaskOutputInput,
-  callerSessionId: string | undefined,
   statusReads?: Map<string, string>,
 ): Promise<TaskOutputToolResult> {
   if (hasLegacyBlockingParam(params)) return Promise.resolve(invalidArguments(BLOCKING_REMOVED_GUIDANCE))
@@ -178,7 +170,7 @@ export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeo
     description: DESCRIPTION,
     parameters: TaskOutputParams,
     execute: (_toolCallId, params, _signal, _onUpdate, ctx) =>
-      runTaskOutputWithStatusReads(deps, params, resolveCaller(ctx), statusReads),
+      runTaskOutput(deps, params, resolveCaller(ctx), statusReads),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
   }
