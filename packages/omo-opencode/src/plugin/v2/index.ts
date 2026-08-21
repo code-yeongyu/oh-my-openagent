@@ -1,4 +1,5 @@
 export * from "./types"
 export * from "./degradation"
 export * from "./event-names"
+export * from "./client-bridge"
 export { createV2PluginModule } from "./create-v2-plugin"
