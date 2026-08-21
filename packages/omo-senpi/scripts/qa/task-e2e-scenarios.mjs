@@ -7,7 +7,9 @@ export const MAIN_SCRIPT = {
   childSteps: [{ type: "text", text: CHILD_FIRST }, { type: "text", text: CHILD_SECOND }],
   parentSteps: [
     { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do the first unit", run_in_background: true, name: "e2echild" } },
-    { type: "text", text: "parent turn one done, going idle" },
+    // Print-mode ends the process on a text/stop step. The in-process child also finishes during
+    // spawn, so the next streamSimple call is the wake turn. An idle text here would stop the
+    // session before task_send/task_output ever run.
     { type: "tool_call", name: "task_send", arguments: { to: "e2echild", message: "do the second unit" } },
     { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "tail" } },
     { type: "text", text: "parent peeked the child tail, all done" },

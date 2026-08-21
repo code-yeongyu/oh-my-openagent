@@ -139,6 +139,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         notifyCalls.push(input)
         order.push("notify")
       },
+      flushBuffered: () => ({ kind: "empty" as const }),
     } as unknown as TaskEngine["notifier"],
     planner: {} as TaskEngine["planner"],
     agents: {},

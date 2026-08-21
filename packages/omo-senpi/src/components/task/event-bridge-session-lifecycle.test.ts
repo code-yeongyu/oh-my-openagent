@@ -33,7 +33,7 @@ describe("event-bridge session_start recovery chain", () => {
       "statusSync",
     ])
     expect(reconcileCalls).toEqual(["parent-session"])
-    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" } }])
+    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "session_switching" } }])
     expect(livenessCalls).toEqual(["task-revived"])
     expect(resumptionCalls).toEqual([2])
   })

@@ -63,7 +63,14 @@ export function wireEventBridge(
     await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
     if (sessionId !== undefined) {
-      engine.notifier.reconcileUnnotifiedNotifications({ sessionId, parentState: engine.runtime.parentState() })
+      // Print-mode resume sends its prompt immediately after session_start. An idle
+      // wake here marks the agent busy, and the CLI prompt then throws
+      // "already processing" without streamingBehavior. Buffer until the first
+      // agent turn drains the queue.
+      engine.notifier.reconcileUnnotifiedNotifications({
+        sessionId,
+        parentState: { kind: "session_switching" },
+      })
     }
     const cleanup = await engine.lifecycle.cleanupExpiredRecords()
     if (cleanup.deleted.length > 0) {
@@ -123,6 +130,8 @@ export function wireEventBridge(
     const liveContext = asLiveContext(eventCtx)
     engine.runtime.captureFrom(liveContext)
     const coordinator = ctx.idleCoordinator
+    const sessionId = engine.runtime.sessionId()
+    if (sessionId !== undefined) engine.notifier.flushBuffered({ sessionId, replaced: false })
     if (coordinator !== undefined) queueMicrotask(() => coordinator.flushOnIdle())
     await engine.memberLiveness.acknowledgePersisted(
       () => liveContext.sessionManager?.getSessionFile?.() ?? engine.runtime.sessionFile(),
