@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #6644 - Stable 4.19.4 `config migrate` rewrites agent chains its plugin validator rejects
+
+- **Affects**: Users on the npm stable 4.19.4 release (the npm `latest` tag) whose generated configuration carries the `variant` / `fallback_models` compatibility settings for agent chains.
+- **Symptom**: Stable 4.19.4 generates and accepts those `variant` / `fallback_models` settings, so the configuration works on that release even though `doctor` reports non-fatal deprecation warnings for them. Running `oh-my-openagent config migrate` rewrites those agent chains to the canonical `agents.*.models` form, which the 4.19.4 plugin validator rejects, so the migrated configuration fails validation on that release.
+- **Workaround**: On stable 4.19.4, keep the generated working configuration and treat the `doctor` warnings as non-fatal. Preview any migration with `oh-my-openagent config migrate --dry-run` before applying it, and wait for a stable release containing the runtime fix instead of accepting a migration that rewrites agent chains.
+- **Status**: Open. The implementation is fixed on `dev` and in beta by https://github.com/code-yeongyu/oh-my-openagent/pull/6602, but npm `latest` (4.19.4) remains affected pending a stable release containing the fix. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/6644.
+
 ## #5911 - Worktree merge status can ignore dirty filesystem changes
 
 - **Affects**: Agent-managed git worktree handoff and cleanup flows.

@@ -94,6 +94,8 @@ Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to li
 
 #### Migration
 
+> **Warning**: If you are on npm stable 4.19.4, keep the generated working configuration and treat `doctor` warnings about its `variant` / `fallback_models` settings as non-fatal; 4.19.4 accepts those settings as generated. Running `oh-my-openagent config migrate` rewrites those agent chains to the canonical `agents.*.models` form, which the 4.19.4 plugin validator rejects. Preview first with `oh-my-openagent config migrate --dry-run`, and wait for a stable release containing the runtime fix (already merged on `dev` via [PR #6602](https://github.com/code-yeongyu/oh-my-openagent/pull/6602)). Tracked at [issue #6644](https://github.com/code-yeongyu/oh-my-openagent/issues/6644).
+
 The first time a current harness starts (and again on install or via the CLI), a lock-and-journal migration engine imports the legacy files into the unified file:
 
 - Sources: `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` in the OpenCode user config directory, in each of its `profiles/<name>/` directories, and in walked project `.opencode/` directories, plus `~/.omo/config.jsonc`.
