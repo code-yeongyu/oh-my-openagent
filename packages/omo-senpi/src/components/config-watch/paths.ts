@@ -69,11 +69,26 @@ function resolveSenpiProtectedPaths(env: OmoConfigEnv): readonly string[] {
   return [join(agentDir, "auth.json"), join(agentDir, "sessions"), join(agentDir, "logs")]
 }
 
-function isSenpiRestrictedTarget(path: string, protectedPaths: readonly string[]): boolean {
-  const resolvedPath = resolve(path)
-  return protectedPaths.some(
-    (protectedPath) => containsPath(resolvedPath, protectedPath) || containsPath(protectedPath, resolvedPath),
-  )
+function matchesConfigWatchFilter(path: string, filterGlobs: readonly string[]): boolean {
+  const normalizedPath = path.replaceAll("\\", "/")
+  const basename = normalizedPath.slice(normalizedPath.lastIndexOf("/") + 1)
+  return filterGlobs.some((filterGlob) => {
+    if (filterGlob.startsWith("/")) return normalizedPath === filterGlob.slice(1)
+    if (filterGlob.startsWith("*")) return normalizedPath.endsWith(filterGlob.slice(1))
+    return basename === filterGlob || normalizedPath.endsWith(`/${filterGlob}`)
+  })
+}
+
+function isSenpiRestrictedTarget(target: OmoConfigWatchTarget, protectedPaths: readonly string[]): boolean {
+  const resolvedPath = resolve(target.path)
+  return protectedPaths.some((protectedPath) => {
+    const resolvedProtectedPath = resolve(protectedPath)
+    return (
+      containsPath(resolvedProtectedPath, resolvedPath) ||
+      (containsPath(resolvedPath, resolvedProtectedPath) &&
+        matchesConfigWatchFilter(relative(resolvedPath, resolvedProtectedPath), target.filterGlobs))
+    )
+  })
 }
 
 function findAncestorDirectories(cwd: string, homeDir: string): readonly string[] {
@@ -166,11 +181,10 @@ export function resolveOmoConfigWatchTargetResolution(
   for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
 
   const senpiProtectedPaths = resolveSenpiProtectedPaths(env)
-  const permittedTargets = targets.filter((target) => !isSenpiRestrictedTarget(target.path, senpiProtectedPaths))
+  const permittedTargets = targets.filter((target) => !isSenpiRestrictedTarget(target, senpiProtectedPaths))
 
-  // Derived from the SURVIVING targets, not from directory existence: `~/.omo`'s parent
-  // is `$HOME`, whose creation target is always dropped by the protected-path filter, so
-  // an existence check would report a watch that was never registered.
+  // Derived from the surviving targets, not from directory existence: the parent
+  // target may be filtered when its globs could expose protected agent state.
   const userConfigCreationWatched = permittedTargets.some(
     (target) => target.path === userConfigDirectory || target.path === dirname(userConfigDirectory),
   )
