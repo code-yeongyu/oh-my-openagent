@@ -61,4 +61,29 @@ describe("task_output polling guard", () => {
     expect(progressed.details.kind).toBe("status")
     if (progressed.details.kind === "status") expect(progressed.details.snapshot.final_response).toBe("done")
   })
+
+  test("#given more callers than the status cache limit #when the oldest caller reads again #then its stale fingerprint was evicted", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_shared", name: "worker" })
+    const manager: OutputManager = {
+      get: () => record,
+      list: () => [{ record }],
+    }
+    const output = createTaskOutputTool({
+      manager,
+      stateDir: "/tmp/state",
+      transcriptReader: () => ({ entries: [], source: "none" }),
+    })
+    const execute = (sessionId: string) =>
+      output.execute("call", { task_id: record.task_id }, undefined, undefined, context(sessionId))
+
+    // when
+    const first = await execute("session-0")
+    for (let index = 1; index <= 1024; index += 1) await execute(`session-${index}`)
+    const afterEviction = await execute("session-0")
+
+    // then
+    expect(first.details.kind).toBe("status")
+    expect(afterEviction.details.kind).toBe("status")
+  })
 })

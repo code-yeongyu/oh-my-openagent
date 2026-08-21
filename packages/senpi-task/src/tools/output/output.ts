@@ -27,6 +27,7 @@ export const TaskOutputParams = Type.Object({
 export type TaskOutputInput = Static<typeof TaskOutputParams>
 
 const DEFAULT_TAIL_LINES = 60
+const MAX_STATUS_READS = 1024
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
@@ -69,10 +70,19 @@ function runTaskOutputWithStatusReads(
       record.notification.run_epoch,
     ])
     if (statusReads.get(key) === fingerprint) return Promise.resolve(noProgress(record))
-    statusReads.set(key, fingerprint)
+    rememberStatusRead(statusReads, key, fingerprint)
   }
 
   return Promise.resolve(outputForRecord(deps, record, params))
+}
+
+function rememberStatusRead(statusReads: Map<string, string>, key: string, fingerprint: string): void {
+  statusReads.delete(key)
+  statusReads.set(key, fingerprint)
+  if (statusReads.size <= MAX_STATUS_READS) return
+
+  const oldestKey = statusReads.keys().next().value
+  if (oldestKey !== undefined) statusReads.delete(oldestKey)
 }
 
 function hasLegacyBlockingParam(params: object): boolean {
