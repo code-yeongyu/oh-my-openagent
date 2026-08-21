@@ -12,12 +12,15 @@ All 14 existing cases passed. Both new direct remote cases failed because the lo
 
 ## Automated Checks
 
+The branch was rebased onto `dev` at `7268b12c8` on 2026-08-21. The current-head checks used Bun 1.4.0.
+
+- The 2 focused parser and loader files passed all 16 tests.
 - `bun test packages/skills-loader-core/src` passed 233 tests with 0 failures.
-- `tsgo --noEmit -p packages/skills-loader-core/tsconfig.json` passed.
-- `git diff --check -- packages/skills-loader-core/src/features/opencode-skill-loader` passed.
+- `bunx tsgo --noEmit -p packages/skills-loader-core/tsconfig.json` passed.
 - The full monorepo `bun run typecheck` passed.
-- The full bundle could not complete because its strict frontend materialization stalled while cloning `nexu-io/open-design`. The clone was stopped before the 150 GiB disk floor and its partial checkout was removed.
-- The full monorepo test run was stopped at 55 seconds. Its failures came from sparse-checkout assets and generated bundles outside this package, including missing `.cursor`, `.devcontainer`, Codex payloads, Senpi Skill payloads, and frontend submodules. The complete `skills-loader-core` suite remained green.
+- `git diff --check upstream/dev...HEAD` passed.
+- The full build stopped after 60 seconds in upstream frontend materialization. Its `nexu-io/open-design` clone had stalled. The exact task-owned process was stopped, and generated submodule worktrees were deinitialized.
+- The OpenCode QA harness self-check passed its sandbox and database checks. `tmux` was unavailable, so TUI smoke was omitted. This parser change uses the noninteractive CLI surface.
 
 ## OpenCode QA
 
@@ -28,13 +31,15 @@ All 14 existing cases passed. Both new direct remote cases failed because the lo
 - a standalone Skill with a direct remote `mcp.json` map;
 - a fake OpenAI Responses server;
 - a localhost Streamable HTTP MCP fixture.
+- a real OpenCode database count before and after the isolated run.
 
 Observed result:
 
 - `skill` completed and exposed the remote `ping` capability;
 - `skill_mcp` completed;
 - the MCP fixture received exactly 1 `ping` call;
-- OpenCode returned `REMOTE_MCP_OK` and exited with code 0.
+- OpenCode returned `REMOTE_MCP_OK` and exited with code 0;
+- the real database contained 7 sessions before and after QA.
 
 Artifacts:
 
