@@ -38,6 +38,14 @@ describe("event-bridge session_start recovery chain", () => {
     expect(resumptionCalls).toEqual([2])
   })
 
+  it("#given an interactive TUI session start #when session_start fires #then owed completions redeliver as idle", async () => {
+    const { pi, notifyCalls } = wireHarness("parent-session", { mode: "tui" })
+
+    await pi.dispatch("session_start", {}, {})
+
+    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" } }])
+  })
+
   it("#given no captured session id #when session_start fires #then the legacy sweep still runs with undefined while the scoped notification branch is skipped", async () => {
     const { pi, order, reconcileCalls, notifyCalls, warnings } = wireHarness(undefined)
 

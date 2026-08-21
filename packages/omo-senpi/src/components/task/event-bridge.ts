@@ -63,13 +63,14 @@ export function wireEventBridge(
     await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
     if (sessionId !== undefined) {
-      // Print-mode resume sends its prompt immediately after session_start. An idle
-      // wake here marks the agent busy, and the CLI prompt then throws
-      // "already processing" without streamingBehavior. Buffer until the first
-      // agent turn drains the queue.
+      // Print-mode (`json`) resume sends its prompt immediately after session_start.
+      // An idle wake here marks the agent busy, and the CLI prompt then throws
+      // "already processing" without streamingBehavior. Buffer only in print mode;
+      // interactive TUI starts are actually idle and must redeliver immediately.
+      const printMode = engine.runtime.mode() !== "tui"
       engine.notifier.reconcileUnnotifiedNotifications({
         sessionId,
-        parentState: { kind: "session_switching" },
+        parentState: printMode ? { kind: "session_switching" } : { kind: "idle" },
       })
     }
     const cleanup = await engine.lifecycle.cleanupExpiredRecords()

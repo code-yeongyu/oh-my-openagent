@@ -23,6 +23,7 @@ type HarnessOptions = {
   readonly cleanupDeleted?: readonly string[]
   readonly resumptionChannelCount?: number
   readonly withRpc?: boolean | "emit-only"
+  readonly mode?: string
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -59,6 +60,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         order.push("capture")
       },
       sessionId: () => sessionId,
+      mode: () => options.mode,
       clearUi: () => {
         order.push("clearUi")
       },
