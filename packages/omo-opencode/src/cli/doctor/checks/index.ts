@@ -11,6 +11,7 @@ import { checkTuiPluginConfig } from "./tui-plugin-config"
 import { checkCodex, gatherCodexSummary } from "./codex"
 import { CODEX_COMPONENTS_CHECK_ID, CODEX_COMPONENTS_CHECK_NAME, checkCodexComponents } from "./codex-components"
 import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
+import { checkOpencodeV2 } from "./opencode-v2"
 
 export type { CheckDefinition }
 export * from "./model-resolution-types"
@@ -59,6 +60,11 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       id: CHECK_IDS.TEAM_MODE,
       name: CHECK_NAMES[CHECK_IDS.TEAM_MODE],
       check: checkTeamMode,
+    },
+    {
+      id: "opencode-v2",
+      name: "OpenCode v2 beta",
+      check: checkOpencodeV2,
     },
   ]
 }
