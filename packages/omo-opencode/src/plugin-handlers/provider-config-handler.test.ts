@@ -4,6 +4,20 @@ import { describe, expect, test } from "bun:test"
 import { applyProviderConfig } from "./provider-config-handler"
 import { createModelCacheState } from "../plugin-state"
 import { clearVisionCapableModelsCache, readVisionCapableModelsCache } from "../shared/vision-capable-models-cache"
+import * as imageCapabilityCache from "../shared/vision-capable-models-cache"
+
+function readTextOnlyModelsForTest(): Array<{
+  providerID: string
+  modelID: string
+}> {
+  const candidate: unknown = Reflect.get(
+    imageCapabilityCache,
+    "readTextOnlyModelsCache",
+  )
+  expect(typeof candidate).toBe("function")
+  if (typeof candidate !== "function") return []
+  return candidate()
+}
 
 describe("applyProviderConfig", () => {
   test("clears stale model context limits when provider config changes", () => {
@@ -129,6 +143,30 @@ describe("applyProviderConfig", () => {
     ])
     expect(readVisionCapableModelsCache()).toEqual([
       { providerID: "zhipuai-coding-plan", modelID: "glm-5.1" },
+    ])
+  })
+
+  test("records models with explicit text-only input modalities", () => {
+    // given
+    const modelCacheState = createModelCacheState()
+    const config = {
+      provider: {
+        openai: {
+          models: {
+            "text-fake": {
+              modalities: { input: ["text"] },
+            },
+          },
+        },
+      },
+    } satisfies Record<string, unknown>
+
+    // when
+    applyProviderConfig({ config, modelCacheState })
+
+    // then
+    expect(readTextOnlyModelsForTest()).toEqual([
+      { providerID: "openai", modelID: "text-fake" },
     ])
   })
 

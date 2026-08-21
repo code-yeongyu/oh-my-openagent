@@ -290,6 +290,69 @@ describe("createChatMessageHandler - first message hook ordering", () => {
     // then
     expect(hookCalls).toEqual(["runtimeFallback"])
   })
+
+  test("runs image proxy after runtime fallback and before keyword detection", async () => {
+    // given
+    const hookCalls: string[] = []
+    const observedModels: unknown[] = []
+    const args = createMockHandlerArgs()
+    args.hooks.runtimeFallback = {
+      "chat.message": async (
+        _input: unknown,
+        output: ChatMessageHandlerOutput,
+      ) => {
+        hookCalls.push("runtimeFallback")
+        output.message.model = {
+          providerID: "openai",
+          modelID: "text-fake",
+        }
+      },
+    }
+    Reflect.set(args.hooks, "imageProxy", {
+      "chat.message": async (
+        _input: unknown,
+        output: ChatMessageHandlerOutput,
+      ) => {
+        hookCalls.push("imageProxy")
+        observedModels.push(output.message.model)
+      },
+    })
+    args.hooks.keywordDetector = {
+      "chat.message": async () => {
+        hookCalls.push("keywordDetector")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("sisyphus"), {
+      message: {
+        id: "message-ordering",
+        model: {
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4",
+        },
+      },
+      parts: [
+        { type: "text", text: "inspect this image" },
+        {
+          type: "file",
+          mime: "image/png",
+          url: "file:///tmp/ordering.png",
+        },
+      ],
+    })
+
+    // then
+    expect(hookCalls).toEqual([
+      "runtimeFallback",
+      "imageProxy",
+      "keywordDetector",
+    ])
+    expect(observedModels).toEqual([
+      { providerID: "openai", modelID: "text-fake" },
+    ])
+  })
 })
 
 describe("createChatMessageHandler - cache warning behavior", () => {

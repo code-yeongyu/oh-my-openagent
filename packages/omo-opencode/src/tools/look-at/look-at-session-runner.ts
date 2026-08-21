@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { isAmbiguousPromptDispatchFailure, log, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
@@ -10,30 +9,32 @@ import { waitForLookAtSessionResult } from "./session-poller"
 
 interface RunLookAtSessionInput {
   ctx: PluginInput
-  toolContext: ToolContext
+  parentSessionID: string
   goal: string
   inputParts: LookAtInputPart[]
+  agentName?: string
 }
 
 export async function runLookAtSession({
   ctx,
-  toolContext,
+  parentSessionID,
   goal,
   inputParts,
+  agentName = MULTIMODAL_LOOKER_AGENT,
 }: RunLookAtSessionInput): Promise<string> {
   const fileParts = inputParts.filter((part): part is LookAtFilePart => part.type === "file")
   const prompt = buildLookAtPrompt(goal, fileParts)
   const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
-  log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
+  log(`[look_at] Creating session with parent: ${parentSessionID}`)
   const parentSession = await ctx.client.session.get({
-    path: { id: toolContext.sessionID },
+    path: { id: parentSessionID },
   }).catch(() => null)
   const parentDirectory = parentSession?.data?.directory ?? ctx.directory
 
   const createResult = await ctx.client.session.create({
     body: {
-      parentID: toolContext.sessionID,
+      parentID: parentSessionID,
       title: `look_at: ${goal.substring(0, 50)}`,
     },
     query: { directory: parentDirectory },
@@ -65,7 +66,7 @@ Original error: ${createResult.error}`
     await promptSyncWithModelSuggestionRetry(ctx.client, {
       path: { id: sessionID },
       body: {
-        agent: MULTIMODAL_LOOKER_AGENT,
+        agent: agentName,
         tools: {
           task: false,
           call_omo_agent: false,

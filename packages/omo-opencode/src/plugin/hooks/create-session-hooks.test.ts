@@ -143,4 +143,24 @@ describe("createSessionHooks", () => {
     // then
     expect(result.codegraphBootstrap).not.toBeNull()
   })
+
+  it("skips image proxy when multimodal-looker is disabled", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+      disabled_agents: ["multimodal-looker"],
+    })
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName === "image-proxy",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.imageProxy).toBeNull()
+  })
 })

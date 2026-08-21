@@ -40,7 +40,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       try {
         return await runLookAtSession({
           ctx,
-          toolContext,
+          parentSessionID: toolContext.sessionID,
           goal: args.goal,
           inputParts: preparedInput.inputParts,
         })

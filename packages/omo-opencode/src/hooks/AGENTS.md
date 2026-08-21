@@ -1,10 +1,10 @@
-# src/hooks/ -- ~54 Lifecycle Hooks Across 62 Dirs
+# src/hooks/ -- ~55 Lifecycle Hooks Across 63 Dirs
 
 **Generated:** 2026-07-17
 
 ## OVERVIEW
 
-54 base registered hooks on default config (61 with team-mode; `monitor-status-injector` adds 1 more with `monitor.enabled` → 62 max), composed from 54 `index.ts` hook dirs (52 wired; `task-reminder/` and `ralph-loop/` unwired) plus 5 standalone hook `.ts` files at the `src/hooks/` top level (bash-file-read-guard, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator). The 62 directories = 54 with `index.ts` + 8 without (`shared/`, `team-session-events/`, `hashline-edit-diff-enhancer/` unwired, and 5 `zauc-mocks-*`/`zauc-sync-mocks`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) -> HookFunction` factory pattern.
+55 base registered hooks on default config (62 with team-mode; `monitor-status-injector` adds 1 more with `monitor.enabled` → 63 max), composed from 55 `index.ts` hook dirs (53 wired; `task-reminder/` and `ralph-loop/` unwired) plus 5 standalone hook `.ts` files at the `src/hooks/` top level (bash-file-read-guard, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator). The 63 directories = 55 with `index.ts` + 8 without (`shared/`, `team-session-events/`, `hashline-edit-diff-enhancer/` unwired, and 5 `zauc-mocks-*`/`zauc-sync-mocks`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) -> HookFunction` factory pattern.
 
 **Unwired WIP (do not modify casually):** `task-reminder/` (has `index.ts` + `createTaskReminderHook` but NOT exported from barrel, NOT imported by any composer), `ralph-loop/` (exported from barrel but NOT imported by any composer; retained for migration, superseded by `goal/`), and `hashline-edit-diff-enhancer/` (has only `hook.ts`, NOT registered). Treat as orphaned until wired in.
 
@@ -12,24 +12,25 @@
 
 | Tier | Composer | Base | With team-mode | Where |
 |------|----------|------|----------------|-------|
-| **Session** | `create-session-hooks.ts` | 24 | 24 | OpenCode session lifecycle + chat.params + chat.message |
+| **Session** | `create-session-hooks.ts` | 25 | 25 | OpenCode session lifecycle + chat.params + chat.message |
 | **Tool Guard** | `create-tool-guard-hooks.ts` | 17 | 18 | Pre/post tool execution (+1: `team-tool-gating`) |
 | **Transform** | `create-transform-hooks.ts` | 4 | 6 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`; `monitor-status-injector` is a further +1 gated on `monitor.enabled`, not team-mode) |
 | **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
 | **Skill** | `create-skill-hooks.ts` | 2 | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
 | **Direct event handlers** | `src/plugin/event.ts` | 0 | +4 | `team-session-events/` sub-files: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 
-Total exposed hooks: **54 base, 61 with team-mode, 62 with team-mode + monitor** (counts the 4 team-session-events handlers individually).
+Total exposed hooks: **55 base, 62 with team-mode, 63 with team-mode + monitor** (counts the 4 team-session-events handlers individually).
 
 Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](../config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema -- they activate together with `team_mode.enabled`.
 
-### Tier 1: Session Hooks (24)
+### Tier 1: Session Hooks (25)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
 | `preemptiveCompaction` | session.idle | Trigger compaction before limit |
 | `sessionNotification` | session.idle | OS notifications on completion |
 | `thinkMode` | chat.params | Model variant switching for extended thinking |
+| `imageProxy` | chat.message | Analyze image attachments for known text-only models and inject a text description |
 | `anthropicContextWindowLimitRecovery` | session.error | Multi-strategy context recovery (truncation, compaction, dedup) |
 | `autoUpdateChecker` | session.created | Check npm for plugin updates |
 | `codegraphBootstrap` | session.created | Bootstrap CodeGraph indexing for the project (pairs with the built-in `codegraph` MCP) |

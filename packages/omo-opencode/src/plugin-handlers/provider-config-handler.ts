@@ -1,5 +1,8 @@
 import type { ModelCacheState, VisionCapableModel } from "../plugin-state";
-import { setVisionCapableModelsCache } from "../shared/vision-capable-models-cache"
+import {
+  setTextOnlyModelsCache,
+  setVisionCapableModelsCache,
+} from "../shared/vision-capable-models-cache"
 
 type ProviderConfig = {
   options?: { headers?: Record<string, string> };
@@ -18,12 +21,14 @@ type ProviderModelConfig = {
   };
 }
 
-function supportsImageInput(modelConfig: ProviderModelConfig | undefined): boolean {
-  if (modelConfig?.modalities?.input?.includes("image")) {
-    return true
+function readImageInputCapability(
+  modelConfig: ProviderModelConfig | undefined,
+): boolean | undefined {
+  if (modelConfig?.modalities?.input) {
+    return modelConfig.modalities.input.includes("image")
   }
 
-  return modelConfig?.capabilities?.input?.image === true
+  return modelConfig?.capabilities?.input?.image
 }
 
 function parseTrustedModel(modelString: string): VisionCapableModel | undefined {
@@ -56,6 +61,7 @@ export function applyProviderConfig(params: {
   params.modelCacheState.visionCapableModelsCache = visionCapableModelsCache
   visionCapableModelsCache.clear()
   setVisionCapableModelsCache(visionCapableModelsCache)
+  const textOnlyModelsCache = new Map<string, VisionCapableModel>()
 
   if (providers) {
     for (const [providerID, providerConfig] of Object.entries(providers)) {
@@ -63,8 +69,14 @@ export function applyProviderConfig(params: {
       if (!models) continue;
 
       for (const [modelID, modelConfig] of Object.entries(models)) {
-        if (supportsImageInput(modelConfig)) {
+        const imageInputCapability = readImageInputCapability(modelConfig)
+        if (imageInputCapability === true) {
           visionCapableModelsCache.set(
+            `${providerID}/${modelID}`,
+            { providerID, modelID },
+          )
+        } else if (imageInputCapability === false) {
+          textOnlyModelsCache.set(
             `${providerID}/${modelID}`,
             { providerID, modelID },
           )
@@ -87,5 +99,7 @@ export function applyProviderConfig(params: {
     const key = `${trustedModel.providerID}/${trustedModel.modelID}`
     if (visionCapableModelsCache.has(key)) continue
     visionCapableModelsCache.set(key, trustedModel)
+    textOnlyModelsCache.delete(key)
   }
+  setTextOnlyModelsCache(textOnlyModelsCache.values())
 }

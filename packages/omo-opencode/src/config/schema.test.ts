@@ -511,6 +511,17 @@ describe("BuiltinCategoryNameSchema", () => {
 })
 
 describe("HookNameSchema", () => {
+  test("accepts image proxy hook name", () => {
+    //#given
+    const input = "image-proxy"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
   test("accepts codegraph bootstrap hook name", () => {
     //#given
     const input = "codegraph-bootstrap"

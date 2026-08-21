@@ -7,6 +7,7 @@ import type { PluginContext } from "../types"
 import {
   createSessionNotification,
   createThinkModeHook,
+  createImageProxyHook,
   createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
@@ -44,6 +45,7 @@ export type SessionHooks = {
   preemptiveCompaction: ReturnType<typeof createPreemptiveCompactionHook> | null
   sessionNotification: ReturnType<typeof createSessionNotification> | null
   thinkMode: ReturnType<typeof createThinkModeHook> | null
+  imageProxy: ReturnType<typeof createImageProxyHook> | null
   modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
@@ -100,6 +102,21 @@ export function createSessionHooks(args: {
 
   const thinkMode = isHookEnabled("think-mode")
     ? safeHook("think-mode", () => createThinkModeHook())
+    : null
+
+  const multimodalLookerDisabled = pluginConfig.disabled_agents?.some(
+    (agentName) => agentName.toLowerCase() === "multimodal-looker",
+  ) ?? false
+  const multimodalLookerAgentName =
+    pluginConfig.agents?.["multimodal-looker"]?.displayName ??
+    "multimodal-looker"
+  const imageProxy = isHookEnabled("image-proxy") && !multimodalLookerDisabled
+    ? safeHook("image-proxy", () => createImageProxyHook(ctx, {
+      isMultimodalLookerAgent: (agentName) =>
+        agentName?.toLowerCase() === "multimodal-looker" ||
+        agentName === multimodalLookerAgentName,
+      multimodalLookerAgentName,
+    }))
     : null
 
   const enableFallbackTitle = pluginConfig.experimental?.model_fallback_title ?? false
@@ -239,6 +256,7 @@ export function createSessionHooks(args: {
     preemptiveCompaction,
     sessionNotification,
     thinkMode,
+    imageProxy,
     modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,

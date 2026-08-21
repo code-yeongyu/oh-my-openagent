@@ -12,6 +12,7 @@ export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detec
 export { createAnthropicContextWindowLimitRecoveryHook, type AnthropicContextWindowLimitRecoveryOptions } from "./anthropic-context-window-limit-recovery";
 
 export { createThinkModeHook } from "./think-mode";
+export { createImageProxyHook } from "./image-proxy";
 export {
   createModelFallbackHook,
   setPendingModelFallback,
