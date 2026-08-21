@@ -1,4 +1,6 @@
 import { createInterface } from "node:readline/promises"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import color from "picocolors"
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../shared"
 import type { InstallArgs, InstallPlatform } from "./types"
@@ -29,6 +31,7 @@ import { runSenpiInstaller } from "./install-senpi"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
+import { addV2PluginToOpencodeConfig } from "./config-manager/add-v2-plugin-to-opencode-config"
 import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -116,6 +119,19 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       printWarning(`Could not update OpenCode TUI config: ${message}`)
+    }
+
+    try {
+      const v2EntryPath = join(import.meta.dir, "..", "..", "dist", "v2", "index.js")
+      if (existsSync(v2EntryPath)) {
+        const v2Result = await addV2PluginToOpencodeConfig({ v2EntryPath })
+        if (!v2Result.success) {
+          printWarning(`Could not register OpenCode v2 plugin entry: ${v2Result.error}`)
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printWarning(`Could not register OpenCode v2 plugin entry: ${message}`)
     }
 
     printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
