@@ -25,7 +25,16 @@ function trackedFrontendReferenceFiles(): string[] {
 }
 
 function submoduleHead(name: string): string {
-	return git(["-C", join(upstreamsRoot, name), "rev-parse", "HEAD"]);
+	const submodulePath = join(upstreamsRoot, name);
+	// An uninitialized submodule is an empty directory inside the parent repo, so `git -C` there
+	// resolves to the PARENT repo and returns its HEAD - which reads as a drifted pin. Fail as the
+	// real condition instead.
+	if (!existsSync(join(submodulePath, ".git"))) {
+		throw new Error(
+			`upstream submodule '${name}' is not initialized - run: git submodule update --init --recursive`,
+		);
+	}
+	return git(["-C", submodulePath, "rev-parse", "HEAD"]);
 }
 
 describe("DMCA provenance gate", () => {

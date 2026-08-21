@@ -5,7 +5,8 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createDagFileStore, createDagManager, type DagManager, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
+import { createDagFileStore, createDagManager, DagManagerError, type DagManager, type DagNodeId, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
+import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
 
 import { DAG_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
 
@@ -427,5 +428,412 @@ describe("dag tool start warnings", () => {
     expect(result.details.kind).toBe("started")
     if (result.details.kind !== "started") throw new Error("Expected start to succeed")
     expect(result.details.warnings).toEqual([])
+  })
+})
+
+describe("dag tool argument validation for the control verbs", () => {
+  test("#given retry without run_id #when the tool runs #then it rejects with run_not_found and never reaches the retry seam", async () => {
+    // given
+    const { manager } = fixture()
+    const retried: string[] = []
+
+    // when
+    const result = await runDagTool(
+      { ...deps(manager), retry: (runId: DagRunId) => { retried.push(runId); return Promise.resolve(manager.snapshot(runId, parentSessionId)) } },
+      { action: "retry" },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected a run_id-less retry to fail")
+    expect(result.details.error.code).toBe("run_not_found")
+    expect(retried).toEqual([])
+  })
+
+  test("#given retry with BOTH node_id and node_ids #when the tool runs #then it rejects with invalid_arguments and never reaches the retry seam", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const retried: string[] = []
+
+    // when
+    const result = await runDagTool(
+      { ...deps(manager), retry: (runId: DagRunId) => { retried.push(runId); return Promise.resolve(manager.snapshot(runId, parentSessionId)) } },
+      { action: "retry", run_id: started.details.run_id, node_id: "plan", node_ids: ["build"] },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected node_id+node_ids to be rejected")
+    expect(result.details.error.code).toBe("invalid_arguments")
+    expect(result.details.error.message).toContain("node_ids")
+    expect(retried).toEqual([])
+  })
+
+  test("#given send without a message #when the tool runs #then it rejects with invalid_arguments and never reaches the send seam", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const sent: string[] = []
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        send: (runId: DagRunId, nodeId: string, message: string) => {
+          sent.push(`${runId}:${nodeId}:${message}`)
+          return Promise.resolve({ nodeId, taskId: "task-1", delivery: "steer" as const })
+        },
+      },
+      { action: "send", run_id: started.details.run_id, node_id: "plan" },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected a message-less send to be rejected")
+    expect(result.details.error.code).toBe("invalid_arguments")
+    expect(sent).toEqual([])
+  })
+
+  test("#given send without a node_id #when the tool runs #then it rejects with invalid_arguments", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+
+    // when
+    const result = await runDagTool(deps(manager), {
+      action: "send",
+      run_id: started.details.run_id,
+      message: "keep going",
+    })
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected a node-less send to be rejected")
+    expect(result.details.error.code).toBe("invalid_arguments")
+  })
+
+  test("#given amend without a definition #when the tool runs #then it rejects with invalid_arguments and never reaches the amend seam", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const amended: string[] = []
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        amend: (runId: DagRunId) => {
+          amended.push(runId)
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
+      { action: "amend", run_id: started.details.run_id },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected a definition-less amend to be rejected")
+    expect(result.details.error.code).toBe("invalid_arguments")
+    expect(amended).toEqual([])
+  })
+
+  test("#given a retry prompt override alongside node_ids #when the tool runs #then it rejects with invalid_arguments", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+
+    // when
+    const result = await runDagTool(deps(manager), {
+      action: "retry",
+      run_id: started.details.run_id,
+      node_ids: ["plan", "build"],
+      prompt: "try harder",
+    })
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected a multi-node prompt override to be rejected")
+    expect(result.details.error.code).toBe("invalid_arguments")
+    expect(result.details.error.message).toContain("prompt")
+  })
+
+  test("#given an amend definition whose nodes carry an impossible target #when the tool runs #then node validation rejects it before the amend seam", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const amended: string[] = []
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        amend: (runId: DagRunId) => {
+          amended.push(runId)
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
+      {
+        action: "amend",
+        run_id: started.details.run_id,
+        definition: definition({ nodes: [{ id: "plan", prompt: "draft", category: "quick", model: "anthropic/claude-opus-4" }] }),
+      },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected an invalid amend definition to be rejected")
+    expect(result.details.error.code).toBe("invalid_definition")
+    expect(result.details.error.nodes.map((node) => node.code)).toEqual(["category_with_model"])
+    expect(amended).toEqual([])
+  })
+})
+
+describe("dag tool control verb dispatch", () => {
+  test("#given a retry seam #when retry runs with node_ids and a prompt #then the seam receives them and the snapshot round-trips", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const calls: Array<{ readonly runId: string; readonly nodeIds?: readonly string[]; readonly prompt?: string }> = []
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        retry: (runId: DagRunId, nodeIds?: readonly string[], options?: { readonly prompt?: string }) => {
+          calls.push({ runId, ...(nodeIds === undefined ? {} : { nodeIds }), ...(options?.prompt === undefined ? {} : { prompt: options.prompt }) })
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
+      { action: "retry", run_id: started.details.run_id, node_id: "plan", prompt: "try harder" },
+    )
+
+    // then
+    expect(result.details.kind).toBe("retried")
+    if (result.details.kind !== "retried") throw new Error("Expected retry to succeed")
+    expect(result.details.run_id).toBe(started.details.run_id)
+    expect(result.details.node_ids).toEqual(["plan"])
+    expect(result.details.snapshot.runId).toBe(started.details.run_id as DagRunId)
+    expect(calls).toEqual([{ runId: started.details.run_id, nodeIds: ["plan"], prompt: "try harder" }])
+  })
+
+  test("#given retry with neither node selector #when retry runs #then the seam is called with no node ids (retry every failed node)", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const calls: Array<readonly string[] | undefined> = []
+
+    // when
+    await runDagTool(
+      {
+        ...deps(manager),
+        retry: (runId: DagRunId, nodeIds?: readonly string[]) => {
+          calls.push(nodeIds)
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
+      { action: "retry", run_id: started.details.run_id },
+    )
+
+    // then
+    expect(calls).toEqual([undefined])
+  })
+
+  test("#given a send seam #when send runs #then the delivery kind reaches the caller", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        send: (_runId: DagRunId, nodeId: string) =>
+          Promise.resolve({ nodeId, taskId: "task-7", delivery: "revive" as const }),
+      },
+      { action: "send", run_id: started.details.run_id, node_id: "plan", message: "resume with the new spec" },
+    )
+
+    // then
+    expect(result.details.kind).toBe("sent")
+    if (result.details.kind !== "sent") throw new Error("Expected send to succeed")
+    expect(result.details.node_id).toBe("plan")
+    expect(result.details.delivery).toBe("revive")
+    expect(result.details.task_id).toBe("task-7")
+  })
+
+  test("#given an amend seam #when amend runs #then the compiled definition reaches it and the amended snapshot returns", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const amended: Array<{ readonly runId: string; readonly prompts: readonly string[] }> = []
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        amend: (runId: DagRunId, amendment: { readonly nodes: readonly { readonly prompt: string }[] }) => {
+          amended.push({ runId, prompts: amendment.nodes.map((node) => node.prompt) })
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
+      {
+        action: "amend",
+        run_id: started.details.run_id,
+        definition: definition({
+          nodes: [
+            { id: "plan", prompt: "draft a BETTER plan", category: "quick" },
+            { id: "build", prompt: "build it", category: "quick", dependsOn: ["plan"] },
+          ],
+        }),
+      },
+    )
+
+    // then
+    expect(result.details.kind).toBe("amended")
+    if (result.details.kind !== "amended") throw new Error("Expected amend to succeed")
+    expect(result.details.run_id).toBe(started.details.run_id)
+    expect(amended).toEqual([{ runId: started.details.run_id, prompts: ["draft a BETTER plan", "build it"] }])
+  })
+})
+
+describe("dag tool control verb refusal vocabulary", () => {
+  const refusals = [
+    { code: "node_not_found", message: 'unknown dag node "ghost"' },
+    { code: "node_not_retryable", message: 'dag node "plan" already completed' },
+    { code: "node_not_continuable", message: 'dag node "plan" cannot be continued' },
+    { code: "run_still_active", message: "run is still active" },
+    { code: "invalid_arguments", message: "a retry prompt override requires exactly one explicit node id" },
+  ] as const
+
+  for (const refusal of refusals) {
+    test(`#given the engine refuses with ${refusal.code} #when the tool dispatches #then the code surfaces verbatim in the error envelope`, async () => {
+      // given
+      const { manager } = fixture()
+      const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+      if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+
+      // when
+      const result = await runDagTool(
+        {
+          ...deps(manager),
+          retry: () => Promise.reject(new DagNodeControlError({ code: refusal.code, message: refusal.message, nodeIds: ["plan" as DagNodeId] })),
+        },
+        { action: "retry", run_id: started.details.run_id },
+      )
+
+      // then
+      expect(result.details.kind).toBe("error")
+      if (result.details.kind !== "error") throw new Error("Expected the engine refusal to surface")
+      expect(result.details.error.code).toBe(refusal.code)
+      expect(result.details.error.message).toBe(refusal.message)
+      expect(result.details.error.node_ids).toEqual(["plan"])
+    })
+  }
+
+  test("#given the engine refuses an amendment #when amend dispatches #then invalid_amendment surfaces verbatim", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        amend: () => Promise.reject(new DagManagerError({ code: "invalid_amendment", message: "removed node still has dependents" })),
+      },
+      { action: "amend", run_id: started.details.run_id, definition: definition() },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected the amendment refusal to surface")
+    expect(result.details.error.code).toBe("invalid_amendment")
+  })
+
+  test("#given the engine refuses to amend running nodes #when amend dispatches #then amend_running_node surfaces verbatim", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+
+    // when
+    const result = await runDagTool(
+      {
+        ...deps(manager),
+        amend: () => Promise.reject(new DagManagerError({ code: "amend_running_node", message: "cannot amend scheduled or running nodes: plan" })),
+      },
+      { action: "amend", run_id: started.details.run_id, definition: definition() },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected the running-node refusal to surface")
+    expect(result.details.error.code).toBe("amend_running_node")
+  })
+
+  test("#given a run owned by another session #when retry dispatches #then run_not_owned is enforced before the retry seam", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const retried: string[] = []
+
+    // when
+    const result = await runDagTool(
+      {
+        manager,
+        parentSessionId: () => foreignSessionId,
+        rootSessionId: () => rootSessionId,
+        retry: (runId: DagRunId) => {
+          retried.push(runId)
+          return Promise.resolve(manager.snapshot(runId, foreignSessionId))
+        },
+      },
+      { action: "retry", run_id: started.details.run_id },
+    )
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected a foreign retry to be denied")
+    expect(result.details.error.code).toBe("run_not_owned")
+    expect(retried).toEqual([])
+  })
+})
+
+describe("dag tool control verb schema", () => {
+  test("#given the shipped tool #when its action union is read #then retry, send, and amend are offered with verb-teaching descriptions", () => {
+    // given
+    const { manager } = fixture()
+
+    // when
+    const tool = createDagTool(deps(manager))
+    const action = (tool.parameters as unknown as { properties: { action: { anyOf: readonly { const: string }[]; description: string } } }).properties.action
+
+    // then
+    expect(action.anyOf.map((member) => member.const)).toEqual([
+      "start",
+      "attach",
+      "snapshot",
+      "wait",
+      "cancel",
+      "retry",
+      "send",
+      "amend",
+    ])
+    expect(action.description).toContain("retry")
+    expect(action.description).toContain("send")
+    expect(action.description).toContain("amend")
   })
 })

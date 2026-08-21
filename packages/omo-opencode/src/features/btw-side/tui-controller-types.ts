@@ -56,3 +56,9 @@ export type BtwSideState =
   | { phase: "open"; parentSessionID: string; sideSessionID: string; owned: boolean }
   | { phase: "closing"; parentSessionID: string; sideSessionID: string; owned: boolean }
 
+export type BtwSideRecord = {
+  parentSessionID: string
+  sideSessionID: string
+  owned: boolean
+}
+

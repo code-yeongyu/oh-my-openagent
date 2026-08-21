@@ -55,6 +55,8 @@ export interface DagCommandRunSnapshot {
   readonly waves: readonly DagCommandWave[]
   readonly criticalPath: readonly string[]
   readonly bottlenecks: readonly DagCommandBottleneck[]
+  // One entry per accepted amendment; only the count is rendered. Absent means never amended.
+  readonly amendHistory?: readonly unknown[]
 }
 
 export interface DagCommandRunCounts {
@@ -186,7 +188,9 @@ function detailText(snapshot: DagCommandRunSnapshot, manager: DagCommandManager)
 }
 
 function summaryHeader(snapshot: DagCommandRunSnapshot): string {
-  return `${normalizeRendererText(snapshot.name)} (${normalizeRendererText(snapshot.runId)}) ${normalizeRendererText(snapshot.status)} ${snapshot.nodes.length} nodes, ${snapshot.waves.length} waves`
+  const amendCount = snapshot.amendHistory?.length ?? 0
+  const amended = amendCount === 0 ? "" : `, amended x${amendCount}`
+  return `${normalizeRendererText(snapshot.name)} (${normalizeRendererText(snapshot.runId)}) ${normalizeRendererText(snapshot.status)} ${snapshot.nodes.length} nodes, ${snapshot.waves.length} waves${amended}`
 }
 
 // Edges are rendered on the node that waits, so the wave tree carries the whole dependency graph
@@ -206,12 +210,14 @@ function nodeRow(node: DagCommandNode, manager: DagCommandManager, isCritical: b
   const parts = [normalizeRendererText(node.label ?? node.id), normalizeRendererText(node.state), routeLabel(node.route)]
   const model = resolvedModel(node, manager)
   if (model !== undefined) parts.push(`model:${model}`)
-  if (node.attempt > 1) parts.push(`attempt ${node.attempt}`)
+  if (node.attempt > 1) parts.push(`x${node.attempt}`)
   const duration = durationLabel(node)
   if (duration !== undefined) parts.push(duration)
   if (dependsOn.length > 0) parts.push(`after ${dependsOn.map((id) => normalizeRendererText(id)).join(", ")}`)
   if (isCritical) parts.push(CRITICAL_MARKER)
-  if (node.error !== undefined) parts.push(`error: ${normalizeRendererText(node.error.message)}`)
+  if (node.error !== undefined) {
+    parts.push(`error: ${normalizeRendererText(node.error.code)} ${normalizeRendererText(node.error.message)}`)
+  }
   return parts.join(" ")
 }
 

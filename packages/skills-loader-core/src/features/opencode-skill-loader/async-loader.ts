@@ -1,7 +1,7 @@
 import { readFile, readdir } from "fs/promises"
 import type { Dirent } from "fs"
 import { join, basename } from "path"
-import yaml from "js-yaml"
+import * as yaml from "js-yaml"
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 import { sanitizeModelField } from "@oh-my-opencode/model-core"
 import { resolveSymlink, isMarkdownFile } from "@oh-my-opencode/utils"

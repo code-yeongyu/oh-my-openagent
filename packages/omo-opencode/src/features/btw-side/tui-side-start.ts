@@ -23,8 +23,8 @@ export type PreparedBtwSideStart = {
 export function prepareBtwSideStart(
   dependencies: BtwSideControllerDependencies,
   promptRef: BtwPromptRef,
+  parentSessionID = dependencies.getCurrentSessionID(),
 ): PreparedBtwSideStart | undefined {
-  const parentSessionID = dependencies.getCurrentSessionID()
   if (!parentSessionID) {
     dependencies.showToast("BTW is unavailable before the session starts.")
     return undefined
@@ -46,13 +46,14 @@ export function prepareBtwSideStart(
 
   const originalDraft = promptRef.input
   const parsed = parseBtwQuestion(originalDraft)
+  const summary = parsed.question.replace(/\s+/g, " ").trim()
   return {
     parentSessionID,
     originalDraft,
     consumeDraft: parsed.consumeDraft,
     question: parsed.question,
     createInput: {
-      title: `BTW · ${parentSession.title}`,
+      title: `BTW · ${(summary || "New side").slice(0, 64)}`,
       ...(parentSession.agent ? { agent: parentSession.agent } : {}),
       ...(parentSession.model
         ? {

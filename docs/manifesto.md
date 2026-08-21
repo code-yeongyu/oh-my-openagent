@@ -64,7 +64,7 @@ That's a worthwhile investment when it means 10x, 20x, or 100x productivity gain
 **However:**
 
 Unnecessary token waste is not pursued. The system optimizes for:
-- Using cheaper models (Haiku, Flash) for simple tasks
+- Using cheaper, faster models for simple tasks (the `quick` category: Kimi highspeed, or GPT-5.6 Luna Fast on OpenAI-only)
 - Avoiding redundant exploration
 - Caching learnings across sessions
 - Stopping research when sufficient context is gathered
@@ -125,7 +125,7 @@ The output should be consistent. Not random, not surprising, not "creative" in w
 ### Continuous
 
 Work should survive interruptions:
-- Session crashes? Resume with `/start-work`
+- Session crash on a Prometheus plan? Resume with `/start-work` (Atlas + boulder). Otherwise use `/handoff` for a new session or `/goal resume` for a paused goal
 - Need to step away? Progress is tracked
 - Multi-day project? Context is preserved
 

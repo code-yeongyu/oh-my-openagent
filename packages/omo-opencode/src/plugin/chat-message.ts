@@ -2,7 +2,11 @@ import type { OhMyOpenCodeConfig } from "../config"
 
 import { updateSessionAgent } from "../features/claude-code-session-state"
 import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-command/detector"
-import { isSyntheticOrInternalOnlyTextParts, log } from "../shared"
+import {
+  isRuntimeFallbackRetryTextParts,
+  isSyntheticOrInternalOnlyTextParts,
+  log,
+} from "../shared"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
@@ -90,6 +94,9 @@ export function createChatMessageHandler(args: {
   ): Promise<void> => {
     const nativeGoalCommand = consumeNativeGoalCommandMarker(output.parts)
     if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
+      if (isRuntimeFallbackRetryTextParts(output.parts)) {
+        await hooks.runtimeFallback?.["chat.message"]?.(input, output)
+      }
       log("[chat-message] Skipping synthetic/internal-only message", {
         sessionID: input.sessionID,
       })

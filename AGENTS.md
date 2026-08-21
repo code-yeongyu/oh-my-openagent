@@ -61,7 +61,7 @@ Typechecks and unit tests are necessary but do not prove harness behavior.
 
 - OpenCode-connected changes must use the `opencode-qa` skill and an isolated XDG sandbox. Never QA against the real OpenCode database. Prove the changed tool, hook, CLI, or runtime path through structured OpenCode events or the server API; tmux is only a TUI smoke surface.
 - Codex-connected changes must use the `codex-qa` skill with an isolated `CODEX_HOME`, the local build, and a local mock model. Never QA against the published package or real `~/.codex`; prove relevant `hook/started` and `hook/completed` events.
-- Senpi-connected changes must follow `packages/omo-senpi/AGENTS.md`, use its isolated live drivers, and run `bun run test:senpi`.
+- Senpi-connected changes under `packages/omo-senpi/` or `packages/senpi-task/` must use the `senpi-qa` skill. Resolve live evidence only with `.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs`, run `tsgo --noEmit -p packages/omo-senpi/tsconfig.json` and `bun run test:senpi`, then use the isolated real-Senpi drivers documented by the skill.
 - A cross-adapter change runs every affected adapter's QA. Unit-only evidence is insufficient for live behavior claims.
 - Each evidence directory must state what was tested, what behavior it proves, what was observed, why coverage is sufficient, isolation proof, residual risk, and what secret-bearing material was omitted or redacted.
 
@@ -104,7 +104,7 @@ bun run test:senpi    # Senpi build, typecheck, and package tests
 
 `script/agent/setup.sh` is the single source of truth for bootstrap. `script/agent/cleanup.sh` removes regenerable state; `script/agent/cleanup-hook.sh` is the non-blocking Claude shutdown launcher. `.env.example` is the credential template. `script/agent/qa-sandbox.sh` creates throwaway XDG and `CODEX_HOME` state for QA.
 
-For the branded `omo-ai` distribution, `canonicalAgentDir()` owns the `~/.omo/agent` default. Senpi's compatibility resolver gives `OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR`, then `PI_CODING_AGENT_DIR` precedence; absent an override, it detects `settings.json` under `~/.omo/agent`, then flat `~/.omo`, and otherwise uses `~/.senpi/agent`. Do not compose another default.
+For the branded `omo-ai` distribution, `canonicalAgentDir()` owns the `~/.omo/agent` default. Senpi's compatibility resolver gives `OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR`, then `PI_CODING_AGENT_DIR` precedence; absent an override, it detects `settings.json` under `~/.omo/agent`, then flat `~/.omo`, and otherwise uses `~/.senpi/agent`. Do not compose another default. The spawned engine, `omo doctor`, `omo setup`, local launcher, and installer must all use the canonical resolver.
 
 Committed harness wiring delegates to that shared setup:
 

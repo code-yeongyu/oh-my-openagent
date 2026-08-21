@@ -6,17 +6,18 @@ import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { RpcRunnerSpec } from "@oh-my-opencode/senpi-task"
-import { createRpcModelAdmission } from "@oh-my-opencode/senpi-task/rpc-model-admission"
+import { createRpcModelAdmission, PROBE_TIMEOUT_MS } from "@oh-my-opencode/senpi-task/rpc-model-admission"
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 /**
- * Admission spends up to PROBE_TIMEOUT_MS (20s) per catalog probe, and it now costs two of them
- * whenever the first exit-0 listing omits the requested model, so both live cases are budgeted for
- * two full probes plus the child's cold start. The confirming probe deliberately keeps the full
- * probe budget: it is the probe that decides a rejection, so starving it would time out on exactly
- * the slow-but-complete listings this admission path exists to admit.
+ * Admission can spend three full catalog probes worst case: a timed-out probe is re-probed once
+ * (a timeout is inconclusive, not absence), and a first exit-0 listing that omits the requested
+ * model. Keep the test deadline derived from the production budget, with 20s for termination and
+ * runner overhead. The confirming probe deliberately keeps the full probe budget: it decides a
+ * rejection, so starving it would time out on exactly the slow-but-complete listings this path must
+ * admit.
  */
-const ADMISSION_TEST_TIMEOUT_MS = 60_000
+const ADMISSION_TEST_TIMEOUT_MS = PROBE_TIMEOUT_MS * 3 + 20_000
 
 const agentDirs: string[] = []
 const mockProviderExtension = fileURLToPath(

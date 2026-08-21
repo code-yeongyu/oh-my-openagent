@@ -74,6 +74,18 @@ describe("omo-senpi mass-ulw component", () => {
         "run mass ulw now",
         "mass-ulw",
         "mass ulw, then report back",
+        "ulw mass",
+        "ulwmass",
+        "ULW MASS",
+        "Ulw-Mass",
+        "ulw  mass",
+        "go ulw mass now",
+        "mulw",
+        "MULW",
+        "run mulw now",
+        "meth",
+        "METH",
+        "meth, then report back",
       ] as const
       for (const text of triggers) {
         expect({ text, matched: isMassUlwInput(text) }).toEqual({ text, matched: true })
@@ -92,6 +104,15 @@ describe("omo-senpi mass-ulw component", () => {
         "massachusetts",
         "mass ulw-loop is separate",
         "the mass of ulw",
+        "ulw massive",
+        "ulwmassive",
+        "simulw",
+        "mulwark",
+        "method",
+        "methods",
+        "methane",
+        "promethean",
+        "amethyst",
       ] as const
       for (const text of misses) {
         expect({ text, matched: isMassUlwInput(text) }).toEqual({ text, matched: false })
@@ -119,6 +140,18 @@ describe("omo-senpi mass-ulw component", () => {
 
       // when
       const result = await dispatchInput(pi, "MASSULW time")
+
+      // then
+      expectSkillPointerInjection(pi, result)
+    })
+
+    it("#when the spelling is a short alias like meth #then the same pointer is injected", async () => {
+      // given
+      const pi = new FakeExtensionAPI()
+      await registerMassUlw(pi)
+
+      // when
+      const result = await dispatchInput(pi, "meth ship the docs refresh")
 
       // then
       expectSkillPointerInjection(pi, result)

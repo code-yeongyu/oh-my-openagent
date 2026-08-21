@@ -7,6 +7,7 @@ import { join } from "node:path"
 
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
+import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
@@ -112,6 +113,7 @@ type MutableTask = {
 
 class RecoveryTaskManager implements TaskManager {
   readonly startOwnedCalls: string[] = []
+  readonly ownerFingerprints: string[] = []
   readonly waitForCalls: string[] = []
   readonly #tasks = new Map<string, MutableTask>()
   readonly #autoCompleteStarts: boolean
@@ -140,6 +142,7 @@ class RecoveryTaskManager implements TaskManager {
 
   async startOwned(_spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
     this.startOwnedCalls.push(String(owner.nodeId))
+    this.ownerFingerprints.push(owner.fingerprint)
     const existing = this.findOwnedTask(owner)
     if (existing !== undefined) {
       return { kind: "started", reused: true, task_id: existing.task_id, status: existing.status, name: existing.name ?? existing.task_id }
@@ -568,5 +571,93 @@ describe("DAG crash recovery", () => {
     expect(checkpoint?.leaseHolderPid).toBeUndefined()
     expect(checkpoint?.previousLeaseHolderPid).toBe(101)
     expect(events(store).at(-1)?.type).toBe("dag.run.paused")
+  })
+})
+
+describe("DAG recovery attempt-scoped ownership", () => {
+  test("#given a pre-change checkpoint with legacy owner fingerprints #when resumed #then it completes and the legacy fingerprint is reused verbatim", async () => {
+    // given - no amendHistory, no execAttempt, owner fingerprints from the legacy two-field formula
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    const manager = new RecoveryTaskManager()
+    const input = definition([node("legacy-done"), node("legacy-next", ["legacy-done"])])
+    const legacyRecord = recoverableRecord(input, {
+      "legacy-done": { state: "completed", taskId: "task-legacy-done", attempt: 1 },
+      "legacy-next": { state: "scheduled" },
+    }, { previousLeaseHolderPid: 9001 })
+    expect(legacyRecord.amendHistory).toBeUndefined()
+    expect(legacyRecord.nodes.every((entry) => entry.execAttempt === undefined)).toBe(true)
+    store.writeCheckpoint(runId, legacyRecord)
+    store.writeResult(runId, "legacy-done", "legacy output")
+
+    // when
+    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
+      .resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcome?.kind).toBe("resumed")
+    expect(outcome?.record?.status).toBe("completed")
+    expect(outcome?.reusedOutputs?.get("legacy-done" as DagNodeId)).toBe("legacy output")
+    expect(manager.startOwnedCalls).toEqual(["legacy-next"])
+    expect(manager.ownerFingerprints).toEqual([
+      dagFingerprint({ definitionFingerprint: "definition-fingerprint", nodeId: "legacy-next" }),
+    ])
+  })
+
+  test("#given a reattach whose observed taskId differs #when resumed #then the display attempt bumps without a new execution and the owner fingerprint still matches", async () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    const manager = new RecoveryTaskManager()
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("drifted")]), {
+      drifted: { state: "running", taskId: "task-stale", attempt: 1 },
+    }, { previousLeaseHolderPid: 9001 }))
+    const persistedOwner: DagTaskOwner = {
+      kind: "dag",
+      runId,
+      nodeId: "drifted" as DagNodeId,
+      fingerprint: dagFingerprint({ definitionFingerprint: "definition-fingerprint", nodeId: "drifted" }),
+    }
+    manager.add(taskRecord(persistedOwner, "completed", "task-owned-drifted"))
+
+    // when
+    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
+      .resumePausedRuns(parentSessionId)
+
+    // then
+    const node0 = outcome?.record?.nodes[0]
+    expect(node0).toMatchObject({ state: "completed", taskId: "task-owned-drifted", attempt: 2 })
+    expect(node0?.execAttempt).toBeUndefined()
+    expect(manager.startOwnedCalls).toEqual([])
+    expect(dagFingerprint(ownerFingerprintInput({
+      definitionFingerprint: "definition-fingerprint",
+      nodeId: "drifted" as DagNodeId,
+      ...(node0?.execAttempt === undefined ? {} : { execAttempt: node0.execAttempt }),
+    }))).toBe(persistedOwner.fingerprint)
+  })
+
+  test("#given a retried pending node with execAttempt #when resumed #then it starts fresh under the attempt-scoped fingerprint", async () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    const manager = new RecoveryTaskManager()
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("retried")]), {
+      retried: { state: "pending", taskId: "task-retried-1", attempt: 1, execAttempt: 2 },
+    }, { previousLeaseHolderPid: 9001 }))
+
+    // when
+    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
+      .resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcome?.record?.nodes[0]?.state).toBe("completed")
+    expect(manager.startOwnedCalls).toEqual(["retried"])
+    expect(manager.ownerFingerprints).toEqual([
+      dagFingerprint(ownerFingerprintInput({
+        definitionFingerprint: "definition-fingerprint",
+        nodeId: "retried" as DagNodeId,
+        execAttempt: 2,
+      })),
+    ])
   })
 })

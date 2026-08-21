@@ -1,5 +1,13 @@
 // Structural read-seam over DagRunSnapshot/DagRunSummary: the bridge reads exactly the fields it
 // puts on the wire, so the engine keeps ownership of the full snapshot type.
+// The engine's DagNodeError also carries nodeId/at; this seam reads only what a viewer renders and
+// the payload projects exactly those two fields, so the extras never reach the wire.
+export interface DagBridgeSnapshotNodeError {
+  readonly code: string
+  readonly message: string
+  readonly [extra: string]: unknown
+}
+
 export interface DagBridgeSnapshotNode {
   readonly id: string
   readonly label?: string
@@ -11,6 +19,8 @@ export interface DagBridgeSnapshotNode {
   readonly createdAt: string
   readonly startedAt?: string
   readonly completedAt?: string
+  // The failure of the LAST settled attempt. A retry clears it when the node runs again.
+  readonly error?: DagBridgeSnapshotNodeError
 }
 
 export interface DagBridgeSnapshotEdge {
@@ -30,10 +40,14 @@ export interface DagBridgeRunSnapshot {
   readonly status: string
   readonly createdAt: string
   readonly updatedAt: string
+  // Absent while the run is live: a resumed run clears it, so the wire must be able to drop it too.
+  readonly completedAt?: string
   readonly counts: Readonly<Record<string, number>>
   readonly nodes: readonly DagBridgeSnapshotNode[]
   readonly edges: readonly DagBridgeSnapshotEdge[]
   readonly waves: readonly DagBridgeSnapshotWave[]
+  // One entry per accepted amendment; only the count reaches the wire.
+  readonly amendHistory?: readonly unknown[]
 }
 
 export const DAG_MAX_RUN_SNAPSHOTS = 256
@@ -52,6 +66,7 @@ export function dagUpdatedPayload(parentSessionId: string, runs: readonly DagBri
 // snake_case is the wire contract omo-desktop-app already consumes for omo.task.updated; optional
 // engine fields stay absent rather than serializing as null.
 function runSnapshotPayload(run: DagBridgeRunSnapshot) {
+  const amendCount = run.amendHistory?.length ?? 0
   return {
     run_id: run.runId,
     run_key: run.runKey,
@@ -59,6 +74,7 @@ function runSnapshotPayload(run: DagBridgeRunSnapshot) {
     status: run.status,
     created_at: run.createdAt,
     updated_at: run.updatedAt,
+    ...(run.completedAt === undefined ? {} : { completed_at: run.completedAt }),
     counts: run.counts,
     nodes: run.nodes.map((node) => ({
       id: node.id,
@@ -71,8 +87,10 @@ function runSnapshotPayload(run: DagBridgeRunSnapshot) {
       ...(node.taskId === undefined ? {} : { task_id: node.taskId }),
       ...(node.startedAt === undefined ? {} : { started_at: node.startedAt }),
       ...(node.completedAt === undefined ? {} : { completed_at: node.completedAt }),
+      ...(node.error === undefined ? {} : { last_error: { code: node.error.code, message: node.error.message } }),
     })),
     edges: run.edges.map((edge) => ({ from: edge.from, to: edge.to })),
     waves: run.waves.map((wave) => ({ index: wave.index, node_ids: wave.nodeIds })),
+    ...(amendCount === 0 ? {} : { amend_count: amendCount }),
   }
 }

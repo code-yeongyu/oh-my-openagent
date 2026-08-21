@@ -22,7 +22,7 @@ function makeSpec(overrides: Partial<RpcRunnerSpec> = {}): RpcRunnerSpec {
   return { task_id: "st_deadbeef", cwd: process.cwd(), state_dir: stateDir, prompt: "hello", ...overrides }
 }
 
-function makeRunner(extra: { heartbeatIntervalMs?: number } = {}): {
+function makeRunner(extra: { heartbeatIntervalMs?: number; now?: () => number } = {}): {
   runner: RpcProcessRunner
   captured: () => RpcSpawnDescriptor | undefined
 } {
@@ -180,14 +180,31 @@ describe("RpcProcessRunner", () => {
 
   test("#given a resident child #when heartbeats poll #then lastSeen and sessionId are recorded", async () => {
     // given
-    const { runner } = makeRunner({ heartbeatIntervalMs: 20 })
+    let signalHeartbeat: (() => void) | undefined
+    const heartbeatObserved = new Promise<void>((resolve) => {
+      signalHeartbeat = resolve
+    })
+    const observedAt = 123_456
+    const { runner } = makeRunner({
+      heartbeatIntervalMs: 20,
+      now: () => {
+        signalHeartbeat?.()
+        return observedAt
+      },
+    })
     const handle = await runner.start(makeSpec({ prompt: "hold" }))
 
     // when
-    await waitFor(() => handle.lastSeen() !== undefined)
+    await Promise.race([
+      heartbeatObserved,
+      new Promise<never>((_, reject) => {
+        const timeout = setTimeout(() => reject(new Error("timed out waiting for heartbeat update")), 2_000)
+        timeout.unref?.()
+      }),
+    ])
 
     // then
-    expect(handle.lastSeen()).toBeDefined()
+    expect(handle.lastSeen()).toBe(observedAt)
     expect(handle.sessionId).toBe("fake-session")
   })
 

@@ -10,7 +10,7 @@ describe("dream shutdown evaluator", () => {
     const f = await fixture()
     const drain = createShutdownDrain({ steps: noopSteps })
     drain.registerEvaluator(f.wiring.shutdownEvaluator())
-    await drain.run({ reason: "quit", sessionId: CONVERSATION, deadlineAt: NOW_MS + 1500, now: () => NOW_MS })
+    await drain.run({ reason: "quit", sessionId: CONVERSATION, deadlineAt: NOW_MS + 30_000, now: () => NOW_MS })
     expect(f.launches).toHaveLength(1)
     expect(f.launches[0]?.request.trigger).toBe("dream")
     expect(f.launches[0]?.request.origin).toBe("shutdown")

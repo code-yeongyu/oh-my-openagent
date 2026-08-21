@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync, rmSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, type ReservedRun } from "@oh-my-opencode/memory-core"
 
@@ -27,7 +28,7 @@ import { recordReflectionCompletion, type ReflectionCompletionRecord } from "./w
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 class RpcFakeExtensionAPI extends MemoryFakeExtensionAPI {

@@ -1,0 +1,5 @@
+fork=MoerAI/oh-my-opencode
+branch=fix/6579-runtime-fallback-dedup
+captured_remote_head=1cca53e227ee28e1920c349a9630c01fc7ad8486
+expected_reviewed_head=1cca53e227ee28e1920c349a9630c01fc7ad8486
+match=true

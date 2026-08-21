@@ -28,6 +28,9 @@ export function dagEventLane(type: DagRunEventType): DagEventLane {
     case "dag.node.transitioned":
     case "dag.node.task-attached":
     case "dag.node.reused":
+    case "dag.node.retried":
+    case "dag.node.steered":
+    case "dag.definition.amended":
     case "dag.diagnostic.added":
     case "dag.stream.overflow":
       return "boundary"
@@ -141,6 +144,54 @@ export function dagNodeReusedEvent(input: {
     nodeId: input.nodeId,
     taskId: input.taskId,
     sourceRunId: input.sourceRunId,
+  }
+}
+
+export function dagNodeRetriedEvent(input: {
+  nodeId: DagNodeId
+  priorTaskId?: string
+  execAttempt: number
+  promptChanged: boolean
+}): DagRunEventPayload {
+  const payload: DagRunEventPayload = {
+    type: "dag.node.retried",
+    nodeId: input.nodeId,
+    execAttempt: input.execAttempt,
+    promptChanged: input.promptChanged,
+  }
+  if (input.priorTaskId !== undefined) {
+    return { ...payload, priorTaskId: input.priorTaskId }
+  }
+  return payload
+}
+
+export function dagNodeSteeredEvent(input: {
+  nodeId: DagNodeId
+  taskId: string
+  delivery: "steer" | "revive"
+}): DagRunEventPayload {
+  return {
+    type: "dag.node.steered",
+    nodeId: input.nodeId,
+    taskId: input.taskId,
+    delivery: input.delivery,
+  }
+}
+
+export function dagDefinitionAmendedEvent(input: {
+  previousFingerprint: string
+  fingerprint: string
+  changedNodeIds: readonly DagNodeId[]
+  addedNodeIds: readonly DagNodeId[]
+  invalidatedNodeIds: readonly DagNodeId[]
+}): DagRunEventPayload {
+  return {
+    type: "dag.definition.amended",
+    previousFingerprint: input.previousFingerprint,
+    fingerprint: input.fingerprint,
+    changedNodeIds: input.changedNodeIds,
+    addedNodeIds: input.addedNodeIds,
+    invalidatedNodeIds: input.invalidatedNodeIds,
   }
 }
 

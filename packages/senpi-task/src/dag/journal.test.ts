@@ -4,7 +4,13 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { dagNodeTransitionedEvent, dagRunStartedEvent } from "./events"
+import {
+  dagDefinitionAmendedEvent,
+  dagNodeRetriedEvent,
+  dagNodeSteeredEvent,
+  dagNodeTransitionedEvent,
+  dagRunStartedEvent,
+} from "./events"
 import { createDagJournal, subscribeDagJournal, type DagJournalCheckpoint } from "./journal"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
@@ -35,6 +41,42 @@ function applyEvent(checkpoint: TestCheckpoint, event: DagRunEvent): TestCheckpo
   return event.type === "dag.run.started"
     ? { ...checkpoint, generations: [...checkpoint.generations, event.generation] }
     : checkpoint
+}
+
+interface ReplayCheckpoint extends DagJournalCheckpoint {
+  readonly runId: DagRunId
+  readonly generations: readonly number[]
+  readonly retried: readonly DagNodeId[]
+  readonly steered: readonly DagNodeId[]
+  readonly amendCount: number
+  readonly lastFingerprint?: string
+}
+
+function initialReplayCheckpoint(): ReplayCheckpoint {
+  return {
+    schemaVersion: 1,
+    runId,
+    checkpointSeq: 0,
+    generations: [],
+    retried: [],
+    steered: [],
+    amendCount: 0,
+  }
+}
+
+function applyReplayEvent(checkpoint: ReplayCheckpoint, event: DagRunEvent): ReplayCheckpoint {
+  switch (event.type) {
+    case "dag.run.started":
+      return { ...checkpoint, generations: [...checkpoint.generations, event.generation] }
+    case "dag.node.retried":
+      return { ...checkpoint, retried: [...checkpoint.retried, event.nodeId] }
+    case "dag.node.steered":
+      return { ...checkpoint, steered: [...checkpoint.steered, event.nodeId] }
+    case "dag.definition.amended":
+      return { ...checkpoint, amendCount: checkpoint.amendCount + 1, lastFingerprint: event.fingerprint }
+    default:
+      return checkpoint
+  }
 }
 
 function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
@@ -347,5 +389,116 @@ describe("createDagJournal subscribers", () => {
 
     // then
     expect(delivered).toEqual([1])
+  })
+})
+
+describe("createDagJournal new event replay", () => {
+  test("#given a WAL with dag.node.retried, dag.node.steered, and dag.definition.amended #when the checkpoint is rebuilt from the WAL #then replayed checkpoint equals the original", () => {
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const journal = createDagJournal({
+      store,
+      runId,
+      initialCheckpoint: initialReplayCheckpoint(),
+      applyEvent: applyReplayEvent,
+    })
+    const nodeA = "node-a" as DagNodeId
+    const nodeB = "node-b" as DagNodeId
+
+    journal.append(dagRunStartedEvent({ generation: 1 }))
+    journal.append(dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false }))
+    journal.append(dagNodeSteeredEvent({ nodeId: nodeB, taskId: "task-b", delivery: "steer" }))
+    journal.append(dagDefinitionAmendedEvent({
+      previousFingerprint: "fp-old",
+      fingerprint: "fp-new",
+      changedNodeIds: [nodeA],
+      addedNodeIds: [],
+      invalidatedNodeIds: [nodeB],
+    }))
+    journal.append(dagRunStartedEvent({ generation: 2 }))
+
+    const expected = journal.snapshot()
+    const wal = store.readEvents(runId, 0, { limit: 100 }).events
+    expect(wal.map((event) => event.seq)).toEqual([1, 2, 3, 4, 5])
+    expect(new Set(wal.map((event) => event.seq)).size).toBe(wal.length)
+    expect(wal.every((event) => event.lane === "boundary")).toBe(true)
+
+    fs.unlinkSync(store.paths.run(runId))
+
+    const replayed = createDagJournal({
+      store,
+      runId,
+      initialCheckpoint: initialReplayCheckpoint(),
+      applyEvent: applyReplayEvent,
+    })
+    expect(replayed.snapshot()).toEqual(expected)
+  })
+
+  test("#given a checkpoint crash on a new boundary event #when reopened #then replay recovers the uncheckpointed tail and seq continues", () => {
+    const project = tempProject()
+    const durableStore = createDagFileStore({ project_dir: project })
+    let failOnce = true
+    const crashingStore: DagFileStore = {
+      ...durableStore,
+      writeCheckpoint(id, checkpoint) {
+        if (failOnce && (checkpoint as DagJournalCheckpoint).checkpointSeq === 2) {
+          failOnce = false
+          throw new Error("injected checkpoint crash")
+        }
+        durableStore.writeCheckpoint(id, checkpoint)
+      },
+    }
+    const nodeA = "node-a" as DagNodeId
+    const journal = createDagJournal({
+      store: crashingStore,
+      runId,
+      initialCheckpoint: initialReplayCheckpoint(),
+      applyEvent: applyReplayEvent,
+    })
+
+    journal.append(dagRunStartedEvent({ generation: 1 }))
+    expect(() => journal.append(dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false }))).toThrow("injected checkpoint crash")
+
+    const reopened = createDagJournal({
+      store: crashingStore,
+      runId,
+      initialCheckpoint: initialReplayCheckpoint(),
+      applyEvent: applyReplayEvent,
+    })
+    reopened.append(dagRunStartedEvent({ generation: 2 }))
+
+    expect(reopened.snapshot()).toEqual({
+      schemaVersion: 1,
+      checkpointSeq: 3,
+      runId,
+      generations: [1, 2],
+      retried: [nodeA],
+      steered: [],
+      amendCount: 0,
+    })
+    expect(crashingStore.readEvents(runId, 0, { limit: 100 }).events.map((event) => event.seq)).toEqual([1, 2, 3])
+  })
+
+  test("#given a subscriber #when new boundary events are appended #then it receives them with monotonic seq", async () => {
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const journal = createDagJournal({
+      store,
+      runId,
+      initialCheckpoint: initialReplayCheckpoint(),
+      applyEvent: applyReplayEvent,
+    })
+    const nodeA = "node-a" as DagNodeId
+    const delivered: { readonly seq: number; readonly type: string }[] = []
+    journal.subscribe((event) => {
+      delivered.push({ seq: event.seq, type: event.type })
+    })
+
+    journal.append(dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: true }))
+    journal.append(dagNodeSteeredEvent({ nodeId: nodeA, taskId: "task-a", delivery: "revive" }))
+    await journal.whenIdle()
+
+    expect(delivered).toEqual([
+      { seq: 1, type: "dag.node.retried" },
+      { seq: 2, type: "dag.node.steered" },
+    ])
   })
 })

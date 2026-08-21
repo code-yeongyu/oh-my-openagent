@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
 import { buildSandboxTransform, SandboxUnavailableError } from "./sandbox"
@@ -14,7 +15,7 @@ import { buildSandboxTransform, SandboxUnavailableError } from "./sandbox"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { readonly root: string; readonly worktree: string; readonly gitCommonDir: string; readonly payload: string } {

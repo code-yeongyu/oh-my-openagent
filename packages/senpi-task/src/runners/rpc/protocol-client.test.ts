@@ -1,4 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process"
+import { EventEmitter } from "node:events"
+import { PassThrough } from "node:stream"
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 import { afterEach, describe, expect, test } from "bun:test"
 
@@ -208,6 +210,26 @@ describe("RpcProtocolClient", () => {
     // then
     expect(malformed).toContain("this-is-not-json")
     expect(events.map((e) => e.type)).toContain("agent_start")
+  })
+
+  test("#given a heartbeat write races a closed child pipe #when stdin emits EPIPE #then shutdown is contained", async () => {
+    // given
+    const stdin = new PassThrough()
+    const child = Object.assign(new EventEmitter(), {
+      stdin,
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      pid: 42,
+    }) as unknown as ChildProcess
+    const client = new RpcProtocolClient({ child })
+    const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE", syscall: "write" })
+
+    // when
+    stdin.emit("error", epipe)
+
+    // then
+    expect(client.exited).toBe(true)
+    await expect(client.send({ type: "get_state" })).rejects.toThrow("RPC process is not running")
   })
 
   test("#given a disposed client #when sending #then it rejects because the process is gone", async () => {

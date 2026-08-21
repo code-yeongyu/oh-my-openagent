@@ -1,0 +1,8 @@
+PASS: dependencies present (codex node jq tmux)
+PASS: codex binary -> /opt/homebrew/bin/codex
+PASS: isolated CODEX_HOME auto-removed on exit (/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.kK5AqQAnfm)
+PASS: CODEX_HOME points inside sandbox, not ~/.codex
+PASS: mock model serves Responses SSE on :52449
+PASS: real ~/.codex/config.toml unchanged (6f9a9998e39f4f8c47e225e81801ecb2c183136a)
+PASS: common.sh self-check
+.agents/skills/codex-qa/scripts/lib/common.sh: line 131: 58942 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$log" 2>&1

@@ -13,7 +13,9 @@ import { createBtwParentValidator } from "./tui-parent-validator"
 import {
   createBtwSideController,
 } from "./tui-controller"
+import { parseBtwQuestion } from "./btw-command-draft"
 import { registerBtwSideKeymap } from "./tui-keymap"
+import { openBtwPicker } from "./tui-picker"
 import {
   adaptTuiPromptRef,
   createBtwControllerDependencies,
@@ -56,8 +58,6 @@ export async function registerBtwSideTui<Node>(
     currentTuiSessionID(api),
   )
   const parentValidator = createBtwParentValidator({
-    localExists: (sessionID) =>
-      api.state.session.get(sessionID) !== undefined,
     fetchStatus: async (sessionID) => {
       try {
         const response = await api.client.session.get({
@@ -92,7 +92,6 @@ export async function registerBtwSideTui<Node>(
   }
 
   function adoptSideSession(sessionID: string): Promise<void> | undefined {
-    if (controller.state().phase !== "closed") return
     const pending = adoptionRequests.get(sessionID)
     if (pending) return pending
     const cached = adoptionCache.read(sessionID)
@@ -158,27 +157,10 @@ export async function registerBtwSideTui<Node>(
     const sessionID = currentTuiSessionID(api)
     if (sessionID) await adoptSideSession(sessionID)
     if (!isCurrentTuiSession(api, sessionID)) return
-    const cachedSession = sessionID
-      ? adoptionCache.read(sessionID)
-      : { hydrated: false as const }
-    if (cachedSession.hydrated && cachedSession.metadata) {
-      api.ui.toast({
-        variant: "warning",
-        message: "BTW is unavailable inside another BTW conversation.",
-      })
-      return
-    }
     if (sessionID && adoptionFailures.has(sessionID)) {
       api.ui.toast({
         variant: "warning",
         message: "Unable to verify whether this is a BTW conversation.",
-      })
-      return
-    }
-    if (controller.state().phase !== "closed") {
-      api.ui.toast({
-        variant: "warning",
-        message: "BTW is unavailable inside another BTW conversation.",
       })
       return
     }
@@ -190,7 +172,35 @@ export async function registerBtwSideTui<Node>(
       })
       return
     }
-    await controller.startFromPrompt(adaptTuiPromptRef(promptRef))
+    const originalInput = promptRef.current.input
+    const parsed = parseBtwQuestion(originalInput)
+    if (parsed.consumeDraft && parsed.question.length > 0) {
+      await controller.startFromPrompt(adaptTuiPromptRef(promptRef))
+      return
+    }
+    const opened = await openBtwPicker({
+      api,
+      controller,
+      activePromptRef,
+    })
+    if (
+      opened &&
+      parsed.consumeDraft &&
+      promptRef.current.input === originalInput
+    ) {
+      promptRef.set({
+        ...promptRef.current,
+        input: "",
+      })
+    }
+  }
+
+  const showBtwPicker = async (): Promise<void> => {
+    await openBtwPicker({
+      api,
+      controller,
+      activePromptRef,
+    })
   }
 
   const unregisterSlashCommand =
@@ -199,7 +209,7 @@ export async function registerBtwSideTui<Node>(
         title: "BTW side conversation",
         value: "omo.btw.slash",
         description:
-          "Start a temporary side conversation without interrupting the main turn",
+          "Start or switch retained side conversations without interrupting the main turn",
         category: "Session",
         enabled: true,
         slash: {
@@ -210,11 +220,23 @@ export async function registerBtwSideTui<Node>(
       },
     ]) ?? (() => undefined)
 
-  const unregisterKeymap = registerBtwSideKeymap({
+  const keymapRegistration = registerBtwSideKeymap({
     api,
     controller,
     activePromptRef,
     openBtw,
+    openPicker: showBtwPicker,
+    isCurrentSideIdle: () => {
+      const sessionID = currentTuiSessionID(api)
+      return (
+        sessionID !== undefined &&
+        controller.side(sessionID) !== undefined &&
+        api.state.session.status(sessionID)?.type !== "busy" &&
+        api.state.session.permission(sessionID).length === 0 &&
+        api.state.session.question(sessionID).length === 0
+      )
+    },
+    returnToParent: controller.returnToParent,
   })
 
   api.slots.register({
@@ -232,6 +254,7 @@ export async function registerBtwSideTui<Node>(
           ref: (promptRef) => {
             value.ref?.(promptRef)
             if (promptRef) {
+              keymapRegistration.resetEscapeSequence()
               promptRefs.set(value.session_id, promptRef)
               log("[btw-side] TUI prompt ref attached", {
                 sessionID: value.session_id,
@@ -252,13 +275,16 @@ export async function registerBtwSideTui<Node>(
                         value.session_id === state.sideSessionID
                       : false
                 if (isRelated) return
-                await controller.waitUntilClosed()
+                if (state.phase === "closing") {
+                  await controller.waitUntilClosed()
+                }
                 if (currentTuiSessionID(api) === value.session_id) {
                   await adoptSideSession(value.session_id)
                 }
               })()
               return
             }
+            keymapRegistration.resetEscapeSequence()
             promptRefs.delete(value.session_id)
             controller.attachPromptRef(value.session_id, undefined)
             void controller.handleNavigation(
@@ -285,12 +311,15 @@ export async function registerBtwSideTui<Node>(
           state.phase === "open" &&
           value.session_id === state.parentSessionID
         ) {
-          label = "BTW open · ctrl+/ switch"
+          label = "BTW retained · ctrl+/ picker"
         } else if (
           state.phase === "open" &&
           value.session_id === state.sideSessionID
         ) {
-          label = `BTW from main · ${parentTuiStatusLabel(api, state.parentSessionID)} · ctrl+/ switch · ctrl+c close`
+          const sideNumber = controller.sideNumber(state.sideSessionID)
+          const sideLabel =
+            sideNumber === undefined ? "BTW side" : `BTW #${sideNumber}`
+          label = `${sideLabel} · ${parentTuiStatusLabel(api, state.parentSessionID)} · esc esc return · ctrl+/ picker · ctrl+c delete`
         } else if (
           state.phase === "closing" &&
           value.session_id === state.sideSessionID
@@ -321,7 +350,7 @@ export async function registerBtwSideTui<Node>(
   api.lifecycle.onDispose(async () => {
     adoptionGuard.dispose()
     unregisterSlashCommand()
-    for (const unregister of unregisterKeymap) unregister()
+    for (const unregister of keymapRegistration.unregister) unregister()
     unsubscribeDeleted()
     await controller.dispose()
   })

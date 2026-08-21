@@ -19,29 +19,23 @@ function bold(text: string): string {
 
 const PLAIN_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
-  italic: (text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
 }
 
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; italic: (text: string) => string }
+  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
   readonly colors: ThemeColor[]
-  readonly italics: string[]
 } {
   const colors: ThemeColor[] = []
-  const italics: string[] = []
   return {
     theme: {
       fg: (color: ThemeColor, text: string) => {
         colors.push(color)
         return text
       },
-      italic: (text: string) => {
-        italics.push(text)
-        return text
-      },
+      bg: (_color: "customMessageBg", text: string) => text,
     },
     colors,
-    italics,
   }
 }
 
@@ -55,7 +49,7 @@ function renderSoul(
     (options.theme ?? PLAIN_THEME) as never,
   )
   expect(component).toBeDefined()
-  return component!.render(120)
+  return component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())
 }
 
 describe("renderSoulUpdatedEntry house notice contract", () => {
@@ -129,7 +123,14 @@ describe("renderSoulUpdatedEntry house notice contract", () => {
 
     // then
     expect(recorder.colors).toEqual(["accent", "dim", "dim", "dim"])
-    expect(recorder.italics).toHaveLength(1)
+  })
+
+  test("#when rendered with a background theme #then every padded line carries customMessageBg", () => {
+    const component = renderSoulUpdatedEntry({ data: SOUL_COMMIT } as never, { expanded: false }, {
+      fg: (_color: ThemeColor, text: string) => text,
+      bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
+    } as never)
+    for (const line of component!.render(120)) expect(line).toMatch(/^<notice-bg>.*<\/notice-bg>$/u)
   })
 
   test("#given no record #when it renders #then it returns undefined", () => {

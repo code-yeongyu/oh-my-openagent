@@ -4,9 +4,10 @@
 // single-consumption test pins that invariant with a counting wrapper around the REAL consumer.
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { access, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { access, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import type { ThemeColor } from "@code-yeongyu/senpi"
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
@@ -27,7 +28,7 @@ const IDENTITY = "memory-notice-agent"
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(): Promise<{ context: MemoryIdentityContext }> {
@@ -344,29 +345,23 @@ function bold(text: string): string {
 
 const PLAIN_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
-  italic: (text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
 }
 
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; italic: (text: string) => string }
+  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
   readonly colors: ThemeColor[]
-  readonly italics: string[]
 } {
   const colors: ThemeColor[] = []
-  const italics: string[] = []
   return {
     theme: {
       fg: (color: ThemeColor, text: string) => {
         colors.push(color)
         return text
       },
-      italic: (text: string) => {
-        italics.push(text)
-        return text
-      },
+      bg: (_color: "customMessageBg", text: string) => text,
     },
     colors,
-    italics,
   }
 }
 
@@ -380,7 +375,7 @@ function renderWrite(
     (options.theme ?? PLAIN_THEME) as never,
   )
   expect(component).toBeDefined()
-  return component!.render(200)
+  return component!.render(200).slice(1, -1).map((line) => line.slice(1).trimEnd())
 }
 
 const RENDER_NOTICE: MemoryWriteNotice = {
@@ -421,6 +416,14 @@ describe("renderMemoryWriteUpdatedEntry house notice contract", () => {
 
     // then
     expect(lines.at(-1)).toBe("a1b2c3d · project-a1b2c3d4 · Track the deploy runbook")
+  })
+
+  test("#when rendered with a background theme #then every padded line carries customMessageBg", () => {
+    const component = renderMemoryWriteUpdatedEntry({ data: RENDER_NOTICE } as never, { expanded: false }, {
+      fg: (_color: ThemeColor, text: string) => text,
+      bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
+    } as never)
+    for (const line of component!.render(200)) expect(line).toMatch(/^<notice-bg>.*<\/notice-bg>$/u)
   })
 
   test("#given no record #when it renders #then it returns undefined", () => {

@@ -94,7 +94,7 @@ if (findings.includes("critical")) {
 
 **Trigger-launched runs.** A run does not have to start from a user turn: a monitor hit, a goal-loop wake, or a task-completion notification can be the trigger, and the cell that fires on the wake builds and starts the next graph. Conditional pipelines live in your code, never in the definition - the graph itself has no branch construct.
 
-**Adaptive retries.** Read `result.nodes[id].error`, then start a NARROWER graph under a NEW key (`${key}-retry-1`) - re-issuing a changed definition under the old key is a definition conflict, and re-issuing the SAME definition under the old key reuses finished nodes instead of retrying.
+**Adaptive retries.** Read `result.nodes[id].error`, then recover IN PLACE on the same run: `retry` re-runs the failed nodes, and `amend` re-runs them with an edited definition. A new key is never the retry mechanism - it starts a different run. Re-issuing the SAME definition under the old key returns the existing run untouched (`reused: true`), so it never retries anything on its own.
 
 **Progressive snapshots.** Between waits, `snapshot(run_id)` reports per-node states; use it to prepare downstream work while lanes finish. Never spin an empty poll loop - `wait()` is the default.
 
@@ -108,8 +108,8 @@ Two caveats:
 The dag is not the only fan-out surface, and picking the wrong one strands the run. Decide before you plan:
 
 - **Chained dags** (the multi-run composition above) when the work is stage-shaped: every stage is a static graph and you synthesize between stages. Journaled resume, idempotent keys, and the `/dag` view come free.
-- **A `team_create` team** when workers must talk DURING the work: broadcasting leads the moment they surface, multi-round debate, or members accumulating investigation context across re-tasking. A dag node is a one-shot prompt; it cannot take a new lead mid-run.
-- **ulw-research requests go to the team path.** Cross-critique and expand loops are team mechanics; use a dag for the independent harvest stages only.
+- **A `team_create` team** when workers must talk DURING the work: broadcasting leads the moment they surface, multi-round debate, or members accumulating investigation context across re-tasking. A dag node takes ONE prompt at dispatch; `send` can steer or revive that node's child afterwards, but the graph has no mid-run conversation between nodes.
+- **ulw-research requests go to the team path.** Cross-critique and expand loops are team mechanics; use a dag for the independent harvest stages only. Its delivery gates - rendered-page visual QA, then the proofread pass - bind any report or PDF deliverable no matter which path produced it.
 
 ## Node prompt contract
 
@@ -136,14 +136,19 @@ Rules that make node prompts obeyed:
 
 **Every graph that changes code ends with at least one verification node** depending on ALL producer nodes. Real runs without one ship unverified work: the synthesis node's own claim is not evidence.
 
-- The verification node runs the REAL check - the test command, the build, the endpoint call - and reports the captured output, not a summary of confidence.
+- The verification node runs the REAL check - the test command, the build, the endpoint call - and reports the captured output.
 - Its prompt names the exact invocation and the binary observable that decides PASS vs FAIL.
+- **A paginated deliverable - PDF, DOCX, deck, print HTML - is verified by its rendered pages, not by binary probes.** File size, keyword grep, and page count are claims about a file, not about what a reader sees. The verification node renders EVERY page to an image and inspects each one for blank or near-empty pages, wrong page breaks, orphaned keep-together blocks, split tables, and clipped text, then fixes and re-renders until the pages are clean. Sampling a few pages is not verification: the defect sits on the page nobody opened.
 - **Node outputs are claims until verified.** A downstream node that builds on an upstream result re-checks the specific facts it depends on (the file exists, the test passes, the symbol is exported) before trusting them.
 
 ## Failure playbook
 
-- **A failed node blocks only its dependents.** Read the node's error first; the fix is usually a NARROWER respawn, not a rerun of the graph.
-- **Respawn small.** Re-`start` with the same `key` and definition reuses finished nodes' outputs - completed work is never redone. Change only what the failure taught you; never re-issue a changed definition under an old key to sneak past a conflict.
+- **A failed node blocks only its dependents.** Read the node's error first, then recover that node in place - never rebuild the graph.
+- **`retry` is the first move.** `dag({action:"retry", run_id})` gives every failed or cancelled node a fresh attempt and hands their skip-cascaded dependents back to the wave loop; completed nodes keep their cached results and are never re-executed. Target specific nodes with `node_ids`, or pass a single `node_id` plus `prompt` to edit that node's instruction as you retry it. Retry a completed node and it is refused with `node_not_retryable` - `amend` is that path. A `skipped` node is retryable only when a failed or cancelled ancestor is in the same retry set, otherwise the cascade re-skips it immediately. A run that is still `running` refuses retry with `run_still_active`: let the wave settle first.
+- **`amend` when the definition itself was wrong.** `dag({action:"amend", run_id, definition})` diffs the new definition per node against the old one: unchanged completed nodes keep their cached results, and only changed or added nodes plus their transitive dependents re-run. Fixing one bad prompt in a settled ten-node run therefore costs one node, not ten. Amending a node that is currently running is refused with `amend_running_node`. Note that `load_skills` is deliberately outside the node fingerprint, so a skills-only edit reads as unchanged and re-runs nothing.
+- **`send` when the node is alive but stuck or needs more context.** `dag({action:"send", run_id, node_id, message})` steers a running node's child in place; if that child already finished and is still resident, the same call revives it with its context intact so it continues rather than starting over. A child that cannot be continued (cancelled, lost, or already released) is refused with `node_not_continuable`, and `retry` is the remedy.
+- **A new key starts a different run, it does not retry one.** Re-`start` with the same `key` and the same definition returns the existing run (`reused: true`) and schedules nothing; a changed definition under that key is a `definition_conflict`. Reach for a new key only when you genuinely want a separate run.
 - **A quiet widget is not a stall.** Nodes past the slot limit sit in `scheduled` with their task queued, so `0 running` mid-wave means waiting for slots, not death. A node whose task already completed can also take a moment to show its transition; the run folds it on the next event. Check node task states before concluding anything.
-- **Provider storms amplify under fan-out.** If many wave-1 nodes fail AT START within seconds, never even attaching a task, the provider or model route is erroring - your prompts are fine. Stop launching, fix the route, then re-`start` with the same key and definition: finished nodes are reused.
+- **Provider storms amplify under fan-out.** If many wave-1 nodes fail AT START within seconds, never even attaching a task, the provider or model route is erroring - your prompts are fine. Stop launching, fix the route, then `retry` the run: the failed nodes get fresh attempts and anything that finished is left alone. A capacity storm that failed a whole wave with `residency_denied` recovers the same way.
+- **Verify a node's claim before you trust its state.** A node counts as completed when its child returns a response, including a response that reports being blocked. Read the node's output before treating its work as done, and `retry` it when the report shows it never ran.
 - **Cancel is for abandoning the goal**, not for impatience. A running node is alive; elapsed time alone never justifies cancelling. When you do cancel, pass a reason so the run record says why.

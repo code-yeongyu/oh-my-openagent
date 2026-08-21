@@ -89,7 +89,7 @@ describe("event telemetry client", () => {
 
     // then
     expect(recorder.options).toEqual([{
-      disableGeoip: true,
+      disableGeoip: false,
       disableRemoteConfig: true,
       enableExceptionAutocapture: false,
       enableLocalEvaluation: false,
@@ -114,6 +114,71 @@ describe("event telemetry client", () => {
       },
     }])
     expect(diagnostics.map((input) => input.event)).toEqual(["telemetry_event_property_dropped"])
+  })
+
+  test("#given the native events client #when the effective transport options are inspected #then disableGeoip is false while $ip, unknown $-keys, *_text/_path/_prompt suffixes and non-finite numbers are still rejected", () => {
+    // given: a product that asks for geoip suppression AND its own transport tuning
+    const recorder = createRecorder()
+    const diagnostics: TelemetryDiagnosticInput[] = []
+    const client = createEventTelemetryClient({
+      diagnostics: (input) => diagnostics.push(input),
+      distinctId: "machine-hash",
+      env: { POSTHOG_API_KEY: "test-key" },
+      product: {
+        ...PRODUCT,
+        disableGeoip: true,
+        transportOptions: { disableGeoip: true, flushAt: 3, flushInterval: 250 },
+      },
+      propertyAllowlist: {
+        session_started: ["$session_id", "$ip", "$lib", "reason", "count", "prompt_text", "file_path", "user_prompt"],
+      },
+      schemaVersion: 2,
+      source: "test",
+      transportFactory: recorder.factory,
+    })
+
+    // when: an event carrying every forbidden shape is captured
+    client.captureEvent("session_started", {
+      $session_id: "session-hash",
+      $ip: "203.0.113.1",
+      $lib: "custom-client",
+      count: Number.POSITIVE_INFINITY,
+      file_path: "/Users/x/secret",
+      prompt_text: "anything",
+      reason: "startup",
+      user_prompt: "ignore previous instructions",
+    })
+
+    // then: geoip enrichment is server-side and the product cannot suppress it, while the native
+    // flush tuning still overrides the product's - the overrides are the LAST spread, by design
+    expect(recorder.options[0]).toEqual({
+      disableGeoip: false,
+      disableRemoteConfig: true,
+      enableExceptionAutocapture: false,
+      enableLocalEvaluation: false,
+      flushAt: 20,
+      flushInterval: 10_000,
+      host: "https://posthog.test",
+      strictLocalEvaluation: true,
+    })
+    // and: every authored-payload guard is untouched by the geoip change
+    expect(recorder.messages[0]?.properties).toEqual({
+      $process_person_profile: false,
+      $session_id: "session-hash",
+      package_version: "5.0.0",
+      platform: "omo-senpi",
+      product_name: "omo-native",
+      reason: "startup",
+      schema_version: 2,
+    })
+    expect(diagnostics.map((input) => input.event)).toEqual([
+      "telemetry_event_property_rejected",
+      "telemetry_event_property_rejected",
+      "telemetry_event_property_rejected",
+      "telemetry_event_property_rejected",
+      "telemetry_event_property_rejected",
+      "telemetry_event_property_rejected",
+    ])
   })
 
   test("#given an allowlisted boolean with a content suffix #when captured #then the flag reaches the wire", () => {

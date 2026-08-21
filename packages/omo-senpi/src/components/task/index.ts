@@ -235,6 +235,9 @@ function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: Dag
       rootSessionId: sessionId,
       wait: runtime.wait,
       cancel: runtime.cancel,
+      retry: runtime.retry,
+      send: runtime.send,
+      amend: runtime.amend,
     }),
   })
 }

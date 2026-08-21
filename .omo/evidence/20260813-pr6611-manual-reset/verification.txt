@@ -1,0 +1,24 @@
+red:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579 test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+  observed: 1 pass, 1 fail
+  failure: retained sessionStatusRetryKeys entry remained after manual model reset
+
+focused green:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579 test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+  observed: 10 pass, 0 fail
+
+runtime-fallback suite:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579 test packages/omo-opencode/src/hooks/runtime-fallback
+  observed: 256 pass, 0 fail
+
+TypeScript audit:
+  bun --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579 packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+  observed: No violations in 2 file(s).
+
+workspace package typecheck:
+  bun run --cwd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579 typecheck:packages
+  observed: exit code 0
+
+patch check:
+  git -C C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579 diff --check
+  observed: exit code 0

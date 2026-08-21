@@ -1,10 +1,11 @@
 // The write-notice gate lives in config, so the registration seam must actually carry it to the
 // registered tool's renderer - otherwise the knob is decorative.
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync, rmSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 
@@ -22,7 +23,7 @@ const roots: string[] = []
 
 afterEach(() => {
   for (const root of roots.splice(0)) {
-    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -63,7 +64,7 @@ const RESULT = {
   },
 }
 
-const THEME = { fg: (_color: string, text: string) => text, italic: (text: string) => text }
+const THEME = { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text }
 
 function lines(renderResult: (...args: readonly unknown[]) => { render(width: number): string[] }): string[] {
   return renderResult(RESULT, { expanded: false, isPartial: false }, THEME, { isError: false }).render(200)

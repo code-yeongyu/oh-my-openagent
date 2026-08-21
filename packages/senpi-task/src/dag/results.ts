@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 import * as fs from "node:fs"
 import { dirname, relative } from "node:path"
 
@@ -115,13 +115,43 @@ function writeStatsSidecar(input: DagNodeResultPersistInput, path: string): DagR
 }
 
 function writeArtifact(path: string, contents: string): void {
-  const fd = fs.openSync(path, "w")
+  const tmpPath = `${path}.tmp-${randomSuffix()}`
+  let fd: number | undefined
   try {
+    fd = fs.openSync(tmpPath, "w")
     fs.writeSync(fd, contents)
     fs.fsyncSync(fd)
-  } finally {
     fs.closeSync(fd)
+    fd = undefined
+    fs.renameSync(tmpPath, path)
+  } catch (error) {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd)
+      } catch {
+        // ignore close errors during cleanup
+      }
+      fd = undefined
+    }
+    try {
+      fs.rmSync(tmpPath, { force: true })
+    } catch {
+      // ignore cleanup errors
+    }
+    throw error
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd)
+      } catch {
+        // ignore close errors during cleanup
+      }
+    }
   }
+}
+
+function randomSuffix(): string {
+  return randomBytes(8).toString("hex")
 }
 
 function artifactRef(store: DagFileStore, path: string, contents: string): DagResultArtifactRef {

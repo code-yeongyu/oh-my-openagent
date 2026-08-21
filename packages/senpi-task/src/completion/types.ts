@@ -32,6 +32,12 @@ export type CompletionDetails = {
   readonly final_response: string
   readonly final_response_file?: string
   readonly continuation_hint: string
+  // Present only when the completed task was a DAG node child, so the parent can address the exact
+  // node it must re-verify or correct.
+  readonly dag?: {
+    readonly run_id: string
+    readonly node_id: string
+  }
 }
 
 // Structurally compatible with senpi sendMessage(Pick<CustomMessage,"customType"|"content"|"display"|

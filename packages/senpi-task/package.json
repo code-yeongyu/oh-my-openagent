@@ -40,6 +40,10 @@
     "./task-renderers": {
       "types": "./src/tools/task/renderers.ts",
       "import": "./src/tools/task/renderers.ts"
+    },
+    "./notice-box": {
+      "types": "./src/notice-box.ts",
+      "import": "./src/notice-box.ts"
     }
   },
   "types": "./src/index.ts",
@@ -52,10 +56,10 @@
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "typebox": "1.1.38"
+    "typebox": "1.3.16"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.8.19",
+    "@code-yeongyu/senpi": "2026.8.21-3",
     "@earendil-works/pi-tui": "0.84.2",
     "typebox": "*"
   },
@@ -71,9 +75,9 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.19",
+    "@code-yeongyu/senpi": "2026.8.21-3",
     "@earendil-works/pi-tui": "0.84.2",
-    "typebox": "1.1.38"
+    "typebox": "1.3.16"
   },
   "sideEffects": false
 }

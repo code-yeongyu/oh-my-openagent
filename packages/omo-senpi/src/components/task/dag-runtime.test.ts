@@ -61,6 +61,7 @@ class ScriptedRunner implements ManagedRunner {
     readonly emit: (event: ManagedChildEvent) => void
     readonly listenerCount: () => number
     readonly settle: (output: string) => void
+    readonly fail: (message: string) => void
   }> = []
   readonly #signals = new Map<number, ReturnType<typeof deferred<void>>>()
   readonly #abortError: Error | undefined
@@ -104,6 +105,7 @@ class ScriptedRunner implements ManagedRunner {
       },
       listenerCount: () => listeners.size,
       settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
+      fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
     })
     this.#signals.get(this.handles.length)?.resolve()
     return Promise.resolve(handle)
@@ -904,4 +906,212 @@ describe("dag runtime node spawn policy", () => {
     expect(runner.handles).toHaveLength(0)
     runtime.dispose()
   })
+})
+
+describe("assembled DAG runtime control verbs", () => {
+  async function controlFixture(name: string, nodes: readonly { readonly id: string; readonly dependsOn?: readonly string[] }[]) {
+    const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-${name}-`))
+    cleanupRoots.push(cwd)
+    const runner = new ScriptedRunner()
+    // Node-level synchronization: every control verb reads the DURABLE record, so the tests wait on
+    // the journaled node event rather than on a runner counter that runs ahead of the checkpoint.
+    const nodeEvents: Array<{ readonly type: string; readonly nodeId?: string; readonly to?: string }> = []
+    const nodeWaiters = new Set<() => void>()
+    const pi = Object.assign(new FakeExtensionAPI(), {
+      rpc: {
+        emit: (channel: string, data: unknown) => {
+          if (channel !== "omo.dag.event") return
+          nodeEvents.push(data as { readonly type: string; readonly nodeId?: string; readonly to?: string })
+          for (const waiter of [...nodeWaiters]) waiter()
+        },
+        handle: () => undefined,
+      },
+    })
+    const whenNode = (nodeId: string, predicate: (event: { readonly type: string; readonly nodeId?: string; readonly to?: string }) => boolean): Promise<void> => {
+      const satisfied = () => nodeEvents.some((event) => event.nodeId === nodeId && predicate(event))
+      if (satisfied()) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        const waiter = (): void => {
+          if (!satisfied()) return
+          nodeWaiters.delete(waiter)
+          resolve()
+        }
+        nodeWaiters.add(waiter)
+      })
+    }
+    const whenAttached = (nodeId: string) => whenNode(nodeId, (event) => event.type === "dag.node.task-attached")
+    const whenState = (nodeId: string, state: string) =>
+      whenNode(nodeId, (event) => event.type === "dag.node.transitioned" && event.to === state)
+    const sessionId = `session-${name}`
+    const engine = composeTaskEngine({
+      pi,
+      omoConfig: loadOmoConfig({ cwd }).config,
+      cwd,
+      sharedParentTools: () => [],
+      runnerFactories: { inProcess: () => runner, process: () => runner },
+    })
+    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    const runtime = createDagRuntime({ pi, engine, logger: logger() })
+    await runtime.attach()
+    const tool = {
+      manager: runtime.manager,
+      parentSessionId: () => sessionId,
+      rootSessionId: () => sessionId,
+      wait: runtime.wait,
+      cancel: runtime.cancel,
+      retry: runtime.retry,
+      send: runtime.send,
+      amend: runtime.amend,
+    }
+    const started = await runDagTool(tool, {
+      action: "start",
+      definition: {
+        key: name,
+        name,
+        nodes: nodes.map((node) => ({
+          id: node.id,
+          prompt: `do ${node.id}`,
+          subagent_type: "explore",
+          model: "omo-mock/mock-1",
+          ...(node.dependsOn === undefined ? {} : { dependsOn: [...node.dependsOn] }),
+        })),
+      },
+    })
+    if (started.details.kind !== "started") throw new Error("expected dag start")
+    return { cwd, runner, runtime, tool, sessionId, whenAttached, whenState, runId: started.details.run_id as DagRunId }
+  }
+
+  test("#given a failed node #when the runtime retry entry point runs #then a fresh scheduler re-registers and the run completes", async () => {
+    // given
+    const { runner, runtime, sessionId, runId } = await controlFixture("retry-reentry", [
+      { id: "plan" },
+      { id: "build", dependsOn: ["plan"] },
+    ])
+    await within(runner.whenStarted(1))
+    runner.handles[0]?.fail("plan blew up")
+    const failed = await within(runtime.wait(runId, sessionId), 5_000)
+    expect(failed.status).toBe("failed")
+
+    // when
+    const retried = await within(runtime.retry(runId), 5_000)
+    await within(runner.whenStarted(2), 5_000)
+    runner.handles[1]?.settle("plan retried")
+    await within(runner.whenStarted(3), 5_000)
+    runner.handles[2]?.settle("build output")
+    const result = await within(runtime.wait(runId, sessionId), 5_000)
+
+    // then
+    expect(retried.status).toBe("running")
+    expect(result.status).toBe("completed")
+    expect(result.nodes.plan).toEqual(expect.objectContaining({ state: "completed", output: "plan retried" }))
+    expect(result.nodes.build).toEqual(expect.objectContaining({ state: "completed", output: "build output" }))
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
+  test("#given a run paused for shutdown and resumed in the SAME process #when a node is retried #then admission is un-latched and the retry completes", async () => {
+    // given
+    const { runner, runtime, sessionId, runId, whenAttached, whenState } = await controlFixture("retry-after-pause", [
+      { id: "solo" },
+      { id: "next", dependsOn: ["solo"] },
+    ])
+    await within(runner.whenStarted(1))
+    await within(whenAttached("solo"), 5_000)
+    // pausing a RUNNING run is the ONLY thing that latches admission, and nothing ever un-latches it
+    runtime.pauseForShutdown()
+    await within(runtime.attach(), 5_000)
+    runner.handles[0]?.fail("solo blew up")
+    await within(whenState("solo", "failed"), 5_000)
+    const failed = await within(runtime.wait(runId, sessionId), 5_000)
+    expect(failed.status).toBe("failed")
+
+    // when the stoppedAdmissions latch is NOT cleared, this retry hangs forever
+    await within(runtime.retry(runId), 5_000)
+    await within(runner.whenStarted(2), 5_000)
+    runner.handles[1]?.settle("solo retried")
+    await within(runner.whenStarted(3), 5_000)
+    runner.handles[2]?.settle("next output")
+    const result = await within(runtime.wait(runId, sessionId), 5_000)
+
+    // then
+    expect(result.status).toBe("completed")
+    expect(result.nodes.solo).toEqual(expect.objectContaining({ state: "completed", output: "solo retried" }))
+    expect(result.nodes.next).toEqual(expect.objectContaining({ state: "completed", output: "next output" }))
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
+  test("#given a run resumed by retry #when attach re-runs the schedulable gate #then the re-registered scheduler is reused instead of a second one starting the node twice", async () => {
+    // given
+    const { runner, runtime, sessionId, runId, whenAttached } = await controlFixture("retry-registration", [{ id: "solo" }])
+    await within(runner.whenStarted(1))
+    runner.handles[0]?.fail("solo blew up")
+    await within(runtime.wait(runId, sessionId), 5_000)
+    const resumed = await within(runtime.retry(runId), 5_000)
+    await within(whenAttached("solo"), 5_000)
+    const childrenAfterRetry = runner.handles.length
+
+    // when the resumed run passes back through the schedulable-status gate
+    await within(runtime.attach(), 5_000)
+    await within(runtime.attach(), 5_000)
+
+    // then no second scheduler admitted the node again
+    expect(resumed.status).toBe("running")
+    expect(runner.handles).toHaveLength(childrenAfterRetry)
+    runner.handles[childrenAfterRetry - 1]?.settle("solo retried")
+    const result = await within(runtime.wait(runId, sessionId), 5_000)
+    expect(result.status).toBe("completed")
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
+  test("#given a running node #when the runtime send entry point runs #then the message is steered to its child", async () => {
+    // given
+    const { runner, runtime, sessionId, runId, whenAttached } = await controlFixture("send-steer", [{ id: "live" }])
+    await within(runner.whenStarted(1))
+    await within(whenAttached("live"), 5_000)
+
+    // when
+    const sent = await within(runtime.send(runId, "live", "focus on the failing test"), 5_000)
+
+    // then
+    expect(sent.delivery).toBe("steer")
+    expect(String(sent.nodeId)).toBe("live")
+    expect(sent.taskId).toBe(runner.handles[0]?.spec.taskId)
+    runner.handles[0]?.settle("done")
+    await within(runtime.wait(runId, sessionId), 5_000)
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
+  test("#given a settled run #when the runtime amend entry point edits a node #then only the changed node re-runs and the run re-enters", async () => {
+    // given
+    const { runner, runtime, sessionId, runId } = await controlFixture("amend-reentry", [
+      { id: "plan" },
+      { id: "build", dependsOn: ["plan"] },
+    ])
+    await within(runner.whenStarted(1))
+    runner.handles[0]?.settle("plan output")
+    await within(runner.whenStarted(2), 5_000)
+    runner.handles[1]?.fail("build blew up")
+    const failed = await within(runtime.wait(runId, sessionId), 5_000)
+    expect(failed.status).toBe("failed")
+    const planTaskId = runtime.manager.record(runId, sessionId).nodes.find((node) => String(node.id) === "plan")?.taskId
+
+    // when
+    await within(runtime.amend(runId, {
+      key: "amend-reentry",
+      name: "amend-reentry",
+      nodes: [
+        { id: "plan", prompt: "do plan", subagent_type: "explore", model: "omo-mock/mock-1" },
+        { id: "build", prompt: "do build CAREFULLY", subagent_type: "explore", model: "omo-mock/mock-1", dependsOn: ["plan"] },
+      ],
+    }), 5_000)
+    await within(runner.whenStarted(3), 5_000)
+    runner.handles[2]?.settle("build amended")
+    const result = await within(runtime.wait(runId, sessionId), 5_000)
+
+    // then
+    expect(result.status).toBe("completed")
+    expect(runner.handles).toHaveLength(3)
+    expect(result.nodes.build).toEqual(expect.objectContaining({ state: "completed", output: "build amended" }))
+    expect(runtime.manager.record(runId, sessionId).nodes.find((node) => String(node.id) === "plan")?.taskId).toBe(planTaskId)
+    runtime.dispose()
+  }, { timeout: 20_000 })
 })

@@ -182,6 +182,36 @@ describe("createDagStatusUi.syncNow", () => {
     expect(settledRows[0]).toContain("wave 2/2")
   })
 
+  it("#given a node re-run by retry #when syncing #then only the retried node carries an xN badge", () => {
+    // given a node on its third attempt beside a first-attempt sibling and a legacy node with no
+    // attempt on the record at all
+    const ui = fakeUi()
+    const dagUi = createDagStatusUi({
+      manager: fakeManager([
+        snapshot({
+          runId: "dag_1",
+          nodes: [
+            node({ id: "plan", state: "completed", attempt: 1 }),
+            node({ id: "build", state: "running", attempt: 3 }),
+            node({ id: "ship", state: "pending" }),
+          ],
+        }),
+      ]),
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
+      timers: fakeTimers(),
+    })
+
+    // when
+    dagUi.syncNow()
+
+    // then
+    expect(rowsOf(ui).slice(1)).toEqual([
+      "  ✓ plan category:quick",
+      "  ▶ build category:quick x3",
+      "  ○ ship category:quick",
+    ])
+  })
+
   it("#given skipped and paused nodes #when syncing #then each state renders its own icon", () => {
     // given
     const ui = fakeUi()

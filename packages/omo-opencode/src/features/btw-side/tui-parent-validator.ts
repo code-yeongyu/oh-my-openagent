@@ -1,5 +1,4 @@
 export function createBtwParentValidator(dependencies: {
-  localExists: (sessionID: string) => boolean
   fetchStatus: (
     sessionID: string,
   ) => Promise<"exists" | "missing" | "retry">
@@ -9,7 +8,6 @@ export function createBtwParentValidator(dependencies: {
   return {
     exists: async (sessionID: string): Promise<boolean> => {
       if (deletedSessionIDs.has(sessionID)) return false
-      if (dependencies.localExists(sessionID)) return true
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const status = await dependencies.fetchStatus(sessionID)
         if (deletedSessionIDs.has(sessionID)) return false

@@ -5,8 +5,9 @@ export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const MASS_ULW_DISABLED_FLAG = "omo-senpi-mass-ulw-disabled"
 
 // `ulw(?!-)` skips the ulw- skill-name family (ulw-plan, ulw-loop, ulw-research) exactly like the
-// ultrawork detector: "mass ulw-loop" is a ulw-loop mention, not a mass-ulw request.
-const MASS_ULW_PATTERN = /\bmass[\s-]*ulw(?!-)\b/i
+// ultrawork detector: "mass ulw-loop" is a ulw-loop mention, not a mass-ulw request. Reversed
+// (`ulw mass`, `ulwmass`) and short (`mulw`, `meth`) aliases fire the same pointer.
+const MASS_ULW_PATTERN = /\b(?:mass[\s-]*ulw(?!-)|ulw[\s-]*mass|mulw|meth)\b/i
 const SKILL_COMMAND_PREFIX = "/skill:"
 const MASS_ULW_SKILL_NAME = "mass-ulw"
 const EXPANDED_SKILL_BLOCK_PATTERN = /<skill\s+name="mass-ulw"/i

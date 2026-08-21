@@ -2,10 +2,11 @@
 // the shared receipt consumer - otherwise the knob is decorative on the search surface, exactly
 // the way it would have been if only the direct tool's renderResult honoured it.
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync, rmSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 
@@ -32,7 +33,7 @@ const roots: string[] = []
 
 afterEach(() => {
   for (const root of roots.splice(0)) {
-    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 

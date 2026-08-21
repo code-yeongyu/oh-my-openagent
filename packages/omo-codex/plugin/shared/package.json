@@ -13,10 +13,9 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@oh-my-opencode/utils": "file:../../../utils",
-		"@types/node": "^25.9.3",
+		"@types/node": "^26.2.0",
 		"bun-types": "1.3.14",
-		"typescript": "^6.0.3"
+		"typescript": "^7.0.2"
 	},
 	"engines": {
 		"node": ">=20.0.0"

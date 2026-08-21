@@ -31,40 +31,43 @@ function bold(text: string): string {
 /** Marks colour/emphasis inline so assertions can see exactly what was applied. */
 const TAGGING_THEME = {
   fg: (color: ThemeColor, text: string) => `[${color}]${text}[/${color}]`,
-  italic: (text: string) => `<i>${text}</i>`,
+  bg: (_color: "customMessageBg", text: string) => text,
 }
 
 /** Plain theme: passes text through so we can assert layout without colour noise. */
 const PLAIN_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
-  italic: (text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
 }
 
 /** Records every fg/italic call so we can prove semantic colour is actually applied. */
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; italic: (text: string) => string }
+  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
   readonly colors: ThemeColor[]
-  readonly italics: string[]
 } {
   const colors: ThemeColor[] = []
-  const italics: string[] = []
   return {
     theme: {
       fg: (color: ThemeColor, text: string) => {
         colors.push(color)
         return text
       },
-      italic: (text: string) => {
-        italics.push(text)
-        return text
-      },
+      bg: (_color: "customMessageBg", text: string) => text,
     },
     colors,
-    italics,
   }
 }
 
 const WIDE = 120
+const BACKGROUND_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
+}
+
+function expectNoticeBackground(lines: readonly string[]): void {
+  expect(lines.length).toBeGreaterThan(0)
+  for (const line of lines) expect(line).toMatch(/^<notice-bg>.*<\/notice-bg>$/u)
+}
 
 function launched(over: Partial<ReflectionLaunchedEntry> = {}): ReflectionLaunchedEntry {
   return {
@@ -107,10 +110,29 @@ function render(
     (options.theme ?? PLAIN_THEME) as never,
   )
   expect(component).toBeDefined()
-  return component!.render(options.width ?? WIDE)
+  return noticeContent(component!.render(options.width ?? WIDE))
+}
+
+function noticeContent(lines: readonly string[]): string[] {
+  return lines.slice(1, -1).map((line) => line.slice(1).trimEnd())
 }
 
 describe("memory reflection entry rendering", () => {
+  test("#given every registered memory notice renderer #when rendered #then each emits a custom-message background block", () => {
+    const cases = [
+      renderReflectionLaunchedEntry({ data: launched() } as never, { expanded: false }, BACKGROUND_THEME as never),
+      renderReflectionCompletionEntry({ data: completion() } as never, { expanded: false }, BACKGROUND_THEME as never),
+      renderReflectionSummaryEntry({ data: {
+        schemaVersion: 1, identity: "project-a1b2c3d4", count: 1, failedCount: 0,
+        oldestISO: "2026-08-11T04:00:00.000Z", newestISO: "2026-08-13T08:00:00.000Z",
+      } } as never, { expanded: false }, BACKGROUND_THEME as never),
+      renderReflectionHealthEntry({ data: {
+        schemaVersion: 1, identity: "project-a1b2c3d4", streak: 3, fingerprint: "child_exit:stable",
+        lastReason: "child_exit", sinceISO: "2026-08-12T22:15:00.000Z", recommendation: "Retry reflection.",
+      } } as never, { expanded: false }, BACKGROUND_THEME as never),
+    ]
+    for (const component of cases) expectNoticeBackground(component!.render(WIDE))
+  })
   describe("#given a launched reflection", () => {
     test("#when it renders collapsed #then a bold title leads a senpi notice with a visible context line", () => {
       // when
@@ -166,7 +188,6 @@ describe("memory reflection entry rendering", () => {
 
       // then
       expect(recorder.colors).toEqual(["accent", "dim", "dim", "dim"])
-      expect(recorder.italics).toHaveLength(1)
     })
   })
 
@@ -336,7 +357,7 @@ describe("memory reflection entry rendering", () => {
         bold("● Memory reflection · 7 older completions collapsed"),
         "Delivered while this session was away; none need attention.",
       ])
-      expect(recorder.colors).toEqual(["muted", "dim"])
+      expect(recorder.colors).toEqual(["dim", "dim"])
     })
 
     test("#when exactly one completion collapsed #then the noun is singular", () => {
@@ -424,7 +445,8 @@ describe("memory reflection entry rendering", () => {
       // then
       expect(lines).toEqual([
         bold("✗ Memory reflection failed · reflection-run-2"),
-        "Reflection did not finish; the transcript cursor was not ...",
+        "Reflection did not finish; the transcript cursor was not",
+        "advanced.",
       ])
     })
 
@@ -444,8 +466,8 @@ describe("memory reflection entry rendering", () => {
       })
 
       // then
-      expect(lines[1]).toBe("[dim]Reflection did not finish; the transcript cursor was not ...[/dim]")
-      expect(lines[1]).not.toContain("\u001b")
+      expect(lines.join("\n")).toContain("[dim]Reflection did not finish; the transcript cursor was")
+      expect(lines.join("\n")).not.toContain("\u001b[0m")
     })
 
     test("#when the title is bolded at a narrow width #then the bold escapes wrap the whole fitted title", () => {

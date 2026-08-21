@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
@@ -38,7 +39,7 @@ async function removeWhenReleased(root: string): Promise<void> {
   const deadline = Date.now() + TEMP_ROOT_RELEASE_TIMEOUT_MS
   for (;;) {
     try {
-      await rm(root, { recursive: true, force: true })
+      await rmEfaultTolerant(root, { recursive: true, force: true })
       return
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code

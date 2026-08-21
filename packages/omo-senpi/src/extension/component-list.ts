@@ -3,6 +3,7 @@ import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
+import { createGitMasterAttributionComponent } from "../components/git-master"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
 import { createLspComponent } from "../components/lsp"
 import { createMassUlwComponent } from "../components/mass-ulw"
@@ -28,6 +29,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createStartWorkContinuationComponent(),
     createUlwLoopComponent(),
     createTodoFanoutReminderComponent(),
+    createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createCommentCheckerComponent(),
     createAstGrepComponent(),

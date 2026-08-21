@@ -1,0 +1,29 @@
+{
+  "description": "console-subsystem child (cmd.exe) spawned from a detached console-less parent",
+  "cases": [
+    {
+      "mode": "show",
+      "parentPid": 5128,
+      "childPid": 25712,
+      "console": {
+        "attached": true,
+        "errorCode": 0,
+        "windowHandle": 4789456,
+        "mainWindowHandle": 0,
+        "windowVisible": true
+      }
+    },
+    {
+      "mode": "hide",
+      "parentPid": 21416,
+      "childPid": 20840,
+      "console": {
+        "attached": true,
+        "errorCode": 0,
+        "windowHandle": 0,
+        "mainWindowHandle": 0,
+        "windowVisible": false
+      }
+    }
+  ]
+}

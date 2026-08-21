@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-ultrawork",
-	"version": "5.0.0-beta.12",
+	"version": "5.0.0-beta.14",
 	"description": "Codex plugin that injects the ultrawork orchestration directive and ships LazyCodex planning, review, QA, and gate agent roles.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -44,11 +44,11 @@
 		"NOTICE"
 	],
 	"devDependencies": {
-		"@biomejs/biome": "2.4.16",
+		"@biomejs/biome": "2.5.9",
 		"@oh-my-opencode/prompts-core": "file:../../../../prompts-core",
-		"@types/node": "^25.9.3",
-		"typescript": "^6.0.3",
-		"vitest": "^4.1.8"
+		"@types/node": "^26.2.0",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.11"
 	},
 	"engines": {
 		"node": ">=20.0.0"

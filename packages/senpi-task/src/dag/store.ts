@@ -601,6 +601,24 @@ function sameLockHolder(left: LockHolder | undefined, right: LockHolder | undefi
   return left.pid === right.pid && left.content === right.content
 }
 
+// Windows can refuse hard links outright (EPERM/EACCES on NTFS ACLs, ReFS, and network shares)
+// even though the target is vacant. Publishing the lock exclusively with "wx" is equally atomic:
+// the OS rejects the second creator with EEXIST, which is the contention answer callers expect.
+function publishLockExclusively(path: string, content: string, fsyncWrites: boolean): boolean {
+  let fd: number | undefined
+  try {
+    fd = fs.openSync(path, "wx")
+    fs.writeSync(fd, content)
+    if (fsyncWrites) fs.fsyncSync(fd)
+    return true
+  } catch (error) {
+    if (hasCode(error, "EEXIST")) return false
+    throw error
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd)
+  }
+}
+
 function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boolean {
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`
   let fd: number | undefined
@@ -614,6 +632,9 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
     return true
   } catch (error) {
     if (hasCode(error, "EEXIST")) return false
+    if (hasCode(error, "EPERM") || hasCode(error, "EACCES")) {
+      return publishLockExclusively(path, content, fsyncWrites)
+    }
     throw error
   } finally {
     if (fd !== undefined) fs.closeSync(fd)

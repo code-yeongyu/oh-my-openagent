@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "../components/memory/teardown.test-support"
 
 import { GitMemoryRepo, buildIdentityPaths, parseMemoryFile } from "@oh-my-opencode/memory-core"
 
@@ -26,7 +27,7 @@ function fixture() {
 afterEach(() => {
   // Windows keeps git's handles open briefly after the child exits, so a bare recursive remove
   // throws EBUSY and fails the test that already passed. Retry the unlink instead.
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 })
 
 // Each case drives real git subprocesses through a fresh repository; the 5s default is not a

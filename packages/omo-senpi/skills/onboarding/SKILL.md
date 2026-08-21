@@ -106,6 +106,11 @@ bundled finder to list sessions across every platform present on the machine, th
 interesting ones. Mine for:
 
 - how they actually work: hands-on-the-wheel back-and-forth versus long one-shot delegations,
+- their planning stance, feeding the seed described in lane 5: opening-message shape (requirements
+  and constraints enumerated upfront, or vague starts?), how they answer agent questions (pick an
+  offered option, answer several at once holistically, redirect, or delegate the decision), how
+  they approve (a verbal yes versus commanding execution), and whether the style shifts by repo or
+  domain,
 - what frustrates them: repeated corrections, abandoned sessions, prompts that read as annoyed, in
   any language,
 - how much they run in parallel, and how long their longest sessions run,
@@ -177,6 +182,20 @@ batch at the end. Worth recording:
 Write durable personal and cross-project facts through the memory tool into `system/human.md`.
 Write repository-specific stack, commands, constraints, and migration decisions through the memory
 tool into `system/project.md`. Do not edit those backing files directly.
+
+Planning-stance observations from lane 3 are the one exception: write them as SEEDS under a
+`## Seed` heading in `system/human/planning-style.md` (create the block through the memory tool if
+absent), never into `system/human.md`. Seeds are inferences and MUST stay weak:
+
+- Phrase every seed as a hypothesis ("appears to enumerate upfront and delegate the rest"), never
+  a conclusion, and set `confidence: low` ALWAYS - never medium or high, however consistent the
+  history looks. Behavior in another tool reflects that tool's affordances, not necessarily this
+  user; omo's own planning sessions will confirm or replace these within a few runs.
+- Record full provenance on every seed line: the source harness name(s) (e.g. Claude Code,
+  Co&#x64;ex, OpenCode), the model(s) under which the pattern was mainly observed, the session ids
+  mined, and today's date as `seeded:`. Format:
+  `- [YYYY-MM-DD] (seed) appears to <hypothesis + context> <!-- src: <harness>/<session-id>,...; harness: <names>; model: <models>; seeded: YYYY-MM-DD; pattern: inferred-from-external-sessions; confidence: low -->`
+- Seeds carry interaction STYLE only - never session content, code, file paths, or secrets.
 
 Record facts, not narration. "Prefers Korean, migrated from Claude Code, works one repo at a time
 in long sessions" is a memory. "The user went through onboarding today" is not.

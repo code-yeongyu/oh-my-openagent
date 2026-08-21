@@ -19,7 +19,6 @@ describe("createBtwParentValidator", () => {
     ]
     const fetchStatus = mock(async () => remoteResults.shift() ?? "missing")
     const validator = createBtwParentValidator({
-      localExists: () => false,
       fetchStatus,
     })
 
@@ -29,7 +28,6 @@ describe("createBtwParentValidator", () => {
 
     // given
     const missingValidator = createBtwParentValidator({
-      localExists: () => false,
       fetchStatus: async () => "missing",
     })
 
@@ -39,7 +37,6 @@ describe("createBtwParentValidator", () => {
     // given
     const deferred = createDeferred<"exists">()
     const racingValidator = createBtwParentValidator({
-      localExists: () => false,
       fetchStatus: () => deferred.promise,
     })
     const validation = racingValidator.exists("ses_deleted_parent")
@@ -52,12 +49,11 @@ describe("createBtwParentValidator", () => {
     expect(await validation).toBe(false)
   })
 
-  it("#given a remotely deleted parent #when a persisted side is adopted again #then it revalidates instead of trusting a prior success", async () => {
+  it("#given stale local parent state #when the remote parent was deleted #then adoption requires remote confirmation", async () => {
     // given
     const remoteResults: Array<"exists" | "missing"> = ["exists", "missing"]
     const fetchStatus = mock(async () => remoteResults.shift() ?? "missing")
     const validator = createBtwParentValidator({
-      localExists: () => false,
       fetchStatus,
     })
 

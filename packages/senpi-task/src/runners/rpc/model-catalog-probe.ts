@@ -3,7 +3,9 @@ import { spawn, type ChildProcess } from "node:child_process"
 import type { RpcSpawnDescriptor } from "./spawn"
 import { terminateRpcChild } from "./terminate"
 
-export const PROBE_TIMEOUT_MS = 20_000
+// Bun 1.4 cold starts of the full Senpi CLI on Windows have exceeded the original 20s budget.
+// Keep the established POSIX ceiling while giving Windows ~46% headroom over the observed 20.5s probe.
+export const PROBE_TIMEOUT_MS = process.platform === "win32" ? 30_000 : 20_000
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 const ANSI_ESCAPE = /\u001B\[[0-?]*[ -/]*[@-~]/g
 

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { rmEfaultTolerant } from "../teardown.test-support"
 import {
   advanceTestClock,
   createTestClock,
@@ -29,7 +30,7 @@ const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
 // platform's known cleanup races are tolerated while every other cleanup defect fails loudly.
 async function removeRoot(root: string): Promise<void> {
   try {
-    await rm(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
   } catch (error) {
     if (
       process.platform === "win32"

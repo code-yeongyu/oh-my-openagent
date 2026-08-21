@@ -1,3 +1,38 @@
+## 2026-08-21 — Follow the Senpi 2026.8.21 host contract
+
+The adapter peer and development dependency now require Senpi `2026.8.21`, and the
+task engine's peer and development pins move with it. The 2026.8.21 host carries
+the settings-lock CPU-spin repair that froze the omo TUI at ~100% CPU under
+provider-error storms: contended settings-lock retries sleep through
+`Atomics.wait` instead of busy-waiting, retry-fallback chain canonicalization is
+memoized per error burst, and the `cursor-cli-oauth` / `claude-sdk-oauth` lanes
+cache their settings loads by mtime+size. It also carries the follow-up that
+makes settings reads lock-free: writers publish through a same-directory temp
+file plus rename, so read-only settings loads take no lock and can never observe
+a torn write. Alongside those, the host refreshes hydrated provider catalog data
+(the vercel-ai-gateway Grok vendor slug moved `xai/` -> `spacexai/`, and opencode
+delisted `deepseek-v4-flash-free`).
+
+The bump covers all four manifest surfaces, the workspace lockfile, the
+`senpi-pin` and package-shape test pins, and the provider-map provenance comment
+(re-verified: `packages/ai/src/providers/all.ts`, which defines
+`builtinProviders()`, is byte-identical between `v2026.8.20-2` and `v2026.8.21`,
+so the builtin provider ids are unchanged).
+
+## 2026-08-21 — Add mass-ulw trigger aliases
+
+The mass-ulw keyword detector now also fires on `ulw mass`, `ulwmass`, `mulw`, and
+`meth` (any case, space/hyphen variants), alongside the existing `mass ulw` /
+`massulw` / `mass-ulw` spellings. `MASS_ULW_PATTERN` becomes
+`/\b(?:mass[\s-]*ulw(?!-)|ulw[\s-]*mass|mulw|meth)\b/i`; the `ulw(?!-)` guard,
+all suppressions, and both injection paths are unchanged.
+
+## 2026-08-20 — Render transcript notices in the Senpi notice-box family
+
+Fallback architect announcements, task completion and liveness cards, and memory reflection, health, soul, accepted-turn, and write notices now share the Senpi-canonical padded `customMessageBg` block. Titles retain semantic tone and bold emphasis, body rows stay dim, and diagnostic detail remains expanded-only.
+
+Compact category warnings and normal tool result rows remain unchanged.
+
 ## 2026-08-19 — Follow the Senpi 2026.8.19 host contract
 
 **What changed.** The adapter peer and development dependency now require Senpi

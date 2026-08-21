@@ -20,11 +20,11 @@ function bold(text: string): string {
 
 const PLAIN_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
-  italic: (text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
 }
 
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; italic: (text: string) => string }
+  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
   readonly colors: ThemeColor[]
 } {
   const colors: ThemeColor[] = []
@@ -34,7 +34,7 @@ function recordingTheme(): {
         colors.push(color)
         return text
       },
-      italic: (text: string) => text,
+      bg: (_color: "customMessageBg", text: string) => text,
     },
     colors,
   }
@@ -83,10 +83,22 @@ function render(
     (options.theme ?? PLAIN_THEME) as never,
     { isError: options.isError ?? false } as never,
   )
-  return (component as { render(width: number): string[] }).render(options.width ?? WIDE)
+  const lines = (component as { render(width: number): string[] }).render(options.width ?? WIDE)
+  if (details?.writeNotice === undefined || options.isError === true || options.enabled === false) return lines
+  if (lines[0]?.startsWith("<notice-bg>")) return lines
+  return lines.slice(1, -1).map((line) => line.slice(1).trimEnd())
 }
 
 describe("memory write notice rendering", () => {
+  test("#when rendered with a background theme #then every padded line carries customMessageBg", () => {
+    const lines = render({ message: MESSAGE, writeNotice: notice() }, {
+      theme: {
+        fg: (_color: ThemeColor, text: string) => text,
+        bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
+      },
+    })
+    for (const line of lines) expect(line).toMatch(/^<notice-bg>.*<\/notice-bg>$/u)
+  })
   describe("#given a successful single-file write", () => {
     test("#when it renders collapsed #then the notice reads as a dated memory entry with size and timeline lines", () => {
       // given

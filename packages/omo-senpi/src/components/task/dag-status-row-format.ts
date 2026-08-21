@@ -16,6 +16,8 @@ export interface DagStatusNode {
   readonly state: string
   readonly route: DagStatusRoute
   readonly dependsOn: readonly string[]
+  // Display attempt; absent on legacy records, 1 for a node that ran exactly once.
+  readonly attempt?: number
 }
 
 export interface DagStatusWave {
@@ -88,6 +90,8 @@ function nodeRow(node: DagStatusNode, activity: ReadonlyMap<string, string> | un
   const icon = NODE_ICONS[node.state] ?? "○"
   const label = excerptRendererText(normalizeRendererText(node.label ?? node.id), LABEL_MAX)
   const parts = [`  ${icon}`, label, routeLabel(node.route)]
+  // A re-run node is the exception worth a badge; a first attempt stays unmarked.
+  if ((node.attempt ?? 1) > 1) parts.push(`x${node.attempt}`)
   // Activity is live telemetry: it belongs to a running node only, never to a settled one.
   const live = node.state === "running" ? activity?.get(node.id) : undefined
   if (live !== undefined) parts.push(excerptRendererText(normalizeRendererText(live), ACTIVITY_MAX))

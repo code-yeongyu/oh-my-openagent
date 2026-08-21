@@ -58,9 +58,27 @@ await sdk.cancel(runId, "superseded by a new plan")
 - `wait` blocks until the run settles and returns the final result.
 - `cancel` stops the run; pass a reason so the record says why.
 
+## Recovering one node - retry, send, amend
+
+A settled run is not a dead end. Three verbs act on a SINGLE node, so one bad node never costs you the whole graph, and every node that already finished keeps its cached result:
+
+```js
+await sdk.retry(runId)                                  // every failed/cancelled node gets a fresh attempt
+await sdk.retry(runId, ["lint"])                        // just this node
+await sdk.retry(runId, ["lint"], { prompt: "..." })     // edit the instruction as you retry it
+await sdk.send(runId, "lint", "skip the vendored dir")  // steer a running child, or revive a finished one
+await sdk.amend(runId, editedDefinition)                // re-run only what changed, plus its dependents
+```
+
+- **`retry`** gives a fresh attempt to every `failed` or `cancelled` node (or just the `node_ids` you name) and hands their skip-cascaded dependents back to the wave loop. Completed nodes are reused, never re-executed. Passing a single `node_id` with `prompt` edits that node's instruction as it retries. Retrying a COMPLETED node is refused with `node_not_retryable` - use `amend`. A `skipped` node is retryable only when a failed or cancelled ancestor is in the same retry set. While the run is still `running`, retry is refused with `run_still_active`: let the wave settle first.
+- **`send`** delivers a message to ONE node's child. A running child is steered in place; a finished child that is still resident is revived with its context intact, so it continues instead of starting over. A child that cannot be continued is refused with `node_not_continuable`, and `retry` is the remedy.
+- **`amend`** submits an edited definition against the SAME run. Each node's fingerprint is diffed: unchanged completed nodes keep their cached results, and only changed or added nodes plus their transitive dependents re-run. Amending a node that is currently running is refused with `amend_running_node`. `load_skills` is deliberately outside the fingerprint, so a skills-only edit re-runs nothing.
+
 ## Resume across a restart
 
 Runs are journaled. When the session dies mid-run, the run pauses instead of being lost; on restart the extension resumes paused runs it owns, reusing outputs of nodes that already finished so completed work is never redone. Your side of the contract: `start` with the same `key` and definition returns the existing run (`reused: true`) instead of forking a duplicate, or `attach` with the stored `run_id`. Never re-issue a changed definition under an old key; that's a definition conflict.
+
+`start` is for STARTING a run, not for recovering one: re-issuing the same key and definition against an already-settled run returns it untouched and schedules nothing. To move a settled run forward, use `retry` or `amend` above.
 
 ## Observing a run
 

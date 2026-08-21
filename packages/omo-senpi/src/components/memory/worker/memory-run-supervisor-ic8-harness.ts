@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { rmEfaultTolerant } from "../teardown.test-support"
 import { createMemoryRunSupervisorIc8ExitResources } from "./memory-run-supervisor-ic8-exit-resources"
 import {
   processGroupIsAlive,
@@ -222,7 +223,7 @@ export function createMemoryRunSupervisorIc8Harness() {
       roots
         .splice(0)
         .map((root) =>
-          rm(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }),
+          rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }),
         ),
     )
     for (const result of removals) {

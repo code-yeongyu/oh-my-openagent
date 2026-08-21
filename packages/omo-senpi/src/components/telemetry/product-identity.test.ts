@@ -12,12 +12,14 @@ import {
   OMO_NATIVE_EVENT_SCHEMAS,
   OMO_NATIVE_POSTHOG_API_KEY,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
+  OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
   getOmoNativeStateDir,
   hashSessionId,
   maskProviderAndModel,
 } from "./product-identity"
 import { MAX_TRACKED_CALLS } from "./wave-assembler"
+import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
 
@@ -111,6 +113,29 @@ describe("OmO Native product identity", () => {
     expect(maskProviderAndModel("user-provider", knownModel ?? "")).toEqual({ provider: "custom", model_id: "custom" })
   })
 
+  test("#given every provider and model rung in CATEGORY_FALLBACK_CHAINS #when masked #then no shipped rung collapses to custom, while an arbitrary user provider and model still mask to custom", () => {
+    // given: every (provider, model) pair a shipped builtin category can actually execute
+    const shippedRungs = Object.values(CATEGORY_FALLBACK_CHAINS).flatMap((chain) =>
+      chain.flatMap((rung) => rung.providers.map((provider) => ({ provider, model: rung.model }))),
+    )
+    expect(shippedRungs.length).toBeGreaterThan(0)
+
+    // when: each rung is masked for export
+    const collapsed = shippedRungs.filter(({ provider, model }) => {
+      const masked = maskProviderAndModel(provider, model)
+      return masked.provider === "custom" || masked.model_id === "custom"
+    })
+
+    // then: no executable rung is exportable only as custom/custom - that is what makes the
+    // per-country category-model insight readable instead of a wall of `custom`
+    expect(collapsed).toEqual([])
+    // and: a model known under one provider stays custom under a provider that does not ship it
+    expect(maskProviderAndModel("deepseek", "claude-opus-5").model_id).toBe("custom")
+    // and: arbitrary user-configured providers and models never leave the machine
+    expect(maskProviderAndModel("my-gateway", "my-finetune")).toEqual({ provider: "custom", model_id: "custom" })
+    expect(maskProviderAndModel("anthropic", "my-finetune")).toEqual({ provider: "anthropic", model_id: "custom" })
+  })
+
   test("#given senpi-task builtins #when telemetry allowlists are loaded #then names exactly match imported sources", () => {
     const categoryNames = BUILTIN_CATEGORY_DEFAULTS.map((definition) => definition.name)
 
@@ -132,6 +157,63 @@ describe("OmO Native product identity", () => {
     expect(worstCaseHistogram.length).toBeLessThanOrEqual(64)
     expect(OMO_NATIVE_EVENT_SCHEMAS.parallelism_summary.non_eval_wave_size_histogram.type).toBe("string")
     expect(OMO_NATIVE_PROPERTY_ALLOWLISTS.parallelism_summary).toContain("non_eval_wave_size_histogram")
+  })
+
+  test("#given the native event schemas #when inspected #then delegation_completed and category_config exist with exactly the planned property sets and enum vocabularies", () => {
+    // given: the two events the task-execution insights are built on
+    const delegation = OMO_NATIVE_EVENT_SCHEMAS.delegation_completed
+    const categoryConfig = OMO_NATIVE_EVENT_SCHEMAS.category_config
+
+    // then: property sets are exactly the planned ones - a stray property is a privacy defect
+    expect(Object.keys(delegation).sort()).toEqual([
+      "$session_id", "agent_type", "background_mode", "cache_read_tokens", "cache_write_tokens",
+      "category", "config_generation", "cost_status", "cost_usd", "duration_ms", "duration_status",
+      "execution_mode", "fallback_attempts", "input_tokens", "model_id", "model_source",
+      "output_tokens", "owner_kind", "provider", "reasoning_effort", "run_epoch", "start_reason",
+      "stats_status", "status", "task_send_queued_count", "task_send_running_count", "task_seq",
+      "token_status", "tool_calls", "total_tokens", "turns",
+    ].sort())
+    expect(Object.keys(categoryConfig).sort()).toEqual([
+      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep",
+      "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
+      "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
+      "user_category_count",
+    ].sort())
+
+    // and: every discriminating string is a closed vocabulary
+    expect(delegation.status.values).toEqual(["completed", "error", "cancelled", "interrupted", "lost"])
+    expect(delegation.start_reason.values).toEqual([
+      "initial_spawn", "runtime_fallback", "session_resume", "dag_retry", "revive_after_completed",
+      "revive_after_error", "revive_after_cancelled", "revive_after_interrupted", "revive_after_lost",
+      "unknown",
+    ])
+    expect(delegation.owner_kind.values).toEqual(["plain_child", "dag_node", "team_member", "unknown"])
+    expect(delegation.background_mode.values).toEqual(["foreground", "background", "promoted", "unknown"])
+    expect(delegation.execution_mode.values).toEqual(["in-process", "process"])
+    expect(delegation.reasoning_effort.values).toEqual([
+      "off", "minimal", "low", "medium", "high", "xhigh", "max", "other", "none",
+    ])
+    expect(delegation.model_source.values).toEqual(["category", "explicit", "agent", "none"])
+    expect(delegation.token_status.values).toEqual(["complete", "partial", "unavailable"])
+    expect(delegation.cost_status.values).toEqual(["reported", "unavailable", "invalid"])
+    expect(delegation.stats_status.values).toEqual(["complete", "partial", "unavailable"])
+    expect(delegation.duration_status.values).toEqual(["monotonic", "wall_clock", "unavailable"])
+    expect(delegation.category.values).toEqual([...BUILTIN_CATEGORY_NAMES, "custom", "none"])
+    expect(delegation.agent_type.values).toEqual([...CURATED_AGENTS, "custom", "none"])
+    expect(categoryConfig.source.values).toEqual(OMO_NATIVE_EVENT_SCHEMAS.session_started.reason.values)
+
+    // and: the join keys and every measurement stay unbucketed numbers
+    for (const key of ["task_seq", "run_epoch", "config_generation", "duration_ms", "turns", "tool_calls"] as const) {
+      expect(delegation[key]).toEqual({ type: "number" })
+    }
+    expect(categoryConfig.config_generation).toEqual({ type: "number" })
+
+    // and: session_started now carries the honestly-labeled timezone signal
+    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.timezone).toEqual({ type: "string" })
+  })
+
+  test("#given the shared schema version #when the native clients are configured #then one exported constant carries it", () => {
+    expect(OMO_NATIVE_SCHEMA_VERSION).toBe(2)
   })
 
   test("#given static telemetry inventories #when inspected #then they and every property allowlist are frozen", () => {

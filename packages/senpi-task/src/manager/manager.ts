@@ -28,6 +28,7 @@ import {
   inSession,
   isTerminalRecord,
   nowIso,
+  promotedBackgroundMode,
   recordSpawnedPid,
 } from "./manager-helpers"
 import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
@@ -35,6 +36,7 @@ import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { withTaskRecordLockAsync } from "../store/record-lock"
 import { reattachManagedTask, respawnManagedTask } from "./manager-respawn"
 import { NameRegistry } from "./names"
+import { TaskSequence } from "./task-sequence"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeTranscriptLog } from "./transcript-log"
 import type {
@@ -124,6 +126,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
+  readonly #taskSequence = new TaskSequence()
   readonly #live = new Map<string, LiveTask>()
   // Callers can subscribe before a queued task owns a handle. Each entry is attached exactly once
   // when #launch promotes it, and its returned cleanup owns both pending and live subscriptions.
@@ -224,8 +227,11 @@ class TaskManagerImpl implements TaskManager {
     })
   }
 
+  // The LAST match wins: a retried DAG node claims the same (kind,runId,nodeId) under a new
+  // execAttempt-scoped fingerprint, and task ids sort by creation, so the newest claim is the live
+  // one. The superseded record keeps its dag owner marker (spawn-time launcher stripping reads it).
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined {
-    return this.#options.store.list().records.find((record) =>
+    return this.#options.store.list().records.findLast((record) =>
       record.owner?.kind === owner.kind &&
       record.owner.runId === owner.runId &&
       record.owner.nodeId === owner.nodeId,
@@ -236,6 +242,10 @@ class TaskManagerImpl implements TaskManager {
     const record = this.findOwnedTask(owner)
     if (record === undefined) return undefined
     if (record.owner?.fingerprint !== owner.fingerprint) {
+      // A settled record cannot be re-run in place, so a differing fingerprint on it is a retry:
+      // ownership moves to the fresh task. Only a LIVE task with a different fingerprint is a
+      // genuine conflict between two callers over one running child.
+      if (isTerminalRecord(record)) return undefined
       return {
         kind: "owner_conflict",
         task_id: record.task_id,
@@ -290,7 +300,13 @@ class TaskManagerImpl implements TaskManager {
     let claimed: TaskRecord
     try {
       const draft = createTaskRecord({
-        ...buildRecordInput({ spec, plan, name: "", executionMode }),
+        ...buildRecordInput({
+          spec,
+          plan,
+          name: "",
+          executionMode,
+          taskSeq: this.#taskSequence.next(spec.parent_session_id),
+        }),
         ...(owner === undefined ? {} : { owner }),
       }, this.#now())
       const claimDraft: TaskRecord = { ...draft, name: requestedRegistration?.name ?? draft.task_id, host_pid: this.#hostPid }
@@ -476,9 +492,13 @@ class TaskManagerImpl implements TaskManager {
     this.#background.add(taskId)
     // Background intent must survive the owning process: a resumed manager reads the RECORD to
     // decide terminal notification, so promotion is persisted, not just held in memory.
-    this.#options.store.mutate(taskId, (record) =>
-      record.notify_on_terminal ? record : { ...record, notify_on_terminal: true },
-    )
+    // A promoted task is neither a background spawn nor a plain foreground run: the mode records
+    // the hand-off so terminal accounting keeps the two populations apart.
+    this.#options.store.mutate(taskId, (record) => {
+      const backgroundMode = promotedBackgroundMode(record)
+      if (record.notify_on_terminal && record.background_mode === backgroundMode) return record
+      return { ...record, notify_on_terminal: true, background_mode: backgroundMode }
+    })
     return promoted
   }
 

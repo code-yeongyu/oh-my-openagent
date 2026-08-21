@@ -1,6 +1,6 @@
 ---
 name: visual-qa
-description: "MUST USE after building/changing any UI or when asked whether a page, component, or TUI looks right. Rigorous visual QA across web/page and terminal UIs. Prefer browser:control-in-app-browser for unauthenticated browser/page QA in Codex, then Playwright/agent-browser/dev-browser. Captures screenshot/TUI evidence with bundled diff scripts, runs design-system/functional and visual-fidelity/CJK reviewer passes, then synthesizes a good/bad verdict. Triggers: visual QA, screenshot/pixel diff, UI looks wrong, reference fidelity, design system check, responsive check, CJK text clipping, TUI alignment, box-drawing drift."
+description: "MUST USE after building/changing any UI or when asked whether a page, component, or TUI looks right. Rigorous visual QA across web/page, terminal, and paginated-document surfaces. Prefer browser:control-in-app-browser for unauthenticated browser/page QA in Codex, then Playwright/agent-browser/dev-browser. Captures screenshot/TUI evidence with bundled diff scripts, runs design-system/functional and visual-fidelity/CJK reviewer passes, then synthesizes a good/bad verdict. Triggers: visual QA, screenshot/pixel diff, UI looks wrong, reference fidelity, design system check, responsive check, CJK text clipping, TUI alignment, box-drawing drift, PDF page check, deck review, blank or near-empty page, wrong page break."
 ---
 
 # Visual QA - Dual-Oracle Web and TUI Verification
@@ -9,7 +9,7 @@ Verify a rendered UI against intent using objective script evidence plus two par
 
 ## Purpose and when to use
 
-- Use after you build or change any UI, before calling it done. Covers web/page UIs and TUI/terminal UIs.
+- Use after you build or change any UI, before calling it done. Covers web/page UIs, TUI/terminal UIs, and paginated documents.
 - Use when output must match a mock, a baseline, or a stated design intent; when you suspect a regression; when CJK (Korean/Japanese/Chinese) text may clip, misalign, or wrap awkwardly; when a claimed design system might actually be a flat image; when a terminal layout may overflow or its borders may break.
 - Skip when there is no rendered surface (pure backend or library logic with no visual or terminal output). For broad post-implementation review use review-work; this skill is the visual specialist.
 
@@ -19,6 +19,7 @@ In the commands below, `$SKILL_DIR` is this skill's own directory (the folder co
 
 - Web/page UI: renders in a browser (HTML/CSS/JS, components, canvas, SVG). Evidence is screenshots.
 - TUI/terminal UI: renders as text in a terminal (box-drawing, panes, status lines, REPL/TUI apps). Evidence is terminal captures.
+- Paginated document: renders as ordered pages (PDF report, printed HTML, exported deck). Evidence is every page rendered to an image - `pdftoppm -png -r 150 <file>.pdf <prefix>` or the pipeline's own renderer. Extracted text is not evidence here: layout is exactly what extraction discards, so a stranded block, a split table, or a near-empty page survives a clean text check.
 - Reference-fidelity UI: any web/page UI built from a concrete reference packet, including screenshots, generated Imagen/Stitch mockups, Figma exports, overview text, annotations, or source-site captures. Evidence is the full reference packet plus same-size actual captures.
 
 If the change touches both, run both capture tracks and feed both into the passes.

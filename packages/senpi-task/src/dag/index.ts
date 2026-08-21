@@ -52,9 +52,12 @@ export { dagDefinitionFingerprint, dagFingerprint, nodeFingerprintInput } from "
 export type { DagDefinitionFingerprintInputV1, DagNodeFingerprintInputV1 } from "./fingerprint"
 
 export {
+  dagDefinitionAmendedEvent,
   dagDiagnosticAddedEvent,
   dagEventLane,
+  dagNodeRetriedEvent,
   dagNodeReusedEvent,
+  dagNodeSteeredEvent,
   dagNodeTaskAttachedEvent,
   dagNodeTransitionedEvent,
   dagRunCancelledEvent,
@@ -88,6 +91,7 @@ export type { DagJournal, DagJournalCheckpoint, DagJournalListener, DagJournalOp
 // and cancel()), so it keeps the plain name and the manager's snapshot-only shape is aliased.
 export { createDagManager, DAG_MANAGER_ERROR_CODES, DagManagerError } from "./manager"
 export type {
+  AmendRecord,
   DagHistoryParams,
   DagManager,
   DagManagerErrorCode,

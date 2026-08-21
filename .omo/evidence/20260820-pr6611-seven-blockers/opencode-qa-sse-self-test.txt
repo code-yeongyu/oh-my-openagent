@@ -1,0 +1,4 @@
+first matching event: {"type":"server.connected"}
+PASS: SSE /event opened and delivered server.connected
+
+exit_code=0

@@ -151,7 +151,7 @@ function bold(text: string): string {
 
 const PLAIN_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
-  italic: (text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
 }
 
 const HEALTH: ReflectionHealthEntry = {
@@ -172,7 +172,7 @@ describe("renderReflectionHealthEntry house notice contract", () => {
 
     // then
     expect(component).toBeDefined()
-    expect(component!.render(120)).toEqual([
+    expect(component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())).toEqual([
       bold("✗ Memory reflection failing · 4 runs in a row"),
       "Run /login <provider>.",
     ])
@@ -183,7 +183,7 @@ describe("renderReflectionHealthEntry house notice contract", () => {
     const component = renderReflectionHealthEntry({ data: HEALTH } as never, { expanded: true }, PLAIN_THEME as never)
 
     // then
-    expect(component!.render(120)[2]).toBe(
+    expect(component!.render(120)[3]?.slice(1).trimEnd()).toBe(
       "reason child_exit · merge refused · since 2026-08-12T22:15:00.000Z · identity project-a1b2c3d4",
     )
   })

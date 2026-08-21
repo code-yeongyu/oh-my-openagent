@@ -13,7 +13,7 @@ import type {
 import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
 import { RpcCommandError } from "./errors"
 import { classifyChildExit } from "./exit-mapping"
-import type { RpcProtocolClient } from "./protocol-client"
+import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
 import { agentEndOutcome, exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
 
@@ -72,13 +72,17 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   })
 
   const heartbeat = setInterval(() => {
+    if (client.exited || child.stdin?.writableEnded || child.stdin?.destroyed) return
     client
       .send({ type: "get_state" })
       .then((response) => {
         lastSeenAt = now()
         sessionId = readSessionId(response) ?? sessionId
       })
-      .catch((error: unknown) => log("senpi-task heartbeat get_state failed", { taskId, error: String(error) }))
+      .catch((error: unknown) => {
+        if (client.exited || isHarmlessRpcShutdownError(error)) return
+        log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+      })
   }, heartbeatIntervalMs)
   heartbeat.unref?.()
 

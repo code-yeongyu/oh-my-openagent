@@ -87,9 +87,19 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
   const probe = options.probe ?? probeModelCatalog
   const now = options.now ?? Date.now
   const catalogs = new Map<string, CachedCatalog>()
-  const probeCatalog = (descriptor: RpcSpawnDescriptor, model: string): Promise<ProbedCatalog> => (
-    probe(descriptor).then((result) => readCatalog(model, result))
-  )
+  const probeCatalog = async (descriptor: RpcSpawnDescriptor, model: string): Promise<ProbedCatalog> => {
+    const first = await probe(descriptor)
+    // A timed-out probe is INCONCLUSIVE, never evidence of absence: the child was killed before it
+    // finished listing, so it says nothing about whether the model is visible. Treating that as
+    // `model_unavailable` is what made a slow cold start on a loaded runner look like a missing
+    // model. Re-probe once with a fresh spawn instead. Widening the timeout was tried twice and is
+    // the wrong lever - the true completion time is unknown because the probe never got to finish.
+    // Every other outcome is answered by the first probe and is deliberately NOT retried: a
+    // non-zero exit is a real failure, and a complete exit-0 listing is handled by the existing
+    // confirming re-probe path.
+    const result = first.timedOut ? await probe(descriptor) : first
+    return readCatalog(model, result)
+  }
   const evict = (key: string, catalog: Promise<ProbedCatalog>): void => {
     if (catalogs.get(key)?.catalog === catalog) catalogs.delete(key)
   }

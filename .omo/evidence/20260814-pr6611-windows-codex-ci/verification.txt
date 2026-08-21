@@ -1,0 +1,30 @@
+GitHub failing job:
+  run=31760176754
+  job=94644705178
+  name=codex-compatibility (windows-latest)
+
+Focused package:
+  command=npm --prefix packages/lsp-tools-mcp test
+  test_files=25 passed
+  tests=96 passed, 1 skipped, 0 failed
+  exit_code=0
+
+Static gates:
+  npm --prefix packages/lsp-tools-mcp run typecheck
+  npx biome check test/process.test.ts test/mcp.test.ts test/client-wrapper.test.ts
+  exit_code=0
+
+Live Codex QA:
+  assistant=Hello from the codex-qa mock model.
+  hooks=sessionStart,userPromptSubmit,stop
+  real_config_unchanged=true
+  isolated_home=/tmp/cqa-home.TU2Z02/codex
+  sandbox_removed=true
+
+Full local gate:
+  command=bun run test:codex
+  formerly_failing_lsp_stage=passed
+  later_installer_timeouts=21
+  elapsed_seconds=1244.32
+  exit_code=1
+  authoritative_full_gate=pending GitHub rerun

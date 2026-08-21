@@ -266,13 +266,13 @@ describe("memory tool result rendering", () => {
     const collapsed = (Reflect.apply(renderResult, undefined, [
       created,
       { expanded: false, isPartial: false },
-      { fg: (_color: string, text: string) => text, italic: (text: string) => text },
+      { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
       { isError: false },
     ]) as { render(width: number): string[] }).render(200)
     const expanded = (Reflect.apply(renderResult, undefined, [
       created,
       { expanded: true, isPartial: false },
-      { fg: (_color: string, text: string) => text, italic: (text: string) => text },
+      { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
       { isError: false },
     ]) as { render(width: number): string[] }).render(200)
 

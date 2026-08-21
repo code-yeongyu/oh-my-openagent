@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import {
   createEventTelemetryClient,
   getDailyActiveCaptureState,
@@ -13,29 +11,27 @@ import {
   type TelemetryOsProvider,
   type TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
-import { isOmoTelemetryEnabled } from "@oh-my-opencode/omo-config-core"
+import { isOmoTelemetryEnabled, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { OmoSenpiComponent } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { getSenpiTelemetryStateDir, recordSenpiDailyActive } from "./index"
+import { createCategoryConfigCapture } from "./omo-native-category-config"
 import {
-  KNOWN_PROVIDERS,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
+  OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
   getOmoNativeStateDir,
   hashSessionId,
-  maskProviderAndModel,
 } from "./product-identity"
+import { readOmoNativeInventory, type OmoNativeInventoryDiagnostic } from "./session-inventory"
+import { resolveSessionModelRegistry } from "./session-model-registry"
+
+export type { OmoNativeInventoryDiagnostic }
 
 const SOURCE = "omo-native-session"
 const SESSION_REASONS = new Set(["startup", "reload", "new", "resume", "fork"])
-
-export type OmoNativeInventoryDiagnostic = {
-  readonly event: "omo_native_inventory_read_failed"
-  readonly error: unknown
-  readonly source: typeof SOURCE
-}
 
 export type OmoNativeSessionOptions = {
   readonly diagnostics?: (input: TelemetryDiagnosticInput | OmoNativeInventoryDiagnostic) => void
@@ -45,15 +41,9 @@ export type OmoNativeSessionOptions = {
   readonly now?: Date
   readonly osProvider?: TelemetryOsProvider
   readonly setTimeoutFn?: EventTelemetrySetTimeout
+  /** Device-reported IANA zone. Injected in tests; the host default reads the runtime's resolved zone. */
+  readonly timeZone?: () => string
   readonly transportFactory?: TelemetryTransportFactory
-}
-
-type Inventory = {
-  readonly defaultModel?: string
-  readonly defaultProvider?: string
-  readonly modelCount: number
-  readonly providerCount: number
-  readonly providers: string
 }
 
 export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions = {}): OmoSenpiComponent {
@@ -75,7 +65,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           env,
           product,
           propertyAllowlist: OMO_NATIVE_PROPERTY_ALLOWLISTS,
-          schemaVersion: 1,
+          schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,
           source: SOURCE,
           transportFactory: options.transportFactory,
@@ -96,7 +86,9 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           })
         }
 
-        const inventory = readInventory(resolveAgentHome({ env }), options.diagnostics)
+        const inventory = readOmoNativeInventory(resolveAgentHome({ env }), options.diagnostics)
+        const reason = sessionReason(payload)
+        const timezone = readTimeZone(options.timeZone)
         client.captureEvent("session_started", {
           $session_id: sessionHash,
           $os: osProvider.platform(),
@@ -107,9 +99,21 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           provider_count: inventory.providerCount,
           model_count: inventory.modelCount,
           providers: inventory.providers,
-          reason: sessionReason(payload),
+          reason,
+          ...(timezone === undefined ? {} : { timezone }),
           ...(inventory.defaultProvider === undefined ? {} : { default_provider: inventory.defaultProvider }),
           ...(inventory.defaultModel === undefined ? {} : { default_model: inventory.defaultModel }),
+        })
+
+        // The category map is only observable where BOTH the config and the live model registry are
+        // in hand. A host that reports no registry (older host, RPC context) simply ships no snapshot
+        // rather than a snapshot that guesses availability.
+        captureCategoryConfig({
+          client,
+          eventCtx,
+          omoConfig: loadCategoryConfig(options, eventCtx, env),
+          reason,
+          sessionHash,
         })
 
         void recordSenpiDailyActive({
@@ -129,6 +133,52 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
         await activeClient?.shutdown()
       })
     },
+  }
+}
+
+// Fire-and-forget: an unreadable config or a throwing registry costs the snapshot, never the session.
+function captureCategoryConfig(input: {
+  readonly client: EventTelemetryClient
+  readonly eventCtx: unknown
+  readonly omoConfig: OmoConfig | undefined
+  readonly reason: string
+  readonly sessionHash: string
+}): void {
+  const registry = resolveSessionModelRegistry(input.eventCtx)
+  if (registry === undefined || input.omoConfig === undefined) return
+  createCategoryConfigCapture({
+    captureEvent: input.client.captureEvent,
+    omoConfig: input.omoConfig,
+    sessionHash: input.sessionHash,
+  }).observe({ registry, source: input.reason })
+}
+
+function loadCategoryConfig(
+  options: OmoNativeSessionOptions,
+  eventCtx: unknown,
+  env: TelemetryEnv,
+): OmoConfig | undefined {
+  const cwd = extractString(eventCtx, "cwd")
+  try {
+    return loadSenpiOmoConfig({ env: { ...env }, ...(cwd === undefined ? {} : { cwd }) }).config
+  } catch (error) {
+    options.diagnostics?.({
+      event: "telemetry_capture_failed",
+      source: SOURCE,
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error",
+    })
+    return undefined
+  }
+}
+
+// A runtime without ICU data (or a host that refuses the lookup) simply ships no timezone.
+function readTimeZone(provider: (() => string) | undefined): string | undefined {
+  try {
+    const zone = (provider ?? (() => Intl.DateTimeFormat().resolvedOptions().timeZone))()
+    return zone.length > 0 && zone.length <= 64 ? zone : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -155,64 +205,8 @@ function configEnabled(options: OmoNativeSessionOptions, eventCtx: unknown, env:
   }
 }
 
-function readInventory(
-  agentDir: string,
-  diagnostics?: OmoNativeSessionOptions["diagnostics"],
-): Inventory {
-  try {
-    const models = readObject(join(agentDir, "models.json"))
-    const settings = readObject(join(agentDir, "settings.json"))
-    const providers = Reflect.get(models, "providers")
-    if (!isRecord(providers)) throw new Error("models.json providers must be an object")
-
-    let modelCount = 0
-    for (const provider of Object.values(providers)) {
-      if (!isRecord(provider)) throw new Error("models.json provider must be an object")
-      const modelsValue = Reflect.get(provider, "models")
-      if (modelsValue !== undefined && !Array.isArray(modelsValue)) {
-        throw new Error("models.json provider models must be an array")
-      }
-      modelCount += modelsValue?.length ?? 0
-    }
-
-    const providerIds = Object.keys(providers)
-    const defaultProvider = stringProperty(settings, "defaultProvider")
-    const defaultModel = stringProperty(settings, "defaultModel")
-    const masked = defaultProvider !== undefined && defaultModel !== undefined
-      ? maskProviderAndModel(defaultProvider, defaultModel)
-      : undefined
-    return {
-      providerCount: providerIds.length,
-      modelCount,
-      providers: providerIds.filter((id) => isKnownProvider(id)).sort().join(","),
-      ...(masked === undefined ? {} : {
-        defaultProvider: masked.provider,
-        defaultModel: masked.model_id,
-      }),
-    }
-  } catch (error) {
-    diagnostics?.({ event: "omo_native_inventory_read_failed", error, source: SOURCE })
-    return { providerCount: 0, modelCount: 0, providers: "" }
-  }
-}
-
-function readObject(path: string): Record<string, unknown> {
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
-  if (!isRecord(parsed)) throw new Error(`${path} must contain an object`)
-  return parsed
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
-function isKnownProvider(value: string): boolean {
-  return KNOWN_PROVIDERS.some((provider) => provider === value)
-}
-
-function stringProperty(value: Record<string, unknown>, key: string): string | undefined {
-  const property = Reflect.get(value, key)
-  return typeof property === "string" && property.length > 0 ? property : undefined
 }
 
 function sessionReason(payload: unknown): string {
