@@ -159,6 +159,17 @@ const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
  */
 const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
 const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS
+/**
+ * Upper bound on how long a parent wake may be held by the stale tool-call
+ * deferral. The hold exists so a live-but-quiet assistant turn is never forked
+ * by a reply dispatch, but a turn whose tool parts can never resolve (for
+ * example a `bash` tool left at status "running" after its stream died) holds
+ * the wake forever and starves background-task completion notifications: the
+ * parent idles even though every background task finished. After this ceiling
+ * the wake is force-delivered instead of being held; observed in the wild as a
+ * wake held for 13+ minutes with a retry log entry every second.
+ */
+const PARENT_WAKE_STALE_TOOL_BLOCK_MAX_HOLD_MS = 60_000
 
 interface EventProperties {
   sessionID?: string
@@ -317,6 +328,7 @@ export class BackgroundManager {
         acceptedMessageSkewMs: PARENT_WAKE_ACCEPTED_MESSAGE_SKEW_MS,
         toolCallDeferMaxMs: PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS,
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
+        staleToolBlockMaxHoldMs: PARENT_WAKE_STALE_TOOL_BLOCK_MAX_HOLD_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
         parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
       },
