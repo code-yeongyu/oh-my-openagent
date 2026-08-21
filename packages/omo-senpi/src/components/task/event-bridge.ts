@@ -35,6 +35,7 @@ export function wireEventBridge(
   state: EventBridgeState,
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  let printRecoverySessionId: string | undefined
   const taskRpc = wireTaskRpcBridge(pi, engine)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
@@ -68,6 +69,7 @@ export function wireEventBridge(
       // "already processing" without streamingBehavior. Buffer only in print mode;
       // interactive TUI starts are actually idle and must redeliver immediately.
       const printMode = engine.runtime.mode() !== "tui"
+      printRecoverySessionId = printMode ? sessionId : undefined
       engine.notifier.reconcileUnnotifiedNotifications({
         sessionId,
         parentState: printMode ? { kind: "session_switching" } : { kind: "idle" },
@@ -85,12 +87,14 @@ export function wireEventBridge(
   pi.on("session_before_switch", (_payload, eventCtx) => {
     taskRpc.detach()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    printRecoverySessionId = undefined
     transitions.onBeforeSwitch(engine.runtime.sessionId())
     engine.runtime.clearUi()
   })
 
   pi.on("session_before_compact", (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    printRecoverySessionId = undefined
     transitions.onBeforeCompact(engine.runtime.sessionId())
   })
 
@@ -104,6 +108,7 @@ export function wireEventBridge(
     unsubscribeTaskSnapshots()
     taskRpc.dispose()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    printRecoverySessionId = undefined
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
     statusUi.dispose()
@@ -132,7 +137,10 @@ export function wireEventBridge(
     engine.runtime.captureFrom(liveContext)
     const coordinator = ctx.idleCoordinator
     const sessionId = engine.runtime.sessionId()
-    if (sessionId !== undefined) engine.notifier.flushBuffered({ sessionId, replaced: false })
+    if (sessionId !== undefined && sessionId === printRecoverySessionId) {
+      printRecoverySessionId = undefined
+      engine.notifier.flushBuffered({ sessionId, replaced: false })
+    }
     if (coordinator !== undefined) queueMicrotask(() => coordinator.flushOnIdle())
     await engine.memberLiveness.acknowledgePersisted(
       () => liveContext.sessionManager?.getSessionFile?.() ?? engine.runtime.sessionFile(),

@@ -46,6 +46,26 @@ describe("event-bridge session_start recovery chain", () => {
     expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" } }])
   })
 
+  it("#given a print-mode recovery buffer #when the resumed prompt reaches agent_end #then that buffer flushes once", async () => {
+    const { pi, flushCalls } = wireHarness("parent-session", { mode: "json" })
+
+    await pi.dispatch("session_start", {}, {})
+    await pi.dispatch("agent_end", {}, {})
+    await pi.dispatch("agent_end", {}, {})
+
+    expect(flushCalls).toEqual([{ sessionId: "parent-session", replaced: false }])
+  })
+
+  it("#given a transition after print-mode recovery #when agent_end fires #then transition-owned completions remain buffered", async () => {
+    const { pi, flushCalls } = wireHarness("parent-session", { mode: "json" })
+
+    await pi.dispatch("session_start", {}, {})
+    await pi.dispatch("session_before_switch", {}, {})
+    await pi.dispatch("agent_end", {}, {})
+
+    expect(flushCalls).toEqual([])
+  })
+
   it("#given no captured session id #when session_start fires #then the legacy sweep still runs with undefined while the scoped notification branch is skipped", async () => {
     const { pi, order, reconcileCalls, notifyCalls, warnings } = wireHarness(undefined)
 

@@ -51,6 +51,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   const infos: Array<{ message: string; details?: unknown }> = []
   const reconcileCalls: Array<string | undefined> = []
   const notifyCalls: Array<{ sessionId: string; parentState: unknown }> = []
+  const flushCalls: Array<{ sessionId: string; replaced: boolean }> = []
   const livenessCalls: string[] = []
   const resumptionCalls: number[] = []
 
@@ -141,7 +142,10 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         notifyCalls.push(input)
         order.push("notify")
       },
-      flushBuffered: () => ({ kind: "empty" as const }),
+      flushBuffered: (input: { sessionId: string; replaced: boolean }) => {
+        flushCalls.push(input)
+        return { kind: "empty" as const }
+      },
     } as unknown as TaskEngine["notifier"],
     planner: {} as TaskEngine["planner"],
     agents: {},
@@ -230,6 +234,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     infos,
     reconcileCalls,
     notifyCalls,
+    flushCalls,
     livenessCalls,
     resumptionCalls,
     rpcHandlers,
