@@ -1,15 +1,22 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
 export {
+  BACKGROUND_MODES,
+  COST_REPORT_STATUSES,
+  DURATION_SOURCE_STATUSES,
   isSpawnSpecV1,
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
+  TOKEN_COVERAGE_STATUSES,
   createTaskRecord,
   markRecordLostForReconciliation,
   messageability,
   transitionTaskRecord,
 } from "./state"
 export type {
+  BackgroundMode,
+  CostReportStatus,
+  DurationSourceStatus,
   LegacyProcessSpawnSpec,
   Messageability,
   PendingSteeringEntry,
@@ -26,6 +33,7 @@ export type {
   TaskTransition,
   TaskTransitionAudit,
   TaskTransitionResult,
+  TokenCoverageStatus,
 } from "./state"
 export { TaskRecordCollisionError, createTaskRecordStore, resolveStateDir } from "./store"
 export type {

@@ -80,7 +80,12 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   async function steerRunning(record: TaskRecord, handle: ManagedChildHandle, message: string, deliverAs: SendDelivery): Promise<SendOutcome> {
     if (deliverAs === "steer") await handle.steer(message)
     else await handle.followUp(message)
-    port.store.appendEvent(record.task_id, { type: "steered", payload: { delivered: deliverAs } })
+    // The run epoch scopes this send to the run it steered: a later revive starts a fresh epoch,
+    // and counting sends per epoch is what keeps a new run's messages off the prior run's tally.
+    port.store.appendEvent(record.task_id, {
+      type: "steered",
+      payload: { delivered: deliverAs, run_epoch: record.notification.run_epoch },
+    })
     return { kind: "steered", task_id: record.task_id, status: record.status, delivered: deliverAs }
   }
 
@@ -109,7 +114,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (updated === null) {
       return { kind: "not_found", reason: `No task found for "${record.task_id}".`, suggestion: NOT_FOUND_SUGGESTION }
     }
-    port.store.appendEvent(record.task_id, { type: "steer_queued", payload: { queue_position: position, deliverAs } })
+    port.store.appendEvent(record.task_id, {
+      type: "steer_queued",
+      payload: { queue_position: position, deliverAs, run_epoch: updated.notification.run_epoch },
+    })
     return { kind: "queued", task_id: record.task_id, queue_position: position }
   }
 
@@ -147,7 +155,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       try {
         if (entry.deliver_as === "steer") await handle.steer(entry.message)
         else await handle.followUp(entry.message)
-        port.store.appendEvent(taskId, { type: "steered", payload: { delivered: entry.deliver_as, queued: true } })
+        port.store.appendEvent(taskId, {
+          type: "steered",
+          payload: { delivered: entry.deliver_as, queued: true, run_epoch: fresh.notification.run_epoch },
+        })
       } catch (error) {
         log("senpi-task steering queued delivery failed", { taskId, error: String(error) })
       }

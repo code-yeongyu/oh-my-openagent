@@ -219,6 +219,7 @@ describe("buildRecordInput durable facts", () => {
       plan: { model: "anthropic/claude-opus-4", toolDenylist: ["write", "edit"] },
       name: "n",
       executionMode: "in-process",
+      taskSeq: 0,
     })
 
     // then
@@ -232,6 +233,7 @@ describe("buildRecordInput durable facts", () => {
       plan: { model: "anthropic/claude-opus-4" },
       name: "n",
       executionMode: "in-process",
+      taskSeq: 0,
     })
 
     // then
@@ -245,12 +247,14 @@ describe("buildRecordInput durable facts", () => {
       plan: { model: "anthropic/claude-opus-4" },
       name: "n",
       executionMode: "in-process",
+      taskSeq: 0,
     })
     const foreground = buildRecordInput({
       spec: managerSpec({}),
       plan: { model: "anthropic/claude-opus-4" },
       name: "n",
       executionMode: "in-process",
+      taskSeq: 0,
     })
 
     // then

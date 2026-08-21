@@ -127,11 +127,11 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-**Примечание**: Опубликованное имя npm-пакета и CLI-бинарника по-прежнему `oh-my-opencode` (в переходный период пакет также дублируется под именем `oh-my-openagent`). Внутри `opencode.json` слой совместимости теперь предпочитает точку входа плагина `oh-my-openagent`, в то время как устаревшие записи `oh-my-opencode` всё ещё загружаются с предупреждением. Файлы конфигурации плагина по-прежнему часто называются `oh-my-opencode.json` или `oh-my-opencode.jsonc`; в переходный период распознаются как устаревшие, так и новые имена.
+**Примечание**: Опубликованное имя npm-пакета и CLI-бинарника по-прежнему `oh-my-opencode` (в переходный период пакет также дублируется под именем `oh-my-openagent`). Внутри `opencode.json` слой совместимости теперь предпочитает точку входа плагина `oh-my-openagent`, в то время как устаревшие записи `oh-my-opencode` всё ещё загружаются с предупреждением. Рабочая конфигурация — это `~/.omo/omo.jsonc` плюс проектные `.omo/omo.jsonc`, найденные при подъёме по дереву каталогов. Устаревшие файлы `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` импортируются движком миграции один раз и после этого не читаются.
 
 Анонимная телеметрия включена по умолчанию для подсчёта активных установок (DAU/WAU/MAU). Не более одного события на машину за UTC-сутки, использует хешированный идентификатор установки, никогда не использует исходное имя хоста, и не создаёт PostHog person profile. Можно отключить через `OMO_SEND_ANONYMOUS_TELEMETRY=0` или `OMO_DISABLE_POSTHOG=1`. См. [Политику конфиденциальности](docs/legal/privacy-policy.md) и [Условия обслуживания](docs/legal/terms-of-service.md).
 
-**Ultimate и Light:** oh-my-openagent поставляется в двух редакциях одного продукта. **Ultimate** (`bunx oh-my-openagent install` или `--platform=opencode`, по умолчанию) — полнофункциональная редакция поверх OpenCode: 11 агентов, 54+ хука, Team Mode, все MCP, все слэш-команды, режимы IntentGate. **Light** (`npx lazycodex-ai install` или `bunx oh-my-openagent install --platform=codex`) — 8 компонентов omo, которые портируются в систему плагинов OpenAI Codex CLI: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, `telemetry`. Чтобы установить обе редакции одной командой, используйте `--platform=both`. Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+**Ultimate и Light:** oh-my-openagent поставляется в двух редакциях одного продукта. **Ultimate** (`bunx oh-my-openagent install` или `--platform=opencode`, по умолчанию) — полнофункциональная редакция поверх OpenCode: 11 агентов, 54+ хука, Team Mode, все MCP, все слэш-команды, режимы IntentGate. **Light** (`npx lazycodex-ai install` или `bunx oh-my-openagent install --platform=codex`) — портируемые компоненты omo для системы плагинов OpenAI Codex CLI: ядро (`rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, `telemetry`), а также `teammode` и вспомогательные компоненты (`bootstrap`, `codegraph`, `lcx` и другие); TOML-файлы Codex-агентов устанавливаются в `~/.codex/agents/`. Чтобы установить обе редакции одной командой, используйте `--platform=both`. Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
 
 ------
 
@@ -164,19 +164,19 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |     | Функция                                                  | Editions | Что делает                                                                                                                                                                                                                       |
 | --- | -------------------------------------------------------- | :------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🤖   | **Дисциплинированные агенты**                            | Ultimate | Sisyphus оркестрирует Hephaestus, Oracle, Librarian, Explore. Полноценная AI-команда разработки в параллельном режиме.                                                                                                           |
-| 🧩   | **Codex CLI Light Edition**                              | Light    | 8 компонентов omo, портированных в OpenAI Codex CLI (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry). Установка: `npx lazycodex-ai install`.                                                                |
+| 🧩   | **Codex CLI Light Edition**                              | Light    | Портируемые компоненты omo в OpenAI Codex CLI (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry, teammode и другие). Установка: `npx lazycodex-ai install`.                                                                |
 | 👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | Лид-агент + до 8 параллельных участников, визуализация в tmux в реальном времени, выделенные инструменты `team_*`. Питает `hyperplan` (5 враждебных критиков) и `security-research` (3 охотника + 2 PoC-инженера). [Документация →](docs/guide/team-mode.md) |
 | ⚡   | **`ultrawork` / `ulw`**                                  | Both     | Одно слово. Все агенты (Ultimate) или Codex-компонент `ultrawork` (Light) активируются. Не останавливается, пока задача не выполнена.                                                                                            |
-| 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Анализирует истинное намерение пользователя перед классификацией и действием. Триггеры `search` / `analyze` / `team` / `hyperplan`. (Light хукает только `ulw` / `ultrawork`.)                                                   |
-| 🔗   | **Инструмент правок на основе хэш-якорей**               | Ultimate | Хэш содержимого `LINE#ID` проверяет каждое изменение. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex использует собственный `apply_patch`.) |
+| 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Анализирует истинное намерение пользователя перед классификацией и действием. Никаких буквальных искажений смысла. (Light распознаёт только ключевые слова `ulw` / `ultrawork`.)                                                   |
+| 🔗   | **Инструмент правок на основе хэш-якорей**               | Ultimate | Тегирование чтения/правок Hashline (`LINE#ID`). Включается вручную: `hashline_edit: true` в `~/.omo/omo.jsonc`. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex использует собственный `apply_patch`.) |
 | 🛠️   | **LSP + AST-Grep**                                       | Both     | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. LSP предоставляется через MCP, AST-Grep — через общий skill `ast-grep` и `sg`.                            |
 | 🧠   | **Фоновые агенты**                                       | Ultimate | Запускайте 5+ специалистов параллельно. Контекст остаётся компактным. Результаты — когда готовы.                                                                                                                                 |
 | 📚   | **Встроенные MCP**                                       | Both     | Ultimate внедряет Exa (веб-поиск), Context7 (официальная документация) и Grep.app (поиск по GitHub) во время выполнения. Light предоставляет plugin-scoped MCP: `grep_app`, `context7`, `git_bash`, `lsp`.                                                                                                     |
-| 🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Самореферентный цикл. Не останавливается, пока задача не выполнена на 100%.                                                                                                                                                      |
+| 🔁   | **Goal / `/goal`**                                       | Ultimate | `/goal` задаёт постоянную цель треда. Idle continuation работает только при `goal.enabled: true` (по умолчанию false).                                                                                                          |
 | ✅   | **Todo Enforcer** (Boulder)                              | Ultimate | Агент завис? Система немедленно возвращает его в работу. Ваша задача будет выполнена, точка.                                                                                                                                     |
 | 💬   | **Comment Checker**                                      | Both     | Никакого AI-мусора в комментариях. Тот же бинарник `@code-yeongyu/comment-checker` работает в обеих редакциях.                                                                                                                   |
 | 📜   | **Rules Injection**                                      | Both     | Иерархическое внедрение контекста из `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**`. В Ultimate это хук, в Light — компонент `rules`.                                                                                                |
-| 🧬   | **Ulw Loop**                                            | Light    | Долговечная оркестрация нескольких целей с аудитом доказательств в `.omo/ulw-loop/`. Сейчас только в Codex; порт в сторону OpenCode в дорожной карте.                                                                            |
+| 🧬   | **Ulw Loop**                                            | Light    | Codex-компонент + CLI для долговечной оркестрации нескольких целей с аудитом доказательств. В OpenCode используйте **Goal / `/goal`**.                                                                            |
 | 🖥️   | **Интеграция с Tmux**                                    | Ultimate | Полноценный интерактивный терминал. REPL, дебаггеры, TUI. Всё живое.                                                                                                                                                             |
 | 🔌   | **Совместимость с Claude Code**                          | Ultimate | Ваши хуки, команды, навыки, MCP и плагины? Всё работает без изменений. (У Codex своя нативная плагин-система.)                                                                                                                  |
 | 🎯   | **MCP, встроенные в навыки**                             | Ultimate | Навыки несут собственные MCP-серверы. Никакого раздувания контекста.                                                                                                                                                             |
@@ -192,7 +192,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`glm-5`**) — главный оркестратор. Он планирует, делегирует задачи специалистам и доводит их до завершения с агрессивным параллельным выполнением. Он не останавливается на полпути. Claude Opus 5 и Kimi K3 — рекомендуемые значения по умолчанию.
+**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`**) — главный оркестратор. Он планирует, делегирует задачи специалистам и доводит их до завершения с агрессивным параллельным выполнением. Он не останавливается на полпути. Claude Opus 5 и Kimi K3 — рекомендуемые значения по умолчанию.
 
 **Hephaestus** (использует только `gpt-5.6-sol` с medium effort через OpenAI, GitHub Copilot, Vercel или OpenCode) — автономный глубокий исполнитель. Дайте ему цель, а не рецепт. Он исследует кодовую базу, изучает паттерны и выполняет задачи сквозным образом без лишних подсказок. *Законный Мастер.*
 
@@ -211,7 +211,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 **Team Mode** превращает oh-my-openagent из «одного агента с подагентами» в полноценную мультиагентную систему. Лид-агент оркестрирует команду специализированных по категориям участников, все они работают **параллельно** и общаются через выделенные инструменты (`team_create`, `team_send_message`, `team_task_create`, `team_status`, …). Наблюдайте за работой каждого участника одновременно в tmux-раскладке с focus- и grid-окнами.
 
 ```jsonc
-// .opencode/oh-my-openagent.jsonc
+// ~/.omo/omo.jsonc  (или проектный .omo/omo.jsonc)
 {
   "team_mode": {
     "enabled": true,
@@ -239,7 +239,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | `quick`              | Изменения в одном файле, опечатки     |
 | `ultrabrain`         | Сложная логика, архитектурные решения |
 
-Агент сообщает тип задачи, а обвязка подбирает нужную модель. `ultrabrain` направляется в GPT-5.6 Sol xhigh через OpenAI или Vercel, когда они доступны, затем в GPT-5.6 Sol xhigh. Вы ни к чему не прикасаетесь.
+Агент сообщает тип задачи, а обвязка подбирает нужную модель. `ultrabrain` направляется в GPT-5.6 Sol max (OpenAI / Vercel, затем GitHub Copilot, затем OpenCode). Вы ни к чему не прикасаетесь.
 
 ### Совместимость с Claude Code
 
@@ -270,7 +270,7 @@ MCP-серверы съедают бюджет контекста. Мы это �
 >
 > <br/>— [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
 
-Вдохновлённые [oh-my-pi](https://github.com/can1357/oh-my-pi), мы сделали **Hashline**. Каждая строка, которую читает агент, возвращается с тегом хэша содержимого:
+Вдохновлённые [oh-my-pi](https://github.com/can1357/oh-my-pi), мы сделали **Hashline**. Когда включён `hashline_edit`, каждая строка, которую читает агент, возвращается с тегом хэша содержимого:
 
 ```
 11#VK| function hello() {
@@ -301,7 +301,7 @@ project/
 
 Сложная задача? Не нужно молиться и надеяться на промпт.
 
-`/start-work` вызывает Prometheus. Он **интервьюирует вас как настоящий инженер**, определяет объём работ и неоднозначности и формирует проверенный план до прикосновения к коду. Агент знает, что строит, прежде чем начать.
+Prometheus **интервьюирует вас как настоящий инженер**, определяет объём работ и неоднозначности и записывает проверенный план в `.omo/plans/` до прикосновения к коду. Затем `/start-work` запускает рабочую сессию **Atlas** по этому плану. Агент знает, что строит, прежде чем начать.
 
 ### Навыки
 
@@ -339,12 +339,16 @@ project/
 2. **Удалите файлы конфигурации (опционально)**
 
    ```bash
-   # Удалить файлы конфигурации плагина, распознаваемые в переходный период
-   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
-         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json
+   # Удалить рабочие файлы конфигурации
+   rm -f ~/.omo/omo.jsonc ~/.omo/omo.json
 
    # Удалить конфиг проекта (если существует)
-   rm -f .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
+   rm -f .omo/omo.jsonc .omo/omo.json
+
+   # Удалить оставшиеся резервные копии миграции (если есть)
+   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
+         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json \
+         .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
          .opencode/oh-my-opencode.jsonc .opencode/oh-my-opencode.json
    ```
 
@@ -374,12 +378,12 @@ project/
 - **Агенты**: Sisyphus (главный агент), Prometheus (планировщик), Oracle (архитектура/отладка), Librarian (документация/поиск по коду), Explore (быстрый grep по кодовой базе), Multimodal Looker
 - **Фоновые агенты**: Запускайте несколько агентов параллельно, как настоящая команда разработки
 - **Инструменты LSP и AST**: Рефакторинг, переименование, диагностика, поиск кода с учётом AST
-- **Инструмент правок на основе хэш-якорей**: Ссылки `LINE#ID` проверяют содержимое перед применением каждого изменения. Хирургические правки, ноль ошибок с устаревшими строками
+- **Инструмент правок на основе хэш-якорей** (включается через `hashline_edit: true`): Ссылки `LINE#ID` проверяют содержимое перед применением каждого изменения. Хирургические правки, ноль ошибок с устаревшими строками
 - **Инъекция контекста**: Автоматическое добавление AGENTS.md, README.md, условных правил
 - **Совместимость с Claude Code**: Полная система хуков, команды, навыки, агенты, MCP
 - **Встроенные MCP**: websearch (Exa), context7 (документация), grep_app (поиск по GitHub)
 - **Инструменты сессий**: Список, чтение, поиск и анализ истории сессий
-- **Инструменты продуктивности**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode и другое
+- **Инструменты продуктивности**: Goal, Todo Enforcer, Comment Checker, Think Mode и другое
 - **Команда Doctor**: Встроенная диагностика (`bunx oh-my-opencode doctor`) проверяет регистрацию плагина, конфиг, модели и окружение
 - **Фолбэки моделей**: `fallback_models` позволяет смешивать простые строки моделей и объектные настройки per-fallback в одном массиве
 - **Файловые промпты**: Загрузка промптов из файлов через `file://` в конфигурации агентов
@@ -394,13 +398,13 @@ project/
 
 **Краткий обзор:**
 
-- **Расположение конфигов**: Слой совместимости распознаёт как `oh-my-openagent.json[c]`, так и устаревшие `oh-my-opencode.json[c]` файлы конфигурации плагина. Существующие установки по-прежнему часто используют устаревшее имя.
+- **Расположение конфигов**: Пользовательский `~/.omo/omo.jsonc` плюс проектные `.omo/omo.jsonc`, найденные при подъёме до `$HOME`; ближайший конфиг выигрывает. Устаревшие файлы `oh-my-*` мигрируются в `omo.jsonc` один раз.
 - **Поддержка JSONC**: Комментарии и конечные запятые поддерживаются
 - **Агенты**: Переопределение моделей, температур, промптов и разрешений для любого агента
 - **Встроенные навыки**: `playwright` (автоматизация браузера), `git-master` (атомарные коммиты)
 - **Агент Sisyphus**: Главный оркестратор с Prometheus (Планировщик) и Metis (Консультант по плану)
 - **Фоновые задачи**: Настройка ограничений параллельности по провайдеру/модели
-- **Категории**: Делегирование задач по предметной области (`visual`, `business-logic`, пользовательские)
+- **Категории**: `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, плюс пользовательские имена
 - **Хуки**: 54+ встроенных хуков жизненного цикла (61 с включённым Team Mode), все настраиваются через `disabled_hooks`
 - **MCP**: Встроенные websearch (Exa), context7 (документация), grep_app (поиск по GitHub)
 - **LSP**: Полная поддержка LSP с инструментами рефакторинга

@@ -6,7 +6,7 @@ The component is on by default. Disable it with the `--no-omo-task` flag; it als
 
 ## Spawning a child
 
-Use the `task` tool. Only `prompt` is required, and it must be written in English (`packages/senpi-task/src/tools/task/params.ts`). Pick a target with **either** `category` (routed through Sisyphus-Junior) **or** `subagent_type` (a named agent invoked directly) - the two are mutually exclusive.
+Use the `task` tool. A single spawn needs `prompt` plus exactly one of `category` (routed through Sisyphus-Junior) or `subagent_type` (a named agent invoked directly); the two are mutually exclusive, and omitting both fails validation (`packages/senpi-task/src/tools/task/validation.ts`). Batch spawns use `tasks:[...]` instead of top-level `prompt`. Prompts are documented as English-only in the schema description, not machine-enforced.
 
 - `run_in_background: false` (default) waits and returns the child's final response inline.
 - `run_in_background: true` returns a task id (prefixed `st_`) immediately so you can keep working and check back later.
@@ -33,7 +33,7 @@ A synchronous batch waits for every started child and returns one aggregate resu
 
 Two runners back a child (`packages/senpi-task/src/runners/`):
 
-- **in-process (default).** The child runs inside the same Senpi runtime and executes through the SAME parent tool closures, minus the `task_*` / `team_*` family. This is the cheapest path and needs no extra process.
+- **in-process (default).** The child runs inside the same Senpi runtime and executes through the SAME parent tool closures, minus `task`, `task_*`, `team_*`, and `dag` (member-scoped tools are the only sanctioned bypass). This is the cheapest path and needs no extra process.
 - **process.** The child is spawned as an isolated Senpi process. Steering (`steer` / `abort` / `prompt`) crosses a JSON-RPC boundary, and the child's transcript is written below `children/<taskId>/sessions/<taskId>/`. On the next session start, a dead process child with a persisted session can be respawned without replaying its original prompt and rebound with `switch_session`.
 
 The default comes from `task.default_execution_mode` in `omo.json`; a per-agent `execution_mode` can override it.
@@ -63,7 +63,7 @@ When a background child finishes on its own - `completed`, `error`, or `lost` - 
 - Parent **streaming**: the completion is steered into the running turn at the next tool-call boundary. Multiple notifications that become ready in the same batch window (about 200ms) are combined into one injection.
 - Parent **compacting / switching / shutting down**: the completion is buffered and flushed once the parent settles.
 
-Because cancel and park return synchronously, they are never delivered as notifications - only externally-caused terminals notify.
+Because cancel (and interrupt) return synchronously in the tool result, they are never delivered as completion notifications - only externally-caused terminals notify.
 
 ## The `/tasks` UI
 
@@ -78,7 +78,7 @@ A live status widget below the editor tracks the session's tasks as they change;
 
 For coordinated multi-agent work, the lead session gets 6 team tools (`packages/senpi-task/src/tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, and `task_update`. These are lead-only. Member sessions receive only team-scoped `task_send`; they never receive team lifecycle or tasklist tools. Lead team messages and shutdown request/response payloads route through `task_send`.
 
-Teams are defined in the `teams` block of `omo.json`. Each team has 1-8 members; a multi-member team requires `leadAgentId`. A member is either `kind: "category"` (needs `category` + `prompt`) or `kind: "subagent_type"` (needs `subagent_type`). See the [teams schema](../reference/omo-json.md#teams).
+Named teams come from the project `teams` block in `omo.json` or `<project>/.omo/teams/<name>/config.json` (directory spec wins on a name collision); user-global team storage is not loaded. Each team has 1-8 members; a multi-member `omo.json` spec still requires `leadAgentId` in schema, and the current session is always the runtime lead. A member is either `kind: "category"` (needs `category` + `prompt`) or `kind: "subagent_type"` (needs `subagent_type`). See the [teams schema](../reference/omo-json.md#teams).
 
 ### Mailbox delivery
 

@@ -28,6 +28,7 @@ import {
   inSession,
   isTerminalRecord,
   nowIso,
+  promotedBackgroundMode,
   recordSpawnedPid,
 } from "./manager-helpers"
 import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
@@ -35,6 +36,7 @@ import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { withTaskRecordLockAsync } from "../store/record-lock"
 import { reattachManagedTask, respawnManagedTask } from "./manager-respawn"
 import { NameRegistry } from "./names"
+import { TaskSequence } from "./task-sequence"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeTranscriptLog } from "./transcript-log"
 import type {
@@ -124,6 +126,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
+  readonly #taskSequence = new TaskSequence()
   readonly #live = new Map<string, LiveTask>()
   // Callers can subscribe before a queued task owns a handle. Each entry is attached exactly once
   // when #launch promotes it, and its returned cleanup owns both pending and live subscriptions.
@@ -297,7 +300,13 @@ class TaskManagerImpl implements TaskManager {
     let claimed: TaskRecord
     try {
       const draft = createTaskRecord({
-        ...buildRecordInput({ spec, plan, name: "", executionMode }),
+        ...buildRecordInput({
+          spec,
+          plan,
+          name: "",
+          executionMode,
+          taskSeq: this.#taskSequence.next(spec.parent_session_id),
+        }),
         ...(owner === undefined ? {} : { owner }),
       }, this.#now())
       const claimDraft: TaskRecord = { ...draft, name: requestedRegistration?.name ?? draft.task_id, host_pid: this.#hostPid }
@@ -483,9 +492,13 @@ class TaskManagerImpl implements TaskManager {
     this.#background.add(taskId)
     // Background intent must survive the owning process: a resumed manager reads the RECORD to
     // decide terminal notification, so promotion is persisted, not just held in memory.
-    this.#options.store.mutate(taskId, (record) =>
-      record.notify_on_terminal ? record : { ...record, notify_on_terminal: true },
-    )
+    // A promoted task is neither a background spawn nor a plain foreground run: the mode records
+    // the hand-off so terminal accounting keeps the two populations apart.
+    this.#options.store.mutate(taskId, (record) => {
+      const backgroundMode = promotedBackgroundMode(record)
+      if (record.notify_on_terminal && record.background_mode === backgroundMode) return record
+      return { ...record, notify_on_terminal: true, background_mode: backgroundMode }
+    })
     return promoted
   }
 

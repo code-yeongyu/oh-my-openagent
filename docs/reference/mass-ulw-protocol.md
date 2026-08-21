@@ -72,7 +72,7 @@ The 17 journaled payload types (`DAG_RUN_EVENT_TYPES`), with their fields beyond
 | `dag.node.retried` | `nodeId`, `priorTaskId?`, `execAttempt`, `promptChanged` |
 | `dag.node.steered` | `nodeId`, `taskId`, `delivery` (`"steer"` \| `"revive"`) |
 | `dag.definition.amended` | `previousFingerprint`, `fingerprint`, `changedNodeIds`, `addedNodeIds`, `invalidatedNodeIds` |
-| `dag.diagnostic.added` | `diagnostic` (`route_fallback` \| `node_flag` \| `run_flag`) |
+| `dag.diagnostic.added` | `diagnostic` (`route_fallback` \| `node_flag` \| `missing_skill` \| `run_flag` \| `journal_corrupt`). `missing_skill` includes `nodeId` + `skill`; `journal_corrupt` includes `path` and optional `runId` |
 | `dag.stream.overflow` | `droppedCount`, `recoverAfterSeq` (see the recovery rules below) |
 
 Node states: `pending`, `blocked`, `scheduled`, `running`, `completed`, `failed`, `cancelled`,
@@ -190,14 +190,20 @@ Error codes (`DAG_RPC_ERROR_CODES`): `invalid_arguments`, `run_not_found`, `run_
 Params: `{ statuses?: string[], limit?: number }`. `statuses` values must come from the run-status
 vocabulary. `limit` defaults to 100, capped at 256.
 
-Value: `{ runs: [{ runId, status, updatedAt }], limit }`. The status filter is applied after the
+Value: `{ runs: [{ runId, runKey, name, parentSessionId, status, createdAt, updatedAt, counts }], limit }`.
+`counts` is the full node-state counter object; `limit` is the caller limit after clamp (default
+100, max 256). The status filter is applied after the
 engine's maximum window, so a filtered query never loses runs the window already held.
 
 ### `omo.dag.snapshot`
 
 Params: `{ runId: string }`.
 
-Value: the run snapshot including `lastSeq`, the run's current head of the seq ledger.
+Value: the full camelCase `DagRunSnapshot` (not the snake_case `omo.dag.updated` projection). It
+always includes `lastSeq` (WAL head) plus run identity, `status`, `generation`, the graph
+(`nodes`/`edges`/`waves`/`criticalPath`/`bottlenecks`), `diagnostics`, `counts`, and
+`amendHistory` when the run was amended. Node `prompt` is the submitted prompt, not the
+skill-prepended `effectivePrompt`.
 
 ### `omo.dag.history`
 

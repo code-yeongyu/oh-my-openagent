@@ -6,8 +6,9 @@ import type { TelemetryCaptureMessage } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import { omoSenpiComponents } from "../../extension/index"
+import { createTaskTerminalObservers } from "../task/terminal-observers"
 import { createOmoNativeTelemetryComponent } from "./omo-native-component"
-import { OMO_NATIVE_PROPERTY_ALLOWLISTS } from "./product-identity"
+import { OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
 import {
   FIXED_NOW,
   createEnabledEnv,
@@ -84,13 +85,18 @@ function nativeMessages(messages: readonly TelemetryCaptureMessage[]): Telemetry
   return messages.filter(({ event }) => event !== "omo_senpi_daily_active")
 }
 
+// Token totals and `cost_usd` are omitted by design when the provider never reported them, so a
+// delegation row is checked for CONTAINMENT in its allowlist; every other event ships a fixed set.
 function assertAllowlistedPayloadKeys(messages: readonly TelemetryCaptureMessage[]): void {
   for (const message of nativeMessages(messages)) {
     const event = message.event as keyof typeof OMO_NATIVE_PROPERTY_ALLOWLISTS
-    expect(Object.keys(message.properties ?? {}).sort()).toEqual([
-      ...OMO_NATIVE_PROPERTY_ALLOWLISTS[event],
-      ...SHARED_KEYS,
-    ].sort())
+    const allowed: readonly string[] = [...OMO_NATIVE_PROPERTY_ALLOWLISTS[event], ...SHARED_KEYS].toSorted()
+    const actual = Object.keys(message.properties ?? {}).sort()
+    if (event === "delegation_completed") {
+      expect(actual.filter((key) => !allowed.includes(key))).toEqual([])
+      continue
+    }
+    expect(actual).toEqual([...allowed])
   }
 }
 
@@ -154,6 +160,104 @@ describe("OmO Native telemetry component integration", () => {
       ])
       assertAllowlistedPayloadKeys(recorder.messages)
       expect(existsSync(join(stateDir, "last-payloads.json"))).toBe(false)
+    })
+  })
+
+  test("#given a delegation capture carrying a foreign $session_id #when forwarded #then state.sessionHash is unchanged and only session_start may set it", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given: a live session plus a terminal edge for a task spawned by an OLDER session
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      const pi = new FakeExtensionAPI()
+      const session = context("live-session")
+      const observers = createTaskTerminalObservers()
+      createOmoNativeTelemetryComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("ownership-host"),
+        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        taskTerminalObservers: observers,
+        transportFactory: recorder.factory,
+      }).register(pi, { config: pi, logger: createSilentLogger() })
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, session)
+
+      // when
+      observers.notify({
+        record: {
+          task_id: "st_0001",
+          status: "completed",
+          residency_state: "resident",
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:01.000Z",
+          parent_session_id: "older-session",
+          root_session_id: "older-session",
+          depth: 0,
+          execution_mode: "in-process",
+          model: "anthropic/claude-opus-5",
+          notify_on_terminal: false,
+          notification: { run_epoch: 0, notified_epoch: -1 },
+          task_seq: 1,
+          spawn_spec: { version: 1, cwd: "/repo", prompt: "work" },
+        },
+        previousStatus: "running",
+      })
+      await pi.dispatch("turn_end", turnEnd(), session)
+
+      // then: the task row is hashed from the parent it belongs to, and the live session hash survives
+      const delegation = recorder.messages.find(({ event }) => event === "delegation_completed")
+      expect(delegation?.properties?.$session_id).toBe("hashed:older-session")
+      expect(delegation?.properties?.schema_version).toBe(OMO_NATIVE_SCHEMA_VERSION)
+      expect(recorder.messages.find(({ event }) => event === "turn_completed")?.properties?.$session_id).toBe("hashed:live-session")
+      assertAllowlistedPayloadKeys(recorder.messages)
+    })
+  })
+
+  test("#given a composed component that shut its session down #when a later terminal edge fires #then nothing is captured", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      const pi = new FakeExtensionAPI()
+      const session = context("disposed-session")
+      const observers = createTaskTerminalObservers()
+      createOmoNativeTelemetryComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("dispose-host"),
+        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        taskTerminalObservers: observers,
+        transportFactory: recorder.factory,
+      }).register(pi, { config: pi, logger: createSilentLogger() })
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, session)
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, session)
+
+      // when
+      observers.notify({
+        record: {
+          task_id: "st_0002",
+          status: "completed",
+          residency_state: "resident",
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:01.000Z",
+          parent_session_id: "disposed-session",
+          root_session_id: "disposed-session",
+          depth: 0,
+          execution_mode: "in-process",
+          model: "anthropic/claude-opus-5",
+          notify_on_terminal: false,
+          notification: { run_epoch: 0, notified_epoch: -1 },
+          task_seq: 1,
+          spawn_spec: { version: 1, cwd: "/repo", prompt: "work" },
+        },
+        previousStatus: "running",
+      })
+
+      // then
+      expect(recorder.messages.filter(({ event }) => event === "delegation_completed")).toEqual([])
     })
   })
 
