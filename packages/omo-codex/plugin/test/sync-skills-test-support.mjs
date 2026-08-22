@@ -18,6 +18,7 @@ export const expectedSkills = [
 	"lcx-report-bug",
 	"lsp",
 	"lsp-setup",
+	"pr",
 	"programming",
 	"refactor",
 	"remove-ai-slops",

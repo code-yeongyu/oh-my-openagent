@@ -12,6 +12,19 @@ import { discoverSharedSkills } from "."
 const CODEX_ONLY_STOP_MARKER = "<start-work-blocked-external>"
 
 describe("shared skills reaching the OpenCode harness", () => {
+  test("#given the shared pr skill #when OpenCode discovers shared skills #then pr is available with loadable content", async () => {
+    // given
+    const sharedSkills = await discoverSharedSkills()
+
+    // when
+    const pr = sharedSkills.find((skill) => skill.name === "pr")
+    const content = (await pr?.lazyContent?.load()) ?? ""
+
+    // then
+    expect(pr).toBeDefined()
+    expect(content.length).toBeGreaterThan(0)
+  })
+
   test("#given the shared start-work skill #when OpenCode discovers it #then it carries no Codex-only stop marker", async () => {
     // given
     const sharedSkills = await discoverSharedSkills()
