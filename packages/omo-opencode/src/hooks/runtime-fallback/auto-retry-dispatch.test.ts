@@ -3,12 +3,17 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
+import { createChatMessageHandler } from "./chat-message-handler"
 import { createFallbackState } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared"
 import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
-function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
+function createContext(
+  promptCalls: { count: number },
+  statusData: Record<string, { type: string }> = {},
+): RuntimeFallbackPluginInput {
   const session = {
     abort: async () => ({}),
     messages: async () => ({
@@ -23,7 +28,7 @@ function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInp
       promptCalls.count += 1
       return {}
     },
-    status: async () => ({ data: {} }),
+    status: async () => ({ data: statusData }),
   }
   return {
     client: {
@@ -36,9 +41,12 @@ function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInp
   }
 }
 
-function createDeps(promptCalls: { count: number }): HookDeps {
+function createDeps(
+  promptCalls: { count: number },
+  statusData: Record<string, { type: string }> = {},
+): HookDeps {
   return {
-    ctx: createContext(promptCalls),
+    ctx: createContext(promptCalls, statusData),
     config: {
       enabled: true,
       retry_on_errors: [429, 503, 529],
@@ -81,6 +89,45 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     releaseAllPromptAsyncReservationsForTesting()
     SessionCategoryRegistry.clear()
     restoreRuntimeFallbackTestClock()
+  })
+
+  test("#given ordinary persisted user parts #when OMO builds the fallback retry #then every part is marked once and retains its id", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const promptInputs: Array<Parameters<RuntimeFallbackPluginInput["client"]["session"]["promptAsync"]>[0]> = []
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { id: "message-user", role: "user" },
+          parts: [
+            { id: "part-1", type: "text", text: "retry this" },
+            {
+              id: "part-2",
+              type: "text",
+              text: `already marked\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+            },
+          ],
+        },
+      ],
+    })
+    deps.ctx.client.session.promptAsync = async (input) => {
+      promptInputs.push(input)
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-mark-every-retry-part"
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+
+    // then
+    expect(promptInputs).toHaveLength(1)
+    expect(promptInputs[0]?.body.parts).toEqual([
+      { id: "part-1", type: "text", text: `retry this\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` },
+      { id: "part-2", type: "text", text: `already marked\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` },
+    ])
   })
 
   test("#given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned", async () => {
@@ -217,6 +264,112 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     // then
     expect(promptCalls.count).toBe(1)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+  })
+
+  test("#given idle confirms the final assistant is a silent clean stop #when auto retry runs #then it dispatches a fresh user message without tool-state inspection", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-confirmed-idle-silent-clean-stop"
+    let messageCalls = 0
+    let capturedBody: Record<string, unknown> | undefined
+    deps.ctx.client.session.messages = async () => {
+      messageCalls += 1
+      return {
+        data: [
+          {
+            info: { role: "user", id: "message-already-completed" },
+            parts: [{ type: "text", text: "retry this" }],
+          },
+          {
+            info: { role: "assistant", finish: "unknown" },
+            parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+          },
+        ],
+      }
+    }
+    deps.ctx.client.session.promptAsync = async (input: { body: Record<string, unknown> }) => {
+      promptCalls.count += 1
+      capturedBody = input.body
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("openai/gpt-5.4")
+    state.pendingFallbackModel = "google/gemini-2.5-pro"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    const outcome = await helpers.autoRetryWithFallback(
+      sessionID,
+      "google/gemini-2.5-pro",
+      undefined,
+      "session.idle.silent-clean-stop",
+    )
+
+    // then
+    expect(outcome).toEqual({ accepted: true, status: "dispatched" })
+    expect(promptCalls.count).toBe(1)
+    expect(messageCalls).toBe(1)
+    expect(capturedBody?.messageID).toBeUndefined()
+  })
+
+  test("#given idle confirms a silent clean stop but session status is busy #when auto retry runs #then status inspection blocks without queueing", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const sessionID = "session-confirmed-idle-status-busy"
+    const deps = createDeps(promptCalls, { [sessionID]: { type: "busy" } })
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("openai/gpt-5.4")
+    state.pendingFallbackModel = "google/gemini-2.5-pro"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    const outcome = await helpers.autoRetryWithFallback(
+      sessionID,
+      "google/gemini-2.5-pro",
+      undefined,
+      "session.idle.silent-clean-stop",
+    )
+
+    // then
+    expect(outcome).toEqual({
+      accepted: false,
+      status: "blocked",
+      reason: "prompt gate returned active",
+    })
+    expect(promptCalls.count).toBe(0)
+  })
+
+  test("#given idle confirms a silent clean stop but another prompt owns the reservation #when auto retry runs #then reservation controls still block the fallback", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-confirmed-idle-reserved"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.pendingFallbackModel = "google/gemini-2.5-pro"
+    deps.sessionStates.set(sessionID, state)
+    reserveSession(sessionID, 60_000)
+    const helpers = createAutoRetryHelpers(deps)
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    const retryPromise = helpers.autoRetryWithFallback(
+      sessionID,
+      "google/gemini-2.5-pro",
+      undefined,
+      "session.idle.silent-clean-stop",
+    )
+    await flushPromptGateMicrotasks()
+    await clock.advanceBy(10_500)
+    const outcome = await retryPromise
+
+    // then
+    expect(outcome).toEqual({
+      accepted: false,
+      status: "blocked",
+      reason: "prompt gate returned reserved",
+    })
+    expect(promptCalls.count).toBe(0)
   })
 
   test("#given a session NOT internally aborted whose assistant turn is genuinely active #when auto retry runs #then the dispatch is still withheld (active-check preserved for live turns)", async () => {
@@ -518,6 +671,11 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     const state = createFallbackState("anthropic/claude-opus-4-7")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:stale-generation"]))
+    const fallbackTimeout = setTimeout(() => {}, 60_000)
+    fallbackTimeout.unref()
+    deps.sessionFallbackTimeouts.set(sessionID, fallbackTimeout)
     let releaseMessages: (() => void) | undefined
     let markLookupStarted: (() => void) | undefined
     const lookupStarted = new Promise<void>((resolve) => {
@@ -557,8 +715,12 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     // when
     const retryPromise = helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
     await lookupStarted
-    const replacementState = createFallbackState("google/gemini-2.5-pro")
-    deps.sessionStates.set(sessionID, replacementState)
+    await createChatMessageHandler(deps)(
+      { sessionID, model: { providerID: "openai", modelID: "gpt-5.4" } },
+      { message: {}, parts: [{ type: "text", text: "replacement request" }] },
+    )
+    const replacementState = deps.sessionStates.get(sessionID)
+    if (!replacementState) throw new Error("real user prompt did not retain fallback state")
     if (!releaseMessages) throw new Error("message lookup did not start")
     releaseMessages()
     const outcome = await retryPromise
@@ -571,8 +733,11 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     })
     expect(promptCalls.count).toBe(0)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
-    expect(replacementState.currentModel).toBe("google/gemini-2.5-pro")
+    expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
+    expect(replacementState.currentModel).toBe("openai/gpt-5.4")
+    expect(replacementState.pendingFallbackModel).toBeUndefined()
   })
 
   test("#given a manual reset starts a new retry while the old dispatcher is awaiting messages #when the old generation completes #then it cannot clear the new generation in-flight marker", async () => {
