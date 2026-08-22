@@ -15,6 +15,7 @@ import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { isCompactionInFlight } from "../../shared/compaction-in-flight"
+import { resolvePersistedSilentCleanStop } from "./silent-clean-stop"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -169,7 +170,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     cancelledSessions.delete(sessionID)
   }
 
-  const handleSessionIdle = (props: Record<string, unknown> | undefined) => {
+  const handleSessionIdle = async (props: Record<string, unknown> | undefined) => {
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
@@ -184,6 +185,77 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       resetRetryState(sessionID)
       log(`[${HOOK_NAME}] Cleared fallback retry state for cancelled session on idle`, { sessionID })
       return
+    }
+
+    const idleState = sessionStates.get(sessionID)
+    const silentCleanStop = idleState
+      ? await resolvePersistedSilentCleanStop(deps.ctx, sessionID)
+      : undefined
+    if (idleState && sessionStates.get(sessionID) !== idleState) return
+    if (silentCleanStop && idleState) {
+      const silentCleanStopRetryKey = `silent-clean-stop:${silentCleanStop.messageID}`
+      if (sessionStatusRetryKeys.get(sessionID)?.has(silentCleanStopRetryKey)) {
+        log(`[${HOOK_NAME}] Duplicate silent clean stop idle ignored`, {
+          sessionID,
+          messageID: silentCleanStop.messageID,
+        })
+        return
+      }
+
+      const eventAgent = props?.agent
+      const resolvedAgent = await helpers.resolveAgentForSessionFromContext(
+        sessionID,
+        typeof eventAgent === "string" ? eventAgent : undefined,
+      )
+      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+      if (sessionStates.get(sessionID) !== idleState) return
+      const state = idleState
+
+      if (fallbackModels.length > 0) {
+        if (sessionStatusRetryKeys.get(sessionID)?.has(silentCleanStopRetryKey)) {
+          log(`[${HOOK_NAME}] Concurrent silent clean stop idle ignored`, {
+            sessionID,
+            messageID: silentCleanStop.messageID,
+          })
+          return
+        }
+
+        sessionRetryInFlight.delete(sessionID)
+        sessionAwaitingFallbackResult.delete(sessionID)
+        helpers.clearSessionFallbackTimeout(sessionID)
+        state.pendingFallbackModel = undefined
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
+        sessionLastAccess.set(sessionID, Date.now())
+
+        log(`[${HOOK_NAME}] Detected persisted silent clean stop on idle; advancing fallback`, {
+          sessionID,
+          messageID: silentCleanStop.messageID,
+          resolvedAgent,
+        })
+        const previousFallbackIndex = state.fallbackIndex
+        const previousAttemptCount = state.attemptCount
+        const previousCurrentModel = state.currentModel
+        sessionStatusRetryKeys.set(sessionID, new Set([silentCleanStopRetryKey]))
+        await dispatchFallbackRetry(deps, helpers, {
+          sessionID,
+          state,
+          fallbackModels,
+          resolvedAgent,
+          source: "session.idle.silent-clean-stop",
+        })
+        const fallbackAdvanced = state.fallbackIndex !== previousFallbackIndex
+          || state.attemptCount !== previousAttemptCount
+          || state.currentModel !== previousCurrentModel
+        if (
+          !fallbackAdvanced
+          && sessionStatusRetryKeys.get(sessionID)?.has(silentCleanStopRetryKey)
+        ) {
+          const retryKeys = sessionStatusRetryKeys.get(sessionID)
+          retryKeys?.delete(silentCleanStopRetryKey)
+          if (retryKeys?.size === 0) sessionStatusRetryKeys.delete(sessionID)
+        }
+        return
+      }
     }
 
     if (sessionAwaitingFallbackResult.has(sessionID)) {
@@ -351,7 +423,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       return
     }
     if (event.type === "session.idle") {
-      handleSessionIdle(props)
+      await handleSessionIdle(props)
       return
     }
     if (event.type === "session.status") {
