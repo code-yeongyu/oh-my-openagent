@@ -1264,6 +1264,7 @@ The shared base and Senpi use an object:
 | --------------------- | ----------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override OpenCode config directory (useful for profile isolation) |
 | `OPENGATEWAY_API_KEY` | API key for the OpenGateway provider; without this or an `opengateway` auth entry, the plugin does not inject the provider |
+| `ORCAROUTER_API_KEY` | API key for the OrcaRouter provider; without this or an `orcarouter` auth entry, the plugin does not inject the provider |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
 | `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1`, `true`, or `yes` to disable PostHog telemetry for the `omo-codex` adapter. Global `OMO_DISABLE_POSTHOG` also disables Codex telemetry. |
@@ -1366,3 +1367,8 @@ See [Ollama Troubleshooting](../troubleshooting/ollama.md) for `JSON Parse error
 #### OpenGateway
 
 The `omo-opencode` plugin exposes the OpenAI-compatible `opengateway` provider at `https://apis.opengateway.ai/v1` when `OPENGATEWAY_API_KEY` is set or an `opengateway` auth entry exists. No provider is injected if neither credential is present.
+
+#### OrcaRouter
+
+The `omo-opencode` plugin exposes the OpenAI-compatible `orcarouter` provider at `https://api.orcarouter.ai/v1` when `ORCAROUTER_API_KEY` is set or an `orcarouter` auth entry exists. No provider is injected if neither credential is present. The provider ships OrcaRouter's routing-product models (`orcarouter/auto`, `orcarouter/fusion`, and friends) so requests can be routed through the gateway without hand-writing a provider block.
+
