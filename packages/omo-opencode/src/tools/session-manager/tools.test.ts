@@ -50,7 +50,7 @@ function createTestTools() {
         : [],
     readSessionTodos: async (): Promise<TodoItem[]> => [],
     formatSessionMessages: (messages) => `messages:${messages.length}`,
-    getAllSessions: async () => ["ses_test123", "ses_test456"],
+    getAllSessions: async () => ({ ids: ["ses_test123", "ses_test456"], archivedIds: new Set<string>() }),
     searchInSession: async (sessionID): Promise<SearchResult[]> => [
       {
         session_id: sessionID,
@@ -202,7 +202,192 @@ describe("session-manager tools", () => {
   test("session_info executes with valid session", async () => {
     const { session_info } = createTestTools()
     const result = await session_info.execute({ session_id: "ses_test123" }, mockContext)
-    
+
     expect(typeof result).toBe("string")
+  })
+})
+
+describe("session-manager tools - archived sessions", () => {
+  type CapturedCalls = {
+    getAllSessionsOptions: Array<{ includeArchived?: boolean }>
+    scannedSessionIds: string[]
+    searchResults: Array<{ session_id: string; archived?: boolean }>
+    formatSessionListCalls: Array<{ sessionIDs: string[]; archivedIds?: Set<string> }>
+    getMainSessionsOptions: Array<{ directory?: string; includeArchived?: boolean }>
+  }
+
+  function createCapturingTools(overrides?: {
+    getAllSessions?: (options: { includeArchived?: boolean }) => Promise<{ ids: string[]; archivedIds: Set<string> }>
+    getMainSessions?: (options: { directory?: string; includeArchived?: boolean }) => Promise<SessionMetadata[]>
+    searchInSession?: (sessionID: string) => Promise<SearchResult[]>
+  }) {
+    const captured: CapturedCalls = {
+      getAllSessionsOptions: [],
+      scannedSessionIds: [],
+      searchResults: [],
+      formatSessionListCalls: [],
+      getMainSessionsOptions: [],
+    }
+
+    const tools = createSessionManagerTools(mockCtx, {
+      setStorageClient: () => {},
+      getMainSessions:
+        overrides?.getMainSessions ??
+        (async (options) => {
+          captured.getMainSessionsOptions.push(options)
+          return []
+        }),
+      getAllSessions:
+        overrides?.getAllSessions ??
+        (async (options) => {
+          captured.getAllSessionsOptions.push(options)
+          return { ids: [], archivedIds: new Set<string>() }
+        }),
+      searchInSession:
+        overrides?.searchInSession ??
+        (async (sessionID) => {
+          captured.scannedSessionIds.push(sessionID)
+          return [
+            {
+              session_id: sessionID,
+              message_id: `${sessionID}-msg`,
+              excerpt: "hit",
+              role: "user",
+              match_count: 1,
+            },
+          ]
+        }),
+      formatSearchResults: (results) => {
+        captured.searchResults.push(...results.map((r) => ({ session_id: r.session_id, archived: r.archived })))
+        return `results:${results.length}`
+      },
+      formatSessionList: async (sessionIDs, archivedIds) => {
+        captured.formatSessionListCalls.push({ sessionIDs, archivedIds })
+        return `sessions:${sessionIDs.join(",")}`
+      },
+      sessionExists: async () => true,
+      readSessionMessages: async () => [],
+      readSessionTodos: async () => [],
+      filterSessionsByDate: async (sessionIDs) => sessionIDs,
+      formatSessionMessages: () => "messages:0",
+      getSessionInfo: async () => null,
+      formatSessionInfo: () => "info:none",
+    })
+
+    return { tools, captured }
+  }
+
+  test("session_search scans archived sessions by default", async () => {
+    //#given
+    const { tools, captured } = createCapturingTools({
+      getAllSessions: async (options) => {
+        captured.getAllSessionsOptions.push(options)
+        return {
+          ids: ["ses_active", "ses_archived"],
+          archivedIds: new Set(["ses_archived"]),
+        }
+      },
+    })
+
+    //#when
+    await tools.session_search.execute({ query: "needle" }, mockContext)
+
+    //#then
+    expect(captured.getAllSessionsOptions).toEqual([{ includeArchived: true }])
+    expect(captured.scannedSessionIds).toEqual(["ses_active", "ses_archived"])
+  })
+
+  test("session_search honors include_archived false", async () => {
+    //#given
+    const { tools, captured } = createCapturingTools({
+      getAllSessions: async (options) => {
+        captured.getAllSessionsOptions.push(options)
+        return { ids: ["ses_active"], archivedIds: new Set<string>() }
+      },
+    })
+
+    //#when
+    await tools.session_search.execute({ query: "needle", include_archived: false }, mockContext)
+
+    //#then
+    expect(captured.getAllSessionsOptions).toEqual([{ includeArchived: false }])
+    expect(captured.scannedSessionIds).toEqual(["ses_active"])
+  })
+
+  test("session_search marks matches from archived sessions", async () => {
+    //#given
+    const { tools, captured } = createCapturingTools({
+      getAllSessions: async () => ({
+        ids: ["ses_active", "ses_archived"],
+        archivedIds: new Set(["ses_archived"]),
+      }),
+    })
+
+    //#when
+    await tools.session_search.execute({ query: "needle" }, mockContext)
+
+    //#then
+    expect(captured.searchResults).toEqual([
+      { session_id: "ses_active", archived: undefined },
+      { session_id: "ses_archived", archived: true },
+    ])
+  })
+
+  test("session_search result limit still applies with archived sessions in the scan", async () => {
+    //#given
+    const { tools, captured } = createCapturingTools({
+      getAllSessions: async () => ({
+        ids: ["ses_active", "ses_archived"],
+        archivedIds: new Set(["ses_archived"]),
+      }),
+    })
+
+    //#when
+    await tools.session_search.execute({ query: "needle", limit: 1 }, mockContext)
+
+    //#then
+    expect(captured.scannedSessionIds).toEqual(["ses_active"])
+  })
+
+  test("session_list excludes archived sessions by default", async () => {
+    //#given
+    const { tools, captured } = createCapturingTools()
+
+    //#when
+    await tools.session_list.execute({}, mockContext)
+
+    //#then
+    expect(captured.getMainSessionsOptions).toEqual([{ directory: projectDir, includeArchived: false }])
+    expect(captured.formatSessionListCalls[0]?.archivedIds?.size).toBe(0)
+  })
+
+  test("session_list honors include_archived true and marks archived rows", async () => {
+    //#given
+    const archivedMetadata: SessionMetadata = {
+      id: "ses_archived",
+      projectID: "project-1",
+      directory: projectDir,
+      time: { created: 1000, updated: 2000, archived: 1500 },
+    }
+    const activeMetadata: SessionMetadata = {
+      id: "ses_active",
+      projectID: "project-1",
+      directory: projectDir,
+      time: { created: 1000, updated: 3000 },
+    }
+    const { tools, captured } = createCapturingTools({
+      getMainSessions: async (options) => {
+        captured.getMainSessionsOptions.push(options)
+        return [activeMetadata, archivedMetadata]
+      },
+    })
+
+    //#when
+    await tools.session_list.execute({ include_archived: true }, mockContext)
+
+    //#then
+    expect(captured.getMainSessionsOptions).toEqual([{ directory: projectDir, includeArchived: true }])
+    expect(captured.formatSessionListCalls[0]?.sessionIDs).toEqual(["ses_active", "ses_archived"])
+    expect(captured.formatSessionListCalls[0]?.archivedIds).toEqual(new Set(["ses_archived"]))
   })
 })

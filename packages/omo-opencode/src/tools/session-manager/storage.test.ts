@@ -91,13 +91,13 @@ describe("session-manager storage", () => {
     }
   })
 
-  test("getAllSessions returns empty array when no sessions exist", async () => {
+  test("getAllSessions returns empty result when no sessions exist", async () => {
     // when
-    const sessions = await getAllSessions()
+    const { ids, archivedIds } = await getAllSessions()
 
     // then
-    expect(Array.isArray(sessions)).toBe(true)
-    expect(sessions).toEqual([])
+    expect(ids).toEqual([])
+    expect(archivedIds.size).toBe(0)
   })
 
   test("getMessageDir finds session in direct path", () => {
@@ -549,7 +549,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
-    const sessionIDs = await getAllSessions()
+    const { ids: sessionIDs } = await getAllSessions()
 
     // then
     expect(mockClient.session.list).toHaveBeenCalled()
@@ -574,10 +574,82 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
-    const sessionIDs = await getAllSessions()
+    const { ids: sessionIDs } = await getAllSessions()
 
     // then
     expect(sessionIDs.slice(0, 3)).toEqual(["ses_new", "ses_mid", "ses_old"])
+  })
+
+  test("getAllSessions excludes archived sessions by default", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_active", directory: "/test", time: { created: 1000, updated: 2000 } },
+      { id: "ses_archived", directory: "/test", time: { created: 1000, updated: 5000, archived: 4000 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, getAllSessions } = await import("./storage")
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
+
+    // when
+    const result = await getAllSessions()
+
+    // then
+    expect(result.ids).toEqual(["ses_active"])
+    expect(result.archivedIds.size).toBe(0)
+  })
+
+  test("getAllSessions with includeArchived appends archived sessions after active ones", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_active_old", directory: "/test", time: { created: 1000, updated: 1000 } },
+      { id: "ses_archived_recent", directory: "/test", time: { created: 1000, updated: 9000, archived: 8000 } },
+      { id: "ses_active_new", directory: "/test", time: { created: 1000, updated: 2000 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, getAllSessions } = await import("./storage")
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
+
+    // when
+    const result = await getAllSessions({ includeArchived: true })
+
+    // then
+    expect(result.ids).toEqual(["ses_active_new", "ses_active_old", "ses_archived_recent"])
+    expect(result.archivedIds).toEqual(new Set(["ses_archived_recent"]))
+  })
+
+  test("getAllSessions treats sessions without time.archived as active", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_legacy", directory: "/test", time: { created: 1000, updated: 1000 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, getAllSessions } = await import("./storage")
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
+
+    // when
+    const result = await getAllSessions({ includeArchived: true })
+
+    // then
+    expect(result.ids).toEqual(["ses_legacy"])
+    expect(result.archivedIds.size).toBe(0)
   })
 
   test("readSessionMessages uses SDK when beta mode is enabled", async () => {
