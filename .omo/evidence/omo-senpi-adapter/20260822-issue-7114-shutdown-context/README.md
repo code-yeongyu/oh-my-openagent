@@ -50,3 +50,10 @@ The isolated model cannot prove a successful child model response because discov
 children cannot load the parent-only mock extension. It does prove the reported lifecycle boundary:
 the real quit path now records and terminalizes the shutdown reflection without stale context/API
 access. Focused runner integration tests cover successful children and merge behavior separately.
+
+## CI observation
+
+The first evidence-containing Ubuntu Senpi job ran 2,218 tests: 2,210 passed, 7 skipped, and the
+unrelated `task-rpc-launch-parity` provider-catalog probe failed once. The same job passed on the
+preceding code commit, and every memory shutdown test passed in the failing run. Contributor access
+cannot rerun an upstream job directly, so this evidence update also requests a fresh CI evaluation.
