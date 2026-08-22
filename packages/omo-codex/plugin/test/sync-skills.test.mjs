@@ -45,6 +45,7 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 
 	// then
 	assert.deepEqual(skillNames, expectedSkills);
+	assert.ok(skillNames.includes("pr"), "shared pr skill must reach the Codex aggregate");
 	for (const skillName of expectedSkills) {
 		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.match(removeCodexCompatibilityGuidance(content), /^---\r?\n/);
