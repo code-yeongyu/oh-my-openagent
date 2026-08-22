@@ -146,6 +146,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
           sessionId,
           deadlineAt: shutdownDeadlineAt(now),
           now,
+          eventCtx,
         })
         wiring.clearStatus(eventCtx)
         releaseSession(sessions.get(sessionId))

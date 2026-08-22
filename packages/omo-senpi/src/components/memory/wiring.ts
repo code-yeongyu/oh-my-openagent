@@ -6,7 +6,7 @@ import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
-import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } from "./shutdown-drain"
+import { createShutdownDrain, type ShutdownEvaluator } from "./shutdown-drain"
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
@@ -21,7 +21,7 @@ import {
 import { createMemoryRuntimeWiring, type MemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
 import type { MemoryCommandSettings } from "./commands/types"
-import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
+import type { MemorySessionShutdownInput, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
@@ -216,7 +216,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await flushSkillsUsageTrackers()
     },
 
-    async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+    async onSessionShutdown(input: MemorySessionShutdownInput): Promise<void> {
+      lastEventCtx.current = input.eventCtx
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
       await shutdownDrain.run(input)
     },
