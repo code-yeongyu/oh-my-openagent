@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-rules",
-	"version": "5.0.0-beta.16",
+	"version": "5.0.0-beta.17",
 	"description": "Codex plugin that injects project rule files into model context through lifecycle hooks.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
