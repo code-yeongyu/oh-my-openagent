@@ -107,14 +107,21 @@ export function createChatMessageHandler(deps: HookDeps) {
 
     const { sessionID } = input
     let state = sessionStates.get(sessionID)
+    const requestedModel = stringifyRuntimeModelWithVariant(input.model, output.message.variant ?? input.variant)
 
-    if (!state) return
+    if (!state) {
+      if (!requestedModel) return
+      state = createFallbackState(requestedModel)
+      sessionStates.set(sessionID, state)
+    }
 
     sessionLastAccess.set(sessionID, Date.now())
 
-    const requestedModel = stringifyRuntimeModelWithVariant(input.model, output.message.variant ?? input.variant)
-
-    if (requestedModel && state.pendingFallbackModel === requestedModel) {
+    if (
+      requestedModel
+      && state.pendingFallbackModel === requestedModel
+      && isRuntimeFallbackRetryTextParts(output.parts)
+    ) {
       state.pendingFallbackModel = undefined
       state.pendingFallbackPromptMayHaveBeenAccepted = false
       clearModelLessRetryKeys(sessionID)
@@ -143,6 +150,21 @@ export function createChatMessageHandler(deps: HookDeps) {
       state.attemptCount = 0
       state.fallbackIndex = -1
     }
+
+    // A genuine user prompt starts a new turn, so a fallback dispatch still in
+    // flight for the previous turn must not act on this one. Replacing the state
+    // object advances the fallback generation: the dispatch path compares
+    // identity to detect that it has been superseded (#6751).
+    state = {
+      ...state,
+      failedModels: new Map(state.failedModels),
+    }
+    sessionStates.set(sessionID, state)
+    clearFallbackWatchdog(sessionID)
+    sessionRetryInFlight.delete(sessionID)
+    sessionStatusRetryKeys.delete(sessionID)
+    state.pendingFallbackModel = undefined
+    state.pendingFallbackPromptMayHaveBeenAccepted = false
 
     if (requestedModel && requestedModel !== state.currentModel) {
       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {

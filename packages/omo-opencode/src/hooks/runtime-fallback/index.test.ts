@@ -8,6 +8,7 @@ import {
 } from "../../shared/delegated-child-session-bootstrap"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared"
 import {
   _resetForTesting as resetClaudeCodeSessionState,
   subagentSessions,
