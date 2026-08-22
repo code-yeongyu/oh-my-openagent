@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit --with-ultrawork",
 						"timeout": 10,
-						"statusMessage": "(OmO 5.0.0-beta.16) Checking Ulw-Loop Steering"
+						"statusMessage": "(OmO 5.0.0-beta.17) Checking Ulw-Loop Steering"
 					}
 				]
 			}
@@ -20,7 +20,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "(OmO 5.0.0-beta.16) Enforcing Unlimited Ulw-Loop Budget"
+						"statusMessage": "(OmO 5.0.0-beta.17) Enforcing Unlimited Ulw-Loop Budget"
 					}
 				]
 			},
@@ -31,7 +31,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use-spawn",
 						"timeout": 5,
-						"statusMessage": "(OmO 5.0.0-beta.16) Guarding Ulw-Loop Spawns"
+						"statusMessage": "(OmO 5.0.0-beta.17) Guarding Ulw-Loop Spawns"
 					}
 				]
 			}
@@ -43,7 +43,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook stop",
 						"timeout": 10,
-						"statusMessage": "(OmO 5.0.0-beta.16) Checking Ulw-Loop Resume"
+						"statusMessage": "(OmO 5.0.0-beta.17) Checking Ulw-Loop Resume"
 					}
 				]
 			}
