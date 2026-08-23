@@ -44,7 +44,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   async function sendToTask(input: SendInput): Promise<SendOutcome> {
-    const record = resolve(input.idOrName)
+    let record = resolve(input.idOrName)
     if (record === undefined) {
       return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
     }
@@ -67,6 +67,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (handle === undefined && port.recoverHandle !== undefined) {
       await port.recoverHandle(record.task_id)
       handle = port.liveHandle(record.task_id)
+      const fresh = tryLoad(record.task_id)
+      if (fresh !== undefined) {
+        record = fresh
+      }
     }
     if (handle === undefined) {
       return {
