@@ -37,6 +37,7 @@ export function wireEventBridge(
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
   let printRecoverySessionId: string | undefined
+  let printDeferReconcileSessionId: string | undefined
   const taskRpc = wireTaskRpcBridge(pi, engine)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
@@ -44,8 +45,15 @@ export function wireEventBridge(
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
+    const printMode = inferPrintMode(engine.runtime.mode())
     transitions.onSessionStart(sessionId)
-    const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
+    let reconciliation: { outcomes: Awaited<ReturnType<typeof engine.lifecycle.reconcileOnSessionStart>>["outcomes"] }
+    if (printMode && sessionId !== undefined) {
+      printDeferReconcileSessionId = sessionId
+      reconciliation = { outcomes: [] }
+    } else {
+      reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
+    }
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
     for (const outcome of reconciliation.outcomes) {
       const record = engine.manager.get(outcome.task_id)
@@ -59,8 +67,10 @@ export function wireEventBridge(
         livenessRecords.set(record.task_id, record)
       }
     }
-    for (const record of livenessRecords.values()) {
-      if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
+    if (!printMode) {
+      for (const record of livenessRecords.values()) {
+        if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
+      }
     }
     await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
@@ -69,7 +79,6 @@ export function wireEventBridge(
       // An idle wake here marks the agent busy, and the CLI prompt then throws
       // "already processing" without streamingBehavior. Buffer only in print mode;
       // interactive TUI starts are actually idle and must redeliver immediately.
-      const printMode = engine.runtime.mode() === "json"
       printRecoverySessionId = printMode ? sessionId : undefined
       engine.notifier.reconcileUnnotifiedNotifications({
         sessionId,
@@ -150,8 +159,13 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", (_payload, eventCtx) => {
+  pi.on("before_agent_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const startedSessionId = engine.runtime.sessionId()
+    if (printDeferReconcileSessionId !== undefined && printDeferReconcileSessionId === startedSessionId) {
+      printDeferReconcileSessionId = undefined
+      await engine.lifecycle.reconcileOnSessionStart(startedSessionId)
+    }
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"
     if (!guidanceGuard(sessionId)) return undefined
@@ -181,6 +195,14 @@ async function tickLeadPollersBestEffort(ctx: ComponentContext, state: EventBrid
       error: error instanceof Error ? error.message : String(error),
     })
   }
+}
+
+export function inferPrintMode(mode: string | undefined, argv: readonly string[] = process.argv): boolean {
+  if (mode === "json") return true
+  if (mode !== undefined) return false
+  if (argv.includes("--mode=json")) return true
+  const flag = argv.indexOf("--mode")
+  return flag >= 0 && argv[flag + 1] === "json"
 }
 
 function asLiveContext(value: unknown): LiveTaskContext {

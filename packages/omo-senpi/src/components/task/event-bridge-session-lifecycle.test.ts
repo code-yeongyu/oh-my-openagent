@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
 import type { TaskRecord } from "@oh-my-opencode/senpi-task"
 
+import { inferPrintMode } from "./event-bridge"
 import { wireHarness } from "./event-bridge.test-harness"
 
 describe("event-bridge session_start recovery chain", () => {
@@ -23,8 +24,6 @@ describe("event-bridge session_start recovery chain", () => {
     expect(order).toEqual([
       "capture",
       "onSessionStart",
-      "reconcile",
-      "liveness:task-revived",
       "resumptionStart:2",
       "reclaim",
       "notify",
@@ -33,9 +32,9 @@ describe("event-bridge session_start recovery chain", () => {
       "poll",
       "statusSync",
     ])
-    expect(reconcileCalls).toEqual(["parent-session"])
+    expect(reconcileCalls).toEqual([])
     expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "session_switching" } }])
-    expect(livenessCalls).toEqual(["task-revived"])
+    expect(livenessCalls).toEqual([])
     expect(resumptionCalls).toEqual([2])
   })
 
@@ -175,5 +174,24 @@ describe("event-bridge session_shutdown", () => {
     expect(calls).toHaveLength(0)
     expect(warnings).toHaveLength(1)
     expect(warnings[0]?.message).toContain("reason")
+  })
+})
+
+describe("inferPrintMode", () => {
+  it("#given mode json #then it is print mode", () => {
+    expect(inferPrintMode("json", [])).toBe(true)
+  })
+
+  it("#given an explicit non-json mode #then it is not print mode", () => {
+    expect(inferPrintMode("tui", ["--mode", "json"])).toBe(false)
+  })
+
+  it("#given omitted mode and --mode json on argv #then it is print mode", () => {
+    expect(inferPrintMode(undefined, ["node", "senpi", "--mode", "json", "-p", "hi"])).toBe(true)
+    expect(inferPrintMode(undefined, ["node", "senpi", "--mode=json"])).toBe(true)
+  })
+
+  it("#given omitted mode and no json flag #then it is not print mode", () => {
+    expect(inferPrintMode(undefined, ["node", "senpi"])).toBe(false)
   })
 })
