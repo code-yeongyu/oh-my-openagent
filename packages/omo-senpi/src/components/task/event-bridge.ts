@@ -43,6 +43,7 @@ export function wireEventBridge(
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 
   const runSessionStartRecovery = async (sessionId: string | undefined, printMode: boolean) => {
+    transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
     for (const outcome of reconciliation.outcomes) {
@@ -81,7 +82,6 @@ export function wireEventBridge(
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
     const printMode = inferPrintMode(engine.runtime.mode())
-    transitions.onSessionStart(sessionId)
     // Print-mode (`--mode json -p`) owns the first turn. Running recovery here
     // starts the agent before the CLI prompt is accepted ("already processing").
     if (printMode && sessionId !== undefined) {

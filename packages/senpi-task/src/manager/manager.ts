@@ -35,7 +35,7 @@ import {
   recordSpawnedPid,
 } from "./manager-helpers"
 import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
-import { claimTaskRecord, TaskRecordCollisionError } from "../store"
+import { claimTaskRecord, TaskRecordCollisionError, type TaskRecordStore } from "../store"
 import { withTaskRecordLockAsync } from "../store/record-lock"
 import { reattachManagedTask, respawnManagedTask } from "./manager-respawn"
 import { NameRegistry } from "./names"

@@ -21,11 +21,22 @@ describe("event-bridge session_start recovery chain", () => {
 
     await pi.dispatch("session_start", {}, {})
 
-    expect(order).toEqual(["capture", "onSessionStart"])
+    expect(order).toEqual(["capture"])
     expect(reconcileCalls).toEqual([])
     expect(notifyCalls).toEqual([])
     expect(livenessCalls).toEqual([])
     expect(resumptionCalls).toEqual([])
+  })
+
+  it("#given a transition-buffered completion in print mode #when the prompt takes ownership #then transition flush is deferred and remains first in recovery", async () => {
+    const { pi, order } = wireHarness("parent-session", { mode: "json" })
+
+    await pi.dispatch("session_start", {}, {})
+    expect(order).toEqual(["capture"])
+
+    await pi.dispatch("before_agent_start", {}, {})
+    expect(order.indexOf("onSessionStart")).toBeGreaterThanOrEqual(0)
+    expect(order.indexOf("onSessionStart")).toBeLessThan(order.indexOf("reconcile"))
   })
 
   it("#given print-mode session_start #when before_agent_start fires #then deferred reconcile and liveness run", async () => {
