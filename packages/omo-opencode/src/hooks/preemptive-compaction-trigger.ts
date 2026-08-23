@@ -96,8 +96,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
   }
 
   // Resolve ContextBudgetPolicy: separates physicalContextWindow and maxActiveContextTokens
-  const budgetConfig = (pluginConfig as Record<string, unknown>)?.experimental as Record<string, unknown> | undefined
-  const contextBudgetConfig = budgetConfig?.context_budget as Record<string, number> | undefined
+  const contextBudgetConfig = pluginConfig?.experimental?.context_budget
 
   const policy = resolveContextBudgetPolicy({
     providerID: cached.providerID,
@@ -109,7 +108,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
   const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
   const usageRatio = totalInputTokens / policy.maxActiveContextTokens
 
-  const triggerThreshold = contextBudgetConfig?.warmup_fraction ?? 0.78
+  const triggerThreshold = policy.warmupFraction
   if (usageRatio < triggerThreshold || !cached.modelID) return
 
   compactionInProgress.add(sessionID)

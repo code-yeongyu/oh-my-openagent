@@ -846,9 +846,9 @@ describe("preemptive-compaction event-driven lifecycle and ContextBudgetPolicy",
   })
 
   // #given 1M model with 384k active ceiling
-  // #when tokens are at 285k (below 78% of 384k = ~299k)
+  // #when tokens are at 285k (below 75% of 384k = 288k)
   // #then summarize should NOT trigger
-  it("should not trigger compaction below 78% of 384k budget on 1M model", async () => {
+  it("should not trigger compaction below 75% of 384k budget on 1M model", async () => {
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_1m_below_budget"
 
@@ -882,9 +882,9 @@ describe("preemptive-compaction event-driven lifecycle and ContextBudgetPolicy",
   })
 
   // #given 1M model with 384k active ceiling
-  // #when tokens reach 310k (> 78% of 384k = ~299k)
+  // #when tokens reach 295k (>= 75% of 384k = 288k)
   // #then summarize SHOULD trigger
-  it("should trigger compaction above 78% of 384k budget on 1M model", async () => {
+  it("should trigger compaction above 75% of 384k budget on 1M model", async () => {
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_1m_above_budget"
 
@@ -998,6 +998,79 @@ describe("preemptive-compaction event-driven lifecycle and ContextBudgetPolicy",
     // Tool execution fires immediately
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
+  // #given explicit experimental.context_budget config in pluginConfig
+  // #when tokens exceed the configured warmup fraction
+  // #then summarize triggers according to user override
+  it("respects experimental.context_budget overrides from pluginConfig", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      experimental: {
+        context_budget: {
+          max_active_context_tokens: 500000,
+          warmup_fraction: 0.8,
+        },
+      },
+    } as never)
+    const sessionID = "ses_budget_override_test"
+
+    // 390k is < 400k (500k * 0.8) -> no trigger
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 390000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+
+    // 405k is >= 400k -> trigger
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 405000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_2" },
       { title: "", output: "test", metadata: null }
     )
 

@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-08-23T14:18:50.753Z",
+  "target": "preemptive-compaction-hook",
+  "policy": "ContextBudgetPolicy (384k active ceiling, 288k warmup, 35k keepRecent)",
+  "verdict": "PASS",
+  "results": [
+    {
+      "name": "warmup_sub_threshold_check",
+      "expectedSummarize": 0,
+      "actualSummarize": 0,
+      "passed": true
+    },
+    {
+      "name": "warmup_supra_threshold_trigger",
+      "expectedSummarize": 1,
+      "actualSummarize": 1,
+      "passed": true
+    },
+    {
+      "name": "session_compacted_stale_cache_invalidation",
+      "expectedSummarize": 1,
+      "actualSummarize": 1,
+      "passed": true
+    }
+  ],
+  "isolation": {
+    "realDbUntouched": true,
+    "tempDirectory": "/tmp/qa-isolated"
+  }
+}

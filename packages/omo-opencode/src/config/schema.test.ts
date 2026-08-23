@@ -1209,3 +1209,31 @@ describe("skills schema", () => {
     expect(result.success).toBe(true)
   })
 })
+
+describe("ContextBudgetConfigSchema", () => {
+  test("accepts valid context_budget configuration inside experimental", () => {
+    //#given
+    const config = {
+      experimental: {
+        context_budget: {
+          max_active_context_tokens: 384_000,
+          keep_recent_tokens: 35_000,
+          warmup_fraction: 0.75,
+          target_active_fraction: 0.5,
+          reserve_tokens: 16_384,
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.experimental?.context_budget?.max_active_context_tokens).toBe(384_000)
+      expect(result.data.experimental?.context_budget?.keep_recent_tokens).toBe(35_000)
+      expect(result.data.experimental?.context_budget?.warmup_fraction).toBe(0.75)
+    }
+  })
+})

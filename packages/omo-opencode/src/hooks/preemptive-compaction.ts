@@ -119,9 +119,6 @@ export function createPreemptiveCompactionHook(
         id: info.id,
         parts: info.parts,
       })
-
-      // Also evaluate at message.updated turn boundary (idempotent with lifecycle guard)
-      await checkCompaction(sessionID)
     }
   }
 
