@@ -453,6 +453,36 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(record?.host_pid).toBe(9999)
   })
 
+  test("#given an orphan child that takes multiple ticks to terminate #when task_send recovers handle #then it polls until dead before respawning", async () => {
+    let probes = 0
+    const calls: SignalCall[] = []
+    const signaller: ProcessSignaller = {
+      isAlive: (pid) => {
+        if (pid === 900) {
+          probes++
+          return probes <= 2
+        }
+        return false
+      },
+      signal: (pid, signal) => {
+        calls.push({ pid, signal })
+      },
+    }
+    const store = tempStore()
+    seedProcessRecord(store, "st_00000023", "completed")
+    persistSessions(store, "st_00000023")
+    const respawnRunner = new FakeRespawnRunner()
+    const { manager } = createManager(store, respawnRunner, 5, new FakeRunner(), undefined, undefined, signaller)
+    store.replace({ ...store.load("st_00000023")!, host_pid: 9999, pid: 900 })
+    manager.forget("st_00000023")
+    const outcome = await manager.sendToTask({ idOrName: "st_00000023", message: "follow up" })
+    expect(outcome.kind).toBe("revived")
+    expect(calls).toEqual([{ pid: 900, signal: "SIGTERM" }])
+    expect(respawnRunner.startedSpecs).toHaveLength(1)
+    const record = store.load("st_00000023")
+    expect(record?.pid).toBe(1001)
+  })
+
   test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {
     // given
     const { store, manager, lifecycle } = createHarness({ taskId: "st_00000007", status: "completed" })

@@ -6,7 +6,7 @@ import { injectedLifecycleReattachPorts } from "./port"
 import type { LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
 import type { BatchAdmissionOptions } from "./residency"
 
-const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
+export const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
 
 export type LifecycleContext = {
   readonly store: TaskRecordStore

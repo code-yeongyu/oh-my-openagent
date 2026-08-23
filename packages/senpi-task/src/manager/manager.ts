@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
-import { defaultSignaller, delay } from "../lifecycle/context"
+import { DEFAULT_ORPHAN_KILL_DELAY_MS, defaultSignaller, delay } from "../lifecycle/context"
 import { newestSessionPath, hasForeignLiveOwner } from "../lifecycle/reconcile"
 import { registerLifecycleReattachPorts, type ProcessSignaller, type ReattachResult, type RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
@@ -120,6 +120,18 @@ function publicStartFailureMessage(error: unknown): string {
   }
 }
 
+async function waitForProcessExit(signaller: ProcessSignaller, pid: number, timeoutMs: number): Promise<boolean> {
+  if (!signaller.isAlive(pid)) return true
+  if (timeoutMs <= 0) return !signaller.isAlive(pid)
+  const pollIntervalMs = 50
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    await delay(Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())))
+    if (!signaller.isAlive(pid)) return true
+  }
+  return !signaller.isAlive(pid)
+}
+
 async function terminateOrphanChild(
   store: TaskRecordStore,
   record: TaskRecord,
@@ -130,12 +142,12 @@ async function terminateOrphanChild(
   if (pid === undefined || !signaller.isAlive(pid)) return true
   signaller.signal(pid, "SIGTERM")
   store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
-  if (delayMs > 0) await delay(delayMs)
-  if (signaller.isAlive(pid)) {
-    signaller.signal(pid, "SIGKILL")
-    store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
-  }
-  return !signaller.isAlive(pid)
+  const deadAfterTerm = await waitForProcessExit(signaller, pid, delayMs)
+  if (deadAfterTerm) return true
+  signaller.signal(pid, "SIGKILL")
+  store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
+  const deadAfterKill = await waitForProcessExit(signaller, pid, Math.min(delayMs, 1_000))
+  return deadAfterKill
 }
 
 // allow: SIZE_OK - one stateful manager keeps concurrency, queue, live-handle, and waiter invariants in one closure-backed implementation.
@@ -182,7 +194,7 @@ class TaskManagerImpl implements TaskManager {
     this.#now = options.now ?? Date.now
     this.#hostPid = options.hostPid ?? process.pid
     this.#signaller = options.signaller ?? defaultSignaller
-    this.#orphanKillDelayMs = options.orphanKillDelayMs ?? 0
+    this.#orphanKillDelayMs = options.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS
     this.#rpcRespawnRunner = options.rpcRespawnRunner ?? new RpcProcessRunner()
     this.#concurrency = new TaskConcurrency({
       default_concurrency: options.config.default_concurrency,
