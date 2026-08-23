@@ -38,6 +38,23 @@ describe("event-bridge session_start recovery chain", () => {
     expect(resumptionCalls).toEqual([2])
   })
 
+  it("#given print-mode session_start #when before_agent_start fires #then deferred reconcile and liveness run", async () => {
+    const revived = { task_id: "task-revived" } as TaskRecord
+    const { pi, reconcileCalls, livenessCalls } = wireHarness("parent-session", {
+      mode: "json",
+      outcomes: [{ task_id: "task-revived", kind: "resumed" }],
+      records: { "task-revived": revived },
+    })
+
+    await pi.dispatch("session_start", {}, {})
+    expect(reconcileCalls).toEqual([])
+    expect(livenessCalls).toEqual([])
+
+    await pi.dispatch("before_agent_start", {}, {})
+    expect(reconcileCalls).toEqual(["parent-session"])
+    expect(livenessCalls).toEqual(["task-revived"])
+  })
+
   it("#given an interactive TUI session start #when session_start fires #then owed completions redeliver as idle", async () => {
     const { pi, notifyCalls } = wireHarness("parent-session", { mode: "tui" })
 

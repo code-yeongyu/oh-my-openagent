@@ -1,3 +1,5 @@
+Superseded by `20260823-pr-7072-task-e2e.md` (live senpi 2026.8.22-2, 25/26).
+
 # PR #7072 scoped live-driver receipt (2026-08-23)
 
 Sanitized status only. Raw e2e transcripts are not committed (GitGuardian previously flagged `.omo/evidence/.../task-e2e.log`).

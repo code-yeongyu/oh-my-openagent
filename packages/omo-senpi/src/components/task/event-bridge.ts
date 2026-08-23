@@ -161,10 +161,21 @@ export function wireEventBridge(
 
   pi.on("before_agent_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    const startedSessionId = engine.runtime.sessionId()
-    if (printDeferReconcileSessionId !== undefined && printDeferReconcileSessionId === startedSessionId) {
+    if (printDeferReconcileSessionId !== undefined) {
+      const deferredSessionId = printDeferReconcileSessionId
       printDeferReconcileSessionId = undefined
-      await engine.lifecycle.reconcileOnSessionStart(startedSessionId)
+      const deferred = await engine.lifecycle.reconcileOnSessionStart(deferredSessionId)
+      const deferredLiveness = new Map<string, ReturnType<typeof engine.manager.get>>()
+      for (const outcome of deferred.outcomes) {
+        const record = engine.manager.get(outcome.task_id)
+        if (record !== undefined) deferredLiveness.set(record.task_id, record)
+      }
+      for (const { record } of engine.manager.list({ scope: "parent-session", session_id: deferredSessionId })) {
+        deferredLiveness.set(record.task_id, record)
+      }
+      for (const record of deferredLiveness.values()) {
+        if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
+      }
     }
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"
