@@ -175,12 +175,23 @@ class TaskManagerImpl implements TaskManager {
         if (this.#live.has(taskId)) return
         const rec = this.#tryLoad(taskId)
         if (rec === null || rec === undefined) return
+        if (rec.host_pid === this.#hostPid) return
         if (hasForeignLiveOwner({ hostPid: this.#hostPid, signaller: defaultSignaller }, rec)) return
         if (this.#options.config.reattach_on_reconcile === false) return
         const sessionPath = newestSessionPath({ store: this.#options.store } as never, rec.task_id)
         if (sessionPath === undefined) return
-        const spawned = await this.respawn(rec, sessionPath)
-        if (spawned.ok) await this.reattach(rec, spawned.handle)
+        let claimed = false
+        this.#options.store.mutate(rec.task_id, (fresh) => {
+          if (fresh.host_pid !== rec.host_pid || fresh.residency_state !== "resident" || fresh.updated_at !== rec.updated_at) {
+            return fresh
+          }
+          claimed = true
+          return { ...fresh, host_pid: this.#hostPid, updated_at: nowIso(this.#now) }
+        })
+        if (!claimed) return
+        const freshRec = this.#tryLoad(taskId) ?? rec
+        const spawned = await this.respawn(freshRec, sessionPath)
+        if (spawned.ok) await this.reattach(freshRec, spawned.handle)
       },
       dequeuePending: (taskId) => {
         const rec = this.#tryLoad(taskId)

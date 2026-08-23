@@ -405,15 +405,25 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(respawnRunner.startedSpecs).toHaveLength(0)
   })
 
-  test("#given a completed child whose handle is recovered on send #then the revived record preserves the replacement pid", async () => {
+  test("#given a same-process sibling child #when task_send recovers handle #then it does not respawn", async () => {
     const { store, manager, respawnRunner } = createHarness({ taskId: "st_00000019", status: "completed" })
     store.replace({ ...store.load("st_00000019")!, host_pid: process.pid })
     manager.forget("st_00000019")
     const outcome = await manager.sendToTask({ idOrName: "st_00000019", message: "follow up" })
+    expect(outcome.kind).toBe("not_continuable")
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
+  })
+
+  test("#given a dead-host orphan child whose handle is recovered on send #then it acquires ownership and the revived record preserves the replacement pid", async () => {
+    const { store, manager, respawnRunner } = createHarness({ taskId: "st_00000020", status: "completed" })
+    store.replace({ ...store.load("st_00000020")!, host_pid: 9999 })
+    manager.forget("st_00000020")
+    const outcome = await manager.sendToTask({ idOrName: "st_00000020", message: "follow up" })
     expect(outcome.kind).toBe("revived")
     expect(respawnRunner.startedSpecs).toHaveLength(1)
-    const record = store.load("st_00000019")
+    const record = store.load("st_00000020")
     expect(record?.status).toBe("running")
+    expect(record?.host_pid).toBe(process.pid)
     expect(record?.pid).toBe(1001)
   })
 
