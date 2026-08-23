@@ -60,6 +60,13 @@ export function runTaskOutput(
       record.residency_state,
       record.updated_at,
       record.notification.run_epoch,
+      record.pid ?? null,
+      record.host_pid ?? null,
+      record.child_session_id ?? null,
+      record.final_response ?? null,
+      record.error_message ?? null,
+      record.killed ?? null,
+      record.run_stats ?? null,
     ])
     if (statusReads.get(key) === fingerprint) return Promise.resolve(noProgress(record))
     rememberStatusRead(statusReads, key, fingerprint)
