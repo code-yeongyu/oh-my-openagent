@@ -117,6 +117,7 @@ function createManager(
   processRunner = new FakeRunner(),
   hostPid?: number,
   extraConfig?: Record<string, unknown>,
+  signaller?: ProcessSignaller,
 ) {
   const inProcess = new FakeRunner()
   const manager = createTaskManager({
@@ -127,6 +128,7 @@ function createManager(
     cwd: "/tmp/project",
     rpcRespawnRunner: respawnRunner,
     ...(hostPid === undefined ? {} : { hostPid }),
+    ...(signaller === undefined ? {} : { signaller }),
   })
   return { manager, inProcess }
 }
@@ -142,10 +144,11 @@ function createHarness(options: HarnessOptions) {
   seedProcessRecord(store, options.taskId, options.status)
   const sessionPath = options.sessions === false ? undefined : persistSessions(store, options.taskId)
   const respawnRunner = new FakeRespawnRunner()
-  const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner, undefined, options.config)
   const signals: SignalCall[] = []
   const alive = options.alive === true ? new Set([900]) : new Set<number>()
-  const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals), orphanKillDelayMs: 0 })
+  const signaller = fakeSignaller(alive, signals)
+  const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner, undefined, options.config, signaller)
+  const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller, orphanKillDelayMs: 0 })
   return { store, sessionPath, respawnRunner, signals, lifecycle, ...managed }
 }
 
@@ -425,6 +428,29 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(record?.status).toBe("running")
     expect(record?.host_pid).toBe(process.pid)
     expect(record?.pid).toBe(1001)
+  })
+
+  test("#given a live child pid on a dead host #when task_send recovers handle #then it terminates the orphan pid before respawning", async () => {
+    const { store, manager, signals, respawnRunner } = createHarness({ taskId: "st_00000021", status: "completed", alive: true })
+    store.replace({ ...store.load("st_00000021")!, host_pid: 9999, pid: 900 })
+    manager.forget("st_00000021")
+    const outcome = await manager.sendToTask({ idOrName: "st_00000021", message: "follow up" })
+    expect(outcome.kind).toBe("revived")
+    expect(signals).toEqual([{ pid: 900, signal: "SIGTERM" }])
+    expect(respawnRunner.startedSpecs).toHaveLength(1)
+    const record = store.load("st_00000021")
+    expect(record?.pid).toBe(1001)
+  })
+
+  test("#given handle recovery fails on respawn #then ownership rolls back to pre-recovery host", async () => {
+    const { store, manager, respawnRunner } = createHarness({ taskId: "st_00000022", status: "completed" })
+    store.replace({ ...store.load("st_00000022")!, host_pid: 9999 })
+    manager.forget("st_00000022")
+    respawnRunner.cancelSwitch = true
+    const outcome = await manager.sendToTask({ idOrName: "st_00000022", message: "follow up" })
+    expect(outcome.kind).toBe("not_continuable")
+    const record = store.load("st_00000022")
+    expect(record?.host_pid).toBe(9999)
   })
 
   test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {

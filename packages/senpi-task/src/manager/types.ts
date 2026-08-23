@@ -3,6 +3,7 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { ProcessSignaller } from "../lifecycle/port"
 import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type {
   CancelOptions,
@@ -200,6 +201,10 @@ export type TaskManagerOptions = {
   // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
   // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
   readonly hostPid?: number
+  // Signaller used to check process liveness and send signals (SIGTERM/SIGKILL). Defaults to defaultSignaller.
+  readonly signaller?: ProcessSignaller
+  // Bounded delay between SIGTERM and SIGKILL for orphan child termination during recovery. Defaults to 0.
+  readonly orphanKillDelayMs?: number
 }
 
 export type TaskManager = {

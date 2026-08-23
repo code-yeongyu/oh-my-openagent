@@ -5,9 +5,9 @@ import { join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
-import { defaultSignaller } from "../lifecycle/context"
+import { defaultSignaller, delay } from "../lifecycle/context"
 import { newestSessionPath, hasForeignLiveOwner } from "../lifecycle/reconcile"
-import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
+import { registerLifecycleReattachPorts, type ProcessSignaller, type ReattachResult, type RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
@@ -120,12 +120,32 @@ function publicStartFailureMessage(error: unknown): string {
   }
 }
 
+async function terminateOrphanChild(
+  store: TaskRecordStore,
+  record: TaskRecord,
+  signaller: ProcessSignaller,
+  delayMs: number,
+): Promise<boolean> {
+  const pid = record.pid
+  if (pid === undefined || !signaller.isAlive(pid)) return true
+  signaller.signal(pid, "SIGTERM")
+  store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
+  if (delayMs > 0) await delay(delayMs)
+  if (signaller.isAlive(pid)) {
+    signaller.signal(pid, "SIGKILL")
+    store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
+  }
+  return !signaller.isAlive(pid)
+}
+
 // allow: SIZE_OK - one stateful manager keeps concurrency, queue, live-handle, and waiter invariants in one closure-backed implementation.
 class TaskManagerImpl implements TaskManager {
   readonly #options: TaskManagerImplOptions
   readonly #now: () => number
   readonly #runStats = new Map<string, RunStatsTracker>()
   readonly #hostPid: number
+  readonly #signaller: ProcessSignaller
+  readonly #orphanKillDelayMs: number
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
@@ -161,6 +181,8 @@ class TaskManagerImpl implements TaskManager {
     }
     this.#now = options.now ?? Date.now
     this.#hostPid = options.hostPid ?? process.pid
+    this.#signaller = options.signaller ?? defaultSignaller
+    this.#orphanKillDelayMs = options.orphanKillDelayMs ?? 0
     this.#rpcRespawnRunner = options.rpcRespawnRunner ?? new RpcProcessRunner()
     this.#concurrency = new TaskConcurrency({
       default_concurrency: options.config.default_concurrency,
@@ -176,7 +198,7 @@ class TaskManagerImpl implements TaskManager {
         const rec = this.#tryLoad(taskId)
         if (rec === null || rec === undefined) return
         if (rec.host_pid === this.#hostPid) return
-        if (hasForeignLiveOwner({ hostPid: this.#hostPid, signaller: defaultSignaller }, rec)) return
+        if (hasForeignLiveOwner({ hostPid: this.#hostPid, signaller: this.#signaller }, rec)) return
         if (this.#options.config.reattach_on_reconcile === false) return
         const sessionPath = newestSessionPath({ store: this.#options.store } as never, rec.task_id)
         if (sessionPath === undefined) return
@@ -189,9 +211,47 @@ class TaskManagerImpl implements TaskManager {
           return { ...fresh, host_pid: this.#hostPid, updated_at: nowIso(this.#now) }
         })
         if (!claimed) return
+
+        const rollback = () => {
+          try {
+            this.#options.store.mutate(rec.task_id, (fresh) => {
+              if (fresh.host_pid !== this.#hostPid) return fresh
+              return {
+                ...fresh,
+                host_pid: rec.host_pid,
+                residency_state: rec.residency_state,
+                updated_at: nowIso(this.#now),
+              }
+            })
+          } catch (error) {
+            log("senpi-task recoverHandle ownership rollback failed", { taskId: rec.task_id, error: String(error) })
+          }
+        }
+
         const freshRec = this.#tryLoad(taskId) ?? rec
-        const spawned = await this.respawn(freshRec, sessionPath)
-        if (spawned.ok) await this.reattach(freshRec, spawned.handle)
+        if (freshRec.execution_mode === "process" && freshRec.pid !== undefined) {
+          const terminated = await terminateOrphanChild(this.#options.store, freshRec, this.#signaller, this.#orphanKillDelayMs)
+          if (!terminated) {
+            rollback()
+            return
+          }
+        }
+
+        try {
+          const spawned = await this.respawn(freshRec, sessionPath)
+          if (!spawned.ok) {
+            rollback()
+            return
+          }
+          const reattached = await this.reattach(freshRec, spawned.handle)
+          if (!reattached.ok) {
+            rollback()
+            return
+          }
+        } catch (error) {
+          rollback()
+          throw error
+        }
       },
       dequeuePending: (taskId) => {
         const rec = this.#tryLoad(taskId)
