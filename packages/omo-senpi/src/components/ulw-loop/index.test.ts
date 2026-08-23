@@ -223,7 +223,7 @@ describe("omo-senpi ulw-loop continuation", () => {
   it("#given copied stale all-pass status #when continuation fires #then no followUp is sent and inactivity is logged", async () => {
     const { pi, logger } = await registerWithRunner([staleAllPassStatus()])
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
 
     expect(pi.userMessages).toEqual([])
     expect(pi.messages).toEqual([])
@@ -237,7 +237,7 @@ describe("omo-senpi ulw-loop continuation", () => {
   it("#given copied all-pass status with one pending criterion #when continuation fires #then exactly one followUp is sent", async () => {
     const { pi } = await registerWithRunner([staleAllPassWithPendingStatus()])
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
 
     expect(pi.userMessages).toEqual([])
     expect(pi.messages).toEqual([
