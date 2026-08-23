@@ -33,15 +33,15 @@ Conventions for human contributors and AI agents working on this repository.
 
 - `src/boulder-reader.ts`: reads `.omo/boulder.json`, resolves the active work for the session, re-exports `getPlanChecklist`/`PlanChecklist` from `plan-checklist.ts`. `readContinuationState` returns null in four cases: `boulder.json` is missing or unparseable, no work matches the session, the work status is not continuable (only `active` and `paused` continue - `completed`/`abandoned` stop), or `checklist.total === 0`.
 - `src/plan-checklist.ts`: `PlanChecklist` (`completed`/`remaining`/`total`/`nextTaskLabel`) and `getPlanChecklist`/`parsePlanChecklist`. Counts structured `## TODOs` rows (`N. <title>`) and `## Final Verification Wave` rows (`F<number>. <title>`); falls back to simple top-level `- [ ]`/`- [x]` checkboxes. Skips fenced blocks and respects `#`/`##` section boundaries.
-- `src/codex-hook.ts`: Stop/SubagentStop hook; fills nine placeholders into `directive.md` - `PLAN_NAME`, `PLAN_PATH`, `BOULDER_PATH`, `REMAINING_COUNT`, `TOTAL_COUNT`, `NEXT_TASK_LABEL`, `WORKTREE_BLOCK`, `LEDGER_PATH`, `SESSION_ID`. `WORKTREE_BLOCK` renders empty when the work has no worktree. When `remaining === 0`, `nextTaskLabel` is null and renders as "none (final gate pending)".
+- `src/codex-hook.ts`: Stop hook; treats `SubagentStop` as a compatibility no-op before reading continuation state. For `Stop`, it fills nine placeholders into `directive.md` - `PLAN_NAME`, `PLAN_PATH`, `BOULDER_PATH`, `REMAINING_COUNT`, `TOTAL_COUNT`, `NEXT_TASK_LABEL`, `WORKTREE_BLOCK`, `LEDGER_PATH`, `SESSION_ID`. `WORKTREE_BLOCK` renders empty when the work has no worktree. When `remaining === 0`, `nextTaskLabel` is null and renders as "none (final gate pending)".
 - **Context-pressure suppression:** the hook reads `input.transcript_path` through the injected `ReadonlyFileSystem` and returns `""` (no continuation) when the transcript carries any context-pressure marker (`context compacted`, `context_length_exceeded`, `context_too_large`, `codex ran out of room in the model's context window`, and related phrasings). This is the safety valve against an infinite continuation loop once the context window is exhausted; it is pinned by a `#given context-window pressure` test.
 - `directive.md`: directive template with placeholders, applied per invocation.
 
 ## Build and Hooks
 
 - Build output goes to `dist/`.
-- `hooks/hooks.json` registers Codex `Stop` and `SubagentStop` hooks.
-- Hook commands run `node ${PLUGIN_ROOT}/components/ulw-execute-continuation/dist/cli.js hook stop` and `node ${PLUGIN_ROOT}/components/ulw-execute-continuation/dist/cli.js hook subagent-stop`.
+- `hooks/hooks.json` registers only the Codex `Stop` hook. The separate `lazycodex-executor-verify` component owns `SubagentStop` evidence validation.
+- The hook command runs `node ${PLUGIN_ROOT}/components/ulw-execute-continuation/dist/cli.js hook stop`.
 
 ## Constraints
 
