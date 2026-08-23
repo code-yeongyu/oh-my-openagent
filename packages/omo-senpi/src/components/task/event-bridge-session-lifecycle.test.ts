@@ -201,13 +201,20 @@ describe("inferPrintMode", () => {
     expect(inferPrintMode("json", [])).toBe(true)
   })
 
+  it("#given mode print #then it is print mode", () => {
+    expect(inferPrintMode("print", [])).toBe(true)
+  })
+
   it("#given an explicit non-json mode #then it is not print mode", () => {
     expect(inferPrintMode("tui", ["--mode", "json"])).toBe(false)
+    expect(inferPrintMode("tui", ["--mode", "print"])).toBe(false)
   })
 
   it("#given omitted mode and --mode json on argv #then it is print mode", () => {
     expect(inferPrintMode(undefined, ["node", "senpi", "--mode", "json", "-p", "hi"])).toBe(true)
     expect(inferPrintMode(undefined, ["node", "senpi", "--mode=json"])).toBe(true)
+    expect(inferPrintMode(undefined, ["node", "senpi", "--mode", "print", "hi"])).toBe(true)
+    expect(inferPrintMode(undefined, ["node", "senpi", "--mode=print"])).toBe(true)
     expect(inferPrintMode(undefined, ["node", "senpi", "-p", "hi"])).toBe(true)
     expect(inferPrintMode(undefined, ["node", "senpi", "--print", "hi"])).toBe(true)
   })

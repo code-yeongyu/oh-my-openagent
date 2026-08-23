@@ -206,12 +206,12 @@ async function tickLeadPollersBestEffort(ctx: ComponentContext, state: EventBrid
 }
 
 export function inferPrintMode(mode: string | undefined, argv: readonly string[] = process.argv): boolean {
-  if (mode === "json") return true
+  if (mode === "json" || mode === "print") return true
   if (mode !== undefined) return false
-  if (argv.includes("--mode=json")) return true
+  if (argv.includes("--mode=json") || argv.includes("--mode=print")) return true
   if (argv.includes("-p") || argv.includes("--print")) return true
   const flag = argv.indexOf("--mode")
-  return flag >= 0 && argv[flag + 1] === "json"
+  return flag >= 0 && (argv[flag + 1] === "json" || argv[flag + 1] === "print")
 }
 
 function asLiveContext(value: unknown): LiveTaskContext {
