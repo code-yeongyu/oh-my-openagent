@@ -176,6 +176,7 @@ class TaskManagerImpl implements TaskManager {
         const rec = this.#tryLoad(taskId)
         if (rec === null || rec === undefined) return
         if (hasForeignLiveOwner({ hostPid: this.#hostPid, signaller: defaultSignaller }, rec)) return
+        if (this.#options.config.reattach_on_reconcile === false) return
         const sessionPath = newestSessionPath({ store: this.#options.store } as never, rec.task_id)
         if (sessionPath === undefined) return
         const spawned = await this.respawn(rec, sessionPath)

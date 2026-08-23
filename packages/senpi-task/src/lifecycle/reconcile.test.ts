@@ -116,13 +116,14 @@ function createManager(
   defaultConcurrency = 5,
   processRunner = new FakeRunner(),
   hostPid?: number,
+  extraConfig?: Record<string, unknown>,
 ) {
   const inProcess = new FakeRunner()
   const manager = createTaskManager({
     store,
     runners: { "in-process": inProcess, process: processRunner },
     planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
-    config: settings({ default_concurrency: defaultConcurrency }),
+    config: settings({ default_concurrency: defaultConcurrency, ...extraConfig }),
     cwd: "/tmp/project",
     rpcRespawnRunner: respawnRunner,
     ...(hostPid === undefined ? {} : { hostPid }),
@@ -141,7 +142,7 @@ function createHarness(options: HarnessOptions) {
   seedProcessRecord(store, options.taskId, options.status)
   const sessionPath = options.sessions === false ? undefined : persistSessions(store, options.taskId)
   const respawnRunner = new FakeRespawnRunner()
-  const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner)
+  const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner, undefined, options.config)
   const signals: SignalCall[] = []
   const alive = options.alive === true ? new Set([900]) : new Set<number>()
   const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals), orphanKillDelayMs: 0 })
@@ -390,6 +391,18 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(result.outcomes[0]?.kind).toBe("resumed")
     expect(respawnRunner.startedSpecs).toHaveLength(0)
     expect(store.load("st_00000017")?.residency_state).toBe("evicted")
+  })
+
+  test("#given reattach is disabled #when task_send recovers a finished child #then it does not respawn", async () => {
+    const { store, manager, respawnRunner } = createHarness({
+      taskId: "st_00000018",
+      status: "completed",
+      config: { reattach_on_reconcile: false },
+    })
+    manager.forget("st_00000018")
+    const outcome = await manager.sendToTask({ idOrName: "st_00000018", message: "again" })
+    expect(outcome.kind).toBe("not_continuable")
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
   })
 
   test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {
