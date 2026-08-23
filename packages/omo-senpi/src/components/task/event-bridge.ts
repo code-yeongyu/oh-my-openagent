@@ -42,18 +42,8 @@ export function wireEventBridge(
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 
-  pi.on("session_start", async (_payload, eventCtx) => {
-    engine.runtime.captureFrom(asLiveContext(eventCtx))
-    const sessionId = engine.runtime.sessionId()
-    const printMode = inferPrintMode(engine.runtime.mode())
-    transitions.onSessionStart(sessionId)
-    let reconciliation: { outcomes: Awaited<ReturnType<typeof engine.lifecycle.reconcileOnSessionStart>>["outcomes"] }
-    if (printMode && sessionId !== undefined) {
-      printDeferReconcileSessionId = sessionId
-      reconciliation = { outcomes: [] }
-    } else {
-      reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
-    }
+  const runSessionStartRecovery = async (sessionId: string | undefined, printMode: boolean) => {
+    const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
     for (const outcome of reconciliation.outcomes) {
       const record = engine.manager.get(outcome.task_id)
@@ -67,19 +57,12 @@ export function wireEventBridge(
         livenessRecords.set(record.task_id, record)
       }
     }
-    if (!printMode) {
-      for (const record of livenessRecords.values()) {
-        if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
-      }
+    for (const record of livenessRecords.values()) {
+      if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
     }
     await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
     if (sessionId !== undefined) {
-      // Print-mode (`json`) resume sends its prompt immediately after session_start.
-      // An idle wake here marks the agent busy, and the CLI prompt then throws
-      // "already processing" without streamingBehavior. Buffer only in print mode;
-      // interactive TUI starts are actually idle and must redeliver immediately.
-      printRecoverySessionId = printMode ? sessionId : undefined
       engine.notifier.reconcileUnnotifiedNotifications({
         sessionId,
         parentState: printMode ? { kind: "session_switching" } : { kind: "idle" },
@@ -92,6 +75,21 @@ export function wireEventBridge(
     await tickLeadPollersBestEffort(ctx, state)
     statusUi.scheduleSync()
     taskRpc.attach()
+  }
+
+  pi.on("session_start", async (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const sessionId = engine.runtime.sessionId()
+    const printMode = inferPrintMode(engine.runtime.mode())
+    transitions.onSessionStart(sessionId)
+    // Print-mode (`--mode json -p`) owns the first turn. Running recovery here
+    // starts the agent before the CLI prompt is accepted ("already processing").
+    if (printMode && sessionId !== undefined) {
+      printDeferReconcileSessionId = sessionId
+      printRecoverySessionId = sessionId
+      return
+    }
+    await runSessionStartRecovery(sessionId, false)
   })
 
   pi.on("session_before_switch", (_payload, eventCtx) => {
@@ -164,18 +162,7 @@ export function wireEventBridge(
     if (printDeferReconcileSessionId !== undefined) {
       const deferredSessionId = printDeferReconcileSessionId
       printDeferReconcileSessionId = undefined
-      const deferred = await engine.lifecycle.reconcileOnSessionStart(deferredSessionId)
-      const deferredLiveness = new Map<string, ReturnType<typeof engine.manager.get>>()
-      for (const outcome of deferred.outcomes) {
-        const record = engine.manager.get(outcome.task_id)
-        if (record !== undefined) deferredLiveness.set(record.task_id, record)
-      }
-      for (const { record } of engine.manager.list({ scope: "parent-session", session_id: deferredSessionId })) {
-        deferredLiveness.set(record.task_id, record)
-      }
-      for (const record of deferredLiveness.values()) {
-        if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
-      }
+      await runSessionStartRecovery(deferredSessionId, true)
     }
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"

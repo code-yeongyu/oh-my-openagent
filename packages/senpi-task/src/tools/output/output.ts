@@ -54,7 +54,7 @@ export function runTaskOutput(
   if (record === undefined) return Promise.resolve(notFound(candidates, idOrName))
 
   const mode = params.mode ?? "status"
-  if (statusReads !== undefined && callerSessionId !== undefined && (mode === "status" || record.status === "lost")) {
+  if (statusReads !== undefined && callerSessionId !== undefined && mode === "status") {
     const key = JSON.stringify([callerSessionId, record.task_id])
     const fingerprint = JSON.stringify([
       record.status,

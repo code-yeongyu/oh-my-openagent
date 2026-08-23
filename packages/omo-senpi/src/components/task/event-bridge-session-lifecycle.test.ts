@@ -21,26 +21,16 @@ describe("event-bridge session_start recovery chain", () => {
 
     await pi.dispatch("session_start", {}, {})
 
-    expect(order).toEqual([
-      "capture",
-      "onSessionStart",
-      "resumptionStart:2",
-      "reclaim",
-      "notify",
-      "cleanup:start",
-      "cleanup:end",
-      "poll",
-      "statusSync",
-    ])
+    expect(order).toEqual(["capture", "onSessionStart"])
     expect(reconcileCalls).toEqual([])
-    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "session_switching" } }])
+    expect(notifyCalls).toEqual([])
     expect(livenessCalls).toEqual([])
-    expect(resumptionCalls).toEqual([2])
+    expect(resumptionCalls).toEqual([])
   })
 
   it("#given print-mode session_start #when before_agent_start fires #then deferred reconcile and liveness run", async () => {
     const revived = { task_id: "task-revived" } as TaskRecord
-    const { pi, reconcileCalls, livenessCalls } = wireHarness("parent-session", {
+    const { pi, reconcileCalls, livenessCalls, notifyCalls } = wireHarness("parent-session", {
       mode: "json",
       outcomes: [{ task_id: "task-revived", kind: "resumed" }],
       records: { "task-revived": revived },
@@ -53,6 +43,7 @@ describe("event-bridge session_start recovery chain", () => {
     await pi.dispatch("before_agent_start", {}, {})
     expect(reconcileCalls).toEqual(["parent-session"])
     expect(livenessCalls).toEqual(["task-revived"])
+    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "session_switching" } }])
   })
 
   it("#given an interactive TUI session start #when session_start fires #then owed completions redeliver as idle", async () => {

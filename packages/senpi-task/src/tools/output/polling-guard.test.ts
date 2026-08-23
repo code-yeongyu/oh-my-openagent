@@ -132,6 +132,26 @@ describe("task_output polling guard", () => {
     expect(JSON.stringify(second).length).toBeLessThan(4096)
   })
 
+  test("#given a lost task #when tail is read twice #then both peeks return the lost snapshot", async () => {
+    const record = makeRecord({ task_id: "st_lost", name: "worker", status: "lost" })
+    const manager: OutputManager = {
+      get: () => record,
+      list: () => [{ record }],
+    }
+    const output = createTaskOutputTool({
+      manager,
+      stateDir: "/tmp/state",
+      transcriptReader: () => ({ entries: [], source: "none" }),
+    })
+    const execute = () =>
+      output.execute("call", { task_id: record.task_id, mode: "tail" }, undefined, undefined, context("session-a"))
+    const first = await execute()
+    const second = await execute()
+    expect(first.details.kind).toBe("status")
+    expect(second.details.kind).toBe("status")
+    if (first.details.kind === "status") expect(first.details.snapshot.status).toBe("lost")
+  })
+
   test("#given more callers than the status cache limit #when the oldest caller reads again #then its stale fingerprint was evicted", async () => {
     // given
     const record = makeRecord({ task_id: "st_shared", name: "worker" })
