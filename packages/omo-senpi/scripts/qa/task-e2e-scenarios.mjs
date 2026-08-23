@@ -11,6 +11,8 @@ export const MAIN_SCRIPT = {
     // spawn, so the next streamSimple call is the wake turn. An idle text here would stop the
     // session before task_send/task_output ever run.
     { type: "tool_call", name: "task_send", arguments: { to: "e2echild", message: "do the second unit" } },
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild" } },
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild" } },
     { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "tail" } },
     { type: "text", text: "parent peeked the child tail, all done" },
   ],

@@ -150,6 +150,12 @@ export function findTranscript(events, needle) {
   return hay.includes("transcript") && hay.includes(needle)
 }
 
+// task_output returns kind "no_progress" when repeated status peeks observe no state changes.
+export function findNoProgressPollingGuard(events) {
+  const hay = JSON.stringify(events)
+  return hay.includes('"kind":"no_progress"') || hay.includes("no progress") || hay.includes("Unchanged status")
+}
+
 // A sync task (run_in_background falsy) returns the child's final text inline in the tool result.
 export function findInlineFinal(events, needle) {
   return JSON.stringify(events).includes(needle)

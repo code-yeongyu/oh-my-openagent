@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { changedRealPaths, classifyRealSenpiChanges, snapshotDir } from "./task-e2e-analysis.mjs";
+import { changedRealPaths, classifyRealSenpiChanges, findNoProgressPollingGuard, snapshotDir } from "./task-e2e-analysis.mjs";
 
 describe("snapshotDir", () => {
 	test("#given a transient lock directory #when it disappears during traversal #then the snapshot continues", () => {
@@ -111,5 +111,17 @@ describe("classifyRealSenpiChanges", () => {
 		// #then
 		expect(result.qaAttributedPaths).toEqual(changedPaths);
 		expect(result.concurrentSessionPaths).toEqual([]);
+	});
+});
+
+describe("findNoProgressPollingGuard", () => {
+	test("#given repeated status peeks returning no_progress #then it is detected", () => {
+		const events = [{ type: "toolResult", details: { kind: "no_progress", task_id: "st_123", status: "completed" } }];
+		expect(findNoProgressPollingGuard(events)).toBe(true);
+	});
+
+	test("#given regular status events without no_progress #then it returns false", () => {
+		const events = [{ type: "toolResult", details: { kind: "status", task_id: "st_123", status: "completed" } }];
+		expect(findNoProgressPollingGuard(events)).toBe(false);
 	});
 });

@@ -11,6 +11,7 @@ import {
   findBatchFanout,
   findCategoryListingError,
   findInlineFinal,
+  findNoProgressPollingGuard,
   findRevived,
   findTranscript,
   findWakeNotification,
@@ -117,6 +118,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
   checks.followup_revive = findRevived(events) && JSON.stringify(events).includes(CHILD_SECOND) ? "PASS" : "FAIL"
   checks.task_output_peek = findTranscript(events, CHILD_FIRST) && findPeekTaskOutput(events) ? "PASS" : "FAIL"
+  checks.task_output_polling_guard = findNoProgressPollingGuard(events) ? "PASS" : "FAIL"
   checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE) ? "PASS" : "FAIL"
   checks.extension_suppression = markerCount(scenario.markerLog) === 1 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
@@ -247,6 +249,9 @@ function runSelfTest() {
   if (!findTranscript(parseJsonEvents(JSON.stringify({ type: "toolResult", content: `st_abc [completed] transcript via jsonl:\n${CHILD_FIRST}` })), CHILD_FIRST)) throw new Error("self-test: transcript must be detected")
   if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: non-blocking output peek must be detected")
   if (findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: legacy blocking output call must not count as a peek")
+  if (!findNoProgressPollingGuard(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "no_progress", task_id: "st_abc", status: "completed" } })))) {
+    throw new Error("self-test: no_progress polling guard must be detected")
+  }
   const taskSendIndex = MAIN_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_send")
   const taskOutputIndex = MAIN_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_output")
   if (taskSendIndex < 0 || taskOutputIndex !== taskSendIndex + 1) {
