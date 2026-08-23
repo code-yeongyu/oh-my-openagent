@@ -214,13 +214,14 @@ class TaskManagerImpl implements TaskManager {
         if (this.#options.config.reattach_on_reconcile === false) return
         const sessionPath = newestSessionPath({ store: this.#options.store } as never, rec.task_id)
         if (sessionPath === undefined) return
+
         let claimed = false
         this.#options.store.mutate(rec.task_id, (fresh) => {
-          if (fresh.host_pid !== rec.host_pid || fresh.residency_state !== "resident" || fresh.updated_at !== rec.updated_at) {
+          if (fresh.host_pid !== rec.host_pid || fresh.residency_state !== rec.residency_state || fresh.updated_at !== rec.updated_at) {
             return fresh
           }
           claimed = true
-          return { ...fresh, host_pid: this.#hostPid, updated_at: nowIso(this.#now) }
+          return { ...fresh, host_pid: this.#hostPid, residency_state: "resident", updated_at: nowIso(this.#now) }
         })
         if (!claimed) return
 

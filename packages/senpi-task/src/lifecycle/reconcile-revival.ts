@@ -75,24 +75,22 @@ export async function reconcileScopedRevival(
     excludeTaskIds: excludedFromAdmission,
   })
   const reported = new Set<string>()
-  for (const outcome of admission.outcomes) {
+  const revivalPromises = admission.outcomes.map(async (outcome) => {
     reported.add(outcome.task_id)
     if (outcome.kind === "deferred") {
-      outcomes.push(deferred(outcome.task_id, outcome.reason === "lease_lost" ? "lock_contended" : outcome.reason))
-      continue
+      return deferred(outcome.task_id, outcome.reason === "lease_lost" ? "lock_contended" : outcome.reason)
     }
     const priorResidency = priorResidencies.get(outcome.task_id)
     if (priorResidency === undefined) {
-      outcomes.push(deferred(outcome.task_id, "foreign_live_owner"))
-      continue
+      return deferred(outcome.task_id, "foreign_live_owner")
     }
     const claimed = context.store.load(outcome.task_id)
     if (!isClaimHeld(context, claimed, parentSessionId)) {
-      outcomes.push(deferred(outcome.task_id, "foreign_live_owner"))
-      continue
+      return deferred(outcome.task_id, "foreign_live_owner")
     }
-    outcomes.push(await reviveClaimed(context, claimed, priorResidency, sessionPathFor(claimed.task_id)))
-  }
+    return reviveClaimed(context, claimed, priorResidency, sessionPathFor(claimed.task_id))
+  })
+  outcomes.push(...await Promise.all(revivalPromises))
   // A concurrent sweep may claim a candidate while this sweep waits for the admission lease. The
   // fresh selector then omits it; retain one outcome per observed candidate and report the lost CAS.
   for (const candidate of candidates) {
