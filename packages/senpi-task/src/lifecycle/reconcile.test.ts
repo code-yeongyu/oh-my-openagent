@@ -362,6 +362,21 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(signals).toHaveLength(0)
   })
 
+  test(" w2reattach #given a completed rpc child with a session file #when reconciled #then it is reattached without a pid", async () => {
+    const { store, manager, lifecycle } = createHarness({ taskId: "st_00000016", status: "completed" })
+    store.replace({
+      ...store.load("st_00000016")!,
+      execution_mode: "rpc",
+      pid: undefined,
+      residency_state: "persisted_only",
+    })
+    persistSessions(store, "st_00000016")
+    const result = await lifecycle.reconcileOnSessionStart("parent-1")
+    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(manager.getResidentHandle("st_00000016")).toBeDefined()
+    expect(store.load("st_00000016")?.status).toBe("completed")
+  })
+
   test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {
     // given
     const { store, manager, lifecycle } = createHarness({ taskId: "st_00000007", status: "completed" })

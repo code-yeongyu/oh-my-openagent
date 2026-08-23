@@ -19,6 +19,7 @@ export type ReviveReservation =
 export type SteeringPort = {
   readonly store: TaskRecordStore
   liveHandle(taskId: string): ManagedChildHandle | undefined
+  recoverHandle?(taskId: string): Promise<void>
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
   readonly destruction: DestructionPort

@@ -169,6 +169,10 @@ async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRe
   }
   const pid = record.pid
   if (record.execution_mode !== "process" || record.residency_state !== "resident" || pid === undefined) {
+    const sessionPath = newestSessionPath(context, record.task_id)
+    if (sessionPath !== undefined && context.config.reattach_on_reconcile !== false) {
+      return reattachLegacyRecord(context, record, sessionPath)
+    }
     return { task_id: record.task_id, kind: "resumed" }
   }
 
@@ -264,7 +268,7 @@ function isSuspended(record: TaskRecord): boolean {
   return record.residency_state === "persisted_only" || record.residency_state === "rpc_detached"
 }
 
-function newestSessionPath(context: LifecycleContext, taskId: string): string | undefined {
+export function newestSessionPath(context: LifecycleContext, taskId: string): string | undefined {
   const sessionDir = resolveChildSessionDir(join(context.store.stateDir, "children", taskId), taskId)
   try {
     let newest: { readonly path: string; readonly mtimeMs: number } | undefined

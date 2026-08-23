@@ -63,7 +63,11 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (mode === "not-continuable") {
       return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: TASK_OUTPUT_SUGGESTION }
     }
-    const handle = port.liveHandle(record.task_id)
+    let handle = port.liveHandle(record.task_id)
+    if (handle === undefined && port.recoverHandle !== undefined) {
+      await port.recoverHandle(record.task_id)
+      handle = port.liveHandle(record.task_id)
+    }
     if (handle === undefined) {
       return {
         kind: "not_continuable",
