@@ -89,20 +89,27 @@ export function wireEventBridge(
       printRecoverySessionId = sessionId
       return
     }
+    printDeferReconcileSessionId = undefined
+    printRecoverySessionId = undefined
     await runSessionStartRecovery(sessionId, false)
   })
+
+  const clearDeferredPrintRecovery = () => {
+    printDeferReconcileSessionId = undefined
+    printRecoverySessionId = undefined
+  }
 
   pi.on("session_before_switch", (_payload, eventCtx) => {
     taskRpc.detach()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    printRecoverySessionId = undefined
+    clearDeferredPrintRecovery()
     transitions.onBeforeSwitch(engine.runtime.sessionId())
     engine.runtime.clearUi()
   })
 
   pi.on("session_before_compact", (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    printRecoverySessionId = undefined
+    clearDeferredPrintRecovery()
     transitions.onBeforeCompact(engine.runtime.sessionId())
   })
 
@@ -118,7 +125,7 @@ export function wireEventBridge(
     unsubscribeTaskSnapshots()
     taskRpc.dispose()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    printRecoverySessionId = undefined
+    clearDeferredPrintRecovery()
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
     statusUi.dispose()
@@ -162,7 +169,10 @@ export function wireEventBridge(
     if (printDeferReconcileSessionId !== undefined) {
       const deferredSessionId = printDeferReconcileSessionId
       printDeferReconcileSessionId = undefined
-      await runSessionStartRecovery(deferredSessionId, true)
+      const currentSessionId = engine.runtime.sessionId()
+      if (currentSessionId === undefined || currentSessionId === deferredSessionId) {
+        await runSessionStartRecovery(deferredSessionId, true)
+      }
     }
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"

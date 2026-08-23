@@ -46,6 +46,17 @@ describe("event-bridge session_start recovery chain", () => {
     expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "session_switching" } }])
   })
 
+  it("#given a print-mode deferred recovery #when the session switches away #then before_agent_start does not run it", async () => {
+    const { pi, reconcileCalls, livenessCalls } = wireHarness("parent-session", { mode: "json" })
+
+    await pi.dispatch("session_start", {}, {})
+    await pi.dispatch("session_before_switch", {}, {})
+    await pi.dispatch("before_agent_start", {}, {})
+
+    expect(reconcileCalls).toEqual([])
+    expect(livenessCalls).toEqual([])
+  })
+
   it("#given an interactive TUI session start #when session_start fires #then owed completions redeliver as idle", async () => {
     const { pi, notifyCalls } = wireHarness("parent-session", { mode: "tui" })
 
