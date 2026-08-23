@@ -112,7 +112,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           ),
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
       })
-      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations, dagRuntime)
+      const { forgetTaskOutputReads } = registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations, dagRuntime)
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
@@ -153,6 +153,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
           leadPollers: teamTools.leadPollers,
           resumptionChannels,
+          forgetTaskOutputReads,
           dagReloadSource: createDagReloadSource({
             manager: dagRuntime.manager,
             sessionId: () => engine.runtime.sessionId(),
@@ -202,7 +203,7 @@ function registerTaskTools(
   resolveDefaultTeamRunId: TaskSendTeamRouting["resolveDefaultTeamRunId"],
   skillInvocations: SkillInvocationTracker,
   dagRuntime: DagRuntime,
-): void {
+): { forgetTaskOutputReads: (sessionId: string) => void } {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
   pi.registerTool({
@@ -222,8 +223,11 @@ function registerTaskTools(
     }),
   })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
-  pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
+  const output = createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId })
+  const { forgetSession, ...outputTool } = output
+  pi.registerTool({ ...outputTool })
   registerDagTool(pi, engine, dagRuntime)
+  return { forgetTaskOutputReads: forgetSession }
 }
 
 function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {

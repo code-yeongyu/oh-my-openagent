@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
@@ -63,10 +64,10 @@ export function runTaskOutput(
       record.pid ?? null,
       record.host_pid ?? null,
       record.child_session_id ?? null,
-      record.final_response ?? null,
-      record.error_message ?? null,
+      digestField(record.final_response),
+      digestField(record.error_message),
       record.killed ?? null,
-      record.run_stats ?? null,
+      digestField(record.run_stats),
     ])
     if (statusReads.get(key) === fingerprint) return Promise.resolve(noProgress(record))
     rememberStatusRead(statusReads, key, fingerprint)
@@ -168,7 +169,15 @@ function noProgress(record: TaskRecord): TaskOutputToolResult {
   })
 }
 
-export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> {
+export type TaskOutputTool = ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> & {
+  forgetSession: (sessionId: string) => void
+}
+
+function digestField(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex")
+}
+
+export function createTaskOutputTool(deps: TaskOutputDeps): TaskOutputTool {
   const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
   const statusReads = new Map<string, string>()
   return {
@@ -180,5 +189,11 @@ export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeo
       runTaskOutput(deps, params, resolveCaller(ctx), statusReads),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
+    forgetSession: (sessionId: string) => {
+      for (const key of statusReads.keys()) {
+        const parsed: unknown = JSON.parse(key)
+        if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+      }
+    },
   }
 }

@@ -88,6 +88,50 @@ describe("task_output polling guard", () => {
     expect(unchanged.details).toMatchObject({ kind: "no_progress", task_id: record.task_id })
   })
 
+  test("#given a cached status read #when the session is compacted #then the next peek reissues the snapshot", async () => {
+    const record = makeRecord({ task_id: "st_compact", name: "worker", status: "completed", final_response: "done" })
+    const manager: OutputManager = {
+      get: () => record,
+      list: () => [{ record }],
+    }
+    const output = createTaskOutputTool({
+      manager,
+      stateDir: "/tmp/state",
+      transcriptReader: () => ({ entries: [], source: "none" }),
+    })
+    const execute = () =>
+      output.execute("call", { task_id: record.task_id }, undefined, undefined, context("session-a"))
+
+    expect((await execute()).details.kind).toBe("status")
+    expect((await execute()).details.kind).toBe("no_progress")
+    output.forgetSession("session-a")
+    const afterCompact = await execute()
+    expect(afterCompact.details.kind).toBe("status")
+    if (afterCompact.details.kind === "status") expect(afterCompact.details.snapshot.final_response).toBe("done")
+  })
+
+  test("#given a huge final_response #when status is polled twice #then the cached fingerprint stays bounded", async () => {
+    const huge = "x".repeat(256 * 1024)
+    const record = makeRecord({ task_id: "st_huge", name: "worker", status: "completed", final_response: huge })
+    const manager: OutputManager = {
+      get: () => record,
+      list: () => [{ record }],
+    }
+    const output = createTaskOutputTool({
+      manager,
+      stateDir: "/tmp/state",
+      transcriptReader: () => ({ entries: [], source: "none" }),
+    })
+    const execute = () =>
+      output.execute("call", { task_id: record.task_id }, undefined, undefined, context("session-a"))
+    const first = await execute()
+    const second = await execute()
+    expect(first.details.kind).toBe("status")
+    expect(second.details.kind).toBe("no_progress")
+    expect(JSON.stringify(first).length).toBeGreaterThan(256 * 1024)
+    expect(JSON.stringify(second).length).toBeLessThan(4096)
+  })
+
   test("#given more callers than the status cache limit #when the oldest caller reads again #then its stale fingerprint was evicted", async () => {
     // given
     const record = makeRecord({ task_id: "st_shared", name: "worker" })
