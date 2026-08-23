@@ -209,6 +209,7 @@ export function inferPrintMode(mode: string | undefined, argv: readonly string[]
   if (mode === "json") return true
   if (mode !== undefined) return false
   if (argv.includes("--mode=json")) return true
+  if (argv.includes("-p") || argv.includes("--print")) return true
   const flag = argv.indexOf("--mode")
   return flag >= 0 && argv[flag + 1] === "json"
 }

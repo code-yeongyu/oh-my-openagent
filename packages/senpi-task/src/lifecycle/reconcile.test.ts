@@ -377,6 +377,21 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(store.load("st_00000016")?.status).toBe("completed")
   })
 
+  test("#given an evicted completed record with a session file #when the legacy sweep runs #then it is not respawned", async () => {
+    const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000017", status: "completed" })
+    store.replace({
+      ...store.load("st_00000017")!,
+      execution_mode: "process",
+      pid: undefined,
+      residency_state: "evicted",
+    })
+    persistSessions(store, "st_00000017")
+    const result = await lifecycle.reconcileOnSessionStart()
+    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
+    expect(store.load("st_00000017")?.residency_state).toBe("evicted")
+  })
+
   test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {
     // given
     const { store, manager, lifecycle } = createHarness({ taskId: "st_00000007", status: "completed" })

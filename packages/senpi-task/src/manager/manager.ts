@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
-import { newestSessionPath } from "../lifecycle/reconcile"
+import { defaultSignaller } from "../lifecycle/context"
+import { newestSessionPath, hasForeignLiveOwner } from "../lifecycle/reconcile"
 import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
@@ -174,6 +175,7 @@ class TaskManagerImpl implements TaskManager {
         if (this.#live.has(taskId)) return
         const rec = this.#tryLoad(taskId)
         if (rec === null || rec === undefined) return
+        if (hasForeignLiveOwner({ hostPid: this.#hostPid, signaller: defaultSignaller }, rec)) return
         const sessionPath = newestSessionPath({ store: this.#options.store } as never, rec.task_id)
         if (sessionPath === undefined) return
         const spawned = await this.respawn(rec, sessionPath)

@@ -167,8 +167,11 @@ async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRe
     if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
     return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
   }
+  if (record.residency_state !== "resident") {
+    return { task_id: record.task_id, kind: "resumed", reason: `nonresident ${record.residency_state}` }
+  }
   const pid = record.pid
-  if (record.execution_mode !== "process" || record.residency_state !== "resident" || pid === undefined) {
+  if (record.execution_mode !== "process" || pid === undefined) {
     const sessionPath = newestSessionPath(context, record.task_id)
     if (sessionPath !== undefined && context.config.reattach_on_reconcile !== false) {
       return reattachLegacyRecord(context, record, sessionPath)
@@ -249,7 +252,10 @@ async function terminateClaimedPid(context: LifecycleContext, record: TaskRecord
   return !context.signaller.isAlive(pid)
 }
 
-function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): boolean {
+export function hasForeignLiveOwner(
+  context: Pick<LifecycleContext, "hostPid" | "signaller">,
+  record: TaskRecord,
+): boolean {
   return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
 }
 
