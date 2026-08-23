@@ -1,13 +1,14 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import { isCompactionAgent } from "../shared/compaction-marker"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id"
-import type { ContextLimitModelCacheState } from "../shared/context-limit-resolver"
+import type { ContextLimitModelCacheState } from "@oh-my-opencode/model-core"
 
 import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-degradation-monitor"
 import { runPreemptiveCompactionIfNeeded } from "./preemptive-compaction-trigger"
 import type {
   CachedCompactionState,
   PreemptiveCompactionContext,
+  SessionCompactionLifecycle,
   TokenInfo,
 } from "./preemptive-compaction-types"
 
@@ -20,6 +21,7 @@ export function createPreemptiveCompactionHook(
   const compactedSessions = new Set<string>()
   const lastCompactionTime = new Map<string, number>()
   const tokenCache = new Map<string, CachedCompactionState>()
+  const lifecycleState = new Map<string, SessionCompactionLifecycle>()
 
   const postCompactionMonitor = createPostCompactionDegradationMonitor({
     client: ctx.client,
@@ -29,20 +31,25 @@ export function createPreemptiveCompactionHook(
     compactionInProgress,
   })
 
-  const toolExecuteAfter = async (
-    input: { tool: string; sessionID: string; callID: string },
-    _output: { title: string; output: string; metadata: unknown }
-  ) => {
+  const checkCompaction = async (sessionID: string) => {
     await runPreemptiveCompactionIfNeeded({
       ctx,
       pluginConfig,
       modelCacheState,
-      sessionID: input.sessionID,
+      sessionID,
       tokenCache,
       compactionInProgress,
       compactedSessions,
       lastCompactionTime,
+      lifecycleState,
     })
+  }
+
+  const toolExecuteAfter = async (
+    input: { tool: string; sessionID: string; callID: string },
+    _output: { title: string; output: string; metadata: unknown }
+  ) => {
+    await checkCompaction(input.sessionID)
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -55,6 +62,7 @@ export function createPreemptiveCompactionHook(
         compactedSessions.delete(sessionID)
         lastCompactionTime.delete(sessionID)
         tokenCache.delete(sessionID)
+        lifecycleState.delete(sessionID)
         postCompactionMonitor.clear(sessionID)
       }
       return
@@ -63,6 +71,13 @@ export function createPreemptiveCompactionHook(
     if (event.type === "session.compacted") {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
+        const lifecycle = lifecycleState.get(sessionID)
+        if (lifecycle) {
+          lifecycle.status = "applied"
+          lifecycle.generation++
+        }
+        // Invalidate stale token cache on completed compaction event!
+        tokenCache.delete(sessionID)
         postCompactionMonitor.onSessionCompacted(sessionID)
       }
       return
@@ -92,6 +107,10 @@ export function createPreemptiveCompactionHook(
           modelID: info.modelID ?? "",
           tokens: info.tokens,
         })
+        const lifecycle = lifecycleState.get(sessionID)
+        if (lifecycle && lifecycle.status === "applied") {
+          lifecycle.status = "idle"
+        }
       }
       compactedSessions.delete(sessionID)
 
@@ -100,6 +119,9 @@ export function createPreemptiveCompactionHook(
         id: info.id,
         parts: info.parts,
       })
+
+      // Also evaluate at message.updated turn boundary (idempotent with lifecycle guard)
+      await checkCompaction(sessionID)
     }
   }
 

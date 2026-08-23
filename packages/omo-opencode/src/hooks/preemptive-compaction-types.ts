@@ -11,6 +11,14 @@ export interface CachedCompactionState {
   tokens: TokenInfo
 }
 
+export type CompactionLifecycleStatus = "idle" | "requested" | "applied"
+
+export interface SessionCompactionLifecycle {
+  status: CompactionLifecycleStatus
+  requestedAt?: number
+  generation: number
+}
+
 export interface PreemptiveCompactionClient {
   session: {
     messages: (input: {

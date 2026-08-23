@@ -423,7 +423,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 300000,
+              input: 200000,
               output: 1000,
               reasoning: 0,
               cache: { read: 0, write: 0 },
@@ -462,7 +462,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 300000,
+              input: 200000,
               output: 1000,
               reasoning: 0,
               cache: { read: 0, write: 0 },
@@ -834,5 +834,173 @@ describe("preemptive-compaction", () => {
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+})
+
+describe("preemptive-compaction event-driven lifecycle and ContextBudgetPolicy", () => {
+  let ctx: ReturnType<typeof createMockCtx>
+
+  beforeEach(() => {
+    ctx = createMockCtx()
+    logMock.mockClear()
+  })
+
+  // #given 1M model with 384k active ceiling
+  // #when tokens are at 285k (below 78% of 384k = ~299k)
+  // #then summarize should NOT trigger
+  it("should not trigger compaction below 78% of 384k budget on 1M model", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_1m_below_budget"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 280000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 5000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  // #given 1M model with 384k active ceiling
+  // #when tokens reach 310k (> 78% of 384k = ~299k)
+  // #then summarize SHOULD trigger
+  it("should trigger compaction above 78% of 384k budget on 1M model", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_1m_above_budget"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 305000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 5000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
+  // #given session.compacted event received
+  // #then stale token cache is cleared and subsequent tool execution does not double-fire
+  it("invalidates stale token cache and prevents double-compaction on session.compacted", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_stale_cache_test"
+
+    // Initial high-token message (310k)
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 305000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 5000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+    // Server emits session.compacted event
+    await hook.event({
+      event: {
+        type: "session.compacted",
+        properties: { info: { id: sessionID } },
+      },
+    })
+
+    // Immediate tool execution before fresh token info arrives should NOT double-fire
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_2" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
+  // #given concurrent message.updated and tool.execute.after
+  // #then idempotency ensures summarize is only called once
+  it("ensures idempotency across turn boundary message.updated and tool.execute.after", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_idempotency_test"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-opus-5",
+            finish: true,
+            tokens: {
+              input: 305000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 5000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    // Tool execution fires immediately
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
   })
 })

@@ -26,7 +26,7 @@ function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState):
 
 function hasGA1MContext(modelID: string): boolean {
   return /^claude-(opus|sonnet)-4(?:-|\.)(?:6|7|8)(?:-high)?$/.test(modelID) ||
-    /^claude-(?:fable|mythos|sonnet)-5$/.test(modelID)
+    /^claude-(?:fable|mythos|opus|sonnet)-5$/.test(modelID)
 }
 
 export function resolveActualContextLimit(
@@ -39,7 +39,7 @@ export function resolveActualContextLimit(
     if (explicit1M === ANTHROPIC_GA_1M_LIMIT) return explicit1M
 
     const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
-    if (cachedLimit && hasGA1MContext(modelID)) return cachedLimit
+    if (typeof cachedLimit === "number" && cachedLimit > 0 && hasGA1MContext(modelID)) return cachedLimit
 
     if (hasGA1MContext(modelID)) return ANTHROPIC_GA_1M_LIMIT
 
