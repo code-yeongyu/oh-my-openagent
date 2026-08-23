@@ -249,18 +249,27 @@ class TaskManagerImpl implements TaskManager {
           }
         }
 
+        const reservation = this.#reserveForReattach(freshRec)
+        if (!reservation.ok) {
+          rollback()
+          return
+        }
+
         try {
           const spawned = await this.respawn(freshRec, sessionPath)
           if (!spawned.ok) {
+            reservation.release()
             rollback()
             return
           }
           const reattached = await this.reattach(freshRec, spawned.handle)
           if (!reattached.ok) {
+            reservation.release()
             rollback()
             return
           }
         } catch (error) {
+          reservation.release()
           rollback()
           throw error
         }

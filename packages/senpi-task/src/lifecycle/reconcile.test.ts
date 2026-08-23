@@ -100,6 +100,16 @@ class FakeRespawnRunner {
   }
 }
 
+class HangingRunner extends FakeRunner {
+  override async start(spec: Parameters<FakeRunner["start"]>[0]) {
+    const handle = await super.start(spec)
+    return {
+      ...handle,
+      waitForIdle: () => new Promise<void>(() => {}),
+    }
+  }
+}
+
 class EffectiveSpawnRunner extends FakeRunner {
   override async start(spec: Parameters<FakeRunner["start"]>[0]) {
     const handle = await super.start(spec)
@@ -118,8 +128,8 @@ function createManager(
   hostPid?: number,
   extraConfig?: Record<string, unknown>,
   signaller?: ProcessSignaller,
+  inProcess = new FakeRunner(),
 ) {
-  const inProcess = new FakeRunner()
   const manager = createTaskManager({
     store,
     runners: { "in-process": inProcess, process: processRunner },
@@ -136,7 +146,7 @@ function createManager(
 type HarnessOptions = {
   readonly taskId: string; readonly status?: TaskStatus; readonly sessions?: boolean; readonly alive?: boolean
   readonly config?: Record<string, unknown>; readonly registry?: FakeRegistry
-  readonly concurrency?: number; readonly processRunner?: FakeRunner
+  readonly concurrency?: number; readonly processRunner?: FakeRunner; readonly inProcessRunner?: FakeRunner
 }
 
 function createHarness(options: HarnessOptions) {
@@ -147,7 +157,7 @@ function createHarness(options: HarnessOptions) {
   const signals: SignalCall[] = []
   const alive = options.alive === true ? new Set([900]) : new Set<number>()
   const signaller = fakeSignaller(alive, signals)
-  const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner, undefined, options.config, signaller)
+  const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner, undefined, options.config, signaller, options.inProcessRunner)
   const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller, orphanKillDelayMs: 0 })
   return { store, sessionPath, respawnRunner, signals, lifecycle, ...managed }
 }
@@ -481,6 +491,34 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(respawnRunner.startedSpecs).toHaveLength(1)
     const record = store.load("st_00000023")
     expect(record?.pid).toBe(1001)
+  })
+
+  test("#given concurrency limit reached #when task_send recovers a running orphan child #then recovery defers and rolls back", async () => {
+    const hanging = new HangingRunner()
+    const { store, manager, respawnRunner } = createHarness({ taskId: "st_00000024", status: "running", concurrency: 1, inProcessRunner: hanging })
+    const activeStart = await manager.start({ prompt: "active", parent_session_id: "parent-1", depth: 1, execution_mode: "in-process", model: "anthropic/claude" })
+    expect(activeStart.kind).toBe("started")
+    expect((activeStart as any).status).toBe("running")
+    store.replace({ ...store.load("st_00000024")!, host_pid: 9999 })
+    manager.forget("st_00000024")
+
+    const outcome = await manager.sendToTask({ idOrName: "st_00000024", message: "follow up" })
+    expect(outcome.kind).toBe("not_continuable")
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
+    const record = store.load("st_00000024")
+    expect(record?.host_pid).toBe(9999)
+  })
+
+  test("#given concurrency 1 #when task_send recovers a running orphan child #then the recovered task occupies concurrency", async () => {
+    const { store, manager, respawnRunner } = createHarness({ taskId: "st_00000025", status: "running", concurrency: 1 })
+    store.replace({ ...store.load("st_00000025")!, host_pid: 9999 })
+    manager.forget("st_00000025")
+    const outcome = await manager.sendToTask({ idOrName: "st_00000025", message: "follow up" })
+    expect(outcome.kind).toBe("steered")
+    expect(respawnRunner.startedSpecs).toHaveLength(1)
+    const nextStart = await manager.start({ prompt: "next", parent_session_id: "parent-1", depth: 1, execution_mode: "in-process", model: "anthropic/claude" })
+    expect(nextStart.kind).toBe("started")
+    expect((nextStart as any).status).toBe("pending")
   })
 
   test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {
