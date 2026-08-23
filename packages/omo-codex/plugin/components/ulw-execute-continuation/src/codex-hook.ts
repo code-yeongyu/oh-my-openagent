@@ -5,6 +5,7 @@ import type { ReadonlyFileSystem, StopHookEventName, StopHookOutput, StopInput }
 
 export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
 	if (!isStopInput(input)) return "";
+	if (input.hook_event_name === "SubagentStop") return "";
 	if (input.stop_hook_active) return "";
 	if (hasAllowedExternalBlockerMarker(input.last_assistant_message)) return "";
 	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
