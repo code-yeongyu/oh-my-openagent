@@ -30,8 +30,7 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:PostCompact:1:0", "Resetting Project Rule Cache"],
 	["hooks/hooks.json:PostCompact:2:0", "Resetting LSP Diagnostics Cache"],
 	["hooks/hooks.json:Stop:0:0", "Checking Ulw-Execute Continuation"],
-	["hooks/hooks.json:SubagentStop:0:0", "Checking Ulw-Execute Continuation"],
-	["hooks/hooks.json:SubagentStop:1:0", "Verifying LazyCodex Executor Evidence"],
+	["hooks/hooks.json:SubagentStop:0:0", "Verifying LazyCodex Executor Evidence"],
 ]);
 
 const COMPONENT_EXPECTED_LABELS = new Map([
@@ -47,7 +46,6 @@ const COMPONENT_EXPECTED_LABELS = new Map([
 	["components/ulw-loop/hooks/hooks.json:UserPromptSubmit:0:0", "Checking Ulw-Loop Steering"],
 	["components/ulw-loop/hooks/hooks.json:PreToolUse:0:0", "Enforcing Unlimited Ulw-Loop Budget"],
 	["components/ulw-execute-continuation/hooks/hooks.json:Stop:0:0", "Checking Ulw-Execute Continuation"],
-	["components/ulw-execute-continuation/hooks/hooks.json:SubagentStop:0:0", "Checking Ulw-Execute Continuation"],
 	[
 		"components/lazycodex-executor-verify/hooks/hooks.json:SubagentStop:0:0",
 		"Verifying LazyCodex Executor Evidence",

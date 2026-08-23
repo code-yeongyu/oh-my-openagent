@@ -63,13 +63,25 @@ test("#given aggregate Stop hooks #when inspected #then ulw-execute continuation
 	assert.ok(stopCommands.some((command) => command.includes("ulw-loop/dist/cli.js\" hook stop")));
 });
 
-test("#given aggregate SubagentStop hooks #when inspected #then ulw-execute and LazyCodex executor verifier are separate groups", async () => {
+test("#given aggregate SubagentStop hooks #when inspected #then only the LazyCodex executor verifier remains", async () => {
 	// given
 	const manifests = await readAggregateHookManifests();
+	const componentManifests = await readComponentHookManifests();
 
 	// when
 	const subagentStopGroups = manifests.filter(({ hooks }) => hooks.hooks.SubagentStop).flatMap(({ hooks }) => hooks.hooks.SubagentStop);
-	const verifierGroups = manifests.flatMap(({ source, hooks }) => collectCommandHooks(hooks, source)).filter(
+	const commandHooks = manifests.flatMap(({ source, hooks }) => collectCommandHooks(hooks, source));
+	const continuationGroups = commandHooks.filter(
+		(hook) =>
+			hook.eventName === "SubagentStop" && hook.handler.command.includes("ulw-execute-continuation/dist/cli.js"),
+	);
+	const componentContinuationGroups = componentManifests
+		.flatMap(({ source, hooks }) => collectCommandHooks(hooks, source))
+		.filter(
+			(hook) =>
+				hook.eventName === "SubagentStop" && hook.handler.command.includes("ulw-execute-continuation/dist/cli.js"),
+		);
+	const verifierGroups = commandHooks.filter(
 		(hook) =>
 			hook.eventName === "SubagentStop" &&
 			hook.handler.command ===
@@ -77,9 +89,10 @@ test("#given aggregate SubagentStop hooks #when inspected #then ulw-execute and 
 	);
 
 	// then
-	assert.equal(subagentStopGroups.length, 2);
-	assert.equal(subagentStopGroups[0]?.matcher, undefined);
-	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-worker-(low|medium|high)$");
+	assert.equal(subagentStopGroups.length, 1);
+	assert.equal(subagentStopGroups[0]?.matcher, "^lazycodex-worker-(low|medium|high)$");
+	assert.equal(continuationGroups.length, 0);
+	assert.equal(componentContinuationGroups.length, 0);
 	assert.equal(verifierGroups.length, 1);
 	assert.equal(verifierGroups[0]?.groupIndex, 0);
 	assert.equal(verifierGroups[0]?.handler.timeout, 10);
