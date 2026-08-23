@@ -10708,6 +10708,27 @@
             "truncate_all_tool_outputs": {
               "type": "boolean"
             },
+            "context_budget": {
+              "type": "object",
+              "properties": {
+                "max_active_context_tokens": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "warmup_fraction": {
+                  "type": "number",
+                  "minimum": 0.01,
+                  "maximum": 1
+                },
+                "reserve_tokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "dynamic_context_pruning": {
               "type": "object",
               "properties": {
@@ -25448,6 +25469,27 @@
                   },
                   "truncate_all_tool_outputs": {
                     "type": "boolean"
+                  },
+                  "context_budget": {
+                    "type": "object",
+                    "properties": {
+                      "max_active_context_tokens": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "warmup_fraction": {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "maximum": 1
+                      },
+                      "reserve_tokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "dynamic_context_pruning": {
                     "type": "object",

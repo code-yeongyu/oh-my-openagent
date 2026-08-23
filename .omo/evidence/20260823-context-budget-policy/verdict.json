@@ -1,30 +1,30 @@
 {
-  "timestamp": "2026-08-23T14:18:50.753Z",
-  "target": "preemptive-compaction-hook",
-  "policy": "ContextBudgetPolicy (384k active ceiling, 288k warmup, 35k keepRecent)",
-  "verdict": "PASS",
-  "results": [
-    {
-      "name": "warmup_sub_threshold_check",
-      "expectedSummarize": 0,
-      "actualSummarize": 0,
-      "passed": true
+  "timestamp": "2026-08-23T14:28:00Z",
+  "branch": "feat/context-budget-policy",
+  "status": "PASS",
+  "checks": {
+    "live_hook_driver": {
+      "status": "PASS",
+      "sub_warmup_trigger_count": 0,
+      "supra_warmup_trigger_count": 1,
+      "post_compact_idempotency_pass": true
     },
-    {
-      "name": "warmup_supra_threshold_trigger",
-      "expectedSummarize": 1,
-      "actualSummarize": 1,
-      "passed": true
+    "typecheck": {
+      "status": "PASS",
+      "errors": 0
     },
-    {
-      "name": "session_compacted_stale_cache_invalidation",
-      "expectedSummarize": 1,
-      "actualSummarize": 1,
-      "passed": true
+    "unit_tests": {
+      "status": "PASS",
+      "total": 464,
+      "passed": 464,
+      "failed": 0
+    },
+    "schema_build": {
+      "status": "PASS",
+      "assets_updated": [
+        "assets/omo.schema.json",
+        "assets/oh-my-opencode.schema.json"
+      ]
     }
-  ],
-  "isolation": {
-    "realDbUntouched": true,
-    "tempDirectory": "/tmp/qa-isolated"
   }
 }

@@ -1,13 +1,15 @@
-# QA Evidence: Preemptive Compaction ContextBudgetPolicy & Hook Lifecycle
+# QA Evidence: Preemptive Compaction Context Budget Policy (384k Active Ceiling & Warmup Trigger)
 
-## Scope
-- `packages/model-core/src/context-budget-policy.ts` (SSOT for 384k active ceiling, 288k warmup, 35k keepRecent)
-- `packages/omo-opencode/src/config/schema/context-budget.ts` (Zod schema for `experimental.context_budget`)
-- `packages/omo-opencode/src/hooks/preemptive-compaction-trigger.ts` (policy-driven warmup trigger)
-- `packages/omo-opencode/src/hooks/preemptive-compaction.ts` (event-driven lifecycle with `session.compacted` cache invalidation)
+## Machine & Timestamp
+- Machine: codeg-ops (macOS arm64)
+- Date: Sun Aug 23 23:28:00 KST 2026
 
-## Test & QA Results
-- **Live Hook QA**: `verdict.json` — 3/3 PASS (sub-threshold, supra-threshold, stale-cache invalidation)
-- **Unit Tests**: `focused-bun-test.txt` — 106/106 PASS across core and hook test suites
-- **Typecheck**: `tsgo.txt` — 0 errors (`tsgo --noEmit`)
-- **Isolation**: Real database untouched (`/tmp/qa-isolated` sandbox)
+## Evidence Files
+- `driver.mts`: Standalone live harness executing real lifecycle sequence (`event(message.updated)` -> `tool.execute.after` -> `event(session.compacted)` -> `tool.execute.after`) on `createPreemptiveCompactionHook`.
+- `driver-output.txt`: Live execution output verifying:
+  1. Sub-warmup (250k tokens) triggers 0 summarize calls.
+  2. Supra-warmup (305k tokens >= 288k warmup trigger) triggers exactly 1 summarize call.
+  3. `session.compacted` cache invalidation prevents duplicate/oscillating summarize calls.
+- `tsgo.txt`: 0 type errors across all packages.
+- `focused-bun-test.txt`: 464 focused unit tests passing 100%.
+- `verdict.json`: Structured test verdict summary.

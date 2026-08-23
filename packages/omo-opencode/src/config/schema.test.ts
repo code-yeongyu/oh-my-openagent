@@ -1232,8 +1232,8 @@ describe("ContextBudgetConfigSchema", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.experimental?.context_budget?.max_active_context_tokens).toBe(384_000)
-      expect(result.data.experimental?.context_budget?.keep_recent_tokens).toBe(35_000)
       expect(result.data.experimental?.context_budget?.warmup_fraction).toBe(0.75)
+      expect(result.data.experimental?.context_budget?.reserve_tokens).toBe(16384)
     }
   })
 })

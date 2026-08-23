@@ -1,0 +1,13 @@
+===== PREEMPTIVE COMPACTION HOOK LIVE QA DRIVER =====
+
+[Test 1] message.updated at 250k tokens (Below 288k warmup trigger)
+Summarize calls after 250k: 0 (Expected: 0)
+
+[Test 2] message.updated reaches 305k tokens (> 288k warmup trigger)
+Summarize calls after 305k: 1 (Expected: 1)
+Last summarized session: live-qa-sess-1787495277105 (Expected: live-qa-sess-1787495277105)
+
+[Test 3] session.compacted cache invalidation & idempotency
+Summarize calls after session.compacted: 1 (Expected: 1, no duplicate trigger)
+
+===== LIVE QA DRIVER VERDICT: ALL ASSERTIONS PASSED (100%) =====
