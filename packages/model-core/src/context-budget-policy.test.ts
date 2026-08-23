@@ -59,6 +59,41 @@ describe("ContextBudgetPolicy", () => {
     expect(policy.reserveTokens).toBe(20_000)
   })
 
+  it("keeps a positive active budget when reserve consumes the physical window", () => {
+    const policy = resolveContextBudgetPolicy({
+      providerID: "openai",
+      modelID: "gpt-4",
+      physicalContextWindow: 8_192,
+    })
+
+    expect(policy.maxActiveContextTokens).toBe(1)
+    expect(policy.reserveTokens).toBe(8_191)
+    expect(policy.emergencyHardLimitTokens).toBeGreaterThan(0)
+  })
+
+  it("keeps a one-token budget for a one-token physical window", () => {
+    const policy = resolveContextBudgetPolicy({
+      providerID: "test",
+      modelID: "tiny",
+      physicalContextWindow: 1,
+    })
+
+    expect(policy.maxActiveContextTokens).toBe(1)
+    expect(policy.reserveTokens).toBe(0)
+  })
+
+  it("clamps an oversized configured reserve below the physical window", () => {
+    const policy = resolveContextBudgetPolicy({
+      providerID: "openai",
+      modelID: "gpt-4o",
+      physicalContextWindow: 128_000,
+      config: { reserve_tokens: 200_000 },
+    })
+
+    expect(policy.maxActiveContextTokens).toBe(1)
+    expect(policy.reserveTokens).toBe(127_999)
+  })
+
   it("handles small context models without overflowing ceiling", () => {
     const policy = resolveContextBudgetPolicy({
       providerID: "openai",

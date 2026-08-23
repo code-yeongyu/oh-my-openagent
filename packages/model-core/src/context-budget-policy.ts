@@ -38,18 +38,19 @@ export function isLargeContextModel(physicalContextWindow: number): boolean {
 export function resolveContextBudgetPolicy(options: ResolveContextBudgetOptions): ContextBudgetPolicy {
   const { physicalContextWindow, config } = options
   const isLarge = isLargeContextModel(physicalContextWindow)
-  const reserveTokens = config?.reserve_tokens ?? DEFAULT_RESERVE_TOKENS
+  const requestedReserveTokens = config?.reserve_tokens ?? DEFAULT_RESERVE_TOKENS
+  const reserveTokens = Math.min(requestedReserveTokens, Math.max(0, physicalContextWindow - 1))
 
   let defaultCeiling: number
   if (isLarge) {
     defaultCeiling = DEFAULT_1M_CEILING
   } else {
-    defaultCeiling = Math.max(0, physicalContextWindow - reserveTokens)
+    defaultCeiling = Math.max(1, physicalContextWindow - reserveTokens)
   }
 
   const configuredCeiling = config?.max_active_context_tokens ?? defaultCeiling
   const maxActiveContextTokens = Math.min(
-    Math.max(0, physicalContextWindow - reserveTokens),
+    Math.max(1, physicalContextWindow - reserveTokens),
     configuredCeiling
   )
 
