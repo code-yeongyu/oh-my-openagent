@@ -1,0 +1,20 @@
+bun test v1.3.12 (700fc117)
+
+packages/omo-senpi/src/components/memory/worker/completion.test.ts:
+(pass) reflection completion flow > #given a reflection launch #when its entry renders #then run trigger and backlog are visible [3.52ms]
+(pass) reflection completion flow > #given a legacy completion without enrichment fields #when it renders #then backward compatibility is preserved [3.98ms]
+(pass) reflection completion flow > #given an existing consumed completion #when a retry ensures the same pending record #then consumed delivery is preserved [3.75ms]
+(pass) reflection completion flow > #given an existing completion with a different outcome #when ensured #then corruption is rejected without overwrite [1.70ms]
+(pass) reflection completion flow > #given no live source session #when completion is recorded #then it remains durable and pending [1.41ms]
+(pass) reflection completion flow > #given a worker completion record #when the landed palace collector reads reflection outcomes #then runId outcome and finishedAt match its contract [2.49ms]
+(pass) reflection completion flow > #given a pending offline completion #when its source session starts #then appendEntry notify and consumed state happen without a model message [2.74ms]
+(pass) reflection completion flow > #given target foreign and missing-identity pending completions in one drained directory > #when the target identity drains the backlog > #then only target records are delivered counted and consumed [8.44ms]
+(pass) reflection completion flow > #given a throwing reflection UI > #when a pending completion is delivered > #then the entry is consumed and the UI failure is logged [1.57ms]
+(pass) reflection completion flow > #given eight pending completions for one identity including two older than seven days > #when a different session for that identity drains the backlog twice > #then five details one summary and one notify are emitted once while stale records are silently consumed [9.14ms]
+
+ 10 pass
+ 0 fail
+ 39 expect() calls
+Ran 10 tests across 1 file. [1.70s]
+
+exit_code=0

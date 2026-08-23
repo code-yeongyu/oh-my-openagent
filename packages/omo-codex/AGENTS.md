@@ -1,6 +1,6 @@
 # packages/omo-codex/ - Codex CLI Light Edition (lazycodex)
 
-**Generated:** 2026-07-17
+**Generated:** 2026-08-22 / 74094829e
 
 ## STOP. THIS IS THE CODEX EDITION. QA IS MANDATORY. EVERY SINGLE TIME. INSTALL THE LOCAL BUILD INTO AN ISOLATED `CODEX_HOME`.
 

@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 5,
-						"statusMessage": "(OmO 5.0.0-beta.10) Checking Ultrawork Trigger"
+						"statusMessage": "(OmO 5.0.0-beta.17) Checking Ultrawork Trigger"
 					}
 				]
 			}

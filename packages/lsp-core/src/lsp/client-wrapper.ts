@@ -16,11 +16,11 @@ import {
 	LspServerLookupError,
 } from "./errors.js";
 import { getLspManager, type LspManager } from "./manager.js";
+import { findWorkspaceRootOutsideContext } from "./outside-context-workspace.js";
 import { loadInstallDecision } from "./server-install-state.js";
 import { findServerForExtension } from "./server-resolution.js";
 import type { ServerLookupResult } from "./types.js";
-
-const WORKSPACE_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"];
+import { WORKSPACE_MARKERS } from "./workspace-markers.js";
 
 export function isDirectoryPath(filePath: string): boolean {
 	try {
@@ -38,6 +38,8 @@ export function findWorkspaceRoot(filePath: string): string {
 	if (!isDirectoryPath(dir)) {
 		dir = dirname(dir);
 	}
+
+	if (!isPathInside(cwd, abs)) return findWorkspaceRootOutsideContext(dir);
 
 	const fallbackRoot = nearestExistingDirectoryInsideContext(dir, cwd) ?? cwd;
 	while (isPathInside(cwd, dir)) {
@@ -64,10 +66,7 @@ export function resolveReadablePathInsideContext(filePath: string): string {
 	const rebased = rebaseThroughCanonicalAncestor(abs, cwd);
 	if (rebased !== undefined) return rebased;
 
-	const canonical = canonicalizeExistingOrNearestAncestor(abs);
-	if (isPathInside(cwd, canonical)) return canonical;
-
-	throw new LspInvalidPathError(`LSP file path must be inside request cwd: ${filePath}`);
+	return canonicalizeExistingOrNearestAncestor(abs);
 }
 
 export function resolvePathInsideContext(filePath: string): string {

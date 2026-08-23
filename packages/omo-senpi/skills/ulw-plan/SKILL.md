@@ -86,6 +86,10 @@ WORKED: "add a 5/min-per-IP rate-limit to `/login`" = CLEAR. "make auth better" 
 
 Both intent paths ALSO read **`references/full-workflow.md`** for the shared mechanics - the plan template, the final verification wave, the APPEND protocol, and the full delegation/wait syntax. Read the phase you are in.
 
+## STANCE - HOW TO ASK
+
+Both intent paths ALSO read **`references/stance-calibration.md`** before the first user-facing question. It selects the opening renderer (batch / one-by-one / examples-first) from the planning-style episodes in projected memory - or the cold-start policy when none exist - classifies every fork reply, gates override phrases like "질문 그만" / "니가 정해", and defines the episode recorded at close. Announce the chosen stance in one line beside the intent verdict, with the veto. FIREWALL: stance chooses HOW to ask; it never reinterprets what a reply meant, and no profile biases classification.
+
 ## RUN THE SCRIPT - do not hand-build artifacts
 
 As soon as `<slug>` and intent are known, before recording draft state, RUN:
@@ -109,6 +113,7 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 - **Explore before asking.** Discoverable facts (repo/system/docs truth) -> research and cite, never ask. Preferences/tradeoffs -> the only things you bring to the user. When unsure which, treat it as a user-decision.
 - **LSP and ast-grep first, tiered.** Repo how/where/what/flow questions: LSP tools for definitions/references/symbols, then the ast-grep skill (`sg` / `ast_grep` MCP) for structural shapes, then `rg` for plain text; for blast radius or flow, fan out parallel explore agents armed with ast-grep - no symbol graph exists to map it for you.
 - **Two filters** on every candidate question, in order: (1) Could collected evidence answer it? -> explore instead. (2) Could the user's stated intent plus a defensible default answer it? -> adopt the default, record it, do not ask - UNLESS it is an owner-decision, which always survives as a question even when a default exists: anything irreversible / destructive / safety-critical, or a cross-cutting product choice the user lives with (public config surface, distribution / packaging, external dependency or pinned SHA, data / schema shape, real budget / paid-service spend, expected scale or capacity target, target-audience / compliance limits). Extrinsic constraints (budget, mandated stack, scale, audience) leave no repo evidence, so exploration can never surface them - sweep those axes explicitly once per plan and classify each as explored, defaulted (ledger), or asked. Default the reversible internals; surface the owner-decisions.
+- **Owner-decisions survive every override.** "질문 그만" / "니가 정해" and kin stop questions, not authorization: surviving irreversible, destructive, or spend decisions are consolidated into ONE final authorization block (mechanics in `references/stance-calibration.md`), never silently adopted.
 - **Explore to sufficiency, then STOP.** One research wave per open question; stop when the clearance check is answerable; never re-explore to double-check.
 - **Parallel-dispatch** independent research in ONE turn and keep working while it runs. Subagent outputs are CLAIMS until you independently verify them.
 - **Approval is not execution.** Approval authorizes writing the plan ONLY, never implementation. ONE request -> ONE plan, however large.
@@ -133,3 +138,4 @@ Roles - the ONLY subagents you may spawn (all read-only; `momus` also runs the h
 
 - Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts are recorded: present the handoff explanation (Phase 4 delivery format in `references/full-workflow.md`), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. **Never begin execution yourself.**
 - Brief presented and `status: awaiting-approval` recorded: wait. Do not re-explore unless the user changes scope.
+- Before ending a completed planning session, run the close step in `references/stance-calibration.md`: append 0-2 qualified planning-style episodes via the memory tool; skip silently when memory tools are absent.

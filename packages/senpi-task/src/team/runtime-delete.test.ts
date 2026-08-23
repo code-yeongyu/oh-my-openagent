@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { createRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
@@ -16,6 +16,13 @@ import {
   taskSettings,
   tempProjectDir,
 } from "./__fixtures__/runtime-fakes"
+
+// bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
+// setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
+// the built-in 5000ms. These deletion cases create a real team under a fresh temp dir and drive
+// lock-file acquisition plus concurrent cancellation/destruction, which overshoots 5s on a loaded
+// windows runner (observed: 5418ms). Set the floor here, where Bun does honour it.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 afterEach(() => {
   cleanupTeamRuntimeTmp()

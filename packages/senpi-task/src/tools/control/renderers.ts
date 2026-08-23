@@ -149,6 +149,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+    case "capacity_deferred":
+      return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
     case "not_continuable":
       return { color: "warning", text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}` }
     case "one_shot_agent":

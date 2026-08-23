@@ -1,9 +1,10 @@
 import { afterEach } from "bun:test"
 import { execFile } from "node:child_process"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import {
   GitMemoryRepo,
@@ -32,7 +33,7 @@ const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
 // test file's budget - the exact shape of the tools-apply-patch timeout on CI.
 async function removeRoot(root: string): Promise<void> {
   try {
-    await rm(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
   } catch (error) {
     // A lingering Windows handle can outlast the bounded retry window. Ignore only that platform's
     // known cleanup races; every other cleanup defect still fails loudly.

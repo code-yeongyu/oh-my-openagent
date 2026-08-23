@@ -149,11 +149,30 @@ function defaultWhich(command: string): string | undefined {
   return undefined
 }
 
+/**
+ * Canonicalizes as much of the path as exists and re-joins the remaining segments.
+ *
+ * The sandbox is built BEFORE the reflection child runs, and several granted entries
+ * (runtime/reflection, runtime/reflection-sessions, the resolved agent dir, XDG_CONFIG_HOME)
+ * legitimately do not exist yet on a fresh machine or a first reflection. A bare realpathSync
+ * throws `ENOENT ... lstat '<first missing ancestor>'` there, which surfaced as a pre-spawn
+ * `spawn_failed` and stalled the reflection cursor.
+ *
+ * Only the existing prefix is resolved through the filesystem; the absent tail is appended
+ * verbatim, so the grant always names the full intended path and can never widen to an ancestor.
+ */
 function canonicalPath(path: string): string {
-  return realpathSync(path)
+  const segments: string[] = []
+  let current = path
+  for (;;) {
+    if (existsSync(current)) return join(realpathSync(current), ...segments.reverse())
+    const parent = dirname(current)
+    if (parent === current) return path
+    segments.push(basename(current))
+    current = parent
+  }
 }
 
-/** Canonicalizes the existing parent and re-joins the basename, so an absent entry never throws. */
 function canonicalAbsentPath(path: string): string {
   return join(canonicalPath(dirname(path)), basename(path))
 }

@@ -20,12 +20,47 @@ type SidebarApiForTest = {
     readonly path: {
       readonly directory: string
     }
+    readonly session: {
+      readonly get: () => undefined
+      readonly messages: () => []
+      readonly status: () => { readonly type: "idle" }
+      readonly permission: () => []
+      readonly question: () => []
+    }
   }
   readonly theme: {
     readonly current: Record<string, unknown>
   }
   readonly slots: {
     readonly register: (registration: TuiSlotPlugin) => string
+  }
+  readonly client: {
+    readonly session: {
+      readonly list: () => Promise<{ readonly data: [] }>
+      readonly create: () => Promise<{ readonly data: undefined }>
+      readonly abort: () => Promise<{ readonly data: true }>
+      readonly delete: () => Promise<{ readonly data: true }>
+    }
+  }
+  readonly keymap: {
+    readonly registerLayer: () => () => void
+  }
+  readonly mode: {
+    readonly current: () => string
+  }
+  readonly route: {
+    readonly current: {
+      readonly name: "home"
+    }
+    readonly navigate: () => void
+  }
+  readonly event: {
+    readonly on: () => () => void
+  }
+  readonly ui: {
+    readonly Prompt: () => undefined
+    readonly Slot: () => undefined
+    readonly toast: () => void
   }
   readonly renderer: {
     readonly requestRender: () => void
@@ -65,7 +100,16 @@ describe("TUI sidebar polling", () => {
     }))
 
     const api = {
-      state: { path: { directory: tempDir } },
+      state: {
+        path: { directory: tempDir },
+        session: {
+          get: () => undefined,
+          messages: () => [],
+          status: () => ({ type: "idle" as const }),
+          permission: () => [],
+          question: () => [],
+        },
+      },
       theme: { current: {} },
       slots: {
         register: (nextRegistration: TuiSlotPlugin): string => {
@@ -73,6 +117,32 @@ describe("TUI sidebar polling", () => {
           registration = nextRegistration
           return "omo-sidebar-slot"
         },
+      },
+      client: {
+        session: {
+          list: async () => ({ data: [] }),
+          create: async () => ({ data: undefined }),
+          abort: async () => ({ data: true as const }),
+          delete: async () => ({ data: true as const }),
+        },
+      },
+      keymap: {
+        registerLayer: (): (() => void) => () => undefined,
+      },
+      mode: {
+        current: () => "base",
+      },
+      route: {
+        current: { name: "home" as const },
+        navigate: () => undefined,
+      },
+      event: {
+        on: (): (() => void) => () => undefined,
+      },
+      ui: {
+        Prompt: () => undefined,
+        Slot: () => undefined,
+        toast: () => undefined,
       },
       renderer: {
         requestRender: (): void => {
@@ -92,7 +162,7 @@ describe("TUI sidebar polling", () => {
     await tuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
 
     // then
-    expect(calls).toEqual(["register", "render"])
+    expect(calls).toEqual(["register", "register", "render"])
     expect(registration).toBeDefined()
     if (!registration) {
       throw new Error("sidebar slot was not registered")

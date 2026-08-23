@@ -45,9 +45,10 @@ bunx oh-my-opencode
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
-| `config migrate` | Migrate legacy OMO configuration into the unified config |
+| `config migrate` | Migrate legacy OMO configuration into the unified config at `~/.omo/omo.jsonc` (`--dry-run` prints the transform/backup plan without writing, `--json` emits a machine-readable report) |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
-| `boulder` | Inspect Sisyphus boulder work-state (active plan, per-task timers, session lineage) |
+| `update` | `lazycodex` / `lazycodex-ai` bins only: refresh the installed Codex Light edition in place (`--dry-run`, `--repo-root <path>`) |
+| `boulder` | Inspect Sisyphus boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
 
@@ -81,7 +82,7 @@ bunx oh-my-openagent install
 | `--minimax-cn-coding-plan <value>` | MiniMax Coding Plan through minimaxi.com: `no`, `yes` (Ultimate only) |
 | `--minimax-coding-plan <value>` | MiniMax Coding Plan through minimax.io: `no`, `yes` (Ultimate only) |
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
-| `--codex-autonomous` | Configure Codex with `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` when installing Light or Both |
+| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
@@ -91,7 +92,7 @@ Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` i
 
 ### Telemetry and opt-out
 
-Anonymous telemetry uses PostHog with a hashed installation identifier. Two streams exist:
+Anonymous telemetry uses PostHog with a SHA-256 hash of a machine-ID prefix plus hostname (not an install-specific identifier). Two streams exist:
 
 - `omo_daily_active`: fired by the main plugin when it loads (`reason: "plugin_loaded"`) and by `oh-my-openagent run` (`reason: "run_started"`).
 - `omo_codex_daily_active`: fired by `omo-agent-toolkit install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
@@ -109,7 +110,7 @@ For the full Codex Light event inventory, collected properties, local state path
 
 ## uninstall / cleanup
 
-Removes managed Codex Light state. `cleanup` remains available as a backward-compatible alias.
+Removes managed Codex Light state. `cleanup` is the underlying command name; `uninstall` is the user-facing alias. Both invoke the same Codex Light cleanup.
 
 ### Usage
 
@@ -127,13 +128,13 @@ omo-agent-toolkit uninstall --platform=codex
 | `--project <path>` | Project directory to inspect for project-local legacy Codex artifacts |
 | `--json` | Output structured JSON result |
 
-The command removes the managed `sisyphuslabs` plugin cache and marketplace snapshot, strips `omo@sisyphuslabs` plugin, hook-state, and managed agent blocks from `~/.codex/config.toml` after writing a backup, and removes managed agent TOML files from `~/.codex/agents/`, including orphaned files whose install manifest is already gone. Project-owned `.codex` artifacts are reported, not deleted.
+The command removes the managed plugin cache and marketplace snapshot, strips managed marketplace, plugin, hook-state, and agent blocks for `sisyphuslabs` and the legacy `lazycodex` / `code-yeongyu-codex-plugins` marketplaces from `~/.codex/config.toml` after writing a backup, and removes managed agent TOML files from `~/.codex/agents/` (including orphaned files whose install manifest is already gone), managed bins, and managed runtime trees. Project-owned `.codex` artifacts are reported, not deleted.
 
 ---
 
 ## doctor
 
-Diagnoses your environment and configuration. OpenCode checks are grouped as **System**, **Config**, **TUI Plugin**, **Deprecated Reasoning Keys**, **Tools**, **Models**, **Telemetry**, and **Team Mode**. The Codex target runs a separate set of Codex checks.
+Diagnoses your environment and configuration. OpenCode checks are grouped as **System**, **Configuration**, **TUI Plugin**, **Deprecated Reasoning Keys**, **Tools**, **Models**, **Telemetry**, and **Team Mode**. The Codex target runs a separate set of Codex checks.
 
 ### Usage
 
@@ -159,10 +160,12 @@ bunx oh-my-openagent doctor
 
 ## run
 
-Runs a non-interactive session and exits only when both conditions are true:
+Runs a non-interactive session and exits only when all of these conditions are true:
 
+- the main session is idle
 - all todos are completed or cancelled
-- all background child sessions are idle
+- all descendant sessions are idle
+- no continuation hooks (boulder, ralph-loop, or todo-hook markers) are active
 
 ### Usage
 
@@ -292,5 +295,7 @@ bunx oh-my-openagent mcp oauth status [server-name]
 
 - `0` on success
 - `1` on failure
+- `2` when the boulder state file exists but can't be read
+- `130` when `run` is aborted
 
-`run`, `install`, `doctor`, `get-local-version`, `refresh-model-capabilities`, and `mcp oauth` subcommands return explicit numeric exit codes.
+`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.

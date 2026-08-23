@@ -25,10 +25,13 @@ function captureRealRequireResolveFailure(): unknown {
 }
 
 describe("isModuleResolutionFailure", () => {
-  it("#given a real Bun dynamic-import failure #when classifying #then it is a resolution failure even though it is not an Error instance", async () => {
+  it("#given a real Bun dynamic-import failure #when classifying #then it is a resolution failure whatever its prototype", async () => {
     const resolveMessage = await captureRealImportFailure()
 
-    expect(resolveMessage instanceof Error).toBe(false)
+    // Bun's ResolveMessage stopped being a non-Error object in Bun 1.4 (it now extends Error),
+    // so pin the identity that is stable across toolchains instead of the prototype.
+    expect((resolveMessage as { name?: string }).name).toBe("ResolveMessage")
+    expect((resolveMessage as { code?: string }).code).toBe("ERR_MODULE_NOT_FOUND")
     expect(isModuleResolutionFailure(resolveMessage)).toBe(true)
   })
 

@@ -15,9 +15,10 @@ import {
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { existsSync, realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
 async function fixture(trigger: "step-count" | "dream" = "step-count") {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-")))
@@ -269,7 +270,7 @@ describe("reflection and dream run reconciliation", () => {
   test("#given old pre-launch reservations with unverifiable or reused launcher pids #when reconciled #then only confirmed pid reuse releases the reservation", async () => {
     // given
     const unknown = await fixture()
-    await rm(unknown.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await rmEfaultTolerant(unknown.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 
     // when
     const untouched = await reconcileReflectionRuns({

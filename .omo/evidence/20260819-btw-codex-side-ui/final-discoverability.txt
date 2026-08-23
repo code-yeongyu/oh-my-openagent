@@ -1,0 +1,11 @@
+Surface: OpenCode 1.18.18 TUI command autocomplete
+Build: worktree dist/tui.js built with repository-pinned Bun 1.3.12
+Input: /btw
+
+Observed top autocomplete row:
+
+  /btw    Start a temporary side conversation without interrupting the main turn
+
+The row appeared after the real TUI received physical keyboard input. This
+proves the host-facing legacy command registration feeds the OpenCode slash
+palette; keymap-only command metadata did not.

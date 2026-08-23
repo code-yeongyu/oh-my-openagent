@@ -1,0 +1,374 @@
+Focused regression:
+  command:
+    bun test C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    14 pass
+    0 fail
+    30 expect() calls
+    exit_code=0
+
+Complete runtime-fallback suite:
+  first command:
+    bun test C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback
+  first observed:
+    256 pass
+    1 fail
+    one hook.init beforeEach exceeded Bun's default 5000 ms while loading modules
+
+  isolated diagnosis:
+    bun test C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback/hook.init.test.ts
+    2 pass
+    0 fail
+    exit_code=0
+
+  deterministic rerun with a filesystem-safe per-test timeout:
+    bun test --timeout 15000 C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback
+    257 pass
+    0 fail
+    460 expect() calls
+    exit_code=0
+
+TypeScript no-excuse audit:
+  command:
+    bun run packages/omo-senpi/plugin/skills/programming/scripts/typescript/check-no-excuse-rules.ts <three changed TypeScript files>
+  observed:
+    No violations in 3 file(s).
+    exit_code=0
+
+Workspace package typecheck:
+  command:
+    bun run typecheck:packages
+  observed:
+    all workspace tsgo invocations completed
+    exit_code=0
+
+Production build:
+  command:
+    cd C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579
+    bun build packages/omo-opencode/src/index.ts --outdir C:/Users/pss/AppData/Local/Temp/pr6611-build-merged --target bun --format esm --external zod
+  observed:
+    Bundled 1986 modules in 4713ms
+    index.js 5.78 MB
+    exit_code=0
+
+Source-loaded bundle rebuild:
+  command:
+    bun build packages/omo-opencode/src/index.ts --outdir dist --target bun --format esm --external zod
+    bun run build:node-require-shim
+  observed:
+    Bundled 1986 modules
+    Patched Node/Electron require shim in dist/index.js
+    bundle_sha256=46da5c49dc88c27840fd70d6a61f33ae316531cc5d34162b4e6d3cede13473e5
+    bundle contains:
+      output.message.variant ?? input.variant
+      const parsedModel = parseModelString(runtimeModel);
+      fallbackState.pendingFallbackModel = effectiveRetryModel;
+      clearFallbackWatchdog(sessionID);
+      clearModelLessRetryKeys(sessionID);
+      areRuntimeModelsEquivalent(
+      resolveAgentVariant(pluginConfig, resolvedAgent)
+      === fallbackState
+      lowerReasoningForModel(
+      two resolveAgentVariant(pluginConfig, callsites
+      retryDispatched = true
+      buildRetryModelPayload(fallbackModel
+      part.synthetic === true
+      Session fallback timeout skipped for stale state generation
+    exit_code=0
+
+Full repository build:
+  command:
+    bun run build
+  observed:
+    The OpenCode index, CLI, TUI, schemas, and supporting MCPs built.
+    The unrelated Senpi extension materialization then failed on a Windows
+    OneDrive file-open error while writing
+    packages/omo-senpi/plugin/extensions/omo-member.js.
+    This path is outside the PR diff. The changed OpenCode entry was therefore
+    validated separately above rather than suppressing the repository error.
+
+Post-upstream-merge verification:
+  focused runtime-fallback command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    14 pass
+    0 fail
+    30 expect() calls
+    exit_code=0
+
+Adapter-contract correction:
+  focused command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    14 pass
+    0 fail
+    30 expect() calls
+    exit_code=0
+
+Variant fallback output correction:
+  focused command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    15 pass
+    0 fail
+    31 expect() calls
+    exit_code=0
+
+Inherited agent variant correction:
+  focused command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    21 pass
+    0 fail
+    46 expect() calls
+    exit_code=0
+
+Three adjacent variant lifecycle corrections:
+  focused command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/normalize-model.test.ts packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+  observed:
+    23 pass
+    0 fail
+    50 expect() calls
+    exit_code=0
+
+Model-less fallback generation correction:
+  focused command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+  observed:
+    9 pass
+    0 fail
+    22 expect() calls
+    exit_code=0
+
+Production-shaped generation and session index correction:
+  focused commands:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    26 pass
+    0 fail
+    72 expect() calls
+    exit_code=0
+
+Corrected committed regression wiring:
+  focused command:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+  observed:
+    26 pass
+    0 fail
+    72 expect() calls
+    exit_code=0
+
+Final three review regressions:
+  focused commands:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+  observed:
+    22 pass
+    0 fail
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    263 pass
+    0 fail
+    475 expect() calls
+    exit_code=0
+
+  package typecheck and strict audit:
+    bun run typecheck:packages
+    check-no-excuse-rules.ts <four changed TypeScript files>
+  observed:
+    all workspace tsgo invocations completed
+    No violations in 4 file(s).
+    exit_code=0
+
+Replacement-state rollback verification:
+  RED:
+    bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+    Expected: "google/gemini-2.5-pro"
+    Received: "anthropic/claude-opus-4-7"
+    7 pass, 1 fail
+
+  GREEN:
+    auto-retry-dispatch.test.ts: 8 pass, 0 fail
+    focused final set: 23 pass, 0 fail
+    full runtime-fallback: 264 pass, 0 fail, 476 expect() calls
+
+  package typecheck and strict audit:
+    bun run typecheck:packages
+    check-no-excuse-rules.ts auto-retry-dispatch.ts auto-retry-dispatch.test.ts
+    observed:
+      all workspace tsgo invocations completed
+      No violations in 2 file(s).
+      exit_code=0
+
+Final capability/category P2 verification:
+  RED:
+    focused command:
+      bun test retry-model-payload.test.ts auto-retry-dispatch.test.ts event-handler.test.ts
+    observed:
+      24 pass
+      3 fail
+      unsupported reasoning mis-encoded
+      category-created fallback index remained -1
+
+  GREEN:
+    focused: 27 pass, 0 fail, 69 expect() calls
+    full runtime-fallback: 266 pass, 0 fail, 480 expect() calls
+    package typecheck: exit_code=0
+    strict audit: No violations in 6 file(s).
+
+  CI-remediation proof:
+    first local final typecheck reproduced TS18048 at
+    auto-retry-dispatch.ts:251-252.
+    adding the defined-state requirement to both identity guards made the
+    complete package typecheck pass.
+
+Explicit variant precedence:
+  RED:
+    retry-model-payload.test.ts
+    received contradictory variant "medium" + reasoningEffort "high"
+    9 pass, 1 fail
+
+  GREEN:
+    full runtime-fallback: 267 pass, 0 fail, 481 expect() calls
+    package typecheck: exit_code=0
+    strict audit: No violations in 2 file(s).
+
+Accepted queued fallback state:
+  RED:
+    auto-retry-dispatch.test.ts
+    expected openai/gpt-5.4(high)
+    received google/gemini-2.5-pro
+    8 pass, 1 fail
+
+  GREEN:
+    focused: 20 pass, 0 fail, 56 expect() calls
+    full runtime-fallback: 268 pass, 0 fail, 486 expect() calls
+    package typecheck: exit_code=0
+    strict audit: No violations in 3 file(s).
+
+Created fallback reasoning index:
+  RED:
+    event-handler.test.ts
+    expected original primary anthropic/claude-opus-4-7
+    received test-provider/test-model
+    10 pass, 1 fail
+
+  GREEN:
+    focused: 21 pass, 0 fail, 53 expect() calls
+    full runtime-fallback: 269 pass, 0 fail, 489 expect() calls
+    package typecheck: exit_code=0
+    strict audit: No violations in 2 file(s).
+
+Synthetic retry adapter acknowledgment:
+  RED:
+    plugin/chat-message.test.ts
+    expected ["runtimeFallback"]
+    received []
+    30 pass, 1 fail
+
+  GREEN:
+    focused: 54 pass, 0 fail, 133 expect() calls
+    full runtime-fallback: 269 pass, 0 fail, 489 expect() calls
+    package typecheck: exit_code=0
+    strict audit: No violations in 2 file(s).
+
+Stale timeout generation:
+  RED:
+    auto-retry-timeout.test.ts
+    expected retryCalls=0
+    received retryCalls=1
+    2 pass, 1 fail
+
+  GREEN:
+    focused: 17 pass, 0 fail, 44 expect() calls
+    full runtime-fallback: 270 pass, 0 fail, 491 expect() calls
+    package typecheck: exit_code=0
+    strict audit: No violations in 2 file(s).
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    262 pass
+    0 fail
+    472 expect() calls
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    262 pass
+    0 fail
+    472 expect() calls
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    261 pass
+    0 fail
+    470 expect() calls
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    260 pass
+    0 fail
+    468 expect() calls
+    exit_code=0
+
+  workspace typecheck and strict audit:
+    bun run typecheck:packages
+    check-no-excuse-rules.ts <seven changed TypeScript files>
+  observed:
+    all workspace tsgo invocations completed
+    No violations in 7 file(s).
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    259 pass
+    0 fail
+    464 expect() calls
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    258 pass
+    0 fail
+    461 expect() calls
+    exit_code=0
+
+  full runtime-fallback command:
+    bun test --timeout 15000 packages/omo-opencode/src/hooks/runtime-fallback
+  observed:
+    257 pass
+    0 fail
+    460 expect() calls
+    exit_code=0
+
+  workspace package typecheck:
+    bun run typecheck:packages
+  observed:
+    all workspace tsgo invocations completed
+    exit_code=0
+
+  workspace package typecheck:
+    bun run typecheck:packages
+  observed:
+    all workspace tsgo invocations completed
+    exit_code=0
+
+  upstream Windows regression:
+    The prior GitHub Windows failure was two 5-second timeouts in memory
+    deletion-reservation tests, outside the PR diff. Upstream commit
+    9c077f24c ("fix(memory): make runner deadline assertion deterministic")
+    was merged into this branch before push.

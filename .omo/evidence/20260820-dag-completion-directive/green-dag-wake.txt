@@ -1,0 +1,18 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/dag-wake.test.ts:
+(pass) dag wake > #given one failed run and an idle parent #when its terminal event arrives #then exactly one dag-run steer contains counts and the first failure [0.81ms]
+(pass) dag wake > #given two terminal runs in one window #when the fake timer flushes #then one coordinator steer carries both summaries [0.16ms]
+(pass) dag wake > #given a terminal during compaction #when session_start resumes the same session #then the buffered notification is redelivered [0.16ms]
+(pass) dag wake > #given mid-run wave and node events #when every fake timer runs #then wake call count remains exactly zero [0.13ms]
+(pass) dag wake > #given a DAG terminal and task completion in one window #when flushed #then the task completion is ordered first [0.11ms]
+(pass) dag wake > #given a run paused by session shutdown and an idle parent #when the pause event arrives #then one steer tells the main session the dag was paused [0.14ms]
+(pass) dag wake > #given a pause during session shutdown #when the session starts again #then the buffered pause notice is redelivered [0.10ms]
+(pass) dag wake > #given a terminal run event and an idle parent #when the injection is delivered #then its content carries the dag verification directive [0.12ms]
+(pass) dag wake > #given a paused run event #when the injection is delivered #then its content omits the dag verification directive [0.11ms]
+(pass) dag wake > #given a pause with no reason #when the event arrives #then the summary omits the reason clause [0.08ms]
+
+ 10 pass
+ 0 fail
+ 37 expect() calls
+Ran 10 tests across 1 file. [491.00ms]

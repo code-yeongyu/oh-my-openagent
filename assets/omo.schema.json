@@ -807,6 +807,31 @@
       ],
       "additionalProperties": false
     },
+    "git_master": {
+      "type": "object",
+      "properties": {
+        "commit_footer": {
+          "default": true,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "include_co_authored_by": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "commit_footer",
+        "include_co_authored_by"
+      ],
+      "additionalProperties": false
+    },
     "task": {
       "type": "object",
       "properties": {
@@ -821,7 +846,13 @@
         "default_concurrency": {
           "default": 5,
           "type": "integer",
-          "exclusiveMinimum": 0,
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "global_concurrency": {
+          "default": 8,
+          "type": "integer",
+          "minimum": 0,
           "maximum": 9007199254740991
         },
         "provider_concurrency": {
@@ -831,7 +862,7 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 0,
             "maximum": 9007199254740991
           }
         },
@@ -842,7 +873,7 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 0,
             "maximum": 9007199254740991
           }
         },
@@ -857,7 +888,7 @@
           "anyOf": [
             {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             {
@@ -1034,6 +1065,7 @@
       "required": [
         "default_execution_mode",
         "default_concurrency",
+        "global_concurrency",
         "max_depth",
         "residency_max_children",
         "ttl_ms",
@@ -1525,6 +1557,22 @@
           ],
           "additionalProperties": false
         },
+        "write_notice": {
+          "default": {
+            "enabled": true
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "additionalProperties": false
+        },
         "sync": {
           "default": {
             "enabled": true
@@ -1718,6 +1766,15 @@
                 },
                 "additionalProperties": false
               },
+              "write_notice": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "sync": {
                 "type": "object",
                 "properties": {
@@ -1760,6 +1817,7 @@
         "dream",
         "people",
         "soul",
+        "write_notice",
         "sync",
         "search",
         "compile_warn_tokens",
@@ -10988,7 +11046,7 @@
           "properties": {
             "defaultConcurrency": {
               "type": "number",
-              "minimum": 1
+              "minimum": 0
             },
             "providerConcurrency": {
               "type": "object",
@@ -12507,6 +12565,25 @@
           },
           "additionalProperties": false
         },
+        "git_master": {
+          "type": "object",
+          "properties": {
+            "commit_footer": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "include_co_authored_by": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -12519,7 +12596,12 @@
             },
             "default_concurrency": {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_concurrency": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "provider_concurrency": {
@@ -12529,7 +12611,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -12540,7 +12622,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -12553,7 +12635,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 {
@@ -13051,6 +13133,15 @@
               },
               "additionalProperties": false
             },
+            "write_notice": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "sync": {
               "type": "object",
               "properties": {
@@ -13223,6 +13314,15 @@
                     "type": "object",
                     "properties": {
                       "edit_notice": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
                         "type": "boolean"
                       }
                     },
@@ -14066,6 +14166,25 @@
           },
           "additionalProperties": false
         },
+        "git_master": {
+          "type": "object",
+          "properties": {
+            "commit_footer": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "include_co_authored_by": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -14078,7 +14197,12 @@
             },
             "default_concurrency": {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_concurrency": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "provider_concurrency": {
@@ -14088,7 +14212,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -14099,7 +14223,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -14112,7 +14236,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 {
@@ -14610,6 +14734,15 @@
               },
               "additionalProperties": false
             },
+            "write_notice": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "sync": {
               "type": "object",
               "properties": {
@@ -14782,6 +14915,15 @@
                     "type": "object",
                     "properties": {
                       "edit_notice": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
                         "type": "boolean"
                       }
                     },
@@ -15631,6 +15773,25 @@
             },
             "additionalProperties": false
           },
+          "git_master": {
+            "type": "object",
+            "properties": {
+              "commit_footer": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "include_co_authored_by": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "task": {
             "type": "object",
             "properties": {
@@ -15643,7 +15804,12 @@
               },
               "default_concurrency": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "global_concurrency": {
+                "type": "integer",
+                "minimum": 0,
                 "maximum": 9007199254740991
               },
               "provider_concurrency": {
@@ -15653,7 +15819,7 @@
                 },
                 "additionalProperties": {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 }
               },
@@ -15664,7 +15830,7 @@
                 },
                 "additionalProperties": {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 }
               },
@@ -15677,7 +15843,7 @@
                 "anyOf": [
                   {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   {
@@ -16175,6 +16341,15 @@
                 },
                 "additionalProperties": false
               },
+              "write_notice": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "sync": {
                 "type": "object",
                 "properties": {
@@ -16347,6 +16522,15 @@
                       "type": "object",
                       "properties": {
                         "edit_notice": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "write_notice": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
                           "type": "boolean"
                         }
                       },
@@ -25603,7 +25787,7 @@
                 "properties": {
                   "defaultConcurrency": {
                     "type": "number",
-                    "minimum": 1
+                    "minimum": 0
                   },
                   "providerConcurrency": {
                     "type": "object",
@@ -27122,6 +27306,25 @@
                 },
                 "additionalProperties": false
               },
+              "git_master": {
+                "type": "object",
+                "properties": {
+                  "commit_footer": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "include_co_authored_by": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -27134,7 +27337,12 @@
                   },
                   "default_concurrency": {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "global_concurrency": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "provider_concurrency": {
@@ -27144,7 +27352,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -27155,7 +27363,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -27168,7 +27376,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "exclusiveMinimum": 0,
+                        "minimum": 0,
                         "maximum": 9007199254740991
                       },
                       {
@@ -27666,6 +27874,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -27838,6 +28055,15 @@
                           "type": "object",
                           "properties": {
                             "edit_notice": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "write_notice": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
                               "type": "boolean"
                             }
                           },
@@ -28681,6 +28907,25 @@
                 },
                 "additionalProperties": false
               },
+              "git_master": {
+                "type": "object",
+                "properties": {
+                  "commit_footer": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "include_co_authored_by": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -28693,7 +28938,12 @@
                   },
                   "default_concurrency": {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "global_concurrency": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "provider_concurrency": {
@@ -28703,7 +28953,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -28714,7 +28964,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -28727,7 +28977,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "exclusiveMinimum": 0,
+                        "minimum": 0,
                         "maximum": 9007199254740991
                       },
                       {
@@ -29225,6 +29475,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -29397,6 +29656,15 @@
                           "type": "object",
                           "properties": {
                             "edit_notice": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "write_notice": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
                               "type": "boolean"
                             }
                           },

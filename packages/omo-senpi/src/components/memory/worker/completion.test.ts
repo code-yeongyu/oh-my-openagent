@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -20,9 +20,10 @@ import {
 } from "./completion"
 import { CapturedCompletionApi } from "./runner.test-support"
 import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
 const FIXED_NOW_MS = Date.parse("2026-08-16T12:00:00.000Z")
 const FIXED_RECENT_TIMESTAMP = new Date(FIXED_NOW_MS - 60_000).toISOString()

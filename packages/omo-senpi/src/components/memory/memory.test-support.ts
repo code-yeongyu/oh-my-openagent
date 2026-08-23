@@ -48,6 +48,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
     },
     people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
     soul: { edit_notice: true },
+    write_notice: { enabled: true },
     sync: { enabled: true },
     search: { enabled: true },
     compile_warn_tokens: 30000,

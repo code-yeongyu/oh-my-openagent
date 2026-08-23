@@ -26,6 +26,7 @@
     "packages/omo-codex/README.md: omo get-local-version",
     "packages/omo-native/AGENTS.md: omo doctor",
     "packages/omo-native/bin/lib/agent-dir.js: omo doctor",
+    "packages/omo-native/test/bun-runtime.test.ts: /bin/omo x2",
     "packages/omo-native/test/doctor.test.ts: omo doctor x2",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts: omo doctor",

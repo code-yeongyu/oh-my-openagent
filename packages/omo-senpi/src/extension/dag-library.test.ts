@@ -31,14 +31,17 @@ const NIGHTLY = {
   ],
 }
 
-function installGlobals(envMap: Record<string, string | undefined>): DagCall[] {
+function installGlobals(
+  envMap: Record<string, string | undefined>,
+  reply: (args: DagCall) => unknown = () => ({ details: { kind: "started", run_id: "run-42" } }),
+): DagCall[] {
   const calls: DagCall[] = []
   Reflect.set(globalThis, "read", async (path: string) => readFileSync(path, "utf8"))
   Reflect.set(globalThis, "env", (key?: string) => (key === undefined ? envMap : envMap[key]))
   Reflect.set(globalThis, "tool", {
     dag: async (args: DagCall) => {
       calls.push(args)
-      return { details: { kind: "started", run_id: "run-42" } }
+      return reply(args)
     },
   })
   return calls
@@ -181,6 +184,60 @@ describe("dag definition library", () => {
       const started = calls[0]!.definition as { key: string; nodes: Array<{ prompt: string }> }
       expect(started.key).toBe("nightly-audit-t1")
       expect(started.nodes[0]!.prompt).toContain("nightly-audit-t1")
+    })
+  })
+
+  // Same live incident as the sdk: a refused start answers with details.kind="error" and no run_id,
+  // and the library reported only "did not include a run_id" while the tool had already said why.
+  describe("#given the dag tool refuses the start with a details.kind=error envelope", () => {
+    it("#then start throws the tool's own code and human message", async () => {
+      const conflict = 'dag run key "nightly-audit-t1" already exists with a different definition'
+      await writeFile(join(libDir, "nightly.json"), JSON.stringify(NIGHTLY))
+      installGlobals(envMap, () => ({
+        content: [{ type: "text", text: conflict }],
+        details: {
+          kind: "error",
+          error: {
+            code: "definition_conflict",
+            message: conflict,
+            nodes: [],
+            errors: [],
+            diagnostics: [],
+            node_ids: [],
+          },
+        },
+      }))
+      const library = await loadLibrary()
+
+      const rejection = expect(library.start("nightly", { suffix: "t1" })).rejects
+      await rejection.toThrow(/definition_conflict/)
+      await rejection.toThrow(/already exists with a different definition/)
+      await rejection.not.toThrow(/did not include a run_id/)
+    })
+
+    it("#then an error envelope without error fields still falls back to the tool's content text", async () => {
+      await writeFile(join(libDir, "nightly.json"), JSON.stringify(NIGHTLY))
+      installGlobals(envMap, () => ({
+        content: [{ type: "text", text: "the dag engine is not wired up" }],
+        details: { kind: "error" },
+      }))
+      const library = await loadLibrary()
+
+      await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(
+        /the dag engine is not wired up/,
+      )
+    })
+  })
+
+  describe("#given a well-formed non-error start response that still lacks a run_id", () => {
+    it("#then the existing run_id diagnostic is preserved", async () => {
+      await writeFile(join(libDir, "nightly.json"), JSON.stringify(NIGHTLY))
+      installGlobals(envMap, () => ({ details: { kind: "started" } }))
+      const library = await loadLibrary()
+
+      await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(
+        /did not include a run_id/,
+      )
     })
   })
 })

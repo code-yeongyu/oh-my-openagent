@@ -66,7 +66,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
-[![Docs](https://img.shields.io/badge/docs-omo.vibetip.help-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.vibetip.help/docs)
+[![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
@@ -113,8 +113,8 @@ Install oh-my-openagent. Type `ultrawork`. Done.
 
 oh-my-openagent ships in three editions of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
-- **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, ulw-loop, ultrawork, hashline edits — everything.
-- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. No agent orchestration and no `team_*` tools — Codex CLI's own surface does that work.
+- **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, `/goal`, ultrawork — everything. Hashline edits are opt-in (`hashline_edit: true`).
+- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry` at the core, plus `teammode` and supporting components (`bootstrap`, `codegraph`, `lcx`, and more), plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It installs Codex agent TOMLs into `~/.codex/agents/`. No OpenCode `team_*` tools — Codex CLI's own spawn/collaboration surface does that work.
 - **Senpi Edition (standalone, beta)** — the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` rather than loading into OpenCode or Codex.
 
 Pick the edition(s) you want.
@@ -169,11 +169,11 @@ Fetch the full guide and follow it step by step:
 curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `search`, `analyze`, `team`, `hyperplan`), slash commands, the Light edition's 8 Codex components, Team Mode, and uninstall. Don't summarize it; read it end to end.
+The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `team`, `hyperplan`), slash commands, the Light edition's Codex components, Team Mode, and uninstall. Don't summarize it; read it end to end.
 
 ### Note on package and command names
 
-The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json[c]`; both legacy and renamed basenames are recognized.
+The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Runtime config is `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc`. Legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and are not read afterward.
 
 The recommended `bunx`/`npx` invocation is `oh-my-openagent install` (or the original `oh-my-opencode install`). Once installed, the short command is `omo-agent-toolkit`. The `omo` bin was removed from these packages in this major release; the name now belongs to the senpi-native edition, installed with `npm i -g omo-ai@beta` (beta channel only). Do **not** use `bunx omo` or `npx omo`: `omo` on npm is a different, unrelated package by a different author, and those commands resolve to it. The senpi edition's package name is `omo-ai`. `lazycodex-ai` is a single-purpose Node/npm installer package: `npx lazycodex-ai install` routes directly to the Codex Light installer. It is not the Codex marketplace name (the marketplace repository is `code-yeongyu/lazycodex`). Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
 
@@ -224,20 +224,20 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |       | Feature                                                  | Edition  | What it does                                                                                                                                                                                                     |
 | :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                              | Light    | Portable OMO components (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry) running inside OpenAI Codex CLI. Install via `npx lazycodex-ai install`.             |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | Portable OMO components (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry, teammode, and more) running inside OpenAI Codex CLI. Install via `npx lazycodex-ai install`.             |
 |   👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Analyzes true user intent before classifying or acting. No more literal misinterpretations. (Light edition only recognises the `ultrawork`/`ulw` keyword.)                                                       |
-|   🔗   | **Hash-Anchored Edit Tool**                              | Ultimate | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
+|   🔗   | **Hash-Anchored Edit Tool**                              | Ultimate | Hashline (`LINE#ID`) edit/read tagging. Opt-in: set `hashline_edit: true` in `~/.omo/omo.jsonc`. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
 |   🛠️   | **LSP integration**                                      | Both     | Diagnostics, navigation, symbols, workspace rename. IDE precision for agents. Same LSP MCP server in both editions.                                                                                              |
-|   🔎   | **AST-Grep**                                             | Ultimate | Pattern-aware code search and rewriting across 25 languages.                                                                                                                                                     |
+|   🔎   | **AST-Grep**                                             |   Both   | Pattern-aware code search and rewriting across 25 languages. Ultimate uses the MCP tools; Light uses the shared `ast-grep` skill with a provisioned `sg`.                                                                                                                                                     |
 |   🧠   | **Background Agents**                                    | Ultimate | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
 |   📚   | **Built-in MCPs** (web/docs/code search)                 | Ultimate | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
-|   🔁   | **Goal / `/goal`**                                       | Ultimate | Persistent per-session objective. Re-injects a continuation prompt on every idle until a completion audit says it's done.                                                                                        |
+|   🔁   | **Goal / `/goal`**                                       | Ultimate | `/goal` sets a persistent thread objective. Idle continuation runs only when `goal.enabled` is true (default false).                                                                                        |
 |   ✅   | **Todo Enforcer**                                        | Ultimate | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
 |   💬   | **Comment Checker**                                      | Both     | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
 |   📐   | **Rules Injection** (`AGENTS.md` / `.omo/rules/**`)      | Both     | Project rules and AGENTS.md auto-loaded into the agent's context at every prompt.                                                                                                                                |
-|   🎯   | **Ulw Loop**                                            | Both     | Durable multi-goal orchestration with evidence audit, backed by `.omo/ulw-loop/`.                                                                                                                               |
+|   🎯   | **Ulw Loop**                                            | Light    | Codex component + CLI for durable multi-goal orchestration with evidence audit. On OpenCode, use **Goal / `/goal`** instead.                                                                                     |
 |   🖥️   | **Tmux Integration**                                     | Ultimate | Full interactive terminal. REPLs, debuggers, TUIs. All live.                                                                                                                                                     |
 |   🔌   | **Claude Code Compatible**                               | Ultimate | Your hooks, commands, skills, MCPs, and plugins? All work here.                                                                                                                                                  |
 |   🧬   | **Skill-Embedded MCPs**                                  | Ultimate | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
@@ -253,7 +253,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`glm-5`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway. Claude Opus 5 and Kimi K3 are the recommended defaults.
+**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway. Claude Opus 5 and Kimi K3 are the recommended defaults.
 
 **Hephaestus** (`gpt-5.6-sol` through OpenAI, GitHub Copilot, Vercel, or OpenCode at medium effort) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
 
@@ -272,7 +272,7 @@ One agent is fast. A coordinated team is *devastating*.
 **Team Mode** turns oh-my-openagent from "one agent with subagents" into a real multi-agent system. A lead agent orchestrates a team of category-specialized members, all running **in parallel** and communicating through dedicated tools (`team_create`, `team_send_message`, `team_task_create`, `team_status`, ...). Watch every member work simultaneously in a tmux layout with focus + grid windows.
 
 ```jsonc
-// .opencode/oh-my-openagent.jsonc
+// ~/.omo/omo.jsonc  (or project .omo/omo.jsonc)
 {
   "team_mode": {
     "enabled": true,
@@ -300,7 +300,7 @@ When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **cat
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 
-The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.6 Sol xhigh through OpenAI or Vercel when available, then GPT-5.6 Sol xhigh. You touch nothing.
+The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` routes to GPT-5.6 Sol max (OpenAI / Vercel, then GitHub Copilot, then OpenCode). You touch nothing.
 
 ### Claude Code Compatibility
 
@@ -331,7 +331,7 @@ The harness problem is real. Most agent failures aren't the model's fault; it's 
 >
 > <br/>- [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
 
-Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi), we built **Hashline**. Every line the agent reads comes back tagged with a content hash:
+Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi), we built **Hashline**. When `hashline_edit` is enabled, every line the agent reads comes back tagged with a content hash:
 
 ```
 11#VK| function hello() {
@@ -362,7 +362,7 @@ Agents auto-read relevant context. Zero manual management.
 
 Complex task? Don't prompt and pray.
 
-`/start-work` calls Prometheus. He **interviews you like a real engineer**, identifies scope and ambiguities, and builds a verified plan before touching code. The agent knows what it's building before it starts.
+Prometheus **interviews you like a real engineer**, identifies scope and ambiguities, and writes a verified plan to `.omo/plans/` before touching code. `/start-work` then starts an **Atlas** work session from that plan. The agent knows what it's building before it starts.
 
 ### Skills
 
@@ -400,12 +400,16 @@ To remove oh-my-openagent:
 2. **Remove configuration files (optional)**
 
    ```bash
-   # Remove plugin config files recognized during the compatibility window
-   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
-         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json
+   # Remove the runtime config files
+   rm -f ~/.omo/omo.jsonc ~/.omo/omo.json
 
    # Remove project config (if exists)
-   rm -f .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
+   rm -f .omo/omo.jsonc .omo/omo.json
+
+   # Remove leftover legacy migration backups (if any)
+   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
+         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json \
+         .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
          .opencode/oh-my-opencode.jsonc .opencode/oh-my-opencode.json
    ```
 
@@ -440,7 +444,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
 - **Background Agents**: Run multiple agents in parallel like a real dev team
 - **LSP & AST Tools**: Refactoring, rename, diagnostics, AST-aware code search
-- **Hash-anchored Edit Tool**: `LINE#ID` references validate content before applying every change. Surgical edits, zero stale-line errors
+- **Hash-anchored Edit Tool** (opt-in via `hashline_edit: true`): `LINE#ID` references validate content before applying every change. Surgical edits, zero stale-line errors
 - **Context Injection**: Auto-inject AGENTS.md, README.md, conditional rules
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search) — injected at runtime by the plugin; not visible in `opencode mcp list` (see [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
@@ -459,13 +463,13 @@ Opinionated defaults, adjustable if you insist.
 See [Configuration Documentation](docs/reference/configuration.md).
 
 **Quick Overview:**
-- **Config Locations**: User config plus walked `.opencode/oh-my-openagent.json[c]` configs up to `$HOME`; closest wins. Legacy `oh-my-opencode.json[c]` still works.
+- **Config Locations**: User `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc` configs up to `$HOME`; closest wins. Legacy `oh-my-*` files are migrated once into `omo.jsonc`.
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
 - **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
 - **Sisyphus Agent**: Main orchestrator with Prometheus (Planner) and Metis (Plan Consultant)
 - **Background Tasks**: Configure concurrency limits per provider/model
-- **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)
+- **Categories**: Domain-specific task delegation (`visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, plus custom names)
 - **Hooks**: 54+ lifecycle hooks (61 with Team Mode), all configurable via `disabled_hooks`
 - **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search) — runtime-injected, not shown in `opencode mcp list`
 - **LSP**: Full LSP support with refactoring tools

@@ -63,7 +63,7 @@ describe("omo-senpi ultrawork component", () => {
     const cases = [
       { text: "ulwultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 2 },
       { text: "ULW ulw Ultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 3 },
-      { text: "ulw-plan", matchedUlw: false, matchedUltrawork: false, occurrenceCount: 0 },
+      { text: "ulw-plan", matchedUlw: true, matchedUltrawork: false, occurrenceCount: 1 },
     ] as const
 
     for (const { text, ...expected } of cases) {
@@ -294,10 +294,21 @@ describe("omo-senpi ultrawork component", () => {
     expect(pi.messages).toHaveLength(0)
   })
 
-  it("#given ulw-prefixed skill names #when user input dispatches #then injects nothing", async () => {
+  it("#given a /skill: command whose trigger sits only in the skill name #when dispatched #then injects nothing", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    // when
+    const result = await dispatchInput(pi, "/skill:ulw-plan 네 plan 을 작성해주세요")
+
+    // then
+    expectNoInjection(pi, result)
+  })
+
+  it("#given ulw- skill-name mentions in plain text #when dispatched #then arms ultrawork by overlap matching", async () => {
     // given
     const prompts = [
-      "/skill:ulw-plan 네 plan 을 작성해주세요",
       "ulw-plan 스킬 좀 검토해줘",
       "omo-agent-toolkit ulw-loop status --json 확인",
     ] as const
@@ -310,7 +321,7 @@ describe("omo-senpi ultrawork component", () => {
       const result = await dispatchInput(pi, prompt)
 
       // then
-      expectNoInjection(pi, result)
+      expectHiddenInjection(pi, result)
     }
   })
 

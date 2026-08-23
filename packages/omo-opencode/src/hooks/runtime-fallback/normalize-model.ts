@@ -1,4 +1,5 @@
 import { isRecord } from "../../shared/record-type-guard"
+import { stringifyRuntimeModelWithVariant } from "./fallback-state"
 
 /**
  * Normalize a session model value into a canonical "<providerID>/<id>" string.
@@ -26,7 +27,8 @@ export function normalizeModelToCanonicalString(model: unknown): string | undefi
         : undefined
     const modelID = rawModelID?.trim()
     if (providerID && modelID) {
-      return `${providerID}/${modelID}`
+      const variant = typeof model.variant === "string" ? model.variant.trim() : undefined
+      return stringifyRuntimeModelWithVariant({ providerID, modelID }, variant)
     }
   }
 

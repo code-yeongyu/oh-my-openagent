@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 
+import type { DagOwnerFingerprintInput } from "./owner"
 import type { DagNodeId, DagRoute } from "./types"
 
 export type DagNodeFingerprintInputV1 = {
@@ -62,4 +63,60 @@ export function nodeFingerprintInput(input: DagNodeFingerprintInputV1): DagNodeF
 export function dagDefinitionFingerprint(input: DagDefinitionFingerprintInputV1): string {
   const nodes = input.nodes.map(nodeFingerprintInput).sort((a, b) => (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0))
   return dagFingerprint({ name: input.name, scheduler: input.scheduler, nodes })
+}
+
+export function ownerFingerprintInput(input: DagOwnerFingerprintInput): JsonValue {
+  if (input.execAttempt && input.execAttempt >= 1) {
+    return {
+      definitionFingerprint: input.definitionFingerprint,
+      nodeId: input.nodeId,
+      execAttempt: input.execAttempt,
+    }
+  }
+  return {
+    definitionFingerprint: input.definitionFingerprint,
+    nodeId: input.nodeId,
+  }
+}
+
+export function diffNodeFingerprints(
+  oldNodes: readonly DagNodeFingerprintInputV1[],
+  newNodes: readonly DagNodeFingerprintInputV1[],
+): {
+  readonly unchangedIds: readonly DagNodeId[]
+  readonly changedIds: readonly DagNodeId[]
+  readonly addedIds: readonly DagNodeId[]
+  readonly removedIds: readonly DagNodeId[]
+} {
+  const oldFingerprints = new Map<DagNodeId, string>()
+  for (const node of oldNodes) {
+    oldFingerprints.set(node.nodeId, dagFingerprint(nodeFingerprintInput(node)))
+  }
+
+  const newFingerprints = new Map<DagNodeId, string>()
+  const unchangedIds: DagNodeId[] = []
+  const changedIds: DagNodeId[] = []
+  const addedIds: DagNodeId[] = []
+
+  for (const node of newNodes) {
+    const fingerprint = dagFingerprint(nodeFingerprintInput(node))
+    newFingerprints.set(node.nodeId, fingerprint)
+    const oldFingerprint = oldFingerprints.get(node.nodeId)
+    if (oldFingerprint === undefined) {
+      addedIds.push(node.nodeId)
+    } else if (oldFingerprint === fingerprint) {
+      unchangedIds.push(node.nodeId)
+    } else {
+      changedIds.push(node.nodeId)
+    }
+  }
+
+  const removedIds: DagNodeId[] = []
+  for (const node of oldNodes) {
+    if (!newFingerprints.has(node.nodeId)) {
+      removedIds.push(node.nodeId)
+    }
+  }
+
+  return { unchangedIds, changedIds, addedIds, removedIds }
 }

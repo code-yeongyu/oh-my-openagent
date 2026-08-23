@@ -43,6 +43,13 @@ export function createOnboardingComponent(
         if (payload.reason !== "startup") return
         if (!isExtensionContext(rawEventCtx)) return
         const eventCtx: ExtensionContext = rawEventCtx
+        // Onboarding starts a turn of its own. sendCustomMessage never registers into
+        // bindExtensions' prompt-readiness set, so on a headless surface (senpi -p / --mode json)
+        // that turn begins underneath print mode, whose own bare prompt is then rejected with
+        // "Agent is already processing" and exits 1. Gate on an interactive surface exactly as the
+        // sibling init-deep-advisor does, and gate BEFORE claiming so a headless first run cannot
+        // burn the once-per-install marker the user's first interactive session is owed.
+        if (!eventCtx.hasUI) return
         if (pi.getFlag("omo-senpi-onboarding-disabled") === true) return
         const force = pi.getFlag("onboard") === true
         if (force && onboardConsumed) return

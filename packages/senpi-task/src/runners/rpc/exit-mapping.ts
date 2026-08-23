@@ -8,6 +8,31 @@ export type ChildExitInput = {
   readonly error?: Error
   readonly pid?: number
   readonly stderr: string
+  /** Host platform; defaults to the running process. Injectable for tests. */
+  readonly platform?: NodeJS.Platform
+}
+
+/**
+ * Exit code Windows reports for a process ended by `TerminateProcess` (which is
+ * what Node's `process.kill`/`taskkill /F` become there).
+ */
+const WINDOWS_TERMINATION_EXIT_CODE = 1
+
+/**
+ * Windows has no POSIX signal provenance: an externally terminated child is
+ * reported as a plain exit code with `signal === null`, indistinguishable by
+ * signal alone from a self-inflicted crash. The one fact that still separates
+ * them is stderr - a crashing child writes diagnostics before dying, while a
+ * terminated one is stopped mid-flight with an empty buffer. POSIX is
+ * unaffected: there a real kill always carries its signal.
+ */
+function isWindowsExternalTermination(input: ChildExitInput, platform: NodeJS.Platform): boolean {
+  return (
+    platform === "win32"
+    && input.signal === null
+    && input.code === WINDOWS_TERMINATION_EXIT_CODE
+    && input.stderr.trim().length === 0
+  )
 }
 
 /** Keep only the last `cap` characters of a stderr buffer (default 4KB). */
@@ -30,7 +55,7 @@ export function classifyChildExit(input: ChildExitInput): ChildExitOutcome {
   if (input.error) {
     return { kind: "spawn_error", message: input.error.message, facts }
   }
-  if (input.signal !== null) {
+  if (input.signal !== null || isWindowsExternalTermination(input, input.platform ?? process.platform)) {
     return { kind: "killed", facts }
   }
   if (input.code === 0) {
@@ -58,7 +83,10 @@ export function mapExitOutcomeToError(
       return {
         status: "error",
         killed: true,
-        error_message: `RPC child killed by signal ${exit.signal} (pid=${exit.pid ?? "unknown"})`,
+        error_message:
+          exit.signal === null
+            ? `RPC child terminated externally with exit code ${exit.code} (pid=${exit.pid ?? "unknown"})`
+            : `RPC child killed by signal ${exit.signal} (pid=${exit.pid ?? "unknown"})`,
         exit,
       }
     case "crashed":

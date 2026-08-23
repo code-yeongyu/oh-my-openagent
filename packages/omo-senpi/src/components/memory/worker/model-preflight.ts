@@ -98,6 +98,7 @@ async function probeChildModels(
   ], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   })
   const stdout: Buffer[] = []
   const stderr: Buffer[] = []

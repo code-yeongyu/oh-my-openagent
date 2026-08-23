@@ -71,6 +71,7 @@ function register(agentDir: string, recorder: Recorder, options: {
   readonly configEnabled?: boolean
   readonly diagnostics?: (input: TelemetryDiagnosticInput | { readonly event: "omo_native_inventory_read_failed" }) => void
   readonly setTimeoutFn?: (callback: () => void, delay: number) => unknown
+  readonly timeZone?: () => string
 } = {}): FakeExtensionAPI {
   const pi = new FakeExtensionAPI()
   const configEnabled = options.configEnabled
@@ -82,9 +83,26 @@ function register(agentDir: string, recorder: Recorder, options: {
     now: options.now ?? FIXED_NOW,
     osProvider: createOsProvider("native-session-host"),
     setTimeoutFn: options.setTimeoutFn,
+    ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
     transportFactory: recorder.factory,
   }).register(pi, { config: pi, logger: createSilentLogger() })
   return pi
+}
+
+function registryCtx(sessionId: string): unknown {
+  const models = [
+    { provider: "anthropic", id: "claude-opus-5" },
+    { provider: "anthropic", id: "claude-fable-5" },
+    { provider: "openai", id: "gpt-5.6-sol" },
+  ]
+  return {
+    cwd: "/repo",
+    sessionManager: { getSessionId: () => sessionId },
+    modelRegistry: {
+      getAvailable: () => models,
+      find: (provider: string, id: string) => models.find((model) => model.provider === provider && model.id === id),
+    },
+  }
 }
 
 const SHARED_KEYS = [
@@ -263,6 +281,69 @@ describe("OmO Native session telemetry", () => {
         ...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_started,
         ...SHARED_KEYS,
       ].sort())
+    })
+  })
+
+  it("#given an injected IANA time zone #when session_started is captured #then timezone is present, at most 64 characters, and category_config is captured once afterwards with the same $session_id", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const pi = register(agentDir, recorder, { timeZone: () => "Asia/Seoul" })
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "resume" }, registryCtx("zoned"))
+
+      // then
+      const started = recorder.messages.find(({ event }) => event === "session_started")
+      expect(started?.properties?.timezone).toBe("Asia/Seoul")
+      expect(String(started?.properties?.timezone).length).toBeLessThanOrEqual(64)
+      const configs = recorder.messages.filter(({ event }) => event === "category_config")
+      expect(configs).toHaveLength(1)
+      expect(configs[0]?.properties?.$session_id).toBe(started?.properties?.$session_id)
+      expect(configs[0]?.properties?.source).toBe("resume")
+      expect(Object.keys(configs[0]?.properties ?? {}).sort()).toEqual([
+        ...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config,
+        ...SHARED_KEYS,
+      ].sort())
+      expect(recorder.messages.map(({ event }) => event).indexOf("category_config")).toBeGreaterThan(
+        recorder.messages.map(({ event }) => event).indexOf("session_started"),
+      )
+    })
+  })
+
+  it("#given a host context without a model registry #when session_start fires #then session_started still ships and no category_config is captured", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const pi = register(agentDir, recorder)
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("registryless"))
+
+      // then
+      expect(recorder.messages.some(({ event }) => event === "session_started")).toBe(true)
+      expect(recorder.messages.filter(({ event }) => event === "category_config")).toEqual([])
+    })
+  })
+
+  it("#given a throwing time zone provider #when session_start fires #then session_started ships without a timezone property", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const pi = register(agentDir, recorder, {
+        timeZone: () => {
+          throw new Error("no ICU")
+        },
+      })
+
+      // when
+      await expect(pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("zoneless"))).resolves.toBeDefined()
+
+      // then
+      expect(recorder.messages.find(({ event }) => event === "session_started")?.properties).not.toHaveProperty("timezone")
     })
   })
 

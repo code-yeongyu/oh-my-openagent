@@ -1,5 +1,5 @@
 import type { ManagedChildEvent } from "./manager/child-handle"
-import type { TaskRunStats } from "./state"
+import type { CostReportStatus, TaskRunStats, TokenCoverageStatus } from "./state"
 
 export type RunStatsTracker = {
   accept(event: ManagedChildEvent): boolean
@@ -19,8 +19,11 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
   let windowStart = startedAt
   let costUsd = 0
   let sawCost = false
+  let inputTokens = 0
   let cacheReadTokens = 0
+  let cacheWriteTokens = 0
   let cacheableTokens = 0
+  let turnsReportingUsage = 0
   let latestCacheHitRate: number | undefined
   const evalRunCallIds = new Set<string>()
   let anonymousEvalRuns = 0
@@ -78,6 +81,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       generationMs += window
       windowStart = timestamp
       const usage = readUsage(event.message)
+      if (Object.keys(usage).length > 0) turnsReportingUsage += 1
       if (window === 0 && (usage.output ?? 0) > 0) collapsedWindows += 1
       outputTokens += usage.output ?? 0
       totalTokens += usage.total ?? 0
@@ -86,10 +90,13 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
         sawCost = true
       }
       const requestCacheReadTokens = usage.cacheRead ?? 0
-      const requestCacheableTokens = (usage.input ?? 0) + requestCacheReadTokens + (usage.cacheWrite ?? 0)
+      const requestCacheWriteTokens = usage.cacheWrite ?? 0
+      const requestCacheableTokens = (usage.input ?? 0) + requestCacheReadTokens + requestCacheWriteTokens
       const requestCacheHitRate = boundedCacheHitRate(requestCacheReadTokens, requestCacheableTokens)
       if (requestCacheHitRate !== undefined) latestCacheHitRate = requestCacheHitRate
+      inputTokens += usage.input ?? 0
       cacheReadTokens += requestCacheReadTokens
+      cacheWriteTokens += requestCacheWriteTokens
       cacheableTokens += requestCacheableTokens
       return true
     },
@@ -111,20 +118,49 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
         collapsedWindows > 0 ? undefined : generationMs > 0 ? generationMs : runtimeMs
       const tps = throughputWindowMs === undefined ? undefined : tokensPerSecond(outputTokens, throughputWindowMs)
       const runCacheHitRate = boundedCacheHitRate(cacheReadTokens, cacheableTokens)
+      const costReported = sawCost && Number.isFinite(costUsd)
       return {
         runtime_ms: runtimeMs,
         turns,
         tool_calls: toolCalls,
-        ...(outputTokens > 0 ? { output_tokens: outputTokens } : {}),
-        ...(totalTokens > 0 ? { total_tokens: totalTokens } : {}),
+        // The tracker measures this run from its own injected clock, so the duration is active
+        // execution time. Reconstructed durations (reconciled records) are the consumer's job.
+        duration_status: "monotonic",
+        token_status: tokenCoverage(turns, turnsReportingUsage),
+        cost_status: costStatus(sawCost, costReported),
+        ...positiveFiniteTotal("output_tokens", outputTokens),
+        ...positiveFiniteTotal("input_tokens", inputTokens),
+        ...positiveFiniteTotal("cache_read_tokens", cacheReadTokens),
+        ...positiveFiniteTotal("cache_write_tokens", cacheWriteTokens),
+        ...positiveFiniteTotal("total_tokens", totalTokens),
         ...(generationMs > 0 ? { generation_ms: generationMs } : {}),
         ...(tps === undefined ? {} : { tokens_per_second: tps }),
-        ...(sawCost && Number.isFinite(costUsd) ? { cost_usd: costUsd } : {}),
+        ...(costReported ? { cost_usd: costUsd } : {}),
         ...(latestCacheHitRate === undefined ? {} : { cache_hit_rate_last: latestCacheHitRate }),
         ...(runCacheHitRate === undefined ? {} : { cache_hit_rate_run: runCacheHitRate }),
       }
     },
   }
+}
+
+// Cumulative sums of individually finite per-turn values can still overflow to Infinity; an
+// overflowed total is not a token count, so it is omitted rather than persisted as null.
+function positiveFiniteTotal<K extends string>(key: K, total: number): Partial<Record<K, number>> {
+  return total > 0 && Number.isFinite(total) ? ({ [key]: total } as Record<K, number>) : {}
+}
+
+// Usage coverage is per assistant turn: a run where every turn reported usage sums to exact
+// totals, one where only some did is a lower bound, and one where none did has no token facts.
+function tokenCoverage(turns: number, turnsReportingUsage: number): TokenCoverageStatus {
+  if (turnsReportingUsage === 0) return "unavailable"
+  return turnsReportingUsage === turns ? "complete" : "partial"
+}
+
+// A cost the provider never reported is unavailable, not zero; a reported-but-non-finite sum is
+// invalid, so aggregates can exclude it instead of poisoning a SUM with NaN/Infinity.
+function costStatus(sawCost: boolean, costReported: boolean): CostReportStatus {
+  if (costReported) return "reported"
+  return sawCost ? "invalid" : "unavailable"
 }
 
 export function tokensPerSecond(outputTokens: number, generationMs: number): number | undefined {

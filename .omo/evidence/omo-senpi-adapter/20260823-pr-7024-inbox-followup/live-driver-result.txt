@@ -1,0 +1,7 @@
+Both the self-test and live driver exited 1 before spawning Senpi.
+
+Failure:
+ENOENT while opening the isolated temporary path agent/settings.json from packages/omo-senpi/scripts/qa/drive.mjs:86.
+
+Interpretation:
+Current dev's seedSandbox() did not create the isolated agent directory before writing settings.json. This prevents collection of the required live-driver JSON on this Windows host. No live QA pass is claimed.

@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { defaultSignaller } from "../lifecycle/context"
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
-import { dagFingerprint } from "./fingerprint"
+import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
 import {
   dagNodeReusedEvent,
   dagNodeTaskAttachedEvent,
@@ -312,9 +312,8 @@ function applyRecoveryEvent(
   },
 ): DagRunRecordV1 {
   if (event.type === "dag.run.paused") return { ...record, status: "paused", updatedAt: event.at }
-  if (event.type === "dag.run.resumed") {
-    return { ...record, status: "running", generation: event.generation, updatedAt: event.at }
-  }
+  // dag.run.resumed is owned by the scheduler reducer now (it also clears the stale completedAt),
+  // so recovery no longer forks that transition.
   return applyDagSchedulerEvent(record, event, pendingErrors, terminalResults)
 }
 
@@ -387,11 +386,19 @@ function startSpec(record: DagRunRecordV1, nodeId: DagNodeId): ManagerStartSpec 
 }
 
 function taskOwner(record: DagRunRecordV1, nodeId: DagNodeId): DagTaskOwner {
+  // Keyed on the persisted execAttempt, NEVER the display attempt: reattach bumps the display
+  // attempt with no new execution, and an attempt-keyed fingerprint would then compute a value the
+  // persisted owner record does not hold - a spurious owner_conflict on an untouched resume.
+  const execAttempt = nodeById(record, nodeId).execAttempt
   return {
     kind: "dag",
     runId: record.runId,
     nodeId,
-    fingerprint: dagFingerprint({ definitionFingerprint: record.definitionFingerprint, nodeId }),
+    fingerprint: dagFingerprint(ownerFingerprintInput({
+      definitionFingerprint: record.definitionFingerprint,
+      nodeId,
+      ...(execAttempt === undefined ? {} : { execAttempt }),
+    })),
   }
 }
 

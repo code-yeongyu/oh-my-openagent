@@ -1,7 +1,16 @@
-import { describe, expect, jest, spyOn, test } from "bun:test"
+import { describe, expect, jest, setDefaultTimeout, spyOn, test } from "bun:test"
 import { PassThrough, Readable, Writable } from "node:stream"
 import { successResponse } from "./responses.js"
 import { isProcessAlive, runJsonRpcStdioServer } from "./server.js"
+
+// Set the per-file budget HERE, never via the root preload: a preload
+// setDefaultTimeout only sticks for the first test file of a run, and every later
+// file silently reverts to the built-in 5000ms. This file spawns real child
+// processes and waits on their watchdog polls, so under `bun test --parallel` on a
+// contended windows runner 5s is not enough for the whole file -- and it must
+// exceed the in-test CHILD_EVENT_TIMEOUT_MS ceiling below so a stuck child fails
+// with that named diagnostic instead of an anonymous per-test timeout.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 30_000)
 
 describe("JSON-RPC stdio server", () => {
   test("#given request handler #when line request arrives #then response is written", async () => {
@@ -135,6 +144,7 @@ describe("parent watchdog", () => {
     try {
       const input = new PassThrough()
       const events: string[] = []
+      const polls: boolean[] = []
       let parentExitCalls = 0
       const server = runJsonRpcStdioServer({
         input,
@@ -148,13 +158,15 @@ describe("parent watchdog", () => {
         onParentExit: () => {
           parentExitCalls += 1
         },
-        parentWatchdog: { pollIntervalMs: 1_000, probeAlive: () => false },
+        parentWatchdog: { pollIntervalMs: 1_000, probeAlive: () => false, onPoll: (alive) => polls.push(alive) },
       })
 
       jest.advanceTimersByTime(1_000)
       await server
 
       expect(parentExitCalls).toBe(1)
+      // The poll that saw the dead parent is reported, and polling stops after it.
+      expect(polls).toEqual([false])
       expect(events).toEqual(["stdio_started", "parent_exit", "stdio_stopped"])
     } finally {
       jest.useRealTimers()
@@ -171,6 +183,7 @@ describe("parent watchdog", () => {
       const output = new PassThrough()
       const received = nextOutput(output)
       const events: string[] = []
+      const polls: boolean[] = []
       const server = runJsonRpcStdioServer({
         input,
         output,
@@ -180,13 +193,15 @@ describe("parent watchdog", () => {
         log: (event) => {
           events.push(event)
         },
-        parentWatchdog: { pollIntervalMs: 1_000 },
+        parentWatchdog: { pollIntervalMs: 1_000, onPoll: (alive) => polls.push(alive) },
       })
 
       jest.advanceTimersByTime(3_000)
 
       expect(killSpy).toHaveBeenCalledTimes(3)
       expect(events).not.toContain("parent_exit")
+      // Every healthy poll is reported, so "still watching" is observable without a kill.
+      expect(polls).toEqual([true, true, true])
       input.write('{"jsonrpc":"2.0","id":"alive","method":"ping"}\n')
       expect(await received).toBe('{"jsonrpc":"2.0","id":"alive","result":{"serving":true}}\n')
       input.end()
@@ -294,20 +309,51 @@ describe("parent watchdog", () => {
     const pollIntervalMs = 300
     const child = spawnWatchdogChild(victim.pid, pollIntervalMs)
     try {
-      await waitForStderrEvent(createLineReader(child.stderr), "stdio_started")
+      const events = createLineReader(child.stderr)
+      await waitForStderrEvent(events, "stdio_started")
       const responses = createLineReader(child.stdout)
-      const deadline = Date.now() + 3 * pollIntervalMs + 1_000
-      let served = 0
-      while (Date.now() < deadline) {
-        const id = `qa-${served}`
+      // The invariant is "the child is still serving after three watchdog polls",
+      // so wait for the poll events this child reports through the watchdog's
+      // opt-in onPoll seam, then prove it answers a request after each one.
+      // The previous loop instead spun requests against a wall-clock deadline, so
+      // the round-trip count scaled with machine speed -- ~79k locally in the same
+      // 1.9s window -- and every extra trip was another chance for one scheduling
+      // stall to outlast its 2s in-loop race. That is a volume bet, not a stronger
+      // assertion: three observed polls prove the same property in three trips.
+      // Measured on macOS, same loop, same load: bun 1.3.14 max round-trip 76ms vs
+      // bun 1.4.0 max 193ms, and 1.4.0's tail widens further with contention while
+      // never losing a line (20k backpressured writes, 0 dropped, both versions).
+      // windows-latest fit only ~697 trips in the window under `bun test
+      // --parallel` (~113x slower per trip than local), so on 1.4.0 one trip's
+      // tail reached the 2s race and returned null -- a latency tail, not a lost
+      // line and not the watchdog: a fired watchdog logs parent_exit, destroys
+      // stdin, and would fail every later ping plus the liveness check below.
+      const pollsToObserve = 3
+      const served: string[] = []
+      for (let poll = 0; poll < pollsToObserve; poll += 1) {
+        // Awaiting the poll event is the exact signal that an interval elapsed:
+        // no fixed sleep, and a stalled runner just delays the event instead of
+        // failing. `alive:true` also asserts the probe saw the live parent.
+        const pollEvent = await withTimeout(
+          nextEventLine(events, "parent_poll"),
+          CHILD_EVENT_TIMEOUT_MS,
+          `parent_poll #${poll + 1} of ${pollsToObserve}`,
+        )
+        expect(pollEvent).toContain('"alive":true')
+
+        const id = `qa-${poll}`
         child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method: "ping" })}\n`)
         await child.stdin.flush()
-        const line = await Promise.race([responses.nextLine(), Bun.sleep(2_000).then(() => null)])
+        const line = await withTimeout(
+          responses.nextLine(),
+          CHILD_EVENT_TIMEOUT_MS,
+          `response to ${id} after ${poll + 1} watchdog poll(s)`,
+        )
         expect(line).toBe(`{"jsonrpc":"2.0","id":"${id}","result":{"acknowledged":true}}`)
-        served += 1
+        served.push(id)
       }
 
-      expect(served).toBeGreaterThanOrEqual(3)
+      expect(served).toEqual(["qa-0", "qa-1", "qa-2"])
       expect(isProcessAlive(child.pid)).toBe(true)
     } finally {
       killQuietly(victim.pid)
@@ -377,6 +423,11 @@ function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
       parentWatchdog: {
         parentPid: Number(process.env.WATCHDOG_PARENT_PID),
         pollIntervalMs: Number(process.env.WATCHDOG_POLL_MS),
+        // Opt this child into per-poll reporting and forward it as a stderr event.
+        // The product stays silent per poll; this harness is the only observer.
+        onPoll: (alive) => {
+          process.stderr.write(JSON.stringify({ event: "parent_poll", alive }) + "\\n");
+        },
       },
     });
     process.stderr.write(JSON.stringify({ event: "server_settled" }) + "\\n");
@@ -402,7 +453,9 @@ function createLineReader(stream: ReadableStream<Uint8Array>): { readonly nextLi
       while (true) {
         const newlineIndex = buffer.indexOf("\n")
         if (newlineIndex !== -1) {
-          const line = buffer.slice(0, newlineIndex)
+          // Strip a trailing CR: a child on Windows can emit \r\n, and comparing a
+          // CR-suffixed line against an exact JSON string fails for no real reason.
+          const line = buffer.slice(0, newlineIndex).replace(/\r$/, "")
           buffer = buffer.slice(newlineIndex + 1)
           return line
         }
@@ -414,21 +467,42 @@ function createLineReader(stream: ReadableStream<Uint8Array>): { readonly nextLi
   }
 }
 
+// One budget for "a live child produces the next line we asked for". A healthy
+// child answers in microseconds locally and never spends this: it is a ceiling on
+// an awaited signal, not a sleep, so raising it costs nothing on a green run and
+// only buys patience on a contended one. Sized from measurement rather than taste:
+// the worst observed round-trip was 193ms on bun 1.4.0 under heavy local CPU
+// oversubscription, and windows-latest runs this loop ~113x slower per trip under
+// `bun test --parallel`, which puts a bad-case Windows trip in the low seconds.
+// 15s leaves roughly an order of magnitude of headroom over that while staying
+// under the 30s win32 per-test default from test-setup.ts, so a genuinely wedged
+// child still fails this test with a named reason instead of a bare timeout.
+const CHILD_EVENT_TIMEOUT_MS = 15_000
+
+async function withTimeout<T>(pending: Promise<T>, timeoutMs: number, description: string): Promise<T> {
+  const timeout = Symbol("timeout")
+  const timer = Bun.sleep(timeoutMs).then(() => timeout)
+  const settled = await Promise.race([pending, timer])
+  if (settled === timeout) throw new Error(`timed out after ${timeoutMs}ms waiting for ${description}`)
+  return settled as T
+}
+
+async function nextEventLine(
+  lines: { readonly nextLine: () => Promise<string | null> },
+  event: string,
+): Promise<string> {
+  while (true) {
+    const line = await lines.nextLine()
+    if (line === null) throw new Error(`child stderr closed before event ${event}`)
+    if (line.includes(`"event":"${event}"`)) return line
+  }
+}
+
 async function waitForStderrEvent(
   lines: { readonly nextLine: () => Promise<string | null> },
   event: string,
 ): Promise<void> {
-  const found = await Promise.race([
-    (async () => {
-      while (true) {
-        const line = await lines.nextLine()
-        if (line === null) return false
-        if (line.includes(`"event":"${event}"`)) return true
-      }
-    })(),
-    Bun.sleep(5_000).then(() => false),
-  ])
-  if (!found) throw new Error(`timed out waiting for child event ${event}`)
+  await withTimeout(nextEventLine(lines, event), CHILD_EVENT_TIMEOUT_MS, `child event ${event}`)
 }
 
 function killQuietly(pid: number): void {

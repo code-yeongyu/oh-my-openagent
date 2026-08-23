@@ -3,7 +3,12 @@ import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:f
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { buildExtension, checkExtensionCurrent, toPortableBuildPath } from "./build-extension.mjs"
+import {
+  buildExtension,
+  checkExtensionCurrent,
+  resolveBunExecutable,
+  toPortableBuildPath,
+} from "./build-extension.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
@@ -58,6 +63,12 @@ async function mutableOutputs() {
 }
 
 describe("checkExtensionCurrent", () => {
+  test("#given the host platform #when resolving the Bun executable #then Windows bypasses the command shell", () => {
+    expect(resolveBunExecutable("win32")).toBe("bun.exe")
+    expect(resolveBunExecutable("darwin")).toBe("bun")
+    expect(resolveBunExecutable("linux")).toBe("bun")
+  })
+
   test("#given freshly built outputs #when the executable bundles are inspected #then the shebang stays the first bytes and the marker still parses", async () => {
     // given
     const outputs = await sharedOutputs()

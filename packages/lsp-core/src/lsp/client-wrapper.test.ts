@@ -36,17 +36,17 @@ describe("LSP client path confinement", () => {
 		expect(workspace).toBe(realpathSync(root));
 	});
 
-	it("#given an absolute file outside context cwd #when resolving #then rejects before workspace inference", () => {
+	it("#given an absolute file outside context cwd #when resolving #then infers the file's own project root", () => {
 		const root = tempRoot("lsp-client-wrapper-cwd-");
 		const outside = tempRoot("lsp-client-wrapper-outside-");
 		mkdirSync(join(outside, ".git"), { recursive: true });
 		writeFileSync(join(outside, "file.ts"), "export const outside = true;\n");
 
-		expect(() =>
-			runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
-				findWorkspaceRoot(join(outside, "file.ts")),
-			),
-		).toThrow(LspInvalidPathError);
+		const workspace = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
+			findWorkspaceRoot(join(outside, "file.ts")),
+		);
+
+		expect(workspace).toBe(realpathSync(outside));
 	});
 
 	it("#given a symlink inside cwd that points outside #when resolving read path #then keeps lexical path and cwd root", () => {

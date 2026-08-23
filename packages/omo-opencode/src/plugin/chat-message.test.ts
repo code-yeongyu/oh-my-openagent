@@ -124,7 +124,7 @@ afterEach(() => {
 })
 
 describe("createChatMessageHandler - synthetic/internal messages", () => {
-  test("skips synthetic-only user messages before session state and hooks mutate", async () => {
+  test("acknowledges fallback-marked synthetic retries through runtime fallback before other hooks mutate", async () => {
     // given
     const hookCalls: string[] = []
     const args = createMockHandlerArgs({ shouldOverride: true })
@@ -133,10 +133,47 @@ describe("createChatMessageHandler - synthetic/internal messages", () => {
         hookCalls.push("keywordDetector")
       },
     }
+    args.hooks.runtimeFallback = {
+      "chat.message": async () => {
+        hookCalls.push("runtimeFallback")
+      },
+    }
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "synthetic prompt", synthetic: true }],
+      parts: [{
+        type: "text",
+        text: "synthetic prompt\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->",
+        synthetic: true,
+      }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(args._appliedSessions).toEqual([])
+    expect(hookCalls).toEqual(["runtimeFallback"])
+    expect(getSessionAgent("test-session")).toBeUndefined()
+  })
+
+  test("does not acknowledge unrelated synthetic continuations as fallback retries", async () => {
+    // given
+    const hookCalls: string[] = []
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.runtimeFallback = {
+      "chat.message": async () => {
+        hookCalls.push("runtimeFallback")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{
+        type: "text",
+        text: `todo continuation\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+        synthetic: true,
+      }],
     }
 
     // when

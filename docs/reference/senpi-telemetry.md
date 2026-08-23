@@ -19,13 +19,14 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `session_started` | `$os_version` | `string` | - |
 | `session_started` | `arch` | `string` | - |
 | `session_started` | `cpu_count` | `number` | - |
-| `session_started` | `default_model` | `string` | `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
-| `session_started` | `default_provider` | `string` | `anthropic`, `anthropic-api`, `deepseek`, `google`, `github-copilot`, `kimi-for-coding`, `moonshotai`, `openai`, `opencode`, `opencode-go`, `quotio-openai`, `vercel`, `xai`, `custom` |
+| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `quotio-openai`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
 | `session_started` | `provider_count` | `number` | - |
 | `session_started` | `providers` | `string` | - |
 | `session_started` | `reason` | `string` | `startup`, `reload`, `new`, `resume`, `fork` |
+| `session_started` | `timezone` | `string` | - |
 | `prompt_submitted` | `$session_id` | `string` | - |
 | `prompt_submitted` | `input_source` | `string` | `interactive`, `rpc`, `extension` |
 | `prompt_submitted` | `invocation_stage` | `string` | `none`, `first_arm`, `remention`, `post_compact_rearm` |
@@ -46,9 +47,9 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `turn_completed` | `cache_write_tokens` | `number` | - |
 | `turn_completed` | `cost_usd` | `number` | - |
 | `turn_completed` | `input_tokens` | `number` | - |
-| `turn_completed` | `model_id` | `string` | `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
 | `turn_completed` | `output_tokens` | `number` | - |
-| `turn_completed` | `provider` | `string` | `anthropic`, `anthropic-api`, `deepseek`, `google`, `github-copilot`, `kimi-for-coding`, `moonshotai`, `openai`, `opencode`, `opencode-go`, `quotio-openai`, `vercel`, `xai`, `custom` |
+| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `quotio-openai`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `turn_completed` | `reasoning_tokens` | `number` | - |
 | `turn_completed` | `total_tokens` | `number` | - |
 | `turn_completed` | `turn_index` | `number` | - |
@@ -91,6 +92,52 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `non_eval_waves_total` | `number` | - |
 | `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1`, `parallelism_v2` |
 | `parallelism_summary` | `upper_bound_saved_ms` | `number` | - |
+| `delegation_completed` | `$session_id` | `string` | - |
+| `delegation_completed` | `agent_type` | `string` | `explore`, `librarian`, `metis`, `momus`, `custom`, `none` |
+| `delegation_completed` | `background_mode` | `string` | `foreground`, `background`, `promoted`, `unknown` |
+| `delegation_completed` | `cache_read_tokens` | `number` | - |
+| `delegation_completed` | `cache_write_tokens` | `number` | - |
+| `delegation_completed` | `category` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `architect`, `unspecified-high`, `writing`, `custom`, `none` |
+| `delegation_completed` | `config_generation` | `number` | - |
+| `delegation_completed` | `cost_status` | `string` | `reported`, `unavailable`, `invalid` |
+| `delegation_completed` | `cost_usd` | `number` | - |
+| `delegation_completed` | `duration_ms` | `number` | - |
+| `delegation_completed` | `duration_status` | `string` | `monotonic`, `wall_clock`, `unavailable` |
+| `delegation_completed` | `execution_mode` | `string` | `in-process`, `process` |
+| `delegation_completed` | `fallback_attempts` | `number` | - |
+| `delegation_completed` | `input_tokens` | `number` | - |
+| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `delegation_completed` | `model_source` | `string` | `category`, `explicit`, `agent`, `none` |
+| `delegation_completed` | `output_tokens` | `number` | - |
+| `delegation_completed` | `owner_kind` | `string` | `plain_child`, `dag_node`, `team_member`, `unknown` |
+| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `quotio-openai`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `delegation_completed` | `reasoning_effort` | `string` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `other`, `none` |
+| `delegation_completed` | `run_epoch` | `number` | - |
+| `delegation_completed` | `start_reason` | `string` | `initial_spawn`, `runtime_fallback`, `session_resume`, `dag_retry`, `revive_after_completed`, `revive_after_error`, `revive_after_cancelled`, `revive_after_interrupted`, `revive_after_lost`, `unknown` |
+| `delegation_completed` | `stats_status` | `string` | `complete`, `partial`, `unavailable` |
+| `delegation_completed` | `status` | `string` | `completed`, `error`, `cancelled`, `interrupted`, `lost` |
+| `delegation_completed` | `task_send_queued_count` | `number` | - |
+| `delegation_completed` | `task_send_running_count` | `number` | - |
+| `delegation_completed` | `task_seq` | `number` | - |
+| `delegation_completed` | `token_status` | `string` | `complete`, `partial`, `unavailable` |
+| `delegation_completed` | `tool_calls` | `number` | - |
+| `delegation_completed` | `total_tokens` | `number` | - |
+| `delegation_completed` | `turns` | `number` | - |
+| `category_config` | `$session_id` | `string` | - |
+| `category_config` | `builtin_overridden_count` | `number` | - |
+| `category_config` | `cat_architect` | `string` | - |
+| `category_config` | `cat_artistry` | `string` | - |
+| `category_config` | `cat_deep` | `string` | - |
+| `category_config` | `cat_quick` | `string` | - |
+| `category_config` | `cat_ultrabrain` | `string` | - |
+| `category_config` | `cat_unspecified_high` | `string` | - |
+| `category_config` | `cat_unspecified_low` | `string` | - |
+| `category_config` | `cat_visual_engineering` | `string` | - |
+| `category_config` | `cat_writing` | `string` | - |
+| `category_config` | `combo_fingerprint` | `string` | - |
+| `category_config` | `config_generation` | `number` | - |
+| `category_config` | `source` | `string` | `startup`, `reload`, `new`, `resume`, `fork` |
+| `category_config` | `user_category_count` | `number` | - |
 <!-- END GENERATED SCHEMA -->
 
 ### Parallelism v2 interpretation
@@ -117,6 +164,37 @@ counts when evaluating rollout coverage.
 
 `turn_completed` reports `reasoning_tokens`. That field is optional and is a subset of `output_tokens`, not an addition to it. Never add `reasoning_tokens` to `output_tokens` when computing totals, or you double count.
 
+### Delegation and category config events
+
+`delegation_completed` fires at most once per task run, on the nonterminal-to-terminal status edge of a delegated task (`completed`, `error`, `cancelled`, `interrupted`, or `lost`). Its `$session_id` is the salted hash of the parent session that owns the task, even when the row is emitted long after that session was resumed. `category_config` snapshots the effective builtin category-to-model map once per `config_generation`; a snapshot is only re-emitted when the canonical map actually changed. Join the two events on `($session_id, config_generation)`, never on event order: re-registration can replay snapshots out of order.
+
+#### Parent follow-up, not "revision request"
+
+`task_send_running_count` counts accepted parent messages delivered while the child was running in the reported `run_epoch`. `task_send_queued_count` counts messages queued before the child launched. Neither is a revision-request metric, and no dashboard may label it as one. Message intent (revision, added context, nudge, status poll, crash recovery, control traffic) is not identifiable without the message text, which never leaves the machine, so the honest published name is parent follow-up rate. Queued sends are reported separately and never enter the follow-up numerator: a prelaunch message cannot revise output that does not exist yet.
+
+Related: the re-query signal is `start_reason = 'revive_after_completed'` only. Revives after `error`, `cancelled`, `interrupted`, or `lost` are recovery and belong in a separate rate.
+
+#### Coverage status fields
+
+Omitting an unavailable number is invisible inside a `sum()`, where missing silently reads as zero. Four status enums make coverage explicit:
+
+- `cost_status`: sum `cost_usd` only where `cost_status = 'reported'`. A reported zero is a real zero; an absent cost is not.
+- `token_status`: sum token fields only where `token_status = 'complete'`. `partial` means some turns reported usage and some did not.
+- `duration_status`: average or percentile durations only where `duration_status = 'monotonic'`. `wall_clock` values come from record timestamps and can include suspended age or clock skew.
+- `stats_status`: exclude `stats_status = 'unavailable'` rows (tasks that never ran, or were reconciled as lost) from efficiency metrics.
+
+Every cost or time dashboard must publish its coverage column alongside the aggregate, for example `countIf(cost_status = 'reported') / count()`. An aggregate without its coverage is misleading by construction.
+
+#### Known undercounts
+
+- Runtime fallback: tokens and cost consumed by a destroyed pre-fallback attempt are lost. `fallback_attempts > 0` flags the row and its `token_status` / `cost_status` degrade when totals cannot be vouched for. Cost per category is a lower bound for these tasks.
+- Session shutdown suspension: work done before a suspension is never counted. The resumed run emits with `start_reason = 'session_resume'` and only the resumed epoch's stats.
+- Background completion after client shutdown: a task that terminates after the spawning host's telemetry client shut down emits nothing. Completion counts are a lower bound; use `delegation_started` as the request denominator, never the completion count.
+
+#### Country queries and delayed delivery
+
+GeoIP country is derived server side from the transport's sending IP at delivery time. For rows delivered late, that IP belongs to whatever network the draining host is on, not the network where the task executed. Country queries must therefore exclude rows with `start_reason = 'session_resume'` or `stats_status = 'unavailable'`. VPNs, proxies, mobile routing, and missing GeoIP data further limit accuracy; treat country as approximate.
+
 ## Identity model
 
 Identity is machine-level, not person-level:
@@ -124,13 +202,13 @@ Identity is machine-level, not person-level:
 - The anonymous machine id is `sha256("omo-senpi:" + hostname)`. The raw hostname never leaves the machine; it's only hashed locally.
 - The `$session_id` value is a keyed hash: a per-machine random salt combined with the raw session id, then hashed. The raw session id is never sent, and sessions from different machines can't be correlated by session id.
 - Person profiles are disabled on every event (`$process_person_profile: false`), so PostHog builds no person records.
-- Geoip enrichment is enabled for these events, matching the legacy adapters, so PostHog may derive location data from the sending IP.
+- GeoIP enrichment is enabled as of schema version 2: native events are sent without the `$geoip_disable` transport flag, so PostHog may derive an approximate country (`$geoip_country_code`) from the sending IP server side. The application never authors `$ip` or any location property itself, and stores no IP locally. Earlier schema versions disabled GeoIP; a prior revision of this document wrongly claimed it was already on.
 
 Because identity is machine-level, a shared machine conflates its users into one id. That's an accepted, documented limitation, not a bug.
 
 ## SDK-added properties
 
-PostHog's node client attaches `$lib` and `$lib_version` to every event. Geoip enrichment is enabled, so the client does not attach `$geoip_disable`; PostHog may add derived location properties after ingestion. These are SDK or service metadata, not authored by the omo-senpi client, so they don't appear in the allowlists above. They're listed here so an auditor comparing captured and ingested payloads against the schema isn't surprised.
+PostHog's node client attaches `$lib` and `$lib_version` to every event. Since schema version 2 the client omits the `$geoip_disable` flag, so PostHog may add derived location properties such as `$geoip_country_code` after ingestion; before schema version 2 that flag was set and no location was derived. These are SDK or service metadata, not authored by the omo-senpi client, so they don't appear in the allowlists above. They're listed here so an auditor comparing captured and ingested payloads against the schema isn't surprised.
 
 ## Opt-out matrix
 

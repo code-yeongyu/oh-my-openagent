@@ -6,10 +6,13 @@ import { join } from "node:path"
 import {
   dagDefinitionFingerprint,
   dagFingerprint,
+  diffNodeFingerprints,
   nodeFingerprintInput,
+  ownerFingerprintInput,
   type DagDefinitionFingerprintInputV1,
   type DagNodeFingerprintInputV1,
 } from "./fingerprint"
+import type { DagOwnerFingerprintInput } from "./owner"
 import type { DagNodeId, DagRoute } from "./types"
 
 const nodeId = (value: string): DagNodeId => value as DagNodeId
@@ -155,5 +158,84 @@ describe("nodeFingerprintInput", () => {
     })
     expect(normalized.dependsOn).toEqual([nodeId("a"), nodeId("d")])
     expect(normalized.prompt).toBe("exact prompt  as submitted")
+  })
+})
+
+describe("ownerFingerprintInput", () => {
+  const ownerInput: DagOwnerFingerprintInput = {
+    definitionFingerprint: "def-abc",
+    nodeId: nodeId("node-x"),
+  }
+
+  it("#given execAttempt is 0 #when fingerprinted #then matches the pinned legacy hash", () => {
+    const input = ownerFingerprintInput({ ...ownerInput, execAttempt: 0 })
+    expect(dagFingerprint(input)).toBe(
+      "8abfeef1a4832e7dd31064a56f785ae0253851596b4a650d6ec8a849620e58dc",
+    )
+  })
+
+  it("#given execAttempt is omitted #when fingerprinted #then matches the pinned legacy hash", () => {
+    const input = ownerFingerprintInput(ownerInput)
+    expect(dagFingerprint(input)).toBe(
+      "8abfeef1a4832e7dd31064a56f785ae0253851596b4a650d6ec8a849620e58dc",
+    )
+  })
+
+  it("#given execAttempt is 1 #when fingerprinted #then differs from the legacy hash", () => {
+    const legacy = ownerFingerprintInput({ ...ownerInput, execAttempt: 0 })
+    const retry1 = ownerFingerprintInput({ ...ownerInput, execAttempt: 1 })
+    expect(dagFingerprint(retry1)).not.toBe(dagFingerprint(legacy))
+  })
+})
+
+describe("diffNodeFingerprints", () => {
+  const base: DagNodeFingerprintInputV1 = {
+    nodeId: nodeId("a"),
+    label: "A",
+    dependsOn: [],
+    prompt: "do a",
+    route: categoryRoute,
+    childName: "child-a",
+  }
+
+  const sibling: DagNodeFingerprintInputV1 = {
+    nodeId: nodeId("b"),
+    label: "B",
+    dependsOn: [],
+    prompt: "do b",
+    route: categoryRoute,
+    childName: "child-b",
+  }
+
+  const dropped: DagNodeFingerprintInputV1 = {
+    nodeId: nodeId("d"),
+    label: "D",
+    dependsOn: [],
+    prompt: "do d",
+    route: categoryRoute,
+    childName: "child-d",
+  }
+
+  it("#given changed/unchanged/added/removed nodes #when diffed #then classifies each bucket correctly", () => {
+    const oldNodes = [base, sibling, dropped]
+    const newNodes = [
+      { ...base, prompt: "do a changed" },
+      sibling,
+      {
+        nodeId: nodeId("c"),
+        label: "C",
+        dependsOn: [],
+        prompt: "do c",
+        route: categoryRoute,
+        childName: "child-c",
+      },
+    ]
+
+    const result = diffNodeFingerprints(oldNodes, newNodes)
+
+    expect(result.unchangedIds).toEqual([nodeId("b")])
+    expect(result.changedIds).toEqual([nodeId("a")])
+    expect(result.addedIds).toEqual([nodeId("c")])
+    expect(result.removedIds).toEqual([nodeId("d")])
   })
 })

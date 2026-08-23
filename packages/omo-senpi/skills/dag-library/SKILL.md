@@ -47,7 +47,7 @@ const result = await run.done()
 The dag engine keys idempotency on `key` + graph fingerprint: re-starting the same key with the same graph REUSES the old run instead of running again. So the library treats the stored `key` as a BASE key and rotates it on every load:
 
 - `lib.start("nightly-audit")` → key becomes `nightly-audit-<UTC YYYYMMDD-HHmmss>`: every call is a fresh run. This is the default because wanting a fresh run is the common case.
-- `lib.start("nightly-audit", { suffix: "20260818" })` → key becomes `nightly-audit-20260818`: explicit suffix, so a retry of the same logical run reuses it (idempotent recovery), while a new day gets a new run.
+- `lib.start("nightly-audit", { suffix: "20260818" })` → key becomes `nightly-audit-20260818`: explicit suffix, so re-running the same logical run reuses it (idempotent recovery), while a new day gets a new run. Recovering a FAILED node inside such a run is `retry`/`amend` on that run id, not a new suffix.
 - `lib.start("nightly-audit", { suffix: "" })` → key stays `nightly-audit`: full idempotency; only reach for this when reusing the previous result is exactly what you want.
 
 ## Python cells

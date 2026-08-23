@@ -6,8 +6,18 @@ import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { RpcRunnerSpec } from "@oh-my-opencode/senpi-task"
-import { createRpcModelAdmission } from "@oh-my-opencode/senpi-task/rpc-model-admission"
+import { createRpcModelAdmission, PROBE_TIMEOUT_MS } from "@oh-my-opencode/senpi-task/rpc-model-admission"
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "@oh-my-opencode/senpi-task/rpc-spawn"
+
+/**
+ * Admission can spend three full catalog probes worst case: a timed-out probe is re-probed once
+ * (a timeout is inconclusive, not absence), and a first exit-0 listing that omits the requested
+ * model. Keep the test deadline derived from the production budget, with 20s for termination and
+ * runner overhead. The confirming probe deliberately keeps the full probe budget: it decides a
+ * rejection, so starving it would time out on exactly the slow-but-complete listings this path must
+ * admit.
+ */
+const ADMISSION_TEST_TIMEOUT_MS = PROBE_TIMEOUT_MS * 3 + 20_000
 
 const agentDirs: string[] = []
 const mockProviderExtension = fileURLToPath(
@@ -92,7 +102,7 @@ describe("task RPC launch profile parity", () => {
 
     // then
     expect(await admission).toBeUndefined()
-  }, 30_000)
+  }, ADMISSION_TEST_TIMEOUT_MS)
 
   test("#given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch", async () => {
     // given
@@ -108,5 +118,5 @@ describe("task RPC launch profile parity", () => {
         message: expect.stringMatching(/omo-mock\/mock-1.*probed catalog has/),
       },
     })
-  }, 30_000)
+  }, ADMISSION_TEST_TIMEOUT_MS)
 })

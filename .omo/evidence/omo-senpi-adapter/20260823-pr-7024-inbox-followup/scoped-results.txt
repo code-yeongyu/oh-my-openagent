@@ -1,0 +1,11 @@
+Focused fresh-identity regression:
+1 pass, 4 filtered, 0 fail, 3 assertions.
+
+Adjacent identity-runtime and sandbox suites:
+22 pass, 10 platform skips, 0 fail, 65 assertions.
+
+Senpi TypeScript check:
+exit 0.
+
+Diff whitespace check against origin/dev:
+exit 0.

@@ -1,0 +1,7 @@
+
+-- status after build --
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/plugin/components/codegraph/dist/serve.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-opencode/src/features/btw-side/tui-parent-validator.test.ts
+ M packages/omo-opencode/src/features/btw-side/tui-parent-validator.ts

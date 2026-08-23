@@ -25,8 +25,8 @@ Tracks bugs that are present in the current release but have been intentionally 
 ## #5746 - tmux subagent panes attach only after focus by default
 
 - **Affects**: `tmux.enabled` sessions that expect every subagent pane to show a live attached session immediately.
-- **Symptom**: New panes can show only the placeholder text `Focus this pane to attach` until the user focuses each pane. With high background concurrency, the tmux layout can look blank or inactive even though subagents are running.
-- **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. Treat the placeholder as current behavior unless an eager-attach option is added.
+- **Symptom**: New panes auto-attach for about 5 seconds after spawn (`AUTO_ACTIVATE_GRACE_MS`). If that window is missed, a pane can stay on the placeholder text `Focus this pane to attach` until the user focuses it. With high background concurrency, parts of the tmux layout can look blank or inactive even though subagents are running.
+- **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. After the grace window, treat focus-to-attach as current behavior; there is no user-facing eager-attach config flag.
 - **Status**: Open enhancement. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5746.
 
 ## #5809 - cmux tmux panes can stay on the focus-to-attach placeholder
@@ -84,32 +84,6 @@ Tracks bugs that are present in the current release but have been intentionally 
 
 BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first prompt payload before dispatch and consume that bootstrap payload exactly once when runtime fallback must retry an empty-history child session.
 
-## v4.2.0 - Delegate-task early-failure-fallback (BLOCKER-4, deferred from PR #3825)
-
-### Symptom
-
-A delegated child session that fails on its very first `promptAsync` call (for example, the provider rejects the request before any session history is persisted) may not advance to the configured fallback models. The session ends in early failure instead of retrying with the next fallback in the chain.
-
-This affects subagents launched via the delegate-task tool (background or sync) where the first provider call fails immediately and `session.messages` is still empty.
-
-### History
-
-PR #3825 (`tw-yshuang/fix/delegated-child-session-early-failure-fallback`, merged as `cd33f3a39` and then `fac90d69f` on 2026-05-07) introduced a shared bootstrap context (`packages/omo-opencode/src/shared/delegated-child-session-bootstrap.ts`) to capture the retry payload before the first prompt dispatch, so empty-history failures could still retry with the fallback chain.
-
-After the merge landed on `dev`, the PR's own regression test (`delegated child-session empty-history fallback retries with captured bootstrap prompt` in `packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts`) failed on a clean root `bun test --timeout 30000` run (6828 pass / 1 fail). PR #4044 (`code-yeongyu/revert/3825-delegated-bootstrap`, revert commit `3c7d1299a`, merge-revert commit `e2b8e49e2`, merged on 2026-05-15) reverted the merge to keep `dev` green (6823 pass / 0 fail / 6 skip across 709 files).
-
-The original failure-mode the PR targets remains in v4.2.0.
-
-### Workaround
-
-- For delegated subagents, prefer providers that succeed reliably on the first call (rarely fail with auth/quota errors at request time).
-- Configure fallback models conservatively in `categories[].fallback_models` and accept that the very first failure may not auto-retry.
-- The existing runtime-fallback persisted-history retry path still works after the subagent produces any history.
-
-### Tracking
-
-Issue #4059 tracks the reland with stabilized regression coverage. The reland is deferred to a follow-up release and should account for current schema-shape changes plus prompt-async-gate semantics.
-
 ## #4225 — Custom LSP config in `.opencode/oh-my-openagent.jsonc` is silently ignored
 
 - **Affects**: v4.2.3+ after the LSP to MCP migration.
@@ -159,18 +133,18 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Status**: Open. The runtime now avoids the misleading auto-updated toast when it detects an OpenCode-managed sandbox, but users may still need the manual cache refresh above until OpenCode exposes a reliable package-sandbox update path. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
 
-## #4710: `@plan` may stay in Sisyphus instead of switching to Prometheus
+## #4710: `@plan` does not switch to Prometheus
 
 - **Affects**: Current OpenCode/Ultimate planning flow.
-- **Symptom**: Typing `@plan` from Sisyphus can leave the request in Sisyphus instead of handing it to Prometheus.
-- **Workaround**: Switch to Prometheus first with the Tab agent selector or `/agent`, ask for the plan there, then run `/start-work` after approval.
+- **Symptom**: `@plan` is OpenCode's native plan-agent mention, not an OMO Prometheus switch, so typing it from Sisyphus does not hand the request to Prometheus.
+- **Workaround**: Select Prometheus first with the Tab agent selector or `/agent`, ask for the plan there; after the plan is written under `.omo/plans/`, run `/start-work` so Atlas executes it.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4710.
 
 ## #5050: OpenCode can hang during startup before the plugin runs
 
 - **Affects**: OpenCode 1.16.2 startup with external plugins and cold package caches.
 - **Symptom**: `opencode --pure` starts, but normal `opencode` clears the terminal and stalls after `service=plugin path=oh-my-openagent@latest loading plugin`.
-- **Workaround**: If the hang happens before `/tmp/oh-my-opencode.log` gets a plugin entry, avoid the npm resolver path by using an absolute `file://` plugin path or by pre-populating the OpenCode package cache. If logs point to a malformed or locked `opencode.db`, back up and remove `~/.local/share/opencode/opencode.db*`; OpenCode recreates it on next start, but local session history is lost.
+- **Workaround**: If the hang happens before `$TMPDIR/oh-my-opencode.log` (on Linux often `/tmp/oh-my-opencode.log`) gets a plugin entry, avoid the npm resolver path by using an absolute `file://` plugin path or by pre-populating the OpenCode package cache. If logs point to a malformed or locked `opencode.db`, back up and remove `~/.local/share/opencode/opencode.db*`; OpenCode recreates it on next start, but local session history is lost.
 - **Status**: Open. The npm resolver timeout belongs upstream in OpenCode; tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5050.
 
 ## #5260: Background tasks can wait on an LSP install decision
@@ -203,7 +177,7 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Affects**: LazyCodex / OMO Codex planner and reviewer flows that use native Codex subagents.
 - **Symptom**: A parent session can receive repeated `wait_agent` timeouts while a planner or reviewer subagent remains `running`. Follow-up prompts may not recover the run, and the session can look stuck until the child agent is closed or respawned.
-- **Workaround**: Use short wait cycles, send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
+- **Workaround**: Do not spin short `wait_agent` cycles; back off between calls by doubling the timeout up to about 5 minutes. Send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5021.
 
 ## #3303 - Windows OpenCode proxy install can fail before OMO loads

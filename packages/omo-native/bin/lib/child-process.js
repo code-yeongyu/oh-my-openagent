@@ -12,6 +12,7 @@ export function propagateResult(result) {
 export function spawnNode(scriptPath, args, options = {}) {
   const result = spawnSync(process.execPath, [scriptPath, ...args], {
     stdio: "inherit",
+    windowsHide: true,
     ...options,
   })
   propagateResult(result)

@@ -344,6 +344,66 @@ describe("createDagFileStore locks and retention", () => {
     expect(fs.existsSync(store.paths.runLock(runId))).toBe(false)
   })
 
+  test("#given Windows lock publication #when hard links are rejected with EPERM #then the lock is still acquired and released", () => {
+    // given
+    const store = createDagFileStore(
+      { project_dir: tempProject() },
+      { isProcessAlive: () => true, platform: "win32" as const },
+    )
+    const realLink = fs.linkSync
+    spyOn(fs, "linkSync").mockImplementation((from, to) => {
+      if (typeof to === "string" && to === store.paths.runLock(runId)) {
+        const error = new Error("operation not permitted")
+        Object.assign(error, { code: "EPERM" })
+        throw error
+      }
+      realLink(from, to)
+    })
+    let entered = false
+
+    // when
+    const acquire = () => store.withRunLock(runId, () => {
+      entered = true
+      expect(fs.existsSync(store.paths.runLock(runId))).toBe(true)
+    })
+
+    // then
+    expect(acquire).not.toThrow()
+    expect(entered).toBe(true)
+    expect(fs.existsSync(store.paths.runLock(runId))).toBe(false)
+  })
+
+  test("#given a Windows lock already held by a live process #when a second acquirer races #then it observes the holder instead of crashing", () => {
+    // given
+    const holderPid = 424_242
+    // The clock advances past the lock-wait ceiling so the contention path terminates instead of
+    // spinning: this asserts the loser OBSERVES a live holder, never that it crashes on raw EPERM.
+    let clock = 0
+    const store = createDagFileStore(
+      { project_dir: tempProject() },
+      {
+        isProcessAlive: (pid: number) => pid === holderPid,
+        platform: "win32" as const,
+        now: () => {
+          clock += 1_001
+          return clock
+        },
+      },
+    )
+    fs.writeFileSync(store.paths.runLock(runId), JSON.stringify({ hostPid: holderPid, owner: "live" }))
+    spyOn(fs, "linkSync").mockImplementation(() => {
+      const error = new Error("operation not permitted")
+      Object.assign(error, { code: "EPERM" })
+      throw error
+    })
+
+    // when
+    const acquire = () => store.withRunLock(runId, () => undefined)
+
+    // then
+    expect(acquire).toThrow(/Timed out acquiring DAG lock/)
+  })
+
   test("#given a concurrent observer watches stale reclamation #when ownership changes #then the canonical lock path is never vacant", () => {
     // given
     const store = createDagFileStore(

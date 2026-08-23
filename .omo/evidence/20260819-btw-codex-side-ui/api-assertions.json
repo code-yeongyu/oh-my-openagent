@@ -1,0 +1,13 @@
+{
+  "parent_has_context_token": true,
+  "parent_lacks_side_question": true,
+  "parent_lacks_side_answer": true,
+  "side_has_question": true,
+  "side_has_answer": true,
+  "side_lacks_persisted_parent_token": true,
+  "side_deleted_after_ctrl_c": true,
+  "remaining_isolated_sessions": 1,
+  "real_session_count_before": 7518,
+  "real_session_count_after": 7518,
+  "qa_ports_released": true
+}

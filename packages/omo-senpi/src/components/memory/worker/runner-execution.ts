@@ -90,6 +90,7 @@ export async function executeReflectionRun(input: {
           identity: options.identity,
           env,
           senpiCommand: options.senpiCommand,
+          senpiPrefixArgs: options.senpiPrefixArgs,
         })
         if (!launched) {
           await input.appendLaunched()

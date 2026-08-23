@@ -70,10 +70,16 @@ export type ReattachResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
 
+export type CapacityReservation =
+  | { readonly ok: false }
+  | { readonly ok: true; release(): void }
+
 export type RespawnPort = (record: TaskRecord, resumeSessionPath?: string) => Promise<RespawnResult>
 export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
+export type ReserveReattachPort = (record: TaskRecord) => CapacityReservation
 
 export type LifecycleReattachPorts = {
+  readonly reserve: ReserveReattachPort
   readonly respawn: RespawnPort
   readonly reattach: ReattachPort
 }
@@ -97,6 +103,7 @@ export type LifecycleDeps = {
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  readonly reserveReattach?: ReserveReattachPort
   readonly respawn?: RespawnPort
   readonly reattach?: ReattachPort
   // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
@@ -113,5 +120,9 @@ export type LifecycleDeps = {
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {
   if (deps.respawn === undefined || deps.reattach === undefined) return undefined
-  return { respawn: deps.respawn, reattach: deps.reattach }
+  return {
+    reserve: deps.reserveReattach ?? (() => ({ ok: true, release: () => undefined })),
+    respawn: deps.respawn,
+    reattach: deps.reattach,
+  }
 }

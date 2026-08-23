@@ -199,13 +199,29 @@ async function reattachLegacyRecord(
     return { task_id: record.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
-  const respawned = await ports.respawn(record, sessionPath)
+  const reservation = ports.reserve(record)
+  if (!reservation.ok) return { task_id: record.task_id, kind: "deferred", reason: "capacity" }
+  let respawned: Awaited<ReturnType<typeof ports.respawn>>
+  try {
+    respawned = await ports.respawn(record, sessionPath)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!respawned.ok) {
+    reservation.release()
     await markLost(context, record, `reattach failed: ${respawned.reason}`)
     return { task_id: record.task_id, kind: "lost", reason: respawned.reason }
   }
-  const reattached = await ports.reattach(record, respawned.handle)
+  let reattached: Awaited<ReturnType<typeof ports.reattach>>
+  try {
+    reattached = await ports.reattach(record, respawned.handle)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!reattached.ok) {
+    reservation.release()
     if (reattached.kind === "already_attached") {
       return { task_id: record.task_id, kind: "resumed", reason: reattached.reason }
     }

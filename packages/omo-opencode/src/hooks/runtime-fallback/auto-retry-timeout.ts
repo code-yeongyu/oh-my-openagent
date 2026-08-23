@@ -42,8 +42,13 @@ export function createFallbackTimeoutHelpers(
     const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
     if (timeoutMs <= 0) return
     const wasSubagentSession = subagentSessions.has(sessionID)
+    const fallbackState = sessionStates.get(sessionID)
 
     const timer = setTimeout(async () => {
+      if (sessionFallbackTimeouts.get(sessionID) !== timer) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped after timer replacement`, { sessionID })
+        return
+      }
       sessionFallbackTimeouts.delete(sessionID)
 
       if (wasSubagentSession && !subagentSessions.has(sessionID)) {
@@ -51,14 +56,25 @@ export function createFallbackTimeoutHelpers(
         return
       }
 
-      const state = sessionStates.get(sessionID)
-      if (!state) return
+      if (!fallbackState || sessionStates.get(sessionID) !== fallbackState) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped for stale state generation`, {
+          sessionID,
+        })
+        return
+      }
+      const state = fallbackState
 
       if (sessionRetryInFlight.has(sessionID)) {
         log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
       }
 
       await abortSessionRequest(sessionID, "session.timeout")
+      if (sessionStates.get(sessionID) !== state) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped for stale state generation`, {
+          sessionID,
+        })
+        return
+      }
       sessionRetryInFlight.delete(sessionID)
 
       if (state.pendingFallbackModel) {

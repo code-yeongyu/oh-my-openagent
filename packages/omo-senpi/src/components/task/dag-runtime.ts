@@ -11,12 +11,15 @@ import {
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
+  type DagDefinition,
   type DagFileStore,
   type DagNodeSpawnPolicy,
   type DagManager,
+  type DagNodeId,
   type DagRunEvent,
   type DagRunId,
   type DagRunRecordV1,
+  type DagRunSnapshot,
   type DagScheduler,
   type OwnedStartResult,
 } from "@oh-my-opencode/senpi-task/dag"
@@ -29,7 +32,13 @@ import { createDagStatusUi, type DagStatusUiTimers } from "./dag-status-ui"
 import { createDagWake } from "./dag-wake"
 import { createDagWakeSource } from "./dag-wake-source"
 import type { TaskEngine } from "./engine"
-import { createDagScheduler, observeDagSchedulers } from "../../../../senpi-task/src/dag/scheduler"
+import {
+  createDagScheduler,
+  observeDagSchedulers,
+  reenterDagRun,
+  type DagNodeSendResult,
+  type DagRunReentry,
+} from "../../../../senpi-task/src/dag/scheduler"
 import { createDagSkillMaterializer } from "../../../../senpi-task/src/dag/skills"
 
 const EVENT_PAGE_SIZE = 1000
@@ -43,6 +52,16 @@ export interface DagRuntime {
   readonly manager: DagRuntimeManager
   readonly wait: ReturnType<typeof createDagWaitSurface>["wait"]
   readonly cancel: (runId: DagRunId, reason?: string) => Promise<void>
+  /** Returns settled nodes to a fresh attempt and resumes the run under a NEW scheduler. */
+  readonly retry: (
+    runId: DagRunId,
+    nodeIds?: readonly string[],
+    options?: { readonly prompt?: string },
+  ) => Promise<DagRunSnapshot>
+  /** Steers a running node's child, revives a finished resident one, or refuses. */
+  readonly send: (runId: DagRunId, nodeId: string, message: string) => Promise<DagNodeSendResult>
+  /** Applies an edited definition to the SAME run and resumes it under a NEW scheduler. */
+  readonly amend: (runId: DagRunId, definition: DagDefinition) => Promise<DagRunSnapshot>
   readonly taskRecord: (taskId: string) => TaskRecord | undefined
   attach(): Promise<void>
   sync(): void
@@ -90,16 +109,28 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       }
     },
   }
+  const materializeSkills = (input: Parameters<ReturnType<typeof createDagSkillMaterializer>>[0]) =>
+    createDagSkillMaterializer({ store, cwd: deps.engine.runtime.cwd(), loadSkills: deps.engine.loadSkills })(input)
   const coreManager = createDagManager({
     store,
-    materializeSkills: (input) =>
-      createDagSkillMaterializer({ store, cwd: deps.engine.runtime.cwd(), loadSkills: deps.engine.loadSkills })(input),
+    materializeSkills,
     ...(dagSettings === undefined ? {} : { settings: dagSettings }),
   })
   const taskManager = admissionTaskManager(
     deps.engine.manager,
     (runId) => stoppedAdmissions.has(runId),
   )
+  // Every scheduler this runtime builds - first run, re-entry after retry, re-entry after amend -
+  // shares one option set so a resumed run keeps the same execution mode, spawn policy, and skill
+  // materialization the original admission had.
+  const schedulerOptions = {
+    store,
+    taskManager,
+    materializeSkills,
+    executionMode: { agents: deps.engine.agents, config: deps.engine.omoConfig },
+    ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
+    ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
+  }
 
   const subscribe = (runId: DagRunId, listener: (event: DagRunEvent) => void): (() => void) => {
     const listeners = runListeners.get(runId) ?? new Set<(event: DagRunEvent) => void>()
@@ -125,14 +156,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     const existing = schedulers.get(runId)
     if (existing !== undefined) return existing
     const initialRecord = coreManager.record(runId, parentSessionId)
-    const scheduler = createDagScheduler({
-      store,
-      taskManager,
-      initialRecord,
-      executionMode: { agents: deps.engine.agents, config: deps.engine.omoConfig },
-      ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
-      ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
-    })
+    const scheduler = createDagScheduler({ ...schedulerOptions, initialRecord })
     const created: { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } = { scheduler }
     schedulers.set(runId, created)
     return created
@@ -163,6 +187,73 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     const record = coreManager.record(runId, sessionId)
     if (TERMINAL_RUN_STATUSES.has(record.status)) return
     await controller(runId, sessionId).scheduler.cancel(runId, reason)
+  }
+
+  /**
+   * The single re-entry seam for the control verbs. The settled scheduler deleted itself from
+   * `schedulers` on settle, so the fresh instance the verb built must be re-registered here or the
+   * next cancel/wait would silently build a THIRD scheduler over a live run. The admission latch is
+   * cleared for the same reason it must be cleared at all: only recovery's shutdown pause ever sets
+   * it, it lives in this closure so it outlives every scheduler, and nothing else ever deletes it -
+   * a retry after a pause+resume in the SAME process would otherwise hang forever on the
+   * never-resolving admission promise instead of starting a child.
+   */
+  const adoptReentry = (runId: DagRunId, reentry: DagRunReentry): void => {
+    const owned: { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } = { scheduler: reentry.scheduler }
+    schedulers.set(runId, owned)
+    const running = reentry.run
+      .then(async (record) => {
+        await reentry.scheduler.whenIdle()
+        return record
+      })
+      .finally(() => {
+        if (schedulers.get(runId) === owned) schedulers.delete(runId)
+      })
+    owned.running = running
+    void running.catch((error: unknown) => {
+      deps.logger.error("omo-senpi dag scheduler failed", {
+        runId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }
+
+  const clearAdmissionLatch = (runId: DagRunId): void => {
+    stoppedAdmissions.delete(runId)
+  }
+
+  const retry = async (
+    runId: DagRunId,
+    nodeIds?: readonly string[],
+    options?: { readonly prompt?: string },
+  ): Promise<DagRunSnapshot> => {
+    const sessionId = deps.engine.runtime.sessionId() ?? ""
+    coreManager.record(runId, sessionId)
+    clearAdmissionLatch(runId)
+    const scheduler = controller(runId, sessionId).scheduler
+    // Node ids arrive as untrusted tool JSON; the engine's branded id is a compile-time tag over the
+    // same string, and the engine itself rejects an id no node carries.
+    const targets = nodeIds as readonly DagNodeId[] | undefined
+    const reentry = options?.prompt === undefined
+      ? scheduler.retryNode(runId, targets)
+      : scheduler.retryNode(runId, targets, { prompt: options.prompt })
+    adoptReentry(runId, reentry)
+    return coreManager.snapshot(runId, sessionId)
+  }
+
+  const send = async (runId: DagRunId, nodeId: string, message: string): Promise<DagNodeSendResult> => {
+    const sessionId = deps.engine.runtime.sessionId() ?? ""
+    coreManager.record(runId, sessionId)
+    return await controller(runId, sessionId).scheduler.sendToNode(runId, nodeId as DagNodeId, message)
+  }
+
+  const amend = async (runId: DagRunId, definition: DagDefinition): Promise<DagRunSnapshot> => {
+    const sessionId = deps.engine.runtime.sessionId() ?? ""
+    const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
+    clearAdmissionLatch(runId)
+    schedulers.delete(runId)
+    adoptReentry(runId, reenterDagRun({ ...schedulerOptions, initialRecord: amended }))
+    return coreManager.snapshot(runId, sessionId)
   }
 
   const waitSurface = createDagWaitSurface({ store, subscribe, cancel })
@@ -339,6 +430,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     manager,
     wait,
     cancel,
+    retry,
+    send,
+    amend,
     taskRecord: (taskId) => deps.engine.manager.get(taskId),
     async attach() {
       activeSessionId = deps.engine.runtime.sessionId()

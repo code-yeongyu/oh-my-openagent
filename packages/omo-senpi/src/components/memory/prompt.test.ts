@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -22,13 +22,14 @@ import {
 } from "./prompt"
 import { MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 const IDENTITY = "prompt-agent"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 class CountingRepo extends GitMemoryRepo {

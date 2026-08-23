@@ -1,3 +1,23 @@
+## 2026-08-20 — Demand parent-side verification of DAG completions
+
+A DAG node's completion summary was delivered to the orchestrating parent as if
+it were established fact, so a node that overstated or fabricated its work could
+satisfy the parent without a single artifact being read. Model-facing DAG
+completion payloads now carry an explicit verification directive: reconstruct the
+node's owed scope from its prompt, open the files and run the commands it claims,
+verify each deliverable with the parent's own tool calls, and send corrective
+instructions back to the same node until that verification passes.
+
+`CompletionDetails` gains an optional `dag` block (`run_id`, `node_id`) sourced
+from the task record's DAG owner, so the parent can address the exact node it
+must correct. `buildCompletionMessage` appends the directive once per message
+whenever any batched detail is DAG-owned, and run-level terminal wakes
+(completed, failed, cancelled) append it to their injection content. A plain
+non-DAG completion keeps byte-identical content, and `dag.run.paused` stays
+directive-free because a pause is not a completion claim. The width-rendered TUI
+path is untouched: `completionMessageLines` and the task-completion renderer
+still render from `details`, so this changes only what the model reads.
+
 ## 2026-08-18 — Rebuild the Sisyphus runtime prompt on same-family model switches
 
 The Sisyphus runtime prompt reconciler skipped every rebuild whose runtime

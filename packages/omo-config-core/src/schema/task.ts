@@ -2,7 +2,9 @@ import { availableParallelism } from "node:os"
 
 import * as z from "zod"
 
-const ResidencyMaxChildrenInputSchema = z.union([z.number().int().positive(), z.literal("unlimited")])
+// 0 is the numeric spelling of "unlimited" for every cap below: the senpi-task engine maps a 0
+// concurrency limit to Infinity and treats a 0 residency cap exactly like the "unlimited" literal.
+const ResidencyMaxChildrenInputSchema = z.union([z.number().int().nonnegative(), z.literal("unlimited")])
 
 export const OmoTaskWaitSchema = z.object({
   min_ms: z.number().int().positive().default(5000),
@@ -35,9 +37,10 @@ export const OmoTaskDagSettingsSchema = z.object({
 
 export const OmoTaskSettingsSchema = z.object({
   default_execution_mode: z.enum(["in-process", "process"]).default("in-process"),
-  default_concurrency: z.number().int().positive().default(5),
-  provider_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
-  model_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
+  default_concurrency: z.number().int().nonnegative().default(5),
+  global_concurrency: z.number().int().nonnegative().default(8),
+  provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   max_depth: z.number().int().nonnegative().default(1),
   residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
   ttl_ms: z.number().int().positive().default(86400000),
@@ -83,9 +86,10 @@ export const OmoTaskWarningsLayerSchema = z.object({
 
 export const OmoTaskSettingsLayerSchema = z.object({
   default_execution_mode: z.enum(["in-process", "process"]).optional(),
-  default_concurrency: z.number().int().positive().optional(),
-  provider_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
-  model_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
+  default_concurrency: z.number().int().nonnegative().optional(),
+  global_concurrency: z.number().int().nonnegative().optional(),
+  provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   max_depth: z.number().int().nonnegative().optional(),
   residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
   ttl_ms: z.number().int().positive().optional(),
@@ -110,5 +114,6 @@ export function resolveOmoTaskSettings(
   return OmoTaskSettingsSchema.parse({
     ...record,
     residency_max_children: record["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3),
+    global_concurrency: record["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2),
   })
 }

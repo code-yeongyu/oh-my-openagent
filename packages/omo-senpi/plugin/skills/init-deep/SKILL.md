@@ -4,7 +4,7 @@ description: "(builtin) Initialize hierarchical AGENTS.md knowledge base"
 ---
 # /init-deep
 
-Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
+Generate hierarchical AGENTS.md files: root + complexity-scored subdirectories, produced by a size-formula-driven dag map-reduce (`quick` scanners -> `unspecified-high` writers) so the main session's context stays flat at any repo size.
 
 ## Usage
 
@@ -18,132 +18,119 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 ## Workflow (High-Level)
 
-1. **Discovery + Analysis** (concurrent)
-   - Fire background explore agents immediately
-   - Main session: bash structure + LSP/ast-grep code map + read existing AGENTS.md
-2. **Score & Decide** - Determine AGENTS.md locations from merged findings
-3. **Generate** - Root first, then subdirs in parallel
-4. **Review** - Deduplicate, trim, validate
+1. **Size & route** (main session) - ONE eval cell measures the repo and computes the node formula.
+2. **Map** (dag) - `quick` scanner nodes extract per-chunk facts into bounded file reports.
+3. **Reduce** (dag) - `unspecified-high` writer nodes own disjoint subtrees: score, write AGENTS.md files, emit digests.
+4. **Root & verify** (dag) - one node writes root AGENTS.md from digests only; one node verifies every file.
+5. **Snapshot & mode** (main session) - snapshot contract unchanged.
 
 <critical>
-**TodoWrite ALL phases. Mark in_progress → completed in real-time.**
-```
-TodoWrite([
-  { id: "discovery", content: "Fire explore agents + LSP/ast-grep map + read existing", status: "pending", priority: "high" },
-  { id: "scoring", content: "Score directories, determine locations", status: "pending", priority: "high" },
-  { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
-  { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
-])
-```
+**THE ALWAYS-REDUCE RULE.** The main session NEVER reads chunk reports or raw node outputs - only the verify node's verdict and, when a repair needs it, one digest. Context protection is structural (bounded fan-in at every stage), never a runtime "how much context is left" guess.
+
+`todo` init the five phases; `start`/`done` each transition in real time.
 </critical>
 
 ---
 
-## Phase 1: Discovery + Analysis (Concurrent)
+## Phase 1: Size & Route
 
-**Mark "discovery" as in_progress.**
+Measure and compute in ONE eval cell - code, not mental arithmetic:
 
-### Fire Background Explore Agents IMMEDIATELY
+```python
+# Measure (tracked files minus vendored/generated: node_modules, .git, dist,
+# build, out, vendor, target, coverage, lockfiles, minified and binary files)
+S        = total source bytes after exclusions
+per_dir  = source bytes per directory            # bin-packing input
+depth    = max directory depth                   # respect --max-depth (default 3)
+existing = every AGENTS.md / CLAUDE.md path      # read the ROOT one now
 
-Don't wait-these run async while main session works. **Equip every agent with ast-grep**: any task touching structure, entry points, dependencies, or hotspots MUST run the `ast-grep` skill (`sg` with `$VAR`/`$$$`) or the `ast_grep` MCP (`search`/`scan`), plus `lsp_symbols` when present, and ground its claims in that data instead of guessing from conventions. WHY: no symbol graph exists, so code shape is matched, not queried. Richer structural context per agent = a more accurate project map.
-
-```
-// Fire all at once, collect results later
-task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: map real layout via ast-grep structural search (sg/ast_grep MCP) + rg --files → REPORT deviations from standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files, trace reach via lsp_find_references + ast-grep call-shape search → REPORT non-standard organization")
-task(subagent_type="explore", load_skills=[], description="Find conventions", run_in_background=true, prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
-task(subagent_type="explore", load_skills=[], description="Find anti-patterns", run_in_background=true, prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
-task(subagent_type="explore", load_skills=[], description="Explore build/CI", run_in_background=true, prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs/structure; ast-grep import-shape search + lsp_find_references on core modules to see what is covered → REPORT unique conventions")
-```
-
-<dynamic-agents>
-**DYNAMIC AGENT SPAWNING**: After bash analysis, spawn ADDITIONAL explore agents based on project scale:
-
-| Factor | Threshold | Additional Agents |
-|--------|-----------|-------------------|
-| **Total files** | >100 | +1 per 100 files |
-| **Total lines** | >10k | +1 per 10k lines |
-| **Directory depth** | ≥4 | +2 for deep exploration |
-| **Large files (>500 lines)** | >10 files | +1 for complexity hotspots |
-| **Monorepo** | detected | +1 per package/workspace |
-| **Multiple languages** | >1 | +1 per language |
-
-```bash
-# Measure project scale first
-total_files=$(find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' | wc -l)
-total_lines=$(find . -type f \\( -name "*.ts" -o -name "*.py" -o -name "*.go" \\) -not -path '*/node_modules/*' -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $1}')
-large_files=$(find . -type f \\( -name "*.ts" -o -name "*.py" \\) -not -path '*/node_modules/*' -exec wc -l {} + 2>/dev/null | awk '$1 > 500 {count++} END {print count+0}')
-max_depth=$(find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' | awk -F/ '{print NF}' | sort -rn | head -1)
+# Formula
+CHUNK   = 400 * 1024          # ~100k tokens of source; a quick worker's usable window
+                              # is ~150k over its fallback chain - leave room for its
+                              # prompt and report
+N_quick = ceil(S / CHUNK)     # bin-pack WHOLE directories into chunks; a directory
+                              # larger than one chunk splits at its children
+N_high  = ceil(N_quick / 12)  # one reducer absorbs ~12 reports (~60k tokens) and
+                              # still has room to spot-check real code
 ```
 
-Example spawning:
-```
-// 500 files, 50k lines, depth 6, 15 large files → spawn 5+5+2+1 = 13 additional agents
-task(subagent_type="explore", load_skills=[], description="Analyze large files", run_in_background=true, prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
-task(subagent_type="explore", load_skills=[], description="Explore deep modules", run_in_background=true, prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
-task(subagent_type="explore", load_skills=[], description="Find shared utilities", run_in_background=true, prompt="Cross-cutting concerns: FIND shared utilities across directories")
-// ... more based on calculation
-```
-</dynamic-agents>
+Route:
 
-### Main Session: Concurrent Analysis
+- **N_quick < 4** -> inline path below; a dag costs more than it saves.
+- **N_quick > `task.dag.max_nodes_per_run` (default 64)** -> raise the knob in omo config, or run one chained dag per top-level directory (multi-run composition, `mass-ulw` skill).
+- **Otherwise** -> dag path: emit `CHUNKS = [{id, dirs, bytes}]`, assign each writer a directory SUBTREE (disjoint - no two writers own the same directory), and `mkdir -p .omo/init-deep/reports .omo/init-deep/digests`.
 
-**While background agents run**, main session does:
+`--create-new`: read every existing AGENTS.md FIRST (still-true facts survive as scanner input), then delete all, then regenerate.
 
-#### 1. Bash Structural Analysis
-```bash
-# Directory depth + file counts
-find . -type d -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/venv/*' -not -path '*/dist/*' -not -path '*/build/*' | awk -F/ '{print NF-1}' | sort -n | uniq -c
+### Inline path (N_quick < 4)
 
-# Files per directory (top 30)
-find . -type f -not -path '*/\\.*' -not -path '*/node_modules/*' | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -30
-
-# Code concentration by extension
-find . -type f \\( -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.go" -o -name "*.rs" \\) -not -path '*/node_modules/*' | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -20
-
-# Existing AGENTS.md / CLAUDE.md
-find . -type f \\( -name "AGENTS.md" -o -name "CLAUDE.md" \\) -not -path '*/node_modules/*' 2>/dev/null
-```
-
-#### 2. Read Existing AGENTS.md
-```
-For each existing file found:
-  Read(filePath=file)
-  Extract: key insights, conventions, anti-patterns
-  Store in EXISTING_AGENTS map
-```
-
-If `--create-new`: Read all existing first (preserve context) → then delete all → regenerate.
-
-#### 3. Code Map - drive LSP AND ast-grep (do NOT skip)
-
-Highest-signal source for the CODE MAP and the Symbol/Export/Reference scoring rows. Complementary, not alternatives - run BOTH when present, alongside the explore agents.
-
-**LSP** - check `lsp_status`; model-facing names are `lsp_status`/`lsp_symbols`/`lsp_find_references`/`lsp_goto_definition` (some harnesses drop the `lsp_` prefix):
-- `lsp_symbols` scope="document" on each entry point -> file outline.
-- `lsp_symbols` scope="workspace", query by kind (class/interface/function) -> symbol inventory.
-- `lsp_find_references` on top exports (line/character from the symbols result) -> reference centrality.
-
-**ast-grep** - the `ast-grep` skill (`sg` with `$VAR`/`$$$`), or the `ast_grep` MCP (`search`/`scan`) when present; a first-class peer to LSP, NOT a last resort:
-- import/export shapes -> module inventory; call shapes on core modules -> centrality + blast radius for the scoring matrix; class/function shapes -> symbol inventory.
-
-`rg` covers text (string contents, comments, file names). For blast-radius/flow synthesis, fan out parallel explore agents armed with ast-grep. WHY: no symbol graph exists, so breadth comes from agents, not one graph query. Only if NEITHER LSP nor ast-grep resolves: mark centrality unmeasured in the CODE MAP.
-
-### Collect Background Results
+Small repo - skip the dag. Fire 2-4 parallel `explore` agents (structure, entry points, conventions, anti-patterns), for example:
 
 ```
-// After main session analysis done, collect all task results
-for each background task ID (`bg_...`): background_output(task_id="bg_...")
+task(subagent_type="explore", run_in_background=true, prompt="Project structure: map real layout via ast-grep structural search (sg/ast_grep MCP) + rg --files -> REPORT deviations from standard patterns")
 ```
 
-**Merge: bash + LSP/ast-grep + existing + explore findings. Mark "discovery" as completed.**
+Run the LSP/ast-grep code map yourself (`lsp_symbols` outlines + workspace inventory, `lsp_find_references` on top exports, ast-grep import/call shapes; when neither resolves, mark centrality unmeasured). Then score with the matrix below and write every file per the templates yourself. Phase 5 applies unchanged.
 
 ---
 
-## Phase 2: Scoring & Location Decision
+## Phase 2: Map Wave - `quick` Scanners (dag)
 
-**Mark "scoring" as in_progress.**
+Build and start the run in one eval JS cell with the dag SDK (`OMO_DAG_SDK_ROOT`); wave doctrine, the node prompt contract, and the failure playbook come from the `mass-ulw` skill's `references/planning.md`. One scanner node per chunk, `category: "quick"`, no `load_skills` - scanners stay lean and their prompt is a rigid numbered extraction template. Quick workers extract; they never judge and never write AGENTS.md:
+
+```
+TASK: Extract knowledge-base facts for chunk <id> (<dirs>) of <repo-root>.
+Steps, in order:
+1. Inventory each directory in scope: file count, LOC, languages, entry files.
+2. Public exports/symbols other code imports - lsp_symbols and ast-grep
+   import/call shapes, never file-name guesses.
+3. Conventions that DEVIATE from stack defaults (configs, naming, layout).
+4. Anti-patterns: DO NOT / NEVER / ALWAYS / DEPRECATED comments, forbidden patterns.
+5. Hotspots: files >500 lines, high-reference symbols, complexity concentrations.
+6. Build/test/dev commands touching these dirs.
+DELIVERABLE: EXACTLY ONE file `.omo/init-deep/reports/<id>.md`, <=5k tokens, sections
+`# CHUNK <id>` / `## INVENTORY` / `## EXPORTS` / `## CONVENTIONS` / `## ANTI-PATTERNS`
+/ `## HOTSPOTS` / `## COMMANDS`; an empty section says `none`.
+SCOPE: read only <dirs>; write only your report file. If an AGENTS.md exists in scope,
+quote its still-true claims into the matching sections.
+VERIFY: the report file exists and every section header is present.
+STOP WHEN: the report is written and verified.
+```
+
+---
+
+## Phase 3: Reduce Wave - `unspecified-high` Writers (same dag)
+
+One writer node per subtree, `dependsOn` its chunks' scanner ids, `load_skills: ["init-deep"]` - every writer carries this file, so the scoring matrix and templates below ARE its instructions:
+
+```
+TASK: Own subtree <path>: produce its AGENTS.md files for the repo knowledge base.
+Steps, in order:
+1. Read your chunk reports: .omo/init-deep/reports/<ids>.md. Reports are claims,
+   not truth - spot-check real code wherever they conflict or look thin.
+2. Score each directory with the init-deep Scoring Matrix; pick locations with the
+   Decision Rules (both are in the init-deep skill content loaded with this task).
+3. Write each AGENTS.md per the templates and the File Writing Rule. 30-80 lines,
+   never repeating parent content.
+4. Write .omo/init-deep/digests/<subtree-slug>.md, <=2k tokens: every location
+   written (score, one-line role) plus cross-subtree facts the root file must know.
+SCOPE: write only inside <path> plus your digest file. Root AGENTS.md is OUT of scope.
+VERIFY: every location chosen in step 2 exists on disk within line limits; digest exists.
+STOP WHEN: files and digest are written and verified.
+```
+
+---
+
+## Phase 4: Root & Verify (same dag)
+
+- **root-writer** - `category: "unspecified-high"`, `load_skills: ["init-deep"]`, dependsOn every writer. Reads ONLY `.omo/init-deep/digests/*` plus the existing root AGENTS.md; writes the root file per the template below. Never reads chunk reports.
+- **verify** - `category: "quick"`, dependsOn root-writer. Checks: every digest-declared path exists; root is 50-150 lines; subdirectory files 30-80; no child repeats a parent section block. DELIVERABLE: one `PASS` / `FAIL <path>: <reason>` line per file.
+
+The main session reads the verify node's output and nothing else. Each FAIL line -> `dag send` the owning writer with the named defect (or `retry` it), then re-run verify. Loop until all PASS. Fixing files yourself by reading reports is a defect - repair flows through the dag.
+
+---
+
+## Scoring & Location (each writer applies this to its subtree; the inline path applies it repo-wide)
 
 ### Scoring Matrix
 
@@ -176,13 +163,9 @@ AGENTS_LOCATIONS = [
 ]
 ```
 
-**Mark "scoring" as completed.**
-
 ---
 
-## Phase 3: Generate AGENTS.md
-
-**Mark "generate" as in_progress.**
+## Templates & File Writing Rule
 
 <critical>
 **File Writing Rule**: If AGENTS.md already exists at the target path → use `Edit` tool. If it does NOT exist → use `Write` tool.
@@ -238,36 +221,9 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 
 **Quality gates**: 50-150 lines, no generic advice, no obvious info.
 
-### Subdirectory AGENTS.md (Parallel)
+### Subdirectory AGENTS.md
 
-Launch writing tasks for each location:
-
-```
-for loc in AGENTS_LOCATIONS (except root):
-  task(category="writing", load_skills=[], run_in_background=false, description="Generate AGENTS.md", prompt=`
-    Generate AGENTS.md for: ${loc.path}
-    - Reason: ${loc.reason}
-    - 30-80 lines max
-    - NEVER repeat parent content
-    - Sections: OVERVIEW (1 line), STRUCTURE (if >5 subdirs), WHERE TO LOOK, CONVENTIONS (if different), ANTI-PATTERNS
-  `)
-```
-
-**Wait for all. Mark "generate" as completed.**
-
----
-
-## Phase 4: Review & Deduplicate
-
-**Mark "review" as in_progress.**
-
-For each generated file:
-- Remove generic advice
-- Remove parent duplicates
-- Trim to size limits
-- Verify telegraphic style
-
-**Mark "review" as completed.**
+30-80 lines max. Sections: OVERVIEW (1 line), STRUCTURE (only if >5 subdirs), WHERE TO LOOK, CONVENTIONS (only if different from parent), ANTI-PATTERNS. NEVER repeat parent content; note why the directory earned its file (score, distinct domain).
 
 ---
 
@@ -322,12 +278,20 @@ EXCLUDE=$(git rev-parse --git-path info/exclude) && sed -i.bak "/# >>> omo-senpi
 
 ---
 
+## Cleanup
+
+After the snapshot: `rm -rf .omo/init-deep` - reports and digests are ephemeral scaffolding; `.omo/init-deep.json` is the only artifact that stays. Record the removal in the final report.
+
+---
+
 ## Final Report
 
 ```
 === init-deep Complete ===
 
 Mode: {update | create-new}
+Sizing: S={MB} source -> {N_quick} scanners, {N_high} writers ({dag | inline} path)
+Cleanup: .omo/init-deep removed
 
 Files:
   [OK] ./AGENTS.md (root, {N} lines)
@@ -346,8 +310,10 @@ Hierarchy:
 
 ## Anti-Patterns
 
-- **Static agent count**: MUST vary agents based on project size/depth
-- **Sequential execution**: MUST parallel (explore + LSP + ast-grep concurrent)
+- **Main session reading reports or node outputs**: always-reduce is structural - repair via `dag send`, never by pulling scan data into your own context
+- **One node per file or per source**: nodes own BATCHES; the formula sets N
+- **Free-form scanner prompts**: quick workers get numbered extraction steps only
+- **Sequential execution**: MUST parallel (map wave fans out; inline path runs explore + LSP + ast-grep concurrently)
 - **Ignoring existing**: ALWAYS read existing first, even with --create-new
 - **Over-documenting**: Not every dir needs AGENTS.md
 - **Redundancy**: Child never repeats parent

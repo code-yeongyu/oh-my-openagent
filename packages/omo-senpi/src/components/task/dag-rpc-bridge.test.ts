@@ -605,6 +605,112 @@ describe("dag rpc bridge", () => {
     })
   })
 
+  describe("#given the retry, steer, and amend event vocabulary", () => {
+    it("#when the three new journaled types arrive #then the generic forward path emits each exactly once in seq order", () => {
+      // given a run whose journal now fans out the control-verb events too
+      const source = fakeRun("dag_1", "running")
+      const { bridge, emitted } = wire([source.run])
+      bridge.attach()
+
+      // when
+      source.publish(runEvent("dag_1", 7, "dag.node.retried"))
+      source.publish(runEvent("dag_1", 8, "dag.node.steered"))
+      source.publish(runEvent("dag_1", 9, "dag.definition.amended"))
+      // and the journal redelivers the retry after a reopen replay
+      source.publish(runEvent("dag_1", 7, "dag.node.retried"))
+
+      // then
+      const events = emittedNames(emitted, "omo.dag.event").map((entry) => entry.data as DagBridgeRunEvent)
+      expect(events.map((event) => [event.type, event.seq])).toEqual([
+        ["dag.node.retried", 7],
+        ["dag.node.steered", 8],
+        ["dag.definition.amended", 9],
+      ])
+    })
+
+    it("#when a retried node's attempt changes #then the whole-payload fingerprint redraws the snapshot channel", () => {
+      // given a settled failed run already on the wire
+      const failed = runSnapshot("dag_1", {
+        status: "failed",
+        nodes: [
+          { id: "build", prompt: "build it", dependsOn: [], state: "failed", attempt: 1, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build", error: { code: "task_error", message: "build exited 1" } },
+        ],
+      })
+      const { bridge, emitted, timers, setSnapshots } = wireSnapshots([failed])
+      bridge.attach()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+      expect(emittedNames(emitted, "omo.dag.updated")).toHaveLength(1)
+
+      // when the retry re-runs the node: attempt bumps, error clears, nothing else moves
+      setSnapshots([
+        runSnapshot("dag_1", {
+          status: "running",
+          nodes: [
+            { id: "build", prompt: "build it", dependsOn: [], state: "running", attempt: 2, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build" },
+          ],
+        }),
+      ])
+      bridge.notifyStoreMutation()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then the existing JSON.stringify fingerprint already saw the change: no new dedup code
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(2)
+      const latest = updates[1]?.data as { runs: { nodes: { attempt: number; last_error?: unknown }[] }[] }
+      expect(latest.runs[0]?.nodes[0]?.attempt).toBe(2)
+      expect(latest.runs[0]?.nodes[0]).not.toHaveProperty("last_error")
+    })
+
+    it("#when only a node's last error changes #then the snapshot channel redraws", () => {
+      // given a failed node already on the wire
+      const first = runSnapshot("dag_1", {
+        status: "failed",
+        nodes: [
+          { id: "build", prompt: "build it", dependsOn: [], state: "failed", attempt: 2, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build", error: { code: "task_error", message: "build exited 1" } },
+        ],
+      })
+      const { bridge, emitted, timers, setSnapshots } = wireSnapshots([first])
+      bridge.attach()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // when the second attempt fails differently: same state, same attempt, new error
+      setSnapshots([
+        runSnapshot("dag_1", {
+          status: "failed",
+          nodes: [
+            { id: "build", prompt: "build it", dependsOn: [], state: "failed", attempt: 2, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build", error: { code: "task_cancelled", message: "cancelled by operator" } },
+          ],
+        }),
+      ])
+      bridge.notifyStoreMutation()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(2)
+      const latest = updates[1]?.data as { runs: { nodes: { last_error?: { code: string; message: string } }[] }[] }
+      expect(latest.runs[0]?.nodes[0]?.last_error).toEqual({ code: "task_cancelled", message: "cancelled by operator" })
+    })
+
+    it("#when the definition is amended #then amend_count reaches the wire and redraws", () => {
+      // given an unamended run on the wire
+      const { bridge, emitted, timers, setSnapshots } = wireSnapshots([runSnapshot("dag_1")])
+      bridge.attach()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // when one amendment lands
+      setSnapshots([runSnapshot("dag_1", { amendHistory: [{ at: "2026-08-14T00:01:00.000Z" }] })])
+      bridge.notifyStoreMutation()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(2)
+      expect((updates[0]?.data as { runs: Record<string, unknown>[] }).runs[0]).not.toHaveProperty("amend_count")
+      expect((updates[1]?.data as { runs: { amend_count?: number }[] }).runs[0]?.amend_count).toBe(1)
+    })
+  })
+
   describe("#given a configured heartbeat interval", () => {
     it("#when task.dag.heartbeat_ms overrides the default #then beats follow the configured period", () => {
       // given

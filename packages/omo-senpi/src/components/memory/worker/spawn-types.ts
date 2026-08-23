@@ -124,6 +124,7 @@ export interface PrepareReflectionSpawnInput {
   readonly systemTokenBudget?: number
   readonly systemTokenTarget?: number
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
   readonly chmodFile?: (path: string, mode: number) => Promise<void>
 }
 

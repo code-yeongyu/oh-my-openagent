@@ -80,18 +80,32 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   async function steerRunning(record: TaskRecord, handle: ManagedChildHandle, message: string, deliverAs: SendDelivery): Promise<SendOutcome> {
     if (deliverAs === "steer") await handle.steer(message)
     else await handle.followUp(message)
-    port.store.appendEvent(record.task_id, { type: "steered", payload: { delivered: deliverAs } })
+    // The run epoch scopes this send to the run it steered: a later revive starts a fresh epoch,
+    // and counting sends per epoch is what keeps a new run's messages off the prior run's tally.
+    port.store.appendEvent(record.task_id, {
+      type: "steered",
+      payload: { delivered: deliverAs, run_epoch: record.notification.run_epoch },
+    })
     return { kind: "steered", task_id: record.task_id, status: record.status, delivered: deliverAs }
   }
 
   async function reviveTerminal(record: TaskRecord, handle: ManagedChildHandle, message: string): Promise<SendOutcome> {
-    // Revive is a follow-up prompt on the SAME session (codex followup_task), not a fresh child.
-    await handle.followUp(message)
-    const revived = buildRevived(record, nowIso())
-    port.store.replace(revived)
-    port.store.appendEvent(record.task_id, { type: "revived", payload: { run_epoch: revived.notification.run_epoch } })
-    port.reacquireForRevive(record.task_id)
-    return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
+    const reservation = port.reserveForRevive(record.task_id)
+    if (!reservation.ok) {
+      return { kind: "capacity_deferred", task_id: record.task_id, reason: "Task capacity is full; retry explicitly." }
+    }
+    try {
+      // Revive is a follow-up prompt on the SAME session (codex followup_task), not a fresh child.
+      await handle.followUp(message)
+      const revived = buildRevived(record, nowIso())
+      port.store.replace(revived)
+      port.store.appendEvent(record.task_id, { type: "revived", payload: { run_epoch: revived.notification.run_epoch } })
+      reservation.commit()
+      return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
+    } catch (error) {
+      reservation.release()
+      throw error
+    }
   }
 
   function enqueuePending(record: TaskRecord, message: string, deliverAs: SendDelivery): SendOutcome {
@@ -109,7 +123,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (updated === null) {
       return { kind: "not_found", reason: `No task found for "${record.task_id}".`, suggestion: NOT_FOUND_SUGGESTION }
     }
-    port.store.appendEvent(record.task_id, { type: "steer_queued", payload: { queue_position: position, deliverAs } })
+    port.store.appendEvent(record.task_id, {
+      type: "steer_queued",
+      payload: { queue_position: position, deliverAs, run_epoch: updated.notification.run_epoch },
+    })
     return { kind: "queued", task_id: record.task_id, queue_position: position }
   }
 
@@ -147,7 +164,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       try {
         if (entry.deliver_as === "steer") await handle.steer(entry.message)
         else await handle.followUp(entry.message)
-        port.store.appendEvent(taskId, { type: "steered", payload: { delivered: entry.deliver_as, queued: true } })
+        port.store.appendEvent(taskId, {
+          type: "steered",
+          payload: { delivered: entry.deliver_as, queued: true, run_epoch: fresh.notification.run_epoch },
+        })
       } catch (error) {
         log("senpi-task steering queued delivery failed", { taskId, error: String(error) })
       }

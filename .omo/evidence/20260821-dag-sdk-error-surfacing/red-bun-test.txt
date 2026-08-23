@@ -1,0 +1,141 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/extension/dag-sdk.test.ts:
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when a cell defines three nodes, starts the run, then waits > #then each call maps to the matching dag tool action in order and wait returns the run result [3.99ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when a shipped attach handle waits and cancels > #then it exposes done and cancel and dispatches the matching dag tool actions [0.31ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when start is called with a whole definition object > #then it forwards the definition verbatim under action=start [0.23ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when define receives only the documented required key > #then start emits a definition accepted by the shipped dag tool schema [1.03ms]
+(pass) dag eval sdk > #when retry is called with node ids and a prompt override > #then it emits action=retry with run_id, node_ids, and prompt [0.32ms]
+(pass) dag eval sdk > #when retry is called with a single node id > #then it emits action=retry with run_id and node_id [0.25ms]
+(pass) dag eval sdk > #when retry is called with no node ids > #then it emits action=retry with only run_id [0.26ms]
+(pass) dag eval sdk > #when send is called > #then it emits action=send with run_id, node_id, and message [0.34ms]
+(pass) dag eval sdk > #when amend is called > #then it emits action=amend with run_id and the new definition [0.24ms]
+272 |         const sdk = await loadSdk()
+273 | 
+274 |         const rejection = expect(
+275 |           sdk.start({ key: "ship-dag", nodes: [{ id: "a", prompt: "A", category: "quick" }] }),
+276 |         ).rejects
+277 |         await rejection.toThrow(/definition_conflict/)
+                              ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /definition_conflict/
+Received message: "The dag start response did not include a run_id."
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-sdk.test.ts:277:25)
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when start receives a definition_conflict > #then it throws the tool's own code and human message instead of hiding them behind run_id [0.37ms]
+285 |       it("#then the non-start actions surface the code and message too", async () => {
+286 |         installToolStub(() => conflictResponse)
+287 |         const sdk = await loadSdk()
+288 | 
+289 |         const rejection = expect(sdk.wait("run-77")).rejects
+290 |         await rejection.toThrow(/definition_conflict/)
+                              ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-sdk.test.ts:290:25)
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when wait receives the same error envelope > #then the non-start actions surface the code and message too [0.24ms]
+310 |           },
+311 |         }))
+312 |         const sdk = await loadSdk()
+313 | 
+314 |         const rejection = expect(sdk.attach("run-88")).rejects
+315 |         await rejection.toThrow(/run_not_found/)
+                              ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-sdk.test.ts:315:25)
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when attach receives the same error envelope > #then it rejects rather than handing back a handle for a run that was never attached [0.24ms]
+324 |           content: [{ type: "text", text: "the dag engine is not wired up" }],
+325 |           details: { kind: "error" },
+326 |         }))
+327 |         const sdk = await loadSdk()
+328 | 
+329 |         await expect(sdk.snapshot("run-99")).rejects.toThrow(/the dag engine is not wired up/)
+                                                           ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-sdk.test.ts:329:54)
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries no code or message > #then it falls back to the first content text so the operator still sees the tool's words [0.21ms]
+333 |     describe("#when the error envelope carries neither error fields nor content text", () => {
+334 |       it("#then it still names the failing action rather than throwing something unreadable", async () => {
+335 |         installToolStub(() => ({ details: { kind: "error" } }))
+336 |         const sdk = await loadSdk()
+337 | 
+338 |         await expect(sdk.cancel("run-100")).rejects.toThrow(/cancel/)
+                                                          ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-sdk.test.ts:338:53)
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries neither error fields nor content text > #then it still names the failing action rather than throwing something unreadable [0.18ms]
+(pass) dag eval sdk > #given a well-formed non-error response that still lacks a run_id > #when start reads it > #then the existing run_id diagnostic is preserved [0.19ms]
+(pass) dag eval sdk > #given a builder that already holds a node id > #when the same id is added again > #then it throws locally and the tool stub is never called [0.44ms]
+(pass) dag eval sdk > #given the shipped sdk artifact > #when it is loaded as a module > #then it imports nothing, so an eval worker without node_modules can run it [0.28ms]
+(pass) dag sdk root provisioning > #given the runtime dag directory exists > #when provisioning runs > #then OMO_DAG_SDK_ROOT holds that absolute directory [0.99ms]
+(pass) dag sdk root provisioning > #given the runtime dag directory is absent > #when provisioning runs > #then the env stays untouched rather than pointing at a missing path [0.51ms]
+(pass) dag sdk root provisioning > #given the real extension entry > #when the default provisioning runs > #then OMO_DAG_SDK_ROOT resolves to an existing directory containing sdk.js [0.47ms]
+
+packages/omo-senpi/src/extension/dag-library.test.ts:
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load rotates the key with an explicit suffix and fills {{key}} and {{date}} placeholders [1.97ms]
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load without a suffix stamps a fresh utc datetime suffix so every call is a new run [1.58ms]
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load with an empty suffix keeps the stored key so the run stays idempotent [1.55ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then OMO_DAG_LIBRARY shadows $PWD/.omo/dags which shadows $HOME/.omo/dags [1.99ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then on win32 the library env splits on semicolons so drive-letter paths survive [1.79ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then a missing name fails listing the searched dirs [1.09ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then a definition without a nodes array fails before any host round-trip [1.25ms]
+(pass) dag definition library > #given a stubbed tool.dag > #then start loads, rotates, and starts the run in one call and the handle wires done/cancel [1.52ms]
+208 |         },
+209 |       }))
+210 |       const library = await loadLibrary()
+211 | 
+212 |       const rejection = expect(library.start("nightly", { suffix: "t1" })).rejects
+213 |       await rejection.toThrow(/definition_conflict/)
+                            ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /definition_conflict/
+Received message: "dag library: the dag start response did not include a run_id."
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-library.test.ts:213:23)
+(fail) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then start throws the tool's own code and human message [1.42ms]
+221 |         content: [{ type: "text", text: "the dag engine is not wired up" }],
+222 |         details: { kind: "error" },
+223 |       }))
+224 |       const library = await loadLibrary()
+225 | 
+226 |       await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(
+                                                                             ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /the dag engine is not wired up/
+Received message: "dag library: the dag start response did not include a run_id."
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-sdk-error-surfacing/packages/omo-senpi/src/extension/dag-library.test.ts:226:72)
+(fail) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then an error envelope without error fields still falls back to the tool's content text [1.20ms]
+(pass) dag definition library > #given a well-formed non-error start response that still lacks a run_id > #then the existing run_id diagnostic is preserved [1.28ms]
+
+7 tests failed:
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when start receives a definition_conflict > #then it throws the tool's own code and human message instead of hiding them behind run_id [0.37ms]
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when wait receives the same error envelope > #then the non-start actions surface the code and message too [0.24ms]
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when attach receives the same error envelope > #then it rejects rather than handing back a handle for a run that was never attached [0.24ms]
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries no code or message > #then it falls back to the first content text so the operator still sees the tool's words [0.21ms]
+(fail) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries neither error fields nor content text > #then it still names the failing action rather than throwing something unreadable [0.18ms]
+(fail) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then start throws the tool's own code and human message [1.42ms]
+(fail) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then an error envelope without error fields still falls back to the tool's content text [1.20ms]
+
+ 24 pass
+ 7 fail
+ 54 expect() calls
+Ran 31 tests across 2 files. [1127.00ms]

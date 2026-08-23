@@ -1,6 +1,125 @@
 import { describe, expect, test } from "bun:test"
 
-import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema, type OmoTaskSettings } from "./task"
+import {
+  OmoTaskSettingsLayerSchema,
+  OmoTaskSettingsSchema,
+  resolveOmoTaskSettings,
+  type OmoTaskSettings,
+} from "./task"
+
+// 0 is the unbounded sentinel for the concurrency/residency caps: the engine already maps it to
+// Infinity (TaskConcurrency.getLimit) and to "admit every child" (residency admission), so the
+// schema must let it through unchanged rather than clamping or rejecting it.
+describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
+  test("#given global concurrency values #when task settings parse #then zero, one, and eight are accepted", () => {
+    expect(OmoTaskSettingsSchema.parse({ global_concurrency: 0 }).global_concurrency).toBe(0)
+    expect(OmoTaskSettingsSchema.parse({ global_concurrency: 1 }).global_concurrency).toBe(1)
+    expect(OmoTaskSettingsSchema.parse({ global_concurrency: 8 }).global_concurrency).toBe(8)
+  })
+
+  test("#given invalid global concurrency values #when task settings parse #then they are rejected", () => {
+    for (const value of [-1, 1.5, "x"]) {
+      expect(OmoTaskSettingsSchema.safeParse({ global_concurrency: value }).success).toBe(false)
+    }
+  })
+
+  test("#given no global concurrency layer override #when layer parses #then no default is injected", () => {
+    expect(OmoTaskSettingsLayerSchema.parse({})).not.toHaveProperty("global_concurrency")
+  })
+
+  test("#given generated schema #when global concurrency values validate #then zero and four pass and negative one fails", async () => {
+    const schemaText = await Bun.file("assets/omo.schema.json").text()
+    expect(schemaText).toContain('"global_concurrency"')
+    expect(schemaText).toContain('"minimum": 0')
+    expect(OmoTaskSettingsSchema.safeParse({ global_concurrency: 4 }).success).toBe(true)
+    expect(OmoTaskSettingsSchema.safeParse({ global_concurrency: -1 }).success).toBe(false)
+  })
+
+  test("#given zero concurrency caps #when task settings parse #then zero is preserved as the unbounded sentinel", () => {
+    // given
+    const input = {
+      default_concurrency: 0,
+      provider_concurrency: { anthropic: 0 },
+      model_concurrency: { "anthropic/opus": 0 },
+      residency_max_children: 0,
+    }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.default_concurrency).toBe(0)
+    expect(parsed.provider_concurrency?.anthropic).toBe(0)
+    expect(parsed.model_concurrency?.["anthropic/opus"]).toBe(0)
+    expect(parsed.residency_max_children).toBe(0)
+  })
+
+  test("#given zero concurrency caps #when the layer schema parses #then zero survives layer merging", () => {
+    // given
+    const input = {
+      default_concurrency: 0,
+      provider_concurrency: { anthropic: 0 },
+      model_concurrency: { "anthropic/opus": 0 },
+      residency_max_children: 0,
+    }
+
+    // when
+    const parsed = OmoTaskSettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed.default_concurrency).toBe(0)
+    expect(parsed.provider_concurrency?.anthropic).toBe(0)
+    expect(parsed.model_concurrency?.["anthropic/opus"]).toBe(0)
+    expect(parsed.residency_max_children).toBe(0)
+  })
+
+  test("#given an explicit zero residency cap #when settings resolve #then the parallelism default never overrides it", () => {
+    // given
+    const input = { residency_max_children: 0 }
+
+    // when
+    const parsed = resolveOmoTaskSettings(input, () => 16)
+
+    // then
+    expect(parsed.residency_max_children).toBe(0)
+  })
+
+  test("#given \"unlimited\" on a concurrency field #when task settings parse #then only numbers are accepted", () => {
+    // given
+    const input = { default_concurrency: "unlimited" }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected a string concurrency to fail")
+    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("default_concurrency")
+  })
+
+  test("#given negative or fractional concurrency caps #when task settings parse #then each field is rejected", () => {
+    // given
+    const inputs = [
+      { default_concurrency: -1 },
+      { default_concurrency: 1.5 },
+      { provider_concurrency: { anthropic: -1 } },
+      { provider_concurrency: { anthropic: 1.5 } },
+      { model_concurrency: { "anthropic/opus": -1 } },
+      { model_concurrency: { "anthropic/opus": 1.5 } },
+      { residency_max_children: -1 },
+      { residency_max_children: 1.5 },
+    ]
+
+    // when
+    const results = inputs.map((input) => ({
+      settings: OmoTaskSettingsSchema.safeParse(input).success,
+      layer: OmoTaskSettingsLayerSchema.safeParse(input).success,
+    }))
+
+    // then
+    expect(results).toEqual(inputs.map(() => ({ settings: false, layer: false })))
+  })
+})
 
 describe("OmoTaskSettingsSchema warnings", () => {
   test("#given no warning suppression override #when task settings parse #then unavailable categories warnings default on", () => {

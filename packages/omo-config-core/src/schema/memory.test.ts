@@ -30,6 +30,7 @@ const FULL_DEFAULTS: OmoMemorySettings = {
   },
   people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
   soul: { edit_notice: true },
+  write_notice: { enabled: true },
   sync: { enabled: true },
   search: { enabled: true },
   compile_warn_tokens: 30000,
@@ -74,6 +75,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       },
       people: { enabled: false, max_entries: 20, max_entry_chars: 100 },
       soul: { edit_notice: false },
+      write_notice: { enabled: false },
       sync: { remote: "file:///tmp/memory-mirror.git", enabled: true },
       search: { enabled: false },
       compile_warn_tokens: 50000,
@@ -139,6 +141,50 @@ describe("OmoMemorySettingsSchema defaults", () => {
     expect(result.success).toBe(false)
     if (result.success) throw new Error("Expected memory settings parsing to fail")
     expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("reflection.trigger.on_compaction")
+  })
+
+  test("#given write_notice defaults #when parsing empty #then the tool-result notice is enabled", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.write_notice).toEqual({ enabled: true })
+  })
+
+  test("#given write_notice disabled #when parsed #then the explicit value is preserved", () => {
+    // given
+    const input = { write_notice: { enabled: false } }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.write_notice.enabled).toBe(false)
+  })
+
+  test("#given write_notice with an unknown key #when parsed #then the strict schema rejects it", () => {
+    // given
+    const input = { write_notice: { bogus: true } }
+
+    // when
+    const result = OmoMemorySettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given a per-agent write_notice override #when parsed #then the layer accepts it as a deep-partial", () => {
+    // given
+    const input = { write_notice: { enabled: false }, agents: { "backend-lead": { write_notice: { enabled: true } } } }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual(input)
   })
 
   test("#given unknown keys inside the memory block #when parsed #then the strict schema rejects them", () => {

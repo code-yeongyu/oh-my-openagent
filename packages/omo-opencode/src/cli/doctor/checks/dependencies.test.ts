@@ -99,7 +99,7 @@ describe("dependencies check", () => {
       expect(result).toBe(expected)
     })
 
-    it("#given a zero-dependency install where require.resolve throws Bun's non-Error ResolveMessage #when resolving package binary #then returns null instead of crashing", () => {
+    it("#given a zero-dependency install where require.resolve throws Bun's ResolveMessage #when resolving package binary #then returns null instead of crashing", () => {
       //#given a real ResolveMessage captured from a genuinely failing require.resolve (lazycodex-ai ships no node_modules)
       const requireFromHere = createRequire(import.meta.url)
       let resolveMessage: unknown
@@ -109,7 +109,8 @@ describe("dependencies check", () => {
       } catch (error) {
         resolveMessage = error
       }
-      expect(resolveMessage instanceof Error).toBe(false)
+      // Bun 1.4 made ResolveMessage extend Error; assert the stable identity, not the prototype.
+      expect((resolveMessage as { name?: string }).name).toBe("ResolveMessage")
 
       //#when resolving without an override so the failing resolver is exercised
       const result = deps.findCommentCheckerPackageBinary(undefined, () => {

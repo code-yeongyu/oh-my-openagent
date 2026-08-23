@@ -111,9 +111,11 @@ export function makeHarness(): SteeringHarness {
   const port: SteeringPort = {
     store,
     liveHandle: (taskId) => live.get(taskId),
-    reacquireForRevive: (taskId) => {
-      reviveCalls.push(taskId)
-    },
+    reserveForRevive: (taskId) => ({
+      ok: true,
+      release: () => undefined,
+      commit: () => { reviveCalls.push(taskId) },
+    }),
     dequeuePending: (taskId) => {
       dequeueCalls.push(taskId)
       return false

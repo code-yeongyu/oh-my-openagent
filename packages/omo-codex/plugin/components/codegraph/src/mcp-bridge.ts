@@ -48,6 +48,7 @@ export async function runBridgedCodegraphProcess(
 		cwd: options.cwd,
 		env: options.env,
 		stdio: ["pipe", "pipe", "inherit"],
+		windowsHide: true,
 	});
 	const childInput = child.stdin;
 	const childOutput = child.stdout;

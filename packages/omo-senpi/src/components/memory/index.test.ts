@@ -1,17 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor, resolveMemoryConfig } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import { MEMORY_WRITE_UPDATED_ENTRY_TYPE } from "./memory-notice-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { cwd: string; memoryHome: string } {
@@ -136,6 +138,7 @@ describe("createMemoryComponent", () => {
       "senpi-memory.reflection-summary",
       "senpi-memory.health",
       SOUL_UPDATED_ENTRY_TYPE,
+      MEMORY_WRITE_UPDATED_ENTRY_TYPE,
       MEMORY_BINDING_CUSTOM_TYPE,
     ])
     // Direct registration is the default surface so memory always works; the exposure-search MCP

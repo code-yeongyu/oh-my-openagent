@@ -68,6 +68,9 @@ function senpiEnvironment(senpiRoot) {
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
   // the plugin via --extension and therefore never match the settings-packages detection gates.
   env.OMO_NATIVE = "1"
+  // This launcher already decided which runtime the product runs on, possibly by re-execing itself
+  // under bun. Handing that answer down stops the engine from making its own, conflicting choice.
+  env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
   env.SENPI_BRAND = JSON.stringify(brandProfile())
 
   const binDir = nearestNodeBin(senpiRoot)

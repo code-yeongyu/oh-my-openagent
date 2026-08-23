@@ -5,7 +5,7 @@ export interface UlwLoopScope {
 	readonly sessionId?: string | null;
 }
 
-const SESSION_ENV_KEYS = ["OMO_ULW_LOOP_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"] as const;
+const SESSION_ENV_KEYS = ["OMO_ULW_LOOP_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "PI_SESSION_ID"] as const;
 type EnvMap = Readonly<Record<string, string | undefined>>;
 
 export function normalizeUlwLoopSessionId(sessionId: string | null | undefined): string | null {

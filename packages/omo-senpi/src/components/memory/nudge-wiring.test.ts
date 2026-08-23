@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
+import type { ThemeColor } from "@code-yeongyu/senpi"
 import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryBinding } from "./binding"
@@ -12,6 +14,8 @@ import { MemoryFakeExtensionAPI, type SessionEntryFixture } from "./memory.test-
 import {
   ACCEPTED_TURNS_ENTRY_TYPE,
   createMemoryNudgeWiring,
+  renderAcceptedTurnsEntry,
+  type AcceptedTurnsRecord,
 } from "./nudge-wiring"
 
 const roots: string[] = []
@@ -49,7 +53,7 @@ function disposition(inputId: string, value: "handled" | "queued" | "started" | 
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("createMemoryNudgeWiring", () => {
@@ -140,7 +144,7 @@ describe("createMemoryNudgeWiring", () => {
   test("#given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history", async () => {
     // given
     const { context } = await fixture()
-    await rm(context.identityPaths.repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await rmEfaultTolerant(context.identityPaths.repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
     const repo = new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity })
     const pi = new MemoryFakeExtensionAPI()
     const wiring = createMemoryNudgeWiring({
@@ -266,4 +270,112 @@ describe("createMemoryNudgeWiring", () => {
       toolCallId: "call-mcp-1",
     })
   }, 30_000)
+})
+
+const BOLD = "\u001b[1m"
+const BOLD_OFF = "\u001b[22m"
+function bold(text: string): string {
+  return `${BOLD}${text}${BOLD_OFF}`
+}
+
+const PLAIN_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
+}
+
+function recordingTheme(): {
+  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
+  readonly colors: ThemeColor[]
+} {
+  const colors: ThemeColor[] = []
+  return {
+    theme: {
+      fg: (color: ThemeColor, text: string) => {
+        colors.push(color)
+        return text
+      },
+      bg: (_color: "customMessageBg", text: string) => text,
+    },
+    colors,
+  }
+}
+
+function acceptedTurns(over: Partial<AcceptedTurnsRecord> = {}): AcceptedTurnsRecord {
+  return {
+    version: 1,
+    sessionId: "session-1",
+    priorUserTurns: 8,
+    sessionBaselineTurns: 6,
+    ...over,
+  }
+}
+
+function renderAccepted(record: AcceptedTurnsRecord, expanded = false): string[] {
+  return renderAcceptedTurnsEntry({ data: record } as never, { expanded }, PLAIN_THEME as never)!
+    .render(120)
+    .slice(1, -1)
+    .map((line) => line.slice(1).trimEnd())
+}
+
+describe("renderAcceptedTurnsEntry", () => {
+  test("#given an accepted-turns record #when it renders collapsed #then a muted notice leads with the turn count", () => {
+    // when
+    const lines = renderAccepted(acceptedTurns())
+
+    // then
+    expect(lines).toEqual([
+      bold("· Memory accepted turns · 8 turns"),
+      "This session has recorded 8 accepted user turns.",
+      "baseline 6",
+    ])
+  })
+
+  test("#given a single accepted turn #when it renders #then the turn noun is singular", () => {
+    // when
+    const lines = renderAccepted(acceptedTurns({ priorUserTurns: 1, sessionBaselineTurns: 0 }))
+
+    // then
+    expect(lines[0]).toBe(bold("· Memory accepted turns · 1 turn"))
+    expect(lines[1]).toBe("This session has recorded 1 accepted user turn.")
+  })
+
+  test("#when it renders expanded #then the detail row carries the session id", () => {
+    // when
+    const lines = renderAccepted(acceptedTurns(), true)
+
+    // then
+    expect(lines).toEqual([
+      bold("· Memory accepted turns · 8 turns"),
+      "This session has recorded 8 accepted user turns.",
+      "baseline 6",
+      "session session-1",
+    ])
+  })
+
+  test("#when it renders collapsed #then the session id stays off the notice", () => {
+    // when
+    const lines = renderAccepted(acceptedTurns())
+
+    // then
+    expect(lines).not.toContain("session session-1")
+  })
+
+  test("#when rendered with a background theme #then every padded line carries customMessageBg", () => {
+    const component = renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: false }, {
+      fg: (_color: ThemeColor, text: string) => text,
+      bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
+    } as never)
+    for (const line of component!.render(120)) expect(line).toMatch(/^<notice-bg>.*<\/notice-bg>$/u)
+  })
+
+  test("#when coloured #then the title is muted and the secondary rows are dim", () => {
+    // given
+    const recorder = recordingTheme()
+
+    // when
+    renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, recorder.theme as never)!.render(120)
+
+    // then
+    expect(recorder.colors).toEqual(["dim", "dim", "dim", "dim"])
+  })
 })

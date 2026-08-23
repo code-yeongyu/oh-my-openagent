@@ -1,0 +1,14 @@
+total 968
+drwxr-xr-x  13 yeongyu  staff     416 Aug 21 08:53 .
+drwxr-xr-x   4 yeongyu  staff     128 Aug 10 23:15 ..
+-rw-------   1 yeongyu  staff       2 Aug 21 08:04 auth.json
+drwxr-xr-x   3 yeongyu  staff      96 Aug 18 18:26 cache
+drwx------   3 yeongyu  staff      96 Aug 21 08:48 cursor-cli-oauth
+drwxr-xr-x   6 yeongyu  staff     192 Aug 10 23:02 extensions
+drwx------   7 yeongyu  staff     224 Aug 10 23:12 logs
+-rw-------   1 yeongyu  staff       2 Aug 21 08:05 models-store.json
+drwxr-xr-x   3 yeongyu  staff      96 Aug 10 23:10 omo-senpi
+-rw-------   1 yeongyu  staff  477593 Aug 21 07:39 senpi-crash.log
+-rw-------   1 yeongyu  staff    1880 Aug 21 09:19 senpi-debug.log
+lrwxr-xr-x   1 yeongyu  staff      28 Aug 11 17:10 sessions -> /Users/yeongyu/.omo/sessions
+-rw-------   1 yeongyu  staff     198 Aug 21 08:52 settings.json

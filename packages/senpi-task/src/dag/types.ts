@@ -150,6 +150,7 @@ export type DagNode = {
   readonly state: DagNodeState
   readonly taskId?: string
   readonly attempt: number
+  readonly execAttempt?: number
   readonly error?: DagNodeError
   readonly runStats?: TaskRunStats
   readonly createdAt: string
@@ -205,6 +206,21 @@ export type DagRunSnapshot = {
   readonly bottlenecks: readonly DagBottleneck[]
   readonly diagnostics: readonly DagDiagnostic[]
   readonly counts: DagNodeCounts
+  // One entry per accepted amendment. Observe surfaces read this projection, so it must carry the
+  // history rather than making them reach for the raw record. Absent on never-amended runs.
+  readonly amendHistory?: readonly AmendRecord[]
+}
+
+// One entry per accepted amendment. Defined here rather than in manager.ts so the snapshot, the wire
+// payload, and the /dag renderer share one shape instead of three independent `unknown[]` widenings;
+// it depends only on DagNodeId, which lives in this module, so no import cycle is introduced.
+export type AmendRecord = {
+  readonly at: string
+  readonly previousFingerprint: string
+  readonly fingerprint: string
+  readonly changedNodeIds: readonly DagNodeId[]
+  readonly addedNodeIds: readonly DagNodeId[]
+  readonly invalidatedNodeIds: readonly DagNodeId[]
 }
 
 export const DAG_NODE_TRANSITION_REASONS = [
@@ -218,13 +234,16 @@ export const DAG_NODE_TRANSITION_REASONS = [
   { kind: "interrupted" },
   { kind: "lost" },
   { kind: "resumed" },
+  { kind: "retried" },
+  { kind: "amend_invalidated" },
+  { kind: "revived" },
 ] as const
 
 export type DagNodeTransitionReason =
   | (typeof DAG_NODE_TRANSITION_REASONS)[number]
   | { readonly kind: "task_queued"; readonly queuePosition: number }
 
-// The journaled payload union. EXACTLY 14 members; every member is written to the WAL with a
+// The journaled payload union. EXACTLY 17 members; every member is written to the WAL with a
 // WAL-assigned seq. Live activity telemetry is NOT here - see DagActivityEvent below.
 export const DAG_RUN_EVENT_TYPES = [
   "dag.run.created",
@@ -239,6 +258,9 @@ export const DAG_RUN_EVENT_TYPES = [
   "dag.node.transitioned",
   "dag.node.task-attached",
   "dag.node.reused",
+  "dag.node.retried",
+  "dag.node.steered",
+  "dag.definition.amended",
   "dag.diagnostic.added",
   "dag.stream.overflow",
 ] as const
@@ -290,6 +312,27 @@ export type DagRunEventPayload =
       readonly nodeId: DagNodeId
       readonly taskId: string
       readonly sourceRunId: DagRunId
+    }
+  | {
+      readonly type: "dag.node.retried"
+      readonly nodeId: DagNodeId
+      readonly priorTaskId?: string
+      readonly execAttempt: number
+      readonly promptChanged: boolean
+    }
+  | {
+      readonly type: "dag.node.steered"
+      readonly nodeId: DagNodeId
+      readonly taskId: string
+      readonly delivery: "steer" | "revive"
+    }
+  | {
+      readonly type: "dag.definition.amended"
+      readonly previousFingerprint: string
+      readonly fingerprint: string
+      readonly changedNodeIds: readonly DagNodeId[]
+      readonly addedNodeIds: readonly DagNodeId[]
+      readonly invalidatedNodeIds: readonly DagNodeId[]
     }
   | { readonly type: "dag.diagnostic.added"; readonly diagnostic: DagDiagnostic }
   | {

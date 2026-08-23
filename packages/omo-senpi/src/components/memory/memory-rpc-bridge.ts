@@ -1,10 +1,11 @@
+import type { GitTreeSizedEntry } from "@oh-my-opencode/memory-core"
+
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import {
+  buildMemorySnapshot,
   createMemoryRpcGitRepo,
-  readMemoryRpcHealth,
-  readMemoryRpcJournalState,
-  readMemoryRpcRepoState,
+  type MemoryTreeStats,
 } from "./memory-rpc-snapshot-state"
 
 /** Push channel: RPC clients receive `{type:"extension_event", name, data}` frames under this name. */
@@ -18,6 +19,12 @@ export interface MemoryRpcGitRepo {
   status(paths?: readonly string[]): Promise<string>
   lsTree(revision?: string, path?: string): Promise<string[]>
   show(revision: string, path: string): Promise<string>
+  /** Optional: whole-tree sizes. Absent on hosts/stubs that predate the size fields. */
+  lsTreeSized?(revision?: string): Promise<readonly GitTreeSizedEntry[]>
+  /** Optional: `git rev-list --count --since=<iso> HEAD`. */
+  countCommitsSince?(sinceISO: string): Promise<number>
+  /** Optional: newest commits, newest first, used for the previous entry timestamp. */
+  recentCommits?(limit: number): Promise<readonly { readonly committedAt: string }[]>
 }
 
 export interface MemoryRpcActiveRun {
@@ -45,6 +52,12 @@ export interface MemoryRpcSnapshot {
     readonly dirty: boolean
     readonly dirtyPaths: number
     readonly systemTokensEstimate: number
+    /** Additive (post-v1): omitted whenever the underlying read is unavailable or fails. */
+    readonly totalBytes?: number
+    readonly systemBytes?: number
+    readonly fileCount?: number
+    readonly entriesToday?: number
+    readonly previousEntryAtISO?: string
   }
   readonly reflection: {
     readonly backlogSteps: number
@@ -53,6 +66,8 @@ export interface MemoryRpcSnapshot {
     readonly lastOutcome?: MemoryRpcLastOutcome
     readonly consecutiveFailures: number
     readonly lastFailureFingerprint?: string
+    /** Additive (post-v1): newest `merged` reflection completion, omitted when none exist. */
+    readonly lastConsolidationAtISO?: string
   }
   readonly journal: {
     readonly sessionId: string
@@ -95,8 +110,9 @@ export function createMemoryRpcBridge(
 ): MemoryRpcBridge {
   const createRepo = deps.createGitRepo ?? createMemoryRpcGitRepo
   const repos = new Map<string, MemoryRpcGitRepo>()
-  /** Token estimates walk the whole system tree, so they are cached per commit, not per sync. */
+  /** Size reads walk the whole tree, so they are cached per commit, not per sync. */
   const tokenEstimates = new Map<string, number>()
+  const treeStats = new Map<string, MemoryTreeStats>()
   let sessionId: string | undefined
   let lastSnapshot: string | undefined
   let disposed = false
@@ -114,31 +130,12 @@ export function createMemoryRpcBridge(
     if (disposed || boundSession === undefined) return undefined
     const context = deps.resolveContext(boundSession)
     if (context === undefined) return undefined
-    const repo = repoFor(context)
-    const [repoState, journal, health] = await Promise.all([
-      readMemoryRpcRepoState(repo, tokenEstimates),
-      readMemoryRpcJournalState(context, boundSession),
-      readMemoryRpcHealth(context),
-    ])
-    const activeRun = deps.activeRun(context.identity)
-    return {
-      schemaVersion: 1,
-      identity: context.identity,
-      repo: repoState,
-      reflection: {
-        backlogSteps: journal.backlogSteps,
-        pendingCompaction: journal.pendingCompaction,
-        ...(activeRun === undefined ? {} : { activeRun }),
-        ...(health.lastOutcome === undefined ? {} : { lastOutcome: health.lastOutcome }),
-        consecutiveFailures: health.streak,
-        ...(health.fingerprint === undefined ? {} : { lastFailureFingerprint: health.fingerprint }),
-      },
-      journal: {
-        sessionId: boundSession,
-        totalSteps: journal.totalSteps,
-        reflectedSteps: journal.reflectedSteps,
-      },
-    }
+    return buildMemorySnapshot(context, boundSession, {
+      repo: repoFor(context),
+      activeRun: deps.activeRun,
+      tokenEstimates,
+      treeStats,
+    })
   }
 
   registerStatusHandler(pi, buildSnapshot)

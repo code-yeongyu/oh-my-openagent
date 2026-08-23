@@ -1,7 +1,7 @@
 // Test harness for the memory command suite: fake contexts, temp identities,
 // seeded git repos, and overridable deps.
 
-import { mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -156,6 +156,37 @@ export function fakeDeps(
     ...overrides,
   }
   return deps
+}
+
+/**
+ * Seeds a trailing burst of three `failed` completions ending at `newestFinishedAtMs`, so a caller
+ * can place that burst on either side of REFLECTION_HEALTH_STALE_MS relative to an injected `now`.
+ * Every timestamp derives from the caller's argument, never from the wall clock, which is what lets
+ * reflection-health severity assertions stay a pure function of their fixtures.
+ */
+export async function seedReflectionFailureStreak(
+  reflectionDir: string,
+  newestFinishedAtMs: number,
+): Promise<void> {
+  const completions = join(reflectionDir, "completions")
+  await mkdir(completions, { recursive: true })
+  for (let index = 0; index < 3; index += 1) {
+    const finishedAtMs = newestFinishedAtMs - (2 - index) * 60_000
+    await writeFile(join(completions, `run-${index}.json`), `${JSON.stringify({
+      schemaVersion: 1,
+      runId: `run-${index}`,
+      identity: TEST_IDENTITY,
+      category: "quick",
+      conversationIds: ["past-session"],
+      trigger: "manual",
+      outcome: "failed",
+      reason: "model-not-found",
+      detail: "configured model unavailable",
+      startedAt: new Date(finishedAtMs - 60_000).toISOString(),
+      finishedAt: new Date(finishedAtMs).toISOString(),
+      delivery: { status: "consumed" },
+    })}\n`)
+  }
 }
 
 export async function invoke(

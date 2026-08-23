@@ -50,6 +50,7 @@ function deferred<T>() {
 type ControlledChild = {
   readonly spec: ManagedStartSpec
   readonly settle: (output: string) => void
+  readonly fail: (message: string) => void
 }
 
 class ControlledRunner implements ManagedRunner {
@@ -75,7 +76,11 @@ class ControlledRunner implements ManagedRunner {
       lastAssistantText: () => undefined,
       dispose: () => Promise.resolve(),
     }
-    this.children.push({ spec, settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }) })
+    this.children.push({
+      spec,
+      settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
+      fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
+    })
     this.#signals.get(this.children.length)?.resolve()
     return Promise.resolve(handle)
   }
@@ -256,13 +261,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
     widgetCalls,
     async start(key, nodes = [{ id: "work" }]) {
       const started = await runDagTool(
-        {
-          manager: runtime.manager,
-          parentSessionId: () => sessionId,
-          rootSessionId: () => sessionId,
-          wait: runtime.wait,
-          cancel: runtime.cancel,
-        },
+        toolDeps(runtime),
         {
           action: "start",
           definition: {
@@ -281,6 +280,19 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
       if (started.details.kind !== "started") throw new Error(`expected dag start, received ${started.details.kind}`)
       return started.details.run_id as DagRunId
     },
+  }
+}
+
+function toolDeps(runtime: DagRuntime) {
+  return {
+    manager: runtime.manager,
+    parentSessionId: () => sessionId,
+    rootSessionId: () => sessionId,
+    wait: runtime.wait,
+    cancel: runtime.cancel,
+    retry: runtime.retry,
+    send: runtime.send,
+    amend: runtime.amend,
   }
 }
 
@@ -606,4 +618,49 @@ describe("assembled DAG lifecycle end to end", () => {
     expect(secondWindow).toHaveLength(1)
     expect((firstWindow[0]?.data as { runs: readonly { status: string }[] }).runs[0]?.status).toBe("running")
   })
+})
+
+describe("assembled DAG retry lifecycle end to end", () => {
+  test("#given a diamond run whose middle node fails #when the dag TOOL retries it #then wait settles completed and the untouched nodes keep their original children", async () => {
+    // given
+    const fixture = await runtimeFixture()
+    const runId = await fixture.start("retry-diamond", [
+      { id: "root" },
+      { id: "left", dependsOn: ["root"] },
+      { id: "right", dependsOn: ["root"] },
+      { id: "join", dependsOn: ["left", "right"] },
+    ])
+    await fixture.runner.whenStarted(1)
+    fixture.runner.children[0]?.settle("root output")
+    await fixture.runner.whenStarted(3)
+    const byNode = (index: number): string => String(fixture.runner.children[index]?.spec.taskId)
+    const rootTaskId = byNode(0)
+    // left fails, right completes: the join node is skipped by the dependent cascade
+    fixture.runner.children[1]?.fail("left blew up")
+    fixture.runner.children[2]?.settle("right output")
+    const failed = await fixture.runtime.wait(runId, sessionId)
+    expect(failed.status).toBe("failed")
+    expect(failed.nodes.join).toEqual(expect.objectContaining({ state: "skipped" }))
+    const rightTaskId = byNode(2)
+
+    // when the tool retries the failed node
+    const retried = await runDagTool(toolDeps(fixture.runtime), { action: "retry", run_id: runId })
+    expect(retried.details.kind).toBe("retried")
+    await fixture.runner.whenStarted(4)
+    fixture.runner.children[3]?.settle("left retried")
+    await fixture.runner.whenStarted(5)
+    fixture.runner.children[4]?.settle("join output")
+    const waited = await runDagTool(toolDeps(fixture.runtime), { action: "wait", run_id: runId })
+
+    // then
+    if (waited.details.kind !== "waited") throw new Error(`expected wait, received ${waited.details.kind}`)
+    expect(waited.details.result.status).toBe("completed")
+    expect(waited.details.result.nodes.left).toEqual(expect.objectContaining({ state: "completed", output: "left retried" }))
+    expect(waited.details.result.nodes.join).toEqual(expect.objectContaining({ state: "completed", output: "join output" }))
+    const record = fixture.runtime.manager.record(runId, sessionId)
+    expect(record.nodes.find((node) => String(node.id) === "root")?.taskId).toBe(rootTaskId)
+    expect(record.nodes.find((node) => String(node.id) === "right")?.taskId).toBe(rightTaskId)
+    expect(events(fixture, runId).some((event) => event.type === "dag.node.retried")).toBe(true)
+    fixture.runtime.dispose()
+  }, { timeout: 20_000 })
 })

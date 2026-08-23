@@ -67,7 +67,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
-[![Docs](https://img.shields.io/badge/docs-omo.vibetip.help-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.vibetip.help/docs)
+[![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
@@ -129,11 +129,11 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-**注意**：已发布的 npm 包名和 CLI 二进制名仍然是 `oh-my-opencode`（过渡期间同时以 `oh-my-openagent` 的名字双重发布）。在 `opencode.json` 中，兼容性层现在优先使用插件入口 `oh-my-openagent`，而旧的 `oh-my-opencode` 条目仍会以警告的形式加载。插件配置文件通常仍使用 `oh-my-opencode.json` 或 `oh-my-opencode.jsonc`，在过渡期间新旧两种文件名都会被识别。
+**注意**：已发布的 npm 包名和 CLI 二进制名仍然是 `oh-my-opencode`（过渡期间同时以 `oh-my-openagent` 的名字双重发布）。在 `opencode.json` 中，兼容性层现在优先使用插件入口 `oh-my-openagent`，而旧的 `oh-my-opencode` 条目仍会以警告的形式加载。运行时配置是 `~/.omo/omo.jsonc`，加上向上逐级查找的项目 `.omo/omo.jsonc`。旧版 `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` 文件只会被迁移引擎导入一次，之后不再被读取。
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
-**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`npx lazycodex-ai install` 或 `bunx oh-my-openagent install --platform=codex`）提供能够干净地移植到 OpenAI Codex CLI 插件系统的 8 个组件（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`start-work-continuation`、`telemetry`）。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`npx lazycodex-ai install` 或 `bunx oh-my-openagent install --platform=codex`）提供能够干净地移植到 OpenAI Codex CLI 插件系统的 核心组件（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`start-work-continuation`、`telemetry`），外加 `teammode` 和配套组件（`bootstrap`、`codegraph`、`lcx` 等），并会把 Codex 智能体 TOML 安装到 `~/.codex/agents/`。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
 
 ---
 
@@ -171,19 +171,19 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 特性                                                            | Editions | 功能说明                                                                                                                                                                        |
 | :---: | :-------------------------------------------------------------- | :------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 |   🤖   | **自律军团 (Discipline Agents)**                                | Ultimate | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的 8 个可移植组件 (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry)。安装: `npx lazycodex-ai install`。                    |
+|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的可移植组件 (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry, teammode 等)。安装: `npx lazycodex-ai install`。                    |
 |   👥   | **Team Mode** (v4.0, 选择性启用)                                 | Ultimate | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                         | Both     | 一键触发，所有智能体(Ultimate)或 Codex `ultrawork` 组件(Light)出动。任务完成前绝不罢休。                                                                                          |
-|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | Ultimate | 真正行动前，先分析用户的真实意图。触发 `search` / `analyze` / `team` / `hyperplan`。(Light 仅 hook `ulw` / `ultrawork`。)                                                       |
-|   🔗   | **基于哈希的编辑工具**                                          | Ultimate | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex 使用其原生 `apply_patch`。) |
+|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | Ultimate | 真正行动前，先分析用户的真实意图。不再有字面意义上的误解。(Light 仅识别 `ulw` / `ultrawork` 关键词。)                                                       |
+|   🔗   | **基于哈希的编辑工具**                                          | Ultimate | Hashline (`LINE#ID`) 编辑/读取标记。需手动启用：在 `~/.omo/omo.jsonc` 中设置 `hashline_edit: true`、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex 使用其原生 `apply_patch`。) |
 |   🛠️   | **LSP + AST-Grep**                                              | Both     | 工作区级别的重命名、构建前诊断、基于 AST 的重写。LSP 通过 MCP 提供，AST-Grep 通过共享 `ast-grep` skill 和 `sg` 提供。                                   |
 |   🧠   | **后台智能体**                                                  | Ultimate | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                                                                                      |
 |   📚   | **内置 MCP**                                                    | Both     | Ultimate 运行时注入 Exa（网络搜索）、Context7（官方文档）、Grep.app（GitHub 源码搜索）。Light 通过 plugin-scoped MCP 提供 `grep_app`、`context7`、`git_bash`、`lsp`。                                                                              |
-|   🔁   | **Ralph Loop / `/ulw-loop`**                                    | Ultimate | 自我引用闭环。达不到 100% 完成度绝不停止。                                                                                                                                      |
+|   🔁   | **Goal / `/goal`**                                              | Ultimate | `/goal` 为会话设定持久目标。idle continuation 仅在 `goal.enabled` 为 true 时运行（默认 false）。                                                                                          |
 |   ✅   | **Todo 强制执行** (Boulder)                                     | Ultimate | Agent 想要摸鱼？系统直接揪着领子拽回来。你的任务，必须完成。                                                                                                                    |
 |   💬   | **注释审查员**                                                  | Both     | 剔除带有浓烈 AI 味的冗余注释。同一个 `@code-yeongyu/comment-checker` 二进制在两个版本中运行。                                                                                    |
 |   📜   | **Rules Injection**                                             | Both     | `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**` 的分层上下文注入。Ultimate 中为 hook，Light 中为 `rules` 组件。                                                                       |
-|   🧬   | **Ulw Loop**                                                   | Light    | 基于 `.omo/ulw-loop/` 证据审计的持久化多目标编排。目前仅 Codex 可用; OpenCode 侧的移植在路线图上。                                                                              |
+|   🧬   | **Ulw Loop**                                                   | Light    | 面向持久化多目标编排（含证据审计）的 Codex 组件 + CLI。在 OpenCode 上请改用 **Goal / `/goal`**。                                                                              |
 |   🖥️   | **Tmux 集成**                                                   | Ultimate | 完整的交互式终端支持。跑 REPL、用调试器、用 TUI 工具，全都在实时会话中完成。                                                                                                    |
 |   🔌   | **Claude Code 兼容**                                            | Ultimate | 你现有的 Hooks、命令、技能、MCP 和插件？全都能无缝迁移过来。(Codex 拥有其自己的原生插件系统。)                                                                                   |
 |   🎯   | **技能内嵌 MCP**                                                | Ultimate | 技能自带其所需的 MCP 服务器。按需开启，不会撑爆你的上下文窗口。                                                                                                                 |
@@ -199,7 +199,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`glm-5`**) 是你的主指挥官。他负责制定计划、分配任务给专家团队，并以极其激进的并行策略推动任务直至完成。他从不半途而废。Claude Opus 5 和 Kimi K3 是推荐默认值。
+**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`**) 是你的主指挥官。他负责制定计划、分配任务给专家团队，并以极其激进的并行策略推动任务直至完成。他从不半途而废。Claude Opus 5 和 Kimi K3 是推荐默认值。
 
 **Hephaestus** (仅通过 OpenAI、GitHub Copilot、Vercel 或 OpenCode 使用 medium effort 的 `gpt-5.6-sol`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
 
@@ -218,7 +218,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 **Team Mode** 把 oh-my-openagent 从「带子 Agent 的单个 Agent」升级为真正的多 Agent 系统。一个领导 Agent 协调一队按类别专业化的成员，全部 **并行** 运行，通过专用工具(`team_create`、`team_send_message`、`team_task_create`、`team_status`、…)进行通信。在 tmux 布局的 focus + grid 窗口中同时观察每个成员的工作。
 
 ```jsonc
-// .opencode/oh-my-openagent.jsonc
+// ~/.omo/omo.jsonc  （或项目的 .omo/omo.jsonc）
 {
   "team_mode": {
     "enabled": true,
@@ -246,7 +246,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | `quick`              | 单文件修改、修错字     |
 | `ultrabrain`         | 复杂硬核逻辑、架构决策 |
 
-智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 在 OpenAI 或 Vercel 可用时优先路由到 GPT-5.6 Sol xhigh，其次是 GPT-5.6 Sol xhigh。你完全不需要操心。
+智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 路由到 GPT-5.6 Sol max（OpenAI / Vercel，其次 GitHub Copilot，再其次 OpenCode）。你完全不需要操心。
 
 ### 完全兼容 Claude Code
 
@@ -277,7 +277,7 @@ Harness 问题是真的。绝大多数所谓的 Agent 故障，其实并不是�
 >
 > <br/>- [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
 
-受 [oh-my-pi](https://github.com/can1357/oh-my-pi) 的启发，我们做出了 **Hashline**。Agent 读到的每一行代码，末尾都会打上一个强绑定的内容哈希值：
+受 [oh-my-pi](https://github.com/can1357/oh-my-pi) 的启发，我们做出了 **Hashline**。启用 `hashline_edit` 后，Agent 读到的每一行代码，末尾都会打上一个强绑定的内容哈希值：
 
 ```
 11#VK| function hello() {
@@ -308,7 +308,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 
 碰到了硬骨头？千万不要扔个 Prompt 就双手合十祈祷。
 
-输入 `/start-work`，召唤 Prometheus 出场。**他会像一个真实的主管那样去采访你**，主动深挖需求、指出模糊地带，并在改动哪怕一行代码之前产出经过严密论证的计划。你的 Agent 终于知道了自己在干嘛。
+Prometheus **会像一个真实的主管那样去采访你**，主动深挖需求、指出模糊地带，并在改动哪怕一行代码之前把经过严密论证的计划写入 `.omo/plans/`。随后 `/start-work` 基于该计划启动 **Atlas** 工作会话。你的 Agent 终于知道了自己在干嘛。
 
 ### 技能系统 (Skills)
 
@@ -346,12 +346,16 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 2. **清除配置文件（可选）**
 
    ```bash
-   # 移除兼容期间被识别的插件配置文件
-   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
-         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json
+   # 移除运行时配置文件
+   rm -f ~/.omo/omo.jsonc ~/.omo/omo.json
 
    # 移除当前项目的配置（如果存在）
-   rm -f .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
+   rm -f .omo/omo.jsonc .omo/omo.json
+
+   # 移除残留的旧版迁移备份（如有）
+   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
+         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json \
+         .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
          .opencode/oh-my-opencode.jsonc .opencode/oh-my-opencode.json
    ```
 
@@ -380,12 +384,12 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 - **Agents**: Sisyphus（主 Agent）、Prometheus（规划师）、Oracle（架构/调试）、Librarian（文档/代码检索）、Explore（快速 grep）、Multimodal Looker
 - **后台 Agents**: 像真正的开发团队那样并行跑多个 Agent
 - **LSP & AST 工具**: 重构、重命名、诊断、AST 感知的代码检索
-- **基于哈希的编辑工具**: `LINE#ID` 引用在应用每次修改前都会验证内容。外科手术级编辑，零陈旧行错误
+- **基于哈希的编辑工具**（通过 `hashline_edit: true` 手动启用）: `LINE#ID` 引用在应用每次修改前都会验证内容。外科手术级编辑，零陈旧行错误
 - **上下文注入**: 自动注入 AGENTS.md、README.md、条件规则
 - **Claude Code 兼容**: 完整的 Hook 系统、命令、技能、Agents、MCP
 - **内置 MCP**: websearch（Exa）、context7（文档）、grep_app（GitHub 检索） ——由插件在运行时注入，不会显示在 `opencode mcp list`  中(参见文档 [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
 - **会话工具**: 列出、读取、搜索、分析会话历史
-- **效率功能**: Ralph Loop、Todo Enforcer、Comment Checker、Think Mode 等
+- **效率功能**: Goal、Todo Enforcer、Comment Checker、Think Mode 等
 - **Doctor 命令**: 内置诊断（`bunx oh-my-opencode doctor`），验证插件注册、配置、模型和环境
 - **模型回退**: `fallback_models` 可以在同一数组中混合使用普通模型字符串和 per-fallback 对象配置
 - **文件提示词**: 通过 `file://` 在 Agent 配置中从文件加载提示词
@@ -399,13 +403,13 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 详细内容见 [Configuration Documentation](docs/reference/configuration.md)。
 
 **简要概览：**
-- **配置文件位置**: 使用用户全局配置，同时会从当前目录向上查找 `.opencode/oh-my-openagent.json[c]`（查到 `$HOME` 为止），离当前目录越近的优先级越高。旧版 `oh-my-opencode.json[c]` 仍然有效。
+- **配置文件位置**: 用户 `~/.omo/omo.jsonc`，同时会从当前目录向上查找项目 `.omo/omo.jsonc`（查到 `$HOME` 为止），离当前目录越近的优先级越高。旧版 `oh-my-*` 文件只会被迁移一次到 `omo.jsonc`。
 - **JSONC 支持**: 支持注释和尾逗号
 - **Agents**: 可对任意 Agent 覆盖模型、temperature、prompts 和权限
 - **内置技能**: `playwright`（浏览器自动化）、`git-master`（原子提交）
 - **Sisyphus Agent**: 主调度器，搭配 Prometheus（规划师）和 Metis（计划顾问）
 - **后台任务**: 按 provider/model 配置并发上限
-- **类别**: 按领域的任务委托（`visual`、`business-logic`、自定义）
+- **类别**: `visual-engineering`、`ultrabrain`、`deep`、`artistry`、`quick`、`unspecified-low`、`unspecified-high`、`writing`，外加自定义名称
 - **Hooks**: 54+ 内置生命周期 Hook（启用 Team Mode 时为 61 个），都可以通过 `disabled_hooks` 控制
 - **MCPs**: 内置 websearch（Exa）、context7（文档）、grep_app（GitHub 检索）——由插件在运行时注入，不会显示在 `opencode mcp list`  中
 - **LSP**: 包括重构工具的完整 LSP 支持

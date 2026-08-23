@@ -32,7 +32,9 @@ describe("compileMemoryBlock", () => {
     expect(block).not.toContain("EXTERNAL_BODY_SENTINEL")
     expect(block).not.toContain("BINARY_BODY_SENTINEL")
     expect(block).not.toContain("SKILL_BODY_SENTINEL")
-  })
+    // Loaded Windows runners push these git fixtures past the 5s default; the work stays
+    // deterministic (~230ms locally), so only the ceiling moves.
+  }, 30_000)
 
   it("#given a committed persona and identity #when compiled #then both projection paths share the self section and metadata remains structured", async () => {
     // given
@@ -53,7 +55,7 @@ describe("compileMemoryBlock", () => {
       memoryOpenTags: ["facts"],
       metadata: { agentId: "persona-identity-agent" },
     })
-  })
+  }, 30_000)
 
   it("#given only a committed identity #when compiled #then it renders under self without a persona projection", async () => {
     // given
@@ -68,7 +70,7 @@ describe("compileMemoryBlock", () => {
     // then
     expect(structure.sections).toEqual(["self", "memory_metadata"])
     expect(structure.projectionPaths).toEqual(["system/identity.md"])
-  })
+  }, 30_000)
 
   it("#given an empty committed repository #when compiled #then only structured metadata is emitted", async () => {
     // given
@@ -85,7 +87,7 @@ describe("compileMemoryBlock", () => {
       memoryOpenTags: [],
       metadata: { agentId: "empty-agent" },
     })
-  })
+  }, 30_000)
 
   it("#given only a committed persona #when compiled #then its body is projected without its description", async () => {
     // given
@@ -102,5 +104,5 @@ describe("compileMemoryBlock", () => {
     expect(structure.projectionPaths).toEqual(["system/persona.md"])
     expect(block).toContain("PERSONA_BODY_SENTINEL")
     expect(block).not.toContain("DESCRIPTION_SENTINEL")
-  })
+  }, 30_000)
 })

@@ -78,20 +78,22 @@ function renderContentLines<T>(
   content: string,
   details: T,
   width = 2_000,
+  expanded = false,
 ): readonly string[] {
   const component = renderer(
     { role: "custom", customType, content, display: true, details, timestamp: 0 },
-    { expanded: false, outputPad: 0 },
+    { expanded, outputPad: 0 },
     TEST_THEME,
   )
   return component?.render(width) ?? []
 }
 
 function expectSanitizedLines(lines: readonly string[]): void {
-  for (const line of lines) expect(line).not.toMatch(TERMINAL_CONTROL_PATTERN)
-  expect(lines.join("\n")).not.toContain("example.com")
-  expect(lines.join("\n")).not.toContain("숨긴 제목")
-  expect(lines.join("\n")).not.toContain("unterminated-dcs")
+  const normalized = lines.map(normalizeRendererText)
+  for (const line of normalized) expect(line).not.toMatch(TERMINAL_CONTROL_PATTERN)
+  expect(normalized.join("\n")).not.toContain("example.com")
+  expect(normalized.join("\n")).not.toContain("숨긴 제목")
+  expect(normalized.join("\n")).not.toContain("unterminated-dcs")
 }
 
 describe("task-family custom message renderers", () => {
@@ -146,15 +148,14 @@ describe("task-family custom message renderers", () => {
     const text = lines.join("\n")
 
     // then
-    expect(text).toContain("task completion")
-    expect(text).toContain("name:worker")
-    expect(text).toContain("id:st_done")
+    expect(text).toContain("Task complete · worker")
+    expect(text).toContain("id st_done")
     expect(text).toContain("category:quick(quotio-openai/gpt-5.6-luna-fast)")
-    expect(text).toContain("status:completed")
-    expect(text).toContain("duration:1.25s")
-    expect(text).toContain("tokens:321")
+    expect(text).toContain("duration 1.25s")
+    expect(text).toContain("tokens 321")
     expect(text).toContain("검증 작업을 완료했습니다.")
-    expect(text).toContain("task_send")
+    expect(text).not.toContain("task_send")
+    expect(lines.every((line) => line.includes("\u001b[48;2;0;0;0m"))).toBe(true)
     expect(text).not.toContain("<task-notification>")
     expect(text).not.toContain("<head>")
   })
@@ -178,9 +179,9 @@ describe("task-family custom message renderers", () => {
     // then
     expectSanitizedLines(lines)
     const text = lines.join("\n")
-    expect(text).toContain("team member liveness")
-    expect(text).toContain("member:alpha")
-    expect(text).toContain("last state:error")
+    expect(text).toContain("Team member unavailable · alpha")
+    expect(text).toContain("last known state was error")
+    expect(lines.every((line) => line.includes("\u001b[48;2;0;0;0m"))).toBe(true)
   })
 
   test("#given a completed team member with a long target #when rendering at 140 cells #then minute duration tools and tps remain visible", () => {
@@ -214,11 +215,10 @@ describe("task-family custom message renderers", () => {
     const text = lines.map(normalizeRendererText).join("\n")
 
     // then
-    expect(text).toContain("name:stats-member")
-    expect(text).toContain("status:completed")
-    expect(text).toContain("duration:1m 5s")
-    expect(text).toContain("tools:4")
-    expect(text).toContain("tps:250")
+    expect(text).toContain("Task complete · stats-member")
+    expect(text).toContain("duration 1m 5s")
+    expect(text).toContain("tools 4")
+    expect(text).toContain("tps 250")
     for (const line of lines) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(140)
   })
 
@@ -235,9 +235,9 @@ describe("task-family custom message renderers", () => {
     }]
 
     // when
-    const lines = renderContentLines(renderTaskCompletion, "senpi-task.completion", "<task-notification>raw</task-notification>", details, 54)
+    const lines = renderContentLines(renderTaskCompletion, "senpi-task.completion", "<task-notification>raw</task-notification>", details, 54, true)
     const normalizedLines = lines.map(normalizeRendererText)
-    const continuationLine = normalizedLines.find((line) => line.startsWith("next:")) ?? ""
+    const continuationLine = normalizedLines.find((line) => line.includes("task_send")) ?? ""
 
     // then
     expect(continuationLine).toContain("to")

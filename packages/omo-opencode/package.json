@@ -10,10 +10,12 @@
       "import": "./src/config-migration/index.ts"
     }
   },
-  "scripts": { "typecheck": "tsgo --noEmit -p tsconfig.json" },
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json"
+  },
   "dependencies": {
-    "@clack/prompts": "^1.4.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@clack/prompts": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
@@ -33,13 +35,12 @@
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "@opencode-ai/plugin": "1.15.13",
-    "@opencode-ai/sdk": "1.15.13",
-    "commander": "^14.0.3",
-    "js-yaml": "^4.1.1",
+    "@opencode-ai/plugin": "1.18.19",
+    "@opencode-ai/sdk": "1.18.19",
+    "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "picomatch": "^4.0.4",
+    "picomatch": "^4.0.5",
     "zod": "^4.4.3"
   }
 }

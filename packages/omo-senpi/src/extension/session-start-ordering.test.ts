@@ -15,7 +15,7 @@ import {
 import { createOnboardingComponent } from "../components/onboarding"
 import { createUltraworkComponent } from "../components/ultrawork"
 import { createUlwLoopComponent } from "../components/ulw-loop"
-import { activeStatus, createLogger } from "../components/ulw-loop/ulw-loop.test-support"
+import { activeStatus, createLogger, sessionEventCtx } from "../components/ulw-loop/ulw-loop.test-support"
 import { getOmoNativeStateDir } from "../components/telemetry/product-identity"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { omoSenpiComponents } from "./index"
@@ -53,7 +53,9 @@ describe("session_start component ordering", () => {
     const scheduleFlush = spyOn(idleCoordinator, "scheduleFlush")
     const sendMessage = spyOn(pi, "sendMessage")
     const select = mockFn(async () => undefined)
-    const eventCtx = { cwd: root, hasUI: true, ui: { select } }
+    // The ulw-loop probe is session-scoped and fails closed without a session id, so the context carries
+    // the host session identity the real Senpi host exposes.
+    const eventCtx = sessionEventCtx(root, { hasUI: true, ui: { select } })
     const componentContext: ComponentContext = {
       logger,
       config: { getFlag: (name) => pi.getFlag(name) },
@@ -66,6 +68,9 @@ describe("session_start component ordering", () => {
       createUlwLoopComponent({
         resolveOmoBin: () => "/tmp/omo-agent-toolkit",
         runCommand: async () => ({ code: 0, stdout: activeStatus() }),
+        // This fixture asserts handler ordering; seeding a real `.omo` ledger would also flip the
+        // onboarding/advisor state the test pins, so the plan lookup is stubbed active instead.
+        planDirExists: () => true,
       }),
     ]
     for (const component of components) await component.register(pi, componentContext)

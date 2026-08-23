@@ -32,9 +32,9 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 |------|------|-------|
 | `create-session-hooks.ts` | Session | 24 |
 | `create-tool-guard-hooks.ts` | Tool Guard | 18 (incl. `team-tool-gating`, null unless team_mode) |
-| `create-transform-hooks.ts` | Transform | 7 slots (2 team-gated, 1 monitor-gated; incl. `contextInjectorMessagesTransform` from `features/context-injector`) |
+| `create-transform-hooks.ts` | Transform | 8 slots (2 team-gated, 1 monitor-gated; incl. `btwSideContextInjector` and `contextInjectorMessagesTransform`) |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 49 slots |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 50 slots |
 
 `createContinuationHooks()` (7) lives in `src/create-hooks.ts` next to `createCoreHooks()` and `createSkillHooks()`.
 
