@@ -375,7 +375,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body).toMatchObject({
-      noReply: true,
+      noReply: false,
       agent: "hephaestus",
       model: { providerID: "openai", modelID: "gpt-5" },
       variant: "xhigh",
