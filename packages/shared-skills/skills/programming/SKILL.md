@@ -51,6 +51,12 @@ These are not style preferences. They are the seven axioms every recipe in `refe
 
 ---
 
+## Epistemic workflow
+
+Treat every implementation claim as a claim until expected truth, observed reality, and the diff are visible in evidence. Use independent observation or review when error cost is high, size verification economics to that cost, and close fixes only on cause disappearance with baseline characterization, failing-first proof, runtime truth, or real-surface proof.
+
+---
+
 ## TDD DISCIPLINE — NON-NEGOTIABLE
 
 **Every change follows the red → green → refactor loop.** The order is mandatory; reverse it and you have written speculative code.

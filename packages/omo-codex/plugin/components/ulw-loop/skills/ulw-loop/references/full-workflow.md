@@ -15,6 +15,9 @@ Prove EVERY success criterion with captured observable evidence from a real-usag
 TESTS ALONE NEVER PROVE DONE. A green test suite is supporting evidence, not completion proof.
 Audit each pass, fail, block, steering change, and checkpoint in `.omo/ulw-loop/ledger.jsonl`.
 
+## Epistemic workflow
+Maintain claim-graph, observation-manifest, verification-economics, and cause-disappearance notes in ledger; each links expected truth, observed reality, independent evidence.
+
 ## Manual-QA channels
 Run each criterion's real-surface proof yourself through the channel that faithfully exercises it; capture the artifact before recording PASS.
 
