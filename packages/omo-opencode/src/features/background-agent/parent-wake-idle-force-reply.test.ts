@@ -305,4 +305,37 @@ describe("parent wake idle force reply", () => {
       notifier.shutdown()
     }
   })
+
+  test("#given recent parent activity is fresh and a user message is in progress #when flushing an idle partial-completion wake #then it stays admit-only noReply and retains the pending wake", async () => {
+    // given
+    const now = Date.now()
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => [
+        ...SAFE_MESSAGES,
+        {
+          info: { role: "user", time: { created: now } },
+          parts: [{ type: "text", text: "real user follow-up" }],
+        },
+      ],
+      parentActivityWindowMs: 180_000,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+    notifier.recordParentSessionActivity("parent-1")
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      // admit-only deposits drop partial (shouldReply=false) wakes from pending
+      // and keep them in the dispatched tracker instead of re-queuing them
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().get("parent-1")?.shouldReply).toBe(false)
+    } finally {
+      notifier.shutdown()
+    }
+  })
 })
