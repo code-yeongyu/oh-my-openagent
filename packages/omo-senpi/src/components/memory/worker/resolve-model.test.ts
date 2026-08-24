@@ -32,6 +32,56 @@ describe("resolveReflectionModel", () => {
     })
   })
 
+  // Three consecutive real reflection runs died on:
+  //   OpenAI API error (400): Unsupported value: 'minimal' is not supported with the
+  //   'gpt-5.6-luna' model. ... param: reasoning.effort
+  // The launch path handed the configured level straight to the child, so a level the
+  // provider had removed reached the wire and reflection failed before doing any work.
+  test("#given a gpt-5.6 model configured with the removed minimal effort #when resolved #then the launch path clamps it", () => {
+    // given
+    const luna: SenpiModelPort = { provider: "openai", id: "gpt-5.6-luna" }
+    const lunaRegistry = {
+      getAvailable: () => [luna],
+      find: (provider: string, modelId: string) =>
+        provider === luna.provider && modelId === luna.id ? luna : undefined,
+    }
+    const config: OmoConfig = {
+      categories: { quick: { model: "openai/gpt-5.6-luna", reasoning: "minimal" } },
+    }
+
+    // when
+    const result = resolveReflectionModel("quick", config, lunaRegistry)
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind === "resolved") {
+      expect(result.thinking).not.toBe("minimal")
+      expect(result.thinking).toBe("off")
+    }
+  })
+
+  test("#given a gpt-5 model configured with minimal #when resolved #then the still-supported level is preserved", () => {
+    // given
+    const gpt5: SenpiModelPort = { provider: "openai", id: "gpt-5" }
+    const gpt5Registry = {
+      getAvailable: () => [gpt5],
+      find: (provider: string, modelId: string) =>
+        provider === gpt5.provider && modelId === gpt5.id ? gpt5 : undefined,
+    }
+    const config: OmoConfig = {
+      categories: { quick: { model: "openai/gpt-5", reasoning: "minimal" } },
+    }
+
+    // when
+    const result = resolveReflectionModel("quick", config, gpt5Registry)
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind === "resolved") {
+      expect(result.thinking).toBe("minimal")
+    }
+  })
+
   test("#given an empty model registry #when quick cannot resolve #then it fails closed as category_unavailable", () => {
     // given
     const config: OmoConfig = { categories: {} }

@@ -78,6 +78,12 @@ function resolveField(
   metadataOverride?: string[],
   familyAliases?: Record<string, string>,
 ): FieldResolution {
+  // An explicit provider capability list is authoritative. When it already supports the
+  // requested value, a family alias must not override it -- e.g. github-copilot exposes
+  // its own effort list for gpt-5.6, and the gpt-5-6-plus minimal->none alias must not
+  // downgrade a value that provider actually accepts.
+  if (metadataOverride?.includes(normalized)) return { value: normalized }
+
   const aliased = familyAliases?.[normalized]
   if (aliased && (metadataOverride?.includes(aliased) || familyCaps?.includes(aliased))) {
     return { value: aliased, reason: "unsupported-by-model-family" }

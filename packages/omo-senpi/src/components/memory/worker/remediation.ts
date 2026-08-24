@@ -17,11 +17,26 @@ export function reflectionRemediation(reason: string | undefined, detail: string
   ) {
     return "the reflection child cannot see the configured category model; adjust memory.reflection category/model in your omo config"
   }
+  // A provider 400 on reasoning.effort is a config/capability mismatch, not a crash:
+  // the child-stderr hint below would send the reader to a log that only repeats the
+  // same line. Name the rejected parameter instead.
+  // Scope this to the reasoning parameter only. An unsupported_value for temperature,
+  // max_tokens or anything else must not be told to change the reasoning level.
+  if (
+    combined.includes("reasoning.effort")
+    || combined.includes("reasoningeffort")
+    || (combined.includes("unsupported_value") && combined.includes("reasoning"))
+  ) {
+    return "the provider rejected the reasoning effort for this model; set categories.<category>.reasoning (the category memory.reflection.category points at) to a value the model accepts, or pick another model"
+  }
   if (combined.includes("spawn") || combined.includes("enoent")) {
     return "senpi executable not resolvable for the reflection child; set SENPI_BIN"
   }
   if (combined.includes("api key") || combined.includes("auth_missing")) {
     return "run /login <provider>"
   }
-  return "inspect runtime/reflection-sessions/<runId>/child-stderr.log"
+  // The run dir is `runtime/reflection/runs/<runId>` (reflection-spawn-input.ts builds
+  // `reflectionSessionsDir` from `paths.reflection` + "runs"), so the hint must name that
+  // path -- `runtime/reflection-sessions/` is a vestigial layout entry nothing writes to.
+  return "inspect runtime/reflection/runs/<runId>/child-stderr.log"
 }

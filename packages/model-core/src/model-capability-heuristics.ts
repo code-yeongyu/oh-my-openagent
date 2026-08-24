@@ -40,6 +40,21 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     supportsTemperature: false,
   },
   {
+    // gpt-5.6 dropped "minimal" from reasoning.effort. The API rejects it with a
+    // 400 unsupported_value instead of degrading, which killed every memory
+    // reflection run against gpt-5.6-luna. Must precede the generic gpt-5 entry
+    // below (first match wins), which still advertises "minimal" for gpt-5/5.1.
+    // Model IDs are normalized before matching, so "gpt-5.6-luna" arrives here as
+    // "gpt-5-6-luna" - match the hyphenated form, not the dotted one.
+    family: "gpt-5-6-plus",
+    pattern: /gpt-5-(?:[6-9]|\d{2,})(?:$|-)/,
+    variants: ["low", "medium", "high", "xhigh"],
+    reasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    reasoningEffortAliases: {
+      minimal: "none",
+    },
+  },
+  {
     family: "gpt-5",
     includes: ["gpt-5"],
     variants: ["low", "medium", "high", "xhigh"],

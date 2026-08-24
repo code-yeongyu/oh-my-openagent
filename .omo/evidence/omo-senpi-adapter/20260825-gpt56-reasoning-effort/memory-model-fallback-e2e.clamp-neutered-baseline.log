@@ -1,0 +1,20 @@
+[0m[1m151 |[0m [0m[35mfunction[0m waitForCompletion(dir, existing) {
+[0m[1m152 |[0m   mkdirSync(dir, { recursive: [0m[33mtrue[0m })
+[0m[1m153 |[0m   [0m[35mreturn[0m [0m[35mnew[0m [0m[1mPromise[0m((resolve, reject) => {
+[0m[1m154 |[0m     [0m[35mconst[0m timer = setTimeout(() => {
+[0m[1m155 |[0m       subscription[0m[3m[1m.close[0m()
+[0m[1m156 |[0m       reject([0m[35mnew[0m [0m[1mError[0m([0m[32m"timed out waiting for reflection completion"[0m))
+                       [31m[1m^[0m
+[0m[31merror[0m[2m:[0m [1mtimed out waiting for reflection completion[0m
+[0m      [2mat [0m[0m[2m<anonymous>[0m[2m ([0m[0m[36m[2m/Users/junhoyeo/omo-worktrees/reflection-fix/[0m[36mpackages/omo-senpi/scripts/qa/memory-model-fallback-e2e.mjs[0m[2m:[0m[33m156[0m[2m:[33m18[0m[2m)[0m
+[0m[1m151 |[0m [0m[35mfunction[0m waitForCompletion(dir, existing) {
+[0m[1m152 |[0m   mkdirSync(dir, { recursive: [0m[33mtrue[0m })
+[0m[1m153 |[0m   [0m[35mreturn[0m [0m[35mnew[0m [0m[1mPromise[0m((resolve, reject) => {
+[0m[1m154 |[0m     [0m[35mconst[0m timer = setTimeout(() => {
+[0m[1m155 |[0m       subscription[0m[3m[1m.close[0m()
+[0m[1m156 |[0m       reject([0m[35mnew[0m [0m[1mError[0m([0m[32m"timed out waiting for reflection completion"[0m))
+                       [31m[1m^[0m
+[0m[31merror[0m[2m:[0m [1mtimed out waiting for reflection completion[0m
+[0m      [2mat [0m[0m[2m<anonymous>[0m[2m ([0m[0m[36m[2m/Users/junhoyeo/omo-worktrees/reflection-fix/[0m[36mpackages/omo-senpi/scripts/qa/memory-model-fallback-e2e.mjs[0m[2m:[0m[33m156[0m[2m:[33m18[0m[2m)[0m
+[0m
+[2mBun v1.4.0 (macOS arm64)[0m

@@ -312,6 +312,61 @@ describe("resolveCompatibleModelSettings", () => {
     }
   })
 
+  // gpt-5.6 removed "minimal" from reasoning.effort. The API answers a 400
+  // unsupported_value rather than degrading, which broke every memory reflection
+  // run against gpt-5.6-luna. Model IDs are normalized before family matching, so
+  // "gpt-5.6-luna" is matched as "gpt-5-6-luna".
+  test("GPT-5.6 downgrades the removed minimal reasoningEffort to none", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.6-luna",
+      desired: { reasoningEffort: "minimal" },
+    })
+
+    expect(result.reasoningEffort).toBe("none")
+  })
+
+  test("GPT-5.6 keeps the reasoningEfforts the API still accepts", () => {
+    for (const effort of ["none", "low", "medium", "high", "xhigh", "max"]) {
+      const result = resolveCompatibleModelSettings({
+        providerID: "openai",
+        modelID: "gpt-5.6-terra",
+        desired: { reasoningEffort: effort },
+      })
+
+      expect(result.reasoningEffort).toBe(effort)
+    }
+  })
+
+  // The narrower gpt-5.6+ entry must not swallow the earlier gpt-5 models, which
+  // still accept "minimal".
+  // A provider that publishes its own effort list is authoritative. github-copilot
+  // still accepts minimal for gpt-5.6, so the gpt-5-6-plus minimal->none alias must
+  // not downgrade it. Without the metadata check the alias fired first and returned
+  // "none" here, silently weakening a level that provider accepts.
+  test("explicit provider capabilities outrank the family alias", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "github-copilot",
+      modelID: "gpt-5.6",
+      desired: { reasoningEffort: "minimal" },
+      capabilities: { reasoningEfforts: ["none", "minimal", "low", "medium", "high"] },
+    })
+
+    expect(result.reasoningEffort).toBe("minimal")
+  })
+
+  test("GPT-5 and GPT-5.1 keep minimal reasoningEffort", () => {
+    for (const modelID of ["gpt-5", "gpt-5.1", "gpt-5.2-codex"]) {
+      const result = resolveCompatibleModelSettings({
+        providerID: "openai",
+        modelID,
+        desired: { reasoningEffort: "minimal" },
+      })
+
+      expect(result.reasoningEffort).toBe("minimal")
+    }
+  })
+
   test("GPT-5 keeps xhigh variant and reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

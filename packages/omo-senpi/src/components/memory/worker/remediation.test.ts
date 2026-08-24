@@ -20,6 +20,39 @@ describe("reflectionRemediation", () => {
     })
   })
 
+  describe("#given a provider 400 rejecting reasoning.effort", () => {
+    // Verbatim stderr from three consecutive real reflection runs against gpt-5.6-luna.
+    // It matched no taxonomy, so a pure capability mismatch was reported with the generic
+    // "inspect child-stderr.log" hint - and that log contains only this same line.
+    test("#when remediated #then it names the rejected parameter instead of the child log", () => {
+      // when
+      const hint = reflectionRemediation(
+        "child_exit",
+        'OpenAI API error (400): {"message":"Unsupported value: \'minimal\' is not supported with the \'gpt-5.6-luna\' model. Supported values are: \'none\', \'low\', \'medium\', \'high\', \'xhigh\', and \'max\'.","type":"invalid_request_error","param":"reasoning.effort","code":"unsupported_value"}',
+      )
+
+      // then
+      expect(hint).toContain("reasoning effort")
+      expect(hint).not.toContain("child-stderr.log")
+    })
+  })
+
+  describe("#given an unsupported_value for a parameter other than reasoning", () => {
+    // The reasoning hint must not be handed out for every unsupported_value: a
+    // temperature or max_tokens rejection needs the generic child-log path instead.
+    test("#when remediated #then it does not recommend changing the reasoning level", () => {
+      // when
+      const hint = reflectionRemediation(
+        "child_exit",
+        'OpenAI API error (400): {"message":"Unsupported value: 0.9 is not supported with this model.","param":"temperature","code":"unsupported_value"}',
+      )
+
+      // then
+      expect(hint).not.toContain("reasoning")
+      expect(hint).toContain("child-stderr.log")
+    })
+  })
+
   describe("#given the senpi child's verbatim model-not-found error", () => {
     // The child prints: Error: Model "<selector>" not found. Use --list-models to see available models.
     // That wording matched no taxonomy, so a repeating model miss was reported with the generic
@@ -55,6 +88,16 @@ describe("reflectionRemediation", () => {
 
     test("#when nothing matches #then the child log hint remains the default for post-spawn failures", () => {
       expect(reflectionRemediation("child_exit", "exit code 1")).toContain("child-stderr.log")
+    })
+
+    // The run dir is `runtime/reflection/runs/<runId>` (reflection-spawn-input.ts builds it from
+    // `paths.reflection` + "runs"). The hint used to name `runtime/reflection-sessions/<runId>`,
+    // a vestigial layout entry nothing ever writes to, sending readers to a nonexistent file.
+    test("#when the default child-log hint is emitted #then it names the directory the run actually writes", () => {
+      const hint = reflectionRemediation("child_exit", "exit code 1")
+
+      expect(hint).toBe("inspect runtime/reflection/runs/<runId>/child-stderr.log")
+      expect(hint).not.toContain("reflection-sessions")
     })
   })
 })

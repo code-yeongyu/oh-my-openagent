@@ -5,6 +5,8 @@ import {
   type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
 
+import { getModelCapabilities, resolveCompatibleModelSettings } from "@oh-my-opencode/model-core"
+
 import { chooseReflectionLaunchModel, type ReflectionLaunchCandidate } from "./model-cost"
 import { readModelPricing, selectRegistryFallbackModels } from "./registry-fallback"
 
@@ -103,11 +105,18 @@ export function resolveReflectionModel(
   const rawThinking = resolution.spec.reasoning
     ?? resolution.spec.reasoningEffort
     ?? resolution.spec.variant
-  const thinking = normalizeThinking(rawThinking)
+  const thinking = clampThinkingToModel(
+    `${resolution.spec.provider}/${resolution.spec.modelId}`,
+    normalizeThinking(rawThinking),
+  )
   const resolvedFallbacks = (resolution.spec.fallback_models ?? []).map((fallback): ReflectionModelCandidate => {
-    const fallbackThinking = normalizeThinking(fallback.reasoning_effort ?? fallback.variant)
+    const fallbackModel = `${fallback.provider}/${fallback.model_id}`
+    const fallbackThinking = clampThinkingToModel(
+      fallbackModel,
+      normalizeThinking(fallback.reasoning_effort ?? fallback.variant),
+    )
     return {
-      model: `${fallback.provider}/${fallback.model_id}`,
+      model: fallbackModel,
       ...(fallbackThinking === undefined ? {} : { thinking: fallbackThinking }),
     }
   })
@@ -149,7 +158,7 @@ function resolveBeyondCategory(
     // request prefix never matches the parent session and no provider cache can be replayed.
     cacheReusable: false,
   })
-  const thinking = normalizeThinking(decision.thinking)
+  const thinking = clampThinkingToModel(decision.model, normalizeThinking(decision.thinking))
   return {
     kind: "resolved",
     category,
@@ -166,9 +175,13 @@ function sessionCandidate(
 ): ReflectionLaunchCandidate | undefined {
   if (session === undefined) return undefined
   const cost = registry === undefined ? undefined : readModelPricing(registry.find(session.provider, session.id))
+  const sessionModel = `${session.provider}/${session.id}`
+  // The live session's level is a raw string chosen for the PARENT model; the reflection
+  // child may run a different one, so it needs the same clamp as every other path.
+  const sessionThinking = clampThinkingToModel(sessionModel, normalizeThinking(session.thinking))
   return {
-    model: `${session.provider}/${session.id}`,
-    ...(session.thinking === undefined ? {} : { thinking: session.thinking }),
+    model: sessionModel,
+    ...(sessionThinking === undefined ? {} : { thinking: sessionThinking }),
     ...(cost === undefined ? {} : { cost }),
   }
 }
@@ -213,7 +226,7 @@ function configuredFallbackModels(
     const rawThinking = typeof entry === "string"
       ? undefined
       : entry.reasoning ?? entry.reasoningEffort ?? entry.variant
-    const thinking = normalizeThinking(rawThinking)
+    const thinking = clampThinkingToModel(selector, normalizeThinking(rawThinking))
     return [{
       model: selector,
       ...(thinking === undefined ? {} : { thinking }),
@@ -237,6 +250,38 @@ export function shouldWarnCategoryUnavailable(config: OmoConfig, category: strin
   return (config.categories?.[category]?.warn_unavailable
     ?? config.task?.warnings.unavailable_categories
     ?? true) !== false
+}
+
+// The launch path previously handed the configured level straight to the child. Providers
+// that removed a level reject it outright rather than degrading -- gpt-5.6 answers a 400
+// `unsupported_value` for reasoning.effort=minimal -- which killed reflection before it did
+// any work. Clamp against the model's advertised capabilities instead.
+// `thinking` uses "off" where reasoning effort uses "none"; translate across that boundary.
+function clampThinkingToModel(
+  model: string,
+  thinking: ReflectionThinkingLevel | undefined,
+): ReflectionThinkingLevel | undefined {
+  if (thinking === undefined) return undefined
+  const separator = model.indexOf("/")
+  if (separator <= 0) return thinking
+  const providerID = model.slice(0, separator)
+  const modelID = model.slice(separator + 1)
+  if (modelID.length === 0) return thinking
+
+  // Provider overrides are authoritative and must reach the resolver: github-copilot
+  // publishes its own effort list for gpt-5.6, and without this the generic family
+  // alias would downgrade a level that provider actually accepts.
+  const capabilities = getModelCapabilities({ providerID, modelID })
+  const resolved = resolveCompatibleModelSettings({
+    providerID,
+    modelID,
+    desired: { reasoningEffort: thinking === "off" ? "none" : thinking },
+    capabilities,
+  })
+  // An unknown family yields no effort at all; keep the caller's choice rather than
+  // silently dropping thinking for every model model-core does not recognise.
+  if (resolved.reasoningEffort === undefined) return thinking
+  return normalizeThinking(resolved.reasoningEffort) ?? thinking
 }
 
 function normalizeThinking(value: string | undefined): ReflectionThinkingLevel | undefined {
