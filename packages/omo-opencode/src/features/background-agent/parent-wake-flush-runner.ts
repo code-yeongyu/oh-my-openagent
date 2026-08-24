@@ -48,6 +48,7 @@ export class ParentWakeFlushRunner {
       return
     }
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
+    const forceIdleReply = !sessionActive && !latestWake.shouldReply
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {
       this.schedulePendingParentWakeFlush(sessionID)
@@ -59,6 +60,17 @@ export class ParentWakeFlushRunner {
 
     if (!forceDispatchAfterActiveDefer && this.hasRecentParentSessionActivity(sessionID)) {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+        return
+      }
+      if (forceIdleReply) {
+        await this.sendParentWakePrompt(sessionID, latestWake, {
+          emptyAssistantTurnRetry: false,
+          toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+          forceReply: true,
+        })
+        log("[background-agent] Forced reply parent wake because parent session is idle", {
+          sessionID,
+        })
         return
       }
       await this.sendParentWakePrompt(sessionID, latestWake, {
@@ -140,10 +152,16 @@ export class ParentWakeFlushRunner {
       return
     }
 
+    if (forceIdleReply) {
+      log("[background-agent] Forced reply parent wake because parent session is idle", {
+        sessionID,
+      })
+    }
     await this.sendParentWakePrompt(sessionID, latestWake, {
       emptyAssistantTurnRetry,
       toolWaitDecision: finalToolWaitDecision,
       ...(forceDispatchAfterActiveDefer ? { skipPromptGateStatusCheck: true } : {}),
+      ...(forceIdleReply ? { forceReply: true } : {}),
     })
     if (forceDispatchAfterActiveDefer) {
       log("[background-agent] Sent parent wake after active-session defer ceiling:", {
@@ -209,6 +227,7 @@ export class ParentWakeFlushRunner {
       readonly emptyAssistantTurnRetry: boolean
       readonly toolWaitDecision: ToolWaitDeferralDecision
       readonly forceNoReply?: boolean
+      readonly forceReply?: boolean
       readonly retainPendingWake?: boolean
       readonly skipPromptGateStatusCheck?: boolean
     },
@@ -231,6 +250,7 @@ export class ParentWakeFlushRunner {
         sessionID,
         latestWake,
         ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
+        ...(options.forceReply !== undefined ? { forceReply: options.forceReply } : {}),
         ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
         ...(options.skipPromptGateStatusCheck !== undefined
           ? { skipPromptGateStatusCheck: options.skipPromptGateStatusCheck }
