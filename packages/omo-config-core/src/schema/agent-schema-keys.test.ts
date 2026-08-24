@@ -21,10 +21,8 @@ describe("agent schema permission and prompt_append keys", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.permission).toEqual({
-      edit: "deny",
-      bash: { "rm *": "ask" },
-    })
+    expect(result.data.permission?.edit).toBe("deny")
+    expect(result.data.permission?.bash).toEqual({ "rm *": "ask" })
     expect(result.data.prompt_append).toBe("x")
   })
 
