@@ -124,13 +124,18 @@ Scale: <axis count, source territories, target document length> · Precision dem
 </analysis>
 ```
 
-Then create the session directory:
+Then create the session directory with the guaranteed Node runtime so the same
+command works under POSIX shells, PowerShell, and `cmd.exe`:
 
-```bash
-mkdir -p .omo/ulw-research/$(date +%Y%m%d-%H%M%S)
+```text
+node -e "const fs=require('node:fs');const s=new Date().toISOString().replace(/\D/g,'').slice(0,14);const d='.omo/ulw-research/'+s.slice(0,8)+'-'+s.slice(8);fs.mkdirSync(d,{recursive:true});console.log(d)"
 ```
 
-This is `$SESSION_DIR`. The orchestrator owns the journal: you write every file in it; workers never do. Maintain:
+Use the printed path as `$SESSION_DIR`. If a filesystem tool is available, it
+may create the same timestamped directory directly instead. Never pass POSIX
+flags such as `-p` to `cmd.exe`.
+
+The orchestrator owns the journal: you write every file in it; workers never do. Maintain:
 
 - `wave-<N>-<kind>-<axis>.md` — your digest of each worker return: key findings, sources with URLs, and the worker's EXPAND markers verbatim.
 - `expansion-log.md` — per wave: workers spawned, markers gained, leads opened and closed.

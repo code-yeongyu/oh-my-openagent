@@ -83,13 +83,18 @@ Debate need: <which claims will be contested, and which member perspectives atta
 </analysis>
 ```
 
-Then create the session directory and write the brief:
+Then create the session directory with the guaranteed Node runtime so the same
+command works under POSIX shells, PowerShell, and `cmd.exe`:
 
-```bash
-mkdir -p .omo/ulw-research/$(date +%Y%m%d-%H%M%S)
+```text
+node -e "const fs=require('node:fs');const s=new Date().toISOString().replace(/\D/g,'').slice(0,14);const d='.omo/ulw-research/'+s.slice(0,8)+'-'+s.slice(8);fs.mkdirSync(d,{recursive:true});console.log(d)"
 ```
 
-This is `$SESSION_DIR`. Write `brief.md` into it: the analysis block, the axis list with one named owner per axis, the expected truths seeding `intent-diff.md`, and the team roster you are about to create. The brief is what the team is built FROM — a team stood up before the brief exists is a failure mode (see the table at the end).
+Use the printed path as `$SESSION_DIR`. If a filesystem tool is available, it
+may create the same timestamped directory directly instead. Never pass POSIX
+flags such as `-p` to `cmd.exe`.
+
+Write `brief.md` into it: the analysis block, the axis list with one named owner per axis, the expected truths seeding `intent-diff.md`, and the team roster you are about to create. The brief is what the team is built FROM — a team stood up before the brief exists is a failure mode (see the table at the end).
 
 ### Run it as a loop, and journal in real time
 

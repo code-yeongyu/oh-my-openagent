@@ -220,7 +220,7 @@ TASK ANALYSIS:
 - `issues.md` - Problems, gotchas
 - `problems.md` - Unresolved blockers
 
-If the directory is missing (e.g. plan predates auto-scaffold), create it with `mkdir -p`. Append findings after work; never overwrite.
+If the directory is missing (e.g. plan predates auto-scaffold), create it recursively with a filesystem tool or Node's `fs.mkdirSync(path, { recursive: true })`; never pass the POSIX `-p` flag to Windows `cmd.exe`. Append findings after work; never overwrite.
 
 ## Step 3: Execute Implementation Tasks
 

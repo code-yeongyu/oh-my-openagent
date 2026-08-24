@@ -102,7 +102,7 @@ elif [ -n "$ULW_LOOP_NODE" ]; then
 fi
 
 if [ -z "${ULW_LOOP_CLI:-}" ]; then
-  /bin/mkdir -p .omo/ulw-loop 2>/dev/null || mkdir -p .omo/ulw-loop 2>/dev/null || true
+  node -e "require('node:fs').mkdirSync('.omo/ulw-loop',{recursive:true})" 2>/dev/null || true
   NOTE="${NOTE:-.omo/ulw-loop/bootstrap-notepad.md}"
   printf '%s\n' "No ulw-loop-capable omo-agent-toolkit executable found; PATH omo-agent-toolkit may be the OpenCode CLI without the omo-senpi ulw-loop subcommand, and cached ulw-loop CLI was not found under ${CODEX_HOME:-$HOME/.omo-senpi}." >> "$NOTE" 2>/dev/null || true
   printf '%s\n' "Install with npx omo-senpi-ai install or set CODEX_LOCAL_BIN_DIR to a PATH directory." >&2
