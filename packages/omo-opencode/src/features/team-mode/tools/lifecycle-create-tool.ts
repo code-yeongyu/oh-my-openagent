@@ -28,6 +28,8 @@ const TeamCreateInlineMemberToolSchema = tool.schema.object({
   loadSkills: tool.schema.array(tool.schema.string()).optional().describe("Optional skills to load for this member."),
   role: tool.schema.string().optional().describe("Optional natural-language role used to build a prompt when prompt is omitted."),
   description: tool.schema.string().optional().describe("Optional natural-language description used to build a prompt when prompt is omitted."),
+  model: tool.schema.string().optional().describe("Optional. Override THIS member's model, e.g. \"openai/gpt-5.5\" or \"xai/grok-composer-2.5-fast\" (optionally \"provider/model variant\"). Gated to connected/available models — call list_models to see them. Omit to use the category/subagent default."),
+  reasoning_effort: tool.schema.string().optional().describe("Optional. Reasoning/variant for THIS member (minimal|low|medium|high|xhigh|max); takes precedence over a variant embedded in model."),
 })
 
 const TeamCreateInlineSpecToolSchema = tool.schema.union([

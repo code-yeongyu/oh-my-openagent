@@ -8,6 +8,10 @@ export interface CallOmoAgentArgs {
   subagent_type: string
   run_in_background: boolean
   session_id?: string
+  /** Orchestrator per-call model override, e.g. "openai/gpt-5.5" or "openai/gpt-5.5 xhigh". Gated to connected models. */
+  model?: string
+  /** Orchestrator per-call reasoning/variant override (e.g. "xhigh"); precedence over a variant inside `model`. */
+  reasoning_effort?: string
 }
 
 export interface CallOmoAgentSyncResult {

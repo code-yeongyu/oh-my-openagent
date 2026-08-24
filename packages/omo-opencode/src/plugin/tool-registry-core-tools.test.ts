@@ -24,6 +24,7 @@ function createFactories(createSkillTool: (options: SkillLoadOptions) => typeof 
     createSkillTool,
     createGrepTools: () => ({}),
     createGlobTools: () => ({}),
+    createListModelsTools: () => ({}),
     createSessionManagerTools: () => ({}),
     createDelegateTask: () => fakeTool,
     discoverCommandsSync: () => [],

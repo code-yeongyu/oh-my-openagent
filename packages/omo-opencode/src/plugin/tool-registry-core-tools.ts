@@ -126,6 +126,7 @@ export function createCoreTools(args: {
   const tools: ToolsRecord = {
     ...factories.createGrepTools(ctx),
     ...factories.createGlobTools(ctx),
+    ...factories.createListModelsTools(ctx),
     ...factories.createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
