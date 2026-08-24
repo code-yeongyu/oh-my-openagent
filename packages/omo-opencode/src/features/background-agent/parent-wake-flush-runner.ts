@@ -62,7 +62,13 @@ export class ParentWakeFlushRunner {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
       }
-      if (forceIdleReply) {
+      // The user-message race guard (issue #4120) must hold on the forced-reply
+      // fast path too: recent recorded parent activity and a just-sent user
+      // message can overlap (activity window 5s vs user-message window 2s), so
+      // a fresh user turn must never be raced by a reply-producing wake. Fall
+      // through to the admit-only noReply deposit so the user's own turn can
+      // consume the notification without forking another assistant chain.
+      if (forceIdleReply && !(await this.isUserMessageInProgress(sessionID))) {
         await this.sendParentWakePrompt(sessionID, latestWake, {
           emptyAssistantTurnRetry: false,
           toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
