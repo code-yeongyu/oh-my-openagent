@@ -105,7 +105,7 @@ describe("omo-native parallelism summary emission", () => {
           non_eval_joined_calls: 2,
           non_eval_saved_round_trips: 1,
           modeled_wallclock_saved_ms: 300,
-          schema_kind: "parallelism_v2",
+          schema_kind: "parallelism_v3",
         })
       })
 

@@ -316,7 +316,7 @@ describe("OmO Native telemetry component integration", () => {
         $session_id: "hashed:ordering-session",
         non_eval_waves_total: 1,
         non_eval_joined_calls: 2,
-        schema_kind: "parallelism_v2",
+        schema_kind: "parallelism_v3",
       })
       expect(Object.keys(summaries[0]?.properties ?? {}).sort()).toEqual(
         [...OMO_NATIVE_PROPERTY_ALLOWLISTS.parallelism_summary, ...SHARED_KEYS].sort(),

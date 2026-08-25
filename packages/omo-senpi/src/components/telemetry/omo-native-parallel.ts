@@ -35,6 +35,8 @@ export type ParallelSessionSnapshot = {
   readonly assembly: WaveAssembly
   readonly evalExecution: EvalExecutionRollup
   readonly evalExecutionEventBusAvailable: boolean
+  readonly evalCellsWithNestedCount: number
+  readonly currentPrefixTokens: number
   readonly measuredTurnDurationMsTotal: number
 }
 
@@ -44,6 +46,7 @@ export type ParallelTelemetryRegistry = {
   readonly setEvalExecutionEventBusAvailable: (available: boolean) => void
   readonly startTurn: (sessionId: string, atMs: number) => void
   readonly endTurn: (sessionId: string, atMs: number) => void
+  readonly recordCompletedTurn: (sessionId: string, inputTokens: number, cacheReadTokens: number) => void
   readonly snapshot: (sessionId: string) => ParallelSessionSnapshot | undefined
   readonly clear: (sessionId: string) => void
   readonly size: () => number
@@ -59,6 +62,8 @@ type SessionState = {
   observations: ToolExecutionObservation[]
   turnStartMs: number | undefined
   measuredTurnDurationMsTotal: number
+  currentPrefixTokens: number
+  evalCellsWithNestedCount: number
 }
 
 export function createParallelTelemetryRegistry(): ParallelTelemetryRegistry {
@@ -74,6 +79,8 @@ export function createParallelTelemetryRegistry(): ParallelTelemetryRegistry {
       observations: [],
       turnStartMs: undefined,
       measuredTurnDurationMsTotal: 0,
+      currentPrefixTokens: 0,
+      evalCellsWithNestedCount: 0,
     }
     sessions.set(sessionId, created)
     return created
@@ -99,16 +106,21 @@ export function createParallelTelemetryRegistry(): ParallelTelemetryRegistry {
       if (sessionId === undefined) return
       const state = sessions.get(sessionId)
       if (state === undefined) return
-      state.evalExecution = addEvalExecutionRollup(
-        state.evalExecution,
-        parsed.kind === "accepted" ? parsed.rollup : REJECTED_EVAL_EXECUTION_ROLLUP,
-      )
+      if (parsed.kind === "accepted") {
+        state.evalExecution = addEvalExecutionRollup(state.evalExecution, parsed.rollup)
+        if (parsed.rollup.nestedToolCallCount > 0) state.evalCellsWithNestedCount += 1
+      } else {
+        state.evalExecution = addEvalExecutionRollup(state.evalExecution, REJECTED_EVAL_EXECUTION_ROLLUP)
+      }
     },
     setEvalExecutionEventBusAvailable: (available) => {
       evalExecutionEventBusAvailable = available
     },
     startTurn: (sessionId, atMs) => {
       ensure(sessionId).turnStartMs = atMs
+    },
+    recordCompletedTurn: (sessionId, inputTokens, cacheReadTokens) => {
+      ensure(sessionId).currentPrefixTokens = inputTokens + cacheReadTokens
     },
     endTurn: (sessionId, atMs) => {
       const state = sessions.get(sessionId)
@@ -126,6 +138,8 @@ export function createParallelTelemetryRegistry(): ParallelTelemetryRegistry {
         assembly: assembleWaves(state.observations),
         evalExecution: state.evalExecution,
         evalExecutionEventBusAvailable,
+        evalCellsWithNestedCount: state.evalCellsWithNestedCount,
+        currentPrefixTokens: state.currentPrefixTokens,
         measuredTurnDurationMsTotal: state.measuredTurnDurationMsTotal,
       }
     },
@@ -168,6 +182,8 @@ export function registerOmoNativeParallelTelemetry(
     const sessionId = extractSessionId(eventContext)
     if (sessionId === undefined) return
     registry.endTurn(sessionId, atMs)
+    const usage = completedTurnUsage(payload)
+    if (usage !== undefined) registry.recordCompletedTurn(sessionId, usage.inputTokens, usage.cacheReadTokens)
   })
 
   pi.on("session_shutdown", (_payload: unknown, eventContext: unknown): void => {
@@ -204,6 +220,25 @@ function toolExecutionIdentity(
   if (typeof toolCallId !== "string" || toolCallId.length === 0) return undefined
   if (typeof toolName !== "string" || toolName.length === 0) return undefined
   return { toolCallId, toolName }
+}
+
+function completedTurnUsage(value: Record<string, unknown>): {
+  readonly inputTokens: number
+  readonly cacheReadTokens: number
+} | undefined {
+  const message = value["message"]
+  if (!isRecord(message) || message["role"] !== "assistant") return undefined
+  const usage = message["usage"]
+  if (!isRecord(usage)) return undefined
+  const inputTokens = nonNegativeNumber(usage["input"])
+  const cacheReadTokens = nonNegativeNumber(usage["cacheRead"])
+  return inputTokens === undefined || cacheReadTokens === undefined
+    ? undefined
+    : { inputTokens, cacheReadTokens }
+}
+
+function nonNegativeNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined
 }
 
 function turnStartTimestamp(value: unknown): number | undefined {

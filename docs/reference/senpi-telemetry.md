@@ -70,6 +70,8 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `eval_execution_event_count` | `number` | - |
 | `parallelism_summary` | `eval_execution_event_rejected_count` | `number` | - |
 | `parallelism_summary` | `eval_execution_ok_count` | `number` | - |
+| `parallelism_summary` | `eval_cells_with_nested_count` | `number` | - |
+| `parallelism_summary` | `eval_saved_prefix_tokens` | `number` | - |
 | `parallelism_summary` | `eval_nested_tool_call_count` | `number` | - |
 | `parallelism_summary` | `eval_nested_tool_call_error_count` | `number` | - |
 | `parallelism_summary` | `eval_nested_tool_call_ok_count` | `number` | - |
@@ -86,12 +88,14 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `mixed_waves` | `number` | - |
 | `parallelism_summary` | `modeled_wallclock_saved_ms` | `number` | - |
 | `parallelism_summary` | `non_eval_joined_calls` | `number` | - |
+| `parallelism_summary` | `non_eval_saved_prefix_tokens` | `number` | - |
 | `parallelism_summary` | `non_eval_saved_round_trips` | `number` | - |
 | `parallelism_summary` | `non_eval_wave_size_histogram` | `string` | - |
 | `parallelism_summary` | `non_eval_waves_multi` | `number` | - |
 | `parallelism_summary` | `non_eval_waves_total` | `number` | - |
-| `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1`, `parallelism_v2` |
+| `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1`, `parallelism_v2`, `parallelism_v3` |
 | `parallelism_summary` | `upper_bound_saved_ms` | `number` | - |
+| `parallelism_summary` | `current_prefix_tokens` | `number` | - |
 | `delegation_completed` | `$session_id` | `string` | - |
 | `delegation_completed` | `agent_type` | `string` | `explore`, `librarian`, `metis`, `momus`, `custom`, `none` |
 | `delegation_completed` | `background_mode` | `string` | `foreground`, `background`, `promoted`, `unknown` |
@@ -142,8 +146,9 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 
 ### Parallelism v2 interpretation
 
-`parallelism_v2` consumes Senpi's in-process `senpi.eval.execution` event and
-adds fixed scalar rollups for eval-internal tool calls. The event's
+`parallelism_v3` consumes Senpi's in-process `senpi.eval.execution` event and
+adds fixed scalar rollups for eval-internal tool calls plus counterfactual prefix
+accounting. The event's
 `toolCallCount` remains authoritative even when its enriched per-call detail
 array is capped. Tool names, arguments, result previews, paths, and aggregate
 map keys are discarded before the PostHog boundary.
@@ -155,7 +160,8 @@ Top-level wave metrics and eval-internal calls remain separate populations.
 durations are sums of per-call elapsed durations and may overlap, so they do
 not prove concurrency, wall-clock savings, or saved round trips.
 
-Historical `parallelism_v1` rows do not carry the new fields. On v2 rows,
+Historical `parallelism_v1` and `parallelism_v2` rows do not carry the v3
+fields. On v3 rows,
 `eval_execution_event_bus_available` reports host bus availability, not proof
 that every producer emitted an event. Use the accepted and rejected event
 counts when evaluating rollout coverage.

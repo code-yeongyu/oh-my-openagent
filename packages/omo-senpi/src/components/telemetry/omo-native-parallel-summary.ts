@@ -98,6 +98,8 @@ export function buildParallelismSummary(
     eval_execution_event_count: evalExecution.eventCount,
     eval_execution_event_rejected_count: evalExecution.rejectedCount,
     eval_execution_ok_count: evalExecution.okCount,
+    eval_cells_with_nested_count: snapshot.evalCellsWithNestedCount,
+    eval_saved_prefix_tokens: (evalExecution.nestedToolCallCount - snapshot.evalCellsWithNestedCount) * snapshot.currentPrefixTokens,
     eval_nested_tool_call_count: evalExecution.nestedToolCallCount,
     eval_nested_tool_call_error_count: evalExecution.nestedToolCallErrorCount,
     eval_nested_tool_call_ok_count: evalExecution.nestedToolCallOkCount,
@@ -114,11 +116,13 @@ export function buildParallelismSummary(
     mixed_waves: buckets.mixedWaves,
     modeled_wallclock_saved_ms: sumBy(nonEvalWaves, (wave) => modeledWallClockSavedMs(wave).valueMs),
     non_eval_joined_calls: buckets.nonEval.joinedCalls,
+    non_eval_saved_prefix_tokens: sumBy(nonEvalWaves, (wave) => (wave.maxConcurrency - 1) * snapshot.currentPrefixTokens),
     non_eval_saved_round_trips: savedRoundTrips(nonEvalWaves),
     non_eval_wave_size_histogram: buckets.nonEval.waveSizeHistogram,
     non_eval_waves_multi: buckets.nonEval.wavesMulti,
     non_eval_waves_total: buckets.nonEval.wavesTotal,
-    schema_kind: "parallelism_v2",
+    schema_kind: "parallelism_v3",
+    current_prefix_tokens: snapshot.currentPrefixTokens,
     upper_bound_saved_ms: sumBy(nonEvalWaves, (wave) => upperBoundSavedMs(wave).valueMs),
   }
 }
