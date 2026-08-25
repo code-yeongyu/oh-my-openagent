@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/components/memory/identity-runtime.test.ts:
+231 | 
+232 |     // when
+233 |     await runtime.launch(reserved.run)
+234 | 
+235 |     // then
+236 |     expect(existsSync(paths.reflectionSessions)).toBe(true)
+                                                       ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7012/packages/omo-senpi/src/components/memory/identity-runtime.test.ts:236:50)
+(fail) memory identity runtime first-write seam > #given a fresh identity whose runtime directories were never created #when a reserved reflection run launches through the identity runtime #then the missing runtime/reflection-sessions is created before the runner settles the run [24.11ms]
+
+ 4 pass
+ 1 fail
+ 6 expect() calls
+Ran 5 tests across 1 file. [1.61s]

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -199,6 +199,43 @@ function sandboxGrantsAgentDir(renderedArgs: readonly string[], agentDirReal: st
   }
   return false
 }
+
+describe("memory identity runtime first-write seam", () => {
+  test("#given a fresh identity whose runtime directories were never created #when a reserved reflection run launches through the identity runtime #then the missing runtime/reflection-sessions is created before the runner settles the run", async () => {
+    // given - no mkdir anywhere under the identity root. Every other suite pre-creates
+    // these dirs, which is exactly what masked #7012: the lazy sandbox grants
+    // runtime/reflection-sessions as writable, and on Linux bwrap cannot bind an entry
+    // that does not exist yet, so the first reflection on a fresh identity died pre-spawn.
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-first-write-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-test")
+    expect(existsSync(paths.reflectionSessions)).toBe(false)
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test",
+      identityPaths: paths,
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const ctx = componentContext()
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      logger: ctx.logger,
+    })
+    const reserved = await runtime.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+
+    // when
+    await runtime.launch(reserved.run)
+
+    // then
+    expect(existsSync(paths.reflectionSessions)).toBe(true)
+  }, 30_000)
+})
 
 describe("memory identity runtime agent-dir resolution", () => {
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
