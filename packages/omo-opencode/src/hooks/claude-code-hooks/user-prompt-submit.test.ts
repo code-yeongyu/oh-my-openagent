@@ -219,13 +219,25 @@ describe("executeUserPromptSubmitHooks control output", () => {
     ],
   }
 
-  function mockHook(stdout: string, options?: { exitCode?: number; stderr?: string }) {
+  function mockHook(stdout?: string, options?: { exitCode?: number; stderr?: string }) {
     spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
       exitCode: options?.exitCode ?? 0,
       stdout,
       stderr: options?.stderr ?? "",
     })
   }
+
+  it("#given a hook that writes nothing #when prompt submit runs #then nothing is injected", async () => {
+    // given
+    mockHook()
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(false)
+    expect(result.messages).toEqual([])
+  })
 
   it("#given control output without additionalContext #when prompt submit runs #then nothing is injected", async () => {
     // given

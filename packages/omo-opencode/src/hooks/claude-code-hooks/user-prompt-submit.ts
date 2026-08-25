@@ -143,10 +143,10 @@ export async function executeUserPromptSubmitHooks(
         messages.push(asHookContext(contextText))
       }
 
-      // Either field stops the prompt whatever the hook exited with, and a
-      // hook that sets both reports `reason`. Claude Code reads the fields in
-      // processHookJSONOutput and applies them in that order in
-      // processUserInput.
+      // Either field stops the prompt whatever the hook exited with. Claude
+      // Code collects both in processHookJSONOutput, then checks the blocking
+      // error ahead of the stop reason in processUserInput, so a hook that
+      // sets both reports `reason`.
       if (control?.decision === "block") {
         return {
           block: true,
