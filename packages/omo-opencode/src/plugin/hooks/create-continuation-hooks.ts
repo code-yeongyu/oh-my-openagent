@@ -82,7 +82,7 @@ export function createContinuationHooks(args: {
           isContinuationStopped: (sessionID: string) =>
             stopContinuationGuard?.isStopped(sessionID) ?? false,
           agentOverrides: pluginConfig.agents,
-          autoCommit: pluginConfig.start_work?.auto_commit,
+          autoCommit: pluginConfig.ulw_execute?.auto_commit,
         }))
     : null
 

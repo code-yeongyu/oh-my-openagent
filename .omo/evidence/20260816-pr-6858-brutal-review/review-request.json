@@ -1,0 +1,19 @@
+{
+  "commit_id": "5e530b4e2885a9a38d0fe108f27fa5a055b37142",
+  "event": "REQUEST_CHANGES",
+  "body": "REQUEST_CHANGES. The `windowsHide: true` source change is correct, but this PR is not mergeable or proven at the commit it would ship.\n\nP1 - Regenerate the conflicted bundle after integrating current `dev`. GitHub reports `mergeable: CONFLICTING` / `mergeStateStatus: DIRTY`, and `git merge-tree --write-tree HEAD origin/dev` conflicts in `packages/omo-senpi/plugin/extensions/omo-task.js`. Do not hand-resolve the minified artifact: integrate `dev`, retain the source/test delta, and rebuild the bundle with the official Bun 1.3.12 pipeline.\n\nP1 - Run the required CI on the repaired head. The evidence cites run 31767086674, whose `head_sha` is `e1eb149cd72929d8ed2db88095f8c7012f1bc645`; current head is `5e530b4e2885a9a38d0fe108f27fa5a055b37142` after a Senpi dependency bump and complete bundle refresh. Current-head checks contain only CLA, labels, Cubic, and GitGuardian. Require green `senpi-compatibility` on Windows/macOS/Linux plus the Ubuntu bundle-freshness step before merge.\n\nThe inline evidence comments are also blocking: replace the unauditable/non-isolated bespoke probe with an exact command or checked-in probe plus captured output, and prove the production `execution_mode: process` route actually reaches an RPC child. The PR body must also be updated from the obsolete `.omo/evidence/20260814-senpi-task-windows-console/qa.md` path to the canonical `.omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md` path.",
+  "comments": [
+    {
+      "path": ".omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md",
+      "line": 22,
+      "side": "RIGHT",
+      "body": "P1: this is not reviewer-auditable live evidence yet. The directory contains only this prose summary: no exact command or checked-in probe, no captured raw output artifact/path, and no section mapping the artifact to sufficiency. More importantly, lines 29-31 admit the window probe did not set `SENPI_CODING_AGENT_DIR` and did not verify the real agent directory stayed untouched. Add a reproducible probe and captured output under this canonical evidence directory, run it with an isolated agent directory, record exact teardown, and update the PR body's four obsolete evidence paths."
+    },
+    {
+      "path": ".omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md",
+      "line": 60,
+      "side": "RIGHT",
+      "body": "P1: `routed: false` is not unrelated to this fix. The production driver reports that `execution_mode: \"process\"` did not reach the RPC runner, while the window claim above comes from a bespoke direct `RpcProcessRunner` harness. That means the evidence does not prove the user-facing production route. Re-run `packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs` on the repaired Windows head and require `wiringFixed: true` plus a real RPC child PID; if it remains false, fix the routing defect instead of dismissing it."
+    }
+  ]
+}

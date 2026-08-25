@@ -1,0 +1,14 @@
+$ npm exec --yes --package=bun@1.3.12 -- bun test packages/senpi-task/src/dag/e2e-happy.test.ts
+bun test v1.3.12 (700fc117)
+
+packages/senpi-task/src/dag/e2e-happy.test.ts:
+(pass) DAG happy-path end to end > #given a linear three-node definition #when the real engine runs #then every event, output, snapshot, and artifact is wave ordered [49.91ms]
+(pass) DAG happy-path end to end > #given a diamond fan-out and join #when the real engine runs #then the middle nodes share one strict wave [41.77ms]
+(pass) DAG happy-path end to end > #given eight mixed-route nodes across four waves #when the real engine runs #then routes, membership, events, and outputs stay intact [78.77ms]
+(pass) DAG happy-path end to end > #given a completed run key #when the identical definition starts again #then the same run is reused without a second run file or event [18.36ms]
+(pass) DAG happy-path end to end > #given the shipped SDK builder #when define, node, start, and wait call the real engine #then wait returns a terminal DagRunResult with node outputs [57.24ms]
+
+ 5 pass
+ 0 fail
+ 81 expect() calls
+Ran 5 tests across 1 file. [372.00ms]

@@ -1,0 +1,6 @@
+(pass) memory footer status live wiring > #given a repo with no HEAD #when refresh runs #then nothing is published [0.31ms]
+
+ 21 pass
+ 0 fail
+ 35 expect() calls
+Ran 21 tests across 2 files. [91.00ms]

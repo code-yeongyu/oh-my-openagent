@@ -1,0 +1,48 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template identity and HEAD #when compiled twice #then the stable projection is reused [1133.59ms]
+(pass) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each stable key retains only its latest revision [2742.85ms]
+(pass) MemoryBlockCache > #given repeated calls for one stable projection #when compile runs many times #then the cache stays bounded to one entry [1745.25ms]
+(pass) MemoryBlockCache > #given two identities at the same HEAD #when compiled through one cache #then identity-stable projections remain isolated [1675.20ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.18ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+(pass) compileMemoryBlock > #given nested committed memory #when compiled #then block sections, projection order, and metadata values form the structural contract [1485.83ms]
+(pass) compileMemoryBlock > #given a committed persona and identity #when compiled #then both projection paths share the self section and metadata remains structured [1401.45ms]
+(pass) compileMemoryBlock > #given only a committed identity #when compiled #then it renders under self without a persona projection [1190.18ms]
+(pass) compileMemoryBlock > #given an empty committed repository #when compiled #then only structured metadata is emitted [800.80ms]
+(pass) compileMemoryBlock > #given only a committed persona #when compiled #then its body is projected without its description [1131.74ms]
+
+packages/memory-core/src/compile/compile-projections.test.ts:
+(pass) compileMemoryBlock > #given a dirty persona edit #when compiled #then only the committed HEAD body sentinel appears [1479.18ms]
+(pass) compileMemoryBlock > #given a committed binary projection #when compiled #then its path is listed without reading its blob [1840.90ms]
+(pass) compileMemoryBlock > #given an unreadable committed system file #when compiled #then its structural tag is skipped best-effort [1387.51ms]
+
+packages/memory-core/src/compile/render.test.ts:
+(pass) memory block sentinels > #given an identity and block #when marked #then the exact sentinel wrapper is returned [0.18ms]
+(pass) memory block sentinels > #given repeated legacy blocks #when replaced #then every matching region is transformed [0.19ms]
+(pass) memory block sentinels > #given no matching block #when replaced #then the sentinel block is appended [0.07ms]
+(pass) memory block sentinels > #given marked regions #when stripped #then only surrounding prompt content remains [0.08ms]
+
+packages/memory-core/src/compile/compile-metadata.test.ts:
+(pass) compileMemoryBlock > #given a stable identity and HEAD #when compiled repeatedly #then metadata is identity-only and byte-identical [1339.60ms]
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v3 stable template [0.24ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [1144.15ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [973.27ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a stable sentinel block and recall metadata arrives late [1118.71ms]
+(pass) createMemoryPromptHandler > #given the same identity and HEAD across sessions and turns #when volatile notices change #then the system block stays byte-identical and notices travel as a late message [864.39ms]
+(pass) createMemoryPromptHandler > #given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token [896.44ms]
+(pass) createMemoryPromptHandler > #given a reflection soul notice #when before_agent_start compiles #then the late message carries the soul token and short sha [872.98ms]
+(pass) createMemoryPromptHandler > #given an out-of-band soul commit #when the prompt compiles repeatedly at the same HEAD #then the soul line appears exactly once [1310.65ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [1011.42ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [874.09ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [1316.29ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [1201.44ms]
+
+ 30 pass
+ 0 fail
+ 96 expect() calls
+Ran 30 tests across 6 files. [31.70s]

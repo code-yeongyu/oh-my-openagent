@@ -8,5 +8,6 @@ export function spawnFakeChild(env?: NodeJS.ProcessEnv): ChildProcess {
     cwd: process.cwd(),
     env: env ?? process.env,
     stdio: ["pipe", "pipe", "pipe"],
+    detached: process.platform !== "win32",
   })
 }

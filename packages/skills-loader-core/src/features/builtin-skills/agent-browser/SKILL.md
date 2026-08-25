@@ -383,6 +383,7 @@ agent-browser --session-name twitter open twitter.com
 
 ### Persistent Profiles
 Persists cookies, localStorage, IndexedDB, service workers, cache, login sessions across browser restarts.
+NEVER point `--profile` or `AGENT_BROWSER_PROFILE` at the user's real/main browser profile when any cookie, cache, or site-data clear or reset might happen (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, `cookies clear`, "clear browsing data") — that wipes their logged-in state everywhere. If the task needs the main profile's login state, clone the profile directory first (`rsync -a <profile>/ <tmp-clone>/`) and pass the clone as `--profile`; run any clearing on the clone only.
 ```bash
 agent-browser --profile ~/.myapp-profile open myapp.com
 # Or via env var

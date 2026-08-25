@@ -1,0 +1,35 @@
+# Hierarchy GREEN audit
+
+## Exact scenario
+
+```bash
+test -f packages/memory-core/AGENTS.md
+test ! -f packages/omo-opencode/AGENTS.md
+grep -Fq '[`memory-core/`](memory-core/AGENTS.md)' packages/AGENTS.md
+test "$(find packages/memory-core -name AGENTS.md | wc -l | tr -d ' ')" = 1
+for d in packages/*; do
+  files=$(find "$d" -type f -not -path "*/node_modules/*" -not -path "*/dist/*" | wc -l)
+  if [ "$files" -ge 15 ] && [ ! -f "$d/AGENTS.md" ] && [ ! -f "$d/src/AGENTS.md" ]; then
+    exit 1
+  fi
+done
+```
+
+## Observed
+
+```
+HIERARCHY_GREEN
+```
+
+The selected map is exact:
+
+- `packages/memory-core/AGENTS.md` exists.
+- `packages/AGENTS.md` links to it.
+- No redundant `packages/omo-opencode/AGENTS.md` was created.
+- `memory-core` has one package-scoped instruction file, not nested duplicates.
+- Every package with at least 15 files has package-root or source-root coverage.
+
+## Why this is enough
+
+The same structural boundary that failed in `hierarchy-red.txt` now passes,
+while the negative assertions prove init-deep did not create redundant files.

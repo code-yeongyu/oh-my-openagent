@@ -1,0 +1,4 @@
+real_db=<home>/.local/share/opencode/opencode.db before=<redacted-count>
+fake_llm_port=63509
+session_id=<redacted-session-id>
+after=<redacted-count> unchanged=yes

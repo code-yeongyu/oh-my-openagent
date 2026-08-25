@@ -11,6 +11,26 @@ export type CompletionValidation =
   | { status: "dirty_uncommitted"; detail: string }
   | { status: "failed"; detail: string }
 
+export type DreamTokenBudgetValidation =
+  | { status: "valid"; totalTokens: number; targetTokens: number }
+  | { status: "budget_not_met"; totalTokens: number; targetTokens: number; detail: string }
+
+export function validateDreamTokenBudget(input: {
+  readonly origin: "manual" | "idle" | "shutdown" | "pressure"
+  readonly totalTokens: number
+  readonly targetTokens: number
+}): DreamTokenBudgetValidation {
+  if (input.origin !== "pressure" || input.totalTokens < input.targetTokens) {
+    return { status: "valid", totalTokens: input.totalTokens, targetTokens: input.targetTokens }
+  }
+  return {
+    status: "budget_not_met",
+    totalTokens: input.totalTokens,
+    targetTokens: input.targetTokens,
+    detail: `Committed system/ estimate is ${input.totalTokens} tokens; pressure dream target is below ${input.targetTokens} tokens`,
+  }
+}
+
 export async function validateCompletion(
   worktree: ReflectionWorktree,
   recordedBase: string,

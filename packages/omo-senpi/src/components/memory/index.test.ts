@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
+import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor, resolveMemoryConfig } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import { MEMORY_WRITE_UPDATED_ENTRY_TYPE } from "./memory-notice-wiring"
+import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { cwd: string; memoryHome: string } {
@@ -51,6 +55,19 @@ describe("createMemoryComponent", () => {
     expect(resolveMemoryConfig({ config: {}, diagnostics: [], layers: [], sources: [] })).toEqual(memorySettings())
   })
 
+  test("#given no memory key in config #when resolved through adapter fallback #then it matches parsing {} through the schema", () => {
+    // given
+    const emptyConfigResult = { config: {}, diagnostics: [] as const, layers: [] as const, sources: [] as const }
+    const schemaParsed = OmoMemorySettingsSchema.parse({})
+
+    // when
+    const fallbackResolved = resolveMemoryConfig(emptyConfigResult)
+
+    // then
+    expect(fallbackResolved).toEqual(schemaParsed)
+    expect(fallbackResolved).toEqual(memorySettings())
+  })
+
   test("#given disabled config or a global/component disable flag #when registered #then the host registration surface is byte-identical", () => {
     for (const scenario of [
       { memory: memorySettings({ enabled: false }), flags: {} },
@@ -68,6 +85,36 @@ describe("createMemoryComponent", () => {
     }
   })
 
+  test("#given a memory child sentinel in env #when registered #then memory registers nothing so a forked child cannot recurse", () => {
+    // A fork-mode child loads extensions (the request prefix must match its parent for the provider
+    // cache to hit), so --no-extensions no longer protects against recursion. The sentinel that the
+    // child already carries must therefore act as a hard disable.
+    for (const sentinel of ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"]) {
+      const pi = new MemoryFakeExtensionAPI()
+      const ctx = componentContext()
+
+      createMemoryComponent({
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        env: { [sentinel]: "1" },
+      }).register(pi, ctx)
+
+      expect({ sentinel, handlers: pi.handlers, tools: pi.tools, commands: pi.commands, renderers: pi.entryRenderers }).toEqual({
+        sentinel, handlers: [], tools: [], commands: [], renderers: [],
+      })
+    }
+  })
+
+  test("#given the sentinel is absent or not exactly 1 #when registered #then memory stays enabled", () => {
+    for (const env of [{}, { SENPI_MEMORY_REFLECTION: "0" }, { SENPI_MEMORY_REFLECTION: "" }]) {
+      const pi = new MemoryFakeExtensionAPI()
+      const ctx = componentContext()
+
+      createMemoryComponent({ loadConfig: () => loadedMemoryConfig(memorySettings()), env }).register(pi, ctx)
+
+      expect(pi.handlers.length).toBeGreaterThan(0)
+    }
+  })
+
   test("#given enabled memory #when session_start binds an auto identity #then it appends a hidden binding and performs no filesystem writes", async () => {
     const { cwd, memoryHome } = fixture()
     const pi = new MemoryFakeExtensionAPI()
@@ -78,12 +125,20 @@ describe("createMemoryComponent", () => {
       loadConfig: () => loadedMemoryConfig(memorySettings()),
       now: () => 123,
       resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
     }).register(pi, ctx)
 
     await pi.dispatch("session_start", {}, sessionContext({ notifications }))
 
     expect(pi.entryRenderers.map((entry) => entry.customType)).toEqual([
       "senpi-memory.reflection-completion",
+      "senpi-memory.reflection-launched",
+      "senpi-memory.reflection-summary",
+      "senpi-memory.health",
+      SOUL_UPDATED_ENTRY_TYPE,
+      MEMORY_WRITE_UPDATED_ENTRY_TYPE,
       MEMORY_BINDING_CUSTOM_TYPE,
     ])
     // Direct registration is the default surface so memory always works; the exposure-search MCP
@@ -96,7 +151,7 @@ describe("createMemoryComponent", () => {
     }])
     expect(existsSync(memoryHome)).toBe(false)
     expect(notifications).toEqual([])
-    await pi.dispatch("session_shutdown", {}, sessionContext())
+    memoryModuleSupervisor.release()
   })
 
   test("#given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding", async () => {

@@ -1,0 +1,45 @@
+120 |   test("#given a publicly known model routed through an unknown gateway provider #when masked #then the model id is exported while the provider stays custom", () => {
+121 |     // given: users route shipped models through OpenRouter, LiteLLM, or a self-hosted gateway.
+122 |     // The gateway name is user-configured and private; the model id is a public product name.
+123 |     // when/then: the private half is masked and the public half survives, so the dashboard can
+124 |     // read real model preference instead of a wall of `custom/custom`.
+125 |     expect(maskProviderAndModel("openrouter", "claude-opus-5")).toEqual({
+                                                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "model_id": "claude-opus-5",
++   "model_id": "custom",
+    "provider": "custom",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/telemetry-model-id-disclosure/packages/omo-senpi/src/components/telemetry/product-identity.test.ts:125:65)
+(fail) OmO Native product identity > #given a publicly known model routed through an unknown gateway provider #when masked #then the model id is exported while the provider stays custom [0.15ms]
+(pass) OmO Native product identity > #given a private or fine-tuned model name #when masked #then it never leaves the machine regardless of provider [0.08ms]
+158 |     // then: no executable rung is exportable only as custom/custom - that is what makes the
+159 |     // per-country category-model insight readable instead of a wall of `custom`
+160 |     expect(collapsed).toEqual([])
+161 |     // and: a public model id is exported even through a provider that does not ship it, because the
+162 |     // id is a product name rather than user-authored text
+163 |     expect(maskProviderAndModel("deepseek", "claude-opus-5").model_id).toBe("claude-opus-5")
+                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: "claude-opus-5"
+Received: "custom"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/telemetry-model-id-disclosure/packages/omo-senpi/src/components/telemetry/product-identity.test.ts:163:72)
+(fail) OmO Native product identity > #given every provider and model rung in CATEGORY_FALLBACK_CHAINS #when masked #then no shipped rung collapses to custom, while an arbitrary user provider and model still mask to custom [0.27ms]
+(pass) OmO Native product identity > #given senpi-task builtins #when telemetry allowlists are loaded #then names exactly match imported sources [0.11ms]
+(pass) OmO Native product identity > #given the tracked-call cap #when the widest wave histogram is encoded #then it stays inside the 64 character privacy limit [0.11ms]
+(pass) OmO Native product identity > #given the native event schemas #when inspected #then delegation_completed and category_config exist with exactly the planned property sets and enum vocabularies [0.21ms]
+(pass) OmO Native product identity > #given the shared schema version #when the native clients are configured #then one exported constant carries it [0.07ms]
+(pass) OmO Native product identity > #given static telemetry inventories #when inspected #then they and every property allowlist are frozen [0.21ms]
+
+ 10 pass
+ 4 fail
+ 286 expect() calls
+Ran 14 tests across 1 file. [2.86s]

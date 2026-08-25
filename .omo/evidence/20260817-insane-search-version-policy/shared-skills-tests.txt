@@ -1,0 +1,116 @@
+bun test v1.3.12 (700fc117)
+
+packages/shared-skills/materialize-frontend-refs.test.ts:
+[materialize] wrote 148 frontend reference files from submodules
+(pass) materialize-frontend-refs > materializes the full third-party reference set when submodules are present [1.08ms]
+(pass) materialize-frontend-refs > reproduces every brand design file and the ui-ux-db scripts [0.19ms]
+(pass) materialize-frontend-refs > materializes the designpowers reference corpus [0.29ms]
+(pass) materialize-frontend-refs > materialized designpowers skills have YAML-safe frontmatter [4.45ms]
+(pass) materialize-frontend-refs > materializes designpowers skills as references instead of nested skill entrypoints [0.28ms]
+(pass) materialize-frontend-refs > recognizes upstream skill sources across platform path separators [0.08ms]
+(pass) materialize-frontend-refs > materializes every taste-skill artifact byte-identical to its upstream source [0.19ms]
+(pass) materialize-frontend-refs > materialized brand reference is verbatim upstream content [0.19ms]
+(pass) materialize-frontend-refs > missing submodule is a soft skip in non-strict mode [0.09ms]
+
+packages/shared-skills/upstreams.test.ts:
+(pass) frontend upstream provenance submodules > declares all 4 frontend content upstreams [0.12ms]
+(pass) frontend upstream provenance submodules > every submodule path is under packages/shared-skills/upstreams/ [0.07ms]
+(pass) frontend upstream provenance submodules > no submodule path references a skills/ directory [0.10ms]
+
+packages/shared-skills/depersonalization-gate.test.ts:
+(pass) #given the vendored shared skills #when the de-personalization gate runs > #then the cleaned ultimate-browsing + ulw-research tree has zero violations [19.20ms]
+(pass) #given the vendored shared skills #when the de-personalization gate runs > #then a planted personal token (jobdori) is caught [1.24ms]
+(pass) #given the vendored shared skills #when the de-personalization gate runs > #then a credential literal and home path are caught but a kept tier name is not [0.44ms]
+
+packages/shared-skills/ultimate-browsing-runtime-pins.test.ts:
+(pass) ultimate-browsing Tier-2 runtime pins > #given the CloakBrowser pin > #then ATTRIBUTION.md pins the expected version [0.35ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the CloakBrowser pin > #then every chrome-stealth.md occurrence uses the same version [0.14ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the agent-browser pin > #then ATTRIBUTION.md pins the expected version [0.07ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the agent-browser pin > #then every chrome-stealth.md occurrence uses the same version [0.11ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the two documents together > #then no stale version string survives anywhere [0.07ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the Playwright template manifest > #then the playwright range lower bound is current [0.07ms]
+
+packages/shared-skills/provenance-gate.test.ts:
+(pass) DMCA provenance gate > no third-party-derived reference file is committed [13.71ms]
+[materialize] wrote 148 frontend reference files from submodules
+(pass) DMCA provenance gate > materialization makes every third-party reference exist on disk [38.96ms]
+[materialize] wrote 148 frontend reference files from submodules
+(pass) DMCA provenance gate > designpowers skills match upstream after frontmatter normalization [24.87ms]
+(pass) DMCA provenance gate > each ATTRIBUTION pin equals the live submodule HEAD [47.18ms]
+(pass) DMCA provenance gate > no submodule gitlink lives under any shipped skills/ directory [0.27ms]
+
+packages/shared-skills/frontend-thirdparty-manifest.test.ts:
+(pass) frontend third-party manifest partition > removes every third-party-derived file from the committed tree [0.12ms]
+(pass) frontend third-party manifest partition > keeps every project-original design file tracked [0.07ms]
+(pass) frontend third-party manifest partition > unignores every project-original design file [0.09ms]
+(pass) frontend third-party manifest partition > no ui-ux-db file is committed [0.08ms]
+(pass) frontend third-party manifest partition > no designpowers vendor file is committed [0.02ms]
+(pass) frontend third-party manifest partition > third-party manifest covers design brand, taste-skill, ui-ux-db, and designpowers [0.16ms]
+
+packages/shared-skills/shared-skills-root-path.test.ts:
+(pass) sharedSkillsRootPath > #given the module beside its own skills directory #when the root is resolved #then the sibling directory wins [0.03ms]
+(pass) sharedSkillsRootPath > #given a bundle one level below the skills directory #when the root is resolved #then the parent directory is used [14.96ms]
+(pass) sharedSkillsRootPath > #given the Codex marketplace layout #when the root is resolved #then the skills directory two levels up is used [0.78ms]
+(pass) sharedSkillsRootPath > #given a nearer skills directory than the marketplace one #when the root is resolved #then the nearest wins [0.74ms]
+(pass) sharedSkillsRootPath > #given no skills directory beside or above the module #when the root is resolved #then the sibling path is still returned [0.42ms]
+
+packages/shared-skills/skills/visual-qa/scripts/png-decode.test.ts:
+(pass) decodePng > #given an encoded RGBA image #when decoded #then dimensions and first pixel round-trip [1.00ms]
+(pass) decodePng > #given a fully opaque image #when decoded #then it has no transparent pixels [0.10ms]
+(pass) decodePng > #given a semi-transparent image #when decoded #then it reports transparent pixels [0.14ms]
+(pass) decodePng > #given a non-PNG buffer #when decoded #then it throws [0.05ms]
+
+packages/shared-skills/skills/visual-qa/scripts/tui-grid.test.ts:
+(pass) checkTui > #given ASCII lines within the width #when checked #then there is no overflow [0.66ms]
+(pass) checkTui > #given a line wider than the expected columns #when checked #then it is flagged as overflow [0.11ms]
+(pass) checkTui > #given CJK text #when checked #then wide characters count as two columns [0.09ms]
+(pass) checkTui > #given a box whose CJK content is wider than its border #when checked #then borders are misaligned [0.10ms]
+(pass) checkTui > #given a well-formed box #when checked #then borders are aligned [0.05ms]
+(pass) checkTui > #given text with ANSI color codes #when checked #then ANSI is detected and ignored for width [0.06ms]
+
+packages/shared-skills/skills/visual-qa/scripts/east-asian-width.test.ts:
+(pass) charWidth > #given an ASCII letter #when measured #then it is one column [0.46ms]
+(pass) charWidth > #given a Hangul syllable #when measured #then it is two columns [0.09ms]
+(pass) charWidth > #given a CJK ideograph #when measured #then it is two columns [0.05ms]
+(pass) charWidth > #given a fullwidth Latin letter #when measured #then it is two columns [0.05ms]
+(pass) charWidth > #given a halfwidth katakana #when measured #then it is one column [0.05ms]
+(pass) charWidth > #given a combining diacritic #when measured #then it is zero columns [0.07ms]
+(pass) charWidth > #given a zero-width space #when measured #then it is zero columns [0.05ms]
+(pass) charWidth > #given an emoji #when measured #then it is two columns [0.07ms]
+(pass) stringWidth > #given an ASCII string #when measured #then width equals character count [0.04ms]
+(pass) stringWidth > #given Hangul text #when measured #then each syllable counts as two [0.04ms]
+(pass) stringWidth > #given CJK text #when measured #then each ideograph counts as two [0.04ms]
+(pass) stringWidth > #given a base letter plus a combining mark #when measured #then it is one column [0.04ms]
+(pass) stringWidth > #given mixed ASCII and CJK #when measured #then widths add up [0.05ms]
+
+packages/shared-skills/skills/visual-qa/scripts/ansi.test.ts:
+(pass) stripAnsi > #given an ANSI-wrapped string #when stripped #then escape codes are removed
+(pass) stripAnsi > #given a plain string #when stripped #then it is unchanged [0.24ms]
+(pass) hasAnsi > #given a string with ANSI codes #when checked #then it is true [0.02ms]
+(pass) hasAnsi > #given a plain string #when checked #then it is false [0.06ms]
+
+packages/shared-skills/skills/visual-qa/scripts/image-diff.test.ts:
+(pass) diffImages > #given two identical images #when diffed #then similarity is 100 with no hotspots
+(pass) diffImages > #given two fully different images #when diffed #then similarity is 0 with hotspots [0.45ms]
+(pass) diffImages > #given images of different sizes #when diffed #then dimensionsMatch is false [0.05ms]
+(pass) diffImages > #given a transparent reference and an opaque actual #when diffed #then alpha is flagged [0.05ms]
+(pass) diffImages > #given a single changed pixel #when diffed #then one hotspot marks its grid cell [0.10ms]
+
+packages/shared-skills/skills/visual-qa/scripts/cli.test.ts:
+(pass) runImageDiff > #given two identical PNG files #when diffed #then similarity is 100 [0.65ms]
+(pass) runImageDiff > #given missing arguments #when diffed #then it throws a usage error [0.08ms]
+(pass) runTuiCheck > #given a CJK capture file #when checked #then widths count wide characters [0.15ms]
+(pass) run dispatch > #given an unknown command #when run #then it throws [0.14ms]
+(pass) cli entry > #given the Node bundle is spawned for image-diff without Bun on PATH #when it runs #then it prints JSON and exits zero [31.31ms]
+
+packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.test.ts:
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project provides typescript #then it resolves the caller's typescript and exits 0 [180.77ms]
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when a checked file violates the rules #then violations are still reported with exit 1 [80.95ms]
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project genuinely lacks typescript #then it fails with a clear error and exit 2 [30.99ms]
+
+ 77 pass
+ 0 fail
+ 586 expect() calls
+Ran 77 tests across 14 files. [694.00ms]
+
+Evidence-bound staged tree: 42189ed4dc6aecbe5407aa381d37150bbc65fbd5

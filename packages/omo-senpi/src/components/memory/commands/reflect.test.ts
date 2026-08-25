@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rm } from "node:fs/promises"
 
-import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import { fakeCommandContext, fakeDeps, invoke, tempIdentity } from "./commands.test-support"
+import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
+import { fakeCommandContext, fakeDeps, invoke, tempIdentity, TEST_IDENTITY } from "./commands.test-support"
 import { registerReflectCommand } from "./reflect"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function harness(overrides: Parameters<typeof fakeDeps>[1] = {}) {
@@ -111,5 +111,48 @@ describe("/reflect", () => {
     // then
     expect(deps.reflectionRequests).toHaveLength(0)
     expect(text).toContain("not bound")
+  })
+
+  test("#given reflection.enabled false #when invoked #then an error is returned and no request is submitted", async () => {
+    // given
+    const { deps, pi, ctx } = await harness({
+      loadSettings: () => ({
+        settings: memorySettings({
+          reflection: { enabled: false, trigger: { step_count: 25, on_compaction: true }, merge: "auto", category: "quick", timeout_minutes: 15, sandbox: "auto" },
+        }),
+        configPath: "/tmp/omo.jsonc",
+      }),
+    })
+
+    // when
+    const text = await invoke(pi, "reflect", "", ctx)
+
+    // then
+    expect(deps.reflectionRequests).toHaveLength(0)
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+
+  test("#given reflection enabled in base but disabled by per-agent override #when invoked #then an error is returned and no request is submitted", async () => {
+    // given
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    const deps = fakeDeps(identity, {
+      loadSettings: () => ({
+        settings: memorySettings({
+          agents: { [TEST_IDENTITY]: { reflection: { enabled: false } } },
+        }),
+        configPath: "/tmp/omo.jsonc",
+      }),
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    registerReflectCommand(pi, deps)
+    const ctx = fakeCommandContext()
+
+    // when
+    const text = await invoke(pi, "reflect", "", ctx)
+
+    // then
+    expect(deps.reflectionRequests).toHaveLength(0)
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
   })
 })

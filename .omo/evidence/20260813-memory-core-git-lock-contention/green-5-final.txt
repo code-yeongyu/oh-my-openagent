@@ -1,0 +1,10 @@
+mc
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.11ms]
+
+ 488 pass
+ 0 fail
+ 4096 expect() calls
+Ran 488 tests across 60 files. [71.88s]
+
+tc
+$ tsgo --noEmit -p tsconfig.json

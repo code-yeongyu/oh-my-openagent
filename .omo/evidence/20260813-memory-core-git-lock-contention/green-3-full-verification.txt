@@ -1,0 +1,21 @@
+memory_core
+(pass) reflection persona asset > #given the commit-contract section #when trailer keys are parsed #then they equal exactly Generated-By and Agent-ID [0.14ms]
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.10ms]
+
+ 488 pass
+ 0 fail
+ 4096 expect() calls
+Ran 488 tests across 60 files. [73.47s]
+
+memory_component
+(pass) run finalization publication races > #given attempt two and a stale attempt-one outcome #when current attempt is confirmed dead #then stale outcome is ignored [228.32ms]
+
+ 613 pass
+ 0 fail
+ 1724 expect() calls
+Ran 613 tests across 101 files. [87.56s]
+
+typecheck
+$ tsgo --noEmit -p tsconfig.json
+src/git/repo.test.ts(259,78): error TS2739: Type '{ name: string; email: string; }' is missing the following properties from type 'GitCommitAuthor': agentId, authorName
+EXIT=0

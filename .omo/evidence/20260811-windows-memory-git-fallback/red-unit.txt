@@ -1,0 +1,1117 @@
+$ bun test packages/memory-core/src/git/exec.test.ts  # dev exec.ts @ ee81ab7c5 + PR #6711 test overlay
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/git/exec.test.ts:
+(pass) createNodeGitExec > #given a spawn cwd that does not exist > #when git runs #then it does NOT report git as missing from PATH [3.58ms]
+55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "status" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:66:33)
+(fail) createNodeGitExec > #given a spawn cwd that does not exist > #when the bare runner reports the missing-cwd result #then Windows fallbacks are not attempted [0.40ms]
+(pass) createNodeGitExec > #given a cwd that exists but no git binary on PATH > #when git runs #then GitNotFoundError fires [0.33ms]
+55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:94:31)
+(fail) createNodeGitExec > #given Git resolves on PATH #when Windows roots exist #then bare Git keeps precedence [0.20ms]
+105 |       throw original
+106 |     }, "linux")
+107 | 
+108 |     await expect(
+109 |       exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
+110 |     ).rejects.toBe(original)
+                    ^
+error: expect(received).toBe(expected)
+
+Expected: 21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+23 | }
+24 | 
+25 | function missingGitError(): GitNotFoundError {
+26 |   return new GitNotFoundError({ cause: spawnError("ENOENT") })
+              ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at missingGitError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:26:10)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:101:22)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: ENOENT
+ code: "ENOENT"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at missingGitError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:26:40)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:101:22)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:110:15)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:109:12)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:110:15)
+(fail) createNodeGitExec > #given a non-Windows platform and missing Git #when git runs #then Windows roots are not attempted [0.34ms]
+120 |         throw failure
+121 |       })
+122 | 
+123 |       await expect(
+124 |         exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
+125 |       ).rejects.toBe(failure)
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: 111 |     expect(attempts).toEqual(["git"])
+112 |   })
+113 | 
+114 |   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
+115 |     test(`#given bare Git reports GitNotFoundError caused by ${code} #when Windows roots exist #then the error propagates without fallback`, async () => {
+116 |       const failure = new GitNotFoundError({ cause: spawnError(code) })
+                            ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:116:23)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EACCES
+ code: "EACCES"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:116:53)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:125:17)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:124:14)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:125:17)
+(fail) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EACCES #when Windows roots exist #then the error propagates without fallback [0.25ms]
+120 |         throw failure
+121 |       })
+122 | 
+123 |       await expect(
+124 |         exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
+125 |       ).rejects.toBe(failure)
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: 111 |     expect(attempts).toEqual(["git"])
+112 |   })
+113 | 
+114 |   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
+115 |     test(`#given bare Git reports GitNotFoundError caused by ${code} #when Windows roots exist #then the error propagates without fallback`, async () => {
+116 |       const failure = new GitNotFoundError({ cause: spawnError(code) })
+                            ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:116:23)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EPERM
+ code: "EPERM"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:116:53)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:125:17)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:124:14)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:125:17)
+(fail) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EPERM #when Windows roots exist #then the error propagates without fallback [0.21ms]
+120 |         throw failure
+121 |       })
+122 | 
+123 |       await expect(
+124 |         exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
+125 |       ).rejects.toBe(failure)
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: 111 |     expect(attempts).toEqual(["git"])
+112 |   })
+113 | 
+114 |   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
+115 |     test(`#given bare Git reports GitNotFoundError caused by ${code} #when Windows roots exist #then the error propagates without fallback`, async () => {
+116 |       const failure = new GitNotFoundError({ cause: spawnError(code) })
+                            ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:116:23)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EIO
+ code: "EIO"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:116:53)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:125:17)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:124:14)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:125:17)
+(fail) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EIO #when Windows roots exist #then the error propagates without fallback [0.20ms]
+55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:139:31)
+(fail) createNodeGitExec > #given UNC, device-prefix, and root-relative roots #when fallback runs #then only a drive-qualified local root is attempted [0.20ms]
+161 |     await expect(exec.run(["--version"], execOptions({
+162 |       ProgramFiles: "C:\\Program Files",
+163 |       ProgramW6432: "D:\\Program Files",
+164 |       "ProgramFiles(x86)": "E:\\Program Files (x86)",
+165 |       LOCALAPPDATA: "F:\\User Data",
+166 |     }))).rejects.toBe(original)
+                       ^
+error: expect(received).toBe(expected)
+
+Expected: 21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+23 | }
+24 | 
+25 | function missingGitError(): GitNotFoundError {
+26 |   return new GitNotFoundError({ cause: spawnError("ENOENT") })
+              ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at missingGitError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:26:10)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:154:22)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: ENOENT
+ code: "ENOENT"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at missingGitError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:26:40)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:154:22)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:166:18)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:161:23)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:166:18)
+(fail) createNodeGitExec > #given distinct standard roots #when every executable is absent #then candidates are attempted in deterministic order [0.20ms]
+184 | 
+185 |     await expect(exec.run(["--version"], execOptions({
+186 |       ProgramFiles: "C:\\Program Files",
+187 |       ProgramW6432: "c:\\PROGRAM FILES",
+188 |       "ProgramFiles(x86)": "D:\\Program Files (x86)",
+189 |     }))).rejects.toBe(original)
+                       ^
+error: expect(received).toBe(expected)
+
+Expected: 21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+23 | }
+24 | 
+25 | function missingGitError(): GitNotFoundError {
+26 |   return new GitNotFoundError({ cause: spawnError("ENOENT") })
+              ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at missingGitError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:26:10)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:178:22)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: ENOENT
+ code: "ENOENT"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at missingGitError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:26:40)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:178:22)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:189:18)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:185:23)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:189:18)
+(fail) createNodeGitExec > #given duplicate standard roots #when fallback runs #then equivalent candidates are attempted once [0.19ms]
+55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:208:31)
+(fail) createNodeGitExec > #given the first fallback executable disappears #when its spawn yields ENOENT #then the next candidate is attempted [0.16ms]
+230 |       })
+231 | 
+232 |       await expect(exec.run(["--version"], execOptions({
+233 |         ProgramFiles: "C:\\Program Files",
+234 |         ProgramW6432: "D:\\Program Files",
+235 |       }))).rejects.toBe(failure)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 219 |   })
+220 | 
+221 |   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
+222 |     test(`#given a fallback reports GitNotFoundError caused by ${code} #when fallback runs #then the error propagates without trying later candidates`, async () => {
+223 |       const original = missingGitError()
+224 |       const failure = new GitNotFoundError({ cause: spawnError(code) })
+                            ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:224:23)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EACCES
+ code: "EACCES"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:224:53)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:235:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:232:25)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:235:20)
+(fail) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EACCES #when fallback runs #then the error propagates without trying later candidates [0.20ms]
+230 |       })
+231 | 
+232 |       await expect(exec.run(["--version"], execOptions({
+233 |         ProgramFiles: "C:\\Program Files",
+234 |         ProgramW6432: "D:\\Program Files",
+235 |       }))).rejects.toBe(failure)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 219 |   })
+220 | 
+221 |   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
+222 |     test(`#given a fallback reports GitNotFoundError caused by ${code} #when fallback runs #then the error propagates without trying later candidates`, async () => {
+223 |       const original = missingGitError()
+224 |       const failure = new GitNotFoundError({ cause: spawnError(code) })
+                            ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:224:23)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EPERM
+ code: "EPERM"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:224:53)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:235:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:232:25)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:235:20)
+(fail) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EPERM #when fallback runs #then the error propagates without trying later candidates [0.17ms]
+230 |       })
+231 | 
+232 |       await expect(exec.run(["--version"], execOptions({
+233 |         ProgramFiles: "C:\\Program Files",
+234 |         ProgramW6432: "D:\\Program Files",
+235 |       }))).rejects.toBe(failure)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 219 |   })
+220 | 
+221 |   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
+222 |     test(`#given a fallback reports GitNotFoundError caused by ${code} #when fallback runs #then the error propagates without trying later candidates`, async () => {
+223 |       const original = missingGitError()
+224 |       const failure = new GitNotFoundError({ cause: spawnError(code) })
+                            ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:224:23)
+
+17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EIO
+ code: "EIO"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:224:53)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:235:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:232:25)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:235:20)
+(fail) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EIO #when fallback runs #then the error propagates without trying later candidates [0.17ms]
+249 |       })
+250 | 
+251 |       await expect(exec.run(["--version"], execOptions({
+252 |         ProgramFiles: "C:\\Program Files",
+253 |         ProgramW6432: "D:\\Program Files",
+254 |       }))).rejects.toBe(failure)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EACCES
+ code: "EACCES"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:243:23)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:254:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:251:25)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:254:20)
+(fail) createNodeGitExec > #given a fallback spawn EACCES #when fallback runs #then the error propagates without trying later candidates [0.19ms]
+249 |       })
+250 | 
+251 |       await expect(exec.run(["--version"], execOptions({
+252 |         ProgramFiles: "C:\\Program Files",
+253 |         ProgramW6432: "D:\\Program Files",
+254 |       }))).rejects.toBe(failure)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EPERM
+ code: "EPERM"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:243:23)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:254:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:251:25)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:254:20)
+(fail) createNodeGitExec > #given a fallback spawn EPERM #when fallback runs #then the error propagates without trying later candidates [0.18ms]
+249 |       })
+250 | 
+251 |       await expect(exec.run(["--version"], execOptions({
+252 |         ProgramFiles: "C:\\Program Files",
+253 |         ProgramW6432: "D:\\Program Files",
+254 |       }))).rejects.toBe(failure)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EIO
+ code: "EIO"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:243:23)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:254:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:251:25)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:254:20)
+(fail) createNodeGitExec > #given a fallback spawn EIO #when fallback runs #then the error propagates without trying later candidates [0.23ms]
+267 |     })
+268 | 
+269 |     await expect(exec.run(["--version"], execOptions({
+270 |       ProgramFiles: "C:\\Program Files",
+271 |       ProgramW6432: "D:\\Program Files",
+272 |     }))).rejects.toBe(timeout)
+                       ^
+error: expect(received).toBe(expected)
+
+Expected: 256 |     })
+257 |   }
+258 | 
+259 |   test("#given a fallback timeout #when fallback runs #then the timeout propagates without trying later candidates", async () => {
+260 |     const original = missingGitError()
+261 |     const timeout = new GitTimeoutError(["--version"], 5000)
+                          ^
+GitTimeoutError: git --version timed out after 5000ms
+      argv: [ "--version" ],
+ timeoutMs: 5000,
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:261:21)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:272:18)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:269:23)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:272:18)
+(fail) createNodeGitExec > #given a fallback timeout #when fallback runs #then the timeout propagates without trying later candidates [0.22ms]
+55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "status" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:286:31)
+(fail) createNodeGitExec > #given a fallback nonzero result #when fallback runs #then the result returns without trying later candidates [0.15ms]
+300 |       throw failure
+301 |     })
+302 | 
+303 |     await expect(
+304 |       exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
+305 |     ).rejects.toBe(failure)
+                    ^
+error: expect(received).toBe(expected)
+
+Expected: 17 |   stdout: "git version test\n",
+18 |   stderr: "",
+19 | }
+20 | 
+21 | function spawnError(code: string): NodeJS.ErrnoException {
+22 |   return Object.assign(new Error(`spawn failed: ${code}`), { code })
+                                ^
+error: spawn failed: EACCES
+ code: "EACCES"
+
+      at spawnError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:22:28)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:296:21)
+
+Received: 55 |                 stdout: "",
+56 |                 stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
+57 |               })
+58 |               return
+59 |             }
+60 |             reject(new GitNotFoundError({ cause: error }))
+                        ^
+GitNotFoundError: Git is required for memory storage but was not found on PATH.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:60:20)
+      at applyHandlers (node:events:64:20)
+      at emitError (node:events:44:27)
+      at <anonymous> (node:child_process:756:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:305:15)
+
+20 | 
+21 | export function createNodeGitExec(): GitExec {
+22 |   return {
+23 |     run(argv, options) {
+24 |       return new Promise((resolve, reject) => {
+25 |         const child = spawn("git", [...argv], {
+                           ^
+error: Executable not found in $PATH: "git"
+      path: "git",
+     errno: -2,
+   syscall: "spawn git",
+ spawnargs: [ "--version" ],
+      code: "ENOENT"
+
+      at spawn (node:child_process:714:35)
+      at spawn (node:child_process:18:39)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:25:23)
+      at new Promise (1:11)
+      at run (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.ts:24:14)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:304:12)
+
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/memory-core/src/git/exec.test.ts:305:15)
+(fail) createNodeGitExec > #given bare Git fails with a non-ENOENT error #when Windows roots exist #then the error propagates without fallback [0.18ms]
+
+ 2 pass
+ 19 fail
+ 17 expect() calls
+Ran 21 tests across 1 file. [109.00ms]

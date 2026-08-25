@@ -1,0 +1,41 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:
+(pass) createAutoRetryHelpers > #given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted [7.53ms]
+(pass) createAutoRetryHelpers > #given an existing fallback result is pending #when the next retry is accepted as queued #then queued pending state supersedes the previous fallback [1.43ms]
+(pass) createAutoRetryHelpers > #given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085) [0.89ms]
+172 |     await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+173 |
+174 |     // then
+175 |     expect(promptCalls.count).toBe(1)
+176 |     expect(capturedBody?.messageID).toBe("msg_internal_continuation")
+177 |     expect(capturedBody?.parts).toEqual([
+                                      ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+      "id": "prt_internal_continuation",
+      "text":
+  "continue
+- <!-- OMO_INTERNAL_INITIATOR -->
+- <!-- OMO_RUNTIME_FALLBACK_RETRY -->"
++ <!-- OMO_INTERNAL_INITIATOR -->"
+  ,
+      "type": "text",
+    },
+  ]
+
+- Expected  - 2
++ Received  + 1
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:177:33)
+(fail) createAutoRetryHelpers > #given a reused internal continuation part #when auto retry dispatches a fallback #then it preserves the part identity and appends the fallback acknowledgement marker [4.24ms]
+(pass) createAutoRetryHelpers > #given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids [0.42ms]
+(pass) createAutoRetryHelpers > #given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed [0.44ms]
+(pass) createAutoRetryHelpers > #given stale internal abort marker #when stale session cleanup runs #then the marker is cleared [0.18ms]
+
+ 6 pass
+ 1 fail
+ 26 expect() calls
+Ran 7 tests across 1 file. [1.73s]

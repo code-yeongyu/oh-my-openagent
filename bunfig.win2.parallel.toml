@@ -1,0 +1,27 @@
+[test]
+preload = ["./test-env.ts", "./test-setup.ts"]
+pathIgnorePatterns = [
+  "dist/**",
+  "packages/web/**",
+  "packages/lsp-tools-mcp/**",
+  "packages/lsp-daemon/**",
+  "packages/omo-codex/plugin/**",
+  "packages/omo-codex/scripts/**",
+  "packages/shared-skills/upstreams/**",
+  "packages/omo-senpi/**",
+  "packages/omo-opencode/**",
+  "packages/memory-core/**",
+  "packages/senpi-task/src/runners/rpc-process.windows.test.ts",
+  "packages/utils/src/codegraph-provision-upgrade.test.ts",
+  "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts",
+  "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts",
+  "script/codex-installer-version.test.ts",
+  "packages/omo-native/test/payload.test.ts",
+  "packages/omo-codex/src/install/install-codex.test.ts",
+  "packages/shared-skills/provenance-gate.test.ts",
+  "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts",
+  "packages/senpi-task/src/dag/scheduler.test.ts",
+]
+
+[loader]
+".md" = "text"

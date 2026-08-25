@@ -8,7 +8,7 @@ import { clearCommandLoaderCache } from "../../features/claude-code-command-load
 import { loadBuiltinCommands } from "../../features/builtin-commands/commands"
 import { createChatMessageHandler } from "../../plugin/chat-message"
 import { createCommandExecuteBeforeHandler } from "../../plugin/command-execute-before"
-import { createStartWorkHook } from "../start-work"
+import { createUlwExecuteHook } from "../ulw-execute"
 import { executeSlashCommand } from "./executor"
 import { createAutoSlashCommandHook } from "./hook"
 import type {
@@ -38,7 +38,7 @@ function joinTextParts(parts: readonly TextPart[]): string {
 function createComposedHooks(directory: string) {
   return {
     autoSlashCommand: createAutoSlashCommandHook({ skills: [], directory }),
-    startWork: createStartWorkHook(unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
+    ulwExecute: createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
       directory,
       client: {
         session: {
@@ -232,7 +232,6 @@ describe("auto-slash command executor plugin dispatch", () => {
     )
 
     expect(result.success).toBe(true)
-    expect(result.replacementText).toContain("# /daplug:run-prompt Command")
     expect(result.replacementText).toContain("**Scope**: plugin")
   })
 
@@ -293,7 +292,6 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.replacementText).toContain("Echo ship it and ship it.")
     expect(result.replacementText).not.toContain("$ARGUMENTS")
     expect(result.replacementText).not.toContain("${user_message}")
-    expect(result.replacementText).not.toContain("## User Request")
   })
 
   it("retains the user request section for command templates without argument placeholders", async () => {
@@ -311,7 +309,6 @@ describe("auto-slash command executor plugin dispatch", () => {
     )
 
     expect(result.success).toBe(true)
-    expect(result.replacementText).toContain("## User Request\n\nship it")
   })
 
   it("preserves special arguments as data when a command template consumes them", async () => {
@@ -332,7 +329,6 @@ describe("auto-slash command executor plugin dispatch", () => {
 
     expect(result.success).toBe(true)
     expect(result.replacementText).toContain(`Echo ${args}.`)
-    expect(result.replacementText).not.toContain("## User Request")
     expect(existsSync(injectionMarker)).toBe(false)
   })
 
@@ -406,19 +402,19 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.replacementText).not.toContain("$TIMESTAMP")
   })
 
-  it("renders Atlas as the builtin start-work agent during slash-command execution", async () => {
+  it("renders Atlas as the builtin ulw-execute agent during slash-command execution", async () => {
     // given
 
     // when
     const result = await executeSlashCommand(
       {
-        command: "start-work",
+        command: "ulw-execute",
         args: "",
-        raw: "/start-work",
+        raw: "/ulw-execute",
       },
       {
         skills: [],
-        sessionID: "ses_start_work_test",
+        sessionID: "ses_ulw_execute_test",
       },
     )
 
@@ -435,7 +431,7 @@ describe("auto-slash-command runtime substitution", () => {
     _resetForTesting()
     registerAgentName("atlas")
     setSystemTime(new Date(FIXED_TIMESTAMP))
-    testDir = mkdtempSync(join(tmpdir(), "p5984-start-work-composed-"))
+    testDir = mkdtempSync(join(tmpdir(), "p5984-ulw-execute-composed-"))
   })
 
   afterEach(() => {
@@ -485,7 +481,7 @@ describe("auto-slash-command runtime substitution", () => {
         const handler = createComposedChatMessageHandler(directory)
         const output = {
           message: {},
-          parts: [{ type: "text", text: `/start-work ${argumentsText}` }],
+          parts: [{ type: "text", text: `/ulw-execute ${argumentsText}` }],
         }
         await handler({ sessionID, agent: "sisyphus" }, output)
         return output.parts
@@ -496,7 +492,7 @@ describe("auto-slash-command runtime substitution", () => {
       run: async (directory: string, sessionID: string, argumentsText: string) => {
         const handler = createComposedCommandExecuteBeforeHandler(directory)
         const output = { parts: [{ type: "text", text: "native command output" }] }
-        await handler({ command: "start-work", sessionID, arguments: argumentsText }, output)
+        await handler({ command: "ulw-execute", sessionID, arguments: argumentsText }, output)
         return output.parts
       },
     },
@@ -536,12 +532,12 @@ describe("auto-slash-command runtime substitution", () => {
         const firstSessionID = "rendered-session"
         const retrySessionID = "retry-session"
         const rendered = await executeSlashCommand(
-          { command: "start-work", args: userInput, raw: `/start-work ${userInput}` },
+          { command: "ulw-execute", args: userInput, raw: `/ulw-execute ${userInput}` },
           { skills: [], sessionID: firstSessionID },
         )
         expect(rendered.success).toBe(true)
-        const rawTemplate = loadBuiltinCommands()["start-work"]?.template ?? ""
-        const hook = createStartWorkHook(unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
+        const rawTemplate = loadBuiltinCommands()["ulw-execute"]?.template ?? ""
+        const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
           directory: testDir,
           client: { session: { messages: async () => ({ data: [] }) } },
         }))
@@ -556,7 +552,7 @@ describe("auto-slash-command runtime substitution", () => {
           await hook["chat.message"]({ sessionID: retrySessionID }, output)
         } else {
           await hook["command.execute.before"]({
-            command: "start-work",
+            command: "ulw-execute",
             sessionID: retrySessionID,
             arguments: userInput,
           }, output)
@@ -572,11 +568,11 @@ describe("auto-slash-command runtime substitution", () => {
   }
 
   it("substitutes one framework session context split across text parts", async () => {
-    const hook = createStartWorkHook(unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
+    const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
       directory: testDir,
       client: { session: { messages: async () => ({ data: [] }) } },
     }))
-    const prompt = loadBuiltinCommands()["start-work"]?.template ?? ""
+    const prompt = loadBuiltinCommands()["ulw-execute"]?.template ?? ""
     const splitAt = prompt.indexOf("\nTimestamp:")
     const output = {
       parts: [

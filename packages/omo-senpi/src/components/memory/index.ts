@@ -12,6 +12,8 @@ import {
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
+import { shutdownDeadlineAt, type ShutdownReason } from "./shutdown-drain"
+import { resolveMemorySettings } from "./identity-runtime"
 import { memoryModuleSupervisor } from "./supervisor"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
@@ -19,23 +21,6 @@ const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
 const MEMORY_DISABLED_FLAG = "omo-senpi-memory-disabled"
 const CONFIG_WATCH_RELOADED = "config-watch:reloaded"
 const RESTART_REQUIRED_NOTICE = "restart required to apply memory config change"
-
-const DEFAULT_MEMORY_CONFIG: OmoMemorySettings = {
-  enabled: true,
-  agent: "auto",
-  tool_exposure: "direct",
-  reflection: {
-    trigger: { step_count: 0, on_compaction: true },
-    merge: "auto",
-    category: "quick",
-    timeout_minutes: 15,
-    sandbox: "auto",
-  },
-  sync: { enabled: true },
-  search: { enabled: true },
-  compile_warn_tokens: 30000,
-  agents: {},
-}
 
 export type ResolvedMemoryConfig = OmoMemorySettings
 
@@ -79,7 +64,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       const cwd = resolveCwd()
       const bootConfig = resolveMemoryConfig(loadConfig({ cwd }))
-      if (!isEnabled(bootConfig, ctx)) return
+      if (!isEnabled(bootConfig, ctx, env)) return
 
       const missing = missingMemoryCapabilities(pi)
       if (missing.length > 0 || !hasMemoryCapabilities(pi)) {
@@ -104,7 +89,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
-        const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx)
+        const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx, env)
         for (const state of sessions.values()) {
           if (state.enabled === enabled || state.restartNotified) continue
           state.restartNotified = true
@@ -116,7 +101,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         const surface = readSessionSurface(eventCtx)
         wiring.clearStatus(eventCtx)
         const sessionConfig = resolveMemoryConfig(loadConfig({ cwd }))
-        const enabled = isEnabled(sessionConfig, ctx)
+        const enabled = isEnabled(sessionConfig, ctx, env)
         releaseSession(sessions.get(surface.id))
         const state: SessionState = {
           enabled,
@@ -145,11 +130,22 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         })
         memoryModuleSupervisor.acquire()
         pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding)
-        void wiring.afterBind(pi, surface.id, state.context, eventCtx)
+        // Bind-time reconcile floats past session_start by design, but its rejection must not
+        // float: an unhandled rejection is attributed to whatever code is running when it lands.
+        void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
+          ctx.logger.warn("memory bind-time reconcile failed", { error: String(error) })
+        })
       })
 
-      pi.on("session_shutdown", (_payload, eventCtx) => {
+      pi.on("session_shutdown", async (payload, eventCtx) => {
         const sessionId = readSessionSurface(eventCtx).id
+        // The drain runs BEFORE the session is released: its steps read the bound identity.
+        await wiring.onSessionShutdown({
+          reason: readShutdownReason(payload),
+          sessionId,
+          deadlineAt: shutdownDeadlineAt(now),
+          now,
+        })
         wiring.clearStatus(eventCtx)
         releaseSession(sessions.get(sessionId))
         sessions.delete(sessionId)
@@ -160,11 +156,26 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
 }
 
 export function resolveMemoryConfig(loaded: SenpiOmoConfigResult): ResolvedMemoryConfig {
-  return loaded.config.memory ?? DEFAULT_MEMORY_CONFIG
+  return resolveMemorySettings(loaded.config.memory)
 }
 
-function isEnabled(config: ResolvedMemoryConfig, ctx: ComponentContext): boolean {
+// A memory child carries one of these sentinels. Today the child also runs --no-extensions, so omo
+// never loads there; a fork-mode child cannot pass --no-extensions (its request prefix must match
+// the parent for the provider cache to hit), so the sentinel is the only thing standing between a
+// forked reflection and unbounded self-triggering recursion.
+const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
+
+export function isMemoryChildProcess(env: Record<string, string | undefined>): boolean {
+  return CHILD_SENTINELS.some((sentinel) => env[sentinel] === "1")
+}
+
+function isEnabled(
+  config: ResolvedMemoryConfig,
+  ctx: ComponentContext,
+  env: Record<string, string | undefined>,
+): boolean {
   return config.enabled
+    && !isMemoryChildProcess(env)
     && ctx.config.getFlag(GLOBAL_DISABLED_FLAG) !== true
     && ctx.config.getFlag(MEMORY_DISABLED_FLAG) !== true
 }
@@ -192,6 +203,15 @@ function readSessionSurface(value: unknown): SessionSurface {
 
 function isSessionUi(value: unknown): value is SessionUi {
   return isRecord(value) && typeof value.notify === "function"
+}
+
+const SHUTDOWN_REASONS: readonly ShutdownReason[] = ["quit", "reload", "new", "resume", "fork"]
+
+/** An unknown or absent reason drains conservatively: flush and enqueue, launch nothing. */
+function readShutdownReason(payload: unknown): ShutdownReason {
+  if (!isRecord(payload)) return "reload"
+  const reason = payload.reason
+  return SHUTDOWN_REASONS.find((candidate) => candidate === reason) ?? "reload"
 }
 
 function isOmoConfigReload(value: unknown): boolean {

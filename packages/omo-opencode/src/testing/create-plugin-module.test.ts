@@ -194,7 +194,7 @@ describe("createPluginModule()", () => {
       }
     })
 
-    it("#given sidebar is disabled #then startup does not write a TUI plugin entry", async () => {
+    it("#given sidebar is disabled #then startup still writes the TUI entry for BTW", async () => {
       // given
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
       const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-disabled-"))
@@ -212,7 +212,7 @@ describe("createPluginModule()", () => {
         } as Parameters<typeof pluginModule.server>[0])
 
         // then
-        expect(() => readFileSync(join(configDir, "tui.json"), "utf-8")).toThrow()
+        expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
       } finally {
         rmSync(configDir, { recursive: true, force: true })
         if (originalConfigDir === undefined) {

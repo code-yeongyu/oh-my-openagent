@@ -111,4 +111,50 @@ describe("buildRetryModelPayload", () => {
       variant: "medium",
     })
   })
+
+  test("should lower unsupported configured reasoning to reasoningEffort", () => {
+    // given
+    const model = "test-provider/test-model"
+    const agentSettings = { reasoning: "high" }
+
+    // when
+    const result = buildRetryModelPayload(model, agentSettings)
+
+    // then
+    expect(result).toEqual({
+      model: { providerID: "test-provider", modelID: "test-model" },
+      reasoningEffort: "high",
+    })
+  })
+
+  test("should preserve explicit reasoningEffort alongside an inline model variant", () => {
+    // given
+    const model = "openai/gpt-5.4 medium"
+    const agentSettings = { reasoning: "high", reasoningEffort: "xhigh" }
+
+    // when
+    const result = buildRetryModelPayload(model, agentSettings)
+
+    // then
+    expect(result).toEqual({
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+      variant: "medium",
+      reasoningEffort: "xhigh",
+    })
+  })
+
+  test("should let an explicit model variant suppress inherited reasoning", () => {
+    // given
+    const model = "test-provider/test-model medium"
+    const agentSettings = { reasoning: "high" }
+
+    // when
+    const result = buildRetryModelPayload(model, agentSettings)
+
+    // then
+    expect(result).toEqual({
+      model: { providerID: "test-provider", modelID: "test-model" },
+      variant: "medium",
+    })
+  })
 })

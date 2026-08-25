@@ -1,0 +1,10 @@
+PASS soul scenario: soul-updated entry persisted during the interactive session
+PASS soul scenario: renderer produced exactly one soul notice with the commit sha7 :: markerCount=1 sha7=b9f5e66
+PASS soul scenario: tool result carries the unconditional discipline line
+TUI soul scenario teardown: absent
+PASS non-soul scenario: turn settled with the commit durable in git
+PASS non-soul scenario: the memory tool actually executed
+PASS non-soul scenario: no soul-updated entry persisted
+PASS non-soul scenario: renderer never produced a soul notice
+TUI non-soul scenario teardown: absent
+TUI_RENDER_RESULT=PASS

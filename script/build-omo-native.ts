@@ -21,6 +21,10 @@ const defaultOutputDir = join(packageDir, "plugin")
 // Mirrors REQUIRED_PLUGIN_ARTIFACTS in packages/omo-senpi/src/install/install-senpi.ts.
 const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
+  join("extensions", "memory-run-supervisor.mjs"),
+  join("extensions", "reflection-persona.md"),
+  join("extensions", "dream-persona.md"),
+  join("extensions", "facts-persona.md"),
   join("skills", "ast-grep", "SKILL.md"),
   join("skills", "coding-agent-sessions", "SKILL.md"),
   join("skills", "debugging", "SKILL.md"),
@@ -32,7 +36,7 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "refactor", "SKILL.md"),
   join("skills", "remove-ai-slops", "SKILL.md"),
   join("skills", "review-work", "SKILL.md"),
-  join("skills", "start-work", "SKILL.md"),
+  join("skills", "ulw-execute", "SKILL.md"),
   join("skills", "ultimate-browsing", "SKILL.md"),
   join("skills", "ultrawork", "SKILL.md"),
   join("skills", "ulw-loop", "SKILL.md"),
@@ -150,7 +154,9 @@ function main(argv: readonly string[]): number {
     )
     return 1
   }
-  if (!options.checkOnly) {
+  // Only the default package plugin dir is git-ignored; staging builds (--output)
+  // must leave packages/omo-native untouched.
+  if (!options.checkOnly && options.outputDir === defaultOutputDir) {
     writeFileSync(join(packageDir, ".gitignore"), "/plugin/\n", "utf8")
   }
   console.log(

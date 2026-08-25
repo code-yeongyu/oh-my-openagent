@@ -56,7 +56,9 @@ export function parseCodexGoalSnapshot(value: unknown): CodexGoalSnapshot {
 	}
 
 	const goal = safeObject(goalValue);
-	const objective = safeString(goal["objective"] ?? goal["goal"] ?? goal["description"] ?? root["objective"]);
+	const objective = safeString(
+		goal["objective"] ?? goal["goal"] ?? goal["description"] ?? goal["title"] ?? root["objective"] ?? root["title"],
+	);
 	const status = normalizeStatus(goal["status"] ?? root["status"]);
 
 	return {

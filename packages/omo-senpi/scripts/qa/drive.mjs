@@ -64,22 +64,25 @@ export function digestDirectory(root) {
 }
 
 export function createSandbox() {
-  const root = mkdtempSync(join(tmpdir(), "omo-senpi-qa-"))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-senpi-qa-")))
   const cwd = join(root, "project")
   const agentDir = join(root, "agent")
   const xdgConfigHome = join(root, "xdg")
+  const xdgDataHome = join(root, "xdg-data")
+  const xdgCacheHome = join(root, "xdg-cache")
   const homeDir = join(root, "home")
-  const canonicalCwd = realpathSync(root)
-  return { root, cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd: join(canonicalCwd, "project") }
+  return { root, cwd, agentDir, xdgConfigHome, xdgDataHome, xdgCacheHome, homeDir, canonicalCwd: cwd }
 }
 
-export function seedSandbox({ cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd }) {
+export function seedSandbox({ cwd, agentDir, xdgConfigHome, xdgDataHome, xdgCacheHome, homeDir, canonicalCwd }) {
   mkdirp(cwd)
   mkdirp(agentDir)
   if (homeDir !== undefined) mkdirp(homeDir)
   // The omo config loader reads the user scope from XDG_CONFIG_HOME; without an isolated one every
   // lane inherits the developer's real ~/.config/omo agents and categories and stops being reproducible.
   if (xdgConfigHome !== undefined) mkdirp(xdgConfigHome)
+  if (xdgDataHome !== undefined) mkdirp(xdgDataHome)
+  if (xdgCacheHome !== undefined) mkdirp(xdgCacheHome)
   const settings = {
     defaultProjectTrust: "ask",
     packages: [pluginRoot],
@@ -120,8 +123,15 @@ function runSenpi(senpiBin, sandbox, prompt, script, extraEnv = {}) {
     env: {
       ...process.env,
       ...extraEnv,
+      OMO_CODING_AGENT_DIR: sandbox.agentDir,
       SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+      PI_CODING_AGENT_DIR: sandbox.agentDir,
+      HOME: sandbox.homeDir,
+      USERPROFILE: sandbox.homeDir,
       XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+      XDG_DATA_HOME: sandbox.xdgDataHome,
+      XDG_CACHE_HOME: sandbox.xdgCacheHome,
+      PI_OFFLINE: "1",
       OMO_SENPI_QA: "1",
     },
     encoding: "utf8",

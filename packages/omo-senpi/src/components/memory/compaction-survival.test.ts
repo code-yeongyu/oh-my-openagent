@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -21,6 +21,8 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { ensureIdentityRuntimeDirs, type MemoryPendingLedger } from "./context"
+import type { MemoryIdentityRuntime } from "./identity-runtime"
+import type { ReservedRun } from "@oh-my-opencode/memory-core"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent } from "./index"
 import {
   MemoryFakeExtensionAPI,
@@ -29,6 +31,8 @@ import {
   memorySettings,
 } from "./memory.test-support"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
+import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 const SESSION_ID = "session-compaction-survival"
 const BASE_SYSTEM_PROMPT = "You are senpi, a coding agent."
@@ -40,7 +44,7 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup()
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 interface CompactionFixture {
@@ -52,7 +56,7 @@ interface CompactionFixture {
 }
 
 async function compactionFixture(): Promise<CompactionFixture> {
-  const root = await mkdtemp(join(tmpdir(), "omo-memory-compaction-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-compaction-")))
   roots.push(root)
   const cwd = join(root, "project")
   const env = { OMO_MEMORY_HOME: join(root, "memory") }
@@ -94,10 +98,11 @@ async function compactionFixture(): Promise<CompactionFixture> {
       boundLedger = context.ledger
       return {
         store,
-        launch: (run) => {
+        launch: (run: ReservedRun) => {
           launches.push(run.request)
         },
-      }
+        reconcile: async () => {},
+      } as unknown as MemoryIdentityRuntime
     },
   }).register(pi, ctx)
   await pi.dispatch("session_start", { type: "session_start" }, sessionEventContext())
@@ -212,7 +217,7 @@ describe("compaction survival + trigger integration", () => {
     const after = memoryBlock(await beforeAgentStart(pi), identity.id)
     expect(after).toBe(baseline)
     expect(after).toContain(PERSONA_BODY)
-  })
+  }, 30_000)
 
   test("#given a bound session #when compaction is rejected #then no flag is recorded and settle launches nothing", async () => {
     const { pi, readLedger, launches } = await compactionFixture()
@@ -224,7 +229,7 @@ describe("compaction survival + trigger integration", () => {
 
     expect(launches).toHaveLength(0)
     expect(readLedger().pendingCompaction).toBe(false)
-  })
+  }, 30_000)
 
   test("#given compaction accepted mid-run #when the retried turn chain settles #then exactly one launch fires across all settles", async () => {
     const { pi, readLedger, launches, logs } = await compactionFixture()
@@ -246,7 +251,7 @@ describe("compaction survival + trigger integration", () => {
     expect(launches, JSON.stringify(logs)).toHaveLength(1)
     expect(launches[0]?.trigger).toBe("compaction")
     expect(readLedger().pendingCompaction).toBe(false)
-  })
+  }, 30_000)
 
   test("#given two consecutive accepted compactions #when the run settles #then the flag is consumed once with exactly one launch", async () => {
     const { pi, readLedger, launches, logs } = await compactionFixture()
@@ -266,5 +271,5 @@ describe("compaction survival + trigger integration", () => {
     await endRun(pi)
     await settle(pi)
     expect(launches).toHaveLength(1)
-  })
+  }, 30_000)
 })

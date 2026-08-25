@@ -1,0 +1,110 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/dream-trigger.test.ts:
+(pass) resolveDreamTriggerSettings > #given base dream settings #when no agent override exists #then the base values resolve [0.54ms]
+(pass) resolveDreamTriggerSettings > #given a per-agent dream override #when resolving #then overridden fields win and the rest inherit [0.09ms]
+(pass) evaluateDreamGates > #given every gate failing #when the origin is manual #then the gates are bypassed without probing [0.15ms]
+(pass) evaluateDreamGates > #given dream disabled #when an idle origin evaluates #then it is rejected before probing [0.11ms]
+(pass) evaluateDreamGates > #given dream disabled #when a pressure origin evaluates #then it is rejected before probing [0.10ms]
+(pass) evaluateDreamGates > #given shutdown_launch disabled #when a shutdown origin evaluates #then it is rejected before probing [0.10ms]
+(pass) evaluateDreamGates > #given the last dream exactly min_hours_between ago #when an idle origin evaluates #then the spacing gate rejects without a volume probe [0.10ms]
+(pass) evaluateDreamGates > #given the last dream one millisecond past min_hours_between #when an idle origin evaluates #then it is allowed [0.09ms]
+(pass) evaluateDreamGates > #given the last dream exactly min_hours_between ago #when pressure evaluates #then spacing rejects without probing volume [0.08ms]
+80 |   })
+81 | 
+82 |   test("#given pressure is past dream spacing #when unreflected volume is zero #then it is allowed without probing volume", async () => {
+83 |     const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 24 * 3_600_000 - 1, unreflectedBytes: 0 })
+84 |     const decision = await evaluateDreamGates("pressure", triggerSettings(), probe)
+85 |     expect(decision).toEqual({ allowed: true })
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "allowed": true,
++   "allowed": false,
++   "rejection": "insufficient_volume",
+  }
+
+- Expected  - 1
++ Received  + 2
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/src/components/memory/dream-trigger.test.ts:85:22)
+(fail) evaluateDreamGates > #given pressure is past dream spacing #when unreflected volume is zero #then it is allowed without probing volume [0.23ms]
+(pass) evaluateDreamGates > #given no recorded dream #when an idle origin evaluates #then the spacing gate passes [0.08ms]
+(pass) evaluateDreamGates > #given unreflected volume exactly at the floor #when an idle origin evaluates #then the volume gate rejects [0.09ms]
+(pass) evaluateDreamGates > #given unreflected volume one byte above the floor #when a shutdown origin evaluates #then it is allowed [0.09ms]
+
+packages/omo-senpi/src/components/memory/status.test.ts:
+(pass) refreshMemoryStatus segments > #given a dirty memory worktree #when refresh runs #then the footer carries the dirty marker [0.98ms]
+(pass) refreshMemoryStatus segments > #given a clean worktree with a backlog of fourteen steps #when refresh runs #then the backlog segment renders [0.88ms]
+(pass) refreshMemoryStatus segments > #given a zero backlog #when refresh runs #then no backlog segment renders [0.84ms]
+(pass) refreshMemoryStatus segments > #given three consecutive reflection failures #when refresh runs #then the streak badge renders [1.26ms]
+(pass) refreshMemoryStatus segments > #given only two consecutive failures #when refresh runs #then no streak badge renders [0.97ms]
+(pass) refreshMemoryStatus segments > #given dirty, backlog, and streak all present #when refresh runs #then segments render in fixed order [1.20ms]
+(pass) refreshMemoryStatus segments > #given an assembled line over sixty characters #when refresh runs #then segments drop right to left until it fits [1.21ms]
+(pass) refreshMemoryStatus segments > #given a base line already past the width budget #when refresh runs #then every segment drops [1.21ms]
+(pass) refreshMemoryStatus segments > #given a repo with no HEAD #when refresh runs #then no git status work happens [0.62ms]
+(pass) refreshMemoryStatus segments > #given footer rendering disabled #when refresh runs #then no git status call happens [0.68ms]
+(pass) refreshMemoryStatus segments > #given a future commit timestamp with dirty state #when refresh runs #then the future-age guard still suppresses the footer [0.21ms]
+(pass) refreshMemoryStatus segments > #given git status throws #when refresh runs #then the base footer still renders [0.24ms]
+(pass) refreshMemoryStatus > #given a committed HEAD ninety seconds old #when refresh runs #then footer shows system-clock-relative age [0.40ms]
+(pass) refreshMemoryStatus > #given committed HEAD ages across display buckets #when refresh runs #then compact labels follow the system clock [0.26ms]
+478 |       alreadyNotified: false,
+479 |       gitRepo: fakeRepo,
+480 |       requestPressureDream: async () => { pressureRequests.push(1) },
+481 |     })
+482 | 
+483 |     expect(pressureRequests).toHaveLength(1)
+                                   ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/src/components/memory/status.test.ts:483:30)
+(fail) refreshMemoryStatus > #given system memory exactly at the soft pressure threshold #when refresh runs #then one pressure dream request fires without changing the advisory notify [0.29ms]
+(pass) refreshMemoryStatus > #given system memory below the soft pressure threshold #when refresh runs #then no pressure dream request fires [0.12ms]
+(pass) refreshMemoryStatus > #given pressure advisory work is already deduped #when refresh runs over threshold #then neither estimate-driven path fires again [0.10ms]
+(pass) refreshMemoryStatus > #given system markdown under the advisory threshold #when refresh runs #then no advisory notify fires [259.75ms]
+(pass) refreshMemoryStatus > #given system markdown at or above the advisory threshold #when refresh runs #then one warning notify fires with token estimate [261.71ms]
+(pass) refreshMemoryStatus > #given footer rendering disabled at session bind #when memory is oversized #then advisory fires without a footer [0.24ms]
+(pass) refreshMemoryStatus > #given advisory checking disabled after first memory use #when memory is oversized #then footer renders without another warning [0.19ms]
+(pass) refreshMemoryStatus > #given an already-notified session #when refresh runs again over threshold #then no second notify fires [226.38ms]
+(pass) refreshMemoryStatus > #given a repo with no HEAD #when refresh runs #then no footer or advisory appears [0.87ms]
+(pass) refreshMemoryStatus > #given a committed HEAD without a readable commit timestamp #when refresh runs #then no footer appears [0.16ms]
+(pass) refreshMemoryStatus > #given a commit timestamp later than the system clock #when refresh runs #then no footer appears [0.12ms]
+(pass) refreshMemoryStatus > #given system files with non-system markdown excluded #when refresh estimates tokens #then only system/**/*.md counts [262.18ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger-pressure.test.ts:
+34 |       request: {},
+35 |       now: () => NOW_MS,
+36 |       warnLaunchFailure: () => {},
+37 |     })
+38 | 
+39 |     expect(outcome).toEqual({ fired: true, runId: "run-pressure", status: "active" })
+                         ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "fired": true,
+-   "runId": "run-pressure",
+-   "status": "active",
++   "fired": false,
++   "rejection": "insufficient_volume",
+  }
+
+- Expected  - 3
++ Received  + 2
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/src/components/memory/dream-trigger-pressure.test.ts:39:21)
+(fail) pressure dream origin > #given no unreflected transcripts #when pressure fires past spacing #then it attempts one reservation through the shared store [2.52ms]
+
+3 tests failed:
+(fail) evaluateDreamGates > #given pressure is past dream spacing #when unreflected volume is zero #then it is allowed without probing volume [0.23ms]
+(fail) refreshMemoryStatus > #given system memory exactly at the soft pressure threshold #when refresh runs #then one pressure dream request fires without changing the advisory notify [0.29ms]
+(fail) pressure dream origin > #given no unreflected transcripts #when pressure fires past spacing #then it attempts one reservation through the shared store [2.52ms]
+
+ 37 pass
+ 3 fail
+ 70 expect() calls
+Ran 40 tests across 3 files. [1138.00ms]

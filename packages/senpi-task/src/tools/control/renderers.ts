@@ -1,6 +1,6 @@
 import type { AgentToolResult, Theme, ThemeColor, ToolRenderResultOptions } from "@code-yeongyu/senpi"
-import { truncateToWidth } from "@earendil-works/pi-tui"
 
+import { piTui } from "../../lazy/pi-tui"
 import {
   excerptRendererPromptText,
   excerptRendererText,
@@ -62,6 +62,7 @@ export function renderTaskCancelResult(
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => [truncateToWidth(renderLine(width), width, ELLIPSIS)],
     invalidate: (): void => {},
@@ -149,6 +150,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+    case "capacity_deferred":
+      return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
     case "not_continuable":
       return { color: "warning", text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}` }
     case "one_shot_agent":

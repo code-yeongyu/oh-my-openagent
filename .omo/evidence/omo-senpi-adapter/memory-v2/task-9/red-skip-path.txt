@@ -1,0 +1,14 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/facts-runner.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './facts-runner' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/facts-runner.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [126.00ms]

@@ -119,8 +119,8 @@ describe("fallback-architect tip message", () => {
       )
       const rendered = component?.render(2_000) ?? []
 
-      it("#then the first line carries the Tip: label", () => {
-        expect(rendered[0]).toContain("Tip:")
+      it("#then the notice carries the fallback architect title", () => {
+        expect(rendered.join("\n")).toContain("Fallback architect tip")
       })
 
       it("#then every line is dimmed through the theme", () => {
@@ -129,9 +129,13 @@ describe("fallback-architect tip message", () => {
         }
       })
 
-      it("#then the tip content survives rendering", () => {
+      it("#then collapsed content keeps the explanation and gates the final detail", () => {
         expect(rendered.join("\n")).toContain("anthropic/claude-opus-5")
-        expect(rendered.join("\n")).toContain("give-me-tips")
+        expect(rendered.join("\n")).not.toContain("give-me-tips")
+      })
+
+      it("#then every rendered line carries customMessageBg styling", () => {
+        for (const line of rendered) expect(line).toContain("\u001b[48;2;0;0;0m")
       })
     })
   })

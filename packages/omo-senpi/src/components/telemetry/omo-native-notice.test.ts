@@ -1,24 +1,19 @@
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "bun:test"
 
-import type { TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
+import {
+  UNCONFIGURED_POSTHOG_API_KEY,
+  type TelemetryDiagnosticInput,
+} from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createOmoNativeNoticeRegistration } from "./omo-native-notice"
-import { getOmoNativePayloadFilePath } from "./omo-native-buffer"
 import { getOmoNativeStateDir } from "./product-identity"
 import {
   createEnabledEnv,
   createSilentLogger,
   withTempAgentDir,
 } from "./telemetry.test-support"
-
-type CommandContext = {
-  readonly output?: (text: string) => void
-  readonly ui?: { notify(message: string, type?: "info" | "warning" | "error"): void }
-}
-
-type CommandHandler = (args: string, ctx: CommandContext) => Promise<void>
 
 function register(agentDir: string, options: {
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
@@ -34,96 +29,17 @@ function register(agentDir: string, options: {
   return pi
 }
 
-function commandHandler(pi: FakeExtensionAPI): CommandHandler {
-  const command = pi.commands.find(({ name }) => name === "omo-telemetry")
-  const handler: unknown = command?.options["handler"]
-  if (typeof handler !== "function") throw new Error("omo-telemetry command was not registered")
-  return handler as CommandHandler
-}
-
-async function commandOutput(pi: FakeExtensionAPI, cwd?: string): Promise<string> {
-  const lines: string[] = []
-  await commandHandler(pi)("", { ...(cwd === undefined ? {} : { cwd }), output: (text) => lines.push(text) })
-  return lines.join("\n")
-}
-
-describe("OmO Native telemetry notice and preview", () => {
-  it.each([
-    ["no config file", undefined, true],
-    ["telemetry enabled false", '{"telemetry":{"enabled":false}}', false],
-    ["telemetry enabled true", '{"telemetry":{"enabled":true}}', true],
-  ])("#given %s #when preview loads config #then it reports the resolved enabled state", async (_name, config, expectedEnabled) => {
+describe("OmO Native telemetry notice", () => {
+  it("#given telemetry registration #when commands are inspected #then no telemetry audit command is exposed", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
-      const home = join(agentDir, "home")
-      const cwd = join(home, "project")
-      mkdirSync(cwd, { recursive: true })
-      if (config !== undefined) {
-        mkdirSync(join(home, ".omo"), { recursive: true })
-        writeFileSync(join(home, ".omo", "omo.json"), config)
-      }
-      const pi = register(agentDir, { env: { ...createEnabledEnv(agentDir), HOME: home } })
+      const pi = register(agentDir)
 
       // when
-      const output = await commandOutput(pi, cwd)
+      const commandNames = pi.commands.map(({ name }) => name)
 
       // then
-      expect(output).toContain(`omo.json telemetry.enabled: ${expectedEnabled}`)
-    })
-  })
-
-  it("#given malformed existing config #when preview loads config #then it reports disabled and emits a diagnostic", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      const home = join(agentDir, "home")
-      const cwd = join(home, "project")
-      mkdirSync(join(home, ".omo"), { recursive: true })
-      mkdirSync(cwd, { recursive: true })
-      writeFileSync(join(home, ".omo", "omo.json"), '{"telemetry":{"enabled":false}')
-      const diagnostics: TelemetryDiagnosticInput[] = []
-      const pi = register(agentDir, {
-        diagnostics: (input) => diagnostics.push(input),
-        env: { ...createEnabledEnv(agentDir), HOME: home },
-      })
-
-      // when
-      const output = await commandOutput(pi, cwd)
-
-      // then
-      expect(output).toContain("omo.json telemetry.enabled: false")
-      expect(diagnostics).toHaveLength(1)
-      expect(diagnostics[0]).toMatchObject({
-        errorKind: "error",
-        event: "telemetry_capture_failed",
-        source: "omo-native-notice",
-      })
-    })
-  })
-
-  it("#given unreadable existing config #when preview loads config #then it reports disabled and emits a diagnostic", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      const home = join(agentDir, "home")
-      const cwd = join(home, "project")
-      mkdirSync(join(home, ".omo", "omo.json"), { recursive: true })
-      mkdirSync(cwd, { recursive: true })
-      const diagnostics: TelemetryDiagnosticInput[] = []
-      const pi = register(agentDir, {
-        diagnostics: (input) => diagnostics.push(input),
-        env: { ...createEnabledEnv(agentDir), HOME: home },
-      })
-
-      // when
-      const output = await commandOutput(pi, cwd)
-
-      // then
-      expect(output).toContain("omo.json telemetry.enabled: false")
-      expect(diagnostics).toHaveLength(1)
-      expect(diagnostics[0]).toMatchObject({
-        errorKind: "error",
-        event: "telemetry_capture_failed",
-        source: "omo-native-notice",
-      })
+      expect(commandNames).not.toContain("omo-telemetry")
     })
   })
 
@@ -145,6 +61,25 @@ describe("OmO Native telemetry notice and preview", () => {
     })
   })
 
+  it("#given the unconfigured project key #when session_start fires #then no first-run notice is sent", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const env = {
+        POSTHOG_API_KEY: UNCONFIGURED_POSTHOG_API_KEY,
+        SENPI_CODING_AGENT_DIR: agentDir,
+      }
+      const pi = register(agentDir, { env })
+      const notifications: string[] = []
+
+      // when
+      await pi.dispatch("session_start", {}, { ui: { notify: (message: string) => notifications.push(message) } })
+
+      // then
+      expect(notifications).toEqual([])
+      expect(existsSync(join(getOmoNativeStateDir(env), "notice-shown"))).toBe(false)
+    })
+  })
+
   it("#given DO_NOT_TRACK=1 #when session_start fires #then no notice is sent", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
@@ -156,6 +91,30 @@ describe("OmO Native telemetry notice and preview", () => {
 
       // then
       expect(notifications).toEqual([])
+    })
+  })
+
+  it("#given telemetry.enabled false #when session_start fires #then no notice or marker is created", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const home = join(agentDir, "home")
+      const cwd = join(home, "project")
+      mkdirSync(join(home, ".omo"), { recursive: true })
+      mkdirSync(cwd, { recursive: true })
+      writeFileSync(join(home, ".omo", "omo.json"), '{"telemetry":{"enabled":false}}')
+      const env = { ...createEnabledEnv(agentDir), HOME: home }
+      const pi = register(agentDir, { env })
+      const notifications: string[] = []
+
+      // when
+      await pi.dispatch("session_start", {}, {
+        cwd,
+        ui: { notify: (message: string) => notifications.push(message) },
+      })
+
+      // then
+      expect(notifications).toEqual([])
+      expect(existsSync(join(getOmoNativeStateDir(env), "notice-shown"))).toBe(false)
     })
   })
 
@@ -229,56 +188,4 @@ describe("OmO Native telemetry notice and preview", () => {
     })
   })
 
-  it("#given captured payloads #when omo-telemetry runs #then output includes enabled state, full opt-out matrix, event names, and payload content", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      const env = {
-        ...createEnabledEnv(agentDir),
-        OMO_DISABLE_POSTHOG: "unset-test",
-        OMO_SEND_ANONYMOUS_TELEMETRY: "0",
-      }
-      const stateDir = getOmoNativeStateDir(env)
-      mkdirSync(stateDir, { recursive: true })
-      writeFileSync(getOmoNativePayloadFilePath(stateDir), JSON.stringify([
-        { distinctId: "machine", event: "session_started", properties: { reason: "startup" } },
-        { distinctId: "machine", event: "turn_completed", properties: { total_tokens: 42 } },
-      ]))
-      const pi = register(agentDir, { env })
-
-      // when
-      const output = await commandOutput(pi)
-
-      // then
-      expect(output).toContain("Enabled: false")
-      for (const key of [
-        "OMO_SENPI_DISABLE_POSTHOG",
-        "OMO_DISABLE_POSTHOG",
-        "OMO_SENPI_SEND_ANONYMOUS_TELEMETRY",
-        "OMO_SEND_ANONYMOUS_TELEMETRY",
-        "DO_NOT_TRACK",
-        "omo.json telemetry.enabled",
-      ]) expect(output).toContain(key)
-      expect(output).toContain('"event": "session_started"')
-      expect(output).toContain('"event": "turn_completed"')
-      expect(output).toContain('"total_tokens": 42')
-    })
-  })
-
-  it("#given last-payloads.json is absent or corrupt #when omo-telemetry runs #then each state prints a clear audit result without throwing", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      const pi = register(agentDir)
-
-      // when
-      const absent = await commandOutput(pi)
-      const stateDir = getOmoNativeStateDir(createEnabledEnv(agentDir))
-      mkdirSync(stateDir, { recursive: true })
-      writeFileSync(getOmoNativePayloadFilePath(stateDir), "[{\"event\":")
-      const corrupt = await commandOutput(pi)
-
-      // then
-      expect(absent).toContain("No telemetry payloads have been recorded.")
-      expect(corrupt).toContain("Telemetry payload preview is unreadable or malformed.")
-    })
-  })
 })

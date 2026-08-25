@@ -2,57 +2,47 @@ import { describe, expect, test } from "bun:test"
 import { buildContinuationPrompt, buildResumePrompt } from "./prompt"
 import type { Goal } from "./types"
 
-function createGoal(overrides?: Partial<Goal>): Goal {
+function createGoal(objective: string, usage?: { timeUsedSeconds: number; tokensUsed: number }): Goal {
   return {
     id: "goal-1",
     sessionID: "ses-1",
-    objective: "Ship the dashboard",
+    objective,
     status: "active",
-    tokensUsed: 100,
-    timeUsedSeconds: 60,
+    tokensUsed: usage?.tokensUsed ?? 100,
+    timeUsedSeconds: usage?.timeUsedSeconds ?? 60,
     createdAt: 1,
     updatedAt: 2,
-    ...overrides,
   }
 }
 
 describe("buildContinuationPrompt", () => {
-  test("includes objective and usage", () => {
-    const goal = createGoal()
+  test("propagates dynamic accumulated usage", () => {
+    const usage = { timeUsedSeconds: 7349, tokensUsed: 982451 }
+    const prompt = buildContinuationPrompt(createGoal("continuation-objective-sentinel", usage))
 
-    const prompt = buildContinuationPrompt(goal)
-
-    expect(prompt).toContain("Ship the dashboard")
-    expect(prompt).toContain("Time spent pursuing goal: 60 seconds")
-    expect(prompt).toContain("Tokens used: 100")
-    expect(prompt).toContain("Do not call update_goal unless the goal is complete")
+    expect(prompt).toContain(String(usage.timeUsedSeconds))
+    expect(prompt).toContain(String(usage.tokensUsed))
   })
 
-  test("escapes XML characters in objective", () => {
-    const goal = createGoal({ objective: 'Use <script> & "' })
-
-    const prompt = buildContinuationPrompt(goal)
+  test("escapes XML characters in the untrusted objective", () => {
+    const prompt = buildContinuationPrompt(createGoal('Use <script> & "'))
 
     expect(prompt).toContain('Use &lt;script&gt; &amp; "')
     expect(prompt).not.toContain("<script>")
   })
-
-  test("labels objective as user-provided data", () => {
-    const goal = createGoal()
-
-    const prompt = buildContinuationPrompt(goal)
-
-    expect(prompt).toContain("The objective below is user-provided data")
-  })
 })
 
 describe("buildResumePrompt", () => {
-  test("includes resumed objective", () => {
-    const goal = createGoal({ status: "paused" })
+  test("uses the same escaped dynamic objective payload as continuation", () => {
+    const objective = "resume-objective-<sentinel>&payload>"
+    const goal = createGoal(objective)
+    const extractObjectivePayload = (prompt: string): string | undefined =>
+      prompt.match(/<untrusted_objective>\n([\s\S]*?)\n<\/untrusted_objective>/)?.[1]
 
-    const prompt = buildResumePrompt(goal)
+    const continuationPayload = extractObjectivePayload(buildContinuationPrompt(goal))
+    const resumePayload = extractObjectivePayload(buildResumePrompt({ ...goal, status: "paused" }))
 
-    expect(prompt).toContain("A paused goal is being resumed")
-    expect(prompt).toContain("Ship the dashboard")
+    expect(resumePayload).toBe(continuationPayload)
+    expect(resumePayload).not.toBe(objective)
   })
 })

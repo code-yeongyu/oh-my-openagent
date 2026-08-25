@@ -1,0 +1,136 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/mcp/memory-server.test.ts:
+(pass) omo-memory MCP server > #given initialize #then server info and tool capabilities are returned [0.53ms]
+(pass) omo-memory MCP server > #given tools/list #then exactly the two memory tools are exposed [0.10ms]
+(pass) omo-memory MCP server > #given a fresh project #when create then str_replace run through tools/call #then the memory repo records them [907.27ms]
+(pass) omo-memory MCP server > #given injected provenance for a non-auto identity #when an MCP memory call runs #then it writes that bound repo with durable turn trailers [333.54ms]
+(pass) omo-memory MCP server > #given injected provenance with a toolCallId #when an MCP memory call commits #then an out-of-band receipt lands under runtime/tool-receipts [262.93ms]
+(pass) omo-memory MCP server > #given no injected toolCallId #when an MCP memory call commits #then no receipt is written [680.24ms]
+(pass) omo-memory MCP server > #given a failing MCP memory call with a toolCallId #when the call errors #then no receipt is written [184.60ms]
+(pass) omo-memory MCP server > #given an unknown tool name #when called #then an error result is returned [0.24ms]
+
+packages/memory-core/src/locks/domains.test.ts:
+(pass) lock domain paths > #given the runtime lock directory #when domain paths are resolved #then every protocol has a stable confined name [0.23ms]
+
+packages/memory-core/src/tools/soul-edit.test.ts:
+(pass) runMemoryTool soul-edit result > #given a create committed under system/persona.md #when the tool runs #then the result carries the commit metadata and the soul-edit directive [268.93ms]
+(pass) runMemoryTool soul-edit result > #given a str_replace on system/identity.md #when the tool runs #then the soul-edit directive appears [320.24ms]
+(pass) runMemoryTool soul-edit result > #given a rename that moves system/persona.md #when the tool runs #then the soul-edit directive appears [315.89ms]
+(pass) runMemoryTool soul-edit result > #given a commit that touches only non-soul files #when the tool runs #then no soul-edit directive appears but commit metadata is present [258.86ms]
+(pass) runMemoryApplyPatch soul-edit result > #given a patch updating system/persona.md #when applied #then the result carries the soul-edit directive and commit metadata [357.54ms]
+(pass) runMemoryApplyPatch soul-edit result > #given a patch adding a non-soul file #when applied #then no soul-edit directive appears [261.69ms]
+
+packages/memory-core/src/identity/layout.test.ts:
+(pass) memory identity layout constants > #given the layout module #when constants are inspected #then they pin the decided directory names [0.14ms]
+(pass) defaultMemoryRoot > #given no override #when the default root is computed #then it is ~/.omo/memory [0.07ms]
+(pass) resolveMemoryRoot > #given an absolute OMO_MEMORY_HOME #when the root is resolved #then the override is used verbatim [0.08ms]
+(pass) resolveMemoryRoot > #given a relative OMO_MEMORY_HOME #when the root is resolved #then it resolves against the given cwd [0.05ms]
+(pass) resolveMemoryRoot > #given an empty or whitespace OMO_MEMORY_HOME #when the root is resolved #then the default root is used [0.05ms]
+(pass) buildIdentityPaths > #given a memory root and id #when paths are built #then the decided layout shape is produced [0.07ms]
+(pass) buildIdentityPaths > #given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime [0.07ms]
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused [239.54ms]
+(pass) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [375.08ms]
+(pass) MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry [3762.53ms]
+(pass) MemoryBlockCache > #given a consumed soul notice at an unchanged HEAD #when compiled again #then the notice variant is replaced and the line is gone [268.76ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.13ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+(pass) compileMemoryBlock > #given nested committed memory #when compiled #then it matches the handcrafted Letta golden [251.75ms]
+(pass) compileMemoryBlock > #given a committed persona and identity #when compiled #then both render under <self> and identity stays out of the generic memory tier [240.15ms]
+(pass) compileMemoryBlock > #given only a committed identity #when compiled #then it renders under <self> without a persona [231.26ms]
+(pass) compileMemoryBlock > #given an empty committed repository #when compiled #then only metadata is emitted [183.41ms]
+(pass) compileMemoryBlock > #given only a committed persona #when compiled #then its description is omitted [225.25ms]
+(pass) compileMemoryBlock > #given nudge turns #when compiled #then metadata includes the behavioral nudge token and count only when requested [216.87ms]
+(pass) compileMemoryBlock > #given a soul notice #when compiled #then metadata carries the soul token and short sha only for that compile [237.83ms]
+(pass) compileMemoryBlock > #given a dirty persona edit #when compiled #then only the committed HEAD body appears [229.09ms]
+(pass) compileMemoryBlock > #given a committed binary projection #when compiled #then its name appears without reading its blob [230.47ms]
+(pass) compileMemoryBlock > #given an unreadable committed system file #when compiled #then it is skipped best-effort [262.07ms]
+
+packages/memory-core/src/soul/watermark.test.ts:
+(pass) consumeSoulNoticeDelta > #given no watermark file #when consumed #then the watermark is established silently at HEAD with no notice [279.54ms]
+(pass) consumeSoulNoticeDelta > #given a watermark behind HEAD with an out-of-band persona commit #when consumed #then exactly one notice is emitted and the watermark advances [391.34ms]
+(pass) consumeSoulNoticeDelta > #given only in-band memory-tool soul commits since the watermark #when consumed #then no notice is emitted and the watermark stays put [365.41ms]
+(pass) consumeSoulNoticeDelta > #given an out-of-band commit that touches only non-soul paths #when consumed #then no notice is emitted [370.47ms]
+(pass) consumeSoulNoticeDelta > #given an out-of-band identity.md commit mixed with an in-band persona commit #when consumed #then the notice names the out-of-band commit [450.89ms]
+(pass) consumeSoulNoticeDelta > #given a corrupt watermark file #when consumed #then it re-establishes silently at HEAD [256.88ms]
+(pass) consumeSoulNoticeDelta > #given a watermark naming a sha that history no longer contains #when consumed #then it re-establishes silently at HEAD [261.24ms]
+
+packages/omo-senpi/src/components/memory/index.test.ts:
+(pass) createMemoryComponent > #given missing custom-entry capabilities #when registered #then it warns once and registers nothing [3.05ms]
+(pass) createMemoryComponent > #given no memory section #when config resolves #then memory defaults enabled with the auto identity [0.09ms]
+(pass) createMemoryComponent > #given no memory key in config #when resolved through adapter fallback #then it matches parsing {} through the schema [0.50ms]
+(pass) createMemoryComponent > #given disabled config or a global/component disable flag #when registered #then the host registration surface is byte-identical [0.12ms]
+(pass) createMemoryComponent > #given enabled memory #when session_start binds an auto identity #then it appends a hidden binding and performs no filesystem writes [1.92ms]
+(pass) createMemoryComponent > #given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding [0.34ms]
+(pass) createMemoryComponent > #given enablement latched false or true at session_start #when config reload flips it #then registration stays fixed and restart notice appears once [0.66ms]
+(pass) createMemoryComponent > #given per-instance module state #when session_shutdown fires #then the identity context and supervisor reference are released [0.28ms]
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v2 soul template [0.13ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [217.60ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [203.74ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata [239.23ms]
+(pass) createMemoryPromptHandler > #given nudge state at the threshold #when before_agent_start compiles #then the memory metadata carries the behavioral nudge token [237.19ms]
+(pass) createMemoryPromptHandler > #given a reflection soul notice #when before_agent_start compiles #then the memory metadata carries the soul token and short sha [236.73ms]
+(pass) createMemoryPromptHandler > #given an out-of-band soul commit #when the prompt compiles repeatedly at the same HEAD #then the soul line appears exactly once [418.80ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [223.74ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [227.15ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [340.50ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [230.26ms]
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+(pass) createMemoryNudgeWiring > #given a fresh session #when two interactive inputs are accepted while extension and rejected inputs occur #then only the accepted interactive turns reach the threshold [207.56ms]
+(pass) createMemoryNudgeWiring > #given a durable accepted-turn record and contaminated branch users #when a session resumes #then hydration uses only the durable baseline [185.56ms]
+(pass) createMemoryNudgeWiring > #given one durable accepted turn and a second admitted input awaiting its started disposition #when the prompt compiles #then the projected accepted turn reaches the threshold [187.01ms]
+(pass) createMemoryNudgeWiring > #given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history [153.11ms]
+(pass) createMemoryNudgeWiring > #given a threshold nudge #when an in-band memory commit lands #then the next compile state self-clears and disabled settings remain quiet [269.92ms]
+(pass) createMemoryNudgeWiring > #given a bound non-auto identity #when a memory MCP tool call starts #then unforgeable identity and accepted-turn provenance are injected in place [164.15ms]
+(pass) createMemoryNudgeWiring > #given a bound identity #when an MCP-surface memory tool call starts #then provenance is injected under the catalog tool names [162.36ms]
+
+packages/omo-senpi/src/components/memory/tools.test.ts:
+(pass) memory tool registration > #given a context resolver #when registerMemoryTools runs #then both tools are captured with sequential execution and prompt metadata [0.24ms]
+(pass) memory tool registration > #given the memory tool description #when inspected #then it documents omo identity, frontmatter rules, and result strings [0.07ms]
+(pass) memory tool activation > #given no bound identity #when either tool executes #then an actionable initialization error is returned [0.27ms]
+(pass) memory tool activation > #given a resolver that binds after registration #when the tool executes #then activation follows binding [254.55ms]
+(pass) memory tool execution > #given a bound identity #when memory create executes #then the engine commits and reports the short sha [275.94ms]
+(pass) memory tool execution > #given a bound identity #when memory_apply_patch executes #then the patch is applied and committed [341.55ms]
+(pass) memory tool execution > #given a bound identity #when the engine rejects the change #then the memory error maps to an error result [254.41ms]
+(pass) memory tool execution > #given a bound identity #when memory_apply_patch receives a malformed patch #then the parse error maps to an error result [186.92ms]
+(pass) memory tool execution > #given the writer lock is held #when a tool executes #then the contention surfaces as an error result [237.55ms]
+(pass) memory tool execution > #given concurrent executions #when both commit #then they serialize through the writer lock [369.80ms]
+(pass) memory tool execution > #given no repo exists yet #when the memory tool executes #then it lazily initializes with hooks and seeds [758.92ms]
+(pass) memory tool onCommit seam > #given a bound identity #when memory create commits #then onCommit receives the sha, first-line subject, and affected paths [271.93ms]
+(pass) memory tool onCommit seam > #given a bound identity #when memory_apply_patch commits #then onCommit receives the commit metadata [333.58ms]
+(pass) memory tool onCommit seam > #given an engine rejection #when the tool executes #then onCommit is not called [186.52ms]
+
+packages/omo-senpi/src/components/memory/soul-notice.test.ts:
+(pass) createSoulNoticeWiring onCommit > #given edit_notice enabled #when a soul commit arrives #then exactly one soul-updated entry is appended with the commit metadata [0.59ms]
+(pass) createSoulNoticeWiring onCommit > #given edit_notice enabled #when a non-soul commit arrives #then no entry is appended [0.32ms]
+(pass) createSoulNoticeWiring onCommit > #given edit_notice disabled #when a soul commit arrives #then no visible entry is appended [0.31ms]
+(pass) createSoulNoticeWiring onCommit > #given registration #when the component registers #then a renderer is registered for the soul-updated entry type [0.28ms]
+(pass) createSoulNoticeWiring tool_result receipts > #given a receipt for the event toolCallId #when tool_result fires #then one entry is appended and the receipt is consumed [1.35ms]
+(pass) createSoulNoticeWiring tool_result receipts > #given a receipt whose embedded toolCallId does not match the event #when tool_result fires #then no entry is appended and the receipt is consumed [1.19ms]
+(pass) createSoulNoticeWiring tool_result receipts > #given no receipt on disk #when tool_result fires #then nothing is appended and nothing throws [0.35ms]
+(pass) createSoulNoticeWiring tool_result receipts > #given a non-memory tool result #when tool_result fires #then receipts are left untouched [0.86ms]
+
+packages/omo-senpi/src/components/memory/commands/doctor.test.ts:
+(pass) /doctor > #given a healthy repository #when doctor runs #then every deterministic check passes [549.12ms]
+(pass) /doctor > #given a persona still equal to the v1 seed #when doctor runs #then a soul-seed advisory is reported [546.09ms]
+(pass) /doctor > #given a persona that diverged from the v1 seed #when doctor runs #then no soul-seed advisory fires [538.02ms]
+(pass) /doctor > #given no repository #when doctor runs #then the repository check fails with an actionable hint [0.44ms]
+(pass) /doctor > #given a memory file with invalid frontmatter #when doctor runs #then the sweep fails and names the file [538.08ms]
+(pass) /doctor > #given a missing persona file #when doctor runs #then a persona warning is reported [507.86ms]
+(pass) /doctor > #given a lock owned by a dead pid #when doctor runs #then the stale lock is reported with its path [543.28ms]
+(pass) /doctor > #given a lock owned by a live pid #when doctor runs #then no stale lock is reported [568.40ms]
+(pass) /doctor > #given an unregistered worktree directory #when doctor runs #then the orphan is reported [545.48ms]
+(pass) /doctor > #given a system estimate over the warn threshold #when doctor runs #then a token advisory is reported [518.90ms]
+(pass) /doctor > #given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix [551.43ms]
+(pass) /doctor > #given an unbound session #when doctor runs #then an actionable error is returned [0.15ms]
+
+ 104 pass
+ 0 fail
+ 318 expect() calls
+Ran 104 tests across 13 files. [27.14s]

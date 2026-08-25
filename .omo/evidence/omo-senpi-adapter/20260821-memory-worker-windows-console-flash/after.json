@@ -1,0 +1,46 @@
+{
+  "label": "after",
+  "runDir": "C:\\Users\\USER\\AppData\\Local\\Temp\\omo-console-qa-6CclHm",
+  "conhostBefore": 32,
+  "conhostAfter": 32,
+  "processes": [
+    {
+      "pid": 18600,
+      "name": "supervisor",
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    },
+    {
+      "name": "bun.exe",
+      "pid": 8664,
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    },
+    {
+      "name": "node.exe",
+      "pid": 23204,
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    },
+    {
+      "name": "conhost.exe",
+      "pid": 20656,
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    }
+  ],
+  "processesWithConsoleWindow": 0,
+  "processesWithVisibleConsoleWindow": 0
+}

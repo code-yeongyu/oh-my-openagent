@@ -1,0 +1,84 @@
+COMMAND: python3 .omo/evidence/20260817-remove-prompt-contract-tests/audit_prompt_contracts.py --compact
+EXPECTED: exit 0; every tracked test enumerated; zero unclassified, forbidden, or stale active fingerprints.
+OBSERVED:
+{
+  "command": "python3 .omo/evidence/20260817-remove-prompt-contract-tests/audit_prompt_contracts.py --compact",
+  "cwd": "<worktree>",
+  "exit_code": 0,
+  "summary": {
+    "root": "<worktree>",
+    "parser": "typescript-6.0.3",
+    "tracked_test_count": 2291,
+    "existing_tracked_test_count": 2282,
+    "missing_tracked_test_count": 9,
+    "candidate_count": 1727,
+    "classified_allowed_count": 1727,
+    "unclassified_count": 0,
+    "forbidden_count": 0,
+    "stale_classification_count": 0
+  },
+  "category_summary": {
+    "machine-sentinel": {
+      "occurrences": 718,
+      "unique_fingerprints": 594
+    },
+    "parser-fixture": {
+      "occurrences": 213,
+      "unique_fingerprints": 187
+    },
+    "runtime-behavior": {
+      "occurrences": 473,
+      "unique_fingerprints": 416
+    },
+    "security-boundary": {
+      "occurrences": 67,
+      "unique_fingerprints": 51
+    },
+    "shipped-copy-equality": {
+      "occurrences": 121,
+      "unique_fingerprints": 109
+    },
+    "user-ui-error": {
+      "occurrences": 135,
+      "unique_fingerprints": 119
+    }
+  },
+  "scanner_hashes": {
+    "audit_prompt_contracts.py": "613273dfdc34c2c586cbe6185f2de278886d042446d13cdf86b9a5c0d10770bb",
+    "classification_bundle.py": "01a67f8e55c6bac21bffda648d33548d213b47fb3e915f8ed687a1ec09188fe0",
+    "prompt_contract_ast.mjs": "5abebf8717a23f12820cbc9d6c32f338f8b509e7c37ce1ed41dc202371dfce87",
+    "test_audit_prompt_contracts.py": "f1c9b56a51ede89d15eb94dba2521c468615b85e8abf6ba56dfe9a2fdb1b773b"
+  },
+  "classification_sources": [
+    {
+      "path": "classification-proposals/codex.json",
+      "sha256": "496b8db2338ffca04abc0fa032b9b70aff64dc084b59f0b321b66e2a06754c43"
+    },
+    {
+      "path": "classification-proposals/core.json",
+      "sha256": "ec8c55c38cd75a02df1462e70701a18ea466af2ed8716dbdfdb5f9340d4f2736"
+    },
+    {
+      "path": "classification-proposals/infra.json",
+      "sha256": "990e63c845318693b6f976945eca2d37160560d6d81ccb066531b951c3220c03"
+    },
+    {
+      "path": "classification-proposals/opencode.json",
+      "sha256": "3e8a30088e0c3146ecec3dcd73b7de7cc63142ed063c1acb31f0c5e19186a7bb"
+    },
+    {
+      "path": "classification-proposals/scripts-tests.json",
+      "sha256": "68f9576fb48ae29d6193ef288b5e594527dfdbd40dcfae43c47e6231f82048b9"
+    },
+    {
+      "path": "classification-proposals/senpi-shared.json",
+      "sha256": "e89a165a739aa13eab7add305d9a534325717061477e3f484ed750bd95c89b6a"
+    },
+    {
+      "path": "prompt-contract-classification-supplemental.json",
+      "sha256": "600083fb44aec65231ddc07c20bb244086b149cc4d2b7263543c43769b91f67c"
+    }
+  ],
+  "active_fingerprint_count": 1476,
+  "violating_inventory": []
+}

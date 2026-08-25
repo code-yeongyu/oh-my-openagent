@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: May 2, 2026
+Last updated: August 21, 2026
 
 This Privacy Policy explains how oh-my-opencode and oh-my-openagent collect, use, and protect information related to the published CLI package, the OpenCode plugin, and the project website or repository materials where they apply.
 
@@ -14,12 +14,16 @@ We collect limited non-personal information needed to operate and improve the Se
 
 ### Automatically collected information
 
-When anonymous telemetry is enabled, the Application may collect a single anonymous usage event:
+When anonymous telemetry is enabled, the Application may collect the following anonymous usage events:
 
 - `omo_daily_active`, sent at most once per UTC day per machine when the plugin loads (`reason: "plugin_loaded"`) or when the `run` CLI is invoked (`reason: "run_started"`), used to estimate daily, weekly, and monthly active installations
 - `omo_codex_daily_active`, sent at most once per UTC day per machine when the `omo-codex` adapter is installed (`reason: "install_completed"`) or when its Codex plugin runtime fires on a Codex `SessionStart` hook (`reason: "session_start"`), with the same opt-out posture as `omo_daily_active`
 - Anonymous machine metadata bundled with that event, such as package version, plugin name, runtime, OS family, locale, and timezone
 - A pseudonymous installation identifier derived from a one-way hash of the local hostname
+- The OmO Native event family for the omo-senpi adapter: anonymous product events such as session start, prompt classification buckets, turn token and cost totals, skill and feature usage, parallelism summaries, per-delegation aggregate metrics, and category configuration snapshots. Payloads contain only booleans, counters, buckets, and allowlisted enum values; the full schema is published in [senpi-telemetry.md](../reference/senpi-telemetry.md)
+- Per-delegation aggregate metrics for delegated subagent tasks: terminal status, category and model identifiers masked to a known list, durations, token and cost totals, and follow-up message counts. No task names, prompts, responses, error messages, or file paths are collected; custom category and model names are masked to `custom`
+- The device-reported timezone (an IANA zone name), sent with the session start event
+- An approximate country derived by PostHog on its servers from the IP address of the sending connection. The Application never writes an IP address into any event payload and stores no IP address itself; the derived country is approximate and can be wrong when you use a VPN, proxy, or mobile network, or when a machine is shared or its traffic exits from another region
 
 The Application does not create or update PostHog person profiles, and does not collect prompt contents, source files, repository contents, access tokens, API keys, raw hostnames, or runtime error diagnostics through this telemetry path.
 

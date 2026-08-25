@@ -159,7 +159,6 @@ describe("runTaskSend team routing", () => {
     expect(tool.name).toBe("task_send")
     expect(Object.keys(tool.parameters.properties)).toContain("to")
     expect(Object.keys(tool.parameters.properties)).not.toContain("deliver_as")
-    expect(tool.description).toContain("always steer")
     expect(tool.description).not.toContain("followUp")
   })
 

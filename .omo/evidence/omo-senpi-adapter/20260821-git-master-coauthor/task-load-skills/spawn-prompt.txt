@@ -1,0 +1,7 @@
+<skill name="qa-skill" location="/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-SMpVyI/agent/skills/qa-skill/SKILL.md">
+References are relative to /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-SMpVyI/agent/skills/qa-skill.
+
+OMO TASK LOAD SKILLS LIVE MARKER
+</skill>
+
+run the skill-marked child

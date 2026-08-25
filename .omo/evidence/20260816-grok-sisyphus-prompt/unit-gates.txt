@@ -1,0 +1,9 @@
+(pass) createSisyphusAgent > #given a Gemini model > #when creating the agent #then injects Gemini corrective anchors before constraints [0.49ms]
+
+ 26 pass
+ 0 fail
+ 183 expect() calls
+Ran 26 tests across 2 files. [228.00ms]
+---
+typecheck: exit 0 (tsgo --noEmit, all packages) - ran 2026-08-16
+build: exit 0 (bun run build) - ran 2026-08-16

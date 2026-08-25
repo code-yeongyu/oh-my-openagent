@@ -1,0 +1,384 @@
+[
+  {
+    "id": "thinking-level",
+    "text": "Use shift+tab to cycle the model's thinking level."
+  },
+  {
+    "id": "favorite-model-rotation",
+    "text": "Rotate through favorite models with ctrl+p; go backward with shift+ctrl+p."
+  },
+  {
+    "id": "model-selector-favorites",
+    "text": "Open the model selector with ctrl+l, then use ctrl+f to toggle the highlighted favorite."
+  },
+  {
+    "id": "model-command-search",
+    "text": "Use /model to open the selector, or /model <pattern> to jump straight to a matching model."
+  },
+  {
+    "id": "model-cycling-scope",
+    "text": "Start senpi with --models \"anthropic/*,gpt-5*\" to limit which models ctrl+p cycles through."
+  },
+  {
+    "id": "thinking-budgets",
+    "text": "Set thinkingBudgets in settings.json to choose the token budget behind each thinking level."
+  },
+  {
+    "id": "prompt-preset",
+    "text": "Set promptPreset in settings.json when a model does not auto-detect the system prompt you want."
+  },
+  {
+    "id": "provider-login",
+    "text": "Use /login to add a subscription or API-key provider, and /logout to remove stored credentials."
+  },
+  {
+    "id": "fallback-chains-setting",
+    "text": "retry.fallbackChains in settings.json maps a model to ordered fallbacks, so a failed turn retries on the next one."
+  },
+  {
+    "id": "fallback-command",
+    "text": "Use /fallback to inspect and manage the retry fallback chain for the current model.",
+    "requiresCommand": "fallback"
+  },
+  {
+    "id": "queue-follow-up",
+    "text": "While the agent is working, use alt+enter to queue a follow-up for after it finishes."
+  },
+  {
+    "id": "steering-message",
+    "text": "Press enter while the agent works to steer it after the current tool batch; alt+enter waits until all work is done."
+  },
+  {
+    "id": "edit-queued-message",
+    "text": "Use alt+up to bring queued messages back for editing."
+  },
+  {
+    "id": "interrupt-restores-queue",
+    "text": "Press escape to abort the current turn and restore queued messages to the editor."
+  },
+  {
+    "id": "file-reference",
+    "text": "Type @ in the editor to fuzzy-search project files and insert their paths."
+  },
+  {
+    "id": "path-completion",
+    "text": "Press tab to complete file paths while typing."
+  },
+  {
+    "id": "shortcut-overlay",
+    "text": "Type ? in an empty editor to pop up the full shortcut grid."
+  },
+  {
+    "id": "prompt-history",
+    "text": "Search prompt history across sessions with ctrl+r.",
+    "requiresCommand": "history"
+  },
+  {
+    "id": "external-editor",
+    "text": "Open the current prompt in your external editor with ctrl+g."
+  },
+  {
+    "id": "expand-tool-output",
+    "text": "Collapse or expand tool output with ctrl+o."
+  },
+  {
+    "id": "thinking-blocks",
+    "text": "Collapse or expand thinking blocks with ctrl+t."
+  },
+  {
+    "id": "paste-image",
+    "text": "Paste an image from the clipboard with ctrl+v."
+  },
+  {
+    "id": "copy-message",
+    "text": "Copy the latest assistant message with ctrl+x."
+  },
+  {
+    "id": "input-newline",
+    "text": "Insert a newline without sending with shift+enter/ctrl+j."
+  },
+  {
+    "id": "bash-prefixes",
+    "text": "Prefix a prompt with ! to run bash, or !! to run bash without adding its output to model context."
+  },
+  {
+    "id": "drag-drop-files",
+    "text": "Drag and drop files into the terminal to add their paths to your prompt."
+  },
+  {
+    "id": "favorite-models-command",
+    "text": "Use /favorite-models to choose and reorder the models in your rotation."
+  },
+  {
+    "id": "tree-command",
+    "text": "Use /tree to revisit earlier points and switch between session branches."
+  },
+  {
+    "id": "fork-command",
+    "text": "Use /fork to create a separate session from an earlier user message."
+  },
+  {
+    "id": "clone-session",
+    "text": "Use /clone to duplicate the current branch into its own session before trying something risky."
+  },
+  {
+    "id": "continue-session",
+    "text": "senpi -c continues your most recent session; senpi -r opens the session picker."
+  },
+  {
+    "id": "session-name",
+    "text": "Use /name <name> to label a session so it is easy to spot in the footer and in /resume."
+  },
+  {
+    "id": "session-info",
+    "text": "Use /session to see the session file, id, message count, tokens, and cost."
+  },
+  {
+    "id": "export-share",
+    "text": "Use /export to write the session to HTML or JSONL, or /share to upload it as a private gist link."
+  },
+  {
+    "id": "compact-command",
+    "text": "Use /compact to compact context now, or /compact <prompt> to tell the summarizer what to keep."
+  },
+  {
+    "id": "auto-compaction",
+    "text": "Auto-compaction is on by default - the (auto) marker in the footer shows it; tune it with compaction.* in settings.json."
+  },
+  {
+    "id": "help-command",
+    "text": "Use /help to see available commands and guidance.",
+    "requiresCommand": "help"
+  },
+  {
+    "id": "keybindings-command",
+    "text": "Use /keybindings to review and customize keyboard shortcuts."
+  },
+  {
+    "id": "agents-md-context",
+    "text": "senpi loads AGENTS.md from your home directory, every parent folder, and the current folder as project instructions."
+  },
+  {
+    "id": "skills-and-prompts",
+    "text": "Skills run as /skill:name, and prompt templates in ~/.senpi/agent/prompts expand as /templatename."
+  },
+  {
+    "id": "files-command",
+    "text": "Use /files to list every file this session read, wrote, or edited.",
+    "requiresCommand": "files"
+  },
+  {
+    "id": "diff-command",
+    "text": "Use /diff to review this session's git changes and open them in a diff view.",
+    "requiresCommand": "diff"
+  },
+  {
+    "id": "todo-command",
+    "text": "Use /todo to show or edit the todo list without leaving the session.",
+    "requiresCommand": "todo"
+  },
+  {
+    "id": "goal-command",
+    "text": "Use /goal to set a persistent goal senpi keeps pursuing, then pause, resume, or clear it.",
+    "requiresCommand": "goal"
+  },
+  {
+    "id": "btw-command",
+    "text": "Use /btw to ask a side question in a parallel session without disturbing this one.",
+    "requiresCommand": "btw"
+  },
+  {
+    "id": "lookat-command",
+    "text": "Use /lookat to manage the vision-model chain the look_at tool uses for images and screenshots.",
+    "requiresCommand": "lookat"
+  },
+  {
+    "id": "mcp-command",
+    "text": "Use /mcp to inspect and manage the MCP servers wired into this session.",
+    "requiresCommand": "mcp"
+  },
+  {
+    "id": "rules-command",
+    "text": "Use /rules to see which rules are loaded, and /reload-rules to re-read them mid-session.",
+    "requiresCommand": "rules"
+  },
+  {
+    "id": "hooks-command",
+    "text": "Use /hooks to list loaded hook sources and their diagnostics.",
+    "requiresCommand": "hooks"
+  },
+  {
+    "id": "websearch-command",
+    "text": "Use /websearch to check which web-search provider is currently active.",
+    "requiresCommand": "websearch"
+  },
+  {
+    "id": "settings-locations",
+    "text": "Use /settings for common options; the rest live in settings.json, with .senpi/settings.json overriding per project."
+  },
+  {
+    "id": "permission-preset",
+    "text": "Set permissionPreset to \"workspace\", \"read-only\", or \"ask\" to decide which tool calls need your approval."
+  },
+  {
+    "id": "packages-setting",
+    "text": "The packages setting loads skills, extensions, prompts, and themes from an npm or git package."
+  },
+  {
+    "id": "custom-themes",
+    "text": "Switch themes from /settings, and drop custom theme files in ~/.senpi/agent/themes."
+  },
+  {
+    "id": "reload-resources",
+    "text": "Use /reload to re-read keybindings, extensions, skills, prompts, themes, and context files without restarting."
+  },
+  {
+    "id": "project-trust",
+    "text": "Use /trust to save a trust decision so this project's settings, skills, and extensions load next time."
+  },
+  {
+    "id": "tips-toggle",
+    "text": "Set \"tips\": false in settings.json to stop showing these tips."
+  },
+  {
+    "id": "print-mode",
+    "text": "senpi -p \"question\" answers without the TUI, and piped stdin is merged into the prompt."
+  },
+  {
+    "id": "tool-flags",
+    "text": "Limit a run's tools with -t read,bash, or drop a few with -xt write,edit."
+  },
+  {
+    "id": "workflow-skills.plan",
+    "text": "Trigger \"ulw plan\" to get an explored, decision-complete plan under .omo/plans/.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.start-work",
+    "text": "Trigger \"$start-work <plan-name>\" to execute a plan end-to-end in a fresh session.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.ultrawork",
+    "text": "Trigger \"ulw\" or \"ulw loop\" for a long, evidence-driven autonomous run in ultrawork mode.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.research",
+    "text": "Trigger \"ulw-research\" for a saturating, citation-backed investigation across the codebase, docs, and the web.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.hyperplan",
+    "text": "Trigger \"hyperplan\" to have adversarial reviewers attack a plan before you commit to it.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.review",
+    "text": "Trigger \"review work\" to run parallel goal, quality, security, and hands-on QA reviews.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.init-deep",
+    "text": "Trigger \"/init-deep\" to map a project and generate a hierarchical AGENTS.md knowledge base.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.debugging",
+    "text": "Trigger \"debug this\" for parallel hypotheses, a failing regression test, a minimal fix, and real-surface QA.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.refactor",
+    "text": "Trigger \"refactor\" for codebase-aware cleanup that pins behavior before changing structure.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.remove-ai-slops",
+    "text": "Trigger \"remove AI slop\" to lock behavior first, then strip generated-code smells without drive-by rewrites.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "workflow-skills.visual-qa",
+    "text": "Trigger \"visual QA\" to capture browser or xterm evidence and review web or terminal interfaces.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "subagent-categories",
+    "text": "Delegate by category - quick, deep, ultrabrain, architect, artistry, git, writing - each runs on its own model.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "subagent-commands",
+    "text": "Use /tasks to see this session's background subagents, and /task-kill to stop one.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "subagent-config",
+    "text": "~/.omo/omo.jsonc maps every subagent category to its model, reasoning effort, and fallback chain.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "subagent-team",
+    "text": "Ask for a team when one task needs several agents at once: members share a tasklist and report back to you.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "ethos.tuning-discipline",
+    "text": "gpt-5.6-sol used to turn a sprint into a marathon. We tuned the system prompt and killed that habit: 5-minute jobs take 5 minutes, 12-hour jobs take 12."
+  },
+  {
+    "id": "ethos.tools-transparent",
+    "text": "Don't study our tools. A tool that needs studying is a tool that failed. We just ride shotgun while you keep doing your actual job."
+  },
+  {
+    "id": "ethos.only-harness",
+    "text": "The only harness that actually knows how to drive gpt-5.6-sol. Same job, feels up to 30% faster. *we counted*"
+  },
+  {
+    "id": "ethos.spend-tokens",
+    "text": "Stop hoarding tokens. Spend them like they buy your hours back, because they do."
+  },
+  {
+    "id": "ethos.deep-work",
+    "text": "Using our tools means your work is already the deep, valuable kind. Keep your eyes on the essence of your craft. The rest is our problem now, and we're great at problems."
+  },
+  {
+    "id": "ethos.ulw-plan-sage",
+    "text": "Try ulw-plan on fable-5 xhigh. A patient sage obsessed with the essence does the agonizing for you and fills in every blank you were pretending not to see.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "ethos.ulw-loop-shallow",
+    "text": "For days when deep thought sounds awful, run the ulw loop with gpt-5.6-sol fast/medium. Fair warning: shallow thinking sends invoices.",
+    "requiresCommand": "tasks"
+  },
+  {
+    "id": "ethos.monitor-subscribe",
+    "text": "Subscribe to a command's stdout and forget it. CI finishes, server boots, log line lands... you're mid-edit and the news finds *you*. No sleep loops, no polling, no re-reading context like a chump."
+  },
+  {
+    "id": "ethos.cache-budget",
+    "text": "My harness knows the prompt cache's expiry to the second and never blocks past it. Cold re-read tax? *Refused on your behalf.* Other agents eat that cost, mine declines it."
+  },
+  {
+    "id": "ethos.cache-hit-rate",
+    "text": "Live cache-hit rate in the footer, plus a running tab of misses, idle gaps, and model swaps. I can point at the exact moment cache broke and why. Watching tokens you never re-pay stack up? Smug doesn't cover it."
+  },
+  {
+    "id": "ethos.multimodal-vision",
+    "text": "Drop a screenshot, a PDF, a crusty whiteboard photo... senpi actually sees it, reads it, reasons about it. Your agent has eyes now. *Yes, really.*"
+  },
+  {
+    "id": "ethos.oauth-multi-account",
+    "text": "Hit a rate limit, switch accounts. Wrong org, switch again. senpi treats your Claude logins like a roster, not a single lifeline. *Env vars could never.*"
+  },
+  {
+    "id": "ethos.agent-sdk-foundation",
+    "text": "Built on the official agent SDK, speaking the protocol natively. No reverse-engineered wrapper, no ToS gray zone, no \"will I get banned for this\" anxiety. *Sleep easy, ship loud.*"
+  },
+  {
+    "id": "ethos.tool-call-repair",
+    "text": "senpi catches malformed tool calls on the wire, fixes them, and salvages the turn - claude's sloppy invokes, kimi k3's leaked XTML channels, all of it. Other harnesses retry the whole thing and bill you for the privilege. *table stakes, honestly*"
+  }
+]

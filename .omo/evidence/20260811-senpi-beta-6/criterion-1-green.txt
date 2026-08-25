@@ -1,0 +1,18 @@
+Scenario: exact Senpi dependency assertion after implementation
+Command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4 && bun -e 'import { readFileSync } from "node:fs"; const want="2026.8.11-4"; const pkg=JSON.parse(readFileSync("package.json","utf8")); const lock=readFileSync("bun.lock","utf8"); const declared=pkg.devDependencies?.["@code-yeongyu/senpi"]; const declarationOk=declared===want; const lockOk=lock.includes(`"@code-yeongyu/senpi": "@code-yeongyu/senpi@${want}"`)||lock.includes(`"@code-yeongyu/senpi": "${want}"`)||lock.includes(`"@code-yeongyu/senpi@${want}"`); console.log(JSON.stringify({want,declared,declarationOk,lockOk},null,2)); if(!declarationOk||!lockOk) process.exit(1);'
+
+Binary observable:
+PASS only when declarationOk=true and lockOk=true with exit code 0.
+
+Observed:
+{
+  "want": "2026.8.11-4",
+  "declared": "2026.8.11-4",
+  "declarationOk": true,
+  "lockOk": true
+}
+
+Command exited with code 0.
+GREEN PASS.
+

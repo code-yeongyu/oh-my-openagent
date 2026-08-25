@@ -1,0 +1,23 @@
+Manager-aware launcher tests RED
+
+Command:
+`npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-native/test/launcher.test.ts`
+
+Observed:
+
+```text
+Expected: "omo is updated via bun: bun add --cwd <fixture>/.bun/install/global/node_modules/omo-ai -g omo-ai@beta"
+Received: "omo is updated via npm: npm i -g omo-ai@beta"
+
+1 tests failed:
+(fail) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Bun-managed install uses a clean package cwd
+
+29 pass
+1 fail
+115 expect() calls
+Ran 30 tests across 1 file.
+EXIT_CODE=1
+```
+
+The npm-managed and unknown-layout cases passed, pinning the existing npm
+behavior and safe fallback. No production code was edited before this RED.

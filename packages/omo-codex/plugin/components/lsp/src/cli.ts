@@ -33,7 +33,7 @@ main().catch((error: unknown) => {
 
 async function runPackageLspMcpCli(): Promise<void> {
 	const cliPath = resolveLspDaemonCliPath();
-	const child = spawn(execPath, [cliPath, "mcp"], { stdio: "inherit" });
+	const child = spawn(execPath, [cliPath, "mcp"], { stdio: "inherit", windowsHide: true });
 	await new Promise<void>((resolve, reject) => {
 		child.once("error", reject);
 		child.once("exit", (code, signal) => {

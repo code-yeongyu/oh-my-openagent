@@ -1,0 +1,2 @@
+45ff21140d7f90ee215871e7d851d2828d932970467242a4e1bc18725cc85a2e  .omo/evidence/20260816-fix-6881-memory-prompt-stability/noticed-system-memory-block.txt
+45ff21140d7f90ee215871e7d851d2828d932970467242a4e1bc18725cc85a2e  .omo/evidence/20260816-fix-6881-memory-prompt-stability/quiet-system-memory-block.txt

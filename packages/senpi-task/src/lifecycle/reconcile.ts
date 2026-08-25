@@ -52,6 +52,16 @@ export async function reconcileOnSessionStart(
   // Suspended records are intentionally excluded: scoped revival may only target parentSessionId.
   for (const record of candidates) {
     if (record.parent_session_id === parentSessionId || record.residency_state !== "resident") continue
+    // A multi-session host (one shared process, one engine + registry PER session) reaches this
+    // loop for every sibling session's children. Such a record carries THIS host_pid yet is absent
+    // from this session's registry, which is indistinguishable from a crashed-process orphan by
+    // host_pid alone - and reclaiming it kills a live sibling child (an in-process record is marked
+    // lost outright). Ownership by a live session in this process is the sibling's to resolve, so
+    // defer instead of sweeping. The global sweep below keeps the single-session crash semantics.
+    if (isSameProcessSibling(context, record)) {
+      outcomes.push({ task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
+      continue
+    }
     outcomes.push(await reconcileLegacyRecord(context, record))
   }
 
@@ -189,13 +199,29 @@ async function reattachLegacyRecord(
     return { task_id: record.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
-  const respawned = await ports.respawn(record, sessionPath)
+  const reservation = ports.reserve(record)
+  if (!reservation.ok) return { task_id: record.task_id, kind: "deferred", reason: "capacity" }
+  let respawned: Awaited<ReturnType<typeof ports.respawn>>
+  try {
+    respawned = await ports.respawn(record, sessionPath)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!respawned.ok) {
+    reservation.release()
     await markLost(context, record, `reattach failed: ${respawned.reason}`)
     return { task_id: record.task_id, kind: "lost", reason: respawned.reason }
   }
-  const reattached = await ports.reattach(record, respawned.handle)
+  let reattached: Awaited<ReturnType<typeof ports.reattach>>
+  try {
+    reattached = await ports.reattach(record, respawned.handle)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!reattached.ok) {
+    reservation.release()
     if (reattached.kind === "already_attached") {
       return { task_id: record.task_id, kind: "resumed", reason: reattached.reason }
     }
@@ -221,6 +247,13 @@ async function terminateClaimedPid(context: LifecycleContext, record: TaskRecord
 
 function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): boolean {
   return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+}
+
+// A record stamped with THIS host pid that reached the candidate list is owned by another engine in
+// this process (this session's registry has no handle for it): a sibling session of a multi-session
+// host. Records with no host_pid or a dead foreign owner are NOT siblings and stay sweepable.
+function isSameProcessSibling(context: LifecycleContext, record: TaskRecord): boolean {
+  return record.host_pid === context.hostPid
 }
 
 function hasLiveResidentHandle(context: LifecycleContext, taskId: string): boolean {

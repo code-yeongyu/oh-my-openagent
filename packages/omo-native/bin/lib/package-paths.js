@@ -12,17 +12,36 @@ export function packageManifest() {
   return readJson(join(packageRoot, "package.json"))
 }
 
+function quotePosix(value) {
+  return `'${value.replaceAll("'", "'\\''")}'`
+}
+
+export function updateTarget(root = packageRoot, platform = process.platform) {
+  const updateCwd = dirname(join(root, "package.json"))
+  const normalizedRoot = updateCwd.replaceAll("\\", "/")
+  if (normalizedRoot.endsWith("/install/global/node_modules/omo-ai")) {
+    const quotedCwd = platform === "win32"
+      ? `"${normalizedRoot}"`
+      : quotePosix(updateCwd)
+    return {
+      manager: "bun",
+      command: `bun add --cwd ${quotedCwd} -g omo-ai@beta`,
+    }
+  }
+  return { manager: "npm", command: "npm i -g omo-ai@beta" }
+}
+
 export function resolveSenpi() {
   let indexPath
   try {
     indexPath = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))
   } catch (error) {
-    throw new Error(`could not resolve @code-yeongyu/senpi; reinstall with: npm i -g omo-ai@beta (${error.message})`)
+    throw new Error(`could not resolve @code-yeongyu/senpi; reinstall with: ${updateTarget().command} (${error.message})`)
   }
 
   const cliPath = join(dirname(indexPath), "cli.js")
   if (!existsSync(cliPath)) {
-    throw new Error(`senpi CLI is missing at ${cliPath}; reinstall with: npm i -g omo-ai@beta`)
+    throw new Error(`senpi CLI is missing at ${cliPath}; reinstall with: ${updateTarget().command}`)
   }
   return { cliPath, packageRoot: dirname(dirname(indexPath)) }
 }

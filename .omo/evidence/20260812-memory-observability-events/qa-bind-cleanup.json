@@ -1,0 +1,3 @@
+{"cleanupReceipt":["removed sandbox /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.ojrkce3Y4v"]}
+external sandbox removal confirmed by absent path: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.ojrkce3Y4v
+manual cleanup confirmed after late agents directory recreation: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.ojrkce3Y4v absent

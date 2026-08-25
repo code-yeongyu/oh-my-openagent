@@ -155,7 +155,7 @@ describe("createTaskChildPlanner", () => {
       reasoning: "low",
     })
     expect(resolved.plan.agentType).toBe("explore")
-    expect(resolved.plan.instructions).toContain("codebase search specialist")
+    expect(resolved.plan.instructions).toBe(BUILTIN_AGENTS.explore?.prompt)
     expect(resolved.plan.toolAllowlist).toEqual([
       "read",
       "find",

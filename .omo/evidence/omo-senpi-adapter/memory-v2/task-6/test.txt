@@ -1,0 +1,48 @@
+TASK 6 - Soul v2: seeds + <self> + template bump
+================================================
+
+RED (before implementation) - see red.txt for full output
+---------------------------------------------------------
+Command: bun test packages/memory-core/src/compile
+  13 pass / 3 fail. The two new todo-6 tests fail exactly on the identity-placement
+  branch the todo names: with no render change, system/identity.md renders inside
+  <memory> as a generic <identity> node and <self> never gains its projection.
+    (fail) compileMemoryBlock > #given a committed persona and identity #when compiled
+           #then both render under <self> and identity stays out of the generic memory tier
+    (fail) compileMemoryBlock > #given only a committed identity #when compiled
+           #then it renders under <self> without a persona
+  The third fail in that run (MemoryBlockCache latest-variant) belonged to todo 3's
+  concurrently in-flight cache.test.ts, not to this task.
+Command: bun test packages/omo-senpi/src/components/memory/prompt.test.ts
+  7 pass / 1 fail:
+    (fail) MEMORY_PROMPT_TEMPLATE > ... Expected "omo-senpi:before_agent_start:v2"
+           Received "omo-senpi:before_agent_start:v1"
+
+GREEN (after implementation) - see green.txt for full output
+------------------------------------------------------------
+Command: bun test packages/memory-core/src/compile packages/memory-core/src/seeds
+  29 pass / 0 fail (includes the prose-agnostic golden fixtures from todo 2 and the
+  new persona-identity.golden.txt; persona-only golden unchanged proves the
+  identity-absent block stays v1-shaped)
+Command: bun test packages/omo-senpi/src/components/memory/prompt.test.ts
+  8 pass / 0 fail (template id is omo-senpi:before_agent_start:v2)
+
+FULL PACKAGE RUNS
+-----------------
+See full-runs.txt. Concurrent agents (todos 3, 8, 15, 16, 25) share this branch and
+their uncommitted RED states fail full-package runs while they work; every failure
+observed was triaged to a file this task does not touch. Final state at commit time
+is recorded in full-runs.txt.
+
+PRE-EXISTING (not this task, verified on pristine origin/dev per task brief)
+----------------------------------------------------------------------------
+bun test packages/omo-senpi/src/components/ulw-loop:
+  44 pass / 1 fail - (fail) omo-senpi ulw-loop runtime > #given OMO_BIN is set #when
+  resolving the default omo binary #then Bun is not needed and PATH is ignored
+  Reproduced in this worktree; exists on pristine origin/dev; not fixed here.
+
+PROSE
+-----
+Persona seed v2 body and the skill's identity-card section are pure prose with no
+machine consumer: no wording test exists or was added (test-discipline.md).
+QA-by-read: qa-by-read.md.

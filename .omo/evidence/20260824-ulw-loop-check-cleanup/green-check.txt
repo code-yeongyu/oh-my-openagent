@@ -1,0 +1,18 @@
+WHAT WAS TESTED
+npm --prefix packages/omo-codex/plugin/components/ulw-loop run check
+
+OBSERVED GREEN
+Exit code: 0.
+TypeScript `tsc --noEmit`: passed.
+Biome: checked 82 files, no fixes or diagnostics.
+Build: `tsc -p tsconfig.build.json` passed.
+
+RED TO GREEN
+Before the patch, the same command exited 1 with three errors, one warning, and two configuration infos.
+After the patch, it exits 0 with no Biome findings.
+
+WHY IT IS ENOUGH
+This is the exact component quality gate that previously failed. It exercises the migrated Biome configuration, formatter output, lint rules, type checker, and build in one command.
+
+WHAT WAS OMITTED
+No credentials, tokens, or secret-bearing logs were captured.

@@ -1,0 +1,14 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/dag-wake.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'DAG_VERIFICATION_DIRECTIVE' not found in module '/private/tmp/ulw-wt-dag-directive/packages/senpi-task/src/index.ts'.
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [555.00ms]

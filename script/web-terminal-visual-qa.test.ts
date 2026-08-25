@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { BUILT_IN_REDACTION_RULE_COUNT } from "./qa/web-terminal-redaction.mjs"
+import { unsafeTestValue } from "../test-support/unsafe-test-value"
 
 const helperFilePath = fileURLToPath(new URL("./qa/web-terminal-visual-qa.mjs", import.meta.url))
 
@@ -117,6 +118,87 @@ describe("web terminal visual QA helper", () => {
     expect(stdoutText).toContain("xterm.js")
     expect(stdoutText).toContain("NEVER tmux")
     expect(stdoutText).toContain("The raw --command string is never stored")
+  })
+
+  test("#given wheel input tokens #when driving the browser terminal #then mouse wheel events target the xterm viewport", async () => {
+    // given
+    const module = await import("./qa/xterm-live-terminal.mjs") as {
+      driveInput?: (
+        page: unknown,
+        inputs: readonly string[],
+        keyDelayMs: number,
+      ) => Promise<void>
+    }
+    const wheel = mock(async () => undefined)
+    const move = mock(async () => undefined)
+    const page = unsafeTestValue({
+      $: async () => ({
+        boundingBox: async () => ({
+          x: 10,
+          y: 20,
+          width: 120,
+          height: 80,
+        }),
+      }),
+      mouse: {
+        move,
+        wheel,
+      },
+      keyboard: {
+        press: async () => undefined,
+        down: async () => undefined,
+        up: async () => undefined,
+        type: async () => undefined,
+      },
+    })
+
+    // when
+    expect(module.driveInput).toBeInstanceOf(Function)
+    if (!module.driveInput) return
+    await module.driveInput(page, ["{WheelDown}", "{WheelUp}"], 0)
+
+    // then
+    expect(move).toHaveBeenCalledTimes(2)
+    expect(move).toHaveBeenNthCalledWith(1, 70, 60)
+    expect(move).toHaveBeenNthCalledWith(2, 70, 60)
+    expect(wheel).toHaveBeenNthCalledWith(1, {
+      deltaY: 720,
+    })
+    expect(wheel).toHaveBeenNthCalledWith(2, {
+      deltaY: -720,
+    })
+  })
+
+  test("#given the Ctrl slash byte token #when driving the browser bridge #then the exact terminal control sequence reaches the PTY", async () => {
+    // given
+    const module = await import("./qa/xterm-live-terminal.mjs") as {
+      driveInput?: (
+        page: unknown,
+        inputs: readonly string[],
+        keyDelayMs: number,
+      ) => Promise<void>
+    }
+    const evaluate = mock(async (
+      _callback: unknown,
+      _data: string,
+    ) => undefined)
+    const page = unsafeTestValue({
+      evaluate,
+    })
+
+    // when
+    expect(module.driveInput).toBeInstanceOf(Function)
+    if (!module.driveInput) return
+    await module.driveInput(
+      page,
+      ["{CtrlSlashByte}", "{Ctrl7Byte}"],
+      0,
+    )
+
+    // then
+    expect(evaluate).toHaveBeenCalledTimes(2)
+    expect(evaluate.mock.calls[0]?.[1]).toBe("\u001f")
+    expect(evaluate.mock.calls[1]?.[1]).toBe("\u001f")
   })
 
   test("#given conflicting sources #when both --from-file and --command are given #then it errors", async () => {

@@ -10,6 +10,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     platform: "opencode",
     hasOpenCode: true,
     hasCodex: false,
+    hasSenpi: false,
     codexAutonomous: false,
     hasClaude: false,
     isMax20: false,
@@ -216,6 +217,24 @@ describe("generateModelConfig provider routes", () => {
   })
 
   describe("Vercel AI Gateway provider", () => {
+    test("does not add gateway or OpenCode Zen routes to fallback lanes", () => {
+      // given native, OpenCode Zen, and Vercel AI Gateway providers are available
+      const config = createConfig({
+        hasOpenAI: true,
+        hasClaude: true,
+        hasOpencodeZen: true,
+        hasVercelAiGateway: true,
+      })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+      const serializedFallbacks = JSON.stringify(result.agents?.explore?.fallback_models ?? [])
+
+      // then only native provider routes remain in the fallback lane
+      expect(serializedFallbacks).not.toContain('"model":"opencode/')
+      expect(serializedFallbacks).not.toContain('"model":"vercel/')
+    })
+
     test("explore uses gateway minimax when only gateway is available", () => {
       // given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })

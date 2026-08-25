@@ -1,114 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-
-import {
-  buildIdentityPaths,
-  ReflectionReservationStore,
-  TranscriptJournal,
-  type MemoryIdentity,
-  type ReflectionRequest,
-} from "@oh-my-opencode/memory-core"
-
+import { describe, expect, test } from "bun:test"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { MemoryPendingLedger } from "./context"
-import { memorySettings } from "./memory.test-support"
-import {
-  createReflectionTriggerWiring,
-  resolveReflectionTriggerConfig,
-  type ReflectionTriggerSession,
-} from "./trigger-wiring"
-
-const CONVERSATION = "conversation-a"
-
-const roots: string[] = []
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
-
-type Fixture = {
-  readonly pi: FakeExtensionAPI
-  readonly ledger: MemoryPendingLedger
-  readonly store: ReflectionReservationStore
-  readonly launches: ReflectionRequest[]
-  readonly logs: Array<{ level: string; message: string; details?: unknown }>
-  readonly wiring: ReturnType<typeof createReflectionTriggerWiring>
-}
-
-async function fixture(options: {
-  readonly stepCount?: number
-  readonly onCompaction?: boolean
-  readonly steps?: number
-  readonly onLaunch?: (request: ReflectionRequest) => void
-  readonly withoutLaunchHandler?: boolean
-  readonly session?: ReflectionTriggerSession | undefined
-} = {}): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), "omo-trigger-wiring-"))
-  roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
-  const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, CONVERSATION) })
-  await journal.reconcile(
-    Array.from({ length: options.steps ?? 2 }, (_value, index) => ({
-      kind: "assistant" as const,
-      messageId: `assistant-${index + 1}`,
-      textBlocks: [`step ${index + 1}`],
-    })),
-  )
-  let nextRunId = 0
-  const store = new ReflectionReservationStore({
-    identity,
-    config: { stepCount: options.stepCount ?? 1, onCompaction: options.onCompaction ?? true },
-    getJournal: async (conversationId) => {
-      if (conversationId !== CONVERSATION) throw new Error(`missing journal: ${conversationId}`)
-      return journal
-    },
-    createRunId: () => `run-${++nextRunId}`,
-  })
-
-  const ledger: MemoryPendingLedger = { pendingCompaction: false, configRestartNotified: false }
-  const launches: ReflectionRequest[] = []
-  const logs: Array<{ level: string; message: string; details?: unknown }> = []
-  const session: ReflectionTriggerSession = { conversationId: CONVERSATION, ledger, engine: store }
-  const resolvedSession = "session" in options ? options.session : session
-
-  const pi = new FakeExtensionAPI()
-  const wiring = createReflectionTriggerWiring({
-    resolveSession: () => resolvedSession,
-    ...(options.withoutLaunchHandler === true
-      ? {}
-      : { onLaunch: options.onLaunch ?? ((request: ReflectionRequest) => void launches.push(request)) }),
-    logger: {
-      info: (message, details) => logs.push({ level: "info", message, details }),
-      warn: (message, details) => logs.push({ level: "warn", message, details }),
-      error: (message, details) => logs.push({ level: "error", message, details }),
-    },
-  })
-  wiring.register(pi)
-  return { pi, ledger, store, launches, logs, wiring }
-}
-
-async function agentEnd(pi: FakeExtensionAPI, payload: Record<string, unknown> = {}): Promise<void> {
-  await pi.dispatch("agent_end", { type: "agent_end", messages: [], ...payload })
-}
-
-async function settle(pi: FakeExtensionAPI): Promise<void> {
-  await pi.dispatch("agent_settled", { type: "agent_settled" })
-}
-
-async function successfulSettle(pi: FakeExtensionAPI): Promise<void> {
-  await agentEnd(pi)
-  await settle(pi)
-}
-
-async function compact(pi: FakeExtensionAPI, accepted: boolean): Promise<void> {
-  await pi.dispatch(
-    "session_compact",
-    accepted
-      ? { type: "session_compact", reason: "auto", requestId: "compact-1", accepted: true, fromExtension: false, willRetry: true }
-      : { type: "session_compact", reason: "manual", requestId: "compact-1", accepted: false, rejectionCause: "cancelled-by-extension", fromExtension: false, willRetry: false },
-  )
-}
+import { createReflectionTriggerWiring, type ReflectionTriggerSession } from "./trigger-wiring"
+import { CONVERSATION, compact, fixture, successfulSettle, agentEnd, settle } from "./trigger-wiring.test-support"
 
 describe("reflection trigger wiring", () => {
   test("#given a met step threshold #when a clean run settles #then exactly one step-count launch fires with no visible message", async () => {
@@ -349,31 +242,42 @@ describe("reflection trigger wiring", () => {
     expect(logs.filter((entry) => entry.level === "warn")).toHaveLength(1)
     expect(base.launches).toEqual([])
   })
-})
 
-describe("resolveReflectionTriggerConfig", () => {
-  test("#given resolved memory settings #when no agent override applies #then the base trigger config is used", () => {
-    expect(resolveReflectionTriggerConfig(memorySettings())).toEqual({ stepCount: 0, onCompaction: true })
-    expect(
-      resolveReflectionTriggerConfig(
-        memorySettings({
-          reflection: { trigger: { step_count: 4, on_compaction: false }, merge: "auto", category: "quick", timeout_minutes: 15, sandbox: "auto" },
-        }),
-      ),
-    ).toEqual({ stepCount: 4, onCompaction: false })
+  test("#given reflection disabled #when a clean run settles #then no reservation is made and no launch fires", async () => {
+    const { pi, launches, store } = await fixture({ stepCount: 1, enabled: false })
+
+    await successfulSettle(pi)
+
+    expect(launches).toEqual([])
+    expect((await store.readState()).active).toBeUndefined()
   })
 
-  test("#given a per-agent override #when the bound agent matches #then its trigger fields win field by field", () => {
-    const settings = memorySettings({
-      reflection: { trigger: { step_count: 4, on_compaction: false }, merge: "auto", category: "quick", timeout_minutes: 15, sandbox: "auto" },
-      agents: {
-        writer: { reflection: { trigger: { step_count: 9 } } },
-        reviewer: { reflection: { trigger: { on_compaction: true } } },
-      },
-    })
+  test("#given reflection disabled #when a pending compaction is consumed at settle #then no compaction launch fires", async () => {
+    const { pi, launches, store, ledger } = await fixture({ stepCount: 1, enabled: false })
 
-    expect(resolveReflectionTriggerConfig(settings, "writer")).toEqual({ stepCount: 9, onCompaction: false })
-    expect(resolveReflectionTriggerConfig(settings, "reviewer")).toEqual({ stepCount: 4, onCompaction: true })
-    expect(resolveReflectionTriggerConfig(settings, "unknown-agent")).toEqual({ stepCount: 4, onCompaction: false })
+    await compact(pi, true)
+    await successfulSettle(pi)
+
+    expect(ledger.pendingCompaction).toBe(false)
+    expect(launches).toEqual([])
+    expect((await store.readState()).active).toBeUndefined()
+  })
+
+  test("#given reflection disabled #when a manual request is made #then no launch fires", async () => {
+    const { launches, wiring } = await fixture({ stepCount: 0, enabled: false })
+
+    wiring.requestManualReflection("ignored")
+    await wiring.whenIdle()
+
+    expect(launches).toEqual([])
+  })
+
+  test("#given reflection enabled #when a clean run settles #then the launch fires exactly as before", async () => {
+    const { pi, launches } = await fixture({ stepCount: 1, enabled: true })
+
+    await successfulSettle(pi)
+
+    expect(launches).toHaveLength(1)
+    expect(launches[0]?.trigger).toBe("step-count")
   })
 })

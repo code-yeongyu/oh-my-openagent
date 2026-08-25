@@ -1,4 +1,4 @@
-Reminder: <projection> contains the local path of the memory file projection. <memory> is your persistent memory across conversations: consult it before asking the user anything it may already answer, and save durable facts, preferences, decisions, and corrections with the memory tools as soon as they emerge instead of waiting to be asked.
+<reminder/>
 
 <self>
 <projection>$MEMORY_DIR/system/persona.md</projection>
@@ -7,7 +7,4 @@ Committed persona.
 
 <memory_metadata>
 - AGENT_ID: persona-agent
-- CONVERSATION_ID: persona-conversation
-- System prompt last recompiled: 2026-05-04 12:00:00 AM UTC+0000
-- 2 previous messages between you and the user are stored in recall memory
 </memory_metadata>

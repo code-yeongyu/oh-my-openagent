@@ -1,0 +1,75 @@
+Task: F2 test-discipline rework for memory-v2 active learning
+Date: 2026-08-10
+
+Reworks
+
+1. packages/memory-core/src/compile/compile.test.ts
+- Removed full-text golden comparisons.
+- Added a prose-agnostic structural parser for top-level section ordering, balanced section boundaries, projection paths, nested memory tag order, and parsed metadata values.
+- Metadata assertions now cover agent id, conversation id, compile timestamp, previous-message count, nudge-turn count, and soul short sha as machine values.
+- Test-supplied body sentinels retain inclusion and exclusion coverage without pinning prose.
+
+2. packages/memory-core/src/tools/memory-apply-patch.test.ts
+- Removed the output-length ceiling.
+- Kept behavioral truncation coverage through the runtime truncation markers, omission of oversized source chunks, and the typed MemoryPatchHunkError result.
+
+3. packages/omo-senpi/src/components/memory/commands/sleeptime.test.ts
+- Replaced rendered sentence assertions with exact resolved values and per-field override flags.
+- Added the minimal additive production seam resolveSleeptimeSettings in sleeptime.ts; the command renderer now consumes the same structured result tested by the suite.
+- Command-level coverage asserts notification level and identity between returned and notified artifacts, not wording.
+
+4. packages/omo-senpi/src/components/memory/commands/doctor.test.ts
+- Retained the stable abandoned-runs diagnostic key and run-directory value.
+- Removed the manual-disposal phrase pin.
+
+5. packages/omo-senpi/src/components/memory/commands/dream.test.ts
+- Directly verifies non-session JSONL raises TypeError.
+- Verifies no dream request is submitted and the same structured error is surfaced through an error notification.
+
+6. packages/omo-senpi/src/components/memory/commands/people.test.ts
+- Replaced roster prose checks with exact node and edge sets.
+- Replaced close-match prose with PersonQueryResolution.
+- Replaced rendered card and observation phrases with parsed card entries and exact selected observation dates.
+- Replaced abstention wording with hasNoEvidence and no-child-launch behavior.
+- Replaced child-answer and disabled wording pins with structured request evidence and notification state.
+
+7. packages/omo-senpi/src/mcp/memory-server.test.ts
+- Replaced success phrases with JSON-RPC isError state, parsed committed file values, git subjects and trailers, and structured receipt fields.
+- Retained failure/no-receipt behavior through receipt filesystem state.
+
+Mutation checks
+
+Each mutation was test-local, injected a representative broken runtime result, was run with Bun against the focused test, failed as expected, and was restored before final verification.
+
+- compile-structure: removed a memory closing boundary before structural parsing; failure detected.
+- apply-patch-truncation: changed the expected runtime truncation count token; failure detected.
+- sleeptime-values: changed the resolved default step count; failure detected.
+- doctor-diagnostic-key: changed the stable abandoned-runs diagnostic key; failure detected.
+- dream-structured-error: changed the expected structured error type; failure detected.
+- people-edge-set: changed a derived relationship predicate; failure detected.
+- people-card-evidence: changed a parsed card field value; failure detected.
+- people-abstention: inverted the no-evidence decision; failure detected.
+- memory-server-commit-state: changed the expected committed body value; failure detected.
+- memory-server-receipt: changed the expected receipt version; failure detected.
+
+Verification
+
+- bun test packages/memory-core
+  Result: 418 pass, 0 fail, 3661 expect calls, 51 files.
+
+- bun test packages/omo-senpi/src/components/memory/commands packages/omo-senpi/src/mcp
+  Result: 124 pass, 0 fail, 393 expect calls, 18 files.
+
+- Focused affected files before package verification
+  Result after correction: all affected tests green. The final package runs above are authoritative.
+
+- Banned-shape audit over all owned tests
+  Result: no audited prose phrase pins, full-text golden equality, snapshot, phrase count, or length-ceiling pattern remained.
+
+- git diff --check over all owned changed files
+  Result: clean.
+
+Production seams
+
+- Added only resolveSleeptimeSettings plus its structured result types and stable override marker export in packages/omo-senpi/src/components/memory/commands/sleeptime.ts.
+- No other production source was changed for this task.

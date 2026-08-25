@@ -1,0 +1,19 @@
+Manager-aware launcher tests GREEN
+
+Command:
+`npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-native/test/launcher.test.ts`
+
+```text
+30 pass
+0 fail
+116 expect() calls
+Ran 30 tests across 1 file.
+EXIT_CODE=0
+```
+
+The suite covers:
+
+- Bun-managed package layout -> `bun add --cwd "<packageRoot>" -g omo-ai@beta`
+- npm-managed package layout -> `npm i -g omo-ai@beta`
+- unknown package layout -> safe npm fallback
+- missing Senpi dependency -> manager-matched reinstall guidance

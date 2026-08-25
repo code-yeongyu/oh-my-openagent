@@ -1,0 +1,49 @@
+WHAT WAS TESTED
+
+From `packages/omo-codex/plugin`, one fail-fast command ran:
+
+1. `node --test test/*.test.mjs`
+2. `npm --prefix components/rules test`
+3. `npm --prefix components/rules run typecheck`
+4. `npm --prefix components/ultrawork test`
+5. `npm --prefix components/ultrawork run typecheck`
+6. `npm --prefix components/ulw-loop test`
+7. `npm --prefix components/ulw-loop run typecheck`
+8. `npm --prefix components/start-work-continuation test`
+9. `npm --prefix components/start-work-continuation run typecheck`
+10. `npm --prefix components/lazycodex-executor-verify test`
+11. `npm --prefix components/lazycodex-executor-verify run typecheck`
+
+The command printed `CODEX_FOCUSED_VERIFICATION_OK` only after every command
+completed successfully.
+
+WHAT WAS OBSERVED
+
+- Combined command: exit 0; completion sentinel observed.
+- Root plugin suite: 324/324 passed.
+- Rules component: 167/167 passed; typecheck exit 0.
+- Ultrawork component: 24/24 passed; typecheck exit 0.
+- ulw-loop component: 420/420 passed; typecheck exit 0.
+- start-work-continuation: 42/42 passed; typecheck exit 0.
+- lazycodex-executor-verify: 25/25 passed; typecheck exit 0.
+- Codex diff integrity: `git diff --check` exit 0.
+- Added `.skip(` / `.only(` guard: zero branch additions.
+- Every Codex branch change is a test-file modification or deletion.
+- The current manifest audit has no `packages/omo-codex/` result. The global
+  scanner remains under active hardening after the deep audit found incomplete
+  all-repository coverage.
+
+WHY IT IS ENOUGH
+
+The root suite plus all five affected component suites execute the retained
+machine fields, shipped-copy equality, parser, hook-routing, state, security,
+CLI, and runtime behaviors after the prose assertions were removed. Every
+affected TypeScript component also typechecks, and no skip/only weakening was
+introduced.
+
+WHAT WAS OMITTED
+
+The full terminal stream is not duplicated. This artifact records the exact
+ordered commands, component pass totals, typecheck results, combined exit, and
+completion sentinel. No credentials, environment dumps, or private logs were
+captured.

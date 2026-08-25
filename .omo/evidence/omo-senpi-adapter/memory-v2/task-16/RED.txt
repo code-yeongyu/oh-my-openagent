@@ -1,0 +1,252 @@
+=== RED: frontmatter-kind-aliases.test.ts ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:
+18 | 
+19 |     it("#then parseMemoryFile extracts kind and aliases", () => {
+20 |       const parsed = parseMemoryFile(content)
+21 | 
+22 |       expect(parsed.frontmatter.description).toBe("Person - Yeongyu")
+23 |       expect(parsed.frontmatter.kind).toBe("person")
+                                           ^
+error: expect(received).toBe(expected)
+
+Expected: "person"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:23:39)
+(fail) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then parseMemoryFile extracts kind and aliases [1.65ms]
+28 |     it("#then renderMemoryFile emits kind then aliases after description", () => {
+29 |       const parsed = parseMemoryFile(content)
+30 |       const rendered = renderMemoryFile(parsed.frontmatter, parsed.body)
+31 | 
+32 |       expect(rendered).toContain("description: Person - Yeongyu")
+33 |       expect(rendered).toContain("kind: person")
+                            ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "kind: person"
+Received: "---\ndescription: Person - Yeongyu\n---\nBody text."
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:33:24)
+(fail) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then renderMemoryFile emits kind then aliases after description [0.14ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then round-trip parse -> render -> parse is stable [0.07ms]
+59 |     ].join("\n")
+60 | 
+61 |     it("#then parseMemoryFile extracts kind and leaves aliases undefined", () => {
+62 |       const parsed = parseMemoryFile(content)
+63 | 
+64 |       expect(parsed.frontmatter.kind).toBe("person")
+                                           ^
+error: expect(received).toBe(expected)
+
+Expected: "person"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:64:39)
+(fail) frontmatter kind + aliases (IC-13) > #given a file with kind but no aliases > #then parseMemoryFile extracts kind and leaves aliases undefined [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind but no aliases > #then renderMemoryFile omits aliases when undefined [0.06ms]
+84 | 
+85 |     it("#then parseMemoryFile extracts aliases and leaves kind undefined", () => {
+86 |       const parsed = parseMemoryFile(content)
+87 | 
+88 |       expect(parsed.frontmatter.kind).toBeUndefined()
+89 |       expect(parsed.frontmatter.aliases).toEqual(["A", "B"])
+                                              ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "A",
+-   "B",
+- ]
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:89:42)
+(fail) frontmatter kind + aliases (IC-13) > #given a file with aliases but no kind > #then parseMemoryFile extracts aliases and leaves kind undefined [0.14ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with aliases but no kind > #then renderMemoryFile omits kind when undefined [0.06ms]
+111 |     it("#then parseMemoryFile preserves all fields", () => {
+112 |       const parsed = parseMemoryFile(content)
+113 | 
+114 |       expect(parsed.frontmatter.description).toBe("Full frontmatter")
+115 |       expect(parsed.frontmatter.read_only).toBe("true")
+116 |       expect(parsed.frontmatter.kind).toBe("person")
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: "person"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:116:39)
+(fail) frontmatter kind + aliases (IC-13) > #given a file with read_only, kind, and aliases together > #then parseMemoryFile preserves all fields [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with read_only, kind, and aliases together > #then renderMemoryFile emits all fields in order [0.04ms]
+134 |       "---",
+135 |       "Body.",
+136 |     ].join("\n")
+137 | 
+138 |     it("#then parseMemoryFile throws FrontmatterError", () => {
+139 |       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
+                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: FrontmatterError
+
+Received function did not throw
+Received value: {
+  frontmatter: {
+    description: "Bad aliases",
+  },
+  body: "Body.",
+}
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:139:46)
+(fail) frontmatter kind + aliases (IC-13) > #given aliases that is not a JSON array > #then parseMemoryFile throws FrontmatterError [0.08ms]
+148 |       "---",
+149 |       "Body.",
+150 |     ].join("\n")
+151 | 
+152 |     it("#then parseMemoryFile throws FrontmatterError", () => {
+153 |       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
+                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: FrontmatterError
+
+Received function did not throw
+Received value: {
+  frontmatter: {
+    description: "Bad aliases",
+  },
+  body: "Body.",
+}
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:153:46)
+(fail) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON array with empty strings > #then parseMemoryFile throws FrontmatterError [0.06ms]
+162 |       "---",
+163 |       "Body.",
+164 |     ].join("\n")
+165 | 
+166 |     it("#then parseMemoryFile throws FrontmatterError", () => {
+167 |       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
+                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: FrontmatterError
+
+Received function did not throw
+Received value: {
+  frontmatter: {
+    description: "Bad aliases",
+  },
+  body: "Body.",
+}
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:167:46)
+(fail) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON array of non-strings > #then parseMemoryFile throws FrontmatterError [0.08ms]
+176 |       "---",
+177 |       "Body.",
+178 |     ].join("\n")
+179 | 
+180 |     it("#then parseMemoryFile throws FrontmatterError", () => {
+181 |       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
+                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: FrontmatterError
+
+Received function did not throw
+Received value: {
+  frontmatter: {
+    description: "Bad aliases",
+  },
+  body: "Body.",
+}
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:181:46)
+(fail) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON object (not array) > #then parseMemoryFile throws FrontmatterError [0.07ms]
+197 |       const parsed = parseMemoryFile(content)
+198 |       const newBody = parsed.body.replace("Software engineer", "Senior engineer")
+199 |       const rendered = renderMemoryFile(parsed.frontmatter, newBody)
+200 |       const reparsed = parseMemoryFile(rendered)
+201 | 
+202 |       expect(reparsed.frontmatter.kind).toBe("person")
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: "person"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:202:41)
+(fail) frontmatter kind + aliases (IC-13) > #given a card edit via str_replace keeps kind+aliases (IC-13 round-trip through memory tool) > #then parse -> render -> parse preserves kind+aliases through body edit [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a card edit via apply_patch keeps kind+aliases (IC-13 round-trip) > #then the full file round-trips through parse+render preserving frontmatter [0.04ms]
+236 |     ].join("\n")
+237 | 
+238 |     it("#then parseMemoryFile accepts it as an empty array", () => {
+239 |       const parsed = parseMemoryFile(content)
+240 | 
+241 |       expect(parsed.frontmatter.aliases).toEqual([])
+                                               ^
+error: expect(received).toEqual(expected)
+
+Expected: []
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:241:42)
+(fail) frontmatter kind + aliases (IC-13) > #given an empty aliases array > #then parseMemoryFile accepts it as an empty array [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given an empty aliases array > #then renderMemoryFile round-trips empty aliases [0.04ms]
+260 |     ].join("\n")
+261 | 
+262 |     it("#then parseMemoryFile preserves kind verbatim", () => {
+263 |       const parsed = parseMemoryFile(content)
+264 | 
+265 |       expect(parsed.frontmatter.kind).toBe("something complex")
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: "something complex"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:265:39)
+(fail) frontmatter kind + aliases (IC-13) > #given kind as a multi-word value > #then parseMemoryFile preserves kind verbatim [0.07ms]
+278 |     it("#then parseMemoryFile preserves them through round-trip", () => {
+279 |       const parsed = parseMemoryFile(content)
+280 |       const rendered = renderMemoryFile(parsed.frontmatter, parsed.body)
+281 |       const reparsed = parseMemoryFile(rendered)
+282 | 
+283 |       expect(reparsed.frontmatter.aliases).toEqual(["O'Brien", 'Quote"Name'])
+                                                 ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "O'Brien",
+-   "Quote"Name",
+- ]
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:283:44)
+(fail) frontmatter kind + aliases (IC-13) > #given aliases with special characters in names > #then parseMemoryFile preserves them through round-trip [0.07ms]
+
+ 6 pass
+ 13 fail
+ 24 expect() calls
+Ran 19 tests across 1 file. [76.00ms]
+=== RED: people/format.test.ts ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/people/format.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './format' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/people/format.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [68.00ms]

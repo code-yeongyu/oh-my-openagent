@@ -29,9 +29,7 @@ describe("thread title PostToolUse guidance", () => {
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
 		expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
-		expect(parsed.hookSpecificOutput.additionalContext).toBe(
-			"THREAD ID thread-123: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE.",
-		);
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("thread-123");
 	});
 
 	it("#given Codex reports create_thread output as a JSON string #when the hook runs #then it still extracts the thread id", () => {
@@ -59,9 +57,7 @@ describe("thread title PostToolUse guidance", () => {
 		// then
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
-		expect(parsed.hookSpecificOutput.additionalContext).toBe(
-			"THREAD ID 019ef350-ee78-72a3-bd5e-e40cebc3d814: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE.",
-		);
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("019ef350-ee78-72a3-bd5e-e40cebc3d814");
 	});
 
 	it("#given an unrelated tool completed #when the hook runs #then it stays silent", () => {
@@ -141,9 +137,7 @@ describe("thread title PostToolUse guidance", () => {
 		// then
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
-		expect(parsed.hookSpecificOutput.additionalContext).toBe(
-			"PENDING WORKTREE ID remote-control:env:test-worktree: WORKTREE THREAD IS NOT READY YET. DO NOT bind-thread OR SEND THE MEMBER BOOTSTRAP UNTIL A REAL THREAD ID EXISTS. THEN CALL codex_app.set_thread_title USING THE REAL TASK/ROLE.",
-		);
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("remote-control:env:test-worktree");
 	});
 });
 

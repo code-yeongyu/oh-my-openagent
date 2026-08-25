@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { rm } from "node:fs/promises"
 
 import { CONFIG_KEY } from "@oh-my-opencode/memory-core"
@@ -18,8 +18,17 @@ const tempDirs: string[] = []
 // Port 1 on loopback refuses immediately, so mirror pushes fail fast and offline.
 const CREDENTIALED_URL = "https://user:s3cr3t-token@127.0.0.1:1/memory.git"
 
+// test-setup.ts raises the default timeout in a preload, but Bun only honours a preload's
+// setDefaultTimeout for the FIRST test file of a run (verified on 1.3.14 and 1.4); every later
+// file silently falls back to the built-in 5000ms. Every test here builds a real git repo,
+// which costs 1.6-5.7s per harness() on a Windows runner, so the un-annotated tests sit on
+// that cliff: Bun kills the in-flight `git commit`, exec reports the kill as exit 1 with empty
+// output, and the rejection surfaces as "Unhandled error between tests". Set the budget in
+// this file, where Bun does honour it.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
+
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 const SEEDS = [

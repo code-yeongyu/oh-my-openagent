@@ -72,6 +72,9 @@ describe("build:omo-native staged payload", () => {
 
           const required = [
             join("extensions", "omo.js"),
+            join("extensions", "reflection-persona.md"),
+            join("extensions", "dream-persona.md"),
+            join("extensions", "facts-persona.md"),
             join("runtime", "ast-grep-mcp", "cli.js"),
             join("runtime", "agent-toolkit", "cli.js"),
             join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -113,8 +116,18 @@ describe("build:omo-native staged payload", () => {
             "scripts/install.mjs",
           ])
 
-          expect(readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8")).toBe(
-            "/plugin/\n",
+          expect(
+            readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8").replaceAll(
+              "\r\n",
+              "\n",
+            ),
+          ).toBe("/plugin/\n")
+
+          rmSync(join(outputDir, "extensions", "dream-persona.md"))
+          const missingPersona = runBuild(["--output", outputDir, "--check-only"])
+          expect(missingPersona.exitCode).toBe(1)
+          expect(missingPersona.output).toContain(
+            `missing required artifact: ${join("extensions", "dream-persona.md")}`,
           )
         },
         fullBuildTimeoutMs,

@@ -1,0 +1,18 @@
+{
+  "label": "after",
+  "driverStarted": true,
+  "parentPid": 7912,
+  "terminationChildren": [
+    {
+      "name": "node.exe",
+      "pid": 16404,
+      "console": {
+        "attached": true,
+        "errorCode": 0,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    }
+  ],
+  "visibleConsoleWindows": 0
+}

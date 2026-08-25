@@ -1,5 +1,7 @@
 export declare const DEFAULT_POSTHOG_HOST: "https://us.i.posthog.com";
 export declare const DEFAULT_POSTHOG_API_KEY: "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
+/** A product default with this exact value is intentionally unconfigured and must fail closed. */
+export declare const UNCONFIGURED_POSTHOG_API_KEY: "phc_REPLACE_ME_OMO_NATIVE";
 
 export type TelemetryCaptureProperties = Record<string, unknown>;
 export type TelemetryCaptureMessage = {
@@ -181,6 +183,7 @@ export declare function shouldDisableTelemetry(input: {
   readonly productEnvPrefix: string;
 }): boolean;
 export declare function getTelemetryApiKey(env?: TelemetryEnv, defaultApiKey?: string): string;
+export declare function isConfiguredTelemetryApiKey(apiKey: string): boolean;
 export declare function hasTelemetryApiKey(env?: TelemetryEnv, defaultApiKey?: string): boolean;
 export declare function getTelemetryHost(env?: TelemetryEnv, defaultHost?: string): string;
 export declare function getDefaultTelemetryOsProvider(): TelemetryOsProvider;

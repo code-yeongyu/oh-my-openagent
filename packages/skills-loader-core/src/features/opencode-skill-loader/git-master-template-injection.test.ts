@@ -21,6 +21,25 @@ const SAMPLE_TEMPLATE = [
 	"</execution>",
 ].join("\n")
 
+/** Dynamic fixture: a footer value no shipped default contains. */
+const FOOTER_FIXTURE = "FOOTER_PROPAGATION_SENTINEL_9d41"
+
+/**
+ * Source parser for the rendered skill: every `git commit -m` line inside
+ * bash code blocks, in render order. Observes what the injected commit
+ * example actually ships instead of diffing two production outputs.
+ */
+function bashCommitExampleLines(rendered: string): string[] {
+	const bashBlocks = [...rendered.matchAll(/```bash\r?\n([\s\S]*?)```/g)].map(
+		(match) => match[1],
+	)
+	return bashBlocks.flatMap((block) =>
+		block
+			.split("\n")
+			.filter((line) => line.includes("git commit -m")),
+	)
+}
+
 function restoreEnv(env: Record<string, string | undefined>): void {
 	for (const [key, value] of Object.entries(env)) {
 		if (value !== undefined) {
@@ -61,13 +80,11 @@ describe("#given git_env_prefix config", () => {
 				git_env_prefix: "GIT_MASTER=1",
 			}))
 
-			expect(result).toContain("## GIT COMMAND PREFIX (MANDATORY)")
 			expect(result).toContain("GIT_MASTER=1 git status")
 			expect(result).toContain("GIT_MASTER=1 git commit")
 			expect(result).toContain("GIT_MASTER=1 git push")
-			expect(result).toContain("EVERY git command MUST be prefixed with `GIT_MASTER=1`")
 
-			const prefixIndex = result.indexOf("## GIT COMMAND PREFIX")
+			const prefixIndex = result.indexOf("GIT_MASTER=1 git status")
 			const modeIndex = result.indexOf("## MODE DETECTION")
 			expect(prefixIndex).toBeLessThan(modeIndex)
 		})
@@ -81,7 +98,6 @@ describe("#given git_env_prefix config", () => {
 				git_env_prefix: "",
 			}))
 
-			expect(result).not.toContain("## GIT COMMAND PREFIX")
 			expect(result).not.toContain("GIT_MASTER=1")
 			expect(result).not.toContain("git_env_prefix")
 		})
@@ -118,22 +134,28 @@ describe("#given git_env_prefix config", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
 
 			expect(result).toContain("GIT_MASTER=1 git status")
-			expect(result).toContain("## GIT COMMAND PREFIX (MANDATORY)")
 		})
 	})
 })
 
 describe("#given git_env_prefix with commit footer", () => {
-	describe("#when both env prefix and footer are enabled", () => {
-		it("#then commit examples include the env prefix", () => {
+	describe("#when both env prefix and a dynamic footer fixture are enabled", () => {
+		it("#then the injected commit example carries the fixture under the env prefix", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: true,
+				commit_footer: FOOTER_FIXTURE,
 				include_co_authored_by: false,
 				git_env_prefix: "GIT_MASTER=1",
 			}))
 
-			expect(result).toContain("GIT_MASTER=1 git commit")
-			expect(result).toContain("Ultraworked with [Sisyphus]")
+			const examples = bashCommitExampleLines(result)
+			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
+
+			// the dynamic footer fixture propagated into a real commit example
+			expect(injected.length).toBeGreaterThan(0)
+			// every fixture-bearing example is env-prefixed
+			expect(injected.every((line) => line.startsWith("GIT_MASTER=1 git commit"))).toBe(true)
+			// co-author branch is off in this configuration
+			expect(examples.some((line) => line.includes("Co-authored-by:"))).toBe(false)
 		})
 	})
 
@@ -157,30 +179,39 @@ describe("#given git_env_prefix with commit footer", () => {
 	})
 
 	describe("#when env prefix disabled but footer enabled", () => {
-		it("#then commit examples have no env prefix", () => {
+		it("#then the injected commit example stays unprefixed but carries the fixture", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: true,
+				commit_footer: FOOTER_FIXTURE,
 				include_co_authored_by: false,
 				git_env_prefix: "",
 			}))
 
-			expect(result).not.toContain("GIT_MASTER=1 git commit")
-			expect(result).toContain("git commit -m")
-			expect(result).toContain("Ultraworked with [Sisyphus]")
+			const examples = bashCommitExampleLines(result)
+			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
+
+			// the footer fixture still reaches a commit example without a prefix
+			expect(injected.length).toBeGreaterThan(0)
+			expect(injected.every((line) => !line.includes("GIT_MASTER=1"))).toBe(true)
 		})
 	})
 
 	describe("#when both env prefix and co-author are enabled", () => {
-		it("#then commit example includes prefix, footer, and co-author", () => {
+		it("#then the injected commit example carries fixture and co-author trailer together", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: true,
+				commit_footer: FOOTER_FIXTURE,
 				include_co_authored_by: true,
 				git_env_prefix: "GIT_MASTER=1",
 			}))
 
-			expect(result).toContain("GIT_MASTER=1 git commit")
-			expect(result).toContain("Ultraworked with [Sisyphus]")
-			expect(result).toContain("Co-authored-by: Sisyphus")
+			const examples = bashCommitExampleLines(result)
+			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
+
+			// one example carries both the dynamic fixture and the git trailer
+			expect(
+				injected.some(
+					(line) => line.includes("Co-authored-by: ") && line.startsWith("GIT_MASTER=1 git commit"),
+			),
+			).toBe(true)
 		})
 	})
 })

@@ -31,7 +31,7 @@ async function captureError(promise: Promise<unknown>): Promise<unknown> {
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await rm(directory, { recursive: true, force: true })
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }))
 })
 

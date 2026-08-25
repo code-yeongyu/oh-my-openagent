@@ -1,0 +1,1 @@
+PASS: omo-senpi tsgo clean

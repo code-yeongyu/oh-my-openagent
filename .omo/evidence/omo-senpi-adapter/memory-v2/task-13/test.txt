@@ -1,0 +1,34 @@
+Task 13 verification
+
+RED
+- Command: bun test packages/memory-core/src/reflection/machine.test.ts packages/memory-core/src/reflection/reservation.test.ts
+- Observed: 15 pass, 4 fail. Dream priority/origin and launch-owner metadata expectations failed before implementation.
+- Command: bun test packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts
+- Observed: module missing before reconciliation implementation.
+- Command: bun test packages/omo-senpi/src/components/memory/commands/doctor.test.ts
+- Observed: 12 pass, 1 fail before abandoned-run reporting was implemented.
+- Full captured output: red.txt
+
+GREEN
+- Scoped command: bun test packages/memory-core/src/reflection packages/omo-senpi/src/components/memory/commands/doctor.test.ts packages/omo-senpi/src/components/memory/trigger-wiring.test.ts packages/omo-senpi/src/components/memory/worker/completion.test.ts packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts packages/omo-senpi/src/components/memory/worker/runner-finalization.test.ts packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+- Observed: 97 pass, 0 fail, 979 expectations in one run.
+- Full captured output: green.txt
+
+PACKAGE GATE
+- Command: bun run test:senpi
+- Observed: 997 pass, 2 fail, 2872 expectations.
+- Pre-existing failure: ulw-loop OMO_BIN test, explicitly listed by the task.
+- Concurrent-work failure: built extension 937022 bytes exceeded the 880000-byte bundle budget while multiple other memory todos were present in the shared working tree. Task 13 did not modify the budget or generated bundle.
+- Full captured output: package-gate.txt
+
+TYPECHECK
+- bunx tsgo --noEmit -p packages/memory-core/tsconfig.json: exit 0
+- bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json: exit 0
+- Outputs: typecheck-memory-core.txt, typecheck-omo-senpi.txt
+
+DETERMINISM
+- Reservation interleavings are exhaustively enumerated over a bounded reflection/dream event set.
+- Pre-launch recovery injects clock, hostname, pid liveness, and process-start identity.
+- UNKNOWN and identified-child branches inject sentinel wait, absolute-time wait, and process-group signalling.
+- Sentinel waits subscribe before re-stat and use persisted absolute deadlines as bounded circuit breakers.
+- No test uses fixed sleeps or polling; deadline tests advance injected state changes directly.

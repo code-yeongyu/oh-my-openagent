@@ -1,0 +1,9 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+script/agent-command-string-audit.test.ts:
+(pass) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized [1186.23ms]
+
+ 1 pass
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [1287.00ms]

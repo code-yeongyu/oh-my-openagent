@@ -1,0 +1,29 @@
+Changed files:
+- package.json
+- packages/omo-native/package.json
+- packages/omo-senpi/package.json
+- packages/senpi-task/package.json
+- bun.lock
+
+LSP attempt 1:
+- Called lsp_diagnostics on each absolute task-worktree manifest path.
+- Result: `LSP file path must be inside request cwd`.
+
+LSP attempt 2:
+- Created temporary ignored symlink `.local-ignore/lsp-senpi-beta6` inside the main workspace pointing to the task worktree.
+- Called lsp_diagnostics through the in-workspace symlink.
+- Result: the LSP tool resolved the symlink target and returned the same request-cwd rejection.
+- Cleanup: removed the symlink and verified both `test ! -e` and `test ! -L`.
+
+Fallback validation:
+- Parsed every changed package manifest with Bun JSON.parse: PASS.
+- `bun install --frozen-lockfile --ignore-scripts`: exit 0.
+- Output:
+  bun install v1.4.0-canary.1 (b58cd4685)
+  6 packages installed [75.00ms]
+- `git diff --check`: exit 0.
+- Manifest baseline/current structural diff audit: only allowed Senpi version slots changed.
+
+Limitation:
+The registered LSP tool is rooted to the shared main checkout and refuses files in the repository-mandated external task worktree, including through a symlink. No TypeScript source changed. Package typechecks and the root build are the next-best semantic diagnostics and remain required.
+

@@ -18,8 +18,8 @@ import { getPostCommitHookScript } from "../sync/mirror"
  *   `memory/` prefix. Root markdown is intentionally NOT validated.
  * - Frontmatter is required, must open and close with `---`.
  * - `description` is required and must be a non-empty single line.
- * - Known keys are `description`, `read_only` and the legacy `limit`; any
- *   other key fails the commit.
+ * - Known keys are `description`, `read_only`, the legacy `limit`, and the
+ *   people-record keys `kind` and `aliases`; any other key fails the commit.
  * - `read_only` is protected: it cannot be added, changed or removed by the
  *   agent, and a file that is `read_only: true` in HEAD cannot be modified.
  * - Skills must be folders: `skills/<name>/SKILL.md`. Flat `skills/<name>.md`
@@ -29,7 +29,7 @@ export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 # Validate frontmatter in staged memory .md files.
 # Installed by omo memory-core. Do not edit by hand - regenerated on startup.
 
-ALL_KNOWN_KEYS="description read_only limit"
+ALL_KNOWN_KEYS="description read_only limit kind aliases"
 TAB=$(printf '\\t')
 
 fm_value() {

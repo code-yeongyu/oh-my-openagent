@@ -8,6 +8,10 @@ import { join } from "node:path"
 import { CODEGRAPH_PINNED_VERSION } from "./codegraph/manifest"
 import { ensureCodegraphProvisioned } from "./codegraph/provision"
 
+// The first `tar` invocation on a cold Windows runner can exceed Bun's 5000ms default
+// (observed 5203-6031ms against 125ms warm); see fa6740ae8 for the same repair on the sibling file.
+const ARCHIVE_FIXTURE_TEST_TIMEOUT_MS = 15_000
+
 function createArchive(root: string): { readonly bytes: Uint8Array; readonly sha256: string } {
   const bundleName = "codegraph-darwin-arm64"
   const archivePath = join(root, `${bundleName}.tar.gz`)
@@ -68,7 +72,7 @@ describe("ensureCodegraphProvisioned version upgrades", () => {
       } finally {
         rmSync(root, { force: true, recursive: true })
       }
-    })
+    }, { timeout: ARCHIVE_FIXTURE_TEST_TIMEOUT_MS })
   }
 
   it("#given a stale managed runtime #when the replacement archive fails verification #then the previous runtime remains intact", async () => {
@@ -161,5 +165,5 @@ describe("ensureCodegraphProvisioned version upgrades", () => {
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
-  })
+  }, { timeout: ARCHIVE_FIXTURE_TEST_TIMEOUT_MS })
 })

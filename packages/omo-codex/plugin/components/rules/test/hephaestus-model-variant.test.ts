@@ -1,10 +1,9 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-
-import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 import { findPluginBundledCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { afterEach, describe, expect, it } from "vitest";
+import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 
 const GPT_55_VARIANT_PATH = "bundled-rules/hephaestus/gpt-5.5.md";
 const GPT_56_VARIANT_PATH = "bundled-rules/hephaestus/gpt-5.6.md";

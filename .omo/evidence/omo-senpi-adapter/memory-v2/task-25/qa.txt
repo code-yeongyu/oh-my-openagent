@@ -1,0 +1,9 @@
+=== REAL-SURFACE QA: built supervisor artifact ===
+$ bun build packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ts --target node --format esm --minify --outfile "$QA_ROOT/memory-run-supervisor.mjs"
+$ node --input-type=module <fixture-manifest-driver>
+Bundled 3 modules in 3ms
+
+  memory-run-supervisor.mjs  4.46 KB  (entry point)
+
+{"pass":true,"exit":{"code":0,"signal":null},"outcome":{"version":1,"runId":"qa-run","finishedAt":"2026-08-10T07:17:46.921Z","childExit":{"code":23,"signal":null},"timedOut":false},"identityBeforeChild":true,"launchRemoved":true}
+TEARDOWN PASS: removed isolated QA root; built supervisor and run artifacts are gone

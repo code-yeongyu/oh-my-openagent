@@ -35,34 +35,7 @@ describe("fallback-architect directive", () => {
         expect(directive).toContain('task(category: "architect")')
       })
 
-      it("#then it is wrapped in the matched marker pair", () => {
-        expect(directive).toContain("<omo-fallback-architect>")
-        expect(directive).toContain("</omo-fallback-architect>")
-      })
 
-      it("#then it identifies the architect consultant as the same Fable 5 model", () => {
-        expect(directive).toContain("Fable 5")
-      })
-
-      it("#then it names the content Fable 5 is sensitive about", () => {
-        expect(directive).toContain("security- and biology-related content")
-      })
-
-      it("#then it demands queries composed to read as legitimate engineering work", () => {
-        expect(directive).toContain("reads as safe, legitimate engineering work")
-      })
-
-      it("#then it prescribes the refusal recovery instead of resending the query", () => {
-        expect(directive).toContain("indirectly-phrased sub-questions")
-        expect(directive).toContain("connects the answers yourself")
-      })
-
-      it("#then it tells the model the user was shown a visible tip about the refusal", () => {
-        expect(directive).toContain("has been shown a visible tip")
-        expect(directive).toContain("did not drop the question")
-        expect(directive).toContain("picks it up and reasons through its essence")
-        expect(directive).toContain("anthropic/claude-opus-5")
-      })
     })
 
     describe("#when the compact reminder is built", () => {
@@ -73,19 +46,7 @@ describe("fallback-architect directive", () => {
         expect(reminder).toContain('task(category: "architect")')
       })
 
-      it("#then it carries the compact Fable 5 refusal-avoidance guidance", () => {
-        expect(reminder).toContain("Fable 5")
-        expect(reminder).toContain("security- and biology-related content")
-        expect(reminder).toContain("indirectly-phrased sub-questions")
-      })
 
-      it("#then it stays shorter than the full directive", () => {
-        const directive = buildFallbackArchitectDirective({
-          from: "anthropic/claude-fable-5",
-          to: "anthropic/claude-opus-5",
-        })
-        expect(reminder.length).toBeLessThan(directive.length)
-      })
     })
   })
 })

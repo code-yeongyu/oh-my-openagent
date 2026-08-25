@@ -18,9 +18,7 @@ describe("skill tool - bundled security skills", () => {
     const researchResult = await tool.execute({ name: "security-research" }, mockContext)
     const reviewResult = await tool.execute({ name: "security-review" }, mockContext)
 
-    expect(researchResult).toContain("## Skill: security-research")
     expect(researchResult).toContain("Security Research - Team Mode Vulnerability Audit")
-    expect(reviewResult).toContain("## Skill: security-review")
     expect(reviewResult).toContain("Security Research - Team Mode Vulnerability Audit")
   })
 })

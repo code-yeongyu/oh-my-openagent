@@ -9,6 +9,7 @@
 import { join } from "node:path"
 
 import {
+  JournalLockTimeoutError,
   TranscriptJournal,
   type AppendResult,
   type MemoryIdentityPaths,
@@ -17,11 +18,12 @@ import {
   type TranscriptProjection,
 } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 
 export interface MemoryJournalWiringOptions {
   readonly identityPaths: MemoryIdentityPaths
   readonly createJournal?: (journalDir: string) => TranscriptJournal
+  readonly logger?: ComponentLogger
 }
 
 export interface MemoryJournalWiring {
@@ -31,6 +33,12 @@ export interface MemoryJournalWiring {
 }
 
 const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
+
+function isJournalLockFailure(error: unknown): boolean {
+  if (error instanceof JournalLockTimeoutError) return true
+  if (error instanceof Error && "code" in error && error.code === "EEXIST") return true
+  return false
+}
 
 export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): MemoryJournalWiring {
   const createJournal =
@@ -48,7 +56,21 @@ export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): 
   async function reconcileSession(eventCtx: unknown): Promise<AppendResult> {
     const surface = readBranchSurface(eventCtx)
     if (surface === undefined) return NOOP_APPEND
-    return journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries))
+    try {
+      return await journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries))
+    } catch (error: unknown) {
+      // A contended journal lock is best-effort bookkeeping: the next settle or session_start
+      // reconcile is idempotent (keyed by source_line_id), so degrade instead of surfacing an
+      // extension error. Covers both the typed timeout and a mixed-version raw EEXIST.
+      if (isJournalLockFailure(error)) {
+        options.logger?.warn("transcript journal reconcile skipped: lock contention", {
+          sessionId: surface.sessionId,
+          error: String(error),
+        })
+        return NOOP_APPEND
+      }
+      throw error
+    }
   }
 
   return {

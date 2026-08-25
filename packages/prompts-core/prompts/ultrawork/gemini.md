@@ -209,7 +209,7 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 ### GOAL REGISTRATION (BINDING)
 
-When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation: the full objective, the scenario contract below, and one line "I'll stop right away when <the exact observable state that ends this run>". Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
+When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation. Check `get_goal` first: continue a matching active goal instead of duplicating it; surface a conflicting one. Pass exactly `objective`, written outcome-first: the concrete thing that will be TRUE when done (an outcome, never an activity like "investigate X"), the named deliverable surfaces, the scenario contract below as success criteria (each a binary observable that CAN fail), explicit scope bounds, and one line "I'll stop right away when <the exact observable state that ends this run>". Never invent a budget or deadline the user did not state. Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
 
 ### SCENARIO CONTRACT (binding, defined BEFORE coding)
 
@@ -288,7 +288,7 @@ Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Renders/changes a page | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. |
+| Renders/changes a page | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against the clone as the user-data-dir; run any clearing there only. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Drives a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-20 files. Stateless utility functions for the `install` command. Handles OpenCode config manipulation, provider configuration, JSONC operations, binary detection, and npm registry queries. No class — flat utility collection.
+27 files. Stateless utility functions for the `install` command. Handles OpenCode config manipulation, provider configuration, JSONC operations, binary detection, and npm registry queries. No class — flat utility collection.
 
 ## FILE CATALOG
 

@@ -45,6 +45,28 @@ describe("GPT-5.6 Sol category routing", () => {
     expect(result.kind).toBe("model_unavailable")
   })
 
+  test("#given only xAI grok-4.6 #when unspecified-low resolves #then it uses the xhigh first rung", () => {
+    // given
+    const grokModel: FakeModel = { provider: "xai", id: "grok-4.6" }
+    const grokRegistry = {
+      getAvailable: (): readonly FakeModel[] => [grokModel],
+      find: (provider: string, modelId: string): FakeModel | undefined =>
+        provider === grokModel.provider && modelId === grokModel.id ? grokModel : undefined,
+    }
+
+    // when
+    const result = resolveCategory("unspecified-low", {}, grokRegistry)
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind !== "resolved") throw new Error("Expected unspecified-low to resolve")
+    expect(result.spec).toMatchObject({
+      provider: "xai",
+      modelId: "grok-4.6",
+      variant: "xhigh",
+    })
+  })
+
   test("#given only Vercel Terra #when unspecified-low resolves #then it uses the high gateway rung", () => {
     // given
     const terraModel: FakeModel = { provider: "vercel", id: "openai/gpt-5.6-terra" }

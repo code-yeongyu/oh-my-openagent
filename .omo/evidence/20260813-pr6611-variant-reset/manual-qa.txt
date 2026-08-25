@@ -1,0 +1,56 @@
+command:
+  MSYS_NO_PATHCONV=1 wsl -u codexqa bash /mnt/c/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/.omo/evidence/20260813-pr6611-variant-reset/opencode-hook-qa.sh
+
+observed:
+  opencode_version=1.18.13
+  bundle_sha256=46da5c49dc88c27840fd70d6a61f33ae316531cc5d34162b4e6d3cede13473e5
+  bundle_variant_wiring=true
+  health={"healthy":true,"version":"1.18.13"}
+  config_plugins=["file:///mnt/c/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/dist/index.js"]
+  prompt_http_status=204
+  sse_event={"type":"session.status"}
+  real_db_sessions_before=0
+  real_db_sessions_after=0
+  sandbox_root=/tmp/oqa-xdg.3UxQvB
+  sandbox_removed=true
+  exit_code=0
+
+cleanup:
+  The QA driver terminated the SSE reader, terminated the isolated OpenCode
+  server process tree, waited for the server, and the common helper's EXIT
+  trap removed its isolated XDG sandbox.
+
+  The driver captured the exact helper-created `OQA_XDG_ROOT`
+  (`/tmp/oqa-xdg.3UxQvB`) and asserted it no longer existed after cleanup.
+  `sandbox_removed=true` is the matching binary receipt.
+
+notes:
+  curl reported code 18 only when the intentionally terminated SSE stream
+  closed after the matching event was captured. All binary driver assertions
+  passed and the command exited zero.
+
+bundle provenance:
+  Before starting OpenCode, the driver hashed the exact configured
+  `dist/index.js` and asserted it contained:
+
+    output.message.variant ?? input.variant
+    const parsedModel = parseModelString(runtimeModel);
+    fallbackState.pendingFallbackModel = effectiveRetryModel;
+    clearFallbackWatchdog(sessionID);
+    clearModelLessRetryKeys(sessionID);
+    areRuntimeModelsEquivalent(
+    resolveAgentVariant(pluginConfig, resolvedAgent)
+    === fallbackState
+    lowerReasoningForModel(
+    two resolveAgentVariant(pluginConfig, callsites
+    retryDispatched = true
+    buildRetryModelPayload(fallbackModel
+    part.synthetic === true
+    Session fallback timeout skipped for stale state generation
+
+  This source-current bundle was rebuilt after stale-timeout generation
+  rejection, synthetic retry adapter acknowledgment, capability-aware created
+  fallback indexing, accepted-queued state preservation, explicit-variant
+  precedence, capability-aware reasoning lowering, category-aware creation
+  indexing, and the defined-state identity guards. It is the same file
+  OpenCode loaded through `opencode.json`.

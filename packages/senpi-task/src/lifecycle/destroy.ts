@@ -23,7 +23,7 @@ export async function destroyResidentTask(
 ): Promise<void> {
   const handle = context.registry.get(taskId)
   if (handle !== undefined) {
-    await teardownHandle(handle)
+    await teardownHandle(handle, cause === "cancel_without_abort")
     if (cause !== "fallback_handoff") context.registry.forget(taskId)
   } else if (cause === "reconcile_lost" || cause === "ttl") {
     await terminateOrphan(context, taskId, orphanPid)
@@ -31,13 +31,16 @@ export async function destroyResidentTask(
   if (cause !== "fallback_handoff") recordResidency(context, taskId, cause)
 }
 
-async function teardownHandle(handle: ResidentHandle): Promise<void> {
+async function teardownHandle(handle: ResidentHandle, skipInProcessAbort: boolean): Promise<void> {
   // The pre-dispose step (in-process abort / rpc terminate) is best-effort: an already-exited child
-  // rejects it. Swallow-and-log so dispose() ALWAYS runs and destroyResidentTask keeps going to
-  // forget + record disposed - a re-thrown abort would leave a resident zombie the LRU can never
-  // reclaim (the residency-slot leak this teardown exists to prevent).
-  if (handle.kind === "in-process") await bestEffort(handle.task_id, "abort", () => handle.abort())
-  else await bestEffort(handle.task_id, "terminate", () => handle.terminate())
+  // rejects it. DAG cancellation skips in-process abort only after the child's outcome has settled,
+  // because Senpi can float retry rejections from both abort() and active-session dispose(). Dispose
+  // must always run at that safe boundary so teardown cannot leave a resident zombie occupying a slot.
+  if (handle.kind === "in-process") {
+    if (!skipInProcessAbort) await bestEffort(handle.task_id, "abort", () => handle.abort())
+  } else {
+    await bestEffort(handle.task_id, "terminate", () => handle.terminate())
+  }
   await handle.dispose()
 }
 

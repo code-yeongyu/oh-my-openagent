@@ -32,7 +32,7 @@ export type InProcessRunnerLike = {
 }
 
 export type RpcRunnerLike = {
-  start(spec: RpcRunnerSpec): RpcChildHandle
+  start(spec: RpcRunnerSpec): Promise<RpcChildHandle>
 }
 
 export function createInProcessManagedRunner(
@@ -60,7 +60,7 @@ export function createInProcessManagedRunner(
 
 export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
   return {
-    start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
+    async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
       const rpcSpec: RpcRunnerSpec = {
         task_id: spec.taskId,
         cwd: spec.cwd,
@@ -73,7 +73,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
       }
-      return Promise.resolve(adaptRpcHandle(runner.start(rpcSpec)))
+      return adaptRpcHandle(await runner.start(rpcSpec))
     },
   }
 }

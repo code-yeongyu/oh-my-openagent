@@ -1,0 +1,30 @@
+RED — stale local parent bypasses remote revalidation
+Date: 2026-08-20
+
+Command:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun test --cwd /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/packages/omo-opencode src/features/btw-side/tui-parent-validator.test.ts
+
+Scenario:
+- localExists("ses_parent") remains true.
+- fetchStatus would return "exists" first and "missing" second.
+- A second adoption check must reject the remotely deleted parent.
+
+Observed before production change:
+65 |     const initiallyValid = await validator.exists("ses_parent")
+66 |     const validAfterRemoteDeletion = await validator.exists("ses_parent")
+69 |     expect(initiallyValid).toBe(true)
+70 |     expect(validAfterRemoteDeletion).toBe(false)
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+1 pass
+1 fail
+6 expect() calls
+
+Why this is the right RED:
+The assertion fails at the exact missed-deletion boundary. The local session
+store says the parent exists, so the merged validator short-circuits without
+consulting remote status and re-adopts a nonexistent parent.

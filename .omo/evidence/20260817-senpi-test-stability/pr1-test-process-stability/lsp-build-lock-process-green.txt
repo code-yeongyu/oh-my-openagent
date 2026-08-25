@@ -1,0 +1,64 @@
+WHAT WAS TESTED
+
+The real vendored LSP dist was removed, then two Bun 1.3.12 test processes
+were launched concurrently in the same worktree.
+
+Setup:
+
+  rm -rf packages/lsp-daemon/dist
+
+Process A:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test script/test-environment-isolation.test.ts
+
+Process B:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+GREEN OBSERVED
+
+Process A:
+
+  [test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+  1 pass
+  0 fail
+  Ran 1 test across 1 file. [2.21s]
+
+Process B:
+
+  build_message_count=0
+  10 pass
+  0 fail
+  Ran 10 tests across 1 file. [2.21s]
+
+Aggregate:
+
+  total_build_entries=1
+  process_a_exit=0
+  process_b_exit=0
+
+POSTCONDITION
+
+  test -f packages/lsp-daemon/dist/cli.js
+  dist_restored=1
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+
+  omo-senpi extension build is current
+  exit=0
+
+WHY THIS IS ENOUGH
+
+This is the same real-surface scenario as the RED proof: two independent Bun
+processes, one shared missing vendored dist, the actual npm install/build
+commands, and the actual test preload. The only changed observable is the
+single build owner. Both waiting and owning processes continue successfully.
+
+CLEANUP
+
+The owner recreated `packages/lsp-daemon/dist`. Both Bun processes exited.
+The Senpi staged runtime remained current, so no generated artifact cleanup or
+restage remained outstanding.

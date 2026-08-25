@@ -1,0 +1,14 @@
+{
+  "resuming_header": "· ship-it resuming wave 1/1 0/2 done, 1 running",
+  "resuming_rows": [
+    "· ship-it resuming wave 1/1 0/2 done, 1 running",
+    "  ▶ alpha · category:quick · 0s",
+    "  ○ beta · category:quick"
+  ],
+  "suspended_header": "· ship-it suspended · 1 active wave 1/1 0/2 done, 1 running",
+  "paused_header": "· ship-it paused wave 1/1 0/2 done",
+  "live_lease_pid": 2501,
+  "state_dir": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/dag-paused-header-qa-IBZlmi/.omo/senpi-task",
+  "failures": [],
+  "result": "PASS"
+}

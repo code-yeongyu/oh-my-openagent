@@ -112,24 +112,20 @@ describe("OpenCode config migration transform", () => {
         $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
         codegraph: { excluded_roots: ["/generated", "/vendor"] },
         "[opencode]": {
-          agents: { oracle: { model: "old-model" } },
           background_task: { enabled: true },
-          categories: { deep: { model: "old-model" } },
         },
         "[codex]": { codegraph: { daemon: false } },
         "[senpi]": { agents: { oracle: { model: "senpi-model" } } },
-        profiles: {
-          focused: { "[opencode]": { categories: { deep: { model: "focused-model" } } } },
-          kimi: { "[opencode]": { agents: { oracle: { model: "kimi-model" } } } },
-        },
       })
-      expect(projectDocument.document["[opencode]"]).toEqual({ agents: { oracle: { model: "project-model" } } })
+      expect(projectDocument.document).toEqual({
+        $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+      })
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true })
     }
   })
 
-  test("#given an identical profile subtree and a sidecar recording a reverted migration #when transformed #then only the profile delta and user-left value are retained", () => {
+  test("#given an identical profile subtree and a sidecar recording a reverted migration #when transformed #then agent-only profile data is omitted", () => {
     // given
     const root: DiscoveredLegacyConfigSource = {
       baseRoot: "/home/alice/.config/opencode",
@@ -164,12 +160,8 @@ describe("OpenCode config migration transform", () => {
     })
 
     // then
-    expect(result.document["[opencode]"]).toEqual({
-      agents: { atlas: { model: "same" }, oracle: { model: "reverted-old-model" } },
-    })
-    expect(result.document.profiles).toEqual({
-      kimi: { "[opencode]": { agents: { atlas: { model: "different" } } } },
-    })
+    expect(result.document["[opencode]"]).toBeUndefined()
+    expect(result.document.profiles).toBeUndefined()
     expect(result.document.legacy_migrations).toEqual({
       [root.path]: ["model-version:reverted-old-model->new-model"],
     })
@@ -202,16 +194,91 @@ describe("OpenCode config migration transform", () => {
     })
 
     expect(result.document["[opencode]"]).toEqual({
-      agents: {
-        oracle: { model: "anthropic/claude-opus-4-8" },
-        sisyphus: { model: "anthropic/claude-opus-4-8" },
-      },
-      categories: { deep: { model: "anthropic/claude-opus-4-8" } },
-      disabled_agents: ["sisyphus"],
-      disabled_hooks: ["anthropic-context-window-limit-recovery"],
-      hashline_edit: { enabled: true },
       sisyphus_agent: { model: "provider/sisyphus" },
     })
     expect(result.document.legacy_migrations).toBeUndefined()
+  })
+
+  test("#given a legacy OpenCode source with agents, categories, and model/provider fields #when transformed #then agents and categories are omitted while model/provider fields remain", () => {
+    // given
+    const root: DiscoveredLegacyConfigSource = {
+      baseRoot: "/home/alice/.config/opencode",
+      configPath: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      kind: "user-config",
+      path: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      precedence: 0,
+    }
+
+    // when
+    const result = transformOpenCodeSources({
+      discovered: [root],
+      scope: { kind: "user" },
+      sources: [loaded(root, {
+        agents: {
+          oracle: { model: "anthropic/claude-opus-4-4" },
+          OmO: { model: "anthropic/claude-opus-4-4" },
+        },
+        categories: { deep: { model: "anthropic/claude-opus-4-4" } },
+        disabled_providers: ["github-copilot", "openrouter"],
+        model_fallback: true,
+        omo_agent: { model: "provider/sisyphus" },
+      })],
+    })
+    const parsed = OmoConfigSchema.safeParse(result.document)
+
+    // then
+    expect(parsed.success).toBe(true)
+    expect(result.document["[opencode]"]).toEqual({
+      disabled_providers: ["github-copilot", "openrouter"],
+      model_fallback: true,
+      sisyphus_agent: { model: "provider/sisyphus" },
+    })
+    expect(result.document["[opencode]"]).not.toHaveProperty("agents")
+    expect(result.document["[opencode]"]).not.toHaveProperty("categories")
+    expect(result.document).not.toHaveProperty("agents")
+    expect(result.document).not.toHaveProperty("categories")
+    expect(result.document.profiles).toBeUndefined()
+  })
+
+  test("#given empty, malformed, and agents/categories-only legacy inputs #when transformed #then outputs parse through OmoConfigSchema without agents or categories", () => {
+    const root: DiscoveredLegacyConfigSource = {
+      baseRoot: "/home/alice/.config/opencode",
+      configPath: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      kind: "user-config",
+      path: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      precedence: 0,
+    }
+
+    const cases: ReadonlyArray<{ readonly label: string; readonly value: unknown }> = [
+      { label: "empty", value: {} },
+      { label: "malformed-agents", value: { agents: "not-a-record", categories: null } },
+      { label: "agents-categories-only", value: {
+        agents: { oracle: { model: "anthropic/claude-opus-4-4" } },
+        categories: { deep: { model: "openai/gpt-5.6-sol" } },
+      } },
+    ]
+
+    for (const { label, value } of cases) {
+      // given
+      const input = { ...root, path: `${root.path}.${label}` }
+
+      // when
+      const result = transformOpenCodeSources({
+        discovered: [input],
+        scope: { kind: "user" },
+        sources: [loaded(input, value)],
+      })
+      const parsed = OmoConfigSchema.safeParse(result.document)
+
+      // then
+      expect(parsed.success).toBe(true)
+      if (result.document["[opencode]"] !== undefined) {
+        expect(result.document["[opencode]"]).not.toHaveProperty("agents")
+        expect(result.document["[opencode]"]).not.toHaveProperty("categories")
+      }
+      expect(result.document).not.toHaveProperty("agents")
+      expect(result.document).not.toHaveProperty("categories")
+      expect(result.document.profiles).toBeUndefined()
+    }
   })
 })

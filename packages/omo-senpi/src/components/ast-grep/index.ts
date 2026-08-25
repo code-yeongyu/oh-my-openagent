@@ -46,7 +46,7 @@ export function createAstGrepComponent(options: AstGrepComponentOptions = {}): O
         args: [entry, "mcp"],
         env: { [PROJECT_CWD_ENV]: env[PROJECT_CWD_ENV] ?? resolveCwd() },
         enabled: true,
-        lifecycle: "eager",
+        lifecycle: "lazy",
       })
     },
   }

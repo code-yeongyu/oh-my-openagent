@@ -23,5 +23,19 @@ export type {
   PalaceReflectionOutcome,
 } from "./collectors"
 export { collectPalaceData, encodePalaceData, generatePalaceHtml, renderPalaceHtml } from "./generator"
+export { PRIMARY_HUMAN_CARD_PATH, PRIMARY_HUMAN_SLUG, collectPeople } from "./people"
+export type {
+  PalacePeople,
+  PalacePeopleDiagnostic,
+  PalacePeopleEdge,
+  PalacePeopleNode,
+  PalacePeopleOptions,
+} from "./people"
 export type { GeneratePalaceOptions, GeneratePalaceResult, PalaceData, PalaceMetadata } from "./generator"
-export { PALACE_DATA_ELEMENT_ID, PALACE_DATA_PLACEHOLDER, PALACE_TEMPLATE } from "./template"
+export {
+  PALACE_DATA_ELEMENT_ID,
+  PALACE_DATA_PLACEHOLDER,
+  PALACE_PEOPLE_PANEL,
+  PALACE_PEOPLE_TAB,
+  PALACE_TEMPLATE,
+} from "./template"

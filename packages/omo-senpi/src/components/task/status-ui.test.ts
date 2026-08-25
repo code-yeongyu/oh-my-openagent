@@ -154,12 +154,17 @@ describe("createTaskStatusUi.syncNow", () => {
     expect(ui.widgetCalls).toHaveLength(0)
   })
 
-  it("#given all tasks terminal #when syncing #then the widget is cleared", () => {
+  it("#given a completed non-resident team record #when syncing #then the stale widget row is cleared", () => {
     const ui = fakeUi()
-    createTaskStatusUi({
-      manager: fakeManager([record({ task_id: "st_done", status: "completed" })]),
-      runtime: runtimeOf(ui),
-    }).syncNow()
+    const manager = {
+      ...fakeManager([record({
+        task_id: "st_stale",
+        name: "team:12345678-1234-1234-1234-123456789abc:stale",
+        status: "completed",
+      })]),
+      residentTaskIds: () => [],
+    }
+    createTaskStatusUi({ manager, runtime: runtimeOf(ui) }).syncNow()
     expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
   })
 })

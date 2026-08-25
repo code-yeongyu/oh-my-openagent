@@ -10,6 +10,7 @@
  * - gemini.ts: Corrective overlays for Gemini's aggressive tendencies
  * - gpt-5-4.ts: Native GPT-5.4 prompt with block-structured guidance
  * - gpt-5-5.ts: Native GPT-5.5 prompt with Codex-style sections
+ * - grok-4.ts: Shared Grok 4.5/4.6 prompt, verification-loop-centered and lean
  * - kimi-k2-6.ts: Kimi K2.6 native prompt with thinking-mode stop conditions
  * - kimi-k2-7.ts: Kimi K2.7 native prompt, restrained and outcome-first
  * - kimi-k3.ts: Kimi K3 native prompt with explicit anti-overthinking calibration
@@ -30,6 +31,7 @@ export {
 } from "./gemini";
 export { buildGpt54SisyphusPrompt } from "./gpt-5-4";
 export { buildGpt55SisyphusPrompt } from "./gpt-5-5";
+export { buildGrok4SisyphusPrompt } from "./grok-4";
 export { buildGlm52SisyphusPrompt } from "./glm-5-2";
 export { buildKimiK26SisyphusPrompt } from "./kimi-k2-6";
 export { buildKimiK27SisyphusPrompt } from "./kimi-k2-7";

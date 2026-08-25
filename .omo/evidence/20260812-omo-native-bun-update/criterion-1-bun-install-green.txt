@@ -1,0 +1,26 @@
+Fixed OMO Native Bun real-surface GREEN
+
+```text
+INSTALL_COMMAND=bun add -g .../omo-ai-5.0.0-0.beta.6.tgz
+INSTALL_EXIT=0
+installed omo-ai@.../omo-ai-5.0.0-0.beta.6.tgz with binaries:
+305 packages installed
+VERSION_OUTPUT=omo 5.0.0-0.beta.6 (engine: senpi 2026.8.11-4)
+UPDATE_OUTPUT=omo is updated via bun: bun add --cwd ".../bun/install/global/node_modules/omo-ai" -g omo-ai@beta
+POLLUTED_PACKAGE={"dependencies":{"":"."}}
+EXECUTING=bun add --cwd ".../bun/install/global/node_modules/omo-ai" -g omo-ai@beta
+UPDATE_EXIT=0
+Saved lockfile
+installed omo-ai@5.0.0-0.beta.6 with binaries:
+UNSAFE_NAME_ABSENT=PASS
+FINAL_VERSION=omo 5.0.0-0.beta.6 (engine: senpi 2026.8.11-4)
+```
+
+PASS:
+
+- fixed tarball installed under a custom `BUN_INSTALL`;
+- launcher detected Bun from the real global-layout suffix;
+- launcher emitted a package-root-anchored command;
+- the emitted command ran from a caller directory containing the exact unsafe
+  empty dependency alias;
+- exit was zero and no unsafe-name error appeared.

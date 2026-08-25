@@ -1,0 +1,39 @@
+=== Real-surface QA: two accepted senpi -p turns in one session ===
+SENPI_BIN=/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/node_modules/.bin/senpi
+SENPI_CODING_AGENT_DIR=/tmp/omo-nudge-debug.BCpizu/agent
+OMO_MEMORY_HOME=/tmp/omo-memory-home.zsAuiU
+Prompt-log assertion token: user turns since your last memory save
+
+--- turn 1 ---
+Warning: No project session found with id 'omo-nudge-final'; creating a new session with that id.
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: 'ast-grep',
+  entry: '/tmp/omo-nudge-debug.BCpizu/plugin/runtime/ast-grep-mcp/cli.js'
+}
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+lsp-daemon stale-version sweep skipped: Senpi packaged LSP daemon CLI is missing: /tmp/omo-nudge-debug.BCpizu/plugin/runtime/lsp-daemon/dist/cli.js undefined
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
+done
+
+--- turn 2 (same session) ---
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: 'ast-grep',
+  entry: '/tmp/omo-nudge-debug.BCpizu/plugin/runtime/ast-grep-mcp/cli.js'
+}
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+lsp-daemon stale-version sweep skipped: Senpi packaged LSP daemon CLI is missing: /tmp/omo-nudge-debug.BCpizu/plugin/runtime/lsp-daemon/dist/cli.js undefined
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
+done
+
+--- prompt log grep ---
+2024:- 2 user turns since your last memory save. Save durable facts now, or decide nothing qualifies.
+REAL_SURFACE_RESULT=PASS
+
+REAL-SURFACE TEARDOWN: rm -rf /tmp/omo-memory-home.zsAuiU
+REAL-SURFACE TEARDOWN VERIFIED: absent
+QA ROOT TEARDOWN: rm -rf /tmp/omo-nudge-debug.BCpizu
+QA ROOT TEARDOWN VERIFIED: absent

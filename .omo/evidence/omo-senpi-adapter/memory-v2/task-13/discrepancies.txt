@@ -1,0 +1,6 @@
+Plan/code discrepancies found during task 13
+
+1. The declared todo-25 dependency commit e742edfee is empty. The initial supervisor implementation was present through an earlier commit, not through the named dependency commit.
+2. At task start, the checked-in supervisor lacked the authoritative IC-8 bootstrap self-deadline enforcement and win32 tree containment. This was a real contract defect, not an edge case. Concurrent dependency repair f68a5da3d landed before task-13 verification; its IC-8 tests passed in the final scoped run.
+3. Todo 9 committed while task 13 was in progress and consumed two task-13 process-liveness barrel exports that had been staged in the shared index. Those exports therefore landed in b0fb0f0ef rather than this task's commit. No behavior was duplicated or reverted; task 13 consumes the now-landed exports.
+4. The LSP diagnostics API is rooted at /Volumes/mengmotaStorage/local-workspaces/omo and rejects every path in the required sibling worktree. It was attempted and rejected without reading or modifying the forbidden checkout. Strict tsgo typechecks for both touched packages passed instead.

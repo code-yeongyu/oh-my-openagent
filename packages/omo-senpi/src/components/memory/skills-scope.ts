@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -29,11 +30,10 @@ export interface MemorySkillsDiscoverResult {
  * discovery set. Memory skills therefore load additively and yield on name collision rather
  * than displacing any existing skill.
  *
- * Create-free contract: the skills dir is returned even when absent on disk. senpi's loader
- * tolerates missing skill paths with a warning diagnostic (no throw), so first-run identities
- * with no skills yet are safe. Reflection-authored skills committed under skills/<name>/SKILL.md
- * are picked up on the next session_start (reason "startup") or /reload (reason "reload");
- * dir shape is enforced by the memory repo pre-commit hooks, not by this component.
+ * Missing dirs contribute nothing, avoiding a startup diagnostic for first-run identities.
+ * Reflection-authored skills committed under skills/<name>/SKILL.md are picked up on the next
+ * session_start (reason "startup") or /reload (reason "reload"); dir shape is enforced by the
+ * memory repo pre-commit hooks, not by this component.
  */
 
 export const MEMORY_SKILLS_DIRNAME = "skills"
@@ -60,7 +60,8 @@ export function createMemorySkillsScopeHandler(
     if (sessionId === undefined) return undefined
     const context = options.resolveContext(sessionId)
     if (context === undefined) return undefined
-    return { skillPaths: [memorySkillsDir(context)] }
+    const skillsDir = memorySkillsDir(context)
+    return existsSync(skillsDir) ? { skillPaths: [skillsDir] } : undefined
   }
 }
 

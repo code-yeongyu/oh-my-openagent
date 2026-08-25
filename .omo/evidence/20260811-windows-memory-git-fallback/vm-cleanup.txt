@@ -1,0 +1,30 @@
+oh-my-openagent #6701 Windows VM cleanup receipt
+Date: 2026-08-11
+VM: Windows 11 {dcde557f-dcad-4131-81b5-11f3b5948310}
+Original state: stopped
+
+=== GUEST CLEANUP ===
+> Remove-Item -LiteralPath C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa -Recurse -Force
+> Test-Path -LiteralPath C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa
+False
+> Get-Process bun -ErrorAction SilentlyContinue
+[no bun processes]
+GUEST_CLEANUP_EXIT=0
+
+=== HOST / VM STATE RESTORATION ===
+BEFORE_STOP
+UUID                                    STATUS       IP_ADDR         NAME
+{dcde557f-dcad-4131-81b5-11f3b5948310}  running      -               Windows 11
+STOP_COMMAND
+Stopping the VM...
+The VM has been successfully stopped.
+AFTER_STOP
+UUID                                    STATUS       IP_ADDR         NAME
+{dcde557f-dcad-4131-81b5-11f3b5948310}  stopped      -               Windows 11
+TASK_ROUTE_CHECK
+10.211.55.4        0.1c.42.3f.d.8f    UHLWIig         bridge102   1199
+VM_PROCESS_CHECK
+no matching VM process
+HOST_CLEANUP_EXIT=0
+
+CLEANUP RECEIPT: PASS - %TEMP%\omo6701-qa is absent, no Bun process remains, VM "Windows 11" is stopped, and no matching VM process remains.

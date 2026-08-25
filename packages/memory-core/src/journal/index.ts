@@ -22,6 +22,7 @@ export {
 } from "./cursor"
 export {
   TranscriptJournal,
+  JournalLockTimeoutError,
   withLocalJournalLock,
   type AppendResult,
   type JournalLock,

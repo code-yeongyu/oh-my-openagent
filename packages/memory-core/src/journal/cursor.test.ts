@@ -4,15 +4,16 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { TranscriptJournal } from "./store"
+import { realpathSync } from "node:fs"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createJournal(): Promise<TranscriptJournal> {
-  const dir = await mkdtemp(join(tmpdir(), "memory-cursor-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-cursor-")))
   tempDirs.push(dir)
   let tick = 0
   return new TranscriptJournal({
@@ -22,6 +23,23 @@ async function createJournal(): Promise<TranscriptJournal> {
 }
 
 describe("reflection cursor", () => {
+  it("#given an aborted signal #when snapshot capture starts #then reflection state is not mutated", async () => {
+    // given
+    const journal = await createJournal()
+    await journal.reconcile([
+      { kind: "assistant", messageId: "assistant-1", textBlocks: ["first"] },
+    ])
+    const controller = new AbortController()
+    controller.abort()
+
+    // when
+    const capture = journal.captureReflectionSnapshot(controller.signal)
+
+    // then
+    await expect(capture).rejects.toThrow()
+    expect((await journal.getState()).last_reflection_started_at).toBeUndefined()
+  })
+
   it("#given rows appended during reflection #when the captured snapshot succeeds #then only snapshot rows become reflected", async () => {
     // given
     const journal = await createJournal()

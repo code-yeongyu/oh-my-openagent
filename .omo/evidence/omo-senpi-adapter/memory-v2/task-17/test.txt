@@ -1,0 +1,272 @@
+task-17: extractor person-routing + alias resolution + reinforcement
+date: 2026-08-10
+scope: packages/memory-core/src/facts/{extraction.ts,person-routing.ts,index.ts,extraction.test.ts} + packages/omo-senpi/src/components/memory/{facts-runner.ts,facts-runner.test.ts,worker/__fixtures__/facts-child.ts}
+
+================ RED (before implementation) ================
+command: bun test packages/memory-core/src/facts/extraction.test.ts packages/omo-senpi/src/components/memory/facts-runner.test.ts
+result: 16 pass / 10 fail - the alias-resolution test failed first as mandated; every new routing test red
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/facts/extraction.test.ts:
+(pass) facts extraction JSONL validation > #given valid project and person arms #when parsed #then scope remains a discriminated union [0.66ms]
+(pass) facts extraction JSONL validation > #given a project record carrying person #when parsed #then the whole extraction is rejected [0.14ms]
+(pass) facts extraction JSONL validation > #given a person record missing person #when parsed #then the whole extraction is rejected [0.07ms]
+(pass) atomic facts batch application > #given project and resolved person records #when applied without a people policy #then one notes commit preserves both texts and trailers [317.52ms]
+(pass) atomic facts batch application > #given zero applicable records #when applied #then no commit is attempted [220.42ms]
+(pass) atomic facts batch application > #given git commit fails after staging #when the batch aborts #then index and working tree are restored [283.24ms]
+83 |   )
+84 |   await repo.commitWrite([`people/${slug}/observations.md`], `test: seed ${slug} observations`, AUTHOR)
+85 | }
+86 | 
+87 | async function readExplicitEntries(dir: string, slug: string): Promise<readonly ObservationEntry[]> {
+88 |   const memory = parseMemoryFile(await readFile(join(dir, "people", slug, "observations.md"), "utf8"))
+                                            ^
+ENOENT: no such file or directory, open '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-Y6fKpb/people/mina/observations.md'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-Y6fKpb/people/mina/observations.md",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at async readExplicitEntries (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:88:40)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:212:27)
+(fail) person routing alias resolution > #given an existing card with a known alias #when a person fact names that alias #then it lands in the card ledger and no new directory appears [343.58ms]
+83 |   )
+84 |   await repo.commitWrite([`people/${slug}/observations.md`], `test: seed ${slug} observations`, AUTHOR)
+85 | }
+86 | 
+87 | async function readExplicitEntries(dir: string, slug: string): Promise<readonly ObservationEntry[]> {
+88 |   const memory = parseMemoryFile(await readFile(join(dir, "people", slug, "observations.md"), "utf8"))
+                                            ^
+ENOENT: no such file or directory, open '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-tS1w6T/people/mina-lee/observations.md'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-tS1w6T/people/mina-lee/observations.md",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at async readExplicitEntries (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:88:40)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:232:19)
+(fail) person routing alias resolution > #given two cards whose aliases both match #when resolved #then the longest matching alias wins [408.67ms]
+83 |   )
+84 |   await repo.commitWrite([`people/${slug}/observations.md`], `test: seed ${slug} observations`, AUTHOR)
+85 | }
+86 | 
+87 | async function readExplicitEntries(dir: string, slug: string): Promise<readonly ObservationEntry[]> {
+88 |   const memory = parseMemoryFile(await readFile(join(dir, "people", slug, "observations.md"), "utf8"))
+                                            ^
+ENOENT: no such file or directory, open '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-UMmlsC/people/aaa-min/observations.md'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-UMmlsC/people/aaa-min/observations.md",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at async readExplicitEntries (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:88:40)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:252:19)
+(fail) person routing alias resolution > #given two cards with equal-length matching aliases #when resolved #then the smallest slug wins and the tie is logged [427.57ms]
+271 |     }, AUTHOR, { people: PEOPLE })
+272 | 
+273 |     // then
+274 |     expect(result.outcome).toBe("committed")
+275 |     if (result.outcome === "committed") {
+276 |       expect(result.affectedPaths).toEqual(["people/human/observations.md"])
+                                         ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "people/human/observations.md",
++   "notes/facts/2026-08.md",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:276:36)
+(fail) person routing alias resolution > #given the primary human card carries an alias #when a fact names it #then it routes to the human ledger without a new card [333.78ms]
+295 |     }, AUTHOR, { people: PEOPLE })
+296 | 
+297 |     // then
+298 |     const entries = await readExplicitEntries(dir, "mina")
+299 |     expect(entries).toHaveLength(1)
+300 |     expect(entries[0]).toMatchObject({ date: "2026-08-10", content: "Mina prefers concise reviews.", n: 2 })
+                             ^
+error: expect(received).toMatchObject(expected)
+
+  {
+    "content": "Mina prefers concise reviews.",
+-   "date": "2026-08-10",
+-   "n": 2,
++   "date": "2026-08-01",
+  }
+
+- Expected  - 2
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:300:24)
+(fail) person routing reinforcement > #given an existing explicit observation #when a textually equal fact arrives #then n increments and the date refreshes without a duplicate line [402.93ms]
+323 |       records: [personRecord("Min", [], "Mina prefers dark themes.")],
+324 |     }, AUTHOR, { people: PEOPLE })
+325 | 
+326 |     // then
+327 |     const entries = await readExplicitEntries(dir, "mina")
+328 |     expect(entries).toHaveLength(2)
+                          ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 2
+Received length: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:328:21)
+(fail) person routing reinforcement > #given an existing explicit observation #when a different fact arrives #then it appends a separate line [400.20ms]
+343 |     }, AUTHOR, { people: PEOPLE })
+344 | 
+345 |     // then
+346 |     expect(result.outcome).toBe("committed")
+347 |     if (result.outcome === "committed") {
+348 |       expect(result.affectedPaths).toEqual(["people/yeongyu/card.md", "people/yeongyu/observations.md"])
+                                         ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "people/yeongyu/card.md",
+-   "people/yeongyu/observations.md",
++   "notes/facts/2026-08.md",
+  ]
+
+- Expected  - 2
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:348:36)
+(fail) person routing new people > #given no matching card #when a confidently named person fact arrives #then a card skeleton and ledger are created [265.71ms]
+367 |       batchId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+368 |       records: [personRecord("Yeongyu", [], "Yeongyu joined the platform guild.")],
+369 |     }, AUTHOR, { people: PEOPLE })
+370 | 
+371 |     // then
+372 |     const card = parseMemoryFile(await readFile(join(dir, "people", "yeongyu-2", "card.md"), "utf8"))
+                                             ^
+ENOENT: no such file or directory, open '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-fYilI9/people/yeongyu-2/card.md'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-fYilI9/people/yeongyu-2/card.md",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:372:40)
+(fail) person routing new people > #given a slug already taken by a different person #when a new person sanitizes to it #then a numeric suffix avoids the collision [354.46ms]
+389 |         personRecord("YG", [], "YG drafted the alias table."),
+390 |       ],
+391 |     }, AUTHOR, { people: PEOPLE })
+392 | 
+393 |     // then
+394 |     expect(await readdir(join(dir, "people"))).toEqual(["yeongyu"])
+                       ^
+ENOENT: no such file or directory, scandir '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-zVVUJu/people'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-facts-extraction-zVVUJu/people",
+ syscall: "scandir",
+   errno: -2,
+    code: "ENOENT"
+
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/facts/extraction.test.ts:394:18)
+(fail) person routing new people > #given two facts about the same new person in one batch #when applied #then one card receives both entries [302.49ms]
+(pass) person routing gate and unresolved mentions > #given people routing is disabled #when a person fact arrives #then it falls back to the monthly notes file [257.97ms]
+(pass) person routing gate and unresolved mentions > #given an unresolved person mention #when applied #then the prefixed bullet is stored verbatim in monthly notes [262.32ms]
+
+packages/omo-senpi/src/components/memory/facts-runner.test.ts:
+(pass) quick-pinned facts launch > #given quick cannot resolve #when pending facts are launched #then no child spawns and the queue stays intact with one warning [16.20ms]
+(pass) quick-pinned facts launch > #given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit [467.94ms]
+(pass) quick-pinned facts launch > #given a commit lands before queue cleanup crashes #when a fresh runner reconciles #then the batch receipt prevents a duplicate commit [479.69ms]
+(pass) quick-pinned facts launch > #given a valid empty extraction #when finalized #then no commit lands and the queue is consumed as no_facts [316.03ms]
+(pass) quick-pinned facts launch > #given a schema-invalid project record carrying person #when finalized #then the queue is retained [314.51ms]
+(pass) deterministic facts writer-lock interleavings > #given the lock releases through the injected retry boundary #when finalization retries #then the batch commits and the queue empties [466.75ms]
+(pass) deterministic facts writer-lock interleavings > #given the lock remains held for all three attempts #when finalization exhausts retries #then no commit lands and one warning leaves queue and watermarks unchanged [457.31ms]
+289 |     // when
+290 |     const result = await runner.launchPending()
+291 | 
+292 |     // then
+293 |     expect(result.status).toBe("committed")
+294 |     expect(await readFile(join(identity.paths.repo, "people", "mina", "observations.md"), "utf8"))
+                       ^
+ENOENT: no such file or directory, open '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-runner-GRYZDM/agents/facts-agent/repo/people/mina/observations.md'
+    path: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-runner-GRYZDM/agents/facts-agent/repo/people/mina/observations.md",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/facts-runner.test.ts:294:18)
+(fail) people routing gate > #given default people settings #when a person record is applied #then it routes to the person ledger with a new card [943.52ms]
+(pass) people routing gate > #given people routing disabled #when a person record is applied #then it falls back to monthly notes [856.15ms]
+
+ 16 pass
+ 10 fail
+ 71 expect() calls
+Ran 26 tests across 2 files. [10.29s]
+
+================ GREEN (after implementation) ================
+command: bun test packages/memory-core/src/facts/extraction.test.ts packages/omo-senpi/src/components/memory/facts-runner.test.ts
+result: 26 pass / 0 fail
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/facts/extraction.test.ts:
+(pass) facts extraction JSONL validation > #given valid project and person arms #when parsed #then scope remains a discriminated union [0.65ms]
+(pass) facts extraction JSONL validation > #given a project record carrying person #when parsed #then the whole extraction is rejected [0.15ms]
+(pass) facts extraction JSONL validation > #given a person record missing person #when parsed #then the whole extraction is rejected [0.07ms]
+(pass) atomic facts batch application > #given project and resolved person records #when applied without a people policy #then one notes commit preserves both texts and trailers [292.05ms]
+(pass) atomic facts batch application > #given zero applicable records #when applied #then no commit is attempted [220.45ms]
+(pass) atomic facts batch application > #given git commit fails after staging #when the batch aborts #then index and working tree are restored [275.36ms]
+(pass) person routing alias resolution > #given an existing card with a known alias #when a person fact names that alias #then it lands in the card ledger and no new directory appears [353.15ms]
+(pass) person routing alias resolution > #given two cards whose aliases both match #when resolved #then the longest matching alias wins [415.98ms]
+(pass) person routing alias resolution > #given two cards with equal-length matching aliases #when resolved #then the smallest slug wins and the tie is logged [425.35ms]
+(pass) person routing alias resolution > #given the primary human card carries an alias #when a fact names it #then it routes to the human ledger without a new card [358.29ms]
+(pass) person routing reinforcement > #given an existing explicit observation #when a textually equal fact arrives #then n increments and the date refreshes without a duplicate line [513.95ms]
+(pass) person routing reinforcement > #given an existing explicit observation #when a different fact arrives #then it appends a separate line [409.78ms]
+(pass) person routing new people > #given no matching card #when a confidently named person fact arrives #then a card skeleton and ledger are created [279.78ms]
+(pass) person routing new people > #given a slug already taken by a different person #when a new person sanitizes to it #then a numeric suffix avoids the collision [356.56ms]
+(pass) person routing new people > #given two facts about the same new person in one batch #when applied #then one card receives both entries [271.39ms]
+(pass) person routing gate and unresolved mentions > #given people routing is disabled #when a person fact arrives #then it falls back to the monthly notes file [284.43ms]
+(pass) person routing gate and unresolved mentions > #given an unresolved person mention #when applied #then the prefixed bullet is stored verbatim in monthly notes [283.35ms]
+
+packages/omo-senpi/src/components/memory/facts-runner.test.ts:
+(pass) quick-pinned facts launch > #given quick cannot resolve #when pending facts are launched #then no child spawns and the queue stays intact with one warning [16.74ms]
+(pass) quick-pinned facts launch > #given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit [475.18ms]
+(pass) quick-pinned facts launch > #given a commit lands before queue cleanup crashes #when a fresh runner reconciles #then the batch receipt prevents a duplicate commit [492.72ms]
+(pass) quick-pinned facts launch > #given a valid empty extraction #when finalized #then no commit lands and the queue is consumed as no_facts [362.64ms]
+(pass) quick-pinned facts launch > #given a schema-invalid project record carrying person #when finalized #then the queue is retained [364.12ms]
+(pass) deterministic facts writer-lock interleavings > #given the lock releases through the injected retry boundary #when finalization retries #then the batch commits and the queue empties [499.99ms]
+(pass) deterministic facts writer-lock interleavings > #given the lock remains held for all three attempts #when finalization exhausts retries #then no commit lands and one warning leaves queue and watermarks unchanged [393.29ms]
+(pass) people routing gate > #given default people settings #when a person record is applied #then it routes to the person ledger with a new card [512.41ms]
+(pass) people routing gate > #given people routing disabled #when a person record is applied #then it falls back to monthly notes [463.79ms]
+
+ 26 pass
+ 0 fail
+ 102 expect() calls
+Ran 26 tests across 2 files. [9.78s]
+
+================ wider suites ================
+command: bun test packages/memory-core
+
+ 417 pass
+ 0 fail
+ 3532 expect() calls
+Ran 417 tests across 42 files. [54.42s]
+
+command: bun test packages/omo-senpi (shared worktree; concurrent todos 10/18 have uncommitted WIP)
+
+5 tests failed:
+(fail) createMemoryComponent > #given per-instance module state #when session_shutdown fires #then the identity context and supervisor reference are released [2.00ms]
+(fail) omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored [0.27ms]
+(fail) people command people.enabled gate > #given people.enabled false #when /people runs #then it refuses without reading any record [563.27ms]
+(fail) people command people.enabled gate > #given people.enabled true #when the suite registers #then /people is present [614.98ms]
+(fail) registerMemoryCommands > #given a fresh extension api #when the suite registers #then exactly the documented commands appear [0.66ms]
+
+ 1020 pass
+ 5 fail
+ 2940 expect() calls
+Ran 1025 tests across 154 files. [83.08s]
+
+failure triage: ulw-loop OMO_BIN is a known pre-existing failure (task brief).
+createMemoryComponent + people-command + registerMemoryCommands failures sit in files owned by
+concurrent todos 10 (index.ts, shutdown-drain.ts, journal/store.ts) and 18 (commands/people*.ts,
+commands/register.ts); their uncommitted WIP also breaks tsgo (journal/store.ts:193,195), which
+blocks the build:senpi-plugin && tsgo chain of bun run test:senpi before tests execute.
+files this task touched typecheck clean (no errors reported outside journal/store.ts) and their
+suites are green in one run (26/26 above; memory-core package 417/417).

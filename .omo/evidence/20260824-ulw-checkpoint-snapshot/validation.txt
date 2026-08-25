@@ -1,0 +1,32 @@
+CHANGED-FILE DIAGNOSTICS
+- lsp_diagnostics src/codex-goal-snapshot.ts: no diagnostics.
+- lsp_diagnostics test/codex-goal-snapshot.test.ts: no diagnostics.
+- npx biome check src/codex-goal-snapshot.ts test/codex-goal-snapshot.test.ts: checked 2 files, no fixes, exit 0.
+- git diff --check: exit 0.
+
+COMPONENT VALIDATION
+- Focused test: 13/13 passed.
+- Full ulw-loop suite: 40 files passed, 423 tests passed.
+- npm run typecheck: exit 0.
+- npm run build: exit 0.
+
+CODEX GATE
+- bun run test:codex: exit 0.
+- Final Node test stage: 493 tests passed, 0 failed, 0 skipped.
+
+ISOLATED REAL-CODEX QA
+- common.sh --self-check: dependencies present, local mock Responses endpoint passed, isolated CODEX_HOME auto-removed, real ~/.codex/config.toml unchanged.
+- install-verify.sh --self-test: plugin cache present, omo@sisyphuslabs enabled in sandbox config, 10 component bins linked, agent TOMLs linked, real ~/.codex/config.toml unchanged.
+- app-server-drive.sh --plugin: turn completed with mock model, sessionStart and userPromptSubmit hook/started + hook/completed notifications present, missingHooks=[], failedHooks=[].
+
+PRE-EXISTING COMPONENT-WIDE CHECK FAILURE
+`npm run check` reaches Biome and fails on unrelated pre-existing files:
+- src/codex-hook.ts formatting.
+- test/package-smoke.test.ts unsafe optional chaining and one unnecessary escape warning.
+- test/steering.test.ts formatting.
+The changed files pass Biome, TypeScript, tests, build, LSP diagnostics, and the mandatory full Codex gate.
+
+CLEANUP
+- Every codex-qa script used its own isolated CODEX_HOME and removed it on exit.
+- Mock model and PTY/process resources were terminated by the scripts.
+- Real ~/.codex/config.toml hash remained c5f0992836d5be1988c09454d66521dcb6ff6321.

@@ -1,0 +1,19 @@
+surface=runtime-fallback exported handler plus real OpenCode lifecycle event
+
+missing_model_driver_exit_code=0
+missing_model_driver_output={"abortCalls":["manual-missing-model-dedup"],"retryCalls":[{"id":"manual-missing-model-dedup","model":"openai/gpt-5.4","source":"session.status"}],"currentModel":"openai/gpt-5.4","retryKey":"unknown:1:ai_apicallerror: 5-hour usage limit reached"}
+
+variant_driver_exit_code=0
+variant_driver_output={"abortCalls":["manual-variant-dedup","manual-variant-dedup"],"retryCalls":[{"id":"manual-variant-dedup","model":"openai/gpt-5.4","source":"session.status"},{"id":"manual-variant-dedup","model":"google/gemini-2.5-pro","source":"session.status"}],"retryKey":"opencode-go/glm-5.2:high:1:ai_apicallerror: 5-hour usage limit reached"}
+
+interleaved_key_set_driver_exit_code=0
+interleaved_key_set_driver_output={"abortCalls":["manual-interleaved-dedup","manual-interleaved-dedup"],"retryCalls":[{"id":"manual-interleaved-dedup","model":"openai/gpt-5.4","source":"session.status"},{"id":"manual-interleaved-dedup","model":"google/gemini-2.5-pro","source":"session.status"}],"seenKeys":["opencode-go/glm-5.2:1:ai_apicallerror: 5-hour usage limit reached","openai/gpt-5.4:1:ai_apicallerror: 5-hour usage limit reached"]}
+
+opencode_version=1.18.13
+health={"healthy":true,"version":"1.18.13"}
+config_plugins=["file:///mnt/c/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/dist/index.js"]
+prompt_http_status=204
+sse_event={"type":"session.status"}
+real_db_sessions_before=0
+real_db_sessions_after=0
+result=PASS

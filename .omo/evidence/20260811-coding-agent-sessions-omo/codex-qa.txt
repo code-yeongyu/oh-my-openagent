@@ -1,0 +1,32 @@
+WHAT WAS TESTED
+Command:
+  bash .agents/skills/codex-qa/scripts/app-server-drive.sh --plugin
+
+Surface:
+  Real `codex app-server`, local worktree plugin, isolated `CODEX_HOME`, and a
+  local mock model. The script shasums the real `~/.codex/config.toml` before
+  and after.
+
+WHAT WAS OBSERVED
+Exit code: 0
+
+  assistantText: "Hello from the codex-qa mock model."
+  hook/started: sessionStart
+  hook/completed: sessionStart
+  hook/started: userPromptSubmit
+  hook/completed: userPromptSubmit
+  failedHooks: []
+
+The mock model process received SIGTERM during the script's intentional
+teardown. The QA script completed with exit code 0.
+
+WHY IT IS ENOUGH
+Generated-copy tests prove the changed shared skill reaches the Codex package.
+This first-party app-server run proves the local plugin still installs and
+executes live session hooks in strict isolation without a real model call.
+
+WHAT WAS OMITTED
+The complete notification stream, isolated home path, raw config, tokens, and
+environment data were summarized or omitted. A prior Docker attempt failed
+before QA began with container transport `unexpected EOF` (exit 125); the
+documented local isolated fallback produced the passing evidence above.

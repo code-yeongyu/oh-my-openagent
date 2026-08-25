@@ -20,6 +20,12 @@ import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/e
 import type { OhMyOpenCodeConfig } from "../config";
 import type { Managers } from "../create-managers";
 import type { FirstMessageVariantGate, PluginEventContext } from "./event-types";
+import {
+  forgetBtwSideSession,
+  getBtwSideMetadata,
+  isTrackedBtwSideSession,
+  trackBtwSideSession,
+} from "../features/btw-side";
 
 export const TMUX_ACTIVITY_EVENT_TYPES: ReadonlySet<string> = new Set([
   "message.updated",
@@ -33,6 +39,10 @@ export function isCompactionAgent(agent: string): boolean {
   return agent.trim().toLowerCase() === "compaction";
 }
 
+export function shouldDispatchOpenClawSessionEvent(sessionID: string): boolean {
+  return !isTrackedBtwSideSession(sessionID);
+}
+
 export async function dispatchOpenClawSessionEvent(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
@@ -40,7 +50,12 @@ export async function dispatchOpenClawSessionEvent(args: {
   rawEvent: string;
   sessionID: string;
 }): Promise<void> {
-  if (!args.pluginConfig.openclaw) return;
+  if (
+    !args.pluginConfig.openclaw ||
+    !shouldDispatchOpenClawSessionEvent(args.sessionID)
+  ) {
+    return;
+  }
 
   await dispatchOpenClawEvent({
     config: args.pluginConfig.openclaw,
@@ -62,8 +77,22 @@ export async function handleSessionCreatedEvent(args: {
   managers: Managers;
   firstMessageVariantGate: FirstMessageVariantGate;
 }): Promise<void> {
-  const sessionInfo = args.props?.info as { id?: string; title?: string; parentID?: string } | undefined;
+  const sessionInfo = args.props?.info as {
+    id?: string;
+    title?: string;
+    parentID?: string;
+    metadata?: Record<string, unknown>;
+  } | undefined;
   const sessionID = resolveSessionEventID(args.props);
+  if (
+    sessionInfo?.id &&
+    trackBtwSideSession({
+      id: sessionInfo.id,
+      metadata: sessionInfo.metadata,
+    })
+  ) {
+    return;
+  }
   const isSubagentSession = !!sessionInfo?.parentID || !!sessionID && subagentSessions.has(sessionID);
 
   if (!isSubagentSession) setMainSession(sessionID);
@@ -93,7 +122,13 @@ export async function handleSessionDeletedEvent(args: {
   clearModelFallbackSession: (sessionID: string) => void;
 }): Promise<void> {
   const sessionID = resolveSessionEventID(args.props);
-  if (sessionID === getMainSessionID()) setMainSession(undefined);
+  const sessionInfo = args.props?.info as {
+    metadata?: Record<string, unknown>;
+  } | undefined;
+  const isBtwSideSession = sessionID
+    ? forgetBtwSideSession(sessionID) || getBtwSideMetadata(sessionInfo) !== undefined
+    : false;
+  if (!isBtwSideSession && sessionID === getMainSessionID()) setMainSession(undefined);
   if (!sessionID) return;
 
   await args.managers.monitorManager?.stopSessionMonitors(sessionID);
@@ -107,11 +142,15 @@ export async function handleSessionDeletedEvent(args: {
   clearSessionModel(sessionID);
   clearSessionPromptParams(sessionID);
   syncSubagentSessions.delete(sessionID);
-  await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
+  if (!isBtwSideSession) {
+    await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
+  }
   if (wasSyncSubagentSession) subagentSessions.delete(sessionID);
   deleteSessionTools(sessionID);
   await args.managers.skillMcpManager.disconnectSession(sessionID);
-  if (args.tmuxIntegrationEnabled) await args.managers.tmuxSessionManager.onSessionDeleted({ sessionID });
+  if (args.tmuxIntegrationEnabled && !isBtwSideSession) {
+    await args.managers.tmuxSessionManager.onSessionDeleted({ sessionID });
+  }
 }
 
 export function handleMessageRemovedEvent(props?: Record<string, unknown>): void {

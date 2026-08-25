@@ -1,0 +1,54 @@
+Validation log — BTW remote parent revalidation
+Date: 2026-08-20
+
+Focused RED:
+- Intended assertion failure: expected false, received true.
+- 1 pass, 1 fail.
+- See red.txt.
+
+Focused GREEN:
+- Parent validator plus real-shaped TUI wiring.
+- 3 pass, 0 fail, 24 expectations.
+- See green.txt.
+
+Complete affected-domain gate:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun test --cwd /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/packages/omo-opencode src/features/btw-side/context-injector.test.ts src/features/btw-side/tui-adoption-cache.test.ts src/features/btw-side/tui-adoption-guard.test.ts src/features/btw-side/tui-controller.test.ts src/features/btw-side/tui-parent-validator.test.ts src/features/btw-side/tui-session-bridge.test.ts src/features/btw-side/tui-wiring.test.ts src/plugin/event-session-lifecycle.test.ts src/plugin/messages-transform.test.ts src/plugin/tool-execute-before.test.ts src/testing/create-plugin-module.test.ts src/tui.test.ts
+
+Observed:
+- 101 pass
+- 0 fail
+- 289 expectations
+- 12 files
+
+Coverage:
+- Remote parent revalidation and deletion-tombstone race
+- Persisted-side adoption and adoption guards
+- TUI controller, session bridge, and registration wiring
+- Bounded context injection and parent transcript isolation
+- Delegation guards and OpenClaw/session lifecycle suppression
+- Plugin startup and TUI integration
+
+Package typecheck:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun run --cwd /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/packages/omo-opencode typecheck
+Observed: exit 0 (`tsgo --noEmit -p tsconfig.json`).
+
+Repository typecheck:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun run typecheck
+Observed: exit 0 for root, script, and every package tsgo project.
+
+Pinned production build:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun run --cwd /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation build
+Observed: all build stages completed.
+Setup note: the fresh worktree required one-off local-file submodule
+initialization with `git -c protocol.file.allow=always submodule update`.
+
+Build cleanup:
+- Reversed the three unrelated generated Codex artifact diffs with apply_patch.
+- Restored their executable bits with chmod.
+- `git diff --exit-code` for those three files returned exit 0.
+- Remaining tracked diff contains only the three BTW validator/test/wiring files.
+
+Production driver:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun -e '<import and execute createBtwParentValidator>'
+Observed:
+{"first":true,"second":false,"calls":2}

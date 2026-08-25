@@ -146,7 +146,6 @@ function logDebug(logger: ComponentLogger, message: string, details: unknown): v
   }
 }
 
-export * from "./omo-native-buffer"
 export * from "./omo-native-component"
 export * from "./omo-native-notice"
 export * from "./omo-native-prompt"

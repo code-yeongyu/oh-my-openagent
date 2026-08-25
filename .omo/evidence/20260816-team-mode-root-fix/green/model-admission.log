@@ -1,0 +1,32 @@
+Focused GREEN command:
+  bun test \
+    packages/senpi-task/src/runners/rpc/model-admission.test.ts \
+    packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts \
+    packages/senpi-task/src/manager/runner.test.ts \
+    packages/senpi-task/src/runners/rpc-process.test.ts
+
+Result:
+  23 pass
+  0 fail
+  53 expectations
+
+Observed behavior:
+  - An unavailable process-child model rejects with typed `model_unavailable` before child spawn.
+  - A visible model is admitted before the RPC child spawn.
+  - Senpi model-table parsing matches exact `provider/model` identities.
+  - The real Senpi `--list-models` surface sees `omo-mock/mock-1` when the explicit provider extension is forwarded.
+  - The same isolated child profile rejects `omo-mock/mock-1` when that parent-known extension is omitted.
+  - The probe runs with isolated agent directories and no provider credentials.
+  - Existing RPC process lifecycle, managed-runner mapping, model threading, and variant threading remain green.
+
+Type verification:
+  bun run --cwd packages/senpi-task typecheck
+    exit 0
+
+  bun run --cwd packages/omo-senpi typecheck
+    exit 0
+
+Why this is enough for the B3 increment:
+  The unit seam proves deterministic typed admission ordering, while the task-component parity test drives
+  the real Senpi catalog command against the exact explicit-extension child profile. Together they prove
+  both sides of the regression without contacting a model provider or relying on the user's live settings.

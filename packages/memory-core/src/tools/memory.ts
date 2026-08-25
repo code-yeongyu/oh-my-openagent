@@ -5,6 +5,7 @@ import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } fro
 import { parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import type { LockDomain } from "../locks"
+import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import { MemoryToolError } from "./tool-errors"
 
 export type MemoryCommand =
@@ -15,10 +16,16 @@ export type MemoryCommand =
   | "rename"
   | "update_description"
 
+export interface MemoryToolProvenance {
+  readonly sessionId: string
+  readonly userTurns: number
+}
+
 export interface MemoryToolParams {
   command: MemoryCommand
   reason: string
   author: GitCommitAuthor
+  provenance?: MemoryToolProvenance
   file_path?: string
   old_path?: string
   new_path?: string
@@ -30,8 +37,16 @@ export interface MemoryToolParams {
   file_text?: string
 }
 
+/** Post-commit metadata carried to the notice channel (plan IC-4); subject is the message's first line. */
+export interface MemoryToolCommit {
+  readonly sha: string
+  readonly subject: string
+  readonly affectedPaths: readonly string[]
+}
+
 export interface MemoryToolResult {
   message: string
+  readonly commit?: MemoryToolCommit
 }
 
 export interface MemoryToolLock {
@@ -59,7 +74,7 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
 
       let result
       try {
-        result = await repo.commitWrite(affectedPaths, reason, params.author)
+        result = await repo.commitWrite(affectedPaths, memoryCommitMessage(reason, params.provenance), params.author)
       } catch (error) {
         if (error instanceof NoEffectiveChangesError) {
           throw toolError(`${params.command} made no effective changes`, error)
@@ -68,10 +83,16 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
       }
 
       const local = !(await hasConfiguredRemote(repo))
+      const summary = local
+        ? `Memory ${params.command} committed locally (${result.sha.slice(0, 7)}).`
+        : `Memory ${params.command} committed (${result.sha.slice(0, 7)}); harness will sync after the turn.`
       return {
-        message: local
-          ? `Memory ${params.command} committed locally (${result.sha.slice(0, 7)}).`
-          : `Memory ${params.command} committed (${result.sha.slice(0, 7)}); harness will sync after the turn.`,
+        message: touchesSoulPath(affectedPaths) ? `${summary}\n${SOUL_EDIT_RESULT_LINE}` : summary,
+        commit: {
+          sha: result.sha,
+          subject: reason.split(/\r?\n/, 1)[0] ?? reason,
+          affectedPaths,
+        },
       }
     })
   } catch (error) {
@@ -231,6 +252,17 @@ async function hasConfiguredRemote(repo: GitMemoryRepo): Promise<boolean> {
 
 function toolError(message: string, cause?: unknown): MemoryToolError {
   return new MemoryToolError(message, cause === undefined ? undefined : { cause })
+}
+
+function memoryCommitMessage(reason: string, provenance: MemoryToolProvenance | undefined): string {
+  if (provenance === undefined) return reason
+  return [
+    reason,
+    "",
+    "Omo-Writer: memory-tool",
+    `Omo-Session: ${provenance.sessionId}`,
+    `Omo-Turn: ${provenance.userTurns}`,
+  ].join("\n")
 }
 
 function errorMessage(error: unknown): string {

@@ -1,0 +1,15 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+tests/ulw-loop-define-goal-reference.test.ts:
+(pass) ulw-loop define-goal reference > #given the ulw-loop skill at /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-ulw-define-goal/packages/omo-senpi/skills/ulw-loop #when checking its references #then define-goal.md ships beside full-workflow.md [0.56ms]
+(pass) ulw-loop define-goal reference > #given the ulw-loop skill at /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-ulw-define-goal/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop #when checking its references #then define-goal.md ships beside full-workflow.md [0.11ms]
+(pass) ulw-loop define-goal reference > #given the ulw-loop SKILL.md at /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-ulw-define-goal/packages/omo-senpi/skills/ulw-loop #when reading its goal instructions #then it routes goal creation through references/define-goal.md [0.18ms]
+(pass) ulw-loop define-goal reference > #given the ulw-loop SKILL.md at /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-ulw-define-goal/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop #when reading its goal instructions #then it routes goal creation through references/define-goal.md [0.14ms]
+(pass) ulw-loop define-goal reference > #given the ulw-loop full-workflow at /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-ulw-define-goal/packages/omo-senpi/skills/ulw-loop #when reading its goal-creation flow #then it routes objective shaping through references/define-goal.md [0.22ms]
+(pass) ulw-loop define-goal reference > #given the ulw-loop full-workflow at /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-ulw-define-goal/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop #when reading its goal-creation flow #then it routes objective shaping through references/define-goal.md [8.91ms]
+(pass) ulw-loop define-goal reference > #given both shipped define-goal copies #when comparing bytes #then the senpi and codex references are identical [0.25ms]
+
+ 7 pass
+ 0 fail
+ 7 expect() calls
+Ran 7 tests across 1 file. [242.00ms]

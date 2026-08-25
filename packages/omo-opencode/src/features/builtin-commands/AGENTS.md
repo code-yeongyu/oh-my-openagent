@@ -21,7 +21,7 @@ Registry of built-in commands shipped inside the plugin. Each command is a templ
 |---------|-------------|-------|
 | `goal` | `templates/goal.ts` | Persistent thread objective (set / pause / resume / clear); replaces removed `/ralph-loop`, `/ulw-loop`, `/cancel-ralph` |
 | `refactor` | `templates/refactor.ts` | LSP + AST-grep refactoring |
-| `start-work` | `templates/start-work.ts` | Prometheus plan executor |
+| `ulw-execute` | `templates/ulw-execute.ts` | Prometheus plan executor |
 | `stop-continuation` | `templates/stop-continuation.ts` | Stop all continuations (todo enforcer, ralph loop, goal, boulder) |
 | `handoff` | `templates/handoff.ts` | Session context summary |
 | `remove-ai-slops` | `templates/remove-ai-slops.ts` | AI code smell cleanup |

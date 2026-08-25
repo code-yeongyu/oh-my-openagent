@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { updateTarget } from "../bin/lib/package-paths.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
@@ -15,6 +16,8 @@ type Fixture = {
   captureFile: string
   shimPath?: string
 }
+
+type InstallLayout = "bun" | "bun-legacy" | "bun-posix-special" | "npm" | "unknown"
 
 function writeFile(path: string, content: string, mode?: number): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -35,14 +38,29 @@ function expandShortPath(path: string): string {
   }
 }
 
-function createFixture(options: { hoisted?: boolean; shim?: boolean } = {}): Fixture {
+function createFixture(options: { hoisted?: boolean; shim?: boolean; installLayout?: InstallLayout } = {}): Fixture {
   // Windows hands back the 8.3 short form (RUNNER~1) here while the launcher reports the long path, so
   // the fixture root is canonicalized once and every derived path inherits the same spelling.
   const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
   roots.push(root)
-  const packagePath = options.hoisted
-    ? join(root, "node_modules", "omo-ai")
-    : join(root, "app")
+  const packagePath = options.installLayout === "bun-legacy"
+    ? join(root, "home", "node_modules", "omo-ai")
+    : options.installLayout?.startsWith("bun")
+    ? join(
+      root,
+      options.installLayout === "bun-posix-special"
+        ? "custom $HOME's bun"
+        : "custom-bun",
+      "install",
+      "global",
+      "node_modules",
+      "omo-ai",
+    )
+    : options.installLayout === "npm"
+      ? join(root, "prefix", "lib", "node_modules", "omo-ai")
+      : options.hoisted
+        ? join(root, "node_modules", "omo-ai")
+        : join(root, "app")
   mkdirSync(packagePath, { recursive: true })
   const packageRoot = expandShortPath(realpathSync(packagePath))
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
@@ -52,6 +70,9 @@ function createFixture(options: { hoisted?: boolean; shim?: boolean } = {}): Fix
     type: "module",
     dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
   }))
+  if (options.installLayout === "npm") {
+    writeFile(join(root, "prefix", "lib", "node_modules", ".package-lock.json"), "{}\n")
+  }
 
   const modulesRoot = options.hoisted ? join(root, "node_modules") : join(packageRoot, "node_modules")
   const senpiRoot = join(modulesRoot, "@code-yeongyu", "senpi")
@@ -92,14 +113,43 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
 }
 
 function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}) {
+  // A developer machine exports the agent directory for its own install; inheriting it would let
+  // the override path answer assertions that are about the unconfigured default.
+  const inherited: NodeJS.ProcessEnv = { ...process.env, PATH: "/usr/bin:/bin", CAPTURE_FILE: fixture.captureFile }
+  delete inherited.OMO_CODING_AGENT_DIR
+  delete inherited.SENPI_CODING_AGENT_DIR
+  delete inherited.PI_CODING_AGENT_DIR
   return spawnSync(process.execPath, [fixture.launcher, ...args], {
     encoding: "utf8",
-    env: { ...process.env, PATH: "/usr/bin:/bin", CAPTURE_FILE: fixture.captureFile, ...env },
+    env: { ...inherited, ...env },
   })
 }
 
 function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; target?: string } {
   return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
+}
+
+/**
+ * Resolves a real interpreter for the runtime under test. `bun test` runs on bun and node ships as
+ * a sibling of it (and vice versa), but neither is guaranteed, so a missing interpreter skips its
+ * case rather than failing on the host's toolchain.
+ */
+function runtimeInterpreter(runtime: "node" | "bun"): string | undefined {
+  const current = runtime === "bun" ? Boolean(process.versions.bun) : !process.versions.bun
+  if (current) return process.execPath
+  const name = process.platform === "win32" ? `${runtime}.exe` : runtime
+  const sibling = join(dirname(process.execPath), name)
+  if (existsSync(sibling)) return sibling
+  const located = spawnSync(process.platform === "win32" ? "where" : "which", [runtime], { encoding: "utf8" })
+  const resolved = located.status === 0 ? located.stdout.split(/\r?\n/)[0]?.trim() : undefined
+  return resolved ? resolved : undefined
+}
+
+function expectedBunUpdateCommand(packageRoot: string): string {
+  const quotedRoot = process.platform === "win32"
+    ? `"${packageRoot.replaceAll("\\", "/")}"`
+    : `'${packageRoot.replaceAll("'", "'\\''")}'`
+  return `omo is updated via bun: bun add --cwd ${quotedRoot} -g omo-ai@beta`
 }
 
 afterEach(() => {
@@ -120,8 +170,9 @@ describe("omo launcher", () => {
 
       test("#then launcher environment points to existing hoisted shims", () => {
         const fixture = createFixture({ hoisted: true })
+        const home = join(fixture.root, "home")
         mkdirSync(join(fixture.packageRoot, "node_modules"), { recursive: true })
-        const result = run(fixture, ["say", "hi"], { OMO_BIN: "/must/not/leak" })
+        const result = run(fixture, ["say", "hi"], { HOME: home, OMO_BIN: "/must/not/leak" })
         const environment = capture(fixture).env
         expect(result.status).toBe(0)
         expect(environment.SENPI_BIN).toBe(fixture.shimPath)
@@ -132,6 +183,8 @@ describe("omo launcher", () => {
         expect(realpathSync.native(binDir ?? "")).toBe(realpathSync.native(dirname(fixture.shimPath ?? "")))
         expect(existsSync(binDir ?? "")).toBe(true)
         expect(environment.OMO_AGENT_TOOLKIT_BIN).toBe(join(fixture.packageRoot, "bin", "omo-agent-toolkit.js"))
+        expect(environment.OMO_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+        expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
         // An inherited value must never survive; it is replaced by this launcher's own entry so
         // anything resolving the product by name re-enters here instead of the bare engine.
         // Windows reports this path in its long form while the fixture root may be the 8.3 short
@@ -151,15 +204,16 @@ describe("omo launcher", () => {
 
 
     describe("#when the product identity is handed to the engine", () => {
-      test("#then the brand profile names the product, its flat home and its update channel", () => {
+      test("#then the brand profile names the product, its home and its update channel", () => {
         const fixture = createFixture()
         const result = run(fixture, ["say", "hi"])
         expect(result.status).toBe(0)
 
         const brand = JSON.parse(capture(fixture).env.SENPI_BRAND ?? "{}")
-        expect(brand.name).toBe("omo")
+        expect(brand.name).toBe("OmO")
+        expect(brand.command).toBe("omo")
         expect(brand.configDir).toBe(".omo")
-        expect(brand.flatLayout).toBe(true)
+        expect(brand.flatLayout).toBe(false)
         expect(brand.envPrefix).toBe("OMO")
         expect(brand.userAgent).toBe("omo")
         expect(brand.originator).toBe("omo")
@@ -171,6 +225,31 @@ describe("omo launcher", () => {
           changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
         })
       })
+
+      // The launcher may re-exec itself under bun; whichever runtime wins, the engine must be told
+      // about it so it never flips back and spawns a second interpreter of its own. Both spellings
+      // are driven through a real interpreter, because the value has to track the process that
+      // actually runs the launcher rather than a constant either side could drift away from.
+      for (const runtime of ["node", "bun"] as const) {
+        const interpreter = runtimeInterpreter(runtime)
+        // Skipping is visible in the report; silently passing on a host without the interpreter
+        // would let the contract rot unnoticed.
+        test.skipIf(!interpreter)(`#then a launcher running on ${runtime} tells the engine SENPI_RUNTIME=${runtime}`, () => {
+          const fixture = createFixture()
+          // OMO_RUNTIME pins the decision, so this asserts the reported value and never depends on
+          // whether the host happens to have omo installed in a bun global tree.
+          const result = spawnSync(interpreter ?? process.execPath, [fixture.launcher, "say", "hi"], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              CAPTURE_FILE: fixture.captureFile,
+              OMO_RUNTIME: runtime,
+            },
+          })
+          expect(result.status).toBe(0)
+          expect(capture(fixture).env.SENPI_RUNTIME).toBe(runtime)
+        })
+      }
 
       test("#then OMO_BIN names this launcher, so the product never resolves to the bare engine", () => {
         const fixture = createFixture({ hoisted: true })
@@ -247,6 +326,97 @@ describe("omo launcher", () => {
         expect(result.status).toBe(0)
         expect(result.stdout).toContain("omo is updated via npm: npm i -g omo-ai@beta")
         expect(existsSync(fixture.captureFile)).toBe(false)
+      })
+
+      test("#then a Bun-managed install uses a clean package cwd", () => {
+        const fixture = createFixture({ installLayout: "bun" })
+        const result = run(fixture, ["update"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout.trim()).toBe(expectedBunUpdateCommand(fixture.packageRoot))
+        expect(existsSync(fixture.captureFile)).toBe(false)
+      })
+
+      test("#then a Bun path with shell metacharacters is quoted for the host", () => {
+        const fixture = createFixture({ installLayout: "bun-posix-special" })
+        const result = run(fixture, ["update"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout.trim()).toBe(expectedBunUpdateCommand(fixture.packageRoot))
+      })
+
+      test("#then a Windows-style Bun path uses shell-compatible forward slashes", () => {
+        const root = String.raw`C:\Users\omo user\.bun\install\global\node_modules\omo-ai`
+
+        expect(updateTarget(root, "win32")).toEqual({
+          manager: "bun",
+          command: "bun add --cwd \"C:/Users/omo user/.bun/install/global/node_modules/omo-ai\" -g omo-ai@beta",
+        })
+      })
+
+      test("#then an npm-managed install keeps the npm update command", () => {
+        const fixture = createFixture({ installLayout: "npm" })
+        const result = run(fixture, ["update"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout.trim()).toBe("omo is updated via npm: npm i -g omo-ai@beta")
+        expect(existsSync(fixture.captureFile)).toBe(false)
+      })
+
+      test("#then an unknown install layout fails safe to npm", () => {
+        const fixture = createFixture({ installLayout: "unknown" })
+        const result = run(fixture, ["update"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout.trim()).toBe("omo is updated via npm: npm i -g omo-ai@beta")
+        expect(existsSync(fixture.captureFile)).toBe(false)
+      })
+    })
+
+    describe("#given a legacy Bun global manifest contains the empty dot dependency", () => {
+      test("#then launching omo removes only the invalid dependency entry", () => {
+        const fixture = createFixture({ installLayout: "bun-legacy" })
+        const home = join(fixture.root, "home")
+        const manifestPath = join(home, "package.json")
+        writeFile(manifestPath, JSON.stringify({
+          dependencies: {
+            "": ".",
+            "left-pad": "1.3.0",
+          },
+        }))
+
+        const result = run(fixture, ["--version"], { HOME: home })
+
+        expect(result.status).toBe(0)
+        expect(JSON.parse(readFileSync(manifestPath, "utf8")).dependencies).toEqual({
+          "left-pad": "1.3.0",
+        })
+      })
+
+      test("#then a different empty dependency value is preserved", () => {
+        const fixture = createFixture({ installLayout: "bun-legacy" })
+        const home = join(fixture.root, "home")
+        const manifestPath = join(home, "package.json")
+        const original = `${JSON.stringify({ dependencies: { "": "file:.", "left-pad": "1.3.0" } }, null, 2)}\n`
+        writeFile(manifestPath, original)
+
+        const result = run(fixture, ["--version"], { HOME: home })
+
+        expect(result.status).toBe(0)
+        expect(readFileSync(manifestPath, "utf8")).toBe(original)
+      })
+
+      test("#then malformed JSON is preserved", () => {
+        const fixture = createFixture({ installLayout: "bun-legacy" })
+        const home = join(fixture.root, "home")
+        const manifestPath = join(home, "package.json")
+        const original = "{ not-json\n"
+        writeFile(manifestPath, original)
+
+        const result = run(fixture, ["--version"], { HOME: home })
+
+        expect(result.status).toBe(0)
+        expect(readFileSync(manifestPath, "utf8")).toBe(original)
       })
     })
 

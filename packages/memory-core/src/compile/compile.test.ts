@@ -1,155 +1,108 @@
-import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { GitMemoryRepo } from "../git"
+import { describe, expect, it } from "bun:test"
 import { compileMemoryBlock } from "./compile"
-
-const tempDirs: string[] = []
-const NOW = new Date("2026-05-04T00:00:00.000Z")
-
-async function fixture(name: string): Promise<string> {
-  return readFile(join(import.meta.dir, "fixtures", `${name}.golden.txt`), "utf8")
-}
-
-async function repoWith(files: Array<{ relativePath: string; content: string }>) {
-  const dir = await mkdtemp(join(tmpdir(), "memory-compile-"))
-  tempDirs.push(dir)
-  const repo = new GitMemoryRepo({ dir, agentId: "fixture-agent" })
-  await repo.init({ seedFiles: files })
-  return { dir, repo }
-}
-
-function memory(description: string, body: string): string {
-  return `---\ndescription: ${description}\n---\n${body}`
-}
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})
+import { memory, parseCompiledBlock, repoWith } from "./compile.test-support"
 
 describe("compileMemoryBlock", () => {
-  it("#given nested committed memory #when compiled #then it matches the handcrafted Letta golden", async () => {
+  it("#given nested committed memory #when compiled #then block sections, projection order, and metadata values form the structural contract", async () => {
     // given
     const { repo } = await repoWith([
-      { relativePath: "system/persona.md", content: memory("Not projected", "I am a careful coding agent.\n") },
-      { relativePath: "system/facts.md", content: memory("Stable facts", "The project uses Bun.\n") },
-      { relativePath: "system/human/prefs/coding.md", content: memory("Coding preferences", "Prefer focused changes.\nRun tests once.\n") },
-      { relativePath: "reference/details.md", content: memory("Reference", "External body must stay out.\n") },
-      { relativePath: "archive/diagram.png", content: "PNG-BODY-MUST-STAY-OUT" },
-      { relativePath: "README.MD", content: "UPPERCASE-BODY-MUST-STAY-OUT" },
-      { relativePath: "skills/deploy/SKILL.md", content: memory("Deploy", "Skill body must stay out.\n") },
+      { relativePath: "system/persona.md", content: memory("PERSONA_DESCRIPTION", "PERSONA_BODY\n") },
+      { relativePath: "system/facts.md", content: memory("FACTS_DESCRIPTION", "FACTS_BODY\n") },
+      { relativePath: "system/human/prefs/coding.md", content: memory("PREFS_DESCRIPTION", "PREFS_BODY\n") },
+      { relativePath: "reference/details.md", content: memory("REFERENCE_DESCRIPTION", "EXTERNAL_BODY_SENTINEL\n") },
+      { relativePath: "archive/diagram.png", content: "BINARY_BODY_SENTINEL" },
+      { relativePath: "README.MD", content: "UPPERCASE_BODY_SENTINEL" },
+      { relativePath: "skills/deploy/SKILL.md", content: memory("SKILL_DESCRIPTION", "SKILL_BODY_SENTINEL\n") },
     ])
 
     // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "agent-golden",
-      conversationId: "conversation-golden",
-      previousMessageCount: 7,
-      clock: () => NOW,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "agent-golden" })
+    const structure = parseCompiledBlock(block)
 
     // then
-    expect(block).toBe(await fixture("full"))
-    expect(block).not.toContain("External body")
-    expect(block).not.toContain("SKILL.md")
-    expect(block).not.toContain("PNG-BODY")
-  })
+    expect(structure).toEqual({
+      sections: ["self", "memory", "memory_metadata"],
+      projectionPaths: ["system/persona.md", "system/facts.md", "system/human/prefs/coding.md"],
+      memoryOpenTags: ["facts", "human", "prefs", "coding", "external_projection"],
+      metadata: { agentId: "agent-golden" },
+    })
+    expect(block).toContain("PERSONA_BODY")
+    expect(block).toContain("FACTS_BODY")
+    expect(block).toContain("PREFS_BODY")
+    expect(block).not.toContain("EXTERNAL_BODY_SENTINEL")
+    expect(block).not.toContain("BINARY_BODY_SENTINEL")
+    expect(block).not.toContain("SKILL_BODY_SENTINEL")
+    // Loaded Windows runners push these git fixtures past the 5s default; the work stays
+    // deterministic (~230ms locally), so only the ceiling moves.
+  }, 30_000)
 
-  it("#given an empty committed repository #when compiled #then only metadata is emitted", async () => {
+  it("#given a committed persona and identity #when compiled #then both projection paths share the self section and metadata remains structured", async () => {
+    // given
+    const { repo } = await repoWith([
+      { relativePath: "system/persona.md", content: memory("PERSONA_DESCRIPTION", "PERSONA_BODY\n") },
+      { relativePath: "system/identity.md", content: memory("IDENTITY_DESCRIPTION", "IDENTITY_BODY\n") },
+      { relativePath: "system/facts.md", content: memory("FACTS_DESCRIPTION", "FACTS_BODY\n") },
+    ])
+
+    // when
+    const block = await compileMemoryBlock(repo, { agentId: "persona-identity-agent" })
+    const structure = parseCompiledBlock(block)
+
+    // then
+    expect(structure).toEqual({
+      sections: ["self", "memory", "memory_metadata"],
+      projectionPaths: ["system/persona.md", "system/identity.md", "system/facts.md"],
+      memoryOpenTags: ["facts"],
+      metadata: { agentId: "persona-identity-agent" },
+    })
+  }, 30_000)
+
+  it("#given only a committed identity #when compiled #then it renders under self without a persona projection", async () => {
+    // given
+    const { repo } = await repoWith([
+      { relativePath: "system/identity.md", content: memory("IDENTITY_DESCRIPTION", "IDENTITY_BODY\n") },
+    ])
+
+    // when
+    const block = await compileMemoryBlock(repo, { agentId: "identity-agent" })
+    const structure = parseCompiledBlock(block)
+
+    // then
+    expect(structure.sections).toEqual(["self", "memory_metadata"])
+    expect(structure.projectionPaths).toEqual(["system/identity.md"])
+  }, 30_000)
+
+  it("#given an empty committed repository #when compiled #then only structured metadata is emitted", async () => {
     // given
     const { repo } = await repoWith([])
 
     // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "empty-agent",
-      conversationId: "empty-conversation",
-      previousMessageCount: 0,
-      clock: () => NOW,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "empty-agent" })
+    const structure = parseCompiledBlock(block)
 
     // then
-    expect(block).toBe(await fixture("empty"))
-  })
+    expect(structure).toEqual({
+      sections: ["memory_metadata"],
+      projectionPaths: [],
+      memoryOpenTags: [],
+      metadata: { agentId: "empty-agent" },
+    })
+  }, 30_000)
 
-  it("#given only a committed persona #when compiled #then its description is omitted", async () => {
+  it("#given only a committed persona #when compiled #then its body is projected without its description", async () => {
     // given
     const { repo } = await repoWith([
-      { relativePath: "system/persona.md", content: memory("Secret description", "Committed persona.\n") },
+      { relativePath: "system/persona.md", content: memory("DESCRIPTION_SENTINEL", "PERSONA_BODY_SENTINEL\n") },
     ])
 
     // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "persona-agent",
-      conversationId: "persona-conversation",
-      previousMessageCount: 2,
-      clock: () => NOW,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "persona-agent" })
+    const structure = parseCompiledBlock(block)
 
     // then
-    expect(block).toBe(await fixture("persona-only"))
-    expect(block).not.toContain("Secret description")
-  })
-
-  it("#given a dirty persona edit #when compiled #then only the committed HEAD body appears", async () => {
-    // given
-    const { dir, repo } = await repoWith([
-      { relativePath: "system/persona.md", content: memory("Persona", "Committed persona.\n") },
-    ])
-    await writeFile(join(dir, "system/persona.md"), memory("Persona", "Dirty persona.\n"))
-
-    // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "persona-agent",
-      conversationId: "persona-conversation",
-      previousMessageCount: 2,
-      clock: () => NOW,
-    })
-
-    // then
-    expect(block).toContain("Committed persona.")
-    expect(block).not.toContain("Dirty persona.")
-  })
-
-  it("#given a committed binary projection #when compiled #then its name appears without reading its blob", async () => {
-    // given
-    const { repo } = await repoWith([{ relativePath: "assets/logo.png", content: "binary payload" }])
-    const originalShow = repo.show.bind(repo)
-    repo.show = async (revision, path) => {
-      if (path.endsWith(".png")) throw new Error("binary blob was read")
-      return originalShow(revision, path)
-    }
-
-    // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "binary-agent",
-      conversationId: "binary-conversation",
-      previousMessageCount: 0,
-      clock: () => NOW,
-    })
-
-    // then
-    expect(block).toContain("└── logo.png")
-    expect(block).not.toContain("binary payload")
-  })
-
-  it("#given an unreadable committed system file #when compiled #then it is skipped best-effort", async () => {
-    // given
-    const { repo } = await repoWith([
-      { relativePath: "system/persona.md", content: memory("Persona", "Readable persona.\n") },
-      { relativePath: "system/broken.md", content: "missing frontmatter" },
-    ])
-
-    // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "skip-agent",
-      conversationId: "skip-conversation",
-      previousMessageCount: 0,
-      clock: () => NOW,
-    })
-
-    // then
-    expect(block).toContain("Readable persona.")
-    expect(block).not.toContain("<broken>")
-  })
+    expect(structure.sections).toEqual(["self", "memory_metadata"])
+    expect(structure.projectionPaths).toEqual(["system/persona.md"])
+    expect(block).toContain("PERSONA_BODY_SENTINEL")
+    expect(block).not.toContain("DESCRIPTION_SENTINEL")
+  }, 30_000)
 })

@@ -23,10 +23,10 @@ export const expectedSkills = [
 	"remove-ai-slops",
 	"review-work",
 	"rules",
-	"start-work",
 	"teammode",
 	"ultimate-browsing",
 	"ultrawork",
+	"ulw-execute",
 	"ulw-loop",
 	"ulw-plan",
 	"ulw-research",
@@ -69,33 +69,33 @@ export function removeCodexCompatibilityGuidance(content) {
 	return `${content.slice(0, start)}${content.slice(end + endMarker.length)}`;
 }
 
-const startWorkOriginalCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
+const ulwExecuteOriginalCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
 2. For PR/branch work, finish the lifecycle from the task-owned worktree: sync \`.omo/\` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
 3. Remove or mark the Boulder work as completed.
 4. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`;
 
-const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
+const ulwExecuteCodexCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
 2. Complete the **Global Review and Debugging Gate** before any completion claim, PR creation, PR handoff, branch handoff, or merge:
    - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
-   - Each passing review lane binds to the exact full commit SHA it reviewed. Immediately append a durable record to \`.omo/start-work/ledger.jsonl\` with the lane name, full SHA, PASS verdict, and report artifact/source. Before same-SHA reuse after any continuation or compaction, re-read the ledger record and require the exact lane/SHA pair; memory, chat history, or an unstamped report is not coverage. New commits require fresh applicable lane coverage.
-   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append a separate durable record with the audit name, exact full SHA, verdict, and evidence artifact/source to \`.omo/start-work/ledger.jsonl\`. Reuse it only after re-reading an exact audit/SHA match.
+   - Each passing review lane binds to the exact full commit SHA it reviewed. Immediately append a durable record to \`.omo/ulw-execute/ledger.jsonl\` with the lane name, full SHA, PASS verdict, and report artifact/source. Before same-SHA reuse after any continuation or compaction, re-read the ledger record and require the exact lane/SHA pair; memory, chat history, or an unstamped report is not coverage. New commits require fresh applicable lane coverage.
+   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append a separate durable record with the audit name, exact full SHA, verdict, and evidence artifact/source to \`.omo/ulw-execute/ledger.jsonl\`. Reuse it only after re-reading an exact audit/SHA match.
    - If any review lane or debugging hypothesis fails, invoke the \`debugging\` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
-   - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/start-work/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
+   - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/ulw-execute/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
    - If the work includes creating, updating, or handing off a PR, refresh \`git status\` and the PR/branch state from the task-owned worktree after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
 3. Finish the PR/branch lifecycle from its task-owned worktree: sync \`.omo/\` state back to the main repo, create or update the PR when requested, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
 4. Remove or mark the Boulder work as completed.
 5. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, Global Review and Debugging Gate verdict, artifacts, and cleanup receipts.`;
 
-const startWorkOriginalHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.\n- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.";
+const ulwExecuteOriginalHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.\n- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.";
 
-const startWorkCodexHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No `ORCHESTRATION COMPLETE`, final response, PR creation, PR handoff, or merge before the Global Review and Debugging Gate passes with recorded evidence.\n- No PR/branch implementation or review in the main worktree; create or use a task-owned git worktree first.\n- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.";
+const ulwExecuteCodexHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No `ORCHESTRATION COMPLETE`, final response, PR creation, PR handoff, or merge before the Global Review and Debugging Gate passes with recorded evidence.\n- No PR/branch implementation or review in the main worktree; create or use a task-owned git worktree first.\n- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.";
 
 const reviewWorkCodexGate = `
-When \`review-work\` is used as a final implementation, PR, or \`$start-work\`
+When \`review-work\` is used as a final implementation, PR, or \`$ulw-execute\`
 gate, it is blocking. A timeout, missing deliverable, ack-only response,
 explicit \`BLOCKED:\`, or inconclusive lane is not a pass. Treat that lane as
 failed, investigate the underlying uncertainty with the \`debugging\` skill when
@@ -134,10 +134,10 @@ export function removeCodexSkillOverlays(skillName, content) {
 	if (skillName === "ulw-research") {
 		return content.replace(ulwResearchCodexDeliveryGate, ulwResearchOriginalDeliveryGates);
 	}
-	if (skillName === "start-work") {
+	if (skillName === "ulw-execute") {
 		return content
-			.replace(startWorkCodexCompletion, startWorkOriginalCompletion)
-			.replace(startWorkCodexHardRule, startWorkOriginalHardRule);
+			.replace(ulwExecuteCodexCompletion, ulwExecuteOriginalCompletion)
+			.replace(ulwExecuteCodexHardRule, ulwExecuteOriginalHardRule);
 	}
 	if (skillName === "review-work") {
 		return content.replace(reviewWorkCodexGatePattern, "");

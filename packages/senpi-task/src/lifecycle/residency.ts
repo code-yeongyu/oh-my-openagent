@@ -5,16 +5,22 @@ import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
 import type { AdmissionResult } from "./types"
 
+// Both the "unlimited" literal and a 0 cap mean unbounded residency (omo.json accepts either).
+function isUnbounded(maxChildren: number | "unlimited"): maxChildren is "unlimited" | 0 {
+  return maxChildren === "unlimited" || maxChildren === 0
+}
+
 /**
  * Residency cap gate (codex residency contract). A resident is a spawned-not-disposed child of the
  * parent session. Under the cap -> admit. At the cap -> LRU-evict the OLDEST terminal, idle resident
  * (skipping any with a queued send) via the destruction port. If nothing is evictable -> reject with
- * AgentLimitReached naming the residents so the caller can explain why.
+ * AgentLimitReached naming the residents so the caller can explain why. An unbounded cap
+ * ("unlimited" or 0) admits every child and never evicts.
  */
 export async function admitResident(context: LifecycleContext, parentSessionId: string): Promise<AdmissionResult> {
   const residents = residentsFor(context, parentSessionId)
   const maxChildren = context.config.residency_max_children
-  if (maxChildren === "unlimited" || residents.length < maxChildren) return { kind: "admitted" }
+  if (isUnbounded(maxChildren) || residents.length < maxChildren) return { kind: "admitted" }
 
   const victim = lruEvictable(context, residents)
   if (victim === undefined) {
@@ -142,7 +148,7 @@ export async function admitSuspendedBatch(
     // Residents include live foreign owners; when the configured cap sits below the current
     // resident count, available clamps to 0 - revive none, keep owned residents, evict nothing.
     const maxChildren = context.config.residency_max_children
-    const available = maxChildren === "unlimited"
+    const available = isUnbounded(maxChildren)
       ? candidates.length
       : Math.max(0, maxChildren - residentsFor(context, parentSessionId).length)
     const selected = candidates.slice(0, available)

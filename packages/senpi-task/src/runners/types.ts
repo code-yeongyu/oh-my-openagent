@@ -1,4 +1,5 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
+import type { RunnerOutcome } from "./in-process/child-handle"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -44,6 +45,7 @@ export type ChildHandle = {
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
   waitForIdle(): Promise<void>
+  waitForOutcome?(): Promise<RunnerOutcome>
   lastAssistantText(): string | undefined
   dispose(): Promise<void>
 }
@@ -72,8 +74,16 @@ export type TerminateOptions = {
   readonly sigkillDelayMs?: number
 }
 
+export type RpcTerminalAssistantMessage = {
+  readonly text?: string
+  readonly stopReason?: string
+  readonly errorMessage?: string
+}
+
 export type RpcChildHandle = ChildHandle & {
   readonly spawnSpec?: RpcSpawnSpec
+  terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
+  wasAbortedByUser?(): boolean
   switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
   getEntries?(since?: string): Promise<RpcEntriesResult>
   terminate(options?: TerminateOptions): Promise<void>

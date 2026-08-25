@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
@@ -7,16 +7,17 @@ import {
   deriveState,
   finalizeCursor,
   initialReflectionState,
-  type ReflectionSnapshot,
-  type ReflectionTranscriptState,
+  type ReflectionSnapshot, type ReflectionTranscriptState,
 } from "./cursor"
 import {
   projectTranscriptEntries,
   type TranscriptEntry,
   type TranscriptProjection,
 } from "./entries"
+import { withLocalJournalLock, JournalLockTimeoutError, type JournalLock } from "./lock"
+import { syncJournalDirectory, syncJournalFile } from "./fsync"
 
-export type JournalLock = <T>(lockPath: string, task: () => Promise<T>) => Promise<T>
+export { withLocalJournalLock, JournalLockTimeoutError, type JournalLock }
 
 export type TranscriptJournalOptions = {
   readonly journalDir: string
@@ -29,34 +30,6 @@ export type AppendResult = { readonly appended: number; readonly skipped: number
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
   return typeof error.code === "string" ? error.code : undefined
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
-}
-
-export const withLocalJournalLock: JournalLock = async (lockPath, task) => {
-  const deadline = Date.now() + 5_000
-  let handle
-  for (;;) {
-    try {
-      handle = await open(lockPath, "wx", 0o600)
-      break
-    } catch (error) {
-      if (errorCode(error) !== "EEXIST" || Date.now() >= deadline) throw error
-      await delay(10)
-    }
-  }
-
-  try {
-    await handle.writeFile(`${process.pid}\n`, "utf8")
-    return await task()
-  } finally {
-    await handle.close()
-    await unlink(lockPath).catch((error: unknown) => {
-      if (errorCode(error) !== "ENOENT") throw error
-    })
-  }
 }
 
 function isTranscriptEntry(value: unknown): value is TranscriptEntry {
@@ -156,18 +129,68 @@ export class TranscriptJournal {
     })
   }
 
-  async captureReflectionSnapshot(): Promise<ReflectionSnapshot | null> {
+  async captureReflectionSnapshot(signal?: AbortSignal): Promise<ReflectionSnapshot | null> {
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
       const snapshot = captureCursorSnapshot(entries, state)
       if (snapshot === null) return null
+      signal?.throwIfAborted()
       await this.writeStateUnlocked(
         { ...state, last_reflection_started_at: this.now().toISOString() },
         entries,
       )
       return snapshot
-    })
+    }, signal)
+  }
+
+  /**
+   * Makes the journal durable WITHOUT the state lock (IC-11). Locking is unnecessary here —
+   * transcript.jsonl is append-only and state.json is published by atomic rename, so fsync
+   * races no writer — and it is harmful: the shutdown drain that calls this owns a 1500ms
+   * budget, while the lock's acquisition wait alone is 5000ms, so a scanner holding state.lock
+   * used to exhaust the whole drain. The signal is re-checked before each fsync so an aborted
+   * flush STARTS no further I/O once the drain has returned.
+   */
+  async flush(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    // Read through a call so the check is re-evaluated after every await: abort can fire
+    // between two fsyncs, which a narrowed property read would miss.
+    const aborted = (): boolean => signal?.aborted ?? false
+    await syncJournalFile(this.transcriptPath)
+    if (aborted()) return
+    await syncJournalFile(this.statePath)
+    if (aborted()) return
+    await syncJournalDirectory(this.options.journalDir)
+  }
+
+  /**
+   * Lock-free tolerant read for identity-wide scanners (dream selection): never touches
+   * state.lock, never creates files, and skips rows that do not parse — a torn trailing line
+   * from a concurrent append is expected under a snapshot read, not corruption. Correctness
+   * paths (reconcile, reflection cursors) keep using the locked readEntries().
+   */
+  async readEntriesSnapshot(): Promise<TranscriptEntry[]> {
+    let raw: string
+    try {
+      raw = await readFile(this.transcriptPath, "utf8")
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+      return []
+    }
+    const entries: TranscriptEntry[] = []
+    for (const line of raw.split("\n")) {
+      if (line.trim().length === 0) continue
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(line)
+      } catch (error) {
+        if (error instanceof SyntaxError) continue
+        throw error
+      }
+      if (isTranscriptEntry(parsed)) entries.push(parsed)
+    }
+    return entries
   }
 
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {
@@ -181,9 +204,10 @@ export class TranscriptJournal {
     })
   }
 
-  private async locked<T>(task: () => Promise<T>): Promise<T> {
+  private async locked<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted()
     await mkdir(this.options.journalDir, { recursive: true, mode: 0o700 })
-    return this.lock(this.lockPath, task)
+    return this.lock(this.lockPath, task, signal)
   }
 
   private async appendUnlocked(entries: readonly TranscriptEntry[]): Promise<AppendResult> {

@@ -422,11 +422,14 @@ describe("steerUlwLoop", () => {
 });
 
 describe("parseUlwLoopSteeringDirective", () => {
-	it.each(["OMO_ULW_LOOP_STEER", "omo.ulw-loop.steer", "omo ulw-loop steer", "omo-agent-toolkit ulw-loop steer"])("parses %s pattern", (marker) => {
-		expect(parseUlwLoopSteeringDirective(`${marker}: ${JSON.stringify(steering())}`)).toMatchObject({
-			kind: "add_subgoal",
-		});
-	});
+	it.each(["OMO_ULW_LOOP_STEER", "omo.ulw-loop.steer", "omo ulw-loop steer", "omo-agent-toolkit ulw-loop steer"])(
+		"parses %s pattern",
+		(marker) => {
+			expect(parseUlwLoopSteeringDirective(`${marker}: ${JSON.stringify(steering())}`)).toMatchObject({
+				kind: "add_subgoal",
+			});
+		},
+	);
 
 	it("returns null when no marker", () => {
 		expect(parseUlwLoopSteeringDirective(JSON.stringify(steering()))).toBeNull();

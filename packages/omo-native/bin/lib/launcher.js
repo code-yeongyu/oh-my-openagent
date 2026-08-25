@@ -2,8 +2,11 @@ import { existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
-import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
+import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
+import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
+import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
+import { detectHarnesses } from "./setup-detect.js"
+import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { printSetupReport } from "./setup-report.js"
 
 const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server"])
@@ -25,18 +28,22 @@ function isSelfUpdate(args) {
 // updates. The engine consumes this once and scrubs it, so nested engine processes are
 // unaffected.
 function brandProfile() {
+  const update = updateTarget()
   return {
-    name: "omo",
+    name: "OmO",
+    command: "omo",
     displayVersion: packageManifest().version,
     configDir: ".omo",
-    flatLayout: true,
+    // Engine state lives at the canonical `~/.omo/agent`, never directly under the config
+    // directory: a flat home would disagree with the directory every omo surface resolves.
+    flatLayout: false,
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
     update: {
       packageName: "omo-ai",
       distTag: "beta",
-      command: "npm i -g omo-ai@beta",
+      command: update.command,
       changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
     },
   }
@@ -55,9 +62,17 @@ function senpiEnvironment(senpiRoot) {
   delete env.OMO_BIN
   delete env.SENPI_BIN
   env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
+  // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
+  // tool inherits the same state instead of falling back to its own home.
+  const agentDir = canonicalAgentDir(env)
+  env.OMO_CODING_AGENT_DIR = agentDir
+  env.SENPI_CODING_AGENT_DIR = agentDir
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
   // the plugin via --extension and therefore never match the settings-packages detection gates.
   env.OMO_NATIVE = "1"
+  // This launcher already decided which runtime the product runs on, possibly by re-execing itself
+  // under bun. Handing that answer down stops the engine from making its own, conflicting choice.
+  env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
   env.SENPI_BRAND = JSON.stringify(brandProfile())
 
   const binDir = nearestNodeBin(senpiRoot)
@@ -86,7 +101,38 @@ function isInteractiveDefault(args) {
   return process.stderr.isTTY === true && !args.includes("-p") && !args.includes("--print")
 }
 
+/**
+ * Engine state that predates the unified directory is carried forward once, so unifying the
+ * location never presents itself to the user as one more round of erased settings.
+ */
+function reportLegacyFlatAdoption() {
+  let result
+  try {
+    result = adoptLegacyFlatState()
+  } catch (error) {
+    console.error(`omo: could not adopt legacy state: ${error.message}`)
+    return
+  }
+  if (!result.adopted) return
+  const moved = [...result.copied, ...result.backfilled].join(", ")
+  console.error(`omo: carried forward settings from the legacy ~/.omo layout (${moved})`)
+}
+
+/**
+ * The interactive banner's sibling-credential hint is advisory, so it must never gate the engine
+ * spawn. It is answered synchronously from the suggestion cache; a stale or missing cache kicks
+ * off a detached refresh (the launcher itself never writes the cache) and still answers this
+ * launch from the cached or empty value. Any cache failure behaves as no-siblings: fail-open.
+ */
+function setupSuggestionForLaunch() {
+  const cached = readSetupSuggestionCache()
+  if (!cached.fresh) spawnSetupSuggestionRefresh()
+  return cached.suggestion === true
+}
+
 export async function runLauncher(args = process.argv.slice(2)) {
+  migrateLegacyBunGlobalManifest()
+  reportLegacyFlatAdoption()
   const command = args[0]
   if (command === "ulw-loop") {
     spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
@@ -109,7 +155,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // The engine is pinned by this package, so a self-update would break the pairing; every
   // self-update spelling is answered with the command that actually updates the product.
   if (isSelfUpdate(args)) {
-    console.log(`omo is updated via npm: ${brandProfile().update.command}`)
+    const update = updateTarget()
+    console.log(`omo is updated via ${update.manager}: ${update.command}`)
     process.exitCode = 0
     return
   }
@@ -119,7 +166,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
   }
   if (isInteractiveDefault(args)) {
     console.error(`omo (omo-ai beta ${packageManifest().version})`)
-    if (process.stdout.isTTY === true && needsSetupSuggestion(await detectHarnesses())) {
+    if (process.stdout.isTTY === true && setupSuggestionForLaunch()) {
       console.error("omo: sibling credentials detected; run `omo setup` to review them")
     }
   }

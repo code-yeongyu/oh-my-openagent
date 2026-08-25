@@ -1,6 +1,3 @@
 <memory_metadata>
 - AGENT_ID: empty-agent
-- CONVERSATION_ID: empty-conversation
-- System prompt last recompiled: 2026-05-04 12:00:00 AM UTC+0000
-- 0 previous messages between you and the user are stored in recall memory
 </memory_metadata>

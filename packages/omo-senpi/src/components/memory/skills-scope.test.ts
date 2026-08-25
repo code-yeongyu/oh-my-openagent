@@ -23,10 +23,8 @@
  *    Extension paths are appended after the pre-existing set, so memory skills yield to
  *    project/user skills on name collision and otherwise load additively. Extension paths
  *    outside the user/project dirs classify as source "path".
- * 4. Missing dir tolerated: core/skills.ts loadSkills skips a nonexistent skill path with a
- *    { type: "warning", "skill path does not exist" } diagnostic and continues (no throw);
- *    loadSkillsFromDirInternal (:168+) likewise returns empty for a missing dir. => the
- *    create-free contract (return repo/skills even when absent) is safe.
+ * 4. Missing dir handling: core/skills.ts emits a visible "skill path does not exist" warning.
+ *    The memory extension therefore contributes repo/skills only after it exists.
  * 5. Real-harness proof of the event round-trip: test/suite/hooks-builtin-extension.test.ts
  *    ("collects resource-discovered hook paths as runtime hook sources") and
  *    test/suite/hooks-lifecycle.test.ts:152 register pi.on("resources_discover", ...) via a
@@ -42,9 +40,11 @@
  */
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
@@ -64,19 +64,21 @@ const IDENTITY = "skills-scope-agent"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
-async function fixture(): Promise<{ context: MemoryIdentityContext; skillsDir: string }> {
-  const dir = await mkdtemp(join(tmpdir(), "memory-skills-scope-"))
+async function fixture(createSkills = true): Promise<{ context: MemoryIdentityContext; skillsDir: string }> {
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-skills-scope-")))
   tempDirs.push(dir)
   const identityPaths = buildIdentityPaths(join(dir, "memory"), IDENTITY)
+  const skillsDir = join(identityPaths.repo, MEMORY_SKILLS_DIRNAME)
+  if (createSkills) await mkdir(skillsDir, { recursive: true })
   const context = createMemoryIdentityContext({
     identity: IDENTITY,
     identityPaths,
     binding: createMemoryBinding({ identity: IDENTITY, repoPath: identityPaths.repo, boundAt: 0 }),
   })
-  return { context, skillsDir: join(identityPaths.repo, MEMORY_SKILLS_DIRNAME) }
+  return { context, skillsDir }
 }
 
 function discoverPayload(reason: "startup" | "reload", cwd: string): unknown {
@@ -186,16 +188,16 @@ describe("createMemorySkillsScopeHandler", () => {
     expect(result).toBeUndefined()
   })
 
-  test("returns the skills dir even when it does not exist on disk (create-free)", async () => {
+  test("returns undefined when the skills dir does not exist on disk", async () => {
     // #given
-    const { context, skillsDir } = await fixture()
+    const { context, skillsDir } = await fixture(false)
     const handler = createMemorySkillsScopeHandler({ resolveContext: () => context })
 
     // #when
     const result = handler(discoverPayload("startup", "/tmp/project"), eventContext("session-1"))
 
     // #then
-    expect(result).toEqual({ skillPaths: [skillsDir] })
+    expect(result).toBeUndefined()
     const { existsSync } = await import("node:fs")
     expect(existsSync(skillsDir)).toBe(false)
   })

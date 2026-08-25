@@ -1,0 +1,54 @@
+===== scenario: default_on =====
+{"resolved":["git-master"],"missing":[]}
+<skill name="git-master" location="/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/gm-resolver-capture-VpXOTC/plugin-skills/git-master/SKILL.md">
+References are relative to /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/gm-resolver-capture-VpXOTC/plugin-skills/git-master.
+
+GIT MASTER FIXTURE BODY
+
+<commit_attribution>
+## Commit Footer & Co-Author (MANDATORY)
+
+Add omo attribution to EVERY commit you create:
+
+1. **Footer in the commit body:** Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)
+2. **Co-authored-by trailer:** Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>
+
+**Example:**
+```bash
+git commit -m "{Commit Message}" -m "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)" -m "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+```
+</commit_attribution>
+</skill>
+
+
+===== scenario: coauthor_off =====
+{"resolved":["git-master"],"missing":[]}
+<skill name="git-master" location="/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/gm-resolver-capture-VpXOTC/plugin-skills/git-master/SKILL.md">
+References are relative to /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/gm-resolver-capture-VpXOTC/plugin-skills/git-master.
+
+GIT MASTER FIXTURE BODY
+
+<commit_attribution>
+## Commit Footer & Co-Author (MANDATORY)
+
+Add omo attribution to EVERY commit you create:
+
+1. **Footer in the commit body:** Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)
+
+**Example:**
+```bash
+git commit -m "{Commit Message}" -m "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)"
+```
+</commit_attribution>
+</skill>
+
+
+===== scenario: all_off =====
+{"resolved":["git-master"],"missing":[]}
+<skill name="git-master" location="/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/gm-resolver-capture-VpXOTC/plugin-skills/git-master/SKILL.md">
+References are relative to /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/gm-resolver-capture-VpXOTC/plugin-skills/git-master.
+
+GIT MASTER FIXTURE BODY
+</skill>
+
+

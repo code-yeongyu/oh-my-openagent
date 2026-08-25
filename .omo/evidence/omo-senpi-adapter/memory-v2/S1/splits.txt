@@ -1,0 +1,103 @@
+S1 file-size splits
+===================
+
+Measurement command
+-------------------
+awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(#|\/\/)/' <file> | wc -l
+
+Before/after pure LOC and cohesive units
+----------------------------------------
+
+packages/memory-core/src/people/format.test.ts
+  before: 373
+  after:
+    170 packages/memory-core/src/people/format.test.ts
+        Core people-card entry parsing, validation, serialization, and round trips.
+    177 packages/memory-core/src/people/format-observations.test.ts
+        Observation section parsing, metadata, diagnostics, serialization, and mixed cards.
+     33 packages/memory-core/src/people/person-slug.test.ts
+        Person slug sanitization, reservation, and collision behavior.
+
+packages/memory-core/src/facts/extraction.test.ts
+  before: 319
+  after:
+    149 packages/memory-core/src/facts/extraction.test.ts
+        JSONL validation and atomic batch application.
+    143 packages/memory-core/src/facts/extraction-person-aliases.test.ts
+        Existing-person and human alias resolution and tie handling.
+    163 packages/memory-core/src/facts/extraction-person-lifecycle.test.ts
+        Observation reinforcement and new-person creation/collision behavior.
+    107 packages/memory-core/src/facts/extraction-routing-gate.test.ts
+        Disabled routing and unresolved-mention fallback behavior.
+
+packages/memory-core/src/git/repo.ts
+  before: 288
+  after:
+    213 packages/memory-core/src/git/repo.ts
+        GitMemoryRepo lifecycle, repository operations, commits, history API, worktrees, and config.
+     45 packages/memory-core/src/git/repo-types.ts
+        Public repository contracts, re-exported unchanged through repo.ts and the existing git barrel.
+     29 packages/memory-core/src/git/repo-log.ts
+        Git log record, trailer, and NUL path parsing.
+     22 packages/memory-core/src/git/repo-arguments.ts
+        Author flags, path normalization, seed validation, and command error construction.
+
+packages/omo-config-core/src/schema/memory.test.ts
+  before: 278
+  after:
+    113 packages/omo-config-core/src/schema/memory.test.ts
+        Root memory settings defaults, explicit values, trigger validation, and strictness.
+    107 packages/omo-config-core/src/schema/memory-v2-blocks.test.ts
+        Nudge, facts, dream, people, and soul block defaults and bounds.
+     62 packages/omo-config-core/src/schema/memory-overrides.test.ts
+        Per-agent overrides and default-free layer schema behavior.
+
+packages/memory-core/src/facts/queue.test.ts
+  before: 268
+  after:
+    137 packages/memory-core/src/facts/queue.test.ts
+        Enqueue ranges, duplicate suppression, consumed endpoints, and canonical-entry filtering.
+     93 packages/memory-core/src/facts/queue-publication.test.ts
+        Durable filename uniqueness and concurrent publication behavior.
+    124 packages/memory-core/src/facts/queue-watermark.test.ts
+        Monotonic enqueue/consume watermarks and crash-window range anchoring.
+     95 packages/memory-core/src/facts/queue-reconcile.test.ts
+        Pending recovery, malformed-file tolerance, and consumed-file reconciliation.
+
+packages/memory-core/src/tools/memory.test.ts
+  before: 260
+  after:
+    151 packages/memory-core/src/tools/memory.test.ts
+        Successful create, provenance, synchronization, replace, insert, delete, and rename operations.
+    172 packages/memory-core/src/tools/memory-validation.test.ts
+        Read-only enforcement, input/target validation, no-op handling, encoding, and dirty-repo errors.
+
+Verification output
+-------------------
+
+Targeted split suites:
+  command: bun test <all split memory-core tests> packages/memory-core/src/git/repo.test.ts
+  result: 89 pass, 0 fail, 252 expect() calls, 14 files
+
+  command: bun test packages/omo-config-core/src/schema/memory.test.ts packages/omo-config-core/src/schema/memory-v2-blocks.test.ts packages/omo-config-core/src/schema/memory-overrides.test.ts
+  result: 30 pass, 0 fail, 40 expect() calls, 3 files
+
+Required package suites (one run each):
+  command: bun test packages/memory-core
+  result: 418 pass, 0 fail, 3661 expect() calls, 51 files
+
+  command: bun test packages/omo-config-core
+  result: 157 pass, 0 fail, 405 expect() calls, 30 files
+
+Typecheck:
+  command: cd packages/memory-core && bun run typecheck
+  output: $ tsgo --noEmit -p tsconfig.json
+  result: exit 0
+
+  command: cd packages/omo-config-core && bun run typecheck
+  output: $ tsgo --noEmit -p tsconfig.json
+  result: exit 0
+
+Whitespace validation:
+  command: git diff --check -- <owned split paths>
+  result: exit 0

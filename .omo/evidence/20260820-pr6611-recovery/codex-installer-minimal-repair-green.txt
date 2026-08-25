@@ -1,0 +1,13 @@
+bun test v1.3.14 (0d9b296a)
+
+script/codex-install-bundle-freshness.test.ts:
+(pass) committed Codex installer bundle > #given the tracked bundle #when its build marker is read #then it is present and self-consistent [15.68ms]
+(pass) committed Codex installer bundle > #given current installer sources #when compared with the tracked bundle marker #then the bundle is current [14.60ms]
+
+script/codex-installer-version.test.ts:
+(pass) #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version [0.67ms]
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 2 files. [331.00ms]

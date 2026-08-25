@@ -1,0 +1,30 @@
+$ bun test packages/memory-core/src/git/exec.test.ts  # after b19271832 port
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/git/exec.test.ts:
+(pass) createNodeGitExec > #given a spawn cwd that does not exist > #when git runs #then it does NOT report git as missing from PATH [3.67ms]
+(pass) createNodeGitExec > #given a spawn cwd that does not exist > #when the bare runner reports the missing-cwd result #then Windows fallbacks are not attempted [0.16ms]
+(pass) createNodeGitExec > #given a cwd that exists but no git binary on PATH > #when git runs #then GitNotFoundError fires [0.43ms]
+(pass) createNodeGitExec > #given Git resolves on PATH #when Windows roots exist #then bare Git keeps precedence [0.10ms]
+(pass) createNodeGitExec > #given a non-Windows platform and missing Git #when git runs #then Windows roots are not attempted [0.14ms]
+(pass) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EACCES #when Windows roots exist #then the error propagates without fallback [0.11ms]
+(pass) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EPERM #when Windows roots exist #then the error propagates without fallback [0.06ms]
+(pass) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EIO #when Windows roots exist #then the error propagates without fallback [0.08ms]
+(pass) createNodeGitExec > #given UNC, device-prefix, and root-relative roots #when fallback runs #then only a drive-qualified local root is attempted [0.21ms]
+(pass) createNodeGitExec > #given distinct standard roots #when every executable is absent #then candidates are attempted in deterministic order [0.14ms]
+(pass) createNodeGitExec > #given duplicate standard roots #when fallback runs #then equivalent candidates are attempted once [0.11ms]
+(pass) createNodeGitExec > #given the first fallback executable disappears #when its spawn yields ENOENT #then the next candidate is attempted [0.11ms]
+(pass) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EACCES #when fallback runs #then the error propagates without trying later candidates [0.09ms]
+(pass) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EPERM #when fallback runs #then the error propagates without trying later candidates [0.05ms]
+(pass) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EIO #when fallback runs #then the error propagates without trying later candidates [0.05ms]
+(pass) createNodeGitExec > #given a fallback spawn EACCES #when fallback runs #then the error propagates without trying later candidates [0.09ms]
+(pass) createNodeGitExec > #given a fallback spawn EPERM #when fallback runs #then the error propagates without trying later candidates [0.06ms]
+(pass) createNodeGitExec > #given a fallback spawn EIO #when fallback runs #then the error propagates without trying later candidates [0.05ms]
+(pass) createNodeGitExec > #given a fallback timeout #when fallback runs #then the timeout propagates without trying later candidates [0.09ms]
+(pass) createNodeGitExec > #given a fallback nonzero result #when fallback runs #then the result returns without trying later candidates [0.07ms]
+(pass) createNodeGitExec > #given bare Git fails with a non-ENOENT error #when Windows roots exist #then the error propagates without fallback [0.07ms]
+
+ 21 pass
+ 0 fail
+ 41 expect() calls
+Ran 21 tests across 1 file. [129.00ms]

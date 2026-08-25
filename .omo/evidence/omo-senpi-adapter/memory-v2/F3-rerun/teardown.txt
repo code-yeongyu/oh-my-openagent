@@ -1,0 +1,33 @@
+timestamp=2026-08-10T11:38:24Z
+bundle_restore_command=git checkout -- packages/omo-senpi/plugin/extensions/
+bundle_status_begin
+bundle_status_end
+bundle_sizes_hashes:
+c79ba6fa2219ff093f649de8bb9214250a680a2a19124c62cd1cbafca1d75b2d  packages/omo-senpi/plugin/extensions/dream-persona.md
+bff8167d0cabf11b3074ec09113e40098c086604336c0f128989072d6a75a82d  packages/omo-senpi/plugin/extensions/facts-persona.md
+013189617911e996b284f03de1f815dfe40233b7bc9c0286bd41d1bce83a9307  packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+1d20385e987066e2ed4155b06a722cc38bf5bb27aaf3ced4251aeedbdcd0fc82  packages/omo-senpi/plugin/extensions/omo-member.js
+a1601b884e96ec62eca844595f6e87697687b03d20af3ec363c5eabdfaf43ffc  packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+1a042a88aa1077be5a12128b34e73a233b981cc4a93120807c45348078f4d003  packages/omo-senpi/plugin/extensions/omo.js
+b78f155336fdcd64aa3521a1ef274fc0ffbd0267e163ed7d27eced38873bb26e  packages/omo-senpi/plugin/extensions/reflection-persona.md
+1100 packages/omo-senpi/plugin/extensions/facts-persona.md
+117729 packages/omo-senpi/plugin/extensions/omo-member.js
+13959 packages/omo-senpi/plugin/extensions/dream-persona.md
+15197 packages/omo-senpi/plugin/extensions/reflection-persona.md
+58068 packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+7085 packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+974066 packages/omo-senpi/plugin/extensions/omo.js
+reminder_after_restore:
+1275:${t}`}function Pne(e){let t=e.match(/^<!-- senpi-memory:([^:\r\n]+):begin -->/);if(!t?.[1])throw Error("Memory block is missing a valid begin sentinel");return t[1]}function Cne(e){return new RegExp(`<!-- senpi-memory:${e}:begin -->[\\s\\S]*?<!-- senpi-memory:${e}:end -->`,"g")}function Ine(e){return e.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}var M_="system/persona.md",O_="system/identity.md",Mne="user turns since your last memory save",One="Soul updated by",Ane="Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).";async function VL(e,t,n){let r=t?await e.lsTree(t):[],o=t&&r.includes(M_)?await A_(e,t,M_):void 0,i=t&&r.includes(O_)?await A_(e,t,O_):void 0,s=t?await Dne(e,t,r.filter(Nne)):[],a=r.filter(Fne),d=Lne(o,i,s,a),c=$ne(n,(n.clock??(()=>new Date))());return[d,c].filter((l)=>l.length>0).join(`
+f3_processes_begin
+f3_processes_end
+f3_temp_roots_begin
+f3_temp_roots_end
+f3_tmux_begin
+f3_tmux_end
+unrelated_memory_supervisor_fixture_processes_observed_and_untouched:
+40607 /Users/yeongyu/.bun/bin/bun /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ts --child-bootstrap /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-LbYWbY 40602
+40612 /Users/yeongyu/.bun/bin/bun /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/__fixtures__/supervisor-child.ts stubborn /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-LbYWbY
+87445 /Users/yeongyu/.bun/bin/bun /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ts --child-bootstrap /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-A0ZCL5 87442
+87450 /Users/yeongyu/.bun/bin/bun /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/__fixtures__/supervisor-child.ts stubborn /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-A0ZCL5
+receipt=PASS

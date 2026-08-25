@@ -1,3 +1,5 @@
+import type { DagTaskOwner } from "../dag/owner"
+
 export const TASK_STATUSES = [
   "pending",
   "running",
@@ -25,6 +27,10 @@ export const RESOLVED_MODEL_SOURCES = ["category", "explicit", "agent"] as const
 
 export type ResolvedModelSource = (typeof RESOLVED_MODEL_SOURCES)[number]
 
+export const BACKGROUND_MODES = ["foreground", "background", "promoted"] as const
+
+export type BackgroundMode = (typeof BACKGROUND_MODES)[number]
+
 export type ResolvedModelRecord = {
   readonly provider: string
   readonly model_id: string
@@ -38,6 +44,18 @@ export type ResolvedModelRecord = {
   readonly source: ResolvedModelSource
 }
 
+export const TOKEN_COVERAGE_STATUSES = ["complete", "partial", "unavailable"] as const
+
+export type TokenCoverageStatus = (typeof TOKEN_COVERAGE_STATUSES)[number]
+
+export const COST_REPORT_STATUSES = ["reported", "unavailable", "invalid"] as const
+
+export type CostReportStatus = (typeof COST_REPORT_STATUSES)[number]
+
+export const DURATION_SOURCE_STATUSES = ["monotonic", "wall_clock", "unavailable"] as const
+
+export type DurationSourceStatus = (typeof DURATION_SOURCE_STATUSES)[number]
+
 // Usage/runtime facts accumulated over ONE run of the child (spawn to terminal transition).
 // total_tokens sums usage.totalTokens across assistant turns (billed volume: context re-sent
 // per turn counts every time); output_tokens sums completion tokens only. generation_ms sums
@@ -50,6 +68,12 @@ export type TaskRunStats = {
   readonly turns: number
   readonly tool_calls: number
   readonly output_tokens?: number
+  /** Summed prompt tokens the provider billed as fresh (cache reads/writes are counted separately). */
+  readonly input_tokens?: number
+  /** Summed tokens served from the provider's prompt cache over the run. */
+  readonly cache_read_tokens?: number
+  /** Summed tokens the provider wrote into its prompt cache over the run. */
+  readonly cache_write_tokens?: number
   readonly total_tokens?: number
   readonly generation_ms?: number
   readonly tokens_per_second?: number
@@ -61,6 +85,12 @@ export type TaskRunStats = {
   /** Sum(cacheRead) / Sum(input + cacheRead + cacheWrite) over the whole run, as a 0..1 fraction.
    * Completed-run summaries use this aggregate. Omitted when no turn reported a denominator. */
   readonly cache_hit_rate_run?: number
+  /** Usage coverage of the token totals: every assistant turn reported usage, only some did, or none. */
+  readonly token_status?: TokenCoverageStatus
+  /** Whether `cost_usd` is a provider-reported figure; a missing cost is never a zero cost. */
+  readonly cost_status?: CostReportStatus
+  /** Provenance of `runtime_ms`: measured by the live tracker, or reconstructed from record timestamps. */
+  readonly duration_status?: DurationSourceStatus
 }
 
 export type TaskNotification = {
@@ -130,6 +160,17 @@ export type TaskRecordInput = {
   readonly notify_on_terminal: boolean
   // Durable prelaunch steering queue, drained in order once the child starts. Omitted when empty.
   readonly pending_steering?: readonly PendingSteeringEntry[]
+  readonly owner?: DagTaskOwner
+  // Session-local spawn ordinal, assigned once per parent session at spawn. A relational key for
+  // grouping a logical task's runs; absent on records persisted before ordinals shipped.
+  readonly task_seq?: number
+  // Generation of the effective category/model configuration that planned this task. Absent when
+  // the planner did not stamp one (legacy records, non-category spawns).
+  readonly config_generation?: number
+  // How the task ran relative to the parent turn: spawned in the foreground, spawned in the
+  // background, or promoted to background mid-run. `notify_on_terminal` alone cannot tell the
+  // last two apart. Absent on records persisted before the mode shipped.
+  readonly background_mode?: BackgroundMode
 }
 
 export type TaskRecord = TaskRecordInput & {

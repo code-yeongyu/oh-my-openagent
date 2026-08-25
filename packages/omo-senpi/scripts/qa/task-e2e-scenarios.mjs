@@ -9,9 +9,8 @@ export const MAIN_SCRIPT = {
     { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do the first unit", run_in_background: true, name: "e2echild" } },
     { type: "text", text: "parent turn one done, going idle" },
     { type: "tool_call", name: "task_send", arguments: { to: "e2echild", message: "do the second unit" } },
-    { type: "text", text: "parent turn two done, going idle" },
     { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "tail" } },
-    { type: "text", text: "parent peeked the child tail, all done" }
+    { type: "text", text: "parent peeked the child tail, all done" },
   ],
 }
 

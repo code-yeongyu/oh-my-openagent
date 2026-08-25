@@ -1,10 +1,10 @@
 # utils — Shared Utilities (Core)
 
-**Generated:** 2026-06-16
+**Generated:** 2026-08-24 / f3642fcda
 
 ## OVERVIEW
 
-Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed by both adapters (`packages/omo-opencode`, `packages/omo-codex`) and 15+ sibling Core packages. Barrel-exports 36 modules across runtime shims, config tooling, file utilities, prompt gating, git parsing, migration maps, and codegraph primitives.
+Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed by both adapters (`packages/omo-opencode`, `packages/omo-codex`) and the other Core packages. Barrel-exports 36 modules across runtime shims, config tooling, file utilities, prompt gating, git parsing, migration maps, and codegraph primitives.
 
 ## CATEGORY MAP
 
@@ -19,12 +19,20 @@ Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed
 | **Git Worktree** | `git-worktree/*.ts` | Porcelain status parser, diff stat collection, `formatFileChanges()` |
 | **Migration** | `migration.ts`, `migration/*.ts` | Agent-name, hook-name, model-version, agent-category migration maps; `migrateConfigFile()` |
 | **Command Exec** | `command-executor/execute-command.ts`, `execute-hook-command.ts` | `executeCommand()` via `node:child_process` `exec`; stderr inlined in return string |
-| **Codegraph** | `codegraph/*.ts` | Workspace manifest, environment detection, provision helpers |
-| **Misc** | `snake-case.ts`, `jsonc-parser.ts`, `record-type-guard.ts`, `port-utils.ts`, `logger.ts` | Key transformation, safe JSONC parse, type guards, port finder, injectable shared logger stub |
+| **Codegraph** | `codegraph/*.ts` | Workspace manifest, env detection, Node runtime policy (min major 20, major 25 blocked, `CODEGRAPH_NODE_BIN` override), provision helpers |
+| **Ast-grep** | `ast-grep/*.ts` | sg binary provisioning: pinned manifest, resolver/cache, install script; `provisionSgBinary()` |
+| **Process Sweep** | `process-sweep/*.ts` | Family-based orphan cleanup: codegraph zombie sweep, LSP daemon proxy/version sweeps, ownership attestation |
+| **Process Tree** | `process-tree.ts`, `process-tree-termination.ts`, `process-stream-reader.ts` | Process tree enumeration/termination, stream reading |
+| **Logging** | `logging/*.ts` | Buffered logger (flush/rotation) + product identity |
+| **Zip Listing** | `zip-entry-listing/*.ts` | tar / zipinfo / Python / PowerShell adapters + symlink target reading |
+| **Ports** | `port-utils.ts` | `findAvailablePort()`, `DEFAULT_SERVER_PORT` |
+| **Misc** | `snake-case.ts`, `jsonc-parser.ts`, `record-type-guard.ts`, `logger.ts` | Key transformation, safe JSONC parse, type guards, injectable shared logger stub |
 
 ## NOTES
 
 - **Dependencies:** `js-yaml`, `jsonc-parser` (only production deps).
 - **No path aliases:** relative imports only; strict `ESNext` + `bundler` moduleResolution.
 - **Runtime portability:** `runtime/spawn.ts` wraps both Bun and Node APIs so downstream packages can run under Electron-hosted OpenCode.
+- **Side effects:** `package.json` `sideEffects` pins `src/prompt-async-gate/queue.ts`; tree-shaking must keep the queue module.
+- **Process-sweep invariant:** the LSP daemon *server* shape (`cli.js daemon`, no `mcp`) is NEVER a proxy candidate — only the proxy shape is swept (`process-sweep/lsp-proxy-family.ts`, pinned by tests).
 - **Prompt-async-gate is critical infrastructure:** every internal prompt dispatch across the plugin must route through `dispatchInternalPrompt()` to prevent duplicate injections and race conditions. See the root [`AGENTS.md`](../../AGENTS.md) "Internal message injection is dangerous" section.

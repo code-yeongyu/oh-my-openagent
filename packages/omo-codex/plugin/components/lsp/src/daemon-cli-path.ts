@@ -3,11 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-	OMO_LSP_DAEMON_CLI,
-	OMO_LSP_DAEMON_VERSION,
-	resolveDaemonRuntime,
-} from "@code-yeongyu/lsp-daemon/client";
+import { OMO_LSP_DAEMON_CLI, OMO_LSP_DAEMON_VERSION, resolveDaemonRuntime } from "@code-yeongyu/lsp-daemon/client";
 
 const requireFromHere = createRequire(import.meta.url);
 

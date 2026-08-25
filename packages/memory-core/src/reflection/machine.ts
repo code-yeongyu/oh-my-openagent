@@ -1,6 +1,7 @@
 import { countCompletedSteps, type ReflectionSnapshot, type ReflectionTranscriptState } from "../journal"
 
-export type ReflectionTrigger = "step-count" | "compaction" | "manual"
+export type ReflectionTrigger = "step-count" | "compaction" | "manual" | "dream"
+export type DreamOrigin = "manual" | "idle" | "shutdown" | "pressure"
 export type ReflectionOutcome =
   | "merged"
   | "no_changes"
@@ -28,15 +29,21 @@ export interface CapturedConversation {
 
 export interface ReflectionRequest {
   readonly trigger: ReflectionTrigger
+  readonly origin?: DreamOrigin
   readonly conversationIds: readonly string[]
   readonly snapshots: readonly CapturedConversation[]
   readonly focus?: string
   readonly recentN?: number
+  readonly targetDoc?: string
 }
 
 export interface ReservedRun {
   readonly runId: string
   readonly request: ReflectionRequest
+  readonly reservedAt?: string
+  readonly launcherPid?: number
+  readonly launcherHostname?: string
+  readonly launcherProcessStart?: string | null
 }
 
 export interface ReservationState {
@@ -76,9 +83,16 @@ export interface CompleteTransition {
   readonly launch?: ReservedRun
 }
 
-const PRIORITY: Record<ReflectionTrigger, number> = {
+const REFLECTION_PRIORITY: Record<Exclude<ReflectionTrigger, "dream">, number> = {
   "step-count": 1,
   compaction: 2,
+  manual: 3,
+}
+
+const DREAM_PRIORITY: Record<DreamOrigin, number> = {
+  idle: 1.5,
+  pressure: 1.5,
+  shutdown: 2.5,
   manual: 3,
 }
 
@@ -180,7 +194,7 @@ export function completeTransition(
 
 function makeRequest(
   journal: JournalSnapshot,
-  trigger: ReflectionTrigger,
+  trigger: Exclude<ReflectionTrigger, "dream">,
   conversationIds: readonly string[] = [journal.conversationId],
   options: { readonly focus?: string; readonly recentN?: number } = {},
 ): ReflectionRequest {
@@ -198,18 +212,23 @@ function containsTrigger(state: ReservationState, trigger: ReflectionTrigger): b
 }
 
 function mergeRequests(left: ReflectionRequest, right: ReflectionRequest): ReflectionRequest {
-  const strongest =
-    PRIORITY[right.trigger] > PRIORITY[left.trigger] ||
-    (PRIORITY[right.trigger] === PRIORITY[left.trigger] && right.focus !== undefined)
-      ? right
-      : left
-  return {
-    trigger: strongest.trigger,
+  const strongest = requestPriority(right) >= requestPriority(left) ? right : left
+  const merged = {
     conversationIds: unique([...left.conversationIds, ...right.conversationIds]),
     snapshots: mergeSnapshots(left.snapshots, right.snapshots),
     focus: strongest.focus,
     recentN: Math.max(left.recentN ?? 0, right.recentN ?? 0) || undefined,
+    targetDoc: strongest.targetDoc,
   }
+  return strongest.trigger === "dream"
+    ? { ...merged, trigger: "dream", origin: strongest.origin }
+    : { ...merged, trigger: strongest.trigger }
+}
+
+function requestPriority(request: ReflectionRequest): number {
+  if (request.trigger !== "dream") return REFLECTION_PRIORITY[request.trigger]
+  if (request.origin === undefined) throw new TypeError("dream requests require an origin")
+  return DREAM_PRIORITY[request.origin]
 }
 
 function mergeSnapshots(left: readonly CapturedConversation[], right: readonly CapturedConversation[]) {
@@ -227,7 +246,7 @@ function isStillTriggered(
   journals: ReadonlyMap<string, JournalSnapshot>,
   config: TriggerConfig,
 ): boolean {
-  if (request.trigger === "manual") return true
+  if (request.trigger === "manual" || request.trigger === "dream") return true
   if (request.trigger === "compaction") {
     return config.onCompaction === true && request.conversationIds.some((id) => journals.get(id)?.state.pending_compaction === true)
   }

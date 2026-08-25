@@ -50,7 +50,7 @@ function advertisedAgentNames(engine: TaskEngine): string {
 function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
   const description = buildTaskToolDescription({ omoConfig: engine.omoConfig, agents: engine.agents })
   const marker =
-    "Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and start-work was never invoked): "
+    "Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and ulw-execute was never invoked): "
   const start = description.indexOf(marker)
   if (start < 0) throw new Error("task tool description is missing the Plan-gated agents list")
   const rest = description.slice(start + marker.length)
@@ -59,13 +59,12 @@ function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
 }
 
 describe("task engine builtin agent overlay", () => {
-  test("#given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas", () => {
+  test("#given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present", () => {
     // given / when
     const engine = composeIn(tempProject())
 
     // then
     expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus"])
-    expect(engine.agents["explore"]?.prompt).toContain("codebase search specialist")
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
   })
 

@@ -55,6 +55,23 @@ describe("runTaskOutput", () => {
     }
   })
 
+  test("#given a source-truncated transcript #when read #then the RPC-visible result reports truncation", async () => {
+    const record = makeRecord({ task_id: "st_source_truncated", status: "completed" })
+    const deps = depsFrom([record], () => ({
+      entries: [{ kind: "assistant", text: "bounded transcript" }],
+      source: "event-log",
+      truncated: true,
+    }))
+
+    const result = await runTaskOutput(deps, { task_id: record.task_id, mode: "full" }, "session-parent")
+
+    expect(result.details).toMatchObject({
+      kind: "transcript",
+      transcript: "assistant: bounded transcript",
+      truncated: true,
+    })
+  })
+
   test("#given default mode #when read #then a status snapshot with final_response is returned", async () => {
     // given
     const record = makeRecord({ task_id: "st_done", status: "completed", final_response: "the answer" })

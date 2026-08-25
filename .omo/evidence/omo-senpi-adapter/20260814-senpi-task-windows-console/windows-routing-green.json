@@ -1,0 +1,97 @@
+{
+  "workflow": 31939507552,
+  "job": 95146554538,
+  "job_url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554538",
+  "head": "effcfe82e7774c5b6458696bc17853a3dfe49d27",
+  "job_conclusion": "success",
+  "sentinel": "WINDOWS_TASK_RPC_E2E",
+  "payload": {
+    "result": "FAIL",
+    "checks": [
+      {
+        "check": "real_credentials_untouched_and_caller_env_ignored",
+        "verdict": "PASS",
+        "facts": {
+          "realCredentialsUntouched": true,
+          "providedAgentDir": "IGNORED",
+          "sandboxAgentDir": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omo-senpi-qa-D1udLW\\agent",
+          "credentialFiles": [
+            "auth.json",
+            "models.json",
+            "settings.json",
+            "trust.json"
+          ]
+        }
+      },
+      {
+        "check": "process_mode_routes_to_rpc_runner",
+        "verdict": "PASS",
+        "facts": {
+          "task_id": "st_01a009f2",
+          "pid": 7820,
+          "status": "completed",
+          "error_excerpt": ""
+        }
+      },
+      {
+        "check": "spawn_process_pid_and_session_jsonl",
+        "verdict": "PASS",
+        "facts": {
+          "task_id": "st_01a009f2",
+          "execution_mode": "process",
+          "pid": 7820,
+          "sessionJsonl": true,
+          "residency_state": "rpc_detached"
+        }
+      },
+      {
+        "check": "steer_ack_mid_run",
+        "verdict": "PASS"
+      },
+      {
+        "check": "completion_push_arrives",
+        "verdict": "PASS",
+        "facts": {
+          "statusSnapshotCount": 10
+        }
+      },
+      {
+        "check": "kill_marks_error_killed_true",
+        "verdict": "FAIL",
+        "reason": "kill did not yield status=error killed:true",
+        "facts": {
+          "pid": 8724,
+          "killed": false,
+          "error_excerpt": ""
+        }
+      },
+      {
+        "check": "reconcile_lost_terminates_orphan",
+        "verdict": "FAIL",
+        "reason": "relaunchOk=true lostWithPid=false orphanDead=true",
+        "facts": {
+          "orphanPid": 6352,
+          "orphanDead": true,
+          "breadcrumb": ""
+        }
+      },
+      {
+        "check": "no_leaked_rpc_child_pids",
+        "verdict": "PASS",
+        "facts": {
+          "leakedPids": []
+        }
+      }
+    ],
+    "realCredentialsUntouched": true,
+    "wholeDirDigestStable": true,
+    "leakedPids": 0,
+    "providedAgentDir": "IGNORED",
+    "sandboxAgentDir": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omo-senpi-qa-D1udLW\\agent",
+    "sandboxCwd": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omo-senpi-qa-D1udLW\\project",
+    "wiringFixed": true
+  },
+  "reviewed_blocker_verdict": "PASS",
+  "reviewed_blocker_reason": "The production process route reached a real RPC child, produced a session JSONL, preserved credentials, and leaked no child PID.",
+  "unrelated_diagnostic_disclosure": "The aggregate payload remains FAIL because kill-status and reconcile-breadcrumb scenarios failed. The job wrapper intentionally requires the reviewed routing, isolation, and leak checks and does not relabel the broader payload."
+}

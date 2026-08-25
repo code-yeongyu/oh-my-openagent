@@ -24,6 +24,7 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 | `gpt-5-4.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
 | `gpt-5-5.ts` | Shared GPT-5.5/GPT-5.6 model-aware orchestration prompt |
 | `gpt-task-system-guide.ts` | Tracking-tool guide shared by the GPT-5.5/GPT-5.6 prompt family |
+| `grok-4.ts` | Shared Grok 4.5/4.6 variant: lean, verification-loop-centered, done-contract calibration |
 | `glm-5-2.ts` | GLM-5.2-native variant with explicit failure-mode calibration |
 | `kimi-k2-6.ts` | Kimi K2.6-native variant |
 | `kimi-k2-7.ts` | Kimi K2.7-native variant |
@@ -43,6 +44,7 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 - Contains "claude-opus-4-8" -> `claude-opus-4-8.ts`
 - Contains "claude-opus-4-7" -> `claude-opus-4-7.ts`
 - GLM family -> `glm-5-2.ts`
+- Grok 4.5 / 4.6 (digit-bounded, so grok-4.20 and fast tiers stay out) -> shared `grok-4.ts` prompt with model-aware identity
 - Default -> fallback prompt (Claude, etc.; Gemini gets corrective overlays)
 
 ## KEY EXPORTS

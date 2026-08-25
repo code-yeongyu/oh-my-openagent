@@ -1,6 +1,6 @@
 import { PostHog } from "posthog-node"
 
-import { getTelemetryApiKey, getTelemetryHost, shouldDisableTelemetry } from "./env"
+import { getTelemetryApiKey, getTelemetryHost, hasTelemetryApiKey, shouldDisableTelemetry } from "./env"
 import { getDefaultTelemetryOsProvider } from "./machine-id"
 import type {
   TelemetryCaptureProperties,
@@ -66,7 +66,7 @@ export function isTelemetryClientEnabled(input: TelemetryClientEnabledInput): bo
   const env = input.env ?? process.env
   return (
     !shouldDisableTelemetry({ env, productEnvPrefix: input.product.productEnvPrefix }) &&
-    getTelemetryApiKey(env, input.product.defaultApiKey).length > 0
+    hasTelemetryApiKey(env, input.product.defaultApiKey)
   )
 }
 

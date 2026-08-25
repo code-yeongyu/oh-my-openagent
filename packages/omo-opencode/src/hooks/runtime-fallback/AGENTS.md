@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-29 source files (~2530 LOC). Session Tier hook that **reactively** switches to fallback models when API providers return errors at runtime (429, 503, quota exhausted, cooldown signals). Distinct from `model-fallback` (which applies preemptively at chat.params).
+~60 files (~14k LOC incl. tests). Session Tier hook that **reactively** switches to fallback models when API providers return errors at runtime (429, 503, quota exhausted, cooldown signals). Distinct from `model-fallback` (which applies preemptively at chat.params).
 
 ## RUNTIME-FALLBACK vs MODEL-FALLBACK
 
@@ -90,6 +90,9 @@ Failed models enter 60s cooldown. `findNextAvailableFallback()` skips models in 
 | `fallback-models.ts` | Resolve chain from config hierarchy (strings + raw objects) |
 | `fallback-bootstrap-model.ts` | Derive initial model when state missing |
 | `fallback-retry-dispatcher.ts` | Toast + dispatch retry orchestration |
+| `auto-retry-dispatch.ts` | Prompt-gate reservation, marker preservation, bounded reservation backoff, stale-generation rollback |
+| `first-prompt-watchdog.ts` | Timeout fallback when a session never produces its first prompt response (90s default) |
+| `stale-session-cleanup.ts` | Lazily clears fallback state for dead sessions |
 | `auto-retry.ts` | Abort, timeout scheduling, cleanup |
 | `agent-resolver.ts` | Session → agent name normalization |
 | `retry-model-payload.ts` | Build model payload (providerID/modelID/variant/reasoningEffort) |

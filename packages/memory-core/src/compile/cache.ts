@@ -5,7 +5,7 @@ import {
   type CompileMemoryBlockOptions,
 } from "./compile"
 
-export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v1"
+export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
 export function hashMemoryTemplate(template: string): string {
   return createHash("sha256")
@@ -15,8 +15,13 @@ export function hashMemoryTemplate(template: string): string {
     .digest("hex")
 }
 
+interface MemoryBlockCacheEntry {
+  readonly variant: string
+  readonly pending: Promise<string>
+}
+
 export class MemoryBlockCache {
-  private readonly entries = new Map<string, Promise<string>>()
+  private readonly entries = new Map<string, MemoryBlockCacheEntry>()
 
   get size(): number {
     return this.entries.size
@@ -28,16 +33,18 @@ export class MemoryBlockCache {
     options: CompileMemoryBlockOptions,
   ): Promise<string> {
     const revision = await repo.head()
-    const key = `${hashMemoryTemplate(template)}:${revision ?? "no-head"}`
+    const key = `${hashMemoryTemplate(template)}:${options.agentId}`
+    const variant = revision ?? "no-head"
     const existing = this.entries.get(key)
-    if (existing) return existing
+    if (existing?.variant === variant) return existing.pending
 
     const pending = compileMemoryBlockAtRevision(repo, revision, options)
-    this.entries.set(key, pending)
+    const entry = { variant, pending }
+    this.entries.set(key, entry)
     try {
       return await pending
     } catch (error) {
-      this.entries.delete(key)
+      if (this.entries.get(key) === entry) this.entries.delete(key)
       throw error
     }
   }

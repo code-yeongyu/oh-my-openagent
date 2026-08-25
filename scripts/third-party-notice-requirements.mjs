@@ -18,7 +18,7 @@ export const CODEX_COMPONENT_NOTICE_REQUIREMENTS = [
     requiredTerms: ["pi-rules", "picomatch"],
   },
   {
-    path: "packages/omo-codex/plugin/components/start-work-continuation",
+    path: "packages/omo-codex/plugin/components/ulw-execute-continuation",
     requiredTerms: [],
   },
   {

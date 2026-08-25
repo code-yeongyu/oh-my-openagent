@@ -1,10 +1,11 @@
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { createRequire } from "node:module"
-import { delimiter, dirname, isAbsolute, join, sep } from "node:path"
+import { basename, delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { RpcRunnerSpec } from "../types"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
+import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
 
 const require = createRequire(import.meta.url)
 
@@ -23,7 +24,7 @@ export type RpcSpawnDescriptor = {
   readonly env: NodeJS.ProcessEnv
 }
 
-type SenpiLauncher = {
+export type SenpiLauncher = {
   readonly command: string
   readonly prefixArgs: readonly string[]
 }
@@ -62,10 +63,19 @@ function senpiBinaryName(platform: NodeJS.Platform): string {
 function scanPathForExecutable(name: string, pathValue: string | undefined): string | null {
   for (const dir of (pathValue ?? "").split(delimiter)) {
     if (dir.length === 0) continue
-    const candidate = join(dir, name)
-    if (existsSync(candidate)) return candidate
+    const candidate = canonicalExecutable(join(dir, name))
+    if (candidate !== null) return candidate
   }
   return null
+}
+
+function canonicalExecutable(candidate: string): string | null {
+  try {
+    const canonical = realpathSync.native(resolve(candidate))
+    return statSync(canonical).isFile() ? canonical : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -81,13 +91,12 @@ export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null 
   const override = runtime.parentEnv[SENPI_BIN_ENV]?.trim()
   if (override !== undefined && override.length > 0) {
     if (override.includes("/") || override.includes(sep) || isAbsolute(override)) {
-      return existsSync(override) ? override : null
+      return canonicalExecutable(override)
     }
     return scanPathForExecutable(override, runtime.parentEnv.PATH)
   }
   if (runtime.isBunBinary) {
-    const sibling = join(dirname(runtime.execPath), binaryName)
-    return existsSync(sibling) ? sibling : null
+    return canonicalExecutable(join(dirname(runtime.execPath), binaryName))
   }
   return scanPathForExecutable(binaryName, runtime.parentEnv.PATH)
 }
@@ -105,7 +114,7 @@ function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): S
   return cliPath === undefined ? null : { command: runtime.execPath, prefixArgs: [cliPath] }
 }
 
-function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
+export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
   const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
   if (executable !== null) {
     const normalized = normalizeSenpiLauncher(executable, runtime)
@@ -126,9 +135,22 @@ function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
  * does NOT auto-load the parent's whole package set, then ONLY the threaded `-e` extensions, then the
  * threaded `--model` so the separate process resolves the requested provider/modelId.
  */
+function isDagOwnedChild(spec: RpcRunnerSpec): boolean {
+  if (basename(dirname(spec.state_dir)) !== "children" || basename(spec.state_dir) !== spec.task_id) return false
+  const stateDir = dirname(dirname(spec.state_dir))
+  const record = JSON.parse(readFileSync(join(stateDir, "tasks", `${spec.task_id}.json`), "utf8")) as unknown
+  if (typeof record !== "object" || record === null || !("owner" in record)) return false
+  const owner = record.owner
+  return typeof owner === "object" && owner !== null && "kind" in owner && owner.kind === "dag"
+}
+
 export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   const args: string[] = ["--no-extensions"]
-  for (const entry of spec.extensions ?? []) {
+  // The OMO launcher prepends its own extension before user/provider entries. DAG-owned tasks drop
+  // that first entry so the detached child cannot boot a task engine, while provider extensions
+  // and every non-DAG child's extension list remain unchanged.
+  const extensions = isDagOwnedChild(spec) ? (spec.extensions ?? []).slice(1) : spec.extensions ?? []
+  for (const entry of extensions) {
     if (entry.length > 0) args.push("--extension", entry)
   }
   if (spec.model !== undefined && spec.model.length > 0) {
@@ -138,6 +160,15 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   if (thinkingLevel !== undefined) {
     args.push("--thinking", thinkingLevel)
   }
+  return args
+}
+
+export function buildModelCatalogArgs(spec: RpcRunnerSpec): readonly string[] {
+  const args: string[] = ["--no-extensions"]
+  for (const entry of spec.extensions ?? []) {
+    if (entry.length > 0) args.push("--extension", entry)
+  }
+  args.push("--no-skills", "--no-prompt-templates", "--no-context-files", "--list-models")
   return args
 }
 
@@ -163,20 +194,37 @@ function defaultRuntime(): RpcSpawnRuntime {
 }
 
 /**
- * Build the child spawn descriptor. The child inherits the parent env untouched plus an isolated
- * SENPI_CODING_AGENT_SESSION_DIR; the real agent dir is deliberately left unset so auth/models resolve
- * normally. It prefers the senpi EXECUTABLE (`<exe> --mode rpc <childArgs>`) so loader-alias hijacking
- * cannot break child resolution; when no executable is found it falls back to the documented
- * `execPath + rpc-entry` path (rpc-entry re-injects `--mode rpc`, so the child args follow the entry).
+ * Build the child spawn descriptor. The child inherits the parent env plus an isolated
+ * SENPI_CODING_AGENT_SESSION_DIR; member-only identity is stripped before explicit memberEnv is
+ * applied. The real agent dir is deliberately left unset so auth/models resolve normally. It prefers
+ * the senpi EXECUTABLE (`<exe> --mode rpc <childArgs>`) so loader-alias hijacking cannot break child
+ * resolution; when no executable is found it falls back to the documented `execPath + rpc-entry` path
+ * (rpc-entry re-injects `--mode rpc`, so the child args follow the entry).
  */
+/**
+ * The env/extension preamble shared by the real child and the catalog probe. Both MUST strip member
+ * identity identically, so the rule lives in exactly one place: a divergence here would silently leak
+ * member identity into one of the two spawns.
+ */
+function buildChildProfile(
+  spec: RpcSpawnSpec,
+  resolved: RpcSpawnRuntime,
+): { readonly env: NodeJS.ProcessEnv; readonly spec: RpcSpawnSpec } {
+  const env: NodeJS.ProcessEnv = { ...resolved.parentEnv }
+  for (const name of MEMBER_PROCESS_ENV_NAMES) delete env[name]
+  Object.assign(env, spec.memberEnv)
+  env[SESSION_DIR_ENV] = resolveChildSessionDir(spec.state_dir, spec.task_id)
+  const extensions = spec.memberEnv === undefined
+    ? spec.extensions?.filter((entry) => basename(entry) !== MEMBER_EXTENSION_BUNDLE_NAME)
+    : spec.extensions
+  return { env, spec: extensions === spec.extensions ? spec : { ...spec, extensions } }
+}
+
 export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRuntime>): RpcSpawnDescriptor {
   const resolved: RpcSpawnRuntime = { ...defaultRuntime(), ...runtime }
-  const env: NodeJS.ProcessEnv = {
-    ...resolved.parentEnv,
-    ...(spec.memberEnv ?? {}),
-    [SESSION_DIR_ENV]: resolveChildSessionDir(spec.state_dir, spec.task_id),
-  }
-  const childArgs = buildChildArgs(spec)
+  const profile = buildChildProfile(spec, resolved)
+  const env = profile.env
+  const childArgs = buildChildArgs(profile.spec)
   const launcher = resolveSenpiLauncher(resolved)
   if (launcher !== null) {
     return {
@@ -187,4 +235,25 @@ export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRunt
     }
   }
   return { command: resolved.execPath, args: [resolved.resolveRpcEntry(), ...childArgs], cwd: spec.cwd, env }
+}
+
+export function buildRpcModelCatalogSpawn(
+  spec: RpcSpawnSpec,
+  runtime?: Partial<RpcSpawnRuntime>,
+): RpcSpawnDescriptor {
+  const resolved: RpcSpawnRuntime = { ...defaultRuntime(), ...runtime }
+  const profile = buildChildProfile(spec, resolved)
+  const env = profile.env
+  const childArgs = buildModelCatalogArgs(profile.spec)
+  const launcher = resolveSenpiLauncher(resolved)
+  if (launcher !== null) {
+    return {
+      command: launcher.command,
+      args: [...launcher.prefixArgs, ...childArgs],
+      cwd: spec.cwd,
+      env,
+    }
+  }
+  const cliEntry = join(dirname(resolved.resolveRpcEntry()), "cli.js")
+  return { command: resolved.execPath, args: [cliEntry, ...childArgs], cwd: spec.cwd, env }
 }

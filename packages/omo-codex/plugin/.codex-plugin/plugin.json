@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "5.0.0-beta.5",
+	"version": "5.0.0-beta.20",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -39,16 +39,16 @@
 		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
 		"./hooks/post-compact-resetting-project-rule-cache.json",
 		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",
-		"./hooks/stop-checking-start-work-continuation.json",
+		"./hooks/stop-checking-ulw-execute-continuation.json",
 		"./hooks/stop-checking-ulw-loop-resume.json",
-		"./hooks/subagent-stop-checking-start-work-continuation.json",
+		"./hooks/subagent-stop-checking-ulw-execute-continuation.json",
 		"./hooks/subagent-stop-verifying-lazycodex-executor-evidence.json"
 	],
 	"mcpServers": "./.mcp.json",
 	"interface": {
 		"displayName": "OMO",
 		"shortDescription": "Unified local Codex components",
-		"longDescription": "OMO exposes local Codex Rules, Comment Checker, Git Bash, LSP, Ultrawork, ulw-loop, start-work continuation, and telemetry components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
+		"longDescription": "OMO exposes local Codex Rules, Comment Checker, Git Bash, LSP, Ultrawork, ulw-loop, ulw-execute continuation, and telemetry components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
 		"developerName": "Yeongyu Kim",
 		"category": "Developer Tools",
 		"capabilities": [

@@ -1,0 +1,16 @@
+Commands:
+1. npm exec --yes --package=bun@1.3.12 -- bun test \
+   packages/omo-senpi/src/components/telemetry \
+   packages/omo-senpi/src/omo-native-capture-path.audit.test.ts
+2. npm exec --yes --package=bun@1.3.12 -- bun run --cwd packages/omo-senpi typecheck
+
+Observed:
+- Telemetry and transport-boundary suite: 72 pass, 0 fail, 287 expect() calls.
+- Typecheck: `tsgo --noEmit -p tsconfig.json`, exit code 0.
+
+Coverage:
+- Telemetry collection and allowlisted event ordering remain intact.
+- Environment, config, component-flag, and daily-stamp controls remain intact.
+- The sole validated transport forwarding boundary remains enforced.
+- Prompt, turn, tool, session, identity, payload, schema-documentation, and lifecycle
+  behavior remain green after removing local payload-history observation.

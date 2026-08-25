@@ -1,0 +1,10 @@
+GATE GREEN (fix tree, serial run)
+All 8 components: npm run check exit 0. GATE_EXIT=0.
+Earlier 3-component failure in the parallel run was an npm ci race on shared node_modules; serial rerun (matching CI step behavior) is fully green.
+
+ACTIONLINT
+actionlint .github/workflows/ci.yml: clean.
+
+WEB
+bun install --frozen-lockfile: 660 packages OK with pinned spec.
+bun run lint (biome 2.4.15 exact + eslint): Checked 61 files, no findings, exit 0.
