@@ -1,0 +1,10 @@
+FAIL plugin manifest: missing plugin/package.json
+FAIL extension: missing plugin/extensions/omo.js
+FAIL lsp-daemon runtime: missing plugin/runtime/lsp-daemon/dist/cli.js
+FAIL agent-toolkit runtime: missing plugin/runtime/agent-toolkit/cli.js
+PASS senpi CLI: /home/viprix/projects/oom-wt-6686/node_modules/.bun/@code-yeongyu+senpi@2026.8.23+3aa9f84f7136ce5f/node_modules/@code-yeongyu/senpi/dist/cli.js
+PASS senpi version 2026.8.23
+INFO omo 5.0.0-0.beta.18 (engine: senpi 2026.8.23)
+WARN stale omo binaries run ahead of this install on PATH: /tmp/tmp.a6g3j7xM7a/legacy/omo (reports 4.19.4) beats /tmp/tmp.a6g3j7xM7a/bin/omo
+WARN refresh the shell command cache after upgrading: hash -r (zsh: rehash); if ~/.local/bin precedes the npm global bin directory, prepend it: export PATH="$(npm prefix -g)/bin:$PATH"
+INFO no credentials found; run omo setup to review sibling stores

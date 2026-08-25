@@ -1,0 +1,22 @@
+GREEN PHASE (after stale-bin.js + doctor wiring)
+
+Command: bun test packages/omo-native/test/stale-bin.test.ts
+  7 pass
+  0 fail
+  21 expect() calls
+Ran 7 tests across 1 file. [659.00ms]
+
+Command: bun test packages/omo-native/test/stale-bin.test.ts packages/omo-native/test/doctor.test.ts packages/omo-native/test/package-shape.test.ts packages/omo-native/test/launcher.test.ts
+ 66 pass
+ 0 fail
+ 202 expect() calls
+Ran 66 tests across 4 files. [11.40s]
+
+Command: bun test packages/omo-native/test   (full scoped gate)
+ 132 pass
+ 6 skip
+ 1 fail      <- payload.test.ts full-build case only; pre-existing env issue:
+                git submodule revision for shared-skills/upstreams/open-design is
+                unfetchable in this worktree, build:materialize-shared-upstreams --strict
+                aborts before staging. Reproduces on untouched base; unrelated files.
+Ran 139 tests across 15 files. [18.91s]

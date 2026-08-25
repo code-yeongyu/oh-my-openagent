@@ -1,0 +1,19 @@
+RED PHASE (failing-first proof, before stale-bin.js existed)
+
+Command: bun test packages/omo-native/test/stale-bin.test.ts
+
+Output:
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/stale-bin.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '../bin/lib/stale-bin.js' from '/home/viprix/projects/oom-wt-6686/packages/omo-native/test/stale-bin.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [405.00ms]

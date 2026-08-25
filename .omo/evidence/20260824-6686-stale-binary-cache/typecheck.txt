@@ -1,0 +1,1 @@
+TYPECHECK_OK (bunx tsc -p packages/omo-native/tsconfig.json --noEmit)

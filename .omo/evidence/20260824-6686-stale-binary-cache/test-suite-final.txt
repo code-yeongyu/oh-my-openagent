@@ -1,0 +1,8 @@
+      at <anonymous> (/home/viprix/projects/oom-wt-6686/packages/omo-native/test/payload.test.ts:71:83)
+(fail) build:omo-native staged payload > #given a full plugin build > #when the payload is staged to a temp output dir > #then every required artifact is present with preserved modes and no dev clutter [6190.85ms]
+
+ 132 pass
+ 6 skip
+ 1 fail
+ 387 expect() calls
+Ran 139 tests across 15 files. [18.91s]

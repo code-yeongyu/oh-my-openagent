@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
+import { staleBinWarnings } from "./stale-bin.js"
 
 const artifacts = [
   ["plugin manifest", "plugin/package.json"],
@@ -91,6 +92,9 @@ export function runDoctor(inventory) {
 
   lines.push(`INFO omo ${packageManifest().version} (engine: senpi ${engineVersionOrUnresolved(senpi)})`)
   lines.push(...warningsForSettings())
+  // A stale shell command cache or a leftover legacy wrapper keeps an old omo serving after an
+  // upgrade; surface every competing copy on PATH with the recovery commands.
+  lines.push(...staleBinWarnings())
   if (needsSetupSuggestion(inventory)) {
     lines.push("INFO no credentials found; run omo setup to review sibling stores")
   }
