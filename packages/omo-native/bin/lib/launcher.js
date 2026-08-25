@@ -75,7 +75,9 @@ function senpiEnvironment(senpiRoot) {
   env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
   env.SENPI_BRAND = JSON.stringify(brandProfile())
 
-  const binDir = nearestNodeBin(senpiRoot)
+  // #6847: only a bin holding the senpi shim may win, so an empty scoped package .bin cannot
+  // shadow the ancestor dependency bin that carries it.
+  const binDir = nearestNodeBin(senpiRoot, { executable: "senpi" })
   if (binDir) {
     const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH"
     const path = env[pathKey]

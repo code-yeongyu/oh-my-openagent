@@ -46,7 +46,7 @@ export function resolveSenpi() {
   return { cliPath, packageRoot: dirname(dirname(indexPath)) }
 }
 
-export function nearestNodeBin(startPath) {
+export function nearestNodeBin(startPath, options = {}) {
   // Hoisted layouts place the engine package inside a shared node_modules (…/node_modules/senpi),
   // whose .bin is a sibling, not a child - starting the climb inside node_modules would walk to the
   // filesystem root and never find it. Begin at the package's parent so that sibling .bin is seen.
@@ -54,10 +54,20 @@ export function nearestNodeBin(startPath) {
     : basename(dirname(startPath)) === "node_modules" ? dirname(dirname(startPath))
     : startPath
   const root = parse(current).root
+  const platform = options.platform ?? process.platform
+  const fileExists = options.fileExists ?? existsSync
   while (true) {
     const candidate = join(current, "node_modules", ".bin")
-    if (existsSync(candidate)) return candidate
+    // #6847: scoped npm installs materialize a node_modules/.bin inside the scoped package even
+    // when it holds no shims, and that empty bin would shadow the ancestor bin carrying the
+    // executable. Only a bin that can actually serve name lookups may be returned.
+    if (fileExists(candidate) && (!options.executable || hasBinShim(candidate, options.executable, platform, fileExists))) return candidate
     if (current === root) return undefined
     current = dirname(current)
   }
+}
+
+function hasBinShim(binDir, executable, platform, fileExists) {
+  const shim = join(binDir, platform === "win32" ? `${executable}.cmd` : executable)
+  return fileExists(shim)
 }

@@ -19,6 +19,14 @@ type Fixture = {
 
 type InstallLayout = "bun" | "bun-legacy" | "bun-posix-special" | "npm" | "unknown"
 
+type FixtureOptions = {
+  hoisted?: boolean
+  shim?: boolean
+  installLayout?: InstallLayout
+  /** Creates the empty node_modules/.bin npm materializes inside the scoped senpi package (#6847). */
+  scopedEmptyBin?: boolean
+}
+
 function writeFile(path: string, content: string, mode?: number): void {
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, content, mode === undefined ? undefined : { mode })
@@ -38,7 +46,7 @@ function expandShortPath(path: string): string {
   }
 }
 
-function createFixture(options: { hoisted?: boolean; shim?: boolean; installLayout?: InstallLayout } = {}): Fixture {
+function createFixture(options: FixtureOptions = {}): Fixture {
   // Windows hands back the 8.3 short form (RUNNER~1) here while the launcher reports the long path, so
   // the fixture root is canonicalized once and every derived path inherits the same spelling.
   const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
@@ -90,6 +98,7 @@ if (process.env.FAKE_STDOUT) console.log(process.env.FAKE_STDOUT)
 if (process.env.FAKE_SIGNAL) process.kill(process.pid, process.env.FAKE_SIGNAL)
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
 `)
+  if (options.scopedEmptyBin) mkdirSync(join(senpiRoot, "node_modules", ".bin"), { recursive: true })
 
   let shimPath: string | undefined
   if (options.shim !== false) {
@@ -199,6 +208,22 @@ describe("omo launcher", () => {
         const result = run(fixture, ["say", "hi"], { SENPI_BIN: "/stale/senpi" })
         expect(result.status).toBe(0)
         expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      // Regression for #6847: npm materializes an empty node_modules/.bin inside the scoped
+      // @code-yeongyu/senpi package, and the senpi shim lives only in the ancestor dependency
+      // bin. The launcher must skip the shimless bin so the reflection child resolves bare
+      // `senpi` through PATH and SENPI_BIN instead of failing with spawn ENOENT.
+      test("#then an empty scoped package .bin does not shadow the ancestor shim", () => {
+        const fixture = createFixture({ scopedEmptyBin: true })
+        const result = run(fixture, ["say", "hi"], { SENPI_BIN: "/stale/senpi" })
+        const environment = capture(fixture).env
+        expect(result.status).toBe(0)
+        expect(environment.SENPI_BIN).toBe(fixture.shimPath)
+        const path = Object.entries(environment).find(([key]) => key.toLowerCase() === "path")?.[1]
+        const binDir = path?.split(process.platform === "win32" ? ";" : ":")[0]
+        expect(binDir).toBeDefined()
+        expect(realpathSync.native(binDir ?? "")).toBe(realpathSync.native(dirname(fixture.shimPath ?? "")))
       })
     })
 

@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/launcher.test.ts:
+217 |       test("#then an empty scoped package .bin does not shadow the ancestor shim", () => {
+218 |         const fixture = createFixture({ scopedEmptyBin: true })
+219 |         const result = run(fixture, ["say", "hi"], { SENPI_BIN: "/stale/senpi" })
+220 |         const environment = capture(fixture).env
+221 |         expect(result.status).toBe(0)
+222 |         expect(environment.SENPI_BIN).toBe(fixture.shimPath)
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-launcher-KuVSYh/app/node_modules/.bin/senpi"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6847/packages/omo-native/test/launcher.test.ts:222:39)
+(fail) omo launcher > #given a fake senpi package > #when the default command is launched > #then an empty scoped package .bin does not shadow the ancestor shim [313.85ms]
+
+ 0 pass
+ 37 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [1242.00ms]

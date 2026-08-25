@@ -1,0 +1,62 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/package-paths.test.ts:
+48 | 
+49 |       // when
+50 |       const resolved = nearestNodeBin(scopedPackageRoot, { executable: "senpi" })
+51 | 
+52 |       // then
+53 |       expect(resolved).toBe(ancestorBin)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-package-paths-ikzkzR/app/node_modules/.bin"
+Received: "/tmp/omo-package-paths-ikzkzR/app/node_modules/@code-yeongyu/senpi/node_modules/.bin"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6847/packages/omo-native/test/package-paths.test.ts:53:24)
+(fail) nearestNodeBin > #given a scoped package with its own empty .bin and an ancestor bin holding the senpi shim > #when resolving from the scoped package root #then the ancestor bin wins over the empty scoped one [3.80ms]
+59 | 
+60 |       // when
+61 |       const resolved = nearestNodeBin(scopedPackageRoot, { executable: "senpi", platform: "win32" })
+62 | 
+63 |       // then
+64 |       expect(resolved).toBe(ancestorBin)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-package-paths-D1Eblh/app/node_modules/.bin"
+Received: "/tmp/omo-package-paths-D1Eblh/app/node_modules/@code-yeongyu/senpi/node_modules/.bin"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6847/packages/omo-native/test/package-paths.test.ts:64:24)
+(fail) nearestNodeBin > #given a scoped package with its own empty .bin and an ancestor bin holding the senpi shim > #when resolving on win32 #then the ancestor bin holding senpi.cmd wins over the empty scoped one [3.24ms]
+70 | 
+71 |       // when
+72 |       const resolved = nearestNodeBin(scopedPackageRoot, { executable: "senpi", platform: "win32" })
+73 | 
+74 |       // then
+75 |       expect(resolved).toBeUndefined()
+                            ^
+error: expect(received).toBeUndefined()
+
+Received: "/tmp/omo-package-paths-6gk3L8/app/node_modules/@code-yeongyu/senpi/node_modules/.bin"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6847/packages/omo-native/test/package-paths.test.ts:75:24)
+(fail) nearestNodeBin > #given a scoped package with its own empty .bin and an ancestor bin holding the senpi shim > #when resolving on win32 and only an extensionless shim exists #then no bin qualifies [0.72ms]
+83 | 
+84 |       // when
+85 |       const resolved = nearestNodeBin(scopedPackageRoot, { executable: "senpi" })
+86 | 
+87 |       // then
+88 |       expect(resolved).toBeUndefined()
+                            ^
+error: expect(received).toBeUndefined()
+
+Received: "/tmp/omo-package-paths-TqVXKt/app/node_modules/@code-yeongyu/senpi/node_modules/.bin"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6847/packages/omo-native/test/package-paths.test.ts:88:24)
+(fail) nearestNodeBin > #given no bin in the ancestry contains the requested executable > #when resolving #then it returns undefined instead of a shimless bin [3.82ms]
+
+ 2 pass
+ 4 fail
+ 6 expect() calls
+Ran 6 tests across 1 file. [1290.00ms]
