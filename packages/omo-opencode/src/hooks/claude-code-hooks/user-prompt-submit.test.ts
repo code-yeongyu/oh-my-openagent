@@ -312,6 +312,31 @@ describe("executeUserPromptSubmitHooks control output", () => {
     expect(result.reason).toBe("quota exhausted")
   })
 
+  it("#given valid JSON that is not an object #when prompt submit runs #then it is injected verbatim", async () => {
+    // given - the leading `{` is what marks control output, not JSON validity
+    mockHook('[{"note":"first"}]')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      '<user-prompt-submit-hook>\n[{"note":"first"}]\n</user-prompt-submit-hook>',
+    ])
+  })
+
+  it("#given both decision block and continue false #when prompt submit runs #then reason wins over stopReason", async () => {
+    // given
+    mockHook('{"decision":"block","reason":"blocked","continue":false,"stopReason":"stopped"}')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(true)
+    expect(result.reason).toBe("blocked")
+  })
+
   it("#given continue false without stopReason #when prompt submit runs #then stderr becomes the reason", async () => {
     // given
     mockHook('{"continue":false}', { exitCode: 1, stderr: "hook failed" })

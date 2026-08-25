@@ -136,28 +136,30 @@ export async function executeUserPromptSubmitHooks(
       const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
       const control = parseControlOutput(result.stdout)
-      const injected = control
+      const contextText = control
         ? normalizeHookText(control.hookSpecificOutput?.additionalContext)
         : normalizeHookText(result.stdout)
-      if (injected !== undefined) {
-        messages.push(asHookContext(injected))
+      if (contextText !== undefined) {
+        messages.push(asHookContext(contextText))
       }
 
-      // Both stop the prompt whatever the hook exited with, matching
-      // processHookJSONOutput in Claude Code.
-      if (control?.continue === false) {
+      // Either field stops the prompt whatever the hook exited with, and a
+      // hook that sets both reports `reason`. Claude Code reads the fields in
+      // processHookJSONOutput and applies them in that order in
+      // processUserInput.
+      if (control?.decision === "block") {
         return {
           block: true,
-          reason: normalizeHookText(control.stopReason) ?? normalizeHookText(result.stderr),
+          reason: normalizeHookText(control.reason) ?? normalizeHookText(result.stderr),
           modifiedParts,
           messages,
         }
       }
 
-      if (control?.decision === "block") {
+      if (control?.continue === false) {
         return {
           block: true,
-          reason: normalizeHookText(control.reason) ?? normalizeHookText(result.stderr),
+          reason: normalizeHookText(control.stopReason) ?? normalizeHookText(result.stderr),
           modifiedParts,
           messages,
         }
