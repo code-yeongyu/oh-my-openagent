@@ -57,7 +57,8 @@ interface ReminderInjectionTarget {
 }
 
 /**
- * The newest user turn, which is the only one safe to add to.
+ * The newest user turn carrying client content, which is the only turn safe to
+ * add to.
  *
  * The reminder is queued from `tool.execute.after`, so by the time this runs
  * the newest user turn carries the tool results for the call that queued it.
@@ -66,8 +67,9 @@ interface ReminderInjectionTarget {
  * leading messages then reads the turn as a different conversation, and every
  * prompt-cache entry keyed on that prefix misses.
  *
- * The previous rule looked for the newest turn holding real user text, which
- * skips a tool-result-only turn and lands on the original prompt.
+ * Searching for the newest turn holding real user *text* is not equivalent and
+ * reintroduces that: a tool-result turn holds no text, so the search walks past
+ * it and lands on the original prompt.
  */
 function findLatestReminderTarget(
   messages: MessageWithParts[],
