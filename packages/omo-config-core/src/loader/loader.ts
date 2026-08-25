@@ -3,6 +3,7 @@ import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
 import { OmoCodegraphSettingsSchema, OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
+import { pruneInvalidConfigLeaves } from "./prune-invalid-leaves"
 import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
 import {
   DEFAULT_READ_FILE_SYSTEM,
@@ -64,6 +65,16 @@ function validationDiagnostic(path: string, issues: readonly { readonly path: re
   }
 }
 
+function isRecordLeafIssue(issue: { readonly path: readonly PropertyKey[] }): boolean {
+  const segments = issue.path.map((segment) => String(segment))
+  if (segments.length < 2) return false
+  return segments[0] === "agents" || segments[0] === "categories"
+}
+
+function hasOnlyRecordLeafIssues(issues: readonly { readonly path: readonly PropertyKey[] }[]): boolean {
+  return issues.length > 0 && issues.every(isRecordLeafIssue)
+}
+
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null
   const record: Record<string, unknown> = {}
@@ -110,7 +121,7 @@ function readConfigSource(
   }
 
   const validation = OmoConfigLayerSchema.safeParse(parsed.data)
-  if (!validation.success) {
+  if (!validation.success && !hasOnlyRecordLeafIssues(validation.error.issues)) {
     return {
       diagnostic: validationDiagnostic(path, validation.error.issues),
       source: { exists: true, loaded: false, path, scope },
@@ -173,9 +184,33 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     }
   }
 
+  // Surgical degradation: prune offending record leaves, keep healthy siblings.
+  const pruned = pruneInvalidConfigLeaves(
+    resolved.config,
+    finalConfig.error.issues,
+    (candidate) => {
+      const parsed = OmoConfigSchema.safeParse(mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, candidate))
+      if (!parsed.success) return { success: false, issues: parsed.error.issues }
+      return { success: true }
+    },
+  )
+
+  if (pruned.config !== null && Object.keys(pruned.config).length > 0) {
+    const prunedConfig = OmoConfigSchema.safeParse(mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, pruned.config))
+    if (prunedConfig.success) {
+      return {
+        config: stripResolutionControlKeys(prunedConfig.data),
+        diagnostics: [...diagnostics, ...resolved.diagnostics, ...pruned.dropped],
+        layers,
+        ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
+        sources,
+      }
+    }
+  }
+
   return {
     config: stripResolutionControlKeys(OmoConfigSchema.parse(DEFAULT_RAW_CONFIG)) satisfies OmoConfig,
-    diagnostics: [...diagnostics, ...resolved.diagnostics, validationDiagnostic("(merged omo config)", finalConfig.error.issues)],
+    diagnostics: [...diagnostics, ...resolved.diagnostics, ...pruned.dropped, validationDiagnostic("(merged omo config)", finalConfig.error.issues)],
     layers,
     ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
     sources,
