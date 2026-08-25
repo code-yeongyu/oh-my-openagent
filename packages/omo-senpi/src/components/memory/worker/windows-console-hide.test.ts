@@ -63,4 +63,30 @@ describe("reflection worker win32 console suppression", () => {
       })
     })
   })
+
+  describe("#given the supervisor's bootstrap and model child spawn sites", () => {
+    describe("#when their detachment options are inspected", () => {
+      test("#then the bootstrap spawn derives detachment from the runtime platform instead of staying detached everywhere", () => {
+        // windowsHide alone does not suppress the window in a Windows Terminal default-terminal
+        // setup while the bootstrap stays detached on win32; POSIX must keep the detached process
+        // group because the group kill targets it.
+        const bootstrapSpawn = collectSpawnCalls("memory-run-supervisor.ts").find((call) =>
+          call.text.includes("--child-bootstrap"),
+        )
+
+        expect(bootstrapSpawn).toBeDefined()
+        expect(bootstrapSpawn?.text).toContain('detached: platform !== "win32"')
+        expect(bootstrapSpawn?.text).not.toContain("detached: true")
+      })
+
+      test("#then the model child spawn stays attached to its bootstrap", () => {
+        const modelChildSpawn = collectSpawnCalls("memory-run-supervisor.ts").find(
+          (call) => !call.text.includes("--child-bootstrap"),
+        )
+
+        expect(modelChildSpawn).toBeDefined()
+        expect(modelChildSpawn?.text).toContain("detached: false")
+      })
+    })
+  })
 })
