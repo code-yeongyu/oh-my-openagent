@@ -1,0 +1,33 @@
+$ bun run build:senpi-plugin && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && bun test packages/omo-senpi && bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
+$ bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 51 packages, and audited 54 packages in 4s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && bun build src/cli.ts src/index.ts src/client.ts --outdir dist --target node --format esm && node scripts/stamp-dist-version.mjs
+
+Bundled 80 modules in 27ms
+
+  cli.js     235.49 KB  (entry point)
+  index.js   216.35 KB  (entry point)
+  client.js  213.91 KB  (entry point)
+
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 254 modules in 41ms
+
+  cli.js  84.65 KB  (entry point)
+
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Cloning into '/home/viprix/projects/oom-wt-7115/packages/shared-skills/upstreams/open-design'...
+error: script "test:senpi" was terminated by signal SIGTERM (Polite quit request)
+error: script "build:senpi-plugin:stage" was terminated by signal SIGTERM (Polite quit request)
+error: script "build:materialize-frontend" was terminated by signal SIGTERM (Polite quit request)
+error: script "build:senpi-plugin" was terminated by signal SIGTERM (Polite quit request)

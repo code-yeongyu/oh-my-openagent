@@ -1,3 +1,18 @@
+## 2026-08-24 — Neutralize the claude-sdk-oauth host-denial leak (#7115)
+
+The senpi claude-sdk-oauth lane denies every host-captured tool through a PreToolUse hook whose
+permission reason is an internal handoff instruction ("This tool call is captured and executed by
+the host. Do not retry with other tools; end the turn."). The SDK records that reason into its
+model-facing transcript, so it surfaces in assistant replies and persists into later turns,
+contaminating subsequent requests and results. Upstream senpi 2026.8.24 still ships the hook
+unchanged, so the adapter now guards the conversation itself: the new `host-denial-guard`
+component listens on `message_end` and swaps the exact literal for a neutral `[host tool handoff]`
+marker in assistant and toolResult messages. User wording is never rewritten, clean messages pass
+through untouched (identity return), and the component is gated by the compose-registered
+`omo-senpi-host-denial-guard-disabled` flag. The literal is pinned locally with a drift tripwire
+test against the installed runtime's dist, since adapter components must not value-import the
+senpi runtime.
+
 ## 2026-08-22 — One exception-free keyword table for every ULW skill pointer
 
 The mass-ulw and ulw-skill-pointers components were the same mechanism written twice, and the

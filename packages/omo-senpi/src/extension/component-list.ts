@@ -4,6 +4,7 @@ import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createGitMasterAttributionComponent } from "../components/git-master"
+import { createHostDenialGuardComponent } from "../components/host-denial-guard"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
 import { createLspComponent } from "../components/lsp"
 import { createMemoryComponent } from "../components/memory"
@@ -32,6 +33,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createCommentCheckerComponent(),
+    createHostDenialGuardComponent(),
     createAstGrepComponent(),
     createLspComponent(),
     taskComponent,
