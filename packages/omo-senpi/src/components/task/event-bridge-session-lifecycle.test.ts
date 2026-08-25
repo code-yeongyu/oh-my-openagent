@@ -59,6 +59,21 @@ describe("event-bridge session_start recovery chain", () => {
     expect(warnings).toHaveLength(0)
   })
 
+  it("#given a terminal child persisted before restart #when reconcile returns no outcome #then session_start still re-observes it for liveness", async () => {
+    const terminal = {
+      task_id: "task-terminal",
+      parent_session_id: "parent-session",
+    } as TaskRecord
+    const { pi, livenessCalls } = wireHarness("parent-session", {
+      outcomes: [],
+      records: { "task-terminal": terminal },
+    })
+
+    await pi.dispatch("session_start", {}, {})
+
+    expect(livenessCalls).toEqual(["task-terminal"])
+  })
+
   it("#given expired records #when session_start fires #then the awaited ttl cleanup runs after notification reconcile and logs deletions", async () => {
     const { pi, order, infos } = wireHarness("parent-session", { cleanupDeleted: ["task-old"] })
 

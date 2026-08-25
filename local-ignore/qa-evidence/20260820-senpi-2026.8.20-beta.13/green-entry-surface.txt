@@ -1,0 +1,5 @@
+=== 2026-08-20T16:03:39Z GREEN entry-surface QA (pre-merge) ===
+--- resolved senpi in worktree node_modules ---
+2026.8.20-2
+--- omo-native version + pin ---
+5.0.0-0.beta.13 senpi-pin 2026.8.20-2

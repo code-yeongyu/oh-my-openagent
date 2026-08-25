@@ -1,4 +1,4 @@
-import { createServer, type ServerResponse } from "node:http"
+import { createServer } from "node:http"
 import type { RuntimeSkillSourceEntry } from "./runtime-skill-config"
 
 export type RuntimeSkillSourceServer = {
@@ -41,7 +41,10 @@ function markdownResponse(markdown: string): Response {
   })
 }
 
-async function writeResponse(response: Response, output: ServerResponse): Promise<void> {
+async function writeResponse(
+  response: Response,
+  output: { writeHead(statusCode: number, headers: Record<string, string>): unknown; end(chunk: Uint8Array): unknown },
+): Promise<void> {
   output.writeHead(
     response.status,
     Object.fromEntries(response.headers.entries()),

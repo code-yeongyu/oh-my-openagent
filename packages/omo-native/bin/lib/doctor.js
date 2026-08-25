@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
+import { canonicalAgentDir } from "./agent-dir.js"
 import { packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
 
@@ -20,7 +20,7 @@ function fail(lines, message) {
 }
 
 function warningsForSettings() {
-  const agentDir = process.env.SENPI_CODING_AGENT_DIR || join(homedir(), ".senpi", "agent")
+  const agentDir = canonicalAgentDir()
   const settingsPath = join(agentDir, "settings.json")
   if (!existsSync(settingsPath)) return []
 

@@ -1,0 +1,32 @@
+ Tip: Use shift+tab to cycle the model's thinking level.                                                                
+ ↳ Want the full story on any tip? Ask about it — the give-me-tips skill has the tour.                                  
+
+[Extensions]                                                                                                            
+  anthropic-bash, anthropic-web-search, bash-timeout, btw, cache-keepalive, claude-sdk-oauth, compaction, config-reload,
+goal, gpt-apply-patch, help, history-search, hooks, imagegen, import-repro, look-at, loop-guard, mcp, model-fallback,   
+nested-agents-md, omo.js, openai-image-gen, openai-web-search, permission-system, prompt-preset, recommended-models,    
+redraws, rules, service-tier, src, terminal, todo, tool-pair-guard, tool-search, ttsr, video-in, webfetch, websearch    
+
+
+ Warning: Non-recommended model 'unknown': odd behavior is the default state; a working session is the anomaly.         
+
+ omo-senpi sends anonymous usage telemetry (no prompts, no paths). Docs:                                                
+ https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/senpi-telemetry.md - opt out: DO_NOT_TRACK=1   
+
+ This project is not trusted. Project .senpi resources and packages are ignored. Use /trust to save a trust decision,   
+ then restart pi.                                                                                                       
+ Runtime error (send_message): Context remains above the compaction threshold because compaction did not complete       
+
+ Warning: No models available. Use /login to log into a provider via OAuth or API key. See:                             
+                                                                                                                        
+ /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/node_modules/.bun/@code-yeongyu+senpi@20 
+ 26.8.14+4fc72482645226fb/node_modules/@code-yeongyu/senpi/docs/providers.md                                            
+                                                                                                                        
+ /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/node_modules/.bun/@code-yeongyu+senpi@20 
+ 26.8.14+4fc72482645226fb/node_modules/@code-yeongyu/senpi/docs/models.md                                               
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                       
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+…ge/local-workspaces/omo-wt/remove-omo-telemetry-command • fix/remove-omo-telemetry-command • ?/0 (0.0%) (auto)  unknown
+(😺 OmO Native)

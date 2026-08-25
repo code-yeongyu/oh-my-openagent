@@ -1,8 +1,15 @@
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
-import { loadDreamPersona, loadFactsPersona, loadReflectionPersona, type ReservedRun } from "@oh-my-opencode/memory-core"
+import {
+  loadDreamPersona,
+  loadFactsPersona,
+  loadReflectionPersona,
+  serializeFactsPayload,
+  type ReservedRun,
+} from "@oh-my-opencode/memory-core"
 
+import { estimateSystemTokens } from "../commands/tokens"
 import type {
   FactsSpawnArgs,
   PrepareFactsSpawnInput,
@@ -10,7 +17,7 @@ import type {
   ReflectionSpawnArgs,
   ReflectionSpawnPaths,
 } from "./spawn-types"
-import { resolveSenpiLaunch } from "./senpi-command"
+import { resolveMemoryChildLaunch, resolveSenpiLaunch } from "./senpi-command"
 
 export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
   const sessionDir = join(input.reflectionSessionsDir, safeRunId(input.run.runId))
@@ -19,10 +26,15 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   const persona = join(sessionDir, "reflection-persona.md")
   const prompt = join(sessionDir, "reflection-task.md")
   const isDream = input.run.request.trigger === "dream"
+  if (isDream && (input.systemTokenBudget === undefined || input.systemTokenTarget === undefined)) {
+    throw new TypeError("dream spawn requires a system token budget and target")
+  }
   const dreamPaths = isDream ? {
     skillsUsage: join(sessionDir, "skills-usage.json"),
+    memoryUsage: join(sessionDir, "memory-usage.json"),
     dreamState: join(sessionDir, "dream-state.json"),
     dreamPolicy: join(sessionDir, "dream-policy.json"),
+    systemTokens: join(sessionDir, "system-tokens.json"),
   } : undefined
   const payloadPaths = [
     transcript,
@@ -46,8 +58,10 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     writeFile(prompt, buildTaskPrompt(input.run, input.worktree.dir, transcript), "utf8"),
     ...(dreamPaths === undefined ? [] : [
       copyJsonOrEmpty(input.skillsUsageSource, dreamPaths.skillsUsage),
+      copyJsonOrEmpty(input.memoryUsageSource, dreamPaths.memoryUsage),
       copyJsonOrEmpty(input.dreamStateSource, dreamPaths.dreamState),
       writeFile(dreamPaths.dreamPolicy, `${JSON.stringify({ version: 1, people: input.peoplePolicy }, null, 2)}\n`, "utf8"),
+      writeSystemTokenEstimate(input.worktree.dir, dreamPaths.systemTokens),
     ]),
   ])
   await Promise.all(payloadPaths.map((path) => chmod(path, 0o400)))
@@ -71,8 +85,12 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     TRANSCRIPT_PATH: transcript,
     ...(dreamPaths === undefined ? {} : {
       SKILLS_USAGE_PATH: dreamPaths.skillsUsage,
+      MEMORY_USAGE_PATH: dreamPaths.memoryUsage,
       DREAM_STATE_PATH: dreamPaths.dreamState,
       DREAM_POLICY_PATH: dreamPaths.dreamPolicy,
+      SYSTEM_TOKENS_PATH: dreamPaths.systemTokens,
+      SYSTEM_TOKEN_BUDGET: String(input.systemTokenBudget),
+      SYSTEM_TOKEN_TARGET: String(input.systemTokenTarget),
       ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
     }),
     SENPI_MEMORY_REFLECTION: "1",
@@ -99,9 +117,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${prompt}`,
   ]
-  const launch = input.senpiCommand === undefined
-    ? resolveSenpiLaunch(input.env)
-    : { command: input.senpiCommand, prefixArgs: [] }
+  const launch = resolveMemoryChildLaunch(input)
   return {
     runId: input.run.runId,
     attempt: input.attempt ?? 1,
@@ -116,6 +132,10 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.run.request.trigger === "dream" ? { origin: input.run.request.origin } : {}),
     mergePolicy: input.mergePolicy,
     ...(input.run.request.targetDoc === undefined ? {} : { targetDoc: input.run.request.targetDoc }),
+    ...(isDream ? {
+      systemTokenBudget: input.systemTokenBudget,
+      systemTokenTarget: input.systemTokenTarget,
+    } : {}),
     worktree: input.worktree,
     command: launch.command,
     args: [...launch.prefixArgs, ...args],
@@ -123,6 +143,35 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     env,
     detached: true,
     paths,
+  }
+}
+
+// Fork mode reuses the parent session's request prefix so the provider cache can hit. That cache
+// is keyed on the exact system prompt, tool list, and cwd, so this variant must NOT pass
+// --system-prompt/--tools/--no-*/--no-context-files and must run in the PARENT cwd. The reflection
+// persona and task prompt ride as the initial message (@file) instead of the system prompt.
+export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
+  const base = await prepareReflectionSpawn(input)
+  const parentSessionFile = input.parentSessionFile
+  if (parentSessionFile === undefined) {
+    throw new Error("fork-mode reflection requires the parent session file")
+  }
+  // Fork mode replaces the sandboxed argv wholesale, so it must re-apply the launch prefix the
+  // base spawn resolved: without it the child is the bare interpreter and dies on senpi flags.
+  const args = [
+    ...resolveMemoryChildLaunch(input).prefixArgs,
+    "-p",
+    "--fork", parentSessionFile,
+    "--session-dir", base.paths.sessionDir,
+    "--model", input.model,
+    ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
+    `@${base.paths.prompt}`,
+  ]
+  return {
+    ...base,
+    fork: { parentSessionFile },
+    args,
+    cwd: input.parentCwd ?? base.cwd,
   }
 }
 
@@ -135,7 +184,9 @@ export async function prepareFactsSpawn(input: PrepareFactsSpawnInput): Promise<
   } catch (error) {
     if (errorCode(error) !== "ENOENT") throw error
   }
-  await writeFile(payload, `${JSON.stringify(input.payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
+  // ONE serializer, shared with the byte cap's measurement: a second stringify here would let
+  // the written bytes drift past the cap the selection proved.
+  await writeFile(payload, serializeFactsPayload(input.payload), { encoding: "utf8", mode: 0o600 })
   await chmod(payload, 0o400)
   const env: NodeJS.ProcessEnv = {
     ...input.env,
@@ -203,6 +254,11 @@ function buildTaskPrompt(run: ReservedRun, worktree: string, transcript: string)
     "Do not modify Git administration files. Finish with a clean worktree.",
     `Trigger: ${run.request.trigger}${focus}`,
   ].join("\n")
+}
+
+async function writeSystemTokenEstimate(repoDir: string, destination: string): Promise<void> {
+  const estimate = await estimateSystemTokens(repoDir)
+  await writeFile(destination, `${JSON.stringify({ totalTokens: estimate.totalTokens, files: estimate.files }, null, 2)}\n`, "utf8")
 }
 
 async function copyJsonOrEmpty(source: string, destination: string): Promise<void> {

@@ -4,6 +4,8 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { DagNodeId, DagRunId } from "../dag/types"
+import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import { buildCompletionDetails, buildCompletionMessage } from "./notification"
 import type { TaskRecord } from "../state"
 
@@ -189,6 +191,83 @@ describe("buildCompletionMessage", () => {
     expect(message.content).toContain("two")
     expect(message.content.match(/task completion/gu)).toHaveLength(2)
     expect(message.content).not.toContain("<task-notification>")
+  })
+})
+
+function directiveOccurrences(content: string): number {
+  let count = 0
+  let index = content.indexOf(DAG_VERIFICATION_DIRECTIVE)
+  while (index !== -1) {
+    count += 1
+    index = content.indexOf(DAG_VERIFICATION_DIRECTIVE, index + DAG_VERIFICATION_DIRECTIVE.length)
+  }
+  return count
+}
+
+describe("dag-owned completions", () => {
+  test("#given a dag-owned record #when details built #then the owning run and node are attached", () => {
+    // given
+    const record = completedRecord({
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+    })
+
+    // when
+    const details = buildCompletionDetails(record)
+
+    // then
+    expect(details.dag).toEqual({ run_id: "dag_run_1", node_id: "build" })
+  })
+
+  test("#given a dag-owned detail #when message built #then the verification directive is appended once", () => {
+    // given
+    const details = buildCompletionDetails(completedRecord({
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+    }))
+
+    // when
+    const message = buildCompletionMessage([details])
+
+    // then
+    expect(directiveOccurrences(message.content)).toBe(1)
+    expect(message.content).toEndWith(DAG_VERIFICATION_DIRECTIVE)
+    expect(message.content).toContain(`\n\n${DAG_VERIFICATION_DIRECTIVE}`)
+  })
+
+  test("#given a plain record #when details and message built #then no dag facts and no directive appear", () => {
+    // given
+    const record = completedRecord()
+
+    // when
+    const details = buildCompletionDetails(record)
+    const message = buildCompletionMessage([details])
+
+    // then
+    expect(details.dag).toBeUndefined()
+    expect(directiveOccurrences(message.content)).toBe(0)
+  })
+
+  test("#given one plain and two dag details #when message built #then the directive appears exactly once", () => {
+    // given
+    const plain = buildCompletionDetails(completedRecord({ task_id: "st_plain", name: "plain" }))
+    const firstDag = buildCompletionDetails(completedRecord({
+      task_id: "st_dag1",
+      name: "dag-one",
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+    }))
+    const secondDag = buildCompletionDetails(completedRecord({
+      task_id: "st_dag2",
+      name: "dag-two",
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "test" as DagNodeId, fingerprint: "fp-2" },
+    }))
+
+    // when
+    const message = buildCompletionMessage([plain, firstDag, secondDag])
+
+    // then
+    expect(directiveOccurrences(message.content)).toBe(1)
+    expect(message.content).toContain("name:plain")
+    expect(message.content).toContain("name:dag-one")
+    expect(message.content).toContain("name:dag-two")
   })
 })
 

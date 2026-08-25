@@ -1,0 +1,46 @@
+SURFACE
+
+Installed OpenCode:
+
+  opencode --version
+  1.18.18
+
+QA skill:
+
+  .agents/skills/opencode-qa
+
+COMMANDS
+
+  bash scripts/lib/common.sh --self-check
+  bash scripts/server-smoke.sh --self-test
+
+REAL DATABASE ISOLATION
+
+  QA_DB_BEFORE=5861
+  QA_DB_AFTER=5861
+
+OBSERVED
+
+  PASS: dependencies present (opencode sqlite3 curl jq tmux)
+  PASS: isolated XDG sandbox auto-removed on exit
+  PASS: isolated HOME points inside sandbox
+  PASS: common.sh self-check
+  PASS: GET /global/health healthy=true version=1.18.18
+  PASS: GET /doc lists 162 documented paths
+  PASS: unauthenticated GET /session rejected with HTTP 401
+  PASS: server-smoke
+  OPENCODE_QA_PASS=1
+
+WHY THIS IS ENOUGH
+
+The only OpenCode-side source edit is a test fixture that describes pure
+PowerShell/cmd environments; production hook code is unchanged. The targeted
+hook tests prove the fixture behavior, while the mandatory real OpenCode QA
+proves the server starts, documents its routes, enforces authentication, uses
+an isolated XDG sandbox, cleans it up, and does not change the real session
+database.
+
+OMITTED
+
+No session contents, database rows, auth credentials, headers, or environment
+dumps were captured.

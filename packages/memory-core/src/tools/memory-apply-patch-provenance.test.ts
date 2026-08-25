@@ -14,6 +14,8 @@ const { fixture, cleanup } = createPatchFixtureHarness()
 
 afterEach(cleanup)
 
+const MEMORY_GIT_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+
 describe("memoryApplyPatch provenance and locks", () => {
   it("#given accepted-turn provenance #when a patch commits #then the in-band writer session and turn trailers are durable", async () => {
     // given
@@ -32,7 +34,7 @@ describe("memoryApplyPatch provenance and locks", () => {
       "Omo-Session": "session-patch",
       "Omo-Turn": "9",
     })
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 
   it("#given a delete and configured remote #when applied #then writer lock, deletion, and remote result shape are pinned", async () => {
     // #given
@@ -57,5 +59,5 @@ describe("memoryApplyPatch provenance and locks", () => {
     expect(domains).toEqual(["memory-write"])
     expect(await repo.lsTree()).toEqual([])
     expect(result.message).toMatch(/^memory_apply_patch committed \([a-f0-9]{7}\); harness will sync after the turn\.$/)
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 })

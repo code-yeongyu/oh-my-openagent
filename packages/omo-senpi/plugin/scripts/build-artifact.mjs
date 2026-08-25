@@ -1,9 +1,17 @@
 import { createHash } from "node:crypto"
+import { spawn } from "node:child_process"
 import { readFile, writeFile } from "node:fs/promises"
 import { relative, resolve } from "node:path"
+import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
+import { minify } from "terser"
 
 const BUILD_MARKER_PREFIX = "// omo:"
+const BUILD_ARTIFACT_PATH = fileURLToPath(import.meta.url)
+const MINIFIER_IDLE_MS = 5_000
+
+let minifierRequestId = 0
+let nodeMinifier
 
 export async function normalizeBuiltinImports(output, builtinModuleNames) {
   const bundled = await readFile(output, "utf8")
@@ -16,6 +24,82 @@ export async function normalizeBuiltinImports(output, builtinModuleNames) {
     },
   ).replace(/^[\t ]+$/gm, "")
   if (normalized !== bundled) await writeFile(output, normalized)
+}
+
+export async function minifyBundle(output) {
+  if (process.versions.bun !== undefined) {
+    await minifyBundleWithNode(output)
+    return
+  }
+  await minifyBundleInProcess(output)
+}
+
+async function minifyBundleInProcess(output) {
+  const result = await minify(await readFile(output, "utf8"), {
+    compress: true,
+    mangle: true,
+    module: true,
+  })
+  if (typeof result.code !== "string") {
+    throw new Error(`Terser did not produce code for ${output}`)
+  }
+  await writeFile(output, result.code)
+}
+
+function minifyBundleWithNode(output) {
+  const minifier = getNodeMinifier()
+  clearTimeout(minifier.idleTimer)
+  const id = ++minifierRequestId
+  return new Promise((resolvePromise, reject) => {
+    minifier.pending.set(id, { resolve: resolvePromise, reject })
+    minifier.child.stdin.write(`${JSON.stringify({ id, output })}\n`, (error) => {
+      if (error === null || error === undefined) return
+      minifier.pending.delete(id)
+      reject(error)
+    })
+  })
+}
+
+function getNodeMinifier() {
+  if (
+    nodeMinifier !== undefined
+    && nodeMinifier.child.stdin.writable
+    && !nodeMinifier.child.stdin.writableEnded
+    && !nodeMinifier.child.stdin.destroyed
+  ) return nodeMinifier
+  nodeMinifier = undefined
+  const child = spawn("node", [BUILD_ARTIFACT_PATH, "--minify-server"], {
+    stdio: ["pipe", "pipe", "inherit"],
+    windowsHide: true,
+  })
+  const pending = new Map()
+  const lines = createInterface({ input: child.stdout })
+  const minifier = { child, pending, idleTimer: undefined }
+  nodeMinifier = minifier
+  lines.on("line", (line) => {
+    const response = JSON.parse(line)
+    const request = pending.get(response.id)
+    if (request === undefined) return
+    pending.delete(response.id)
+    if (response.error === undefined) request.resolve()
+    else request.reject(new Error(response.error))
+    minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+  })
+  child.on("exit", (code, signal) => {
+    clearTimeout(minifier.idleTimer)
+    if (nodeMinifier === minifier) nodeMinifier = undefined
+    const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+    for (const request of pending.values()) request.reject(reason)
+    pending.clear()
+  })
+  return minifier
+}
+
+export function closeNodeMinifier(minifier = nodeMinifier) {
+  if (minifier === undefined) return
+  clearTimeout(minifier.idleTimer)
+  if (nodeMinifier === minifier) nodeMinifier = undefined
+  minifier.child.stdin.end()
 }
 
 export async function attachBuildMarker(options) {
@@ -53,6 +137,9 @@ export function artifactsMatch(currentText, expectedText) {
   return current !== undefined && expected !== undefined
     && current.sourceDigest === expected.sourceDigest
     && current.bodyDigest === digest(current.body)
+    && expected.bodyDigest === digest(expected.body)
+    && current.bodyDigest === expected.bodyDigest
+    && current.body === expected.body
 }
 
 function parseBuildArtifact(text) {
@@ -79,4 +166,23 @@ function digest(value) {
 
 export function toPortableBuildPath(path) {
   return path.replaceAll("\\", "/")
+}
+
+if (resolve(process.argv[1] ?? "") === resolve(BUILD_ARTIFACT_PATH)) {
+  if (process.argv[2] === "--minify") {
+    const output = process.argv[3]
+    if (output === undefined) throw new Error("missing bundle path for --minify")
+    await minifyBundleInProcess(output)
+  } else if (process.argv[2] === "--minify-server") {
+    const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })
+    for await (const line of lines) {
+      const request = JSON.parse(line)
+      try {
+        await minifyBundleInProcess(request.output)
+        process.stdout.write(`${JSON.stringify({ id: request.id })}\n`)
+      } catch (error) {
+        process.stdout.write(`${JSON.stringify({ id: request.id, error: error instanceof Error ? error.message : String(error) })}\n`)
+      }
+    }
+  }
 }

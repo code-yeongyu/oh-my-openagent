@@ -96,10 +96,10 @@ describe("OmO Native prompt telemetry", () => {
     }
   })
 
-  test("#given suppression and source cases #when submitted #then skill names do not match and extension prompts stay non-real", async () => {
+  test("#given no-keyword and extension source cases #when submitted #then extension prompts stay non-real", async () => {
     const testHarness = await harness()
     try {
-      await input(testHarness.pi, "skill", "ulw-plan", "session-a")
+      await input(testHarness.pi, "skill", "plan only", "session-a")
       await disposition(testHarness.pi, "skill", "started")
       await input(testHarness.pi, "extension", "ultrawork internal", "session-a", "extension")
       await disposition(testHarness.pi, "extension", "handled")

@@ -236,4 +236,81 @@ setInterval(() => undefined, 30_000)
     expect(result).toEqual({ kind: "unavailable", candidates })
     expect(warnings.join("\n")).toContain("exited with code 7")
   })
+
+  test("#given a table catalog whose model column contains a slash #when candidates are preflighted #then the slashed model id stays visible", async () => {
+    // given
+    const item = await fixture(`process.stdout.write([
+  "provider                    model                                                     context  max-out  thinking  images",
+  "apitopia                    z-ai/glm-5.2-ultrafast-unlocked                           1M       131.1K   yes       no",
+  "apitopia                    kimi-for-coding-highspeed                                 262.1K   65.5K    yes       yes",
+].join("\\n") + "\\n")`)
+    const slashed: MemoryModelChain = [
+      { model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked", thinking: "off" },
+      { model: "apitopia/kimi-for-coding-highspeed" },
+    ]
+
+    // when
+    const result = await preflightMemoryModels({
+      candidates: slashed,
+      launch: item.launch,
+      env: { PATH: process.env.PATH },
+      configSources: [{ path: item.config, exists: true }],
+    })
+
+    // then
+    expect(result).toEqual({
+      kind: "filtered",
+      candidates: slashed,
+      rejected: [],
+    })
+  })
+
+  test("#given a table catalog row whose provider column contains a slash #when candidates are preflighted #then that malformed row is not treated as a visible model", async () => {
+    // given
+    const item = await fixture(`process.stdout.write([
+  "provider                    model                                                     context",
+  "bad/provider                some-model                                                1M",
+  "apitopia                    z-ai/glm-5.2-ultrafast-unlocked                           1M",
+].join("\\n") + "\\n")`)
+    const mixed: MemoryModelChain = [
+      { model: "bad/provider/some-model" },
+      { model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked" },
+    ]
+
+    // when
+    const result = await preflightMemoryModels({
+      candidates: mixed,
+      launch: item.launch,
+      env: { PATH: process.env.PATH },
+      configSources: [{ path: item.config, exists: true }],
+    })
+
+    // then
+    expect(result).toEqual({
+      kind: "filtered",
+      candidates: [{ model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked" }],
+      rejected: [{ model: "bad/provider/some-model", cause: "model_not_visible" }],
+    })
+  })
+
+  test("#given a headerless catalog listing a slashed model id #when candidates are preflighted #then the slashed model id stays visible", async () => {
+    // given
+    const item = await fixture('process.stdout.write("apitopia/z-ai/glm-5.2-ultrafast-unlocked\\nbuiltin/fallback\\n")')
+    const headerless: MemoryModelChain = [
+      { model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked" },
+      { model: "builtin/fallback", thinking: "minimal" },
+    ]
+
+    // when
+    const result = await preflightMemoryModels({
+      candidates: headerless,
+      launch: item.launch,
+      env: { PATH: process.env.PATH },
+      configSources: [{ path: item.config, exists: true }],
+    })
+
+    // then
+    expect(result).toEqual({ kind: "filtered", candidates: headerless, rejected: [] })
+  })
+
 })

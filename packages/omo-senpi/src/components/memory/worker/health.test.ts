@@ -30,7 +30,7 @@ describe("reflection health", () => {
         await writeFile(join(root, "corrupt.json"), "{")
 
         // when
-        const health = await readReflectionHealth(root)
+        const health = await readReflectionHealth(root, { now: Date.parse("2026-08-12T05:00:00.000Z") })
 
         // then
         expect(health).toEqual({
@@ -72,7 +72,7 @@ describe("reflection health", () => {
     const before = await snapshotDir(root)
 
     // when
-    const health = await readReflectionHealth(root)
+    const health = await readReflectionHealth(root, { now: Date.parse("2026-08-12T05:00:00.000Z") })
 
     // then
     expect(health.streak).toBe(3)
@@ -110,7 +110,7 @@ describe("reflection health", () => {
     )
 
     // when
-    const health = await readReflectionHealth(root)
+    const health = await readReflectionHealth(root, { now: Date.parse("2026-08-12T05:00:00.000Z") })
 
     // then
     expect(health.lastOutcome).toEqual({
@@ -136,6 +136,73 @@ describe("reflection health", () => {
       pendingCount: 0,
       recentFailureFingerprints: [],
     })
+  })
+})
+
+describe("reflection health recency", () => {
+  test("#given a trailing failure streak whose newest failure is past the stale window #when health is derived #then the streak is zeroed and no fingerprint is reported", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "reflection-health-"))
+    roots.push(root)
+    const now = Date.parse("2026-08-17T00:00:00.000Z")
+    for (let index = 0; index < 3; index += 1) {
+      const record = completion(`stale-${index}`, `2026-08-08T0${index}:00:00.000Z`, "failed", "child_exit", "stable")
+      await writeFile(join(root, `stale-${index}.json`), JSON.stringify(record))
+    }
+
+    // when
+    const health = await readReflectionHealth(root, { now })
+
+    // then
+    expect(health.streak).toBe(0)
+    expect(health.fingerprint).toBe("")
+    expect(health.recentFailureFingerprints).toEqual([])
+    expect(health.streakSinceISO).toBeUndefined()
+    expect(health.lastFailure?.finishedAt).toBe("2026-08-08T02:00:00.000Z")
+    expect(health.counts.failed).toBe(3)
+  })
+
+  test("#given a streak whose newest failure sits exactly on the stale boundary #when health is derived #then the streak still counts", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "reflection-health-"))
+    roots.push(root)
+    const now = Date.parse("2026-08-17T00:00:00.000Z")
+    await writeFile(
+      join(root, "edge.json"),
+      JSON.stringify(completion("edge", "2026-08-10T00:00:00.000Z", "failed", "child_exit", "stable")),
+    )
+    await writeFile(
+      join(root, "older.json"),
+      JSON.stringify(completion("older", "2026-08-08T00:00:00.000Z", "failed", "child_exit", "stable")),
+    )
+
+    // when
+    const health = await readReflectionHealth(root, { now })
+
+    // then
+    expect(health.streak).toBe(2)
+  })
+
+  test("#given a streak spanning the stale window with a fresh newest failure #when health is derived #then the whole streak counts", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "reflection-health-"))
+    roots.push(root)
+    const now = Date.parse("2026-08-17T12:00:00.000Z")
+    const records = [
+      completion("fresh-1", "2026-08-17T11:00:00.000Z", "failed", "child_exit", "stable"),
+      completion("fresh-2", "2026-08-17T10:00:00.000Z", "failed", "child_exit", "stable"),
+      completion("old-1", "2026-08-08T10:00:00.000Z", "failed", "child_exit", "stable"),
+      completion("old-2", "2026-08-08T09:00:00.000Z", "failed", "child_exit", "stable"),
+    ]
+    for (const record of records) {
+      await writeFile(join(root, `${String(record.runId)}.json`), JSON.stringify(record))
+    }
+
+    // when
+    const health = await readReflectionHealth(root, { now })
+
+    // then
+    expect(health.streak).toBe(4)
   })
 })
 

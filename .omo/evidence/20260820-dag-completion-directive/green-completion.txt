@@ -1,0 +1,84 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/completion/notifier-reconcile-unnotified.test.ts:
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a terminal notify_on_terminal record with an unnotified epoch w4notif #when the session reconciles twice #then exactly one notification is delivered [1.04ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given an already-notified epoch w4notif #when the session reconciles #then the record is skipped [0.10ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a terminal unnotified record of another session w4notif #when this session reconciles #then the record is skipped [0.13ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a terminal unnotified record without opt-in or failed delivery w4notif #when the session reconciles #then the record is skipped [0.09ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a legacy failed-delivery record without notify_on_terminal w4notif #when the session reconciles #then the in-flight retry is preserved [0.13ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given delivery fails during reconcile w4notif #when the enqueue throws #then notification_failed_epoch is recorded and the retry is scheduled [0.30ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a completion buffered behind a transient parent state w4notif #when the session reconciles before the flush #then reconcile skips it and the flush delivers exactly once [0.18ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a residency claim lands between read and notified-epoch persist w4notif #when the epoch is stamped #then the claim survives [0.12ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a residency claim lands before a failed-delivery persist w4notif #when the failure epoch is stamped #then the claim survives [0.10ms]
+
+packages/senpi-task/src/completion/model-visibility.test.ts:
+(pass) task completion model visibility > #given a resolved category model #when completion is rendered #then the event names both [0.30ms]
+
+packages/senpi-task/src/completion/routing.test.ts:
+(pass) routeCompletion > #given idle parent #when routed #then always wakes with no config to consult [0.11ms]
+(pass) routeCompletion > #given streaming parent #when routed #then delivered into the running turn [0.14ms]
+(pass) routeCompletion > #given compacting parent #when routed #then buffered with compacting reason [0.09ms]
+(pass) routeCompletion > #given session_switching parent #when routed #then buffered with switching reason [0.06ms]
+(pass) routeCompletion > #given session_shutdown parent #when routed #then buffered with shutdown reason [0.06ms]
+(pass) shouldNotifyStatus > #given external terminals and completions/errors #when checked #then notifies [0.07ms]
+(pass) shouldNotifyStatus > #given parent-initiated terminals #when checked #then does not notify [0.07ms]
+(pass) shouldNotifyStatus > #given non-terminal statuses #when checked #then does not notify [0.07ms]
+
+packages/senpi-task/src/completion/notifier-retry.test.ts:
+(pass) createCompletionNotifier scheduled retries > #given two immediate failures w2notif #when the first timer fires #then delivery persists exactly once [0.41ms]
+(pass) createCompletionNotifier scheduled retries > #given a failed epoch w2notif #when revive advances the epoch before retry #then stale delivery drops [0.16ms]
+(pass) createCompletionNotifier scheduled retries > #given a pending retry w2notif #when the buffered entry flushes first #then the timer skips notified work [0.12ms]
+(pass) createCompletionNotifier scheduled retries > #given persistent enqueue failures w2notif #when eight timers exhaust #then the cycle caps and the count is cleaned so a later reconcile restarts fresh [0.20ms]
+(pass) createCompletionNotifier scheduled retries > #given failed records from mixed sessions w2notif #when reconciled twice #then only eligible work delivers once [0.13ms]
+(pass) createCompletionNotifier scheduled retries > #given a failed record w2notif #when reconciliation sees compaction #then it buffers normally [0.08ms]
+(pass) createCompletionNotifier scheduled retries > #given retries keep failing w2notif #when timers reschedule #then delays follow the capped ladder [0.19ms]
+(pass) createCompletionNotifier scheduled retries > #given a retry dropped for another session w2notif #when its session reconciles #then backoff restarts at the base delay [0.17ms]
+(pass) createCompletionNotifier scheduled retries > #given session A owns a failed retry w2notif #when session B is current #then retry drops until A reconciles [0.14ms]
+
+packages/senpi-task/src/completion/notifier-buffer-dedupe.test.ts:
+(pass) completion notifier buffered dedupe (W1-V F5) > #given the same (task,epoch) buffered twice #when flushed #then the parent is notified once [0.24ms]
+
+packages/senpi-task/src/completion/notifier.test.ts:
+(pass) createCompletionNotifier - exactly-once epoch contract > #given double terminal replay #when notified twice #then exactly one delivery [0.28ms]
+(pass) createCompletionNotifier - exactly-once epoch contract > #given revived task at epoch 1 #when second completion arrives #then it notifies again [0.10ms]
+(pass) createCompletionNotifier - exactly-once epoch contract > #given persisted notified_epoch #when notified after resume #then no re-notify [0.07ms]
+(pass) createCompletionNotifier - gating > #given synchronous foreground task #when it completes #then never notifies [0.07ms]
+(pass) createCompletionNotifier - gating > #given parent-initiated cancel or interrupt #when terminal #then never notifies [0.08ms]
+(pass) createCompletionNotifier - gating > #given still-running task #when notified #then skipped as non-terminal [0.09ms]
+(pass) createCompletionNotifier - routing table > #given idle parent #when delivered #then triggerTurn payload recorded unconditionally [0.11ms]
+(pass) createCompletionNotifier - routing table > #given streaming parent #when delivered #then triggerTurn payload recorded for the batched steer [0.07ms]
+(pass) createCompletionNotifier - routing table > #given compacting parent #when notified #then buffered without delivery [0.07ms]
+(pass) createCompletionNotifier - routing table > #given session_switching parent #when notified #then buffered without delivery [0.06ms]
+(pass) createCompletionNotifier - buffering, flush, batching > #given two buffered completions on one session #when flushed on idle #then one wake carries both [0.11ms]
+(pass) createCompletionNotifier - buffering, flush, batching > #given buffered completion #when the session was replaced #then it is dropped, not delivered [0.10ms]
+(pass) createCompletionNotifier - buffering, flush, batching > #given no buffered notifications #when flushed #then empty result [0.06ms]
+(pass) createCompletionNotifier - notifier failure contract > #given first enqueue throws but retry succeeds #when delivered #then one retry lands and epoch advances [0.08ms]
+(pass) createCompletionNotifier - notifier failure contract > #given enqueue throws twice #when delivered #then failure recorded and epoch not advanced [0.12ms]
+
+packages/senpi-task/src/completion/notification.test.ts:
+(pass) buildCompletionDetails > #given completed record #when details built #then core facts, full result, and duration are populated [0.24ms]
+(pass) buildCompletionDetails > #given a result longer than the former 700-char cap #when details built #then the full result is included [0.09ms]
+(pass) buildCompletionDetails > #given a result beyond transport capacity #when details built #then its full text is spilled to a local file [0.86ms]
+(pass) buildCompletionDetails > #given resident completed record #when details built #then continuation hint names task_send but never task_output [0.08ms]
+(pass) buildCompletionDetails > #given resident completed record #when details built #then task_send hint uses to and message params [0.06ms]
+(pass) buildCompletionDetails > #given error record #when details built #then error message feeds the full result [0.07ms]
+(pass) buildCompletionDetails > #given tokens provided #when details built #then tokens are attached [0.07ms]
+(pass) buildCompletionMessage > #given a complete result #when notification built #then the body contains it without a follow-up task_output instruction [0.11ms]
+(pass) buildCompletionMessage > #given a spilled result #when notification built #then the body names its local file [0.99ms]
+(pass) buildCompletionMessage > #given two details #when message built #then both completions appear in one content block [0.12ms]
+(pass) dag-owned completions > #given a dag-owned record #when details built #then the owning run and node are attached [0.07ms]
+(pass) dag-owned completions > #given a dag-owned detail #when message built #then the verification directive is appended once [0.10ms]
+(pass) dag-owned completions > #given a plain record #when details and message built #then no dag facts and no directive appear [0.07ms]
+(pass) dag-owned completions > #given one plain and two dag details #when message built #then the directive appears exactly once [0.10ms]
+(pass) completion run stats > #given a record with run stats #when details are built #then run stats and token fallback are attached [0.09ms]
+(pass) completion run stats > #given explicit tokens #when details are built #then the explicit value wins over run stats [0.06ms]
+
+packages/senpi-task/src/completion/unconditional-wake.test.ts:
+(pass) unconditional wake > #given an idle parent #when a background child completes #then it always wakes with triggerTurn [0.62ms]
+(pass) unconditional wake > #given an idle parent #when notified end to end #then a triggerTurn message is enqueued [0.23ms]
+(pass) unconditional wake > #given a streaming parent #when a background child completes #then delivery carries triggerTurn for the batched steer [0.12ms]
+
+ 62 pass
+ 0 fail
+ 169 expect() calls
+Ran 62 tests across 8 files. [212.00ms]

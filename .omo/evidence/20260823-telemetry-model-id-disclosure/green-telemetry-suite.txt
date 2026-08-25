@@ -1,0 +1,10 @@
+(pass) omo-native parallelism v2 summary > #given a correlated invalid event #when shutdown fires #then rejection is visible without partial totals [0.26ms]
+(pass) omo-native parallelism v2 summary > #given a valid eval event but an incomplete outer wrapper #when shutdown fires #then the event still justifies one summary [0.12ms]
+
+1 tests failed:
+(fail) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi [0.35ms]
+
+ 187 pass
+ 1 fail
+ 774 expect() calls
+Ran 188 tests across 21 files. [622.00ms]

@@ -1,0 +1,2126 @@
+{
+  "version": 1,
+  "domain": "senpi-shared",
+  "rule": "Allow only machine-consumed fields and sentinels, real source/packaged equality, parser/state/runtime/security behavior, and user UI/error copy; forbid authored prompt, directive, SKILL, and tool-description prose plus headings, order, negative wording, and length contracts.",
+  "candidate_occurrence_count": 252,
+  "candidate_fingerprint_count": 239,
+  "allowed": [
+    {
+      "fingerprint": "2c296ae1ae1fdc61f565e122a10e5cf67e13b616b60200d9965ada1f18fbccfd",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Checks a machine-consumed schema, frontmatter, loader, or normalized field using fixture value string; the assertion covers parsing/shape rather than authored guidance.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 234,
+      "expected": "string"
+    },
+    {
+      "fingerprint": "72bd412507743baf7cd52edba038b12515c6d5c59f9440587c43278b64afbbad",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token omo-fallback-architect:directive consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 16,
+      "expected": "omo-fallback-architect:directive"
+    },
+    {
+      "fingerprint": "b60c748715369caebbdaa671cba847a8cfe14fd8c89cb830e1903a3a045ce945",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Verifies the exact runtime fallback model identifier anthropic/claude-fable-5 is interpolated into the hidden transition notice; the identifier is provider routing data, not a required sentence.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 30,
+      "expected": "anthropic/claude-fable-5"
+    },
+    {
+      "fingerprint": "78e3a5e54f3174f71928faff1f62fafd2ea13301adebae913d2bc2b8b2334559",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Verifies the exact runtime fallback model identifier anthropic/claude-opus-5 is interpolated into the hidden transition notice; the identifier is provider routing data, not a required sentence.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 31,
+      "expected": "anthropic/claude-opus-5"
+    },
+    {
+      "fingerprint": "14e296764e4ec96a4358cf024c1aae6d1fce2dd0452a84a1aa2c76298d5a83a1",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Keeps the exact registered task tool/category invocation token for the architect route; surrounding explanatory fallback prose is classified separately as forbidden.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 35,
+      "expected": "task(category: \"architect\")"
+    },
+    {
+      "fingerprint": "bb8086d3ddc7250cd0e489621bbe1b0895303905931d90c52e74d466835de535",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (should not wear you down); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/tip-message.test.ts",
+      "line": 94,
+      "expected": "should not wear you down"
+    },
+    {
+      "fingerprint": "21004f8f4a64a8ef15523de56af56c4077466e864363f01f5cdb291d920d073d",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token AGENTS.md consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/init-deep-advisor/git-exclude.test.ts",
+      "line": 38,
+      "expected": "AGENTS.md"
+    },
+    {
+      "fingerprint": "15f13af33ce0a2ff0af9cbf8c3661b766bd5ad3da5f9c72a46eea624d0c0e7f5",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token AGENTS.md consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/init-deep-advisor/git-exclude.test.ts",
+      "line": 69,
+      "expected": "AGENTS.md"
+    },
+    {
+      "fingerprint": "4f8bbddebb9a0200ad4e4a2d85bdf3b7b1f36a34d749b9a7a66c8eed450bcd95",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token AGENTS.md consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/init-deep-advisor/git-exclude.test.ts",
+      "line": 90,
+      "expected": "AGENTS.md"
+    },
+    {
+      "fingerprint": "efab29ba889bf92b2a617ef73ada2c9c7941031da613dc2b8131900ed0154f48",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (skills/commit/SKILL.md); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/doctor.test.ts",
+      "line": 276,
+      "expected": "skills/commit/SKILL.md"
+    },
+    {
+      "fingerprint": "9fc4f3948e458f7c52aca1fcdbed37c6d6418b97fe1c0b313846f7414e85ff8e",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (skills/commit/SKILL.md); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/memfs.test.ts",
+      "line": 189,
+      "expected": "skills/commit/SKILL.md"
+    },
+    {
+      "fingerprint": "7b937313362cca828b484179267282bbe900ed3b9412d0676c95267ce2ba0bbd",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (### system/persona.md — Persona); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/memory.test.ts",
+      "line": 67,
+      "expected": "### system/persona.md — Persona"
+    },
+    {
+      "fingerprint": "0b81a188e98cf19321620803e2eb15ac71a509bc607b39a7e777c668361b4a60",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (### system/projects/index.md — Project index); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/memory.test.ts",
+      "line": 69,
+      "expected": "### system/projects/index.md — Project index"
+    },
+    {
+      "fingerprint": "4ee34a5bb9ff84d2691e290d6eb70f6ea3f406cda10f86de19d67221d6523da4",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (- skills/commit/SKILL.md); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/memory.test.ts",
+      "line": 71,
+      "expected": "- skills/commit/SKILL.md"
+    },
+    {
+      "fingerprint": "ea82ea05dddd8b7337f20c008c15b004957fe2ab3c4f8bffd9ac523adb42a0e0",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (## Uncommitted changes); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/memory.test.ts",
+      "line": 94,
+      "expected": "## Uncommitted changes"
+    },
+    {
+      "fingerprint": "1a924a35a27ddff8ae858e0004c362bc1daf5eeadee88a34809967848074f744",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (**linter**); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/memory/commands/search.test.ts",
+      "line": 74,
+      "expected": "**linter**"
+    },
+    {
+      "fingerprint": "ea591b5dc2e06d5934944fc8f88fb55a65b3c0ea2e924b30250ecfc8f568a559",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Exercises SKILL.md frontmatter repair/parsing with machine-consumed field or report datum name: \"my skill\"; it does not require any skill-body instruction wording.",
+      "path": "packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts",
+      "line": 79,
+      "expected": "name: \"my skill\""
+    },
+    {
+      "fingerprint": "1f6f62cfa2deac3958cab80e14366984dc535e314cec5e1fde8cc1f0588135f5",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Exercises SKILL.md frontmatter repair/parsing with machine-consumed field or report datum skills/commit/SKILL.md; it does not require any skill-body instruction wording.",
+      "path": "packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts",
+      "line": 112,
+      "expected": "skills/commit/SKILL.md"
+    },
+    {
+      "fingerprint": "4e1932639d8e3d174afa837f70dea3b4cf11f0b56bb92fb2e6bfd6a138ec579d",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Exercises SKILL.md frontmatter repair/parsing with machine-consumed field or report datum name: commit; it does not require any skill-body instruction wording.",
+      "path": "packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts",
+      "line": 115,
+      "expected": "name: commit"
+    },
+    {
+      "fingerprint": "a35190fdec6b75d8fc875898105100c68dfc921c5b4b2146ccd35a3934008591",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Exercises SKILL.md frontmatter repair/parsing with machine-consumed field or report datum skills/commit/SKILL.md; it does not require any skill-body instruction wording.",
+      "path": "packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts",
+      "line": 131,
+      "expected": "skills/commit/SKILL.md"
+    },
+    {
+      "fingerprint": "410d68575300a786c6864b8c927f5e21d7c1ca27a69803df872f3bf919de1945",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Exercises SKILL.md frontmatter repair/parsing with machine-consumed field or report datum skills/broken/SKILL.md; it does not require any skill-body instruction wording.",
+      "path": "packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts",
+      "line": 132,
+      "expected": "skills/broken/SKILL.md"
+    },
+    {
+      "fingerprint": "df9b626c3fb271730651e519144531d24a7e161bf8666470e714266b423bf8d1",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Exercises SKILL.md frontmatter repair/parsing with machine-consumed field or report datum missing YAML frontmatter; it does not require any skill-body instruction wording.",
+      "path": "packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts",
+      "line": 133,
+      "expected": "missing YAML frontmatter"
+    },
+    {
+      "fingerprint": "f4ea8c95de76e00d1785a277ff208211419613adc5b116c37e60ba8543d8a2b8",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value fixture persona to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/palace/entry-collector.test.ts",
+      "line": 20,
+      "expected": "fixture persona"
+    },
+    {
+      "fingerprint": "48314e89526e6e5f3f0c1a5d62fd8f60d12189b4d9d551a7a832876a84e0a26e",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value external note to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/palace/entry-collector.test.ts",
+      "line": 36,
+      "expected": "external note"
+    },
+    {
+      "fingerprint": "0f7a3af26dd7af2f566b25f976e273762282fb785bb0561d3c1af875ff83fc93",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value uncommitted - not active in system prompt to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/palace/entry-collector.test.ts",
+      "line": 46,
+      "expected": "uncommitted - not active in system prompt"
+    },
+    {
+      "fingerprint": "7268513b54796ccf7fcf0ed27bbc9fd4bbc7016e46ebc3d7ebaf3c9960c8e926",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value uncommitted - not active in system prompt to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/palace/people.test.ts",
+      "line": 81,
+      "expected": "uncommitted - not active in system prompt"
+    },
+    {
+      "fingerprint": "15d1bfd702b64a0c9ace8d032c8afce4879422fb4c72bae2a6180453a1e2a641",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the compiled-memory template/cache version key used to invalidate and identify runtime prompt blocks; it is a machine state token, not prompt prose.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 103,
+      "expected": "omo-senpi:before_agent_start:v3"
+    },
+    {
+      "fingerprint": "1f8ba6098a66ff7173504397c4858db09d98de58974edbc0a51f863c6f2bd032",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value BASE PROMPT to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 146,
+      "expected": "BASE PROMPT"
+    },
+    {
+      "fingerprint": "27d531305cfbbd9f3a41845959159d30c3dffc43841f2645c1ca1ef8f381b952",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value first to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 149,
+      "expected": "first"
+    },
+    {
+      "fingerprint": "dbb98a000d493acba5995d2d6eff37374c2bb22d55a6fb134f43f6e15b25ae14",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value CONVERSATION_ID to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 151,
+      "expected": "CONVERSATION_ID"
+    },
+    {
+      "fingerprint": "97d8fc2e1e889f1015facbcb660002e8ee33238e9a80a38d382478f2f2fc4f62",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value previous messages to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 152,
+      "expected": "previous messages"
+    },
+    {
+      "fingerprint": "f150a7a50443869ecc6db17e1d75d509210aa9ba2f78723c0c75114bb105113a",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (afterThreshold?.systemPrompt and <expression:beforeThreshold?.systemPrompt>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 175,
+      "expected": "<expression:beforeThreshold?.systemPrompt>"
+    },
+    {
+      "fingerprint": "9073e94cc613cada6157445148851b133c42965d89cc070e4cb5595001ae2305",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (second?.systemPrompt and <expression:first?.systemPrompt>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 254,
+      "expected": "<expression:first?.systemPrompt>"
+    },
+    {
+      "fingerprint": "115192fcf2d342530bc6b61d03dfbeb376cce98b06baee015b9b27f92b79d994",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (third?.systemPrompt and <expression:first?.systemPrompt>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 255,
+      "expected": "<expression:first?.systemPrompt>"
+    },
+    {
+      "fingerprint": "82265cfdc6c2eede24e9bcf53e38235090b91cd76701eb199051573c358225d4",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value FOREIGN EXTENSION TEXT to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 272,
+      "expected": "FOREIGN EXTENSION TEXT"
+    },
+    {
+      "fingerprint": "466ef00a156260856069fdb7ebb81d8b79a3d3ea945fa778bfb069c64d12cf3f",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value first to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 309,
+      "expected": "first"
+    },
+    {
+      "fingerprint": "85ba66757a68fc4c37409f0fbd1250e221f7c1fa64ec28ea3b7cf4106ae13b85",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value second to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 310,
+      "expected": "second"
+    },
+    {
+      "fingerprint": "75e04cdcddb1fb60dfa5df15a746c7178b6d16276dde305239a039a758f565eb",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value second to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 311,
+      "expected": "second"
+    },
+    {
+      "fingerprint": "8a1cf39fa34dcb57ebe8ffe2f7023e6723306de633eb45775dd179142ac67881",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value BASE PROMPT to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/prompt.test.ts",
+      "line": 329,
+      "expected": "BASE PROMPT"
+    },
+    {
+      "fingerprint": "b8db2866b80d6b5445286d079a742c9cc8ccb9b453f756d11986419fe58d5c3a",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (dir and <expression:skillsDir>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/skills-scope.test.ts",
+      "line": 128,
+      "expected": "<expression:skillsDir>"
+    },
+    {
+      "fingerprint": "54f5dea08f1ab78210eed2f911769a5772e2c419d3365fe92f4446d176440e4b",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (dir and <expression:join(context.identityPaths.repo, \"skills\")>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/skills-scope.test.ts",
+      "line": 129,
+      "expected": "<expression:join(context.identityPaths.repo, \"skills\")>"
+    },
+    {
+      "fingerprint": "ae8de9855bee9c81ee27342ae8d769728755fa41ea68275789584bbeefd64d60",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (merged and <expression:[...preExisting.map((path) => resolve(path)), resolve(skillsDir)]>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/skills-scope.test.ts",
+      "line": 247,
+      "expected": "<expression:[...preExisting.map((path) => resolve(path)), resolve(skillsDir)]>"
+    },
+    {
+      "fingerprint": "6c766215f9b65cc3c96e17891c27c474181edcc94972956da81a414ac54266ee",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (merged and <expression:[resolve(skillsDir)]>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/omo-senpi/src/components/memory/skills-scope.test.ts",
+      "line": 263,
+      "expected": "<expression:[resolve(skillsDir)]>"
+    },
+    {
+      "fingerprint": "3b7588871bfa4ea9f60cee900cc5133daebe329c61ae355200e461cd1a95802d",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies runtime skill-usage path parsing extracts the skill directory name from a canonical SKILL.md path.",
+      "path": "packages/omo-senpi/src/components/memory/skills-usage.test.ts",
+      "line": 15,
+      "expected": "foo"
+    },
+    {
+      "fingerprint": "43cc7432604279927463e8cbb90abb470f1cf82fd0e7edb3791cddfaf9131ebe",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value Prefer small focused helpers to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/tools-apply-patch.test.ts",
+      "line": 37,
+      "expected": "Prefer small focused helpers"
+    },
+    {
+      "fingerprint": "c3e693ca64d8864a126772d9717d6510e69a3d0d0fa2eb139d5def85514fcbf5",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value Adds type hints to all Python code. to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/memory/tools-operations.test.ts",
+      "line": 35,
+      "expected": "Adds type hints to all Python code."
+    },
+    {
+      "fingerprint": "9e815ef36d2013ab72e0efc26b3b99940e24a8cba9298fc908ede6e38dd0cc3a",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Checks a machine-consumed schema, frontmatter, loader, or normalized field using fixture value string; the assertion covers parsing/shape rather than authored guidance.",
+      "path": "packages/omo-senpi/src/components/memory/tools.test.ts",
+      "line": 28,
+      "expected": "string"
+    },
+    {
+      "fingerprint": "a5ebf9608ae39f614539f0985fef160ad2d733e305a79d9dd420b80dd65d571f",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token skills-usage.json consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts",
+      "line": 130,
+      "expected": "skills-usage.json"
+    },
+    {
+      "fingerprint": "b908896cf096add44602634ac9b4cb188ed233c8eebf225e9d6f79c66036c270",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token --system-prompt consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/memory/worker/runner-fork-spawn.test.ts",
+      "line": 23,
+      "expected": "--system-prompt"
+    },
+    {
+      "fingerprint": "7ae8da29e3c0db36108395144a0b38659b9985f330d460be4854df35d8c0f777",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token --no-prompt-templates consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/memory/worker/runner-fork-spawn.test.ts",
+      "line": 27,
+      "expected": "--no-prompt-templates"
+    },
+    {
+      "fingerprint": "1bba5c74b5b335864166bb8dd934e1189dc91cf0fad73ccaed410093f2458ba2",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token --system-prompt consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/memory/worker/runner-fork-spawn.test.ts",
+      "line": 92,
+      "expected": "--system-prompt"
+    },
+    {
+      "fingerprint": "f8440b5f9aa9c9ac56cd8a6b9f8b35863a987e813d9c210e47aaf1204fa87068",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token --system-prompt consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts",
+      "line": 157,
+      "expected": "--system-prompt"
+    },
+    {
+      "fingerprint": "d3b4a78658dd9a5a7672afe36512336195ae96aa23d3ac50e1e487f70a6e6536",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token --no-prompt-templates consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts",
+      "line": 161,
+      "expected": "--no-prompt-templates"
+    },
+    {
+      "fingerprint": "51cdb1da667840b4f3f25a2eaa1027d2b3a4472b70f5c2a3350ce049f818301c",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value original prompt to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/components/task/dag-runtime.test.ts",
+      "line": 309,
+      "expected": "original prompt"
+    },
+    {
+      "fingerprint": "822dd1dd9172edf17a65d770d4d5c62e3e817e913b471ceaa00c5907bbc0d7f0",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies configured agent prompt fixture <expression:BUILTIN_AGENTS[\"explore\"]?.prompt> survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/omo-senpi/src/components/task/engine-agents.test.ts",
+      "line": 83,
+      "expected": "<expression:BUILTIN_AGENTS[\"explore\"]?.prompt>"
+    },
+    {
+      "fingerprint": "d982d196c3be2f8680c8f4c849cbfe6d736375f4448b0f1be2d98d341442409e",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies configured agent prompt fixture Scout the repo. survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/omo-senpi/src/components/task/engine-agents.test.ts",
+      "line": 97,
+      "expected": "Scout the repo."
+    },
+    {
+      "fingerprint": "841102b33785a9254ea70c0111fbed84b0dfc72cfab4eedb66e6fd3b9cfea95e",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token immediate consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 167,
+      "expected": "immediate"
+    },
+    {
+      "fingerprint": "a6f1e7fe88a9ee9369d85e7e1b4160c4f93b0d088937f57ac6fae8450c6585da",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token lt_100 consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 167,
+      "expected": "lt_100"
+    },
+    {
+      "fingerprint": "8b9fb06024c84ec8abe00644e8dd4e5f5b9faf2e5e4bb22818589d273e792719",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token follow_up consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 168,
+      "expected": "follow_up"
+    },
+    {
+      "fingerprint": "39bd3c932a10fb4eaad069d9fd476e4729969086e46478d91717ef58a0adcf4e",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token 100_500 consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 168,
+      "expected": "100_500"
+    },
+    {
+      "fingerprint": "58d95cfb39ef87e6560be59c6ab1df91f402f62b7af767bb8e267d53f15715a9",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token 2_3 consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 168,
+      "expected": "2_3"
+    },
+    {
+      "fingerprint": "03f910fd3564fe2b56bf1279f1c39680175e4dde391e52179d90e6edd93843c3",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token other consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 169,
+      "expected": "other"
+    },
+    {
+      "fingerprint": "11462d79befc6690db452558ef72ef976549fc608190ac2d7524a01926ff631a",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token 500_2000 consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 169,
+      "expected": "500_2000"
+    },
+    {
+      "fingerprint": "c9728de715d403c045d26a97cbda5574c6f40cffd2e633641e3ffa6035ce4514",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token gte_2000 consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 170,
+      "expected": "gte_2000"
+    },
+    {
+      "fingerprint": "f23516db4a38f5bac734bb442b5872281e3788051a2d3ed60a2099f3b9c41369",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token 4_10 consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-prompt.test.ts",
+      "line": 170,
+      "expected": "4_10"
+    },
+    {
+      "fingerprint": "bcfbf912f34a665557f8e0951529e45f0fa53e2fc5dcbd6b278d70e8e7d2b3eb",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token debugging consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-tools.test.ts",
+      "line": 111,
+      "expected": "debugging"
+    },
+    {
+      "fingerprint": "49b0c4aa40bd33f81f7d56099d0b5550cbc6c6e508c1462236ecb74e1d5f4892",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token ulw-plan consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-tools.test.ts",
+      "line": 116,
+      "expected": "ulw-plan"
+    },
+    {
+      "fingerprint": "389c9af5d2a058c1975ac9abe3206f3f6560dd311b2aaca8d3b417d06c4fcc43",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token debugging consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/telemetry/omo-native-tools.test.ts",
+      "line": 121,
+      "expected": "debugging"
+    },
+    {
+      "fingerprint": "999d8016590be33a6585f6611320ef5f906396010e9bb5f2434eabec8fd304fd",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token <ultrawork-mode> consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork-arming.test.ts",
+      "line": 196,
+      "expected": "<ultrawork-mode>"
+    },
+    {
+      "fingerprint": "b2f8be3c250c8fd13899eb6dc857e2f6ec2f2e74df5a90a8f34c0665570ad5aa",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token create_goal consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 437,
+      "expected": "create_goal"
+    },
+    {
+      "fingerprint": "3b31dd56ce051a9ac9dff7d11ccb9654e7d7a1e1b827b01104507a353188bd85",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token `todo` consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 438,
+      "expected": "`todo`"
+    },
+    {
+      "fingerprint": "9ad5ddcce8620cf5a4d1a85f027dd6c4b666e2af09a2049db1449c19bd7af14c",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token team_create consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 439,
+      "expected": "team_create"
+    },
+    {
+      "fingerprint": "4ac5536a8f4e60513baf3e0feeb45892002b819598c6e9bdf69320f481e22da2",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (generated directive drifted); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 474,
+      "expected": "generated directive drifted"
+    },
+    {
+      "fingerprint": "b1398a2ac213492cff4b345c89c756b623f0a45866e1ee19ff817885c8a208c6",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value theme: light to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/omo-senpi/src/mcp/memory-server.test.ts",
+      "line": 77,
+      "expected": "theme: light"
+    },
+    {
+      "fingerprint": "d9435e507544523615d4d1fb842daf5c228acdb5737c826305dae07e0358424b",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies an MCP memory write persists and can be parsed back from Git with the submitted fixture body intact.",
+      "path": "packages/omo-senpi/src/mcp/memory-server.test.ts",
+      "line": 201,
+      "expected": "standalone"
+    },
+    {
+      "fingerprint": "304a2cebb577bcbe920a18c03c0f9f8c6bc8b3f0e8aaded1b5f8330ed0bc5fa2",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token ./skills consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/plugin-manifest.test.ts",
+      "line": 53,
+      "expected": "./skills"
+    },
+    {
+      "fingerprint": "d9898eaf9d116c1f2b5d6e54dc336b4288e3a0252ba7dd6a672af28e0da929ea",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the materialized or packaged artifact directly with its canonical source (<expression:listDirectoryNames(skillsRoot)>), so shipped content drift is detected without pinning independently authored prose.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "line": 106,
+      "expected": "<expression:listDirectoryNames(skillsRoot)>"
+    },
+    {
+      "fingerprint": "5e0d89b9d3a7b838926ddddf96639b288151f931b610c374c7267fd5cfaf4f87",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the materialized or packaged artifact directly with its canonical source (<expression:[...expectedSkillNames].sort()>), so shipped content drift is detected without pinning independently authored prose.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "line": 111,
+      "expected": "<expression:[...expectedSkillNames].sort()>"
+    },
+    {
+      "fingerprint": "7df7f49f7a874becdad3510b71e95ea23990af4e103d2b624b4771fdc37ab09f",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token senpi:<session_id> consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "line": 199,
+      "expected": "senpi:<session_id>"
+    },
+    {
+      "fingerprint": "5fc15f396bcd2ef1d0dd0d771c04d519cceccad89a706e2e54fd77129bae96ee",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token codex:<session_id> consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "line": 200,
+      "expected": "codex:<session_id>"
+    },
+    {
+      "fingerprint": "62b1a9812efa9327d769ae0585a7f6ed0323294aa0c8bba443ce629fbdf65cc7",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token plan-review consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/agents/interaction-policy.test.ts",
+      "line": 17,
+      "expected": "plan-review"
+    },
+    {
+      "fingerprint": "cb38e5f4aab626e7499ff92264b7358bd8819045a8294b475ac758e9970102fe",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token plan-review consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/agents/interaction-policy.test.ts",
+      "line": 49,
+      "expected": "plan-review"
+    },
+    {
+      "fingerprint": "3ff04b143440e8db3f79d179e67e1c794f92357b3af98362b9bf879db8880f14",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token ulw-plan consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/agents/invocation-guard.test.ts",
+      "line": 38,
+      "expected": "ulw-plan"
+    },
+    {
+      "fingerprint": "b425264195d4688f4742d6920d69640fdb1fc209a76fb46d1dce9bb44f15ce89",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token start-work consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/agents/invocation-guard.test.ts",
+      "line": 40,
+      "expected": "start-work"
+    },
+    {
+      "fingerprint": "8996d004c08b915ec9a201d70ef81efef57df0772188fdce347530dc8afaa993",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (/skill:ulw-plan); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/agents/invocation-guard.test.ts",
+      "line": 180,
+      "expected": "/skill:ulw-plan"
+    },
+    {
+      "fingerprint": "d7336a489ffe713cc22d597d7c2a85ab0e5fdbb43691e4bc45190a98bfb3f3bc",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (/skill:ulw-plan); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/agents/invocation-guard.test.ts",
+      "line": 203,
+      "expected": "/skill:ulw-plan"
+    },
+    {
+      "fingerprint": "27b66252785c2cd2d85226a288fdfab19aade12534adf54c437b1512d1784e53",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Verifies configured agent prompt fixture project senpi survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/senpi-task/src/agents/loader.test.ts",
+      "line": 54,
+      "expected": "project senpi"
+    },
+    {
+      "fingerprint": "ea21137bb9b37025e3f8d0e1fc86641ae6d6d2822dafcf23302730e290938598",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Verifies configured agent prompt fixture registered prompt survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/senpi-task/src/agents/loader.test.ts",
+      "line": 82,
+      "expected": "registered prompt"
+    },
+    {
+      "fingerprint": "aecbdd6b3317d33999c9febdf42a9586d8887bed533c55c19daf2cfba5ff240f",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Verifies configured agent prompt fixture file prompt survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/senpi-task/src/agents/loader.test.ts",
+      "line": 97,
+      "expected": "file prompt"
+    },
+    {
+      "fingerprint": "50a2ab39ee2e6cb6cf9e92cf432a3f2a04787ee994d9cedc9e57e6fe3a7cb53f",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies configured agent prompt fixture Inspect the codebase survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/senpi-task/src/agents/resolve-agent.test.ts",
+      "line": 99,
+      "expected": "Inspect the codebase"
+    },
+    {
+      "fingerprint": "975d761058ff82d35e5bf2f2df9771bc23de1c248b2a79772602d13185de3db1",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies configured agent prompt fixture Advise only survives loading, overlay, or resolution while structured model/tool policy is applied; it does not require shipped persona wording.",
+      "path": "packages/senpi-task/src/agents/resolve-agent.test.ts",
+      "line": 277,
+      "expected": "Advise only"
+    },
+    {
+      "fingerprint": "9b4a49240c8777d7e7b46609ab3b3d8473ba0d3f93e7cfc8964c73c12fd99457",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value prompt: to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/completion/notification.test.ts",
+      "line": 109,
+      "expected": "prompt:"
+    },
+    {
+      "fingerprint": "e46b88306860839eb9f26ad331b8db041d05b5535afebe30dc2a1165f450a2d0",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value intake through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 311,
+      "expected": "intake"
+    },
+    {
+      "fingerprint": "5ef272b564cae19ce70e48bae30679e621fe5e4b09ebf9bce6b9a545d461c246",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/quick through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 311,
+      "expected": "scripted/quick"
+    },
+    {
+      "fingerprint": "33d519d93873102f1fc63397067c67db87a45707296f7b29fdd52829bec6fe29",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value research through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 312,
+      "expected": "research"
+    },
+    {
+      "fingerprint": "e41ef7aac6c649b1361a6cbea7b728bbd981d0d45f636e41b317cfef8f8b3715",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/explore through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 312,
+      "expected": "scripted/explore"
+    },
+    {
+      "fingerprint": "c4bd3b1d1f64ba99bb6ba78d7cb2f5071019c4aea5aeabdc80d0d1d14e204f9c",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value explore through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 312,
+      "expected": "explore"
+    },
+    {
+      "fingerprint": "b9f2c86d58a4809c5bd0bfe59d1355525efffd509c6858e090d00b5e0a32e9eb",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value design through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 313,
+      "expected": "design"
+    },
+    {
+      "fingerprint": "544147cd5ed607661a81b234afcd64030be1851eeaa1335a81f1d6d8a640baef",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/visual-engineering through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 313,
+      "expected": "scripted/visual-engineering"
+    },
+    {
+      "fingerprint": "32bfc8e36021b4ae7a4fb9a3af91697b660047f1c5bec9b2cfeb681f9a717df2",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value evidence through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 314,
+      "expected": "evidence"
+    },
+    {
+      "fingerprint": "c1b608f1a5e302434d8babb9ea97c42c152f558c9083560a6c83245e1466357b",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/librarian through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 314,
+      "expected": "scripted/librarian"
+    },
+    {
+      "fingerprint": "0b3615376b2c7ccb813798e18fc280e4847d4f5a32d4b511bc018c682a1436ba",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value librarian through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 314,
+      "expected": "librarian"
+    },
+    {
+      "fingerprint": "483ba5b8b8b023b553590ace430cf656438c14f9f289eff5d6f595a54b0e8bd8",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value budget through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 315,
+      "expected": "budget"
+    },
+    {
+      "fingerprint": "bb7daecc7b74559aaa01a3f46cebd9779ee7ae9bb714b41f741ee379a1bf5c9a",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/deep through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 315,
+      "expected": "scripted/deep"
+    },
+    {
+      "fingerprint": "626ad3fe253de4677c223ff5f1cb81e6481737ce368ec28075fa152327e8cfcc",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value build through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 316,
+      "expected": "build"
+    },
+    {
+      "fingerprint": "f9d58e0796b01694b2d6da8098ba7104fd82bc2b7753864cda00fc1b1d0a2ce5",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/hephaestus through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 316,
+      "expected": "scripted/hephaestus"
+    },
+    {
+      "fingerprint": "4726fbe782ec2fea4ceaf04654c76a51132712dd3b91add24f394c4648850c17",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value hephaestus through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 316,
+      "expected": "hephaestus"
+    },
+    {
+      "fingerprint": "4924876e9ecb8883b86402e81336e639b2a9483c92f9b13f6eaf27cb7a7c355e",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value docs through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 317,
+      "expected": "docs"
+    },
+    {
+      "fingerprint": "d6ad34a2ce36a274aeeeb08211230d4134dfb8be823c1cc82e7e9e09c9715022",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/writing through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 317,
+      "expected": "scripted/writing"
+    },
+    {
+      "fingerprint": "c260b549a7997182913eb9e76860ee244d40a3e408ddf679d29c6d13b95ec3a5",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value review through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 318,
+      "expected": "review"
+    },
+    {
+      "fingerprint": "c8a7ff28af4455588e87a5ce0ba797d5fe99a63ae0171d6bfd74bef0132b1b00",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value scripted/momus through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 318,
+      "expected": "scripted/momus"
+    },
+    {
+      "fingerprint": "56dfb759f97bfb41229a347ee4ffe4812a7e3580ab764ca56bbaf7951e8128ac",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks the DAG runner tuple carries fixture node/model/agent value momus through route resolution; it validates dispatch state rather than authored instructions.",
+      "path": "packages/senpi-task/src/dag/e2e-happy.test.ts",
+      "line": 318,
+      "expected": "momus"
+    },
+    {
+      "fingerprint": "5ac6bab924dab65bab648911c7719e7738c87bedb9d5cf1e630b901758618422",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies node fingerprint normalization preserves the submitted prompt bytes, including significant repeated whitespace; this is state/fingerprint behavior, not a prose requirement.",
+      "path": "packages/senpi-task/src/dag/fingerprint.test.ts",
+      "line": 157,
+      "expected": "exact prompt as submitted"
+    },
+    {
+      "fingerprint": "bfad7aa4fc4b97fedd7b5d396021ba1676c3b2f7b44889b429a7ca70efa5c097",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Verifies DAG template compilation leaves an unresolved {{plan}} placeholder unchanged, covering parser/template behavior rather than instruction wording.",
+      "path": "packages/senpi-task/src/dag/graph.test.ts",
+      "line": 95,
+      "expected": "use {{plan}}"
+    },
+    {
+      "fingerprint": "8940289f5bdddbc1f5495d618d7d25103e8e23287576ebe3e6d71a2c378fd685",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content <skill name=\"x\">body</skill> draft the plan; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/manager.test.ts",
+      "line": 313,
+      "expected": "<skill name=\"x\">body</skill> draft the plan"
+    },
+    {
+      "fingerprint": "546ab86ce7053e97e0b321060a43f63da8152754c585fa3089ad9802ed2e4183",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content <skill name=\"x\">body</skill> build it; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/manager.test.ts",
+      "line": 313,
+      "expected": "<skill name=\"x\">body</skill> build it"
+    },
+    {
+      "fingerprint": "03d745cab8330ac65dcfff5a6e5b1d5938cfcfe6be7f30fcefb3063e34ff9240",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content draft the plan; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/manager.test.ts",
+      "line": 315,
+      "expected": "draft the plan"
+    },
+    {
+      "fingerprint": "4492b69cf6c40cc41704174f0dbdc8f35f6f31c44a0a756fd5a201676e97c83b",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content build it; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/manager.test.ts",
+      "line": 315,
+      "expected": "build it"
+    },
+    {
+      "fingerprint": "2ca4242cf74ea43ffa70be008ed65172ac344a4f9d7773852b2ef006a0f33302",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content nonexistent; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 121,
+      "expected": "nonexistent"
+    },
+    {
+      "fingerprint": "c537ed18c43dc28b545150e6bd70d940bf440bf712dfa20eb27dedeaa0e9e3b5",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content v1 skill body; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 142,
+      "expected": "v1 skill body"
+    },
+    {
+      "fingerprint": "979fa41b56e40bb2cf79e7ab92efb87893909a6bd04631b9460ef90a693dff05",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content v2 skill body; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 143,
+      "expected": "v2 skill body"
+    },
+    {
+      "fingerprint": "8508e151c07eed66115ff3a8aed39e27852a3bbe9af14720247861a7c293b05d",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies DAG skill materialization and persisted effectivePrompt composition using fixture content ship the feature; the assertion covers creation-time state, wrapping, and passthrough behavior.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 191,
+      "expected": "ship the feature"
+    },
+    {
+      "fingerprint": "bf63bfcae38514ee98f9e9f5c077671f3399e71b1c7fb4aae05537420f83992c",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token number consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/lifecycle/admission-lease.test.ts",
+      "line": 44,
+      "expected": "number"
+    },
+    {
+      "fingerprint": "e10fdc8ecee2bc999b6b6fa4c7605e4c8e322392c97ea9827ffb851591c52b09",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value persisted effective prompt to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/lifecycle/reconcile-revival.test.ts",
+      "line": 401,
+      "expected": "persisted effective prompt"
+    },
+    {
+      "fingerprint": "0a74acf71bc7e1a8b8cbfd673043517f6bb5879849fa7afdb87ee078c3fcb049",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token child-prompt-failed consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/manager/child-handle.test.ts",
+      "line": 164,
+      "expected": "child-prompt-failed"
+    },
+    {
+      "fingerprint": "c7dc711e85949738e36af8570937f0cbf291b1f59855cad7ba76e4a46fd35e37",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the authoritative v1 respawn spec persists the composed caller/planner fixture field RAW PROMPT PLANNER APPEND and survives later RPC echo handling.",
+      "path": "packages/senpi-task/src/manager/manager-respawn-spec.test.ts",
+      "line": 72,
+      "expected": "RAW PROMPT PLANNER APPEND"
+    },
+    {
+      "fingerprint": "a70b1dab188d502920f526a46cbbe45c9b49ba17a285261fa6760282ea672bcb",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the authoritative v1 respawn spec persists the composed caller/planner fixture field RAW PROMPT and survives later RPC echo handling.",
+      "path": "packages/senpi-task/src/manager/manager-respawn-spec.test.ts",
+      "line": 73,
+      "expected": "RAW PROMPT"
+    },
+    {
+      "fingerprint": "6a37b3c48f0eb4d8d2a0608cc911da12d02ae3638271fd613e216d863533c317",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the authoritative v1 respawn spec persists the composed caller/planner fixture field be careful and survives later RPC echo handling.",
+      "path": "packages/senpi-task/src/manager/manager-respawn-spec.test.ts",
+      "line": 75,
+      "expected": "be careful"
+    },
+    {
+      "fingerprint": "386ec920828ec6a1d580edb96ea4f0631b3b6f0acb35a0231fe8b7396962f12f",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the authoritative v1 respawn spec persists the composed caller/planner fixture field do the thing PLANNER APPEND and survives later RPC echo handling.",
+      "path": "packages/senpi-task/src/manager/manager-respawn-spec.test.ts",
+      "line": 95,
+      "expected": "do the thing PLANNER APPEND"
+    },
+    {
+      "fingerprint": "fbf1ba4e5d0021ce6a139ee2c3afbb276f1c9920fca07c342dc14cb29f01e3d0",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Verifies prompt data is present only in the authoritative respawn record and omitted from user-visible failure rendering, preserving the intended persistence/privacy boundary.",
+      "path": "packages/senpi-task/src/manager/manager.test.ts",
+      "line": 252,
+      "expected": "private prompt payload"
+    },
+    {
+      "fingerprint": "eca25ee7acef29204458439f3140b359e09c12c578c63e281a556cf4433a7376",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Verifies prompt data is present only in the authoritative respawn record and omitted from user-visible failure rendering, preserving the intended persistence/privacy boundary.",
+      "path": "packages/senpi-task/src/manager/manager.test.ts",
+      "line": 272,
+      "expected": "private prompt payload"
+    },
+    {
+      "fingerprint": "d3bcc5a57192db2630389454b6420ce10595dd9f9db10faa666870a860793fac",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (Child prompt failed to start.); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/manager/rpc-terminal-outcome.test.ts",
+      "line": 67,
+      "expected": "Child prompt failed to start."
+    },
+    {
+      "fingerprint": "25eaa865695ae8c838f4fa5431de4edefbbcf069e73faf50e2feb989572c0bdf",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value do it to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/manager/runner.test.ts",
+      "line": 180,
+      "expected": "do it"
+    },
+    {
+      "fingerprint": "75ede47d076f93089b4f40de942b292dead0db92c69944a066e432e6ddaaf112",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value child prompt marker to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/runners/in-process-persistence.test.ts",
+      "line": 227,
+      "expected": "child prompt marker"
+    },
+    {
+      "fingerprint": "00125ab46d3cd18581f839e34824525bc2a950bb75e2249e21f47b96e80f1cb8",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value child prompt marker to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/runners/in-process-resume-session.test.ts",
+      "line": 228,
+      "expected": "child prompt marker"
+    },
+    {
+      "fingerprint": "833c92979382527d74d7d8bec1fec622161976ca3e9259f7696fcdc923e911e0",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Checks a machine-consumed schema, frontmatter, loader, or normalized field using fixture value implement the south gate; the assertion covers parsing/shape rather than authored guidance.",
+      "path": "packages/senpi-task/src/state/spawn-spec.test.ts",
+      "line": 50,
+      "expected": "implement the south gate"
+    },
+    {
+      "fingerprint": "448051bf653fcc8548f6d2be6c8897857140694c57b50785933f1635f1f4b3fc",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Checks a machine-consumed schema, frontmatter, loader, or normalized field using fixture value keep the ledger intact; the assertion covers parsing/shape rather than authored guidance.",
+      "path": "packages/senpi-task/src/state/spawn-spec.test.ts",
+      "line": 51,
+      "expected": "keep the ledger intact"
+    },
+    {
+      "fingerprint": "a89e0a3ee5a56487e1c656ec1b397aee997de68c1d3b1da02d0b83be563f6bd7",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Exercises the security boundary by proving untrusted or private marker prompt cannot escape into the child prompt, persisted public record, or rendered output.",
+      "path": "packages/senpi-task/src/store/security.test.ts",
+      "line": 315,
+      "expected": "prompt"
+    },
+    {
+      "fingerprint": "0cb63e4c9ae2e707c5c950506ccffaf0bc889c1d79e480ad5d5e1f31ac8dd511",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Exercises the security boundary by proving untrusted or private marker do not persist cannot escape into the child prompt, persisted public record, or rendered output.",
+      "path": "packages/senpi-task/src/store/security.test.ts",
+      "line": 317,
+      "expected": "do not persist"
+    },
+    {
+      "fingerprint": "71e1bfa53ddacce36a532a377e34851d63d26aefa34d4a179682e35be1ed1ca6",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value member note to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/team/member-extension/tools.test.ts",
+      "line": 63,
+      "expected": "member note"
+    },
+    {
+      "fingerprint": "805d70fd8397d5fca6d7b41c55d3bb4deb18041ec2759f867a21fca507b2703c",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value lead note to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/team/member-extension/tools.test.ts",
+      "line": 64,
+      "expected": "lead note"
+    },
+    {
+      "fingerprint": "a49696f79d7108c2cf61ba6726cdd81223b96f5ebc7ec85de30afc279f164479",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (message and <expression:{ version: 1, messageId: \"11111111-1111-4111-8111-111111111111\", from: \"alpha\", to: \"beta\", kind: \"message\", body: \"ping\", timestamp: 1_700_000_000_000, }>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/senpi-task/src/team/messaging/message.test.ts",
+      "line": 15,
+      "expected": "<expression:{ version: 1, messageId: \"11111111-1111-4111-8111-111111111111\", from: \"alpha\", to: \"beta\", kind: \"message\", body: \"ping\", timestamp: 1_700_000_000_000, }>"
+    },
+    {
+      "fingerprint": "c302cab1814ea4907fd8d4661c4ef6d66046a6fed448a7fbb4b0ec70f53b199b",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token task_send consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 181,
+      "expected": "task_send"
+    },
+    {
+      "fingerprint": "5b6a232ccc5ddef2bea70ebc5010617277257d875045e0e93d744ced75b0cf8c",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies team bootstrap serialization interpolates the structured member, team, or assigned-task fixture 'alpha' into the correct child launch and keeps members distinct.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 183,
+      "expected": "'alpha'"
+    },
+    {
+      "fingerprint": "60521cc7adc0eee166ade041292146104e68f97b0e915b81502ff7e85ab64bf7",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies team bootstrap serialization interpolates the structured member, team, or assigned-task fixture 'squad' into the correct child launch and keeps members distinct.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 184,
+      "expected": "'squad'"
+    },
+    {
+      "fingerprint": "148ab20a3a8b85819caef7458be12dd09fd3e15d3e7fe196b2a33194a7232a84",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies team bootstrap serialization interpolates the structured member, team, or assigned-task fixture task alpha into the correct child launch and keeps members distinct.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 185,
+      "expected": "task alpha"
+    },
+    {
+      "fingerprint": "a25dd53d87f85dd60bf71b8d374bd53dd12fa931511cff94ed287bff8d1d20c9",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies team bootstrap serialization interpolates the structured member, team, or assigned-task fixture 'beta' into the correct child launch and keeps members distinct.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 187,
+      "expected": "'beta'"
+    },
+    {
+      "fingerprint": "7dd7c9c3758a716a0613641970a510f7ecd6dc6bce84f5ac3a89cf63c799f1b4",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies team bootstrap serialization interpolates the structured member, team, or assigned-task fixture 'squad' into the correct child launch and keeps members distinct.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 188,
+      "expected": "'squad'"
+    },
+    {
+      "fingerprint": "66adccca1f3fb6a0404a65cbe6d2e4c84921f7ce1236727063bff43a4f1c3a78",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (prepared and <expression:{ prompt: \"TASK: Audit the task tool boundary.\", description: \"Audit task tool\", subagent_type: \"explore\", run_in_background: true, name: \"task-padding-audit\", }>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/senpi-task/src/tools/task/argument-normalization.test.ts",
+      "line": 81,
+      "expected": "<expression:{ prompt: \"TASK: Audit the task tool boundary.\", description: \"Audit task tool\", subagent_type: \"explore\", run_in_background: true, name: \"task-padding-audit\", }>"
+    },
+    {
+      "fingerprint": "7796f9aa8a7bdd6ee0339faeae0285d3791e79ffb1047479b9da6f67591a9c02",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token task_summary consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 66,
+      "expected": "task_summary"
+    },
+    {
+      "fingerprint": "3bc540cb2aebb1bd3194f787df3c8a16a4181fd157a73c9d0b16b7acbe270385",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token model consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 108,
+      "expected": "model"
+    },
+    {
+      "fingerprint": "e9c9a0663cf699ec15741365b02579bc7da23ee50d502a3d50d9b9afc0b9f444",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token category consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 109,
+      "expected": "category"
+    },
+    {
+      "fingerprint": "2872016ff27141189e9d10d6574503c76e5ac868c7fd162819179cfa39bd8670",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token omo.json consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 110,
+      "expected": "omo.json"
+    },
+    {
+      "fingerprint": "91653ccc42c853ba0dfd893264940c99c06864273f3fb432fae5bd56e0de7149",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares two runtime-produced values (batched and <expression:legacy>) to verify stable composition, caching, routing, or passthrough behavior without asserting independently authored wording.",
+      "path": "packages/senpi-task/src/tools/task/execute-batch.test.ts",
+      "line": 246,
+      "expected": "<expression:legacy>"
+    },
+    {
+      "fingerprint": "d6ec51e7e825b7da8df1af6810f0ddd940d3c0a14806733dd731e38f6f3d1a16",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (prompt-cache-safe budget (270s)); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/tools/task/execute-budget-wait.test.ts",
+      "line": 127,
+      "expected": "prompt-cache-safe budget (270s)"
+    },
+    {
+      "fingerprint": "141b03142a9a90783634db171e71280929485585bf59dfcda6d1df80c6d3d2bd",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (prompt-cache-safe budget (2s)); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/tools/task/execute-budget-wait.test.ts",
+      "line": 272,
+      "expected": "prompt-cache-safe budget (2s)"
+    },
+    {
+      "fingerprint": "f4bc0e9fb9c4f50dac55bad7731cdb5be70c7c363a709ed050f6c4fda9a7f06e",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (prompt-cache-safe budget (3s)); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/tools/task/execute-budget-wait.test.ts",
+      "line": 273,
+      "expected": "prompt-cache-safe budget (3s)"
+    },
+    {
+      "fingerprint": "5e67c65cf61f58acb7380a3c10db651601100e55d01911190f71b99b3f5253e7",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value new work to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/execute-continuation.test.ts",
+      "line": 29,
+      "expected": "new work"
+    },
+    {
+      "fingerprint": "818602f7d463518b10491d6e39679c4ec203c37f530325946c5c04cec2636601",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Exercises the security boundary by proving untrusted or private marker SKILLBLOCK cannot escape into the child prompt, persisted public record, or rendered output.",
+      "path": "packages/senpi-task/src/tools/task/execute-plan-review-contract.test.ts",
+      "line": 156,
+      "expected": "SKILLBLOCK"
+    },
+    {
+      "fingerprint": "b7b80c81505a78f825f8f4d99165ca5f49f62c6982f038480a31dbd55b560082",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the plan-review substitution is scoped to momus while an independent explore item retains its caller-supplied prompt fixture unchanged.",
+      "path": "packages/senpi-task/src/tools/task/execute-plan-review-contract.test.ts",
+      "line": 203,
+      "expected": "scan the repo"
+    },
+    {
+      "fingerprint": "7339fe1dfc60171a63f30fe88b88890dc9a7ace94e95c1ac2d69b317f3f4b080",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Exercises the security boundary by proving untrusted or private marker ATTACKER_CONTROLLED cannot escape into the child prompt, persisted public record, or rendered output.",
+      "path": "packages/senpi-task/src/tools/task/execute-plan-review-contract.test.ts",
+      "line": 222,
+      "expected": "ATTACKER_CONTROLLED"
+    },
+    {
+      "fingerprint": "e7362b1309402bed8bca71bf1a0e8c7cb9ef9255c6e384eef870093c1e29d2c1",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the task tool passes the caller prompt fixture into the in-process runner while preserving the parent session and persisted task state.",
+      "path": "packages/senpi-task/src/tools/task/integration.test.ts",
+      "line": 44,
+      "expected": "explore"
+    },
+    {
+      "fingerprint": "a624f531af7cd170f15e39c88b3acbf9183992c149a56ad9ecfcd527c7c33b37",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Checks a machine-consumed schema, frontmatter, loader, or normalized field using fixture value prompt; the assertion covers parsing/shape rather than authored guidance.",
+      "path": "packages/senpi-task/src/tools/task/params.test.ts",
+      "line": 27,
+      "expected": "prompt"
+    },
+    {
+      "fingerprint": "54a4b0f3b27c3c3448215edab544826f3921b2568a8a7f54d4b807fc273908a8",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (prompt:); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/tools/task/renderers.test.ts",
+      "line": 298,
+      "expected": "prompt:"
+    },
+    {
+      "fingerprint": "9ab7292b1801c9129a905633aa32f1789e99eead89dfe782c2bc1a3c53604b36",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value ALPHA BODY to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/skills.test.ts",
+      "line": 20,
+      "expected": "ALPHA BODY"
+    },
+    {
+      "fingerprint": "e1878133dff85b4df50d82e8af6707cc28f8da0891c117a04a3d57fe25207eef",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value BETA BODY to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/skills.test.ts",
+      "line": 21,
+      "expected": "BETA BODY"
+    },
+    {
+      "fingerprint": "33fe87a0c581b4d17ed7600fac84c6eba97ad7cfbdebb09e7235522307c756ca",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value just the prompt to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/skills.test.ts",
+      "line": 31,
+      "expected": "just the prompt"
+    },
+    {
+      "fingerprint": "487b5db573d452d0f36de1d8e549df102fd2e5c2f3466530ba63849973113f37",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value REVIEWER DIRECTIVE to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/skills.test.ts",
+      "line": 61,
+      "expected": "REVIEWER DIRECTIVE"
+    },
+    {
+      "fingerprint": "274c926cb7cf3ce2d30afa820df175a3a8912eecbe1be8771adca8aaf60e6885",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value COMMIT DIRECTIVE to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/skills.test.ts",
+      "line": 95,
+      "expected": "COMMIT DIRECTIVE"
+    },
+    {
+      "fingerprint": "dbc8ff9ddc1b0f08429f7ecfa4eead9039393c37d18b6750293048fb655fc198",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (MUST provide EITHER category OR subagent_type); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/tools/task/validation.test.ts",
+      "line": 58,
+      "expected": "MUST provide EITHER category OR subagent_type"
+    },
+    {
+      "fingerprint": "28685eebb77e9d1d02136363aa16957351bd08c373316a00f12b760105ad2cbb",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Asserts command, status, notice, or error text shown on a user-visible surface (prompt); this is shipped UI/CLI copy rather than hidden agent instruction prose.",
+      "path": "packages/senpi-task/src/tools/task/validation.test.ts",
+      "line": 109,
+      "expected": "prompt"
+    },
+    {
+      "fingerprint": "9e1d007a0b1a8d132bb523907c21a1eb25b65a7ab2d75f79d83b0a858b0a2e0a",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Uses fixture value do it to verify executable runtime behavior such as passthrough, composition, persistence, cache invalidation, routing, or serialization; the value is test data, not a required prose phrase.",
+      "path": "packages/senpi-task/src/tools/task/validation.test.ts",
+      "line": 162,
+      "expected": "do it"
+    },
+    {
+      "fingerprint": "cd45c8b9c3c104be56167e35124788539f7bc6784fbe452d16aba2cec559b0a9",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token shared consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/validation.test.ts",
+      "line": 201,
+      "expected": "shared"
+    },
+    {
+      "fingerprint": "f14484c132feb91797bb093d036bd84affecb2490b3295a0a16b6ba9b839beef",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token shared consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/validation.test.ts",
+      "line": 202,
+      "expected": "shared"
+    },
+    {
+      "fingerprint": "cf7b5699c9ba2a6f18791a2f33ed5776c7127b400d3dd6a6f396dc9f51eac85b",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token extra consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/senpi-task/src/tools/task/validation.test.ts",
+      "line": 203,
+      "expected": "extra"
+    },
+    {
+      "fingerprint": "d238ab734d38d735473db43c39a0d0bb5d0e698f31cec578e47de77b05eb434e",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the materialized or packaged artifact directly with its canonical source (<expression:upstream>), so shipped content drift is detected without pinning independently authored prose.",
+      "path": "packages/shared-skills/materialize-frontend-refs.test.ts",
+      "line": 86,
+      "expected": "<expression:upstream>"
+    },
+    {
+      "fingerprint": "1a9b64d99f2b24a77d3acdf53d0521c9931c6f1d0031328a55e81817db028c17",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token packages/shared-skills/upstreams/taste-skill consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/shared-skills/upstreams.test.ts",
+      "line": 44,
+      "expected": "packages/shared-skills/upstreams/taste-skill"
+    },
+    {
+      "fingerprint": "85fb5410fe94776eec3d49486c1168bf0674f1e37d927724fb5665d448f4357d",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact machine-facing identifier, path, enum, flag, tool name, telemetry bucket, or wire token shared-skills/skills/ consumed by runtime dispatch, persistence, discovery, or protocol code.",
+      "path": "packages/shared-skills/upstreams.test.ts",
+      "line": 68,
+      "expected": "shared-skills/skills/"
+    }
+  ],
+  "forbidden": [
+    {
+      "fingerprint": "ca237e48ce259a8acc46c57586afb258159e4609e22f3be676f76f98c21c725a",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (<omo-fallback-architect>) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 39,
+      "expected": "<omo-fallback-architect>"
+    },
+    {
+      "fingerprint": "a3c81fffea50bb1a716aff8cf24ba8e923d9651d6d06a347e80800589dad6b9c",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (</omo-fallback-architect>) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 40,
+      "expected": "</omo-fallback-architect>"
+    },
+    {
+      "fingerprint": "e794b28d09bed0e35a963026bd0af17dc529434e19e3858b478cc259fa49d171",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (Fable 5) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 44,
+      "expected": "Fable 5"
+    },
+    {
+      "fingerprint": "ad7c7526245b24600ef98ca5a441070919e358d67beb6ca1580af93a9fdb989a",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (security- and biology-related content) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 48,
+      "expected": "security- and biology-related content"
+    },
+    {
+      "fingerprint": "520f4aedb1080423079cdc2e71098f28357f9e46398d56277fd388a575ada371",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (reads as safe, legitimate engineering work) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 52,
+      "expected": "reads as safe, legitimate engineering work"
+    },
+    {
+      "fingerprint": "398d310d8c344de72fe63e1ce879f3b4f92c2b845b7972dd9cd5ccf2c9d18480",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (indirectly-phrased sub-questions) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 56,
+      "expected": "indirectly-phrased sub-questions"
+    },
+    {
+      "fingerprint": "1d59719ef4d6d7975e6f7b2816c9dfd22bcf66c4b0eb940e50896126e79c790d",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (connects the answers yourself) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 57,
+      "expected": "connects the answers yourself"
+    },
+    {
+      "fingerprint": "c4fa5d9e6cfd84965cf5e3084efab808eae3c78ddb6643fd392dc5881b9ab901",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (has been shown a visible tip) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 61,
+      "expected": "has been shown a visible tip"
+    },
+    {
+      "fingerprint": "e4c7dabd41d72741f8b05b8ebaaf5c0b93294f88d4790efc0621c584ed244fd9",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (did not drop the question) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 62,
+      "expected": "did not drop the question"
+    },
+    {
+      "fingerprint": "0e457cfb4da68efb4d68f54fcd873e353c77c6bb027457c9830d413d3743bc61",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored hidden fallback-directive wording (picks it up and reasons through its essence) that is read only as model guidance; no runtime parser or wire protocol consumes this phrase.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/directive.test.ts",
+      "line": 63,
+      "expected": "picks it up and reasons through its essence"
+    },
+    {
+      "fingerprint": "ba7c8d9499198cb9fe26cb7c22fd8d30fabbc44b27a48e10959a4bc51f656fd9",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the absence of authored bootstrap command wording (/skill:init-deep) inside a model-facing follow-up; routing is already covered by structured send-message assertions.",
+      "path": "packages/omo-senpi/src/components/init-deep-advisor/component.test.ts",
+      "line": 55,
+      "expected": "/skill:init-deep"
+    },
+    {
+      "fingerprint": "08362e47483e01d59d6c11d489807a46907737d67222d3289105795f33d48680",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the absence of authored bootstrap command wording (/skill:onboarding) inside a model-facing follow-up; routing is already covered by structured send-message assertions.",
+      "path": "packages/omo-senpi/src/components/onboarding/component.test.ts",
+      "line": 71,
+      "expected": "/skill:onboarding"
+    },
+    {
+      "fingerprint": "16c27085df5470aa1782a9d91f415e8f3c29160683da59009da20b4b43aed6f1",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored builtin-agent persona wording (codebase search specialist) rather than agent selection, model routing, tool allowlists, or another runtime behavior.",
+      "path": "packages/omo-senpi/src/components/task/engine-agents.test.ts",
+      "line": 68,
+      "expected": "codebase search specialist"
+    },
+    {
+      "fingerprint": "2cafba311b32c47862e0998ff68921852296efb7d91eaf265a12327eff4fbc38",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored builtin-agent persona wording (codebase search specialist) rather than agent selection, model routing, tool allowlists, or another runtime behavior.",
+      "path": "packages/omo-senpi/src/components/task/planner.test.ts",
+      "line": 158,
+      "expected": "codebase search specialist"
+    },
+    {
+      "fingerprint": "adbd2178cfcaf8b173eeb1fbda339303d4a2c95d692f5a541301c830b38d7b20",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins a sentence in TASK_USAGE_GUIDANCE (never queues as editable follow-up work); the delivery and wake behavior must be tested at the task runtime seam, not through agent-facing prose.",
+      "path": "packages/omo-senpi/src/components/task/usage-guidance.test.ts",
+      "line": 10,
+      "expected": "never queues as editable follow-up work"
+    },
+    {
+      "fingerprint": "b6f6df8f369af00cb0688fb8f7f4ad2ae6334525e316fff6d0c23bb9f0203e77",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins a sentence in TASK_USAGE_GUIDANCE (idle session is always woken); the delivery and wake behavior must be tested at the task runtime seam, not through agent-facing prose.",
+      "path": "packages/omo-senpi/src/components/task/usage-guidance.test.ts",
+      "line": 20,
+      "expected": "idle session is always woken"
+    },
+    {
+      "fingerprint": "0aedf7072b1940353ec6eb43ef6a4a5a8f5b93d1f52339bd3ec1834d128e2cee",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (hidden); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 411,
+      "expected": "hidden"
+    },
+    {
+      "fingerprint": "4469fbf90a9efd486409dc7f98b669401efa5db1411a4a3d42d3d6b081384e20",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (do not read this file again); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 412,
+      "expected": "do not read this file again"
+    },
+    {
+      "fingerprint": "f9dcfe90c1dc46a272d365ac65fe1dbc99f3703a6ea2c988ad0ef53497f97cad",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (injects the full directive inline); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 413,
+      "expected": "injects the full directive inline"
+    },
+    {
+      "fingerprint": "c57dddafeb0d2884fefdd73648e31fb8e46319106b35a644090d2c2e917e1f18",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (short bootstrap); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 415,
+      "expected": "short bootstrap"
+    },
+    {
+      "fingerprint": "80ef8a34ecf1414331bd8beecef55628ae3037931345eb6df9d11d2e4fb4faba",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (Read the whole file); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 416,
+      "expected": "Read the whole file"
+    },
+    {
+      "fingerprint": "31ed4c49462d1b548a8122af33737872fb068bebe307edb87a24e402b9b12efb",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (ULTRAWORK MODE ENABLED!); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 428,
+      "expected": "ULTRAWORK MODE ENABLED!"
+    },
+    {
+      "fingerprint": "5253aecdade705ec238a91c57d7ad9d59f84e2a03c85e61f4602ebc87865d728",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (/# Tier triage/i); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 429,
+      "expected": "/# Tier triage/i"
+    },
+    {
+      "fingerprint": "9a3a65e5f0feedc1fec6918daf1e88efcfd970c7a9ffd9b22179d90a40d60e0f",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (/Evidence-driven|captured evidence|evidence/i); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 430,
+      "expected": "/Evidence-driven|captured evidence|evidence/i"
+    },
+    {
+      "fingerprint": "9b71fe97dd0f66080c9854fd6c8b7ea019d1504ae22d15d2575dca1e73b0e181",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (# Parallel execution); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 440,
+      "expected": "# Parallel execution"
+    },
+    {
+      "fingerprint": "d07b7e0b0766e7ddc3a8a4880b424c0f5534f79675a21fde7f1c8d743e202dd8",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins authored ultrawork SKILL/directive prose or a markdown heading (# Stop rules); wording and section presence are not runtime contracts.",
+      "path": "packages/omo-senpi/src/components/ultrawork/ultrawork.test.ts",
+      "line": 441,
+      "expected": "# Stop rules"
+    },
+    {
+      "fingerprint": "d1340b70dadf277382575c669ab54504d80b7e36f0b6bd06f264da1005086de0",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the absence of authored bootstrap command wording (/skill:onboarding) inside a model-facing follow-up; routing is already covered by structured send-message assertions.",
+      "path": "packages/omo-senpi/src/extension/session-start-ordering.test.ts",
+      "line": 86,
+      "expected": "/skill:onboarding"
+    },
+    {
+      "fingerprint": "044fd03b45d4abe1b02fc7cdc5d2e4b3c7d65a495640bd0c76a227c632ddd8db",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins a markdown heading in shipped SKILL prose (## Senpi Harness Tool Compatibility); it is neither parsed frontmatter nor a runtime sentinel.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "line": 54,
+      "expected": "## Senpi Harness Tool Compatibility"
+    },
+    {
+      "fingerprint": "fb8c25c878625d03841baefb5b4b14dafd18753e9f480ff252228fcfa796da15",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token call_omo_agent; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 20,
+      "expected": "call_omo_agent"
+    },
+    {
+      "fingerprint": "6e2f12fd2af72642b98fe5bb4ab062d8284957f7d46a7c1ea2bdbbf43ea296bc",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token background_output; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 21,
+      "expected": "background_output"
+    },
+    {
+      "fingerprint": "c842d77ac8135d01a4bde80837ace5388e01544bfd80c2d9e2eb7565f9143978",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token context7; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 22,
+      "expected": "context7"
+    },
+    {
+      "fingerprint": "8419b3217e9adf0b2af9afe0c7a629ccd50b5a9f933c68c5fb92493aa5dcfd6b",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token todowrite; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 23,
+      "expected": "todowrite"
+    },
+    {
+      "fingerprint": "bc5c73b5406552a792002267bc6b22471e1ed7be882fbd15da126a6049011c59",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token todoread; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 24,
+      "expected": "todoread"
+    },
+    {
+      "fingerprint": "d4947ace8dd64918360d11c0fd0ca450b2da7b5653071761d0d2566077da2889",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token websearch; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 25,
+      "expected": "websearch"
+    },
+    {
+      "fingerprint": "aff463d656e62b8eb43d07786763a8f255c5fe6dea0215fba8617719d5a11bc9",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token webfetch; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 26,
+      "expected": "webfetch"
+    },
+    {
+      "fingerprint": "60fc275b6b6779453744459ae53d2734d3a6a022c1ab76ddeac5ee8304a3203e",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token ast-grep; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 27,
+      "expected": "ast-grep"
+    },
+    {
+      "fingerprint": "c522c1e6fb4610116565a1b5c81884d8c94d81ac8a0567d85e5b3372d0b4de00",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token ast_grep_helper; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 28,
+      "expected": "ast_grep_helper"
+    },
+    {
+      "fingerprint": "1075538bfb27e655b186a05f85652baa316f797193db9a799d4e6048f7694bc8",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token sg --pattern; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 29,
+      "expected": "sg --pattern"
+    },
+    {
+      "fingerprint": "e6b09ad7cdea2b117503ab581eda805b9dd585ae6ad31ba0c88dfc5da9868139",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token gh repo clone; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 30,
+      "expected": "gh repo clone"
+    },
+    {
+      "fingerprint": "77df6ccaa6680c9d17f2478ec7d44c95e667b6b904acf4473d9e81faaf2a8309",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token npm view; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 31,
+      "expected": "npm view"
+    },
+    {
+      "fingerprint": "3428e8617ec8f898141dad11a29363a2e3f56b1fa8968cc0071644fccaa39ef5",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token git log; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 32,
+      "expected": "git log"
+    },
+    {
+      "fingerprint": "5ef70a2921f557d786a454c38104be7d12d6c6eae0a4a5564f09b1c7de64728e",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins negative wording in curated agent prompts by forbidding the token git blame; available capabilities are covered by structured tool allowlists instead.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 33,
+      "expected": "git blame"
+    },
+    {
+      "fingerprint": "c5488664deda68e77b4d3abb5d663dece9d94d7975b8783294164d0ae82bc615",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins sentence-level denial wording (SKILL.md) sent to the agent; guard allow/deny state and required skill data are the behavioral contract.",
+      "path": "packages/senpi-task/src/agents/invocation-guard.test.ts",
+      "line": 100,
+      "expected": "SKILL.md"
+    },
+    {
+      "fingerprint": "33b4a35f5db9004ea65d229b66baa50c7f8486a78721110e08e05dba3726f495",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins sentence-level denial wording (Do not attempt to unlock this gate yourself) sent to the agent; guard allow/deny state and required skill data are the behavioral contract.",
+      "path": "packages/senpi-task/src/agents/invocation-guard.test.ts",
+      "line": 101,
+      "expected": "Do not attempt to unlock this gate yourself"
+    },
+    {
+      "fingerprint": "ecdeba8e7a43280dedb518cdd0cd84e669c1e25a18018225d36e6834af00fd56",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins category prompt_append prose or its ordering (DEEP LOGICAL REASONING); category routing and structured model parameters can be tested without contracting prompt text.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "line": 94,
+      "expected": "DEEP LOGICAL REASONING"
+    },
+    {
+      "fingerprint": "41cce0d5e5ece63b339121bc56ac88d87ba9828450710e567a1b82f085c16d3c",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins category prompt_append prose or its ordering (USER OVERLAY PROMPT); category routing and structured model parameters can be tested without contracting prompt text.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "line": 95,
+      "expected": "USER OVERLAY PROMPT"
+    },
+    {
+      "fingerprint": "345cb9d960818e1901857bcc8ced408fdb537bc787b50ab5f4cabac04f6f7be7",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins category prompt_append prose or its ordering (SMALL / QUICK); category routing and structured model parameters can be tested without contracting prompt text.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "line": 440,
+      "expected": "SMALL / QUICK"
+    },
+    {
+      "fingerprint": "1b10b4508655d202413fe2edf94763a874fb701ee0cb65e622f90b2ff2532be9",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins category prompt_append prose or its ordering (EXTRA QUICK CONTEXT); category routing and structured model parameters can be tested without contracting prompt text.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "line": 441,
+      "expected": "EXTRA QUICK CONTEXT"
+    },
+    {
+      "fingerprint": "b4a7e7a29e83093b0530c5ac6a453d7b08c26faa4530b71a0a59b880f1773f92",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the complete authored restart-continuation instruction. Respawn and continuation delivery can be verified without freezing this natural-language sentence.",
+      "path": "packages/senpi-task/src/manager/manager-respawn-cleanup.test.ts",
+      "line": 523,
+      "expected": "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
+    },
+    {
+      "fingerprint": "e22af82787b840d75b07bb1310dd9e017e7501b19c235d126a8db6988205ee88",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins presence or absence of authored team bootstrap wording (injected messages); structured member identities, task data, and tool routing remain independently testable.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 179,
+      "expected": "injected messages"
+    },
+    {
+      "fingerprint": "aa7c277ef62066a55c44d68dc2d1bcc10ba753148d62a3e34532a2df00a6f794",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins presence or absence of authored team bootstrap wording (team_wait); structured member identities, task data, and tool routing remain independently testable.",
+      "path": "packages/senpi-task/src/team/runtime.test.ts",
+      "line": 180,
+      "expected": "team_wait"
+    },
+    {
+      "fingerprint": "b3541e9e51ebb3694877864ec44f92d5c6b444138c2039733c0b96fef981b9ea",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins natural-language tool-description prose (always steer); execute-path behavior and parameter schemas are the runtime contract.",
+      "path": "packages/senpi-task/src/tools/control/send-always-steer.test.ts",
+      "line": 22,
+      "expected": "always steer"
+    },
+    {
+      "fingerprint": "72e16e05ba0e6e95bcbce176513b549e59e9cdb54b03b766989f18cf4bd7bec8",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins natural-language tool-description prose (always steer); execute-path behavior and parameter schemas are the runtime contract.",
+      "path": "packages/senpi-task/src/tools/control/send-team.test.ts",
+      "line": 162,
+      "expected": "always steer"
+    },
+    {
+      "fingerprint": "07af047ca6d86a284e8d0fbc5a2c56cb5f0a158cb2044d9044f576745676c78c",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins natural-language tool-description prose (always returns immediately); execute-path behavior and parameter schemas are the runtime contract.",
+      "path": "packages/senpi-task/src/tools/output/factory.test.ts",
+      "line": 16,
+      "expected": "always returns immediately"
+    },
+    {
+      "fingerprint": "9a8062d0aa0d7d45b8e71fa5a27b426e7f6597cba4cd7de419ade86ea9d73f3b",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins emphatic task-tool instruction wording (DO NOT provide both); XOR/category validation is covered by executable validation tests.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 37,
+      "expected": "DO NOT provide both"
+    },
+    {
+      "fingerprint": "d912c8bb0e5be549c3ef8f0e162c0c4243cd07c0761a74b8340587135a01958b",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins emphatic task-tool instruction wording (NEVER combine model with category); XOR/category validation is covered by executable validation tests.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 101,
+      "expected": "NEVER combine model with category"
+    },
+    {
+      "fingerprint": "5743c70e14344c33e20ef5f9c40b83c4dc3c2b124cbf6f516990cacd2242abee",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins an arbitrary prose fragment from an upstream brand reference. The adjacent byte-for-byte upstream/materialized equality is the real shipped-copy contract.",
+      "path": "packages/shared-skills/materialize-frontend-refs.test.ts",
+      "line": 95,
+      "expected": "> Category:"
+    }
+  ]
+}

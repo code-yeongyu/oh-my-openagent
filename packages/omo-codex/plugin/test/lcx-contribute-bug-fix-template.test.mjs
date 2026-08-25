@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const scriptPath = join(root, "skills", "lcx-contribute-bug-fix", "scripts", "create-pr-body.mjs");
 
-test("#given complete bug-fix evidence #when creating a PR body #then required LazyCodex sections and label are emitted", async () => {
+test("#given complete bug-fix evidence #when creating a PR body #then evidence and machine label are emitted", async () => {
 	// given
 	const { createLazyCodexBugFixPrBody } = await import(`file://${scriptPath}`);
 	const input = {
@@ -27,15 +27,11 @@ test("#given complete bug-fix evidence #when creating a PR body #then required L
 	const body = createLazyCodexBugFixPrBody(input);
 
 	// then
-	assert.match(body, /^## Problem Situation/m);
-	assert.match(body, /## Reproduction Logs/);
-	assert.match(body, /## Approach/);
-	assert.match(body, /## Why I Am Confident/);
-	assert.match(body, /## Risks/);
-	assert.match(body, /## User-Visible Behavior Changes/);
-	assert.match(body, /## Verification/);
-	assert.match(body, /lazycodex-generated/);
-	assert.match(body, /This PR was debugged, implemented, and created with \[LazyCodex\]/);
+	for (const field of ["problem", "reproductionLogs", "approach", "confidence", "risks", "userVisibleBehaviorChanges"]) {
+		assert.ok(body.includes(input[field]));
+	}
+	for (const command of input.verification) assert.ok(body.includes(command));
+	assert.match(body, /^Tag: lazycodex-generated$/m);
 });
 
 test("#given missing bug-fix evidence #when creating a PR body #then the script rejects the incomplete payload", async () => {
@@ -57,7 +53,7 @@ test("#given missing bug-fix evidence #when creating a PR body #then the script 
 		});
 
 	// then
-	assert.throws(action, /reproductionLogs must be a non-empty string/);
+	assert.throws(action, /reproductionLogs/);
 });
 
 test("#given a JSON payload path #when running the PR body script #then markdown is written to the requested file", async () => {
@@ -65,27 +61,25 @@ test("#given a JSON payload path #when running the PR body script #then markdown
 	const workspace = await mkdtemp(join(tmpdir(), "lcx-pr-body-test-"));
 	const inputPath = join(workspace, "input.json");
 	const outputPath = join(workspace, "body.md");
-	await writeFile(
-		inputPath,
-		JSON.stringify({
-			title: "Fix Codex skill sync drift",
-			targetRepository: "code-yeongyu/lazycodex",
-			problem: "Skill sync omitted a shared skill from the aggregate plugin.",
-			reproductionLogs: "node --test failed before the fix.",
-			approach: "Add the missing shared skill source and sync the aggregate plugin.",
-			confidence: "The failing sync test now passes.",
-			risks: "Low risk.",
-			userVisibleBehaviorChanges: "Users get a direct bug-fix PR skill.",
-			verification: ["node --test test/lcx-contribute-bug-fix-template.test.mjs"],
-		}),
-		"utf8",
-	);
+	const input = {
+		title: "Fix Codex skill sync drift",
+		targetRepository: "code-yeongyu/lazycodex",
+		problem: "Skill sync omitted a shared skill from the aggregate plugin.",
+		reproductionLogs: "node --test failed before the fix.",
+		approach: "Add the missing shared skill source and sync the aggregate plugin.",
+		confidence: "The failing sync test now passes.",
+		risks: "Low risk.",
+		userVisibleBehaviorChanges: "Users get a direct bug-fix PR skill.",
+		verification: ["node --test test/lcx-contribute-bug-fix-template.test.mjs"],
+	};
+	await writeFile(inputPath, JSON.stringify(input), "utf8");
 
 	// when
 	const { spawnSync } = await import("node:child_process");
+	const { createLazyCodexBugFixPrBody } = await import(`file://${scriptPath}`);
 	const result = spawnSync(process.execPath, [scriptPath, inputPath, outputPath], { encoding: "utf8" });
 
 	// then
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(await readFile(outputPath, "utf8"), /## User-Visible Behavior Changes/);
+	assert.equal(await readFile(outputPath, "utf8"), createLazyCodexBugFixPrBody(input));
 });

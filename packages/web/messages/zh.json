@@ -47,7 +47,7 @@
       "light": {
         "name": "Light",
         "platform": "Codex CLI",
-        "description": "8 个组件 — comment-checker、git-bash、LSP、rules、start-work-continuation、telemetry、ultrawork、ulw-loop — 接入 Codex 事件。",
+        "description": "8 个组件 — comment-checker、git-bash、LSP、rules、ulw-execute-continuation、telemetry、ultrawork、ulw-loop — 接入 Codex 事件。",
         "install": "npx lazycodex-ai install"
       }
     },

@@ -1,0 +1,146 @@
+# Manual QA Summary
+
+## OpenCode live plugin
+
+**Command**
+
+```sh
+cd .agents/skills/opencode-qa
+bash scripts/lib/common.sh --self-check
+bash scripts/serve-wake-split-probe.sh --self-test
+bash scripts/serve-wake-split-probe.sh \
+  --expect fixed \
+  --evidence-dir .omo/evidence/20260817-remove-prompt-contract-tests/opencode-serve-wake
+```
+
+**Binary PASS observable**
+
+- Real local plugin initialized once.
+- `terminal_stops=1`.
+- `child_task_sessions=1`.
+- `route_live_dispatch=true`.
+- Branch counts matched the fixed topology.
+- Real OpenCode DB session count stayed unchanged (exact count redacted).
+
+**Observed**
+
+`RESULT=FIXED`; `OPENCODE_MANUAL_QA_OK`.
+
+**Why sufficient**
+
+This drives the real OpenCode server, local worktree plugin, live parent/child
+prompt routing, idle/continuation edges, and database isolation using a local
+fake LLM.
+
+**Cleanup**
+
+The script stopped the fake model/server and removed the isolated XDG sandbox.
+
+**Post-rebase rerun**
+
+The same fixed-topology probe wrote
+`opencode-serve-wake-rebased/` and again observed `RESULT=FIXED`,
+`terminal_stops=1`, `child_task_sessions=1`, `route_live_dispatch=true`, and
+real DB isolation with an unchanged count (exact count redacted).
+
+## Codex live plugin
+
+**Command**
+
+```sh
+cd .agents/skills/codex-qa
+bash scripts/lib/common.sh --self-check
+bash scripts/app-server-drive.sh --self-test
+bash scripts/app-server-drive.sh \
+  --plugin \
+  --prompt 'ulw: return CODEX_QA_OK' \
+  --expect sessionStart,userPromptSubmit
+```
+
+**Binary PASS observable**
+
+- Real `codex app-server` turn completed against the local mock model.
+- First-party `hook/completed` notifications included
+  `sessionStart` and `userPromptSubmit` (plus `stop`).
+- Real `~/.codex/config.toml` hash remained unchanged (exact hash redacted).
+
+**Observed**
+
+Assistant response returned from the mock model; `CODEX_MANUAL_QA_OK`.
+
+**Why sufficient**
+
+This installs the worktree plugin into an isolated `CODEX_HOME`, proves the
+real app-server wiring and plugin hooks, performs no external model call, and
+proves the user’s real Codex configuration was untouched.
+
+**Cleanup**
+
+The helper stopped the mock model and automatically removed the isolated
+`CODEX_HOME`.
+
+**Post-rebase installer proof**
+
+`bash scripts/install-verify.sh --self-test` passed serially: plugin cache
+`5.0.0-beta.8` existed, `omo@sisyphuslabs` was enabled, 10 component bins and
+agent TOMLs were linked in the isolated home, and the real config hash stayed
+unchanged (exact hash redacted).
+
+## Senpi local extension through xterm.js
+
+**Command**
+
+```sh
+node script/qa/web-terminal-visual-qa.mjs \
+  --title "Senpi local OMO extension prompt-contract QA" \
+  --command "env SENPI_CODING_AGENT_DIR=<isolated> PI_OFFLINE=1 \
+    node_modules/.bin/senpi --no-extensions \
+    --extension packages/omo-senpi/plugin/extensions/omo.js \
+    --no-context-files --no-skills --no-prompt-templates --no-themes \
+    --no-session --offline --list-tips" \
+  --evidence-dir .omo/evidence/20260817-remove-prompt-contract-tests/senpi-web-terminal
+```
+
+Additional CLI checks:
+
+```sh
+senpi --no-extensions --offline --help
+senpi --no-extensions --offline --no-approve --definitely-invalid-option
+```
+
+**Binary PASS observable**
+
+- xterm.js command exited 0 and captured valid tips JSON.
+- `terminal.png`, `terminal.txt`, `terminal-ansi.txt`, and `metadata.json`
+  exist.
+- Metadata records `xterm.js (true color; not tmux)` and confirms the PTY was
+  terminated (exact PID redacted).
+- `--help` exited 0.
+- Invalid option exited 1 with `Unknown option`.
+
+**Why sufficient**
+
+This drives the installed Senpi CLI through a real PTY rendered by xterm.js
+while explicitly loading the local OMO extension in an isolated, offline
+agent home.
+
+**Cleanup**
+
+Removed the temporary `SENPI_CODING_AGENT_DIR`; verified the path and Senpi
+process were absent.
+
+## Senpi post-rebase CLI
+
+`node packages/omo-senpi/scripts/qa/drive.mjs` returned:
+
+```json
+{"result":"PASS","ultraworkInjected":true,"commentChecker":"PASS","realSenpiUntouched":true,"providedSenpiCodingAgentDir":"IGNORED"}
+```
+
+The helper used an isolated agent directory and project, then removed both.
+
+## Omitted
+
+Raw secret-bearing environment/configuration values were not captured.
+Artifacts contain only sanitized command results, local temporary paths, and
+hash/count proofs.

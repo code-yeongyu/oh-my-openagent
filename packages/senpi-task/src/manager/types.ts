@@ -2,8 +2,10 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
+import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
 import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type {
+  CancelOptions,
   CancelOutcome,
   DestructionPort,
   InterruptOutcome,
@@ -202,10 +204,12 @@ export type TaskManagerOptions = {
 
 export type TaskManager = {
   start(spec: ManagerStartSpec): Promise<StartResult>
+  startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
+  findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
-  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
+  cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   list(scope: ListScope): readonly ListedTask[]
   waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>

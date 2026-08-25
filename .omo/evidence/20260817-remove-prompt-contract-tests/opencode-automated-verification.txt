@@ -1,0 +1,47 @@
+WHAT WAS TESTED
+
+1. Complete OpenCode source suite:
+   cd <worktree>
+   bun test packages/omo-opencode/src
+
+2. OpenCode package typecheck:
+   cd packages/omo-opencode
+   bun run typecheck
+
+3. Prompt-contract audit after final OpenCode disposition:
+   cd <worktree>
+   python3 .omo/evidence/20260817-remove-prompt-contract-tests/audit_prompt_contracts.py --compact
+
+4. New skip/only guard:
+   git diff -U0 -- packages/omo-opencode | grep for added .skip( or .only(
+
+5. Diff integrity:
+   git diff --check -- packages/omo-opencode
+
+WHAT WAS OBSERVED
+
+- Complete suite: exit 0; 8,241 passed, 0 failed, 6 skipped, 18,268
+  expect() calls, 977 files, 84.76 seconds.
+- The six skipped tests are existing dist-bundle Bun-global checks and the
+  existing live tmux smoke. The branch adds no `.skip(` or `.only(` call.
+- Typecheck: exit 0 (`tsgo --noEmit -p tsconfig.json`).
+- Audit: no remaining `packages/omo-opencode/` entry. The nonzero global audit
+  exit is expected until the still-open Codex, Senpi, shared, and core scopes
+  are cleaned.
+- `git diff --check -- packages/omo-opencode`: exit 0.
+- Every OpenCode change is a test-file modification or deletion. Production
+  source and generated bundles are unchanged.
+
+WHY IT IS ENOUGH
+
+The package-wide suite exercises every retained OpenCode parser, routing,
+dispatch, state, security, and runtime prompt-delivery seam after removal of
+the prose contracts. Package typecheck verifies the rewritten tests compile.
+The manifest audit proves the OpenCode domain is fully dispositioned, while
+the skip guard proves the suite was not weakened to reach green.
+
+WHAT WAS OMITTED
+
+The full 8,000-test terminal stream is not duplicated here. The reviewer-safe
+summary includes the command, exit code, pass/fail/skip totals, file count, and
+duration. No credentials, environment dumps, or private logs were captured.

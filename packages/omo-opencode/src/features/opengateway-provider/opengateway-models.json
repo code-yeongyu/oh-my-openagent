@@ -1,0 +1,1485 @@
+{
+  "anthropic/claude-fable-5": {
+    "name": "Claude Fable 5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 10,
+      "output": 50,
+      "cache_read": 1,
+      "cache_write": 12.5
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "anthropic/claude-haiku-4-5": {
+    "name": "Claude Haiku 4.5 (latest)",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1,
+      "output": 5,
+      "cache_read": 0.1,
+      "cache_write": 1.25
+    },
+    "limit": {
+      "context": 200000,
+      "output": 64000
+    }
+  },
+  "anthropic/claude-opus-4-5": {
+    "name": "Claude Opus 4.5 (latest)",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 200000,
+      "output": 64000
+    }
+  },
+  "anthropic/claude-opus-4-6": {
+    "name": "Claude Opus 4.6",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "anthropic/claude-opus-4-7": {
+    "name": "Claude Opus 4.7",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "anthropic/claude-opus-4-8": {
+    "name": "Claude Opus 4.8",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "anthropic/claude-opus-5": {
+    "name": "Claude Opus 5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "anthropic/claude-sonnet-4-5": {
+    "name": "Claude Sonnet 4.5 (latest)",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 3,
+      "output": 15,
+      "cache_read": 0.3,
+      "cache_write": 3.75
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 64000
+    }
+  },
+  "anthropic/claude-sonnet-4-6": {
+    "name": "Claude Sonnet 4.6",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 3,
+      "output": 15,
+      "cache_read": 0.3,
+      "cache_write": 3.75
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "anthropic/claude-sonnet-5": {
+    "name": "Claude Sonnet 5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.2,
+      "cache_write": 2.5
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "deepseek/deepseek-v4-flash": {
+    "name": "DeepSeek V4 Flash",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.14,
+      "output": 0.28,
+      "cache_read": 0.0028,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 384000
+    }
+  },
+  "deepseek/deepseek-v4-pro": {
+    "name": "DeepSeek V4 Pro",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.435,
+      "output": 0.87,
+      "cache_read": 0.003625,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 384000
+    }
+  },
+  "google/gemini-2.5-flash": {
+    "name": "Gemini 2.5 Flash",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.3,
+      "output": 2.5,
+      "cache_read": 0.03,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "google/gemini-2.5-flash-lite": {
+    "name": "Gemini 2.5 Flash-Lite",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.1,
+      "output": 0.4,
+      "cache_read": 0.01,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "google/gemini-2.5-pro": {
+    "name": "Gemini 2.5 Pro",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.25,
+      "output": 10,
+      "cache_read": 0.125,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "google/gemini-3-flash-preview": {
+    "name": "Gemini 3 Flash Preview",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.5,
+      "output": 3,
+      "cache_read": 0.05,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "google/gemini-3.1-flash-lite": {
+    "name": "Gemini 3.1 Flash Lite",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.25,
+      "output": 1.5,
+      "cache_read": 0.025,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "google/gemini-3.1-pro-preview": {
+    "name": "Gemini 3.1 Pro Preview",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2,
+      "output": 12,
+      "cache_read": 0.2,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "google/gemini-3.5-flash": {
+    "name": "Gemini 3.5 Flash",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.5,
+      "output": 9,
+      "cache_read": 0.15,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 65536
+    }
+  },
+  "minimax/MiniMax-M2.5": {
+    "name": "MiniMax-M2.5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.3,
+      "output": 1.2,
+      "cache_read": 0.03,
+      "cache_write": 0.375
+    },
+    "limit": {
+      "context": 204800,
+      "output": 131072
+    }
+  },
+  "minimax/MiniMax-M2.7": {
+    "name": "MiniMax-M2.7",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.3,
+      "output": 1.2,
+      "cache_read": 0.06,
+      "cache_write": 0.375
+    },
+    "limit": {
+      "context": 204800,
+      "output": 131072
+    }
+  },
+  "minimax/MiniMax-M3": {
+    "name": "MiniMax-M3",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.3,
+      "output": 1.2,
+      "cache_read": 0.06,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 128000
+    }
+  },
+  "moonshotai/kimi-k2.5": {
+    "name": "Kimi K2.5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.6,
+      "output": 3,
+      "cache_read": 0.1,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 262144,
+      "output": 262144
+    }
+  },
+  "moonshotai/kimi-k2.6": {
+    "name": "Kimi K2.6",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.95,
+      "output": 4,
+      "cache_read": 0.16,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 262144,
+      "output": 262144
+    }
+  },
+  "moonshotai/kimi-k3": {
+    "name": "Kimi K3",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 3,
+      "output": 15,
+      "cache_read": 0.3,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 131072
+    }
+  },
+  "moonshotai/kimi-k3-ultrafast": {
+    "name": "Kimi K3 Ultrafast",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 3,
+      "output": 15,
+      "cache_read": 0.3,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 131072
+    }
+  },
+  "openai/gpt-3.5-turbo-0125": {
+    "name": "GPT-3.5 Turbo (0125)",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.5,
+      "output": 1.5,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 16385,
+      "output": 4096
+    }
+  },
+  "openai/gpt-3.5-turbo-1106": {
+    "name": "GPT-3.5 Turbo (1106)",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1,
+      "output": 2,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 16385,
+      "output": 4096
+    }
+  },
+  "openai/gpt-4": {
+    "name": "GPT-4",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 30,
+      "output": 60,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 8192,
+      "output": 8192
+    }
+  },
+  "openai/gpt-4-0613": {
+    "name": "GPT-4 (0613)",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 30,
+      "output": 60,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 8192,
+      "output": 8192
+    }
+  },
+  "openai/gpt-4-turbo": {
+    "name": "GPT-4 Turbo",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 10,
+      "output": 30,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 128000,
+      "output": 4096
+    }
+  },
+  "openai/gpt-4.1": {
+    "name": "GPT-4.1",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2,
+      "output": 8,
+      "cache_read": 0.5,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1047576,
+      "output": 32768
+    }
+  },
+  "openai/gpt-4.1-mini": {
+    "name": "GPT-4.1 mini",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.4,
+      "output": 1.6,
+      "cache_read": 0.1,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1047576,
+      "output": 32768
+    }
+  },
+  "openai/gpt-4.1-nano": {
+    "name": "GPT-4.1 nano",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.1,
+      "output": 0.4,
+      "cache_read": 0.025,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1047576,
+      "output": 32768
+    }
+  },
+  "openai/gpt-4o": {
+    "name": "GPT-4o",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2.5,
+      "output": 10,
+      "cache_read": 1.25,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 128000,
+      "output": 16384
+    }
+  },
+  "openai/gpt-4o-mini": {
+    "name": "GPT-4o mini",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.15,
+      "output": 0.6,
+      "cache_read": 0.075,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 128000,
+      "output": 16384
+    }
+  },
+  "openai/gpt-5": {
+    "name": "GPT-5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.25,
+      "output": 10,
+      "cache_read": 0.125,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 400000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5-mini": {
+    "name": "GPT-5 Mini",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.25,
+      "output": 2,
+      "cache_read": 0.025,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 400000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5-nano": {
+    "name": "GPT-5 Nano",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.05,
+      "output": 0.4,
+      "cache_read": 0.005,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 400000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.1": {
+    "name": "GPT-5.1",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.25,
+      "output": 10,
+      "cache_read": 0.125,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 400000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.4": {
+    "name": "GPT-5.4",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2.5,
+      "output": 15,
+      "cache_read": 0.25,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1050000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.4-nano": {
+    "name": "GPT-5.4 nano",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.2,
+      "output": 1.25,
+      "cache_read": 0.02,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 400000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.5": {
+    "name": "GPT-5.5",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 30,
+      "cache_read": 0.5,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1050000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.6": {
+    "name": "GPT-5.6",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 30,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 1050000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.6-luna": {
+    "name": "GPT-5.6 Luna",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.2,
+      "output": 1.2,
+      "cache_read": 0.02,
+      "cache_write": 0.25
+    },
+    "limit": {
+      "context": 1050000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.6-sol": {
+    "name": "GPT-5.6 Sol",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 5,
+      "output": 30,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "limit": {
+      "context": 1050000,
+      "output": 128000
+    }
+  },
+  "openai/gpt-5.6-terra": {
+    "name": "GPT-5.6 Terra",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2,
+      "output": 12,
+      "cache_read": 0.2,
+      "cache_write": 2.5
+    },
+    "limit": {
+      "context": 1050000,
+      "output": 128000
+    }
+  },
+  "openai/o1": {
+    "name": "o1",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 15,
+      "output": 60,
+      "cache_read": 7.5,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 200000,
+      "output": 100000
+    }
+  },
+  "openai/o3": {
+    "name": "o3",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2,
+      "output": 8,
+      "cache_read": 0.5,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 200000,
+      "output": 100000
+    }
+  },
+  "openai/o3-mini": {
+    "name": "o3-mini",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.1,
+      "output": 4.4,
+      "cache_read": 0.55,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 200000,
+      "output": 100000
+    }
+  },
+  "openai/o4-mini": {
+    "name": "o4-mini",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.1,
+      "output": 4.4,
+      "cache_read": 0.275,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 200000,
+      "output": 100000
+    }
+  },
+  "qwen/qwen-flash": {
+    "name": "Qwen Flash",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.05,
+      "output": 0.4,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 32768
+    }
+  },
+  "qwen/qwen3.7-max": {
+    "name": "Qwen3.7 Max",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 2.5,
+      "output": 7.5,
+      "cache_read": 0.5,
+      "cache_write": 3.125
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 65536
+    }
+  },
+  "qwen/qwen3.7-plus": {
+    "name": "Qwen3.7 Plus",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.5,
+      "output": 3,
+      "cache_read": 0.05,
+      "cache_write": 0.625
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 65536
+    }
+  },
+  "x-ai/grok-4-1-fast": {
+    "name": "Grok 4.1 Fast",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.2,
+      "output": 0.5,
+      "cache_read": 0.05,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 2000000,
+      "output": 30000
+    }
+  },
+  "x-ai/grok-4.20": {
+    "name": "Grok 4.20",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.25,
+      "output": 2.5,
+      "cache_read": 0.2,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 2000000,
+      "output": 2000000
+    }
+  },
+  "x-ai/grok-4.3": {
+    "name": "Grok 4.3",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.25,
+      "output": 2.5,
+      "cache_read": 0.2,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 30000
+    }
+  },
+  "z-ai/glm-5.1": {
+    "name": "GLM-5.1",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.4,
+      "output": 4.4,
+      "cache_read": 0.26,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 200000,
+      "output": 131072
+    }
+  },
+  "z-ai/glm-5.2": {
+    "name": "GLM-5.2",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.4,
+      "output": 4.4,
+      "cache_read": 0.26,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 131072
+    }
+  },
+  "z-ai/glm-5.2-ultrafast": {
+    "name": "GLM-5.2 Ultrafast",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 1.4,
+      "output": 4.4,
+      "cache_read": 0.26,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 131072
+    }
+  }
+}

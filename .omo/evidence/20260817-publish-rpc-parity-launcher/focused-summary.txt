@@ -1,0 +1,40 @@
+--- run 1 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [6.26s]
+--- run 2 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.44s]
+--- run 3 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [3.28s]
+--- run 4 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [3.24s]
+--- run 5 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.27s]
+--- run 6 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.45s]
+--- run 7 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.31s]
+--- run 8 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.27s]
+--- run 9 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.36s]
+--- run 10 ---
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [2.26s]

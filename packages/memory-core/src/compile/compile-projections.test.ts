@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { compileMemoryBlock } from "./compile"
-import { memory, NOW, parseCompiledBlock, repoWith } from "./compile.test-support"
+import { memory, parseCompiledBlock, repoWith } from "./compile.test-support"
 
 describe("compileMemoryBlock", () => {
   it("#given a dirty persona edit #when compiled #then only the committed HEAD body sentinel appears", async () => {
@@ -13,12 +13,7 @@ describe("compileMemoryBlock", () => {
     await writeFile(join(dir, "system/persona.md"), memory("PERSONA", "DIRTY_BODY_SENTINEL\n"))
 
     // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "persona-agent",
-      conversationId: "persona-conversation",
-      previousMessageCount: 2,
-      clock: () => NOW,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "persona-agent" })
 
     // then
     expect(block).toContain("COMMITTED_BODY_SENTINEL")
@@ -35,12 +30,7 @@ describe("compileMemoryBlock", () => {
     }
 
     // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "binary-agent",
-      conversationId: "binary-conversation",
-      previousMessageCount: 0,
-      clock: () => NOW,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "binary-agent" })
     const structure = parseCompiledBlock(block)
 
     // then
@@ -58,12 +48,7 @@ describe("compileMemoryBlock", () => {
     ])
 
     // when
-    const block = await compileMemoryBlock(repo, {
-      agentId: "skip-agent",
-      conversationId: "skip-conversation",
-      previousMessageCount: 0,
-      clock: () => NOW,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "skip-agent" })
     const structure = parseCompiledBlock(block)
 
     // then

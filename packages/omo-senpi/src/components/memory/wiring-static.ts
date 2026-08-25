@@ -16,7 +16,8 @@ import type { createMemoryNudgeWiring } from "./nudge-wiring"
 import { registerPalaceCommand } from "./palace/command"
 import { registerMemorySkillsScope } from "./skills-scope"
 import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
-import type { createSoulNoticeWiring } from "./soul-notice"
+import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
+import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
 import {
@@ -36,7 +37,7 @@ export function registerMemoryStatic(input: {
   readonly options: MemoryWiringOptions
   readonly promptCache: MemoryBlockCache
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
-  readonly soulNoticeWiring: ReturnType<typeof createSoulNoticeWiring>
+  readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
   readonly dreamTriggerWiring: DreamTriggerWiring
   readonly completionApi: (pi: SenpiExtensionAPI) => ReflectionCompletionApi | undefined
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -49,6 +50,7 @@ export function registerMemoryStatic(input: {
   readonly lastEventCtx: { current?: unknown }
   readonly activeSession: { current?: string }
   readonly skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> }
+  readonly memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> }
   /** Fires at the manual reflection launch site so the footer animates while the run is in flight. */
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
@@ -57,10 +59,10 @@ export function registerMemoryStatic(input: {
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, nudgeWiring, soulNoticeWiring, dreamTriggerWiring,
+    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
-    activeSession, skillsUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
+    activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
   } = input
   const api = completionApi(pi)
   if (api !== undefined) {
@@ -69,13 +71,14 @@ export function registerMemoryStatic(input: {
   }
   if (hasMemoryCapabilities(pi)) {
     nudgeWiring.register(pi)
-    soulNoticeWiring.register(pi)
+    noticeWiring.register(pi)
   }
   const toolExposure = options.toolExposure ?? "direct"
   const promptHandler = createPromptHandler({
     resolveContext,
     cache: promptCache,
     searchExposure: () => toolExposure === "search",
+    resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = resolveContext(sessionId)
@@ -114,7 +117,15 @@ export function registerMemoryStatic(input: {
     exposure: toolExposure,
     onCommit: (commit) => {
       const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
-      if (context !== undefined) soulNoticeWiring.onCommit(context, commit)
+      if (context !== undefined) noticeWiring.onCommit(context, commit)
+    },
+    // Read per call rather than latched at registration: the gate is presentation-only, so a
+    // config edit takes effect on the next write instead of at the next restart.
+    writeNotice: {
+      get enabled(): boolean {
+        return resolveWriteNoticeEnabled(loadCommandSettings, activeSession, resolveContext)
+      },
+      resolveSessionId: () => activeSession.current,
     },
   })
   registerMemoryGuard(pi, ctx, {
@@ -134,6 +145,15 @@ export function registerMemoryStatic(input: {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   skillsUsageTrackersRef.current = skillsUsageTrackers
+  const memoryUsageTrackers = registerMemoryUsage(pi, {
+    resolveContext: (eventContext) => {
+      const sessionId = sessionIdFrom(eventContext)
+      return sessionId === undefined ? undefined : resolveContext(sessionId)
+    },
+    resolveCwd: options.cwd,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+  memoryUsageTrackersRef.current = memoryUsageTrackers
   registerPalaceCommand(
     pi,
     () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),
@@ -165,6 +185,14 @@ export function registerMemoryStatic(input: {
       },
     },
     dreamSink: { request: (request) => dreamTriggerWiring.requestManualDream(request) },
+    factsSink: {
+      // ONE attempt after a manual unpark: `reconcileExtractor` fires the extractor's own
+      // reconcile-then-launch path, which owns the re-entrancy latch, so this never loops.
+      reconcile: async () => {
+        const identity = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
+        if (identity !== undefined) factsWiringFor(identity).reconcileExtractor()
+      },
+    },
     sessionsDir: () => join(options.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"), "sessions"),
   })
   const triggerWiring = createReflectionTriggerWiring({
@@ -174,6 +202,23 @@ export function registerMemoryStatic(input: {
   })
   triggerWiring.register(pi)
   dreamTriggerWiring.register(pi)
+}
+
+/** memory.write_notice.enabled for the bound identity, honouring its per-agent override. */
+function resolveWriteNoticeEnabled(
+  loadCommandSettings: () => MemoryCommandSettings,
+  activeSession: { current?: string },
+  resolveContext: (sessionId: string) => MemoryIdentityContext | undefined,
+): boolean {
+  try {
+    const settings = loadCommandSettings().settings
+    const identity = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)?.identity
+    const override = identity === undefined ? undefined : settings.agents[identity]?.write_notice
+    return override?.enabled ?? settings.write_notice.enabled
+  } catch {
+    // Presentation must never depend on config health: an unreadable config keeps the default on.
+    return true
+  }
 }
 
 function asCommandIdentity(identity: MemoryIdentityContext | undefined): MemoryCommandIdentity | undefined {

@@ -67,7 +67,7 @@ class FakeRespawnRunner {
   readonly controls: RespawnControl[] = []
   cancelSwitch = false
 
-  start(spec: RpcRunnerSpec): RpcChildHandle {
+  async start(spec: RpcRunnerSpec): Promise<RpcChildHandle> {
     this.startedSpecs.push(spec)
     let resolveIdle: () => void = () => {}
     const idle = new Promise<void>((resolve) => {

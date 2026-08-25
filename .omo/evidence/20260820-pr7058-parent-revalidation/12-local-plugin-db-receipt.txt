@@ -1,0 +1,4 @@
+real_db=/Users/sungsoopark/.local/share/opencode/opencode.db
+before_sessions=7584
+after_sessions=7584
+sandbox_removed=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T//pr7058-opencode-qa.ROfZCU

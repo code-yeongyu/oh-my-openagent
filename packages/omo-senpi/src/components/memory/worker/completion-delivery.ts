@@ -19,6 +19,7 @@ export async function consumePendingReflectionCompletions(
   completionsDir: string,
   identity: string,
   live: ReflectionLiveSession,
+  nowMs = Date.now(),
 ): Promise<readonly ReflectionCompletionRecord[]> {
   let names: string[]
   try {
@@ -35,7 +36,7 @@ export async function consumePendingReflectionCompletions(
   }
   pending.sort((left, right) => Date.parse(right.finishedAt) - Date.parse(left.finishedAt))
 
-  const cutoff = Date.now() - COMPLETION_MAX_AGE_MS
+  const cutoff = nowMs - COMPLETION_MAX_AGE_MS
   const fresh = pending.filter((record) => Date.parse(record.finishedAt) >= cutoff)
   const stale = pending.filter((record) => Date.parse(record.finishedAt) < cutoff)
   const consumed: ReflectionCompletionRecord[] = []

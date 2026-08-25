@@ -4,7 +4,7 @@ import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
-import { wireReloadGuard } from "./reload-guard"
+import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge } from "./task-rpc-bridge"
@@ -16,6 +16,8 @@ type EventBridgeState = {
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
+  // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
+  readonly dagReloadSource?: ReloadGuardDagSource
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -35,18 +37,27 @@ export function wireEventBridge(
   const guidanceGuard = createOncePerSessionGuard()
   const taskRpc = wireTaskRpcBridge(pi, engine)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
-  wireReloadGuard(pi, engine.manager)
+  wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
     transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
+    const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
     for (const outcome of reconciliation.outcomes) {
       const record = engine.manager.get(outcome.task_id)
       // A previous process can persist the terminal transition before its queued team-liveness steer
       // flushes. Re-observe every reconciled record; the notifier filters non-team/non-error states and
       // its persisted liveness epoch suppresses records already delivered in an earlier process.
+      if (record !== undefined) livenessRecords.set(record.task_id, record)
+    }
+    if (sessionId !== undefined) {
+      for (const { record } of engine.manager.list({ scope: "parent-session", session_id: sessionId })) {
+        livenessRecords.set(record.task_id, record)
+      }
+    }
+    for (const record of livenessRecords.values()) {
       if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
     }
     await state.resumptionChannels.emitSessionStart()

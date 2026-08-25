@@ -28,7 +28,7 @@ const memberExtensionEntry = join(scriptDir, "..", "..", "plugin", "extensions",
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 const STALE_TTL_MS = 10 * 60 * 1000
 const DURA_DRAIN_TIMEOUT_MS = 30_000
-const MAIN_INJECTION_TIMEOUT_MS = 30_000
+const MAIN_INJECTION_TIMEOUT_MS = 60_000
 const DURA_EXPECTED_PROCESSED = 3
 
 export const TEAM_E2E_OMO_CONFIG = {

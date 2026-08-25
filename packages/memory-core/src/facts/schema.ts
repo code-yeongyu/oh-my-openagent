@@ -62,6 +62,7 @@ export interface FactsQueueLayout {
   readonly queueDir: string
   readonly cursorDir: string
   readonly consumedPath: string
+  readonly failuresPath: string
   cursorPath(conversationId: string): string
   entryPath(conversationId: string, endMessageId: string, at: Date): string
 }
@@ -85,6 +86,7 @@ export function factsQueuePaths(identityPaths: MemoryIdentityPaths): FactsQueueL
     queueDir,
     cursorDir,
     consumedPath: join(queueDir, "consumed.json"),
+    failuresPath: join(queueDir, "failures.json"),
     cursorPath: (conversationId) => join(cursorDir, `${hash(conversationId, 12)}.json`),
     entryPath: (conversationId, endMessageId, at) =>
       join(queueDir, `${queueTimestamp(at)}-${hash(conversationId, 12)}-${hash(endMessageId, 8)}.json`),

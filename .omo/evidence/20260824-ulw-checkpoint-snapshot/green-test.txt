@@ -1,0 +1,16 @@
+WHAT WAS TESTED
+npm --prefix packages/omo-codex/plugin/components/ulw-loop test -- test/codex-goal-snapshot.test.ts
+
+WHAT IT PROVES
+The checkpoint snapshot parser accepts the title-bearing ulw-loop status/TUI goal shape while preserving every existing parser and reconciliation case.
+
+OBSERVED GREEN
+Test files: 1 passed.
+Tests: 13 passed.
+Exit code: 0.
+
+WHY IT IS ENOUGH FOR THE UNIT CONTRACT
+The exact assertion that failed before the production change now passes, and the existing direct get_goal, file-input, malformed-input, objective mismatch, and status mismatch cases remain green.
+
+WHAT WAS OMITTED
+No credentials, auth headers, or secret-bearing logs were captured.

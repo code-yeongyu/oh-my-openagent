@@ -93,6 +93,25 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm")
 }
 
+/**
+ * Grok 4.5 / 4.6 need a digit boundary after the minor version: the xAI catalog
+ * also ships grok-4.20 (and grok-4.1/4.2/4.3 fast tiers), so a bare substring
+ * match on "grok-4-5" would swallow future grok-4.5x ids and "grok-4-2" would
+ * swallow grok-4.20 today. Suffixed ids (grok-4.5-fast) still match.
+ */
+const GROK_45_RE = /grok-4-5(?![0-9])/
+const GROK_46_RE = /grok-4-6(?![0-9])/
+
+export function isGrok45Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return GROK_45_RE.test(modelName)
+}
+
+export function isGrok46Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return GROK_46_RE.test(modelName)
+}
+
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"] as const
 
 export function isGeminiModel(model: string): boolean {

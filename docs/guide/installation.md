@@ -3,7 +3,7 @@
 oh-my-openagent ships in **three editions** of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
 - **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
-- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `codegraph`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `start-work-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `codegraph`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `ulw-execute-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
 - **Senpi Edition (standalone, beta)** — the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` instead of loading as a plugin into OpenCode or Codex.
 
 Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
@@ -172,14 +172,13 @@ omo
 
 A bare `npm i -g omo-ai` fails with ETARGET on purpose; every published version is a prerelease, so the default channel never resolves. See the [omo-ai publishing runbook](../reference/omo-ai-publishing.md) for the mechanism.
 
-**Where omo keeps its state.** The senpi edition stores everything flat under `~/.omo`
-(`settings.json`, `auth.json`, `models.json`, `sessions/`, `themes/`, `prompts/`), alongside the
-files the other omo harnesses already keep there. On first run, an existing `~/.senpi/agent` is
-copied forward once: caches and logs are skipped, a `.migrated-from-senpi` marker is written, and
-the original directory is left untouched. That copy is a snapshot, not a link, so a standalone
-senpi install keeps working and the two products hold independent state from then on. Set
-`OMO_CODING_AGENT_DIR` to override the location; the legacy `SENPI_*` and `PI_*` variables are
-still read when the `OMO_*` one is unset.
+**Where omo keeps its state.** The senpi edition stores engine state under `~/.omo/agent`
+(`settings.json`, `auth.json`, `models.json`, and friends). A pre-unification flat `~/.omo` layout
+is adopted once into `~/.omo/agent` (marker `.adopted-from-omo-flat`; sessions, caches, and logs
+are not copied). If neither branded layout exists, the engine falls back to `~/.senpi/agent`
+without copying it, so a standalone senpi install keeps working. Set `OMO_CODING_AGENT_DIR` to
+override the location; the legacy `SENPI_*` and `PI_*` variables are still read when the `OMO_*`
+one is unset.
 
 **Upgrade order on older machines.** If the machine still has oh-my-openagent/oh-my-opencode 4.19.4 or earlier installed globally, that package owns a global `omo` bin and the install above fails with EEXIST. Upgrade or uninstall the old package first, then install `omo-ai@beta`.
 
@@ -400,7 +399,7 @@ bunx oh-my-openagent install \
 | Platform | Writes |
 |----------|--------|
 | `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into the `[opencode]` block of `~/.omo/omo.jsonc` (legacy config files are migrated into the unified file first). With `--atlas-cloud=yes`, adds the OpenAI-compatible `atlascloud` provider to `opencode.json[c]` using the `ATLASCLOUD_API_KEY` environment placeholder and makes supported Atlas Cloud models available to the existing fallback chains. |
-| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[model_providers.atlascloud]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 1000`, and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
+| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[model_providers.atlascloud]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
 
 Both halves are independent and idempotent — re-running is safe.
 
@@ -433,7 +432,7 @@ cat ~/.config/opencode/opencode.json
 bunx oh-my-openagent doctor
 ```
 
-For the OpenCode target, `doctor` runs eight registered checks: **System**, **Config**, **TUI Plugin**, **Deprecated Reasoning Keys**, **Tools**, **Models**, **Telemetry**, and **Team Mode**. The Codex target runs its own **Codex**, **Codex Components**, and **Codex Runtime Wrapper** checks. Exit code `0` means no check failed; exit code `1` means at least one check failed. Warnings alone still return `0`.
+For the OpenCode target, `doctor` runs eight registered checks: **System**, **Configuration**, **TUI Plugin**, **Deprecated Reasoning Keys**, **Tools**, **Models**, **Telemetry**, and **Team Mode**. The Codex target runs its own **Codex**, **codex-components**, and **codex-runtime-wrapper** checks. Exit code `0` means no check failed; exit code `1` means at least one check failed. Warnings alone still return `0`.
 
 #### Verify Codex CLI Light edition (skip if platform=opencode)
 
@@ -451,7 +450,7 @@ grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
 grep -E 'approval_policy|sandbox_mode|network_access' ~/.codex/config.toml
 
 # Component binaries linked?
-ls ~/.local/bin/ | grep -E '^(omo-agent-toolkit|ulw|ulw-loop|omo-(comment-checker|git-bash-hook|lsp|rules|start-work-continuation|telemetry|ultrawork|ulw-loop))$'
+ls ~/.local/bin/ | grep -E '^(omo-agent-toolkit|lazycodex-executor-verify|ulw|ulw-loop|omo-(codegraph|comment-checker|git-bash-hook|lsp|rules|ulw-execute-continuation|telemetry|ultrawork|ulw-loop))$'
 
 # Codex CLI sees the plugin?
 codex --help
@@ -741,8 +740,6 @@ Just type one of these words in your message and the system injects the correspo
 | Keyword | Editions | What it does |
 |---------|:--------:|--------------|
 | `ultrawork` or `ulw` | Both | Full orchestration mode — every agent (Ultimate) or the Codex `ultrawork` component (Light) activates, doesn't stop until done |
-| `search` | Ultimate | Web/doc search focus |
-| `analyze` | Ultimate | Deep analysis mode |
 | `team mode`, `team-mode`, `team_mode`, or `teammode` | Ultimate | Forces `team_*` tools orchestration (requires `team_mode.enabled`); bare `team` does not trigger it |
 | `hyperplan` | Ultimate | Adversarial planning via 5 hostile critics |
 | `hyperplan ultrawork` (combo) | Ultimate | Both at once |
@@ -753,13 +750,12 @@ All built-in slash commands are **Ultimate-only** — Codex CLI does not have a 
 
 | Command | Editions | Purpose |
 |---------|:--------:|---------|
-| `/start-work` | Ultimate | Spawn Prometheus to interview the user and build a plan, then execute |
+| `/ulw-execute` | Ultimate | Start an Atlas (fallback Sisyphus) work session from an existing Prometheus plan in `.omo/plans/` |
 | `/goal` | Ultimate | Set, show, pause, resume, or clear a persistent thread goal that auto-continues on idle until done |
 | `/stop-continuation` | Ultimate | Stop todo continuation, clear the active Goal, and clear boulder state |
 | `/refactor` | Ultimate | LSP + AST-grep + TDD-verified intelligent refactor |
 | `/handoff` | Ultimate | Generate detailed context summary to continue in a new session |
 | `/remove-ai-slops` | Ultimate | Strip AI-generated code smells from recent changes |
-| `/init-deep` | Ultimate | Generate hierarchical AGENTS.md knowledge base (skill-backed slash command) |
 | `/hyperplan` | Ultimate | Direct invocation of hyperplan skill |
 
 #### Agents (11) — Ultimate only
@@ -774,7 +770,7 @@ All 11 OpenCode discipline agents are part of the Ultimate edition. The Light ed
 - **Librarian** — external docs/code search.
 - **Explore** — fast codebase grep.
 - **Multimodal-Looker** — vision/PDF analysis.
-- **Metis** — pre-planning consultant, reviews Prometheus plans for gaps.
+- **Metis** — pre-planning consultant; analyzes the request for hidden intent and gaps before Prometheus plans.
 - **Momus** — high-accuracy plan reviewer.
 - **Sisyphus-Junior** — category-spawned executor for delegated tasks.
 
@@ -799,7 +795,7 @@ After verification, tell the user:
 
 1. **Sisyphus strongly recommends Opus 5.** Using other models may noticeably degrade the experience.
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. The agent figures out the rest.
-3. **Need precision?** Press **Tab** to enter Prometheus (Planner) mode, then run `/start-work` to execute the verified plan.
+3. **Need precision?** Press **Tab** and select **Prometheus - Plan Builder** to produce a plan under `.omo/plans/`, then run `/ulw-execute` so Atlas executes the verified plan.
 4. **Your own agent/category setup?** Read [`docs/guide/agent-model-matching.md`](agent-model-matching.md) — the assistant can interview the user and tune the config.
 
 Then say **Congratulations! 🎉 You have successfully set up oh-my-openagent! Type `opencode` (or `codex`) in your terminal to start using it.**
@@ -812,9 +808,9 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 - **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
 - **Codex marketplace snapshot:** `~/.codex/.tmp/marketplaces/sisyphuslabs/` (local marketplace metadata and bundled source snapshot)
-- **User-linked component binaries:** `lazycodex-executor-verify`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-start-work-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). Other components, including `codegraph` and `teammode`, run through plugin MCP, hook, skill, or script surfaces rather than user-linked executables. The top-level `omo-agent-toolkit` command belongs to the shared oh-my-openagent launcher, not a Codex component.
-- **Codex agent roles:** `~/.codex/agents/{lazycodex-clone-fidelity-reviewer,lazycodex-code-reviewer,lazycodex-executor,lazycodex-gate-reviewer,lazycodex-qa-executor,lazycodex-worker-low,lazycodex-worker-medium,lazycodex-worker-high,explorer,librarian,metis,momus,plan}.toml` copied from the bundled plugin snapshot, so they keep resolving when Codex prunes old plugin-cache versions or temporary marketplace state
-- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 1000`, `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, `[model_providers.atlascloud]` (unless a user-owned section already exists), plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled. The Atlas Cloud block references `ATLASCLOUD_API_KEY`, uses the Responses wire API, and does not change the default model/provider.
+- **User-linked component binaries:** `lazycodex-executor-verify`, `omo-codegraph`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-ulw-execute-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). `teammode` runs through skill, hook, and script surfaces rather than a user-linked executable. The top-level `omo-agent-toolkit` command belongs to the shared oh-my-openagent launcher, not a Codex component.
+- **Codex agent roles:** `~/.codex/agents/{lazycodex-clone-fidelity-reviewer,lazycodex-code-reviewer,lazycodex-gate-reviewer,lazycodex-qa-executor,lazycodex-worker-low,lazycodex-worker-medium,lazycodex-worker-high,explorer,librarian,metis,momus,plan}.toml` (there is no `lazycodex-executor` agent TOML; executor completion is handled by the `lazycodex-executor-verify` hook/bin), copied from the bundled plugin snapshot, so they keep resolving when Codex prunes old plugin-cache versions or temporary marketplace state
+- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, `[model_providers.atlascloud]` (unless a user-owned section already exists), plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled. The Atlas Cloud block references `ATLASCLOUD_API_KEY`, uses the Responses wire API, and does not change the default model/provider.
 
 #### The components
 
@@ -829,7 +825,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 | `teammode` | TypeScript + skill | `PostToolUse` plus script-driven skill | Coordinates Codex-native agents or app threads with durable team state and thread-title guidance |
 | `ultrawork` | TypeScript | `UserPromptSubmit` keyword detector | Detects `ulw`/`ultrawork` keyword; the installer links bundled Codex agent TOMLs into `$CODEX_HOME/agents` |
 | `ulw-loop` | TypeScript | `UserPromptSubmit`, `PreToolUse`, `Stop` | Multi-goal orchestration with evidence audit trail, spawn guards, and Stop-hook auto-resume via `.omo/ulw-loop/` |
-| `start-work-continuation` | TypeScript | `Stop`, `SubagentStop` | Continues `.omo/boulder.json` start-work plans when Codex pauses at a stop boundary |
+| `ulw-execute-continuation` | TypeScript | `Stop`, `SubagentStop` | Continues `.omo/boulder.json` ulw-execute plans when Codex pauses at a stop boundary |
 | `telemetry` | TypeScript | `SessionStart` | Emits anonymous daily active telemetry when enabled |
 
 #### Coexistence with OpenCode
@@ -930,7 +926,7 @@ Every agent, hook, skill, MCP, command, and tool is configurable via `disabled_*
 {
   "disabled_agents": ["multimodal-looker"],
   "disabled_hooks": ["goal", "keyword-detector"],
-  "disabled_skills": ["playwright-cli"],
+  "disabled_skills": ["playwright"],
   "disabled_mcps": ["grep_app"],
   "disabled_commands": ["hyperplan"],
   "disabled_tools": ["interactive_bash"]
@@ -967,8 +963,8 @@ OpenClaw is a bidirectional external integration: outbound dispatchers fire on s
 
 | Command | Purpose |
 |---------|---------|
-| `bunx oh-my-openagent doctor` | Run 8 OpenCode checks (System / Config / TUI Plugin / Deprecated Reasoning Keys / Tools / Models / Telemetry / Team Mode), or the separate Codex target checks |
-| `bunx oh-my-openagent boulder` | Inspect boulder work-state and per-task stats from `.omo/boulder-state/` |
+| `bunx oh-my-openagent doctor` | Run 8 OpenCode checks (System / Configuration / TUI Plugin / Deprecated Reasoning Keys / Tools / Models / Telemetry / Team Mode), or the separate Codex target checks (Codex / codex-components / codex-runtime-wrapper) |
+| `bunx oh-my-openagent boulder` | Inspect boulder work-state and per-task stats from `.omo/boulder.json` |
 | `bunx oh-my-openagent refresh-model-capabilities` | Refresh `models.json` cache from models.dev |
 | `bunx oh-my-openagent mcp oauth login <server-name>` | Authenticate with an MCP server using OAuth |
 | `bunx oh-my-openagent mcp oauth logout <server-name>` | Remove stored OAuth tokens for an MCP server |

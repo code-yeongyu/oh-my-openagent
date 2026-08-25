@@ -45,35 +45,38 @@ function fakeUi(): FakeUi {
 }
 
 describe("createTaskStatusUi.background progress", () => {
-  it("#given only terminal background tasks #when syncing #then no refresh timer remains active", () => {
+  it("#given a completed resident team member #when syncing #then its settled row remains without a refresh timer", () => {
     // given
     const active = new Map<number, () => void>()
-    let nextHandle = 1
     const timers: StatusUiTimers = {
-      set: (callback) => {
-        const handle = nextHandle++
-        active.set(handle, callback)
-        return handle
-      },
+      set: (callback) => { active.set(1, callback); return 1 },
       clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
     }
-    const manager: StatusUiManager = {
-      list: () => listed([record({ task_id: "st_done", status: "completed" })]),
+    const member = record({
+      task_id: "st_done",
+      name: "team:12345678-1234-1234-1234-123456789abc:researcher",
+      task_summary: "settled researcher",
+      status: "completed",
+    })
+    const manager = {
+      list: () => listed([member, record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })]),
       wasBackground: () => true,
+      residentTaskIds: () => [member.task_id, "st_ordinary"],
     }
     const ui = fakeUi()
-    const statusUi = createTaskStatusUi({
-      manager,
-      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
-      timers,
-    })
+    const statusUi = createTaskStatusUi({ manager, runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" }, timers })
 
     // when
     statusUi.syncNow()
 
     // then
+    const rows = ui.widgetCalls.at(-1)?.content ?? []
     expect(active.size).toBe(0)
-    expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("settled researcher")
+    expect(rows[0]).toContain("completed")
+    expect(rows[0]).not.toStartWith("⠋ ")
+    expect(rows.join("\n")).not.toContain("ordinary task")
   })
 
   it("#given an idle parent with a running background task #when time advances quietly #then live status refreshes", () => {

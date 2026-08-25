@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
@@ -15,7 +16,7 @@ import {
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 interface RecordingUi {
@@ -113,7 +114,7 @@ function segmentContext(input: {
         outcome: "failed",
         reason: "spawn_failed",
         detail: "boom",
-        finishedAt: new Date(Date.parse("2026-08-09T00:00:00.000Z") + index * 1000).toISOString(),
+        finishedAt: new Date(Date.now() - ((input.failures ?? 0) - index) * 60_000).toISOString(),
         delivery: { status: "consumed" },
       }),
     )
@@ -454,6 +455,89 @@ describe("refreshMemoryStatus", () => {
       ])
     }
   }, 30_000)
+
+  test("#given system memory exactly at the soft pressure threshold #when refresh runs #then one pressure dream request fires without changing the advisory notify", async () => {
+    const pressureRequests: number[] = []
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => null,
+      lsTree: async () => ["system/persona.md"],
+      show: async () => "P".repeat(320),
+      status: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "pressure-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "pressure-agent"),
+      binding: { identity: "pressure-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 100,
+      alreadyNotified: false,
+      gitRepo: fakeRepo,
+      requestPressureDream: async () => { pressureRequests.push(1) },
+    })
+
+    expect(pressureRequests).toHaveLength(1)
+    expect(recorder.notifications).toEqual([])
+  })
+
+  test("#given system memory below the soft pressure threshold #when refresh runs #then no pressure dream request fires", async () => {
+    const pressureRequests: number[] = []
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => null,
+      lsTree: async () => ["system/persona.md"],
+      show: async () => "P".repeat(316),
+      status: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "pressure-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "pressure-agent"),
+      binding: { identity: "pressure-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+
+    await refreshMemoryStatus({
+      context,
+      ui: recordingUi().ui,
+      compileWarnTokens: 100,
+      alreadyNotified: false,
+      gitRepo: fakeRepo,
+      requestPressureDream: async () => { pressureRequests.push(1) },
+    })
+
+    expect(pressureRequests).toEqual([])
+  })
+
+  test("#given pressure advisory work is already deduped #when refresh runs over threshold #then neither estimate-driven path fires again", async () => {
+    const calls = { tree: 0, pressure: 0 }
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => null,
+      lsTree: async () => { calls.tree += 1; return ["system/persona.md"] },
+      show: async () => "P".repeat(400),
+      status: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "pressure-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "pressure-agent"),
+      binding: { identity: "pressure-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+
+    await refreshMemoryStatus({
+      context,
+      ui: recordingUi().ui,
+      compileWarnTokens: 100,
+      alreadyNotified: true,
+      gitRepo: fakeRepo,
+      requestPressureDream: async () => { calls.pressure += 1 },
+    })
+
+    expect(calls).toEqual({ tree: 0, pressure: 0 })
+  })
 
   test("#given system markdown under the advisory threshold #when refresh runs #then no advisory notify fires", async () => {
     const smallContent = "x".repeat(100)

@@ -54147,6 +54147,47 @@
         "input": 272000,
         "output": 128000
       }
+    },
+    "grok-4.6": {
+      "id": "grok-4.6",
+      "family": "grok",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 500000,
+        "output": 500000
+      }
+    },
+    "xai/grok-4.6": {
+      "id": "xai/grok-4.6",
+      "family": "grok",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 500000,
+        "output": 500000
+      }
     }
   }
 }

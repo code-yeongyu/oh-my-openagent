@@ -56,6 +56,8 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         task_id: outcome.task_id,
         run_epoch: outcome.run_epoch,
       })
+    case "capacity_deferred":
+      return toolResult(outcome.reason, { kind: "capacity_deferred", task_id: outcome.task_id, reason: outcome.reason })
     case "queued":
       return toolResult(`Queued for ${outcome.task_id} at position ${outcome.queue_position}.`, {
         kind: "queued",

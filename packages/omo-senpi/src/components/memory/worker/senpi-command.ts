@@ -44,6 +44,22 @@ export function resolveSenpiLaunch(
   throw new Error("Unable to resolve a runnable Senpi launcher")
 }
 
+/**
+ * Resolve the launch for a memory child, honoring an explicit host-supplied command.
+ *
+ * A host that resolves its own senpi command (the npm install shape: the node binary plus the
+ * CLI entry in `senpiPrefixArgs`) must keep BOTH halves. Dropping the prefix leaves the bare
+ * interpreter receiving senpi flags, which dies as `node: bad option: --fork`.
+ */
+export function resolveMemoryChildLaunch(input: {
+  readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
+  readonly env: NodeJS.ProcessEnv
+}): SenpiLauncher {
+  if (input.senpiCommand === undefined) return resolveSenpiLaunch(input.env)
+  return { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
+}
+
 export type SenpiLaunchRuntime = {
   readonly isBunBinary: boolean
   readonly execPath: string

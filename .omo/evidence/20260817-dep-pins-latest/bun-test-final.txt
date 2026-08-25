@@ -1,0 +1,20 @@
+
+packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.test.ts:
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project provides typescript #then it resolves the caller's typescript and exits 0 [122.52ms]
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when a checked file violates the rules #then violations are still reported with exit 1 [69.35ms]
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project genuinely lacks typescript #then it fails with a clear error and exit 2 [20.78ms]
+
+7 tests skipped:
+(skip) bounded sg NDJSON runner > #given a hung child on Windows #when aborted #then child.kill terminates it without POSIX grace signaling
+(skip) bounded sg NDJSON runner > #given a hung child on Windows #when the whole-call budget expires #then child.kill terminates it without POSIX grace signaling
+(skip) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child
+(skip) #given a console-less parent #when the default RPC child starts #then windowsHide suppresses its console
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+
+ 15737 pass
+ 7 skip
+ 0 fail
+ 1 snapshots, 166462 expect() calls
+Ran 15744 tests across 2041 files. [555.78s]

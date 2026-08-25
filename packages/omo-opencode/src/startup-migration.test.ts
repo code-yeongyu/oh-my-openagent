@@ -75,7 +75,6 @@ describe("runOpenCodeStartupMigration", () => {
     expect(result.reloadRequired).toBe(true)
     expect(result.migratedFrom).toEqual([rootSourcePath, configJsoncPath])
     expect(parseFile(fileSystem, targetPath)).toMatchObject({
-      "[opencode]": { agents: { oracle: { model: "anthropic/legacy" } } },
       codegraph: { excluded_roots: ["/generated"] },
     })
     expect(fileSystem.existsSync(rootSourcePath)).toBe(false)

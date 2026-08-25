@@ -31,15 +31,17 @@ export async function fireDream(input: {
   })
   if (!decision.allowed) return { fired: false, rejection: decision.rejection }
   if (stopped()) return { fired: false, rejection: "aborted" }
-  const selected = request.conversationIds === undefined
-    ? (await selectDreamConversations({
-        transcriptsDir: session.identityPaths.transcripts,
-        currentConversationId: session.conversationId,
-        autoSelectMax: settings.autoSelectMax,
-        autoSelectMaxBytes: settings.autoSelectMaxChars,
-        now: () => new Date(now()),
-      }, { ...(request.focus === undefined ? {} : { focus: request.focus }) })).conversationIds
-    : request.conversationIds
+  const selected = origin === "pressure"
+    ? []
+    : request.conversationIds === undefined
+      ? (await selectDreamConversations({
+          transcriptsDir: session.identityPaths.transcripts,
+          currentConversationId: session.conversationId,
+          autoSelectMax: settings.autoSelectMax,
+          autoSelectMaxBytes: settings.autoSelectMaxChars,
+          now: () => new Date(now()),
+        }, { ...(request.focus === undefined ? {} : { focus: request.focus }) })).conversationIds
+      : request.conversationIds
   if (stopped()) return { fired: false, rejection: "aborted" }
   const conversationIds: string[] = []
   const snapshots: CapturedConversation[] = []
@@ -57,7 +59,7 @@ export async function fireDream(input: {
     conversationIds.push(conversationId)
     snapshots.push({ conversationId, snapshot })
   }
-  if (conversationIds.length === 0) return { fired: false, rejection: "no_unreflected_content" }
+  if (origin !== "pressure" && conversationIds.length === 0) return { fired: false, rejection: "no_unreflected_content" }
   if (stopped()) return { fired: false, rejection: "aborted" }
   let result
   try {

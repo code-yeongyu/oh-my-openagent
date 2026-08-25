@@ -1,0 +1,25 @@
+Command:
+  bun test packages/omo-senpi/src/components/task/index.test.ts packages/senpi-task/src/runners/rpc/spawn.test.ts packages/senpi-task/src/team/member-extension/identity.test.ts --bail
+
+Result:
+  GREEN (exit 0)
+
+Observed:
+  38 pass
+  0 fail
+  98 expectations
+
+Passing behavior:
+  - explicit member processes register no normal OMO task, lead, team, command, renderer, or lifecycle surface;
+  - generic descendants strip member identity, member task id, team config, and `omo-member.js`;
+  - generic descendants preserve other inherited extensions;
+  - explicit member launches preserve member identity/config, isolated session dir, and the member extension;
+  - empty or absent member identity is not classified as an explicit member process.
+
+Verification:
+  - changed-file LSP diagnostics: clean;
+  - `packages/senpi-task` typecheck: PASS;
+  - `packages/omo-senpi` typecheck: PASS.
+
+Source provenance:
+  The member-boundary and descendant-identity direction preserves the valid portion of PR #6801. The later commit for this increment will retain Ivan Smetanin as author and will not repeat the withdrawn whole-extension rejection explanation.

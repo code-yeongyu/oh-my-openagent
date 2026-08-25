@@ -41,6 +41,10 @@ export class CapturedCompletionApi implements ReflectionCompletionApi {
   }
 }
 
+export type HarnessModel = SenpiModelPort & {
+  readonly cost?: { readonly input: number; readonly cacheRead?: number; readonly output?: number }
+}
+
 export interface RunnerHarness {
   readonly root: string
   readonly identity: MemoryIdentity
@@ -56,18 +60,27 @@ export interface RunnerHarness {
 }
 
 const childFixture = join(import.meta.dir, "__fixtures__", "reflection-child.ts")
+
+/** Modes whose scenario needs the two-rung category chain rather than the single mock model. */
+function isChainMode(childMode: string): boolean {
+  return childMode === "model-fallback" || childMode === "model-exhausted" || childMode === "provider-cooldown"
+}
 const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 
 export async function createRunnerHarness(options: {
-  readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted"
+  readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
   readonly categoryAvailable?: boolean
   readonly config?: OmoConfig
-  readonly models?: readonly SenpiModelPort[]
-  readonly preflightModels?: readonly SenpiModelPort[]
+  readonly models?: readonly HarnessModel[]
+  readonly preflightModels?: readonly HarnessModel[]
   readonly deadlineMs?: number
   readonly terminationGraceMs?: number
   readonly now?: () => Date
   readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
+  readonly resolveSessionModel?: () => { readonly provider: string; readonly id: string; readonly thinking?: string } | undefined
+  readonly resolveParentContextTokens?: () => number | undefined
+  readonly resolveParentSessionFile?: () => string | undefined
+  readonly resolveParentCacheReusable?: () => boolean
 }): Promise<RunnerHarness> {
   const root = await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
   const identity: MemoryIdentity = {
@@ -109,7 +122,7 @@ export async function createRunnerHarness(options: {
     { provider: "kimi-coding", id: "fallback" },
   ]
   const models = options.models
-    ?? (options.childMode === "model-fallback" || options.childMode === "model-exhausted" ? fallbackModels : [model])
+    ?? (isChainMode(options.childMode) ? fallbackModels : [model])
   const categoryAvailable = options.categoryAvailable ?? true
   const memory = OmoMemorySettingsSchema.parse({
     reflection: { category: "quick", timeout_minutes: 15, merge: "auto" },
@@ -118,7 +131,7 @@ export async function createRunnerHarness(options: {
     memory,
     categories: categoryAvailable
       ? {
-          quick: options.childMode === "model-fallback" || options.childMode === "model-exhausted"
+          quick: isChainMode(options.childMode)
             ? {
                 models: [
                   { model: "extension-only/primary", reasoning: "off" },
@@ -158,6 +171,10 @@ export async function createRunnerHarness(options: {
     senpiCommand: process.execPath,
     senpiPrefixArgs: [senpiLauncher],
     resolveAndPreflightLaunch: options.resolveAndPreflightLaunch,
+    ...(options.resolveSessionModel === undefined ? {} : { resolveSessionModel: options.resolveSessionModel }),
+    ...(options.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: options.resolveParentContextTokens }),
+    ...(options.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: options.resolveParentSessionFile }),
+    ...(options.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: options.resolveParentCacheReusable }),
     getTranscriptState: (conversationId) => {
       if (conversationId !== "conversation-a") throw new Error(`unknown conversation: ${conversationId}`)
       return journal.getState()
@@ -173,7 +190,9 @@ export async function createRunnerHarness(options: {
         ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "commit"
         : options.childMode === "model-exhausted"
           ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "auth-missing"
-          : options.childMode
+          : options.childMode === "provider-cooldown"
+            ? spawnArgs.args.includes("extension-only/primary") ? "provider-cooldown" : "commit"
+            : options.childMode
       return {
         ...spawnArgs,
         command: process.execPath,

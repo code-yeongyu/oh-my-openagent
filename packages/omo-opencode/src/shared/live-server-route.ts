@@ -23,6 +23,7 @@ type SessionAffinityEntry = {
 
 type RouteRegistration = {
   serverUrl: URL | undefined
+  directory: string
   liveClient: unknown
   available: boolean | undefined
   probeTimestamp: number
@@ -69,6 +70,7 @@ export function initLiveServerRoute(opts: {
 }): void {
   const registration: RouteRegistration = {
     serverUrl: opts.serverUrl,
+    directory: opts.directory,
     liveClient: undefined,
     available: undefined,
     probeTimestamp: 0,
@@ -243,7 +245,10 @@ function getOrBuildLiveClient(registration: RouteRegistration): unknown {
   if (!registration.serverUrl) {
     return undefined
   }
-  const client = createOpencodeClientSdk({ baseUrl: registration.serverUrl.toString() })
+  const client = createOpencodeClientSdk({
+    baseUrl: registration.serverUrl.toString(),
+    directory: registration.directory,
+  })
   injectServerAuthIntoClient(client)
   registration.liveClient = client
   return registration.liveClient

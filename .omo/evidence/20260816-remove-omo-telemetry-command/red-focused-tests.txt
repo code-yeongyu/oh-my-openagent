@@ -1,0 +1,25 @@
+Command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command
+npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-senpi/src/components/telemetry/omo-native-notice.test.ts packages/omo-senpi/src/components/telemetry/omo-native-component.test.ts
+
+Observed:
+bun test v1.3.12 (700fc117)
+
+FAIL omo-native-notice.test.ts:63
+Expected commandNames not to contain "omo-telemetry".
+Received: ["omo-telemetry"].
+
+FAIL omo-native-component.test.ts:156
+Expected existsSync(join(stateDir, "last-payloads.json")) to be false.
+Received: true.
+
+Summary:
+17 pass
+2 fail
+51 expect() calls
+Exit code 1
+
+Why this is valid RED:
+Both failures reached the intended assertions on unchanged production behavior. One pins
+the public TUI command registration; the other drives the composed telemetry component
+through a real event sequence and observes the unwanted local payload-history artifact.

@@ -14,9 +14,11 @@ describe("createNativeSkillSources", () => {
   const { sources, names } = createNativeSkillSources(repoRoot)
 
   const expectedOrderedNames = [
+    "dag-library",
     "give-me-tips",
     "hyperplan",
     "init-deep",
+    "mass-ulw",
     "onboarding",
     "ultrawork",
     "ulw-plan",
@@ -45,7 +47,7 @@ describe("createNativeSkillSources", () => {
   test("#given onboarding skill #when checked #then it is present in the registry at the correct position", () => {
     const onboardingEntry = sources.find(({ name }) => name === "onboarding")
     assert.ok(onboardingEntry, "onboarding must be in the registry")
-    assert.equal(sources.indexOf(onboardingEntry), 3, "onboarding must be at index 3 (alphabetical)")
+    assert.equal(sources.indexOf(onboardingEntry), 5, "onboarding must be at index 5 (alphabetical)")
     assert.equal(onboardingEntry.source, join(nativeSkillsRoot, "onboarding"))
   })
 })

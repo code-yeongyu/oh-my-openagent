@@ -31,7 +31,7 @@ describe("release and platform publish workflows", () => {
     const platformUsesMetadata = workflow.includes("version: ${{ needs.release-metadata.outputs.version }}") &&
       workflow.includes("dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}")
     const mainWaitsForPlatform = workflow.includes(
-      "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+      "needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
     ) &&
       workflow.includes("inputs.skip_platform == true || needs.publish-platform.result == 'success'")
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")
@@ -127,7 +127,7 @@ describe("release and platform publish workflows", () => {
   test("regenerates and commits release lockfiles only in the prepared source state", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
-    const prepareStep = sliceWorkflowSection(workflow, "      - name: Prepare and merge release state before publishing", "      - name: Write job summary")
+    const prepareStep = sliceWorkflowSection(workflow, "      - name: Prepare release state (generation)", "      - name: Publish prepared release state")
     const releaseJob = workflow.slice(workflow.indexOf("  release:"))
     const codexLockfileCommand = "npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false"
     const codexLockfilePath = "packages/omo-codex/plugin/package-lock.json"

@@ -210,7 +210,9 @@ describe("createCompactionContextInjector recovery", () => {
     expect(peerHold.status).toBe("dispatched")
     expect(released).toBe(true)
     expect(promptAsyncRecorder.calls).toHaveLength(1)
-    expect(promptAsyncRecorder.calls[0]?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+    const queuedRecoveryCall = promptAsyncRecorder.calls[0]?.body
+    expect(queuedRecoveryCall?.agent).toBe("atlas")
+    expect(queuedRecoveryCall?.tools).toEqual({ bash: true })
   })
 
   it("marks the recovery prompt as synthetic compaction continuation", async () => {

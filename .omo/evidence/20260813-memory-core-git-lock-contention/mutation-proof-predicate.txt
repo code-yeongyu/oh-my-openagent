@@ -1,0 +1,19 @@
+MUTATED:
+^
+error: fatal: Unable to create '/tmp/r/.git/index.lock': File exists.
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/config-lock.test.ts:127:19)
+      at withGitLockRetry (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/config-lock.ts:46:20)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/config-lock.test.ts:124:26)
+(fail) git lock retry > #given transient index.lock failures #when an operation runs #then it retries and finally succeeds [0.23ms]
+(pass) git lock retry > #given a non-lock git failure #when an operation runs #then it surfaces immediately without retrying [0.12ms]
+
+ 5 pass
+ 3 fail
+ 10 expect() calls
+Ran 8 tests across 1 file. [402.00ms]
+
+RESTORED:
+8 pass
+ 0 fail
+ 12 expect() calls
+Ran 8 tests across 1 file. [475.00ms]

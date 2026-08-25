@@ -5,13 +5,18 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { createSandbox, seedSandbox } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
-const { readRecords, pidAlive, pollRecord, sleep } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
+const { readRecords, readTaskEventTypes, pidAlive, pollRecord, sleep } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
+const { killProcessGroup } = await import(pathToFileURL(join(scriptDir, "team-e2e-process.mjs")).href)
 
 const mockProviderEntry = join(scriptDir, "task-rpc-e2e-mock-provider.ts")
 const CHILD_FINAL_TEXT = "omo rpc child mock work complete"
 const PROJECT_OMO_CONFIG = {
   task: { default_execution_mode: "process" },
   categories: { proc: { description: "Process-mode mock category.", model: "omo-mock/mock-1" } },
+}
+const RECONCILE_PROJECT_OMO_CONFIG = {
+  ...PROJECT_OMO_CONFIG,
+  task: { ...PROJECT_OMO_CONFIG.task, reattach_on_reconcile: false },
 }
 const CHILD_STEPS_COMPLETE = [{ type: "text", text: CHILD_FINAL_TEXT }]
 const CHILD_STEPS_HANG = [{ type: "hang" }]
@@ -31,7 +36,7 @@ const RECONCILE_RELAUNCH_STEPS = [
 const hangingChildSteps = (name) => [
   { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name, prompt: "hang until signalled" } },
   { type: "tool_call", name: "task_output", arguments: { name, mode: "status" } },
-  { type: "text", text: `${name} parent done` },
+  { type: "hang" },
 ]
 
 const runningRpcChild = (r) => r.execution_mode === "process" && r.status === "running" && typeof r.pid === "number"
@@ -48,13 +53,30 @@ function writeScript(sandbox, parentSteps, childSteps) {
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ parentSteps, childSteps }, null, 2)}\n`)
 }
 
-export function prepareScenarioSandbox() {
+// Every scenario gets a brand-new agent dir, and SENPI_CODING_AGENT_DIR is what omo resolves its
+// omo-native state dir from, so onboarding wins its once-per-install claim on EVERY run and fires a
+// triggerTurn message from session_start. That turn starts before print mode issues the harness
+// prompt, so print mode's bare prompt hits an already-streaming session, senpi rejects it with
+// "Agent is already processing", and the host exits 1 having persisted no task record. Pre-claiming
+// the marker keeps the scripted scenario in control of the first turn, as it is for a real user who
+// already onboarded.
+function claimOnboardingMarker(agentDir) {
+  const stateDir = join(agentDir, "omo-senpi", "omo-native")
+  mkdirSync(stateDir, { recursive: true })
+  writeFileSync(
+    join(stateDir, "onboarding-completed"),
+    `${JSON.stringify({ completedAt: new Date().toISOString(), version: 1 })}\n`,
+  )
+}
+
+export function prepareScenarioSandbox(projectConfig = PROJECT_OMO_CONFIG) {
   const sandbox = createSandbox()
   seedSandbox(sandbox)
+  claimOnboardingMarker(sandbox.agentDir)
   const sessionDir = join(sandbox.root, "sessions")
   mkdirSync(sessionDir, { recursive: true })
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
-  writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify(PROJECT_OMO_CONFIG, null, 2)}\n`)
+  writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify(projectConfig, null, 2)}\n`)
   return { sandbox, sessionDir, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
 }
 
@@ -75,8 +97,35 @@ function driveSenpiAsync(senpiBin, sandbox, sessionDir, parentSteps, childSteps,
   return spawn(senpiBin, childArgv(sessionDir, prompt), {
     cwd: sandbox.cwd,
     env: childEnv(sandbox, sessionDir, senpiBin),
+    detached: true,
     stdio: ["ignore", "ignore", "ignore"],
   })
+}
+
+export async function killSenpiHost(child, terminate = killProcessGroup) {
+  if (typeof child.pid !== "number" || child.exitCode !== null || child.signalCode !== null) return true
+  return terminate(child.pid)
+}
+
+function waitForChildClose(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      child.off("close", onClose)
+      reject(new Error(`timed out waiting ${timeoutMs}ms for pid=${child.pid ?? "unknown"} to close`))
+    }, timeoutMs)
+    const onClose = () => {
+      clearTimeout(timeout)
+      resolve()
+    }
+    child.once("close", onClose)
+  })
+}
+
+async function cleanupSenpiHost(child) {
+  const terminated = await killSenpiHost(child)
+  if (!terminated) throw new Error(`could not terminate Senpi host pid=${child.pid ?? "unknown"}`)
+  await waitForChildClose(child, 15_000)
 }
 
 export async function runKillCheck(senpiBin) {
@@ -100,17 +149,13 @@ export async function runKillCheck(senpiBin) {
       facts: { pid: running.pid, killed: errored?.killed ?? false, error_excerpt: (errored?.error_message ?? "").slice(0, 120) },
     }
   } finally {
-    try {
-      parent.kill("SIGKILL")
-    } catch {
-      // parent already exited when its blocking output read observed the child failure
-    }
+    await cleanupSenpiHost(parent)
     rmSync(sandbox.root, { recursive: true, force: true })
   }
 }
 
 export async function runReconcileCheck(senpiBin) {
-  const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
+  const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox(RECONCILE_PROJECT_OMO_CONFIG)
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pr"), CHILD_STEPS_HANG, "drive the reconcile scenario")
   let orphanPid
   try {
@@ -119,24 +164,36 @@ export async function runReconcileCheck(senpiBin) {
       return { check: "reconcile_lost_terminates_orphan", verdict: "FAIL", reason: "no running rpc child appeared to reconcile" }
     }
     orphanPid = running.pid
-    parent.kill("SIGKILL")
-    await sleep(1_500)
+    if (parent.exitCode !== null || parent.signalCode !== null) {
+      return {
+        check: "reconcile_lost_terminates_orphan",
+        verdict: "FAIL",
+        reason: "parent exited before crash injection",
+      }
+    }
+    await cleanupSenpiHost(parent)
     const relaunch = driveSenpi(senpiBin, sandbox, sessionDir, RECONCILE_RELAUNCH_STEPS, CHILD_STEPS_COMPLETE, "relaunch for reconcile")
-    const lost = readRecords(stateDir).find((r) => r.task_id === running.task_id && r.status === "lost" && typeof r.pid === "number")
+    const lost = readRecords(stateDir).find((r) => r.task_id === running.task_id && r.status === "lost")
+    const eventTypes = readTaskEventTypes(stateDir, running.task_id)
+    const lostEvent = eventTypes.includes("reconcile_lost")
     const orphanDead = pidAlive(orphanPid) === false
-    const pass = relaunch.status === 0 && lost !== undefined && orphanDead
+    const pass = relaunch.status === 0 && lost !== undefined && lostEvent && orphanDead
     return {
       check: "reconcile_lost_terminates_orphan",
       verdict: pass ? "PASS" : "FAIL",
-      ...(pass ? {} : { reason: `relaunchOk=${relaunch.status === 0} lostWithPid=${lost !== undefined} orphanDead=${orphanDead}` }),
-      facts: { orphanPid, lostPid: lost?.pid, orphanDead, breadcrumb: (lost?.error_message ?? "").slice(0, 120) },
+      ...(pass ? {} : {
+        reason: `relaunchOk=${relaunch.status === 0} lostRecord=${lost !== undefined} lostEvent=${lostEvent} orphanDead=${orphanDead}`,
+      }),
+      facts: {
+        orphanPid,
+        orphanDead,
+        status: lost?.status,
+        eventTypes,
+        breadcrumb: (lost?.error_message ?? "").slice(0, 120),
+      },
     }
   } finally {
-    try {
-      parent.kill("SIGKILL")
-    } catch {
-      // already exited
-    }
+    await cleanupSenpiHost(parent)
     if (typeof orphanPid === "number" && pidAlive(orphanPid)) {
       try {
         process.kill(orphanPid, "SIGKILL")

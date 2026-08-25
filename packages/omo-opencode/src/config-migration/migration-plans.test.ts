@@ -72,7 +72,7 @@ describe("legacy config migration plans", () => {
         CONFIG_JSONC_MIGRATION_ID,
         OPENCODE_CONFIG_MIGRATION_ID,
       ])
-      expect(userDocument["[opencode]"]).toEqual({ agents: { oracle: { model: "reverted-old-model" } } })
+      expect(userDocument["[opencode]"]).toBeUndefined()
       expect(userDocument.legacy_migrations).toMatchObject({
         [canonicalRootPath]: ["model-version:reverted-old-model->new-model"],
         [canonicalConfigJsoncPath]: ["legacy-config-jsonc"],

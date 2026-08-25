@@ -53,6 +53,7 @@ export async function runOmoCommand(
   const child = spawn(target.command, [...target.args], {
     cwd: options.cwd,
     stdio: ["ignore", "pipe", "ignore"],
+    windowsHide: true,
   })
 
   const stdoutChunks: Buffer[] = []

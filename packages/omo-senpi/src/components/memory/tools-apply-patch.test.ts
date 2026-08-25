@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -6,6 +6,11 @@ import { parseMemoryFile } from "@oh-my-opencode/memory-core"
 
 import { createMemoryTools } from "./tools"
 import { boundFixture, git, seedFile, textOf } from "./tools.test-support"
+
+// Each case initializes a real Git repo and commits through git children. Match the 60s process test
+// ceiling used by the supervisor suites: this file timed out on Windows CI at the 5s default while
+// absorbing the preceding file's process cleanup, not because its own work grew.
+setDefaultTimeout(60_000)
 
 describe("memory tool execution", () => {
   test("#given a bound identity #when memory_apply_patch executes #then the patch is applied and committed", async () => {

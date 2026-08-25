@@ -1,0 +1,12 @@
+WHAT WAS TESTED
+New CI gate step loop (npm run check for every packages/omo-codex/plugin/components/* with a check script) executed against an archived copy of pre-fix tree f8ad86e0b with plugin npm ci.
+
+WHAT WAS OBSERVED (RED)
+Gate exit code 1. Multiple components failed their check scripts, including ulw-loop (3 errors, 1 warning, 2 infos) exactly matching the debt PR #7173 fixed.
+This proves the gate detects the exact debt class that sat undetected for 3 days.
+
+WHY IT IS ENOUGH
+The same loop the CI step will run, on the exact tree that carried the debt, produces a non-zero exit — the gate would have blocked that tree.
+
+WHAT WAS OMITTED
+Full component output truncated to summaries; archived tree removed after capture.

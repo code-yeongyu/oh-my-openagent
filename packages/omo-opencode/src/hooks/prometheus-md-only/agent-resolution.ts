@@ -41,14 +41,14 @@ async function getAgentFromMessageFiles(
 /**
  * Get the effective agent for the session.
  * Priority order:
- * 1. In-memory session agent (most recent, set by /start-work)
+ * 1. In-memory session agent (most recent, set by /ulw-execute)
  * 2. Boulder state agent (persisted across restarts, fixes #927)
  * 3. Message files (fallback for sessions without boulder state)
  *
  * This fixes issue #927 where after interruption:
  * - In-memory map is cleared (process restart)
  * - Message files return "prometheus" (oldest message from /plan)
- * - But boulder.json has agent: "atlas" (set by /start-work)
+ * - But boulder.json has agent: "atlas" (set by /ulw-execute)
  */
 export async function getAgentFromSession(
   sessionID: string,

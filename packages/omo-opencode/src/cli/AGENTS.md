@@ -1,10 +1,10 @@
-# src/cli/ — CLI: install, run, doctor, mcp (oauth), refresh-model-capabilities, get-local-version, version, boulder, cleanup, ulw-loop
+# src/cli/ — CLI: install, run, doctor, config, mcp (oauth), refresh-model-capabilities, get-local-version, version, boulder, worktree-sweep, cleanup, ulw-loop
 
 **Generated:** 2026-07-03
 
 ## OVERVIEW
 
-Commander.js CLI with 10 commands (`sparkshell` removed 2026-07). Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+Commander.js CLI with 12 commands (`sparkshell` removed 2026-07). Entry: `index.ts` → `runCli()` in `cli-program.ts`; runtime commands registered via `configureRuntimeCommands()` in `runtime-commands.ts`.
 
 ## COMMANDS
 
@@ -13,15 +13,17 @@ Commander.js CLI with 10 commands (`sparkshell` removed 2026-07). Entry: `index.
 | `install` | Interactive/non-interactive setup | Provider selection → config gen → plugin registration |
 | `run <message>` | Non-interactive session launcher | Agent resolution (flag → env → config → Sisyphus) |
 | `doctor` | 4-category health checks | System, Config, Tools, Models |
+| `config migrate` | Migrate legacy OMO config into `~/.omo/omo.jsonc` | `config-migrate.ts` over `runOpenCodeStartupMigration`; `--dry-run` prints transform + backup move plan, `--json` machine-readable |
 | `get-local-version` | Version detection | Installed vs npm latest |
 | `version` | Print plugin version | Trivial 2-line subcommand |
 | `mcp` | MCP management; nested `oauth` group | `mcp oauth login <server-name>` (PKCE), `logout`, `status` |
 | `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
 | `boulder` | Boulder state inspector | Format work-state + tasks from `.omo/boulder-state/` |
+| `worktree-sweep` | Sweep stale git worktrees | `worktree-sweep/`: classify + delete merged/stale worktrees; excludes externally-owned roots (`~/.codex/worktrees`, `~/.codex-gui-cli-remote/worktrees`) by default |
 | `cleanup` (alias `uninstall`) | Remove Codex Light state | Clean managed Codex cache/marketplace + repair project-local legacy Codex artifacts |
 | `ulw-loop` | Codex ulw-loop CLI | Run the Codex LazyCodex ulw-loop CLI |
 
-`install` accepts `--platform=opencode|codex|both` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `npx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`.
+`install` accepts `--platform=opencode|codex|both` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `npx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`. A `senpi` choice appears (hidden from help) only when `SENPI_PLATFORM_ENV_FLAG=1` is set from a source checkout; it routes through `install-senpi/` (re-export of `@oh-my-opencode/omo-senpi/install`). `install-ast-grep-sg.ts` provisions the `sg` binary at install time.
 
 ## STRUCTURE
 
@@ -35,24 +37,21 @@ cli/
 ├── model-fallback.ts            # Model config gen by provider availability
 ├── provider-availability.ts     # Provider detection
 ├── fallback-chain-resolution.ts # Fallback chain logic
-├── config-manager/              # 20 config utilities
+├── config-manager/              # 27 config utilities
 │   ├── plugin registration, provider config
 │   ├── JSONC operations, auth plugins
 │   └── npm dist-tags, binary detection
 ├── doctor/
 │   ├── runner.ts                # Parallel check execution
 │   ├── formatter.ts             # Output formatting
-│   └── checks/                  # 15 check files in 4 categories
-│       ├── system.ts            # Binary, plugin, version
-│       ├── config.ts            # JSONC validity, Zod schema
-│       ├── tools.ts             # AST-Grep, LSP, GH CLI, MCP
-│       └── model-resolution.ts  # Cache, resolution, overrides (6 sub-files)
+│   └── checks/                  # 25 check files (8 registered + 3 Codex-only) — see [doctor/AGENTS.md](doctor/AGENTS.md)
 ├── run/                         # Session launcher
 │   ├── runner.ts                # Main orchestration
 │   ├── agent-resolver.ts        # Flag → env → config → Sisyphus
 │   ├── session-resolver.ts      # Create/resume sessions
 │   ├── event-handlers.ts        # Event processing
 │   └── poll-for-completion.ts   # Wait for todos/background tasks
+├── worktree-sweep/               # Stale git worktree classification + sweep
 └── mcp-oauth/                   # OAuth token management
 ```
 

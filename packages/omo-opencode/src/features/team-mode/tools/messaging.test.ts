@@ -574,15 +574,17 @@ describe("createTeamSendMessageTool", () => {
   })
 
   test("live delivery uses the registered agent alias when the runtime stores a config-key agent name", async () => {
-    jest.useFakeTimers()
     const settleTimerScheduled = createDeferred<void>()
-    const fakeSetTimeout = globalThis.setTimeout
-    const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation((callback, delay, ...args) => {
-      if (delay === DEFAULT_SESSION_IDLE_SETTLE_MS) {
-        settleTimerScheduled.resolve()
-      }
-      return fakeSetTimeout(callback, delay, ...args)
+    const acceleratedSetTimeout = new Proxy(realSetTimeout, {
+      apply(target, thisArg, args) {
+        if (args[1] === DEFAULT_SESSION_IDLE_SETTLE_MS) {
+          settleTimerScheduled.resolve()
+          args[1] = 0
+        }
+        return Reflect.apply(target, thisArg, args)
+      },
     })
+    const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(acceleratedSetTimeout)
 
     try {
       // given
@@ -605,7 +607,6 @@ describe("createTeamSendMessageTool", () => {
         body: "ping",
       }, fixture.toolContext(fixture.memberOneSessionId))
       await waitForEvent(settleTimerScheduled.promise, "live delivery idle-settle timer")
-      jest.advanceTimersByTime(DEFAULT_SESSION_IDLE_SETTLE_MS)
       await delivery
 
       // then
@@ -613,8 +614,6 @@ describe("createTeamSendMessageTool", () => {
       expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
     } finally {
       setTimeoutSpy.mockRestore()
-      jest.clearAllTimers()
-      jest.useRealTimers()
     }
   })
 

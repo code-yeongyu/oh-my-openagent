@@ -19,6 +19,7 @@ import {
   MemoryModelExhaustedError,
   type MemoryModelChain,
 } from "./memory-model-attempts"
+import type { MemoryLaunchRoute } from "./fork-cost"
 import { prepareReflectionCandidateSpawn } from "./reflection-spawn-input"
 import type { ReflectionModelResolution } from "./resolve-model"
 import { readRunJson } from "./run-artifacts"
@@ -33,6 +34,7 @@ import { runReflectionChild } from "./spawn"
 export async function executeReflectionRun(input: {
   readonly run: ReservedRun
   readonly resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>
+  readonly route?: MemoryLaunchRoute
   readonly loaded: SenpiOmoConfigResult
   readonly startedAt: string
   readonly options: SenpiSubprocessRunnerOptions
@@ -70,7 +72,12 @@ export async function executeReflectionRun(input: {
       warn: (message, details) => options.logger?.warn(message, details),
       surfaceName: "reflection",
       attempt: async (candidate, attemptNumber, nextAttempt) => {
+        const parentSessionFile = input.route?.route === "fork" ? options.resolveParentSessionFile?.() : undefined
+        const parentCwd = input.route?.route === "fork" ? options.cwd : undefined
         const spawnArgs = await prepareReflectionCandidateSpawn({
+          ...(parentSessionFile === undefined
+            ? {}
+            : { fork: { parentSessionFile, ...(parentCwd === undefined ? {} : { parentCwd }) } }),
           run,
           worktree: activeWorktree,
           mergePolicy: reflection.merge,
@@ -83,6 +90,7 @@ export async function executeReflectionRun(input: {
           identity: options.identity,
           env,
           senpiCommand: options.senpiCommand,
+          senpiPrefixArgs: options.senpiPrefixArgs,
         })
         if (!launched) {
           await input.appendLaunched()

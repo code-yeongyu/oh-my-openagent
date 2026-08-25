@@ -43,6 +43,7 @@ describe("skill tool - short name resolution", () => {
 
     const result = await tool.execute({ name: "debugging" }, mockContext)
 
-    expect(result).toContain("## Skill: debugging")
+    expect(result).toContain(loadedSkills[0]!.definition.template)
+
   })
 })

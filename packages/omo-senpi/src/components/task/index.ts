@@ -8,10 +8,13 @@ import {
   createTaskSendTool,
   createTaskTool,
   defaultResolveCallerSessionId,
+  evaluateSpawnPolicy,
+  isTeamMemberProcess,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
   type LeadDeliveryJournal,
+  type SkillLoader,
   type TaskSendTeamRouting,
   type TeamToolsService,
 } from "@oh-my-opencode/senpi-task"
@@ -19,6 +22,10 @@ import {
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
+import { registerDagCommands } from "./dag-commands"
+import { createDagReloadSource } from "./dag-reload-source"
+import { createDagRuntime, type DagRuntime } from "./dag-runtime"
+import { createDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -32,6 +39,7 @@ import { createSkillInvocationTracker, type SkillInvocationTracker } from "./ski
 import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
+import { createTaskSkillLoader } from "./task-skill-loader"
 
 const TASK_ENABLED_FLAG = "omo-task"
 
@@ -41,6 +49,7 @@ export interface TaskComponentOptions {
   // Project root the task engine anchors its state dir + omo.json load to. Defaults to the cwd the
   // host reports for THIS session; injectable so tests never write task state into the repo tree.
   readonly loadConfig?: typeof loadSenpiOmoConfig
+  readonly loadSkills?: SkillLoader
   readonly resolveCwd?: () => string
 }
 
@@ -49,6 +58,8 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   return {
     name: "task",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      if (isTeamMemberProcess()) return
+
       // Unconditional omo process hygiene (T16): fires on session_start before any
       // flag/capability gate can skip the rest of the component.
       wireSessionStartProcessSweep(pi, ctx)
@@ -67,11 +78,13 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 
       const cwd = options.resolveCwd?.() ?? sessionCwd(pi)
       const loaded = loadConfig({ cwd })
+      const loadSkills = options.loadSkills ?? createTaskSkillLoader()
 
       const engine = composeTaskEngine({
         pi,
         omoConfig: loaded.config,
         cwd,
+        loadSkills,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
       })
@@ -81,10 +94,33 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       pi.registerMessageRenderer?.(CATEGORY_UNAVAILABLE_MESSAGE_TYPE, renderCategoryUnavailable)
       const teamTools = createTeamToolContext(pi, ctx, engine)
       const skillInvocations = createSkillInvocationTracker(pi)
-      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations)
+      const dagRuntime = createDagRuntime({
+        pi,
+        engine,
+        logger: ctx.logger,
+        nodeSpawnPolicy: (node) =>
+          evaluateSpawnPolicy(
+            {
+              manager: engine.manager,
+              omoConfig: engine.omoConfig,
+              agents: engine.agents,
+              resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
+            },
+            node.subagentType,
+            node.prompt,
+            node.parentSessionId,
+          ),
+        ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
+      })
+      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations, dagRuntime)
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
+      registerDagCommands(pi, {
+        list: dagRuntime.manager.list,
+        snapshot: dagRuntime.manager.snapshot,
+        taskRecord: dagRuntime.taskRecord,
+      })
 
       const statusUi = createTaskStatusUi({
         manager: engine.manager,
@@ -103,6 +139,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
       engine.onStoreMutation(() => {
         statusUi.scheduleSync()
+        dagRuntime.sync()
         void resumptionChannels.emitIfChanged().catch((error: unknown) => {
           ctx.logger.warn("omo-senpi task resumption-channel emission failed", {
             error: error instanceof Error ? error.message : String(error),
@@ -111,10 +148,16 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
-      wireEventBridge(pi, ctx, engine, statusUi, transitions, {
-        reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
-        leadPollers: teamTools.leadPollers,
-        resumptionChannels,
+      wireDagLifecycle(pi, dagRuntime, () => {
+        wireEventBridge(pi, ctx, engine, statusUi, transitions, {
+          reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
+          leadPollers: teamTools.leadPollers,
+          resumptionChannels,
+          dagReloadSource: createDagReloadSource({
+            manager: dagRuntime.manager,
+            sessionId: () => engine.runtime.sessionId(),
+          }),
+        })
       })
     },
   }
@@ -158,6 +201,7 @@ function registerTaskTools(
   teamService: TeamToolsService,
   resolveDefaultTeamRunId: TaskSendTeamRouting["resolveDefaultTeamRunId"],
   skillInvocations: SkillInvocationTracker,
+  dagRuntime: DagRuntime,
 ): void {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
@@ -166,6 +210,7 @@ function registerTaskTools(
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
+      loadSkills: engine.loadSkills,
       resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })
@@ -178,6 +223,35 @@ function registerTaskTools(
   })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
   pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
+  registerDagTool(pi, engine, dagRuntime)
+}
+
+function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {
+  const sessionId = (): string => engine.runtime.sessionId() ?? ""
+  pi.registerTool({
+    ...createDagTool({
+      manager: runtime.manager,
+      parentSessionId: sessionId,
+      rootSessionId: sessionId,
+      wait: runtime.wait,
+      cancel: runtime.cancel,
+      retry: runtime.retry,
+      send: runtime.send,
+      amend: runtime.amend,
+    }),
+  })
+}
+
+export function wireDagLifecycle(
+  pi: SenpiExtensionAPI,
+  runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose">,
+  wireTaskLifecycle: () => void,
+): void {
+  pi.on("session_shutdown", () => runtime.pauseForShutdown())
+  wireTaskLifecycle()
+  pi.on("session_start", () => runtime.attach())
+  pi.on("session_before_switch", () => runtime.detach())
+  pi.on("session_shutdown", () => runtime.dispose())
 }
 
 function createTeamToolContext(

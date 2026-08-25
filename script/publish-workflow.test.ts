@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process"
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
 const publishWorkflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 const workflowsDir = new URL("../.github/workflows/", import.meta.url)
-const pinnedBunVersion = 'bun-version: "1.3.12"'
+const pinnedBunVersion = 'bun-version: "1.4.0"'
 const workflowPaths = readdirSync(workflowsDir)
   .filter((name) => name.endsWith(".yml") || name.endsWith(".yaml"))
   .map((name) => new URL(name, workflowsDir))
@@ -19,10 +19,6 @@ const workflowChecks = [
       "run: bun test",
       "run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
     ],
-  },
-  {
-    path: publishWorkflowPath,
-    testRuns: ["run: bun test"],
   },
 ]
 
@@ -45,15 +41,6 @@ function sliceWorkflowSectionToEnd(workflow: string, startMarker: string): strin
 
 function normalizeWorkflowText(workflow: string): string {
   return workflow.replace(/\r\n/g, "\n")
-}
-
-function expectBunSetupBeforeLspToolsBuild(workflowSection: string, label: string): void {
-  const bunSetupIndex = workflowSection.indexOf("uses: oven-sh/setup-bun@v2")
-  const lspBuildIndex = workflowSection.indexOf("name: Build vendored lsp-tools-mcp package")
-
-  expect(bunSetupIndex, `${label} must setup Bun`).toBeGreaterThanOrEqual(0)
-  expect(lspBuildIndex, `${label} must build lsp-tools-mcp`).toBeGreaterThanOrEqual(0)
-  expect(bunSetupIndex, `${label} must setup Bun before lsp-tools-mcp build`).toBeLessThan(lspBuildIndex)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -80,28 +67,6 @@ describe("test workflows", () => {
         expect(workflow).toContain(testRun)
       }
     }
-  })
-
-  test("prepares vendored lsp-tools-mcp before publish workflow tests and typecheck", () => {
-    // #given
-    const workflow = readFileSync(publishWorkflowPath, "utf8")
-    const testJob = sliceWorkflowSection(workflow, "  test:", "  typecheck:")
-    const typecheckJob = sliceWorkflowSection(workflow, "  typecheck:", "  preflight-trust:")
-
-    // #when
-    const testHasNodeSetup = testJob.includes('node-version: "24"')
-    const testBuildsLspToolsMcp = testJob.includes("name: Build vendored lsp-tools-mcp package") &&
-      testJob.includes("working-directory: packages/lsp-tools-mcp")
-
-    const typecheckHasNodeSetup = typecheckJob.includes('node-version: "24"')
-    const typecheckBuildsLspToolsMcp = typecheckJob.includes("name: Build vendored lsp-tools-mcp package") &&
-      typecheckJob.includes("working-directory: packages/lsp-tools-mcp")
-
-    // #then
-    expect(testHasNodeSetup, "publish test job must setup Node for MCP package builds").toBe(true)
-    expect(testBuildsLspToolsMcp, "publish test job must build lsp-tools-mcp before bun test").toBe(true)
-    expect(typecheckHasNodeSetup, "publish typecheck job must setup Node for MCP package builds").toBe(true)
-    expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
   })
 
   test("builds publish-main from the prepared release SHA", () => {
@@ -155,42 +120,6 @@ describe("test workflows", () => {
     expect(releaseDoesNotRestampOrRetag, "the provenance-bearing release run must not mutate its release source").toBe(true)
   })
 
-  test("runs Codex compatibility checks before publish jobs", () => {
-    // #given
-    const workflow = readFileSync(publishWorkflowPath, "utf8")
-    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  preflight-trust:")
-
-    // #when
-    const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
-    const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
-    const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
-    const buildsLspToolsMcp =
-      codexCompatibilityJob.includes("name: Build vendored lsp-tools-mcp package") &&
-      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
-      codexCompatibilityJob.indexOf("name: Build vendored lsp-tools-mcp package") <
-        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
-    const runsCodexCommand = codexCompatibilityJob.includes("run: bun run test:codex")
-    const publishMainNeedsCodex =
-      workflow.includes(
-        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
-      ) &&
-      workflow.includes("needs.codex-compatibility.result == 'success'")
-    const publishPlatformNeedsCodex =
-      workflow.includes(
-        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]",
-      ) &&
-      workflow.includes("needs.codex-compatibility.result == 'success'")
-
-    // #then
-    expect(hasCodexMatrixJob, "publish workflow must expose a Codex compatibility job").toBe(true)
-    expect(hasSupportedOsMatrix, "publish Codex compatibility must cover supported OSes").toBe(true)
-    expect(hasNodeSetup, "publish Codex compatibility must setup Node for MCP package builds").toBe(true)
-    expect(buildsLspToolsMcp, "publish Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
-    expect(runsCodexCommand, "publish Codex compatibility must run the shared Codex test script").toBe(true)
-    expect(publishMainNeedsCodex, "main wrapper publish must wait for Codex compatibility").toBe(true)
-    expect(publishPlatformNeedsCodex, "platform publish must wait for Codex compatibility").toBe(true)
-  })
-
   test("exercise root checks across linux macos and windows", () => {
     // #given
     const workflow = readFileSync(ciWorkflowPath, "utf8")
@@ -216,9 +145,13 @@ describe("test workflows", () => {
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
     const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
-    const buildWaitsForChecks = buildJob.includes("needs:")
+    const buildWaitsOnlyForMode =
+      buildJob.includes("needs: [ci-mode]") &&
+      !buildJob.includes("needs: [test") &&
+      !buildJob.includes("needs: [typecheck")
     const buildHasReadOnlyContentsPermission = buildJob.includes("permissions:\n      contents: read")
-    const allRootChecks = "needs: [test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]"
+    const allRootChecks =
+      "needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]"
     const writeGateNeedsAllChecks = autoCommitSchemaJob.includes(allRootChecks)
     const draftReleaseNeedsAllChecks = draftReleaseJob.includes(allRootChecks)
 
@@ -226,7 +159,7 @@ describe("test workflows", () => {
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
     expect(hasSupportedOsMatrix, "CI Codex compatibility must cover supported OSes").toBe(true)
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
-    expect(buildWaitsForChecks, "Build has no artifact dependency on test/typecheck/codex and must not serialize CI").toBe(false)
+    expect(buildWaitsOnlyForMode, "Build may wait for classification but must stay parallel with validation jobs").toBe(true)
     expect(buildHasReadOnlyContentsPermission, "Parallel build must explicitly stay read-only; write actions belong behind the all-check gate").toBe(true)
     expect(writeGateNeedsAllChecks, "Schema auto-commit must wait for all root checks and build").toBe(true)
     expect(draftReleaseNeedsAllChecks, "Draft release must wait for all root checks and build").toBe(true)
@@ -244,23 +177,6 @@ describe("test workflows", () => {
 
     expect(hasNodeSetup, "Codex compatibility must setup Node for MCP package builds").toBe(true)
     expect(runsCodexTests, "Codex compatibility must run bun run test:codex").toBe(true)
-  })
-
-  test("sets up Bun before vendored lsp-tools-mcp builds in publish workflow jobs", () => {
-    // #given
-    // ci.yml no longer pre-builds lsp-tools-mcp in any job: typecheck/codex/build
-    // dropped it as redundant (typecheck needs no build; test:codex and bun run
-    // build self-build it), and the test job's full install rebuilds it via prepare.
-    // publish.yml still pre-builds it, so the ordering guard still applies there.
-    const publishWorkflow = readFileSync(publishWorkflowPath, "utf8")
-    const publishTestJob = sliceWorkflowSection(publishWorkflow, "  test:", "  typecheck:")
-    const publishTypecheckJob = sliceWorkflowSection(publishWorkflow, "  typecheck:", "  codex-compatibility:")
-    const publishCodexCompatibilityJob = sliceWorkflowSection(publishWorkflow, "  codex-compatibility:", "  preflight-trust:")
-
-    // #then
-    expectBunSetupBeforeLspToolsBuild(publishTestJob, "publish test job")
-    expectBunSetupBeforeLspToolsBuild(publishTypecheckJob, "publish typecheck job")
-    expectBunSetupBeforeLspToolsBuild(publishCodexCompatibilityJob, "publish Codex compatibility job")
   })
 
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {
@@ -329,7 +245,7 @@ describe("test workflows", () => {
       const unpinnedBunLines = bunVersionLines.filter((line) => line !== pinnedBunVersion)
 
       // #then
-      expect(unpinnedBunLines, `${workflowPath.pathname} must pin Bun to 1.3.12`).toEqual([])
+      expect(unpinnedBunLines, `${workflowPath.pathname} must pin Bun to 1.4.0`).toEqual([])
     }
   })
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
+import { BUILTIN_AGENTS, DEFAULT_CATEGORIES } from "@oh-my-opencode/senpi-task"
 import { BUILTIN_SKILL_NAMES } from "./components/telemetry/product-identity"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
@@ -9,6 +10,7 @@ const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
 const expectedSkillNames = [
   "ast-grep",
   "coding-agent-sessions",
+  "dag-library",
   "data-scientist",
   "debugging",
   "frontend",
@@ -17,14 +19,15 @@ const expectedSkillNames = [
   "hyperplan",
   "init-deep",
   "lsp-setup",
+  "mass-ulw",
   "onboarding",
   "programming",
   "refactor",
   "remove-ai-slops",
   "review-work",
-  "start-work",
   "ultimate-browsing",
   "ultrawork",
+  "ulw-execute",
   "ulw-loop",
   "ulw-plan",
   "ulw-research",
@@ -35,21 +38,22 @@ const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
 // Skills authored directly against the omo-senpi tool surface. They already speak native Senpi tools,
 // so they carry no OpenCode examples and need no "Senpi Harness Tool Compatibility" translation banner.
 const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
+  "dag-library": true,
   "give-me-tips": true,
   hyperplan: true,
   "init-deep": true,
+  "mass-ulw": true,
   onboarding: true,
   ultrawork: true,
   "ulw-loop": true,
   "ulw-research": true,
 }
-const sharedSkillNames = expectedSkillNames.filter(
-  (name) => !(name in CODEX_DERIVED_SKILL_NAMES) && !(name in NATIVE_SENPI_SKILL_NAMES),
-)
 const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
-const opencodeOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
-const compatibilitySectionHeading = "## Senpi Harness Tool Compatibility"
+// The ulw-loop CLI literally accepts `--codex-goal-json`; that interface name is not Codex
+// guidance, so mask it before scanning for leaked harness tokens.
+const cliInterfaceFlagPattern = /--codex-goal-json/g
+const taskTargetPattern = /\b(subagent_type|category)["']?\s*[=:]\s*["']([a-z0-9-]+)["']/g
 
 function listDirectoryNames(path: string): string[] {
   if (!existsSync(path)) {
@@ -104,7 +108,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 20 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 24 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
@@ -144,7 +148,7 @@ describe("OMO Senpi scoped skill sync", () => {
       if (!existsSync(skillRoot)) continue
 
       for (const file of listFiles(skillRoot)) {
-        const content = readFileSync(file, "utf8")
+        const content = readFileSync(file, "utf8").replace(cliInterfaceFlagPattern, "")
         if (forbiddenTokenPattern.test(content)) {
           leaks.push(relative(repoRoot, file))
         }
@@ -154,7 +158,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect(leaks).toEqual([])
   })
 
-  test("#given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization and carry no compatibility banner", () => {
+  test("#given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization", () => {
     for (const skillName of Object.keys(NATIVE_SENPI_SKILL_NAMES)) {
       const sourceFile = join(repoRoot, "packages", "omo-senpi", "skills", skillName, "SKILL.md")
       expect(existsSync(sourceFile), `${relative(repoRoot, sourceFile)} must exist`).toBe(true)
@@ -163,48 +167,24 @@ describe("OMO Senpi scoped skill sync", () => {
       const shippedPath = join(skillsRoot, skillName, "SKILL.md")
       const shipped = readFileSync(shippedPath, "utf8")
       expect(shipped, `${relative(repoRoot, shippedPath)} must ship the native source verbatim`).toBe(source)
-      expect(
-        shipped.includes(compatibilitySectionHeading),
-        `${skillName} is senpi-native and must not carry the compatibility banner`,
-      ).toBe(false)
     }
   })
 
-  test("#given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example", () => {
-    const missing: string[] = []
-
-    for (const skillName of sharedSkillNames) {
-      const skillFile = join(skillsRoot, skillName, "SKILL.md")
-      if (!existsSync(skillFile)) continue
-
-      const content = readFileSync(skillFile, "utf8")
-      const firstExampleMatch = opencodeOrchestrationPattern.exec(content)
-      if (firstExampleMatch === null) continue
-
-      const sectionIndex = content.indexOf(compatibilitySectionHeading)
-      if (sectionIndex === -1 || sectionIndex > firstExampleMatch.index) {
-        missing.push(relative(repoRoot, skillFile))
-      }
-    }
-
-    expect(missing).toEqual([])
-  })
-
-  test("#given start-work skill #when inspected #then session ids reference senpi, not codex", () => {
-    const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+  test("#given ulw-execute skill #when inspected #then session ids reference senpi, not codex", () => {
+    const skillFile = join(skillsRoot, "ulw-execute", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
 
-    expect(content.includes("senpi:<session_id>"), "start-work must reference senpi:<session_id>").toBe(true)
-    expect(content.includes("codex:<session_id>"), "start-work must not reference codex:<session_id>").toBe(false)
+    expect(content.includes("senpi:<session_id>"), "ulw-execute must reference senpi:<session_id>").toBe(true)
+    expect(content.includes("codex:<session_id>"), "ulw-execute must not reference codex:<session_id>").toBe(false)
   })
 
-  test("#given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
-    const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+  test("#given ulw-execute skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
+    const skillFile = join(skillsRoot, "ulw-execute", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
 
-    expect(/\bmonitor\b/.test(content), "start-work must name the senpi tool that arms a lane watcher").toBe(true)
-    expect(/\bkill_bash\b/.test(content), "start-work must name the senpi tool that tears a watcher down").toBe(true)
-    expect(/\bwait_agent\b/.test(content), "start-work must not carry the codex wait_agent polling idiom").toBe(false)
+    expect(/\bmonitor\b/.test(content), "ulw-execute must name the senpi tool that arms a lane watcher").toBe(true)
+    expect(/\bkill_bash\b/.test(content), "ulw-execute must name the senpi tool that tears a watcher down").toBe(true)
+    expect(/\bwait_agent\b/.test(content), "ulw-execute must not carry the codex wait_agent polling idiom").toBe(false)
   })
 
   test("#given synced skill tree #when inspected #then no codex-only display metadata is packaged", () => {
@@ -213,7 +193,7 @@ describe("OMO Senpi scoped skill sync", () => {
   })
 
   test("#given ported orchestration skills #when scanned #then no foreign-harness delegation guidance survives", () => {
-    const portedOrchestrationSkillNames = ["start-work", "ulw-plan"] as const
+    const portedOrchestrationSkillNames = ["ulw-execute", "ulw-plan"] as const
     const foreignDelegationPattern = /\b(?:multi_agent|spawn_agent|lazycodex)\b/i
     const leaks: string[] = []
 
@@ -233,6 +213,27 @@ describe("OMO Senpi scoped skill sync", () => {
     }
 
     expect(leaks).toEqual([])
+  })
+
+  test("#given shipped task examples #when targets are scanned #then every agent and category exists in Senpi", () => {
+    const allowedTargets = {
+      subagent_type: new Set(Object.keys(BUILTIN_AGENTS)),
+      category: new Set(Object.keys(DEFAULT_CATEGORIES)),
+    }
+    const invalidTargets: string[] = []
+
+    for (const file of listFiles(skillsRoot).filter((path) => path.endsWith(".md"))) {
+      const content = readFileSync(file, "utf8")
+      for (const match of content.matchAll(taskTargetPattern)) {
+        const kind = match[1] as keyof typeof allowedTargets
+        const target = match[2]
+        if (target !== undefined && !allowedTargets[kind].has(target)) {
+          invalidTargets.push(`${relative(repoRoot, file)}: ${kind}=${target}`)
+        }
+      }
+    }
+
+    expect(invalidTargets).toEqual([])
   })
 
   test("#given frontend skill #when inspected #then materialized design references exist", () => {

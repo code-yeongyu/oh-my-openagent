@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ff03c5541f13c6939e697de3a4aae542348e0a8135c96a238e62f06f529ce4ba:4ad931dd278695f56588c7ca90e435c02cb863cd9be1a98302cc15b6c84dbd9d
+// omo-codex-install:667efd1c5ec67e97a4d8320d590220e5e55dfd894fedca452835cd55fa3f7613:60b7f551f20477ed16f529e7123f7b1ef16b8c987e7576f27f5e902e54007abe
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -5927,7 +5927,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.7",
+    version: "5.0.0-beta.19",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -5961,7 +5961,7 @@ var init_package = __esm(() => {
       "@oh-my-opencode/utils": "workspace:*"
     },
     devDependencies: {
-      "bun-types": "1.3.14"
+      "bun-types": "1.4.0"
     }
   };
 });
@@ -6647,9 +6647,9 @@ var LEGACY_CODEX_COMPONENT_BINS = [
   { name: "codex-comment-checker", component: "comment-checker" },
   { name: "codex-lsp", component: "lsp" },
   { name: "codex-rules", component: "rules" },
-  { name: "codex-start-work-continuation", component: "start-work-continuation" },
   { name: "codex-telemetry", component: "telemetry" },
-  { name: "codex-ultrawork", component: "ultrawork" }
+  { name: "codex-ultrawork", component: "ultrawork" },
+  { name: "codex-ulw-execute-continuation", component: "ulw-execute-continuation" }
 ];
 var LEGACY_CODEX_COMPONENT_BIN_NAMES = LEGACY_CODEX_COMPONENT_BINS.map((entry) => entry.name);
 async function removeLegacyCodexComponentBins(binDir, platform) {
@@ -10840,6 +10840,7 @@ function runtimeSlug(platform = process.platform, arch = process.arch) {
 
 // packages/utils/src/ast-grep/install-script.ts
 var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
+var KILL_GRACE_MS = 1000;
 var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
 function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
   return join32(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
@@ -10891,16 +10892,30 @@ function invocationsForPlatform(scriptPath, platform) {
 async function runInvocation(input) {
   const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
   let timedOut = false;
+  let terminateDeadline;
+  let terminateDeadlineGrace;
+  const killIgnored = new Promise((_, reject) => {
+    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"));
+  });
   const timeout = setTimeout(() => {
     timedOut = true;
     child.kill();
+    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS);
   }, input.timeoutMs);
-  timeout.unref?.();
   try {
-    const outcome = await child.outcome;
-    return timedOut ? { kind: "timed-out" } : outcome;
+    const outcome = await Promise.race([child.outcome, killIgnored]);
+    if (timedOut)
+      return { kind: "timed-out" };
+    return outcome;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("ignored termination")) {
+      return { kind: "spawn-error", error, missingExecutable: false };
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
+    if (terminateDeadlineGrace !== undefined)
+      clearTimeout(terminateDeadlineGrace);
   }
 }
 function failedReason(outcome) {

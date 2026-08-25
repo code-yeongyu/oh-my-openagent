@@ -1,0 +1,45 @@
+{
+  "result": "PASS",
+  "realSenpiCredentialsUntouched": true,
+  "freshSessionsCompared": [
+    "noticed",
+    "quiet"
+  ],
+  "byteIdenticalMemoryBlock": true,
+  "memoryBlockBytes": 2857,
+  "memoryBlockSha256": "45ff21140d7f90ee215871e7d851d2828d932970467242a4e1bc18725cc85a2e",
+  "noticedProviderMessage": {
+    "providerRole": "user",
+    "sourceCustomType": "omo-memory:notice",
+    "content": "<memory_notice>\n- 5 previous messages between you and the user are stored in recall memory\n- 1 user turns since your last memory save. Save durable facts now, or decide nothing qualifies.\n- Soul updated by reflection 2a1620e since your last run\n</memory_notice>"
+  },
+  "quietProviderMessage": {
+    "providerRole": "user",
+    "sourceCustomType": "omo-memory:notice",
+    "content": "<memory_notice>\n- 5 previous messages between you and the user are stored in recall memory\n- 1 user turns since your last memory save. Save durable facts now, or decide nothing qualifies.\n</memory_notice>"
+  },
+  "systemVolatileFieldsAbsent": true,
+  "runs": [
+    {
+      "name": "bootstrap",
+      "status": 0,
+      "providerDump": "bootstrap-provider.jsonl"
+    },
+    {
+      "name": "baseline",
+      "status": 0,
+      "providerDump": "baseline-provider.jsonl"
+    },
+    {
+      "name": "noticed",
+      "status": 0,
+      "providerDump": "noticed-provider.jsonl"
+    },
+    {
+      "name": "quiet",
+      "status": 0,
+      "providerDump": "quiet-provider.jsonl"
+    }
+  ],
+  "cleanup": "removed isolated sandbox /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-H7qUwj"
+}

@@ -4,13 +4,18 @@ import { join } from "node:path"
 
 import { describe, runLiveness } from "./facts-run-storage"
 import type { FactsRunLedger } from "./facts-runner-types"
-import { readRunJson, runOutcomeMatchesLedger, writeRunJsonAtomic, type RunOutcome } from "./worker/run-artifacts"
+import { readRunJson, runOutcomeMatchesLedger, type RunOutcome } from "./worker/run-artifacts"
 
+/**
+ * Both terminal paths take the ledger: the caller records the run's queued endpoints in the
+ * failure ledger BEFORE its sentinel lands, and only the ledger knows which endpoints those are.
+ */
 export async function reconcileFactsRuns(options: {
   readonly factsDir: string
   readonly now: () => Date
   readonly finalize: (runDir: string) => Promise<void>
-  readonly fail: (runDir: string, runId: string, detail: string) => Promise<void>
+  readonly fail: (runDir: string, ledger: FactsRunLedger, detail: string) => Promise<void>
+  readonly abandon: (runDir: string, ledger: FactsRunLedger, reason: "unknown_liveness") => Promise<void>
   readonly warn?: (message: string, fields: Readonly<Record<string, unknown>>) => void
 }): Promise<boolean> {
   const runsDir = join(options.factsDir, "runs")
@@ -42,14 +47,9 @@ export async function reconcileFactsRuns(options: {
       continue
     }
     if (verdict === "unknown") {
-      await writeRunJsonAtomic(join(runDir, "abandoned.json"), {
-        version: 1,
-        runId: ledger.runId,
-        abandonedAt: options.now().toISOString(),
-        reason: "unknown_liveness",
-      })
+      await options.abandon(runDir, ledger, "unknown_liveness")
     } else {
-      await options.fail(runDir, ledger.runId, "facts supervisor and child are not alive")
+      await options.fail(runDir, ledger, "facts supervisor and child are not alive")
     }
   }
   return active

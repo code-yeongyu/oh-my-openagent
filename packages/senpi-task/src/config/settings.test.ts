@@ -17,5 +17,8 @@ describe("task settings", () => {
     expect(settings.residency_max_children).toBe(expected)
     expect(twoCpuSettings.residency_max_children).toBe(8)
     expect(fourCpuSettings.residency_max_children).toBe(12)
+    expect(twoCpuSettings.global_concurrency).toBe(8)
+    expect(resolveOmoTaskSettings({}, () => 6).global_concurrency).toBe(12)
+    expect(resolveOmoTaskSettings({ global_concurrency: 3 }, () => 6).global_concurrency).toBe(3)
   })
 })

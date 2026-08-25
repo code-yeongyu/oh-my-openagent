@@ -1,0 +1,14 @@
+{
+  "serverStopped": true,
+  "port": 0,
+  "sandboxes": [
+    {
+      "root": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/<temp-sandbox>",
+      "removed": true
+    },
+    {
+      "root": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/<temp-sandbox>",
+      "removed": true
+    }
+  ]
+}

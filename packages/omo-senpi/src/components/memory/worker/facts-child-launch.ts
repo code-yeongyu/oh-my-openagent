@@ -1,5 +1,6 @@
 import type { FactsPayload } from "@oh-my-opencode/memory-core"
 
+import type { FactsQueuedKey } from "../facts-failure-recording"
 import type { MemoryModelChain } from "./memory-model-attempts"
 import {
   resolveAndPreflightMemoryLaunch,
@@ -29,7 +30,7 @@ type FactsChildLaunchInput = {
   readonly sandbox?: FactsSandbox
   readonly supervisorPath?: string
   readonly batchId: string
-  readonly queued: readonly { readonly conversationId: string; readonly end_message_id: string }[]
+  readonly queued: readonly FactsQueuedKey[]
   readonly launchedAt: number
 }
 

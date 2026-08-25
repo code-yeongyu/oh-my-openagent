@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import { withSerializedGitConfigMutation } from "./config-lock"
+import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
 import { createNodeGitExec, type GitExec, type GitExecResult } from "./exec"
 import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
@@ -9,19 +9,21 @@ import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
 import { parseLogOutput, parseNulPaths } from "./repo-log"
 import { assertNoUnrelatedChanges } from "./repo-status"
+import { withSerializedGitWorktreeMutation } from "./worktree-mutation-queue"
 import type {
   GitCommitAuthor,
   GitCommitResult,
   GitLogOptions,
   GitMemoryRepoOptions,
   GitMergeOptions,
+  GitTreeSizedEntry,
   InitializeGitRepoOptions,
   MemoryCommit,
 } from "./repo-types"
 
 export type {
   GitCommitAuthor, GitCommitResult, GitLogOptions, GitMemoryRepoOptions,
-  GitMergeOptions, GitSeedFile, InitializeGitRepoOptions, MemoryCommit,
+  GitMergeOptions, GitSeedFile, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
 } from "./repo-types"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -46,12 +48,12 @@ export class GitMemoryRepo {
   async init(options: InitializeGitRepoOptions = {}): Promise<string> {
     await mkdir(this.dir, { recursive: true })
     if (!existsSync(join(this.dir, ".git"))) {
-      await this.git(["init"])
-      await this.git(["symbolic-ref", "HEAD", "refs/heads/main"])
+      await withGitLockRetry(() => this.git(["init"]))
+      await withGitLockRetry(() => this.git(["symbolic-ref", "HEAD", "refs/heads/main"]))
     }
 
     await (options.installHooks ?? this.hookInstaller)(this.dir)
-    await this.ensureIdentity(options.authorName?.trim() || "Omo Agent")
+    await this.ensureIdentity(options.authorName?.trim() || "OmO Agent")
     const currentHead = await this.head()
     if (currentHead) return currentHead
 
@@ -66,7 +68,7 @@ export class GitMemoryRepo {
 
     const author: GitCommitAuthor = {
       agentId: this.agentId,
-      authorName: options.authorName?.trim() || "Omo Agent",
+      authorName: options.authorName?.trim() || "OmO Agent",
     }
     if (paths.length > 0) {
       await this.stage(paths)
@@ -75,7 +77,9 @@ export class GitMemoryRepo {
       }
     }
 
-    await this.git([...authorFlags(author), "commit", "--allow-empty", "-m", EMPTY_INITIAL_COMMIT])
+    await withGitLockRetry(() =>
+      this.git([...authorFlags(author), "commit", "--allow-empty", "-m", EMPTY_INITIAL_COMMIT]),
+    )
     return this.requireHead()
   }
 
@@ -138,6 +142,11 @@ export class GitMemoryRepo {
     return result.stdout.split("\0").filter(Boolean)
   }
 
+  async lsTreeSized(revision = "HEAD"): Promise<readonly GitTreeSizedEntry[]> {
+    const result = await this.git(["ls-tree", "-r", "-l", "-z", revision])
+    return parseLsTreeSized(result.stdout)
+  }
+
   async show(revision: string, path: string): Promise<string> {
     return (await this.git(["show", `${revision}:${path}`])).stdout
   }
@@ -158,11 +167,15 @@ export class GitMemoryRepo {
   }
 
   async worktreeAdd(path: string, branch: string, startPoint = "HEAD"): Promise<void> {
-    await this.git(["worktree", "add", "-b", branch, path, startPoint])
+    await withSerializedGitWorktreeMutation(this.dir, () =>
+      withGitLockRetry(() => this.git(["worktree", "add", "-b", branch, path, startPoint])),
+    )
   }
 
   async worktreeRemove(path: string, force = true): Promise<void> {
-    await this.git(["worktree", "remove", ...(force ? ["--force"] : []), path])
+    await withSerializedGitWorktreeMutation(this.dir, () =>
+      withGitLockRetry(() => this.git(["worktree", "remove", ...(force ? ["--force"] : []), path])),
+    )
   }
 
   async merge(ref: string, options: GitMergeOptions = {}): Promise<string> {
@@ -170,7 +183,7 @@ export class GitMemoryRepo {
     if (options.noFF ?? true) argv.push("--no-ff")
     if (options.message) argv.push("-m", options.message)
     argv.push(ref)
-    await this.git(argv)
+    await withGitLockRetry(() => this.git(argv))
     return this.requireHead()
   }
 
@@ -204,7 +217,7 @@ export class GitMemoryRepo {
   }
 
   private async stage(paths: readonly string[]): Promise<void> {
-    await this.git(["add", "-A", "--", ...paths])
+    await withGitLockRetry(() => this.git(["add", "-A", "--", ...paths]))
   }
 
   private async hasPathChanges(paths: readonly string[]): Promise<boolean> {
@@ -215,7 +228,7 @@ export class GitMemoryRepo {
     reason: string,
     author: GitCommitAuthor,
   ): Promise<GitCommitResult> {
-    await this.git([...authorFlags(author), "commit", "-m", reason])
+    await withGitLockRetry(() => this.git([...authorFlags(author), "commit", "-m", reason]))
     return { committed: true, sha: await this.requireHead() }
   }
 
@@ -238,4 +251,22 @@ export class GitMemoryRepo {
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     })
   }
+}
+
+function parseLsTreeSized(stdout: string): GitTreeSizedEntry[] {
+  const entries: GitTreeSizedEntry[] = []
+  for (const record of stdout.split("\0")) {
+    if (record.length === 0) continue
+    const tab = record.indexOf("\t")
+    if (tab === -1) continue
+    const meta = record.slice(0, tab).trim().split(/\s+/)
+    const path = record.slice(tab + 1)
+    if (meta.length < 4 || path.length === 0) continue
+    const size = meta[3]
+    if (size === undefined || size === "-") continue
+    const bytes = Number.parseInt(size, 10)
+    if (!Number.isSafeInteger(bytes) || bytes < 0) continue
+    entries.push({ path, bytes })
+  }
+  return entries
 }

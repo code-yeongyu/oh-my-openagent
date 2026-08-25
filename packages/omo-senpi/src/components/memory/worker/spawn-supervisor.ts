@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -10,7 +10,9 @@ import {
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
+import type { FactsQueuedKey } from "../facts-failure-recording"
 import { requireRunMetadata } from "./spawn-metadata"
+import { waitForRunCompletion } from "./run-sentinel"
 import {
   defaultSupervisorPath,
   definedEnvironment,
@@ -28,6 +30,9 @@ import type {
 
 const DEFAULT_GRACE_MS = 5_000
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024
+// Publication can still be waiting for the terminal gate after the child deadline expires.
+// Keep the parent alive for one additional default grace window so the durable outcome can land.
+const OUTCOME_PUBLICATION_MARGIN_MS = 5_000
 
 export async function runReflectionChild(
   spawnArgs: ReflectionSpawnArgs,
@@ -82,6 +87,8 @@ export async function runReflectionChild(
       deadlineAt: prepared.hardDeadlineAt + graceMs,
       mergePolicy: metadata.mergePolicy,
       ...(metadata.targetDoc === undefined ? {} : { targetDoc: metadata.targetDoc }),
+      ...(metadata.systemTokenBudget === undefined ? {} : { systemTokenBudget: metadata.systemTokenBudget }),
+      ...(metadata.systemTokenTarget === undefined ? {} : { systemTokenTarget: metadata.systemTokenTarget }),
       worktreeDir: metadata.worktree.dir,
       worktreeBranch: metadata.worktree.branch,
       baseSha: metadata.worktree.baseSha,
@@ -102,7 +109,7 @@ export async function runFactsChild(
     readonly supervisorPath?: string
     readonly now?: () => number
     readonly batchId: string
-    readonly queued: readonly { readonly conversationId: string; readonly end_message_id: string }[]
+    readonly queued: readonly FactsQueuedKey[]
   },
 ): Promise<ReflectionChildResult> {
   const graceMs = options.terminationGraceMs ?? DEFAULT_GRACE_MS
@@ -201,24 +208,60 @@ async function runSupervisedChild(input: {
   const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
     detached: true,
     stdio: "ignore",
+    // win32 gives a detached child its own console, which flashes an empty terminal window on the
+    // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
+    windowsHide: true,
   })
   supervisor.unref()
-  const supervisorExit = await new Promise<{ readonly code: number | null; readonly signal: NodeJS.Signals | null }>((resolve, reject) => {
-    let settled = false
-    supervisor.once("error", (error) => {
-      if (settled) return
-      settled = true
-      reject(error)
-    })
-    supervisor.once("close", (code, signal) => {
-      if (settled) return
-      settled = true
-      resolve({ code, signal })
-    })
-  })
   const outcomePath = join(input.runDir, "outcome.json")
-  if (!existsSync(outcomePath) && (supervisorExit.code !== 0 || supervisorExit.signal !== null)) {
-    throw new Error(`memory run supervisor exited with ${supervisorExit.code ?? supervisorExit.signal ?? "unknown status"}`)
+  const launchPath = join(input.runDir, "launch.json")
+  const hasCompleteOutcome = () => {
+    if (!existsSync(outcomePath) || existsSync(launchPath)) return false
+    try {
+      return runOutcomeMatchesLedger(ledger, JSON.parse(readFileSync(outcomePath, "utf8")) as RunOutcome)
+    } catch {
+      return false
+    }
+  }
+  const outcomeWait = new AbortController()
+  type RunCompletion =
+    | { readonly kind: "error"; readonly error: Error }
+    | { readonly kind: "close"; readonly exit: { readonly code: number | null; readonly signal: NodeJS.Signals | null } }
+    | { readonly kind: "outcome"; readonly result: "present" | "timeout" }
+  let settle: (completion: RunCompletion) => void = () => {}
+  const completion = new Promise<RunCompletion>((resolve) => {
+    let settled = false
+    settle = (result) => {
+      if (settled) return
+      settled = true
+      resolve(result)
+    }
+  })
+  const onError = (error: Error) => settle({ kind: "error", error })
+  const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
+    settle({ kind: "close", exit: { code, signal } })
+  }
+  supervisor.once("error", onError)
+  supervisor.once("close", onClose)
+  void waitForRunCompletion(
+      outcomePath,
+      launchPath,
+      hasCompleteOutcome,
+      input.hardDeadlineAt + input.terminationGraceMs + OUTCOME_PUBLICATION_MARGIN_MS,
+      Date.now,
+      outcomeWait.signal,
+    ).then((result) => settle({ kind: "outcome", result }))
+  const result = await completion.finally(() => {
+    outcomeWait.abort()
+    supervisor.off("error", onError)
+    supervisor.off("close", onClose)
+  })
+  if (result.kind === "error" && !hasCompleteOutcome()) throw result.error
+  if (result.kind === "close" && !hasCompleteOutcome()) {
+    throw new Error(`memory run supervisor exited with ${result.exit.code ?? result.exit.signal ?? "unknown status"}`)
+  }
+  if (result.kind === "outcome" && result.result === "timeout") {
+    throw new Error("memory run supervisor did not publish an outcome before its deadline")
   }
   const outcome = await readRunJson<RunOutcome>(outcomePath)
   if (!runOutcomeMatchesLedger(ledger, outcome)) {

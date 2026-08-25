@@ -1,0 +1,23 @@
+TUI command-removal run:
+- xterm helper killed pty pid 26951 and closed its browser.
+- Removed `/tmp/omo-telemetry-qa.Ym7L75`.
+- Verified the sandbox path no longer exists.
+
+Disclosure TUI run:
+- xterm helper killed pty pid 90258 and closed its browser.
+- Removed `/tmp/omo-telemetry-notice-qa`.
+- Verified the sandbox path no longer exists.
+
+Enabled/opt-out runtime driver:
+- Bun server `stop(true)` completed.
+- Both temporary Senpi sandboxes report `removed: true` in `runtime-cleanup.json`.
+
+Failed broad QA-driver attempt:
+- Its `finally` path stopped the capture server and removed all created sandboxes.
+
+Final temporary-resource scan:
+- No `/tmp/omo-telemetry-removal-*` directories found.
+- No `/tmp/omo-native-telemetry-*` directories found.
+- No `/tmp/omo-native-telemetry-capture-*` directories found.
+- No `/tmp/omo-telemetry-qa.*` directory found.
+- No `/tmp/omo-telemetry-notice-qa` directory found.

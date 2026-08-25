@@ -67,7 +67,7 @@ function isCompletionRecord(value: unknown): value is ReflectionCompletionRecord
     && record.conversationIds.every((id) => typeof id === "string")
     && (record.trigger === "manual" || record.trigger === "compaction" || record.trigger === "step-count" || record.trigger === "dream")
     && (record.trigger === "dream"
-      ? record.origin === "manual" || record.origin === "idle" || record.origin === "shutdown"
+      ? record.origin === "manual" || record.origin === "idle" || record.origin === "shutdown" || record.origin === "pressure"
       : record.origin === undefined)
     && typeof record.outcome === "string"
     && typeof record.startedAt === "string"

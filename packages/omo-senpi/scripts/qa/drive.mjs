@@ -64,13 +64,12 @@ export function digestDirectory(root) {
 }
 
 export function createSandbox() {
-  const root = mkdtempSync(join(tmpdir(), "omo-senpi-qa-"))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-senpi-qa-")))
   const cwd = join(root, "project")
   const agentDir = join(root, "agent")
   const xdgConfigHome = join(root, "xdg")
   const homeDir = join(root, "home")
-  const canonicalCwd = realpathSync(root)
-  return { root, cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd: join(canonicalCwd, "project") }
+  return { root, cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd: cwd }
 }
 
 export function seedSandbox({ cwd, agentDir, xdgConfigHome, homeDir, canonicalCwd }) {

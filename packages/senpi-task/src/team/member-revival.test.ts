@@ -48,7 +48,7 @@ const TRUSTED_INHERITED = "/trusted/provider-extension.js"
 class FakeRespawnRunner {
   readonly startedSpecs: RpcRunnerSpec[] = []
 
-  start(spec: RpcRunnerSpec): RpcChildHandle {
+  async start(spec: RpcRunnerSpec): Promise<RpcChildHandle> {
     this.startedSpecs.push(spec)
     const pid = 1_000 + this.startedSpecs.length
     return {
@@ -154,6 +154,40 @@ async function givenTeamWithSuspendedMember() {
 }
 
 describe("team member revival across session resume", () => {
+  test("#given a completed resident member whose process died unexpectedly #when reattach is disabled #then reconcile records the killed residency instead of silently suspending it", async () => {
+    // given
+    const h = await givenTeamWithSuspendedMember()
+    h.store.mutate(h.taskId, (record) => {
+      const { host_pid: _hostPid, ...withoutHost } = record
+      return { ...withoutHost, status: "completed", residency_state: "resident", pid: 9_001 }
+    })
+    const lifecycle = createTaskLifecycle({
+      store: h.store,
+      registry: new FakeRegistry(),
+      config: settings({ reattach_on_reconcile: false }),
+      now,
+      signaller: { isAlive: () => false, signal: () => undefined },
+      orphanKillDelayMs: 0,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart(LEAD_SESSION_ID)
+
+    // then
+    expect(result.outcomes).toContainEqual({
+      task_id: h.taskId,
+      kind: "lost",
+      reason: "reattach disabled for crashed resident",
+    })
+    expect(h.store.load(h.taskId)).toMatchObject({
+      status: "completed",
+      residency_state: "disposed",
+      killed: true,
+      error_message: "reattach disabled for crashed resident",
+    })
+    expect(readEvents(h.store, h.taskId)).toContain("reconcile_lost")
+  })
+
   test("#given a suspended team member record #when the owning session reconciles #then it revives with launch inputs from the trusted resolver and keeps its mailbox identity", async () => {
     // given a team member record suspended at shutdown, whose persisted spec carries untrusted launch inputs
     const h = await givenTeamWithSuspendedMember()

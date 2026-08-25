@@ -257,7 +257,7 @@ describe("steering pending cancellation", () => {
     const engine = createSteeringEngine({
       store: harness.store,
       liveHandle: (taskId) => live.get(taskId),
-      reacquireForRevive: () => {},
+      reserveForRevive: () => ({ ok: true, commit: () => undefined, release: () => undefined }),
       dequeuePending: (taskId) => {
         dequeued.push(taskId)
         return true
@@ -336,7 +336,7 @@ describe("durable prelaunch steering", () => {
     const engine = createSteeringEngine({
       store,
       liveHandle: (taskId) => live.get(taskId),
-      reacquireForRevive: () => {},
+      reserveForRevive: () => ({ ok: true, commit: () => undefined, release: () => undefined }),
       dequeuePending: () => false,
       runStatsSnapshot: () => undefined,
       destruction: makeFakeDestruction(),

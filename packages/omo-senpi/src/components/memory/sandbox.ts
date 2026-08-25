@@ -1,3 +1,6 @@
+import { join } from "node:path"
+
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { FactsSandbox, FactsSpawnArgs } from "./worker/spawn"
 import {
   SandboxUnavailableError,
@@ -53,10 +56,14 @@ export function buildFactsSandboxTransform(input: {
   readonly which?: (command: string) => string | undefined
 }): FactsSandbox {
   return (spawnArgs) => {
+    // The child only needs to take senpi's own settings/auth locks; the agent dir itself stays
+    // read-only so auth.json and settings.json cannot be rewritten by a misbehaving child.
+    const agentDir = resolveAgentHome({ env: spawnArgs.env })
     const transform = buildPathSandboxTransform<FactsSpawnArgs>({
       surface: "facts",
       policy: input.policy,
       writableDirs: [spawnArgs.paths.runDir],
+      lockPaths: [join(agentDir, "settings.json.lock"), join(agentDir, "auth.json.lock")],
       payloadPaths: [spawnArgs.paths.payload],
       fallbackDir: spawnArgs.paths.runDir,
       foreignRoots: input.foreignRoots,

@@ -1,6 +1,6 @@
 # team-core — Team-Mode Domain Primitives (Core)
 
-**Generated:** 2026-06-16
+**Generated:** 2026-06-16 (updated 2026-08-24)
 
 ## OVERVIEW
 
@@ -23,8 +23,17 @@ Team specs live under `~/.omo/teams/{name}/config.json` (user) and `<project>/.o
 
 ## NOTES
 
-- **78 TypeScript files** across the 6 primitives plus shared types, config, and logger.
+- **82 TypeScript files** across the 6 primitives plus shared top-level modules (`types.ts`, `config.ts`, `logger.ts`, `member-parser.ts`, `session-client.ts`, `shell-quote.ts`, `tolerant-fsync.ts`, `resolve-caller-team-lead.ts`).
 - **Zod schemas** in `types.ts` define `TeamSpec`, `Member`, `Message`, `Task`, `RuntimeState`, and `AGENT_ELIGIBILITY_REGISTRY`.
 - **Eligible agents** are sisyphus, atlas, sisyphus-junior, and hephaestus (conditional). Hard-reject agents are blocked at parse time.
 - **Atomic writes** via `team-state-store/locks.ts`: temp file + rename, with file-based locking for task claims and state transitions.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).
+
+## QA
+
+```sh
+bun run typecheck        # tsgo --noEmit -p tsconfig.json
+bun test src/*.test.ts src/**/*.test.ts
+```
+
+`team-layout-tmux/live-tmux-smoke.test.ts` is opt-in via `OMO_LIVE_TMUX=1` (it fakes `TMUX`/`TMUX_PANE` itself); the rest run filesystem-backed against temp dirs.

@@ -35,8 +35,13 @@ export type EventTelemetryClient = {
   readonly shutdown: () => Promise<void>
 }
 
+// Applied LAST, so a product cannot weaken them. `disableGeoip: false` lets PostHog derive
+// `$geoip_country_code` from the transport source IP server-side, which is the only honest way to
+// answer a per-country question: a device timezone is not a country (countries share zones, span
+// zones, and users override them). The application still never AUTHORS an ip - `$ip` stays a
+// rejected key - stores none itself, and keeps `$process_person_profile` false.
 const EVENT_TRANSPORT_OVERRIDES = {
-  disableGeoip: true,
+  disableGeoip: false,
   flushAt: 20,
   flushInterval: 10_000,
 } as const

@@ -1,0 +1,80 @@
+FINAL HEAD VERIFICATION
+
+Branch:
+
+  fix/test-process-stability-20260817-ulw
+
+Base:
+
+  ed723a3901fd6c14ea55b21aa8afcac28a87b6d7
+
+Build:
+
+  bun run build
+  exit=0
+
+Targeted:
+
+  43 pass
+  0 fail
+  Ran 43 tests across 5 files. [1254.00ms]
+
+Typecheck:
+
+  bun run typecheck
+  exit=0
+
+Faithful Senpi:
+
+  extension build current
+  staged runtimes current
+  package creation succeeded
+  LSP daemon roundtrip 5/5
+  Senpi typecheck exit=0
+  1884 pass
+  0 fail
+  Ran 1885 tests across 275 files. [165.83s]
+
+Unsharded root:
+
+  13902 pass
+  0 fail
+  Ran 13914 tests across 1781 files. [265.09s]
+
+Codex:
+
+  LSP tools: 25 files / 97 tests passed
+  daemon/component suite: 40 files / 422 tests passed
+  CodeGraph: 78 pass, 0 fail
+  installer/package suite: 417 pass, 0 fail
+  Node compatibility suite: 519 pass, 0 fail
+  notice/license payload verification passed
+
+Portable source audit:
+
+  #given shipped extension sources
+  #when scanned for Bun-only module-location APIs
+  #then none appear
+
+  pass=1
+  fail=0
+
+Generated artifacts:
+
+  Senpi generated diff=0
+  Codex verification-generated body diff removed
+  final generated diff=0
+
+Cleanup:
+
+  pack_dir_removed=1
+  live LSP owner fixtures=0
+  live onboarding children=0
+  live supervisor/bootstrap/model processes=0
+  IC-8 temporary roots=0
+  LSP bridge symlinks=0
+
+Result:
+
+  FINAL3_PASS=1
+

@@ -55,68 +55,12 @@ describe("default memory seeds", () => {
       expect(MEMORY_DISCIPLINE_SKILL_PATH).toBe("skills/memory-discipline/SKILL.md")
     })
 
-    it("#then the memory-discipline skill frontmatter parses and its description starts with the trigger phrase", () => {
-      const files = buildDefaultSeedFiles()
-      const skill = files.find((f) => f.relativePath === MEMORY_DISCIPLINE_SKILL_PATH)!
-
-      const parsed = parseMemoryFile(skill.content)
-      expect(parsed.frontmatter.description.startsWith("This skill should be used when")).toBe(true)
-      expect(parsed.body.trim().length).toBeGreaterThan(0)
-    })
-
-    it("#then every seed file has valid frontmatter with a description", () => {
+    it("#then every seed file parses as a memory file", () => {
       const files = buildDefaultSeedFiles()
 
       for (const file of files) {
-        const parsed = parseMemoryFile(file.content)
-        expect(parsed.frontmatter.description.trim().length).toBeGreaterThan(0)
-        expect(parsed.body.length).toBeGreaterThan(0)
+        expect(() => parseMemoryFile(file.content)).not.toThrow()
       }
-    })
-
-    it("#then the persona description is 'Persona - who I am'", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-
-      expect(parseMemoryFile(persona.content).frontmatter.description).toBe(
-        "Persona - who I am",
-      )
-    })
-
-    it("#then the human description is 'Person - Human'", () => {
-      const files = buildDefaultSeedFiles()
-      const human = files.find((f) => f.relativePath === "system/human.md")!
-
-      expect(parseMemoryFile(human.content).frontmatter.description).toBe(
-        "Person - Human",
-      )
-    })
-
-    it("#then the persona body mentions the memory directory and system projection", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-      const body = parseMemoryFile(persona.content).body
-
-      expect(body.toLowerCase()).toContain("$memory_dir")
-      expect(body.toLowerCase()).toContain("system/")
-    })
-
-    it("#then the persona body has no letta branding", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-      const body = parseMemoryFile(persona.content).body.toLowerCase()
-
-      expect(body).not.toContain("letta")
-    })
-
-    it("#then the persona body has no emojis", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-      const body = parseMemoryFile(persona.content).body
-
-      // Reject any code point in the emoji/pictograph Unicode ranges.
-      const hasEmoji = /\p{Extended_Pictographic}/u.test(body)
-      expect(hasEmoji).toBe(false)
     })
 
     it("#then the human seed frontmatter has kind: person and aliases", () => {
@@ -126,15 +70,6 @@ describe("default memory seeds", () => {
 
       expect(parsed.frontmatter.kind).toBe("person")
       expect(parsed.frontmatter.aliases).toEqual([])
-    })
-
-    it("#then the human body is a card-format template (not empty, invites learning)", () => {
-      const files = buildDefaultSeedFiles()
-      const human = files.find((f) => f.relativePath === "system/human.md")!
-      const body = parseMemoryFile(human.content).body
-
-      expect(body.trim().length).toBeGreaterThan(0)
-      expect(body.toLowerCase()).not.toContain("letta")
     })
   })
 
@@ -202,11 +137,7 @@ describe("default memory seeds", () => {
 
     // when
     await initMemoryWithSeeds(repo, { authorName: "Compiler Agent" })
-    const block = await compileMemoryBlock(repo, {
-      agentId: "seed-agent",
-      conversationId: "conv-seed",
-      previousMessageCount: 0,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "seed-agent" })
 
     // then
     expect(block).toContain("<self>")

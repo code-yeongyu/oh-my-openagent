@@ -67,6 +67,11 @@ export interface DreamRequestSink {
   request(request: ManualDreamCommandRequest): Promise<DreamCommandOutcome>
 }
 
+/** `/facts retry` seam: triggers exactly ONE reconcile/launch attempt after an unpark. */
+export interface FactsRetrySink {
+  reconcile(): Promise<void>
+}
+
 export interface MemoryCommandSettings {
   readonly settings: OmoMemorySettings
   /** Path of the omo config file users edit to change memory settings. */
@@ -85,6 +90,8 @@ export interface MemoryCommandDeps {
   bustPromptCache(): void
   reflectionSink?: ReflectionRequestSink
   dreamSink?: DreamRequestSink
+  /** Absent means `/facts retry` still clears records but cannot trigger a launch itself. */
+  factsSink?: FactsRetrySink
   /** Senpi sessions root for `/search`; defaults to <agentDir>/sessions. */
   sessionsDir?(): string
   exec?: GitExec

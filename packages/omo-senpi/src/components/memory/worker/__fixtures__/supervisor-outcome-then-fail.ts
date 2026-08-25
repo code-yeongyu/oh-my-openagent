@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import { readRunJson, writeRunJsonAtomic, type RunLaunchManifest } from "../run-artifacts"
+import { readRunJson, unlinkRunArtifact, writeRunJsonAtomic, type RunLaunchManifest } from "../run-artifacts"
 
 const runDir = process.argv[2]
 if (runDir === undefined) throw new TypeError("run directory is required")
@@ -13,4 +13,5 @@ await writeRunJsonAtomic(join(runDir, "outcome.json"), {
   childExit: { code: null, signal: "SIGTERM" },
   timedOut: true,
 })
+await unlinkRunArtifact(join(runDir, "launch.json"))
 process.exit(1)

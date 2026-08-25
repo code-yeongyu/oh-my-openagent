@@ -14,7 +14,8 @@ describe("skill tool - browserProvider forwarding", () => {
 
     const result = await tool.execute({ name: "agent-browser" }, mockContext)
 
-    expect(result).toContain("Skill: agent-browser")
+    expect(result).toContain(agentBrowserSkill.definition.template)
+
   })
 
   it("description includes agent-browser when browserProvider is agent-browser", () => {

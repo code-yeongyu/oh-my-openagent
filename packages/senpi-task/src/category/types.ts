@@ -7,6 +7,7 @@ export type BuiltinCategoryDefinition = {
   readonly name: string
   readonly config: OmoCategoryConfig
   readonly description: string
+  readonly callerGuidance?: string
   readonly promptAppend: string
   readonly resolvePromptAppend?: (model: string | undefined) => string
   readonly requiresModel?: string

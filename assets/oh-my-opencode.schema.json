@@ -61,7 +61,7 @@
         "enum": [
           "goal",
           "refactor",
-          "start-work",
+          "ulw-execute",
           "stop-continuation",
           "remove-ai-slops",
           "hyperplan"
@@ -9206,7 +9206,7 @@
       "properties": {
         "defaultConcurrency": {
           "type": "number",
-          "minimum": 1
+          "minimum": 0
         },
         "providerConcurrency": {
           "type": "object",
@@ -9888,6 +9888,19 @@
           "additionalProperties": false
         }
       },
+      "additionalProperties": false
+    },
+    "ulw_execute": {
+      "type": "object",
+      "properties": {
+        "auto_commit": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "auto_commit"
+      ],
       "additionalProperties": false
     },
     "start_work": {

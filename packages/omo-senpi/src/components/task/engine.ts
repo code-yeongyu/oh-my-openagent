@@ -3,6 +3,7 @@ import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh
 import { log } from "@oh-my-opencode/utils"
 import {
   createCompletionNotifier,
+  createFsSkillLoader,
   createTaskLifecycle,
   parseExtensionEntries,
   createTaskManager,
@@ -14,16 +15,21 @@ import {
   type CompletionNotifier,
   type PersistedTaskEvent,
   type SpawnAdmission,
+  type SkillLoader,
   type TaskLifecycle,
   type TaskManager,
   type TaskRecord,
-  type TaskRecordStore,
 } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
+import {
+  createCategoryConfigGenerations,
+  createGenerationObservingPlanner,
+  type CategoryConfigGenerations,
+} from "./category-config-generation"
 import { createCategoryUnavailableWarningPlanner } from "./category-unavailable-warning"
-import { createCompletionObservingStore } from "./completion-bridge"
+import { createTaskStoreChain } from "./engine-store-chain"
 import {
   DEFAULT_RUNNER_FACTORIES,
   resolveTaskAgents,
@@ -32,11 +38,11 @@ import {
 } from "./engine-runners"
 import { createOwnedMemberLivenessNotifier } from "./owned-member-liveness"
 import { createParentNotifier } from "./parent-notifier"
-import { createTaskChildPlanner } from "./planner"
+import { createTaskChildPlanner, type ResolveModelRegistry } from "./planner"
 import { createTeamMemberLivenessNotifier, type TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
-import { createMutationNotifyingStore } from "./store-mutation-observer"
+import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "./terminal-observers"
 
 export interface TaskEngine {
   readonly manager: TaskManager
@@ -44,10 +50,14 @@ export interface TaskEngine {
   readonly notifier: CompletionNotifier
   readonly runtime: TaskRuntimeContext
   readonly planner: ChildPlanner
+  // Session-local category config generations observed at the planner seam. Telemetry reads the
+  // current snapshot; every task record carries the generation that planned it.
+  readonly categoryConfigGenerations: CategoryConfigGenerations
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
   readonly stateDir: string
+  readonly loadSkills: SkillLoader
   readonly memberLiveness: TeamMemberLivenessNotifier
   readonly notifyOwnedMemberLiveness: (record: TaskRecord) => Promise<void>
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
@@ -62,9 +72,13 @@ export interface ComposeTaskEngineDeps {
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
+  readonly loadSkills?: SkillLoader
   // Per-execution-mode runner construction, injectable so tests can prove `execution_mode:"process"`
   // routes to the process (rpc) runner and not the in-process one. Defaults wire the real runners.
   readonly runnerFactories?: TaskRunnerFactories
+  // Terminal status-edge ledger notified on every nonterminal -> terminal write. Defaults to the
+  // process-shared ledger; tests inject an isolated one so edges cannot leak between engines.
+  readonly terminalObservers?: TaskTerminalObservers
 }
 
 export type { RunnerBuildContext, TaskRunnerFactories } from "./engine-runners"
@@ -80,6 +94,7 @@ export type { RunnerBuildContext, TaskRunnerFactories } from "./engine-runners"
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
   const runtime = new TaskRuntimeContext(deps.cwd)
+  const loadSkills = deps.loadSkills ?? createFsSkillLoader()
   const stateDir = {
     project_dir: deps.cwd,
     ...(settings.state_dir !== undefined && { task: { state_dir: settings.state_dir } }),
@@ -166,24 +181,31 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     return managerRef
   }
 
-  const observingStore = createCompletionObservingStore(baseStore, {
+  const categoryConfigGenerations = createCategoryConfigGenerations()
+  const storeChain = createTaskStoreChain({
+    baseStore,
+    runtime,
     notifier,
-    parentState: () => runtime.parentState(),
-    wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
-    onTerminal: (record) => void notifyOwnedMemberLiveness(record),
-  })
-
-  const mutationListeners = new Set<() => void>()
-  const notifyingStore: TaskRecordStore = createMutationNotifyingStore(observingStore, () => {
-    for (const listener of mutationListeners) listener()
+    terminal: {
+      wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
+      notifyOwnedMemberLiveness: (record) => void notifyOwnedMemberLiveness(record),
+      observers: deps.terminalObservers ?? sharedTaskTerminalObservers(),
+    },
+    generations: categoryConfigGenerations,
   })
 
   const registry = createManagerResidencyRegistry(getManager)
-  const lifecycle = createTaskLifecycle({ store: notifyingStore, registry, config: settings })
+  const lifecycle = createTaskLifecycle({ store: storeChain.store, registry, config: settings })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
-  const basePlanner = createTaskChildPlanner(deps.omoConfig, agents, () => runtime.modelRegistry())
+  const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
+  const basePlanner = createGenerationObservingPlanner({
+    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry),
+    omoConfig: deps.omoConfig,
+    resolveRegistry,
+    generations: categoryConfigGenerations,
+  })
   const planner = createCategoryUnavailableWarningPlanner({
     planner: basePlanner,
     pi: deps.pi,
@@ -192,7 +214,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     settings,
   })
   const manager = createTaskManager({
-    store: notifyingStore,
+    store: storeChain.store,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
     planner,
     config: settings,
@@ -219,17 +241,16 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     notifier,
     runtime,
     planner,
+    categoryConfigGenerations,
     agents,
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
+    loadSkills,
     memberLiveness,
     notifyOwnedMemberLiveness,
     appendTaskEvent,
-    onStoreMutation: (listener) => {
-      mutationListeners.add(listener)
-      return () => mutationListeners.delete(listener)
-    },
+    onStoreMutation: storeChain.onMutation,
   }
 }
 

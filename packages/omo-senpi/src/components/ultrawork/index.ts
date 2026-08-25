@@ -1,10 +1,12 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
-// `ulw(?!-)` keeps generous matching ("하이ulw", "ulw_helper.ts") while skipping the
-// `ulw-` skill-name family (ulw-plan, ulw-loop, ulw-research): typing a skill name
-// must not arm ultrawork mode on top of the skill itself.
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw(?!-))/i
+// Generous, exception-free matching by design ("하이ulw", "ulw_helper.ts", "ulw-plan"):
+// overlapping keywords all fire, so a skill-name mention like "ulw-loop" arms ultrawork
+// while the skill-pointers component loads that skill in the same turn. Only structural
+// dedup remains: /skill: name-only, /skill:ultrawork expansion, and an embedded
+// <ultrawork-mode> tag pair never re-inject.
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
 const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
 const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"

@@ -94,7 +94,12 @@ describe("memory runtime wiring", () => {
           command: "missing-senpi",
           args: [],
           cwd: runDir,
-          env: { PATH: "" },
+          // Seed the agent dir so the facts lock-path grant resolves against a parent that
+          // exists on every host: with an empty env the resolver falls back to host probing,
+          // and CI runners have neither ~/.omo/agent/settings.json nor ~/.senpi/agent, so the
+          // sandbox would degrade on the missing lock parent instead of reaching the
+          // unresolvable-inner-command escape this test pins.
+          env: { PATH: "", OMO_CODING_AGENT_DIR: root },
           detached: true,
           paths: { runDir, payload, extraction: join(runDir, "extraction.jsonl") },
         }
@@ -102,14 +107,19 @@ describe("memory runtime wiring", () => {
         // when
         await captured?.sandbox?.(spawnArgs)
 
-        // then
+        // then: the expected warning differs by platform - on darwin the profile
+        // builds but the inner command can't be resolved; on linux the lock-path
+        // grant cannot be expressed (bwrap limitation) so it degrades earlier.
+        const isDarwin = process.platform === "darwin"
         expect(ctx.logs).toContainEqual({
           level: "warn",
           message: "memory facts sandbox degraded",
           details: {
             identity: "agent-test",
             runId: "facts-run-visible",
-            warning: 'facts sandbox unavailable: inner command "missing-senpi" is not absolute and could not be resolved; running unsandboxed',
+            warning: isDarwin
+              ? 'facts sandbox unavailable: inner command "missing-senpi" is not absolute and could not be resolved; running unsandboxed'
+              : expect.stringContaining("facts sandbox unavailable on linux"),
           },
         })
       } finally {

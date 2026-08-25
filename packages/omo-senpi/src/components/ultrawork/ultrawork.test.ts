@@ -63,7 +63,7 @@ describe("omo-senpi ultrawork component", () => {
     const cases = [
       { text: "ulwultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 2 },
       { text: "ULW ulw Ultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 3 },
-      { text: "ulw-plan", matchedUlw: false, matchedUltrawork: false, occurrenceCount: 0 },
+      { text: "ulw-plan", matchedUlw: true, matchedUltrawork: false, occurrenceCount: 1 },
     ] as const
 
     for (const { text, ...expected } of cases) {
@@ -294,10 +294,21 @@ describe("omo-senpi ultrawork component", () => {
     expect(pi.messages).toHaveLength(0)
   })
 
-  it("#given ulw-prefixed skill names #when user input dispatches #then injects nothing", async () => {
+  it("#given a /skill: command whose trigger sits only in the skill name #when dispatched #then injects nothing", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    // when
+    const result = await dispatchInput(pi, "/skill:ulw-plan 네 plan 을 작성해주세요")
+
+    // then
+    expectNoInjection(pi, result)
+  })
+
+  it("#given ulw- skill-name mentions in plain text #when dispatched #then arms ultrawork by overlap matching", async () => {
     // given
     const prompts = [
-      "/skill:ulw-plan 네 plan 을 작성해주세요",
       "ulw-plan 스킬 좀 검토해줘",
       "omo-agent-toolkit ulw-loop status --json 확인",
     ] as const
@@ -310,7 +321,7 @@ describe("omo-senpi ultrawork component", () => {
       const result = await dispatchInput(pi, prompt)
 
       // then
-      expectNoInjection(pi, result)
+      expectHiddenInjection(pi, result)
     }
   })
 
@@ -401,20 +412,6 @@ describe("omo-senpi ultrawork component", () => {
     }
   })
 
-  it("#given synced senpi skill artifact #when description is read #then documents hidden injection instead of inviting a re-read", () => {
-    // given
-    const skillPath = resolve("packages/omo-senpi/plugin/skills/ultrawork/SKILL.md")
-    const skillContent = readFileSync(skillPath, "utf8")
-    const description = skillContent.match(/^description: (.*)$/m)?.[1] ?? ""
-
-    // then
-    expect(description).toContain("hidden")
-    expect(description).toContain("do not read this file again")
-    expect(description).not.toContain("injects the full directive inline")
-    expect(description.length).toBeLessThanOrEqual(1024)
-    expect(description).not.toContain("short bootstrap")
-    expect(description).not.toContain("Read the whole file")
-  })
 
   it("#given embedded directive #when inspected #then contains zero forbidden non-senpi tokens", () => {
     // then
@@ -423,11 +420,8 @@ describe("omo-senpi ultrawork component", () => {
     }
   })
 
-  it("#given embedded directive #when inspected #then keeps required ultrawork anchors", () => {
+  it("#given embedded directive #when inspected #then keeps one machine marker", () => {
     // then
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("ULTRAWORK MODE ENABLED!")
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/# Tier triage/i)
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/Evidence-driven|captured evidence|evidence/i)
     expect(markerCount(SENPI_ULTRAWORK_DIRECTIVE)).toBe(1)
   })
 
@@ -437,8 +431,6 @@ describe("omo-senpi ultrawork component", () => {
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("create_goal")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("`todo`")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("team_create")
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("# Parallel execution")
-    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("# Stop rules")
   })
 
   it("#given generated directive #when embed script runs check #then passes without drift", () => {

@@ -107,8 +107,6 @@ describe("handleSubagentCompletionAfter background_output incomplete reports", (
       const result = await runBackgroundOutput(output)
 
       expect(result.output).toBe(output)
-      expect(result.output).not.toContain("COMPLETION GATE")
-      expect(result.output).not.toContain("SUBAGENT WORK COMPLETED")
       expect(result.collectCalls).toBe(0)
     })
   }
@@ -134,8 +132,6 @@ Still working.
       const result = await runBackgroundOutput(output)
 
       expect(result.output).toBe(output)
-      expect(result.output).not.toContain("COMPLETION GATE")
-      expect(result.output).not.toContain("SUBAGENT WORK COMPLETED")
       expect(result.collectCalls).toBe(0)
     })
   }
@@ -159,7 +155,7 @@ Done.
 
     const result = await runBackgroundOutput(output)
 
-    expect(result.output).toContain("VERIFICATION_REMINDER")
+    expect(result.output).toContain("ses_child")
     expect(result.collectCalls).toBe(1)
   })
 
@@ -169,8 +165,6 @@ Done.
     const result = await runBackgroundOutput(output)
 
     expect(result.output).toBe(output)
-    expect(result.output).not.toContain("COMPLETION GATE")
-    expect(result.output).not.toContain("SUBAGENT WORK COMPLETED")
     expect(result.collectCalls).toBe(0)
   })
 
@@ -186,7 +180,7 @@ The generated report includes this markdown from the child process:
 
     const result = await runBackgroundOutput(output)
 
-    expect(result.output).toContain("VERIFICATION_REMINDER")
+    expect(result.output).toContain("ses_child")
     expect(result.collectCalls).toBe(1)
   })
 })

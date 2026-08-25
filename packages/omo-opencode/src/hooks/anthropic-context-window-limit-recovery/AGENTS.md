@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-31 files (~2232 LOC). Most complex hook. Recovers from context window limit errors via multiple strategies applied in sequence.
+~39 files (~5.5k LOC incl. tests; `storage/` subdir persists tool results). Most complex hook. Recovers from context window limit errors via multiple strategies applied in sequence.
 
 ## RECOVERY STRATEGIES (in priority order)
 

@@ -112,11 +112,20 @@ function spawnTerminationCommand(command: readonly string[], args: readonly stri
   const [executable, ...prefix] = command
   if (executable === undefined) throw new TypeError("termination command is required")
   if (synchronous) {
-    const result = spawnSync(executable, [...prefix, ...args], { env: process.env, stdio: "ignore" })
+    const result = spawnSync(executable, [...prefix, ...args], {
+      env: process.env,
+      stdio: "ignore",
+      windowsHide: true,
+    })
     if (result.error !== undefined) throw result.error
     return
   }
-  const child = spawn(executable, [...prefix, ...args], { env: process.env, stdio: "ignore" })
+  // taskkill runs from the console-less supervisor, so it needs the same hidden creation flag.
+  const child = spawn(executable, [...prefix, ...args], {
+    env: process.env,
+    stdio: "ignore",
+    windowsHide: true,
+  })
   child.once("error", (error) => process.stderr.write(`${error.message}\n`))
 }
 

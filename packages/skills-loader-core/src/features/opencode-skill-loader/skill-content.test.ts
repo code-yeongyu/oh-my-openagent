@@ -4,13 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdirSync, writeFileSync } from "node:fs"
-import {
-	clearSkillCache,
-	resolveSkillContent,
-	resolveMultipleSkills,
-	resolveSkillContentAsync,
-	resolveMultipleSkillsAsync,
-} from "./skill-content"
+import { frontendSkill, playwrightSkill } from "../builtin-skills/skills/index"
+import { clearSkillCache, resolveSkillContent, resolveMultipleSkills } from "./skill-content"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
@@ -51,10 +46,8 @@ describe("resolveSkillContent", () => {
 		// when: resolving content for 'frontend'
 		const result = resolveSkillContent("frontend")
 
-		// then: returns template string
-		expect(result).not.toBeNull()
-		expect(typeof result).toBe("string")
-		expect(result).toContain("router, not a rulebook")
+		// then: returns the frontend source template
+		expect(result === frontendSkill.template).toBe(true)
 	})
 
 	it("should return template for 'playwright' skill", () => {
@@ -62,10 +55,8 @@ describe("resolveSkillContent", () => {
 		// when: resolving content for 'playwright'
 		const result = resolveSkillContent("playwright")
 
-		// then: returns template string
-		expect(result).not.toBeNull()
-		expect(typeof result).toBe("string")
-		expect(result).toContain("Playwright Browser Automation")
+		// then: returns the playwright source template
+		expect(result === playwrightSkill.template).toBe(true)
 	})
 
 	it("should return null for non-existent skill", () => {
@@ -97,11 +88,12 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: all skills resolved, none not found
-		expect(result.resolved.size).toBe(2)
+		// then: all skills resolve to their source templates in request order
+		expect([...result.resolved.entries()]).toEqual([
+			["frontend", frontendSkill.template],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should handle partial success - some skills not found", () => {
@@ -111,11 +103,12 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: resolves existing skills, lists not found skills
-		expect(result.resolved.size).toBe(2)
+		// then: resolves the correct source templates and preserves missing-name order
+		expect([...result.resolved.entries()]).toEqual([
+			["frontend", frontendSkill.template],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual(["nonexistent", "another-missing"])
-		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should handle empty array", () => {
@@ -150,9 +143,8 @@ describe("resolveMultipleSkills", () => {
 		// #when: resolving multiple skills with disabled one
 		const result = resolveMultipleSkills(skillNames, options)
 
-		// #then: frontend in notFound, playwright resolved
-		expect(result.resolved.size).toBe(1)
-		expect(result.resolved.has("playwright")).toBe(true)
+		// #then: frontend in notFound, playwright resolves to its source template
+		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
 		expect(result.notFound).toEqual(["frontend"])
 	})
 
@@ -163,9 +155,10 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: map contains skills with expected keys
-		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.resolved.has("frontend")).toBe(true)
-		expect(result.resolved.size).toBe(2)
+		// then: map preserves request order and routes each key to the correct source template
+		expect([...result.resolved.entries()]).toEqual([
+			["playwright", playwrightSkill.template],
+			["frontend", frontendSkill.template],
+		])
 	})
 })

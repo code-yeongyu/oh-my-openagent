@@ -1,0 +1,79 @@
+{
+  "headRefOid": "effcfe82e7774c5b6458696bc17853a3dfe49d27",
+  "mergeable": "MERGEABLE",
+  "mergeStateStatus": "CLEAN",
+  "reviewDecision": "CHANGES_REQUESTED",
+  "workflow": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552",
+  "required_checks": [
+    {
+      "name": "test (ubuntu-latest)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554596"
+    },
+    {
+      "name": "test (macos-latest)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554539"
+    },
+    {
+      "name": "test (windows-latest, 1/2)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554570"
+    },
+    {
+      "name": "test (windows-latest, 2/2)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554571"
+    },
+    {
+      "name": "typecheck",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554564"
+    },
+    {
+      "name": "build",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554568"
+    },
+    {
+      "name": "senpi-compatibility (ubuntu-latest)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554526"
+    },
+    {
+      "name": "senpi-compatibility (macos-latest)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554550"
+    },
+    {
+      "name": "senpi-compatibility (windows-latest)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554538"
+    },
+    {
+      "name": "codex-compatibility (ubuntu-latest, full)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554584"
+    },
+    {
+      "name": "codex-compatibility (macos-latest, platform)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554536"
+    },
+    {
+      "name": "codex-compatibility (windows-latest, platform)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554728"
+    },
+    {
+      "name": "omo-ai-payload-check",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31939507552/job/95146554612"
+    },
+    {
+      "name": "cubic · AI code reviewer",
+      "conclusion": "NEUTRAL",
+      "url": "https://www.cubic.dev/pr/code-yeongyu/oh-my-openagent/pull/6858"
+    }
+  ]
+}

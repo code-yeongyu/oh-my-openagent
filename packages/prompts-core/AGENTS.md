@@ -1,6 +1,6 @@
 # prompts-core — Markdown Prompt Loading + Variant Routing (Core)
 
-**Generated:** 2026-07-17 / 7d664b96b
+**Generated:** 2026-08-24 / f3642fcda
 
 ## OVERVIEW
 

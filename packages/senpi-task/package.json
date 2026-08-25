@@ -21,6 +21,10 @@
       "types": "./src/category/resolver.ts",
       "import": "./src/category/resolver.ts"
     },
+    "./dag": {
+      "types": "./src/dag/index.ts",
+      "import": "./src/dag/index.ts"
+    },
     "./renderer-text": {
       "types": "./src/renderer-text.ts",
       "import": "./src/renderer-text.ts"
@@ -29,9 +33,17 @@
       "types": "./src/runners/rpc/spawn.ts",
       "import": "./src/runners/rpc/spawn.ts"
     },
+    "./rpc-model-admission": {
+      "types": "./src/runners/rpc/model-admission.ts",
+      "import": "./src/runners/rpc/model-admission.ts"
+    },
     "./task-renderers": {
       "types": "./src/tools/task/renderers.ts",
       "import": "./src/tools/task/renderers.ts"
+    },
+    "./notice-box": {
+      "types": "./src/notice-box.ts",
+      "import": "./src/notice-box.ts"
     }
   },
   "types": "./src/index.ts",
@@ -44,11 +56,11 @@
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "typebox": "1.1.38"
+    "typebox": "1.3.18"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.8.12-4",
-    "@earendil-works/pi-tui": "0.80.3",
+    "@code-yeongyu/senpi": "2026.8.24",
+    "@earendil-works/pi-tui": "0.84.2",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -63,9 +75,9 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.12-4",
-    "@earendil-works/pi-tui": "0.80.3",
-    "typebox": "1.1.38"
+    "@code-yeongyu/senpi": "2026.8.24",
+    "@earendil-works/pi-tui": "0.84.2",
+    "typebox": "1.3.18"
   },
   "sideEffects": false
 }

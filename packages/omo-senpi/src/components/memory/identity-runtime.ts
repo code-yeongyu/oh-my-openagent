@@ -1,4 +1,3 @@
-import { homedir } from "node:os"
 import { join } from "node:path"
 
 import {
@@ -11,6 +10,7 @@ import {
 import type { SenpiModelRegistryPort, SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
@@ -24,6 +24,7 @@ import {
   reconcileReflectionRuns,
   type ReflectionLiveSession,
   type ReflectionReservationPort,
+  type ReflectionSessionModel,
 } from "./worker"
 import type { ReflectionSpawnArgs } from "./worker"
 export { resolveMemorySettings } from "./reflection-settings"
@@ -32,8 +33,14 @@ export interface MemoryIdentityRuntimeDeps {
   readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd: () => string
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly resolveSessionModel?: () => ReflectionSessionModel | undefined
+  readonly resolveParentContextTokens?: () => number | undefined
+  readonly resolveParentSessionFile?: () => string | undefined
+  readonly resolveParentCacheReusable?: () => boolean
   readonly liveSession?: () => ReflectionLiveSession | undefined
   readonly logger?: ComponentLogger
+  /** Agent home resolved for the sandbox writable grant; defaults to resolveAgentHome on process.env. */
+  readonly resolveAgentDir?: () => string
 }
 
 export interface MemoryIdentityRuntime {
@@ -70,6 +77,7 @@ export function createIdentityRuntime(
   })
 
   let builtSandbox: SandboxTransform | undefined
+  const resolveAgentDir = deps.resolveAgentDir ?? (() => resolveAgentHome({ env: process.env }))
   const lazySandbox = (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs => {
     if (builtSandbox === undefined) {
       builtSandbox = buildSandboxTransform({
@@ -80,7 +88,7 @@ export function createIdentityRuntime(
         runtimeWrites: [
           identity.identityPaths.reflectionSessions,
           identity.identityPaths.reflection,
-          process.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"),
+          resolveAgentDir(),
           ...(process.env.XDG_CONFIG_HOME === undefined ? [] : [process.env.XDG_CONFIG_HOME]),
         ],
         command: spawnArgs.command,
@@ -102,6 +110,10 @@ export function createIdentityRuntime(
     reservation: store,
     logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,
+    ...(deps.resolveSessionModel === undefined ? {} : { resolveSessionModel: deps.resolveSessionModel }),
+    ...(deps.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: deps.resolveParentContextTokens }),
+    ...(deps.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: deps.resolveParentSessionFile }),
+    ...(deps.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: deps.resolveParentCacheReusable }),
     loadConfig: (options) => deps.loadConfig(options ?? {}),
     cwd: deps.cwd(),
     sandbox: lazySandbox,

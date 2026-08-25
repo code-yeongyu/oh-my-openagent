@@ -1,16 +1,21 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync } from "fs"
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 
-const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
-const TEST_HOME = join(TEST_DIR, "home")
+// mkdtempSync, never a clock-derived name: consecutive Date.now() calls in one process
+// return the same millisecond, so sibling suites sharing this prefix collided on one
+// directory and each teardown removed the other's live fixture. On Windows, removing an
+// in-use tree blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+let TEST_DIR = ""
+let TEST_HOME = ""
 
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
-    mkdirSync(TEST_DIR, { recursive: true })
+    TEST_DIR = mkdtempSync(join(tmpdir(), "mcp-loader-test-"))
+    TEST_HOME = join(TEST_DIR, "home")
     mkdirSync(TEST_HOME, { recursive: true })
     process.env.HOME = TEST_HOME
     process.env.CLAUDE_CONFIG_DIR = join(TEST_HOME, ".claude")

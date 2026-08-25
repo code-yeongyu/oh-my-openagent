@@ -1,3 +1,18 @@
+## 2026-08-20 — Export the canonical notice-box visual contract
+
+The package now exports one `buildNoticeBox` helper and `NoticeSpec`-shaped types for Senpi-coupled adapters. It reproduces Senpi's canonical `Box(1, 1, customMessageBg)` contract while the pinned host package does not export its own builder.
+
+Keep transcript notices on this helper. Compact task/tool/status rows remain on their purpose-built renderers.
+
+## 2026-08-18 — Route category selection guidance to the caller
+
+The task tool description now shows the caller-only selection gates for quick and unspecified
+categories before a child is spawned. Those gates no longer enter the child prompt, while each
+category's worker-directed execution context remains unchanged.
+
+Keep caller guidance on builtin category definitions and render it only from the task description.
+`promptAppend` is reserved for instructions the spawned worker can act on.
+
 ## 2026-08-06 — Make batch contention coverage scheduler-independent
 
 The batch-admission contention test now injects the typed `contended` lease result directly instead

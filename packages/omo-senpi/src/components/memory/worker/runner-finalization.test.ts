@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFile, rm } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
 
 const harnesses: RunnerHarness[] = []
-afterEach(async () => Promise.all(harnesses.splice(0).map((item) => rm(item.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(harnesses.splice(0).map((item) => rmEfaultTolerant(item.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
 describe("live reflection run finalization", () => {
   test("#given a successful supervised run #when the parent finalizer completes #then final is published after integration and the merge carries its run receipt", async () => {

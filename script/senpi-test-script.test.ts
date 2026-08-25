@@ -103,7 +103,7 @@ describe("Senpi compatibility test script", () => {
         "refactor",
         "remove-ai-slops",
         "review-work",
-        "start-work",
+        "ulw-execute",
         "ultimate-browsing",
         "ultrawork",
         "ulw-loop",
@@ -213,7 +213,7 @@ describe("Senpi compatibility test script", () => {
     // #then
     expect(senpiJob).toContain("os: [ubuntu-latest, macos-latest, windows-latest]")
     expect(senpiJob).toContain('node-version: "24"')
-    expect(senpiJob).toContain('bun-version: "1.3.12"')
+    expect(senpiJob).toContain('bun-version: "1.4.0"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")

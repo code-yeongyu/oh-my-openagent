@@ -1,0 +1,21 @@
+# Classification: run 32215869849 / test (windows-latest, 2/2)
+
+Source: gh run view 32215869849 --log-failed
+
+2026-08-19T04:38:19.8477403Z packages\senpi-task\src\team\runtime-delete.test.ts:
+2026-08-19T04:38:19.8509383Z (fail) deleteTeam > #given two delete calls for one team #when invoked concurrently #then they share one cancellation and one destruction [5418.31ms]
+2026-08-19T04:38:19.8509908Z   ^ this test timed out after 5000ms.
+--
+2026-08-19T04:38:34.7170660Z (pass) DAG failure, crash, and policy end to end > #given a crash after an owned task spawns but before task attachment #when a fresh manager resumes #then startOwned recovers the existing task and spawn count remains exactly one [1035.63ms]
+2026-08-19T04:38:34.7272161Z (fail) DAG failure, crash, and policy end to end > #given an existing run key #when its prompt changes #then definition_conflict leaves the original checkpoint, events, and task count untouched [10795.57ms]
+2026-08-19T04:38:34.7336477Z   ^ this test timed out after 5000ms.
+2026-08-19T04:38:34.7382297Z (fail) DAG failure, crash, and policy end to end > #given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent [8638.37ms]
+2026-08-19T04:38:34.7526838Z   ^ this test timed out after 5000ms.
+--
+2026-08-19T04:40:01.5973679Z 3 tests failed:
+2026-08-19T04:40:01.5974827Z (fail) DAG failure, crash, and policy end to end > #given an existing run key #when its prompt changes #then definition_conflict leaves the original checkpoint, events, and task count untouched [10795.57ms]
+2026-08-19T04:40:01.5975845Z   ^ this test timed out after 5000ms.
+2026-08-19T04:40:01.5977289Z (fail) DAG failure, crash, and policy end to end > #given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent [8638.37ms]
+2026-08-19T04:40:01.5978298Z   ^ this test timed out after 5000ms.
+2026-08-19T04:40:01.5979225Z (fail) deleteTeam > #given two delete calls for one team #when invoked concurrently #then they share one cancellation and one destruction [5418.31ms]
+2026-08-19T04:40:01.5980874Z   ^ this test timed out after 5000ms.

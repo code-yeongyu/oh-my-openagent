@@ -1,4 +1,4 @@
-# src/features/ — 23 Feature Modules
+# src/features/ — 25 Feature Modules
 
 **Generated:** 2026-08-07
 
@@ -12,6 +12,7 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 |--------|------------|-------------------|---------|
 | **team-mode** | HIGH | yes | Parallel multi-agent coordination — 12 `team_*` tools; domain primitives live in `packages/team-core/` with OpenCode runtime/session wiring here |
 | **background-agent** | HIGH | yes | Task lifecycle, concurrency (5/key), 3s polling, spawner pattern, circuit breaker. Newer files include `parent-wake-notifier.ts`, `loop-detector`, `error-classifier`, `fallback-retry-handler`, `process-cleanup`, `subagent-spawn-limits`, `session-status-classifier`, and `compaction-aware-message-resolver`. |
+| **btw-side** | HIGH | no | Codex-aligned ephemeral side conversations: TUI commands and controls, bounded parent-context injection, session metadata, lifecycle cleanup, and isolation guards |
 | **tmux-subagent** | HIGH | yes | Tmux pane management, grid planning, session orchestration via `runTmuxCommand`; reusable tmux primitives live in `packages/tmux-core/` |
 | **opencode-skill-loader** | HIGH | yes | OpenCode adapter for YAML frontmatter skill discovery; reusable loader primitives live in `packages/skills-loader-core/` |
 | **builtin-skills** | LOW–MED | yes | Built-in skill files (git-master, playwright, frontend, review-work, remove-ai-slops, init-deep, security-research, security-review, dev-browser, playwright-cli, **team-mode**, …) |
@@ -33,6 +34,7 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 | **claude-code-session-state** | LOW | no | Subagent session state tracking |
 | **monitor** | MEDIUM | no | `monitor_*` tools backend: managed watcher processes, line filtering, ring buffer, batched output injection (gated on `monitor.enabled`) |
 | **tui-sidebar** | MEDIUM | no | TUI sidebar snapshot builder + mirror manager (roster/state derivers rendered into the OpenCode TUI; gated on `tui.sidebar.enabled`) |
+| **opengateway-provider** | LOW | no | Injects the `opengateway` provider into opencode's live config when a credential exists (`OPENGATEWAY_API_KEY` env or `opengateway` auth.json entry); fills only missing keys, ships bundled `opengateway-models.json` catalog |
 
 ## KEY MODULES
 

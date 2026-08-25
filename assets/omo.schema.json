@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
-  "title": "Omo Configuration",
+  "title": "OmO Configuration",
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
@@ -807,6 +807,31 @@
       ],
       "additionalProperties": false
     },
+    "git_master": {
+      "type": "object",
+      "properties": {
+        "commit_footer": {
+          "default": true,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "include_co_authored_by": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "commit_footer",
+        "include_co_authored_by"
+      ],
+      "additionalProperties": false
+    },
     "task": {
       "type": "object",
       "properties": {
@@ -821,7 +846,13 @@
         "default_concurrency": {
           "default": 5,
           "type": "integer",
-          "exclusiveMinimum": 0,
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "global_concurrency": {
+          "default": 8,
+          "type": "integer",
+          "minimum": 0,
           "maximum": 9007199254740991
         },
         "provider_concurrency": {
@@ -831,7 +862,7 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 0,
             "maximum": 9007199254740991
           }
         },
@@ -842,7 +873,7 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 0,
             "maximum": 9007199254740991
           }
         },
@@ -857,7 +888,7 @@
           "anyOf": [
             {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             {
@@ -965,11 +996,76 @@
             "max_wall_clock_minutes"
           ],
           "additionalProperties": false
+        },
+        "dag": {
+          "type": "object",
+          "properties": {
+            "max_nodes_per_run": {
+              "default": 64,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_runs_per_session": {
+              "default": 16,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "subscriber_ring": {
+              "default": 1000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "heartbeat_ms": {
+              "default": 15000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "history_default_limit": {
+              "default": 256,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "history_max_limit": {
+              "default": 1000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "retention_days": {
+              "default": 7,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_prompt_bytes": {
+              "default": 262144,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "max_nodes_per_run",
+            "max_runs_per_session",
+            "subscriber_ring",
+            "heartbeat_ms",
+            "history_default_limit",
+            "history_max_limit",
+            "retention_days",
+            "max_prompt_bytes"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "default_execution_mode",
         "default_concurrency",
+        "global_concurrency",
         "max_depth",
         "residency_max_children",
         "ttl_ms",
@@ -1461,6 +1557,22 @@
           ],
           "additionalProperties": false
         },
+        "write_notice": {
+          "default": {
+            "enabled": true
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "additionalProperties": false
+        },
         "sync": {
           "default": {
             "enabled": true
@@ -1654,6 +1766,15 @@
                 },
                 "additionalProperties": false
               },
+              "write_notice": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "sync": {
                 "type": "object",
                 "properties": {
@@ -1696,6 +1817,7 @@
         "dream",
         "people",
         "soul",
+        "write_notice",
         "sync",
         "search",
         "compile_warn_tokens",
@@ -1779,7 +1901,7 @@
             "enum": [
               "goal",
               "refactor",
-              "start-work",
+              "ulw-execute",
               "stop-continuation",
               "remove-ai-slops",
               "hyperplan"
@@ -10924,7 +11046,7 @@
           "properties": {
             "defaultConcurrency": {
               "type": "number",
-              "minimum": 1
+              "minimum": 0
             },
             "providerConcurrency": {
               "type": "object",
@@ -11606,6 +11728,19 @@
               "additionalProperties": false
             }
           },
+          "additionalProperties": false
+        },
+        "ulw_execute": {
+          "type": "object",
+          "properties": {
+            "auto_commit": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "auto_commit"
+          ],
           "additionalProperties": false
         },
         "start_work": {
@@ -12443,6 +12578,25 @@
           },
           "additionalProperties": false
         },
+        "git_master": {
+          "type": "object",
+          "properties": {
+            "commit_footer": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "include_co_authored_by": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -12455,7 +12609,12 @@
             },
             "default_concurrency": {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_concurrency": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "provider_concurrency": {
@@ -12465,7 +12624,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -12476,7 +12635,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -12489,7 +12648,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 {
@@ -12556,6 +12715,52 @@
                   "maximum": 8
                 },
                 "max_wall_clock_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "dag": {
+              "type": "object",
+              "properties": {
+                "max_nodes_per_run": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_runs_per_session": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "subscriber_ring": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "heartbeat_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "history_default_limit": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "history_max_limit": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "retention_days": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_prompt_bytes": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -12941,6 +13146,15 @@
               },
               "additionalProperties": false
             },
+            "write_notice": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "sync": {
               "type": "object",
               "properties": {
@@ -13113,6 +13327,15 @@
                     "type": "object",
                     "properties": {
                       "edit_notice": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
                         "type": "boolean"
                       }
                     },
@@ -13956,6 +14179,25 @@
           },
           "additionalProperties": false
         },
+        "git_master": {
+          "type": "object",
+          "properties": {
+            "commit_footer": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "include_co_authored_by": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -13968,7 +14210,12 @@
             },
             "default_concurrency": {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_concurrency": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "provider_concurrency": {
@@ -13978,7 +14225,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -13989,7 +14236,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -14002,7 +14249,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 {
@@ -14069,6 +14316,52 @@
                   "maximum": 8
                 },
                 "max_wall_clock_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "dag": {
+              "type": "object",
+              "properties": {
+                "max_nodes_per_run": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_runs_per_session": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "subscriber_ring": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "heartbeat_ms": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "history_default_limit": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "history_max_limit": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "retention_days": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_prompt_bytes": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -14454,6 +14747,15 @@
               },
               "additionalProperties": false
             },
+            "write_notice": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "sync": {
               "type": "object",
               "properties": {
@@ -14626,6 +14928,15 @@
                     "type": "object",
                     "properties": {
                       "edit_notice": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
                         "type": "boolean"
                       }
                     },
@@ -15475,6 +15786,25 @@
             },
             "additionalProperties": false
           },
+          "git_master": {
+            "type": "object",
+            "properties": {
+              "commit_footer": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "include_co_authored_by": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "task": {
             "type": "object",
             "properties": {
@@ -15487,7 +15817,12 @@
               },
               "default_concurrency": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "global_concurrency": {
+                "type": "integer",
+                "minimum": 0,
                 "maximum": 9007199254740991
               },
               "provider_concurrency": {
@@ -15497,7 +15832,7 @@
                 },
                 "additionalProperties": {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 }
               },
@@ -15508,7 +15843,7 @@
                 },
                 "additionalProperties": {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 }
               },
@@ -15521,7 +15856,7 @@
                 "anyOf": [
                   {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   {
@@ -15588,6 +15923,52 @@
                     "maximum": 8
                   },
                   "max_wall_clock_minutes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "dag": {
+                "type": "object",
+                "properties": {
+                  "max_nodes_per_run": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_runs_per_session": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "subscriber_ring": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "heartbeat_ms": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "history_default_limit": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "history_max_limit": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "retention_days": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_prompt_bytes": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -15973,6 +16354,15 @@
                 },
                 "additionalProperties": false
               },
+              "write_notice": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "sync": {
                 "type": "object",
                 "properties": {
@@ -16150,6 +16540,15 @@
                       },
                       "additionalProperties": false
                     },
+                    "write_notice": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "sync": {
                       "type": "object",
                       "properties": {
@@ -16256,7 +16655,7 @@
                   "enum": [
                     "goal",
                     "refactor",
-                    "start-work",
+                    "ulw-execute",
                     "stop-continuation",
                     "remove-ai-slops",
                     "hyperplan"
@@ -25401,7 +25800,7 @@
                 "properties": {
                   "defaultConcurrency": {
                     "type": "number",
-                    "minimum": 1
+                    "minimum": 0
                   },
                   "providerConcurrency": {
                     "type": "object",
@@ -26083,6 +26482,19 @@
                     "additionalProperties": false
                   }
                 },
+                "additionalProperties": false
+              },
+              "ulw_execute": {
+                "type": "object",
+                "properties": {
+                  "auto_commit": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "auto_commit"
+                ],
                 "additionalProperties": false
               },
               "start_work": {
@@ -26920,6 +27332,25 @@
                 },
                 "additionalProperties": false
               },
+              "git_master": {
+                "type": "object",
+                "properties": {
+                  "commit_footer": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "include_co_authored_by": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -26932,7 +27363,12 @@
                   },
                   "default_concurrency": {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "global_concurrency": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "provider_concurrency": {
@@ -26942,7 +27378,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -26953,7 +27389,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -26966,7 +27402,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "exclusiveMinimum": 0,
+                        "minimum": 0,
                         "maximum": 9007199254740991
                       },
                       {
@@ -27033,6 +27469,52 @@
                         "maximum": 8
                       },
                       "max_wall_clock_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "dag": {
+                    "type": "object",
+                    "properties": {
+                      "max_nodes_per_run": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_runs_per_session": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "subscriber_ring": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "heartbeat_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "history_default_limit": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "history_max_limit": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "retention_days": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_prompt_bytes": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -27418,6 +27900,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -27590,6 +28081,15 @@
                           "type": "object",
                           "properties": {
                             "edit_notice": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "write_notice": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
                               "type": "boolean"
                             }
                           },
@@ -28433,6 +28933,25 @@
                 },
                 "additionalProperties": false
               },
+              "git_master": {
+                "type": "object",
+                "properties": {
+                  "commit_footer": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "include_co_authored_by": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -28445,7 +28964,12 @@
                   },
                   "default_concurrency": {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "global_concurrency": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "provider_concurrency": {
@@ -28455,7 +28979,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -28466,7 +28990,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -28479,7 +29003,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "exclusiveMinimum": 0,
+                        "minimum": 0,
                         "maximum": 9007199254740991
                       },
                       {
@@ -28546,6 +29070,52 @@
                         "maximum": 8
                       },
                       "max_wall_clock_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "dag": {
+                    "type": "object",
+                    "properties": {
+                      "max_nodes_per_run": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_runs_per_session": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "subscriber_ring": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "heartbeat_ms": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "history_default_limit": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "history_max_limit": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "retention_days": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_prompt_bytes": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -28931,6 +29501,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -29103,6 +29682,15 @@
                           "type": "object",
                           "properties": {
                             "edit_notice": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "write_notice": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
                               "type": "boolean"
                             }
                           },

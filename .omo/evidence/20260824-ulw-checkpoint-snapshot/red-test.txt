@@ -1,0 +1,19 @@
+WHAT WAS TESTED
+npm --prefix packages/omo-codex/plugin/components/ulw-loop test -- test/codex-goal-snapshot.test.ts
+
+WHAT IT PROVES
+A goal snapshot shaped like the ulw-loop status/TUI payload:
+{"id":"G002-goal-2-senpi-repo-audit-determine-wh","title":"Audit the Senpi repository","status":"in_progress","successCriteria":[]}
+must preserve its title as the goal objective.
+
+OBSERVED RED
+Test file: test/codex-goal-snapshot.test.ts
+Result: 1 failed, 12 passed.
+Failure: expected snapshot.objective to equal "Audit the Senpi repository", received undefined.
+Exit code: 1.
+
+WHY THIS IS THE RIGHT FAILURE
+The parser recognizes in_progress as an active status, so the snapshot is available, but it ignores title and reaches the exact missing-objective reconciliation branch seen by the user.
+
+WHAT WAS OMITTED
+No credentials, auth headers, or secret-bearing logs were captured.

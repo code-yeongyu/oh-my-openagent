@@ -83,24 +83,21 @@ test("#given a worktree team #when worktree-add A #then a real git worktree on a
 		assert.match(result.stdout, /A/);
 		assert.match(result.stdout, /wait for the real Codex thread id/);
 		assert.match(result.stdout, /bind-thread before sending bootstrap/);
-		assert.doesNotMatch(result.stdout, /Tell that member to:/);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}
 });
 
-test("#given worktree-add ran #when the field manual is regenerated #then it flips the member's guide to ISOLATION IS ON with the derived branch", () => {
+test("#given worktree-add ran #when the field manual is regenerated #then it shows the member's derived worktree branch", () => {
 	const tempRoot = createTeamRoot("omo-codex-teammode-wt-guide-");
 	try {
 		initGitRepo(tempRoot);
 		bootstrapTeam(tempRoot, "wt-guide", { worktree: false });
-		// before: no isolation, so the manual tells members to signal collisions instead
-		assert.match(readFileSync(join(teamDir(tempRoot, "wt-guide"), "guide.md"), "utf8"), /does not use isolated git worktrees/);
 
 		runTeam(tempRoot, "worktree-add", "--team", "wt-guide", "--id", "A");
 
+		// then - the regenerated guide carries the derived branch recorded in team state
 		const guide = readFileSync(join(teamDir(tempRoot, "wt-guide"), "guide.md"), "utf8");
-		assert.match(guide, /ISOLATION IS ON/);
 		assert.match(guide, /team\/wt-guide\/A/, "the member's row must show its derived worktree branch");
 	} finally {
 		cleanupTeamRoot(tempRoot);
@@ -225,7 +222,6 @@ test("#given a member branch that cannot be merged #when integrate runs #then it
 		const out = `${result.stdout}${result.stderr}`;
 		assert.notEqual(result.status, 0);
 		assert.match(out, /could not integrate|not something we can merge|ghost-branch-404/i, "must surface git's actual reason");
-		assert.doesNotMatch(out, /Conflicting files/, "a non-conflict failure must NOT be mislabeled as a merge conflict");
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

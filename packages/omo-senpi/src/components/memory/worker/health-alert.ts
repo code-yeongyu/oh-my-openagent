@@ -35,7 +35,7 @@ export const renderReflectionHealthEntry: EntryRenderer<ReflectionHealthEntry> =
       glyph: "✗",
       title: `Memory reflection failing · ${health.streak} run${health.streak === 1 ? "" : "s"} in a row`,
       tone: "error",
-      why: normalizeRendererText(health.recommendation),
+      why: recommendationWhy(health.recommendation),
       detail: joinFields([
         `reason ${normalizeRendererText(health.lastReason)}`,
         optionalRendererText(health.lastDetail) === undefined ? undefined : detailExcerpt(health.lastDetail ?? ""),
@@ -50,6 +50,14 @@ export const renderReflectionHealthEntry: EntryRenderer<ReflectionHealthEntry> =
 
 export function registerReflectionHealthRenderer(api: ReflectionCompletionApi): void {
   api.registerEntryRenderer(REFLECTION_HEALTH_ENTRY_TYPE, renderReflectionHealthEntry)
+}
+
+/** House why-line: one full English sentence, even when remediation copy is a fragment. */
+function recommendationWhy(recommendation: string): string {
+  const text = normalizeRendererText(recommendation).trim()
+  if (text.length === 0) return "Reflection has failed repeatedly and needs attention."
+  const sentence = `${text[0]!.toUpperCase()}${text.slice(1)}`
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`
 }
 
 /**

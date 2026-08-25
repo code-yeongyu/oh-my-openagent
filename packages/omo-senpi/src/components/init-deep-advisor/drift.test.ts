@@ -5,8 +5,9 @@ import { join } from "node:path"
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { COOLDOWN_DAYS } from "./constants"
-import { computeDrift, shouldProposeRefresh } from "./drift"
+import { computeDrift, shouldProposeRefresh, type DriftMetrics } from "./drift"
 import {
+  advanceCommits,
   cleanupTempDirs,
   commitAll,
   git,
@@ -14,7 +15,6 @@ import {
   sourceFile,
   writeFileAt,
 } from "./fixtures.test-support"
-import { gitHead } from "./git-helpers"
 import type { InitDeepSnapshotV1 } from "./state"
 
 afterEach(() => {
@@ -23,7 +23,7 @@ afterEach(() => {
 
 const MS_PER_DAY = 86_400_000
 
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
 
 function snapshotAt(commitSha: string, timestamp: number = Date.now()): InitDeepSnapshotV1 {
   return { commitSha, fileCount: 10, loc: 1000, timestamp, mode: "local" }
@@ -38,12 +38,17 @@ function makeDriftRepo(): { root: string; baseSha: string } {
   return { root, baseSha }
 }
 
-function advanceCommits(root: string, count: number, touchedFileIndexes: readonly number[]): void {
-  for (let step = 0; step < count; step++) {
-    for (const fileIndex of touchedFileIndexes) {
-      writeFileAt(root, join("src", `file${fileIndex}.ts`), sourceFile(100 + step + 1))
-    }
-    commitAll(root, `drift ${step}`)
+function thresholdDrift(): Extract<DriftMetrics, { kind: "valid" }> {
+  return {
+    kind: "valid",
+    commitsSince: 40,
+    touchedFiles: 2,
+    trackedFiles: 10,
+    touchedRatio: 0.2,
+    churnLoc: 100,
+    totalLoc: 1_000,
+    churnLocRatio: 0.1,
+    daysSince: 0,
   }
 }
 
@@ -51,7 +56,7 @@ describe("computeDrift", () => {
   test("#given 40 commits touching 2 of 10 files #when computing drift #then metrics report 40 commits and a 0.2 touched ratio", () => {
     // given
     const { root, baseSha } = makeDriftRepo()
-    advanceCommits(root, 40, [0, 1])
+    advanceCommits(root, baseSha, 40, [0, 1])
 
     // when
     const drift = computeDrift(root, snapshotAt(baseSha))
@@ -150,12 +155,10 @@ describe("computeDrift", () => {
 describe("shouldProposeRefresh", () => {
   test("#given 40 commits and a 20% touched ratio #when deciding #then it proposes a refresh", () => {
     // given
-    const { root, baseSha } = makeDriftRepo()
-    advanceCommits(root, 40, [0, 1])
-    const drift = computeDrift(root, snapshotAt(baseSha))
+    const drift = thresholdDrift()
 
     // when
-    const result = shouldProposeRefresh(drift, gitHead(root), null, 0)
+    const result = shouldProposeRefresh(drift, "current-head", null, 0)
 
     // then
     expect(result).toBe(true)
@@ -163,10 +166,8 @@ describe("shouldProposeRefresh", () => {
 
   test("#given the current HEAD equals the last proposed HEAD #when deciding #then it suppresses", () => {
     // given
-    const { root, baseSha } = makeDriftRepo()
-    advanceCommits(root, 40, [0, 1])
-    const drift = computeDrift(root, snapshotAt(baseSha))
-    const head = gitHead(root)
+    const drift = thresholdDrift()
+    const head = "current-head"
 
     // when
     const result = shouldProposeRefresh(drift, head, head, 0)
@@ -177,13 +178,11 @@ describe("shouldProposeRefresh", () => {
 
   test("#given an active 7-day cooldown #when deciding #then it suppresses", () => {
     // given
-    const { root, baseSha } = makeDriftRepo()
-    advanceCommits(root, 40, [0, 1])
-    const drift = computeDrift(root, snapshotAt(baseSha))
+    const drift = thresholdDrift()
     const cooldownUntil = Date.now() + COOLDOWN_DAYS * MS_PER_DAY
 
     // when
-    const result = shouldProposeRefresh(drift, gitHead(root), null, cooldownUntil)
+    const result = shouldProposeRefresh(drift, "current-head", null, cooldownUntil)
 
     // then
     expect(result).toBe(false)

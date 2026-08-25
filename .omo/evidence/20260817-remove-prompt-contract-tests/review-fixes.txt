@@ -1,0 +1,69 @@
+INDEPENDENT REVIEW BLOCKERS AND RESOLUTION
+
+Scanner coverage
+
+- Blocker: Node node:assert assertions and prompt-bearing snapshots were not
+  covered by the original AST scanner.
+- Fix: added import-aware Node assert parsing for default, namespace, named,
+  aliased, require, destructured, strict, positive, negative, regex, and ok
+  forms; added precise recursive binding context for instruction artifacts;
+  added prompt-bearing snapshot tracing.
+- Precision proof: generic numeric, body, template, and workflow assertions are
+  ignored.
+- Final result: 2,297 tracked tests, 1,894 candidates, 1,894 allowed,
+  0 missing, 0 unclassified, 0 forbidden, 0 stale.
+- Regression suite: 13 passed under the declared uv environment.
+
+Codex spawn safety
+
+- Blocker: deleting the old aggregate skill test removed structural checks for
+  parent-context isolation and unsupported spawn-time parameters.
+- Fix: restored balanced spawn_agent parsing over 26 top-level skills,
+  10 component-owned skills, and 2 bundled Hephaestus rules.
+- Final result: all 61 spawn calls specify fork_context:false or
+  fork_turns:"none"; no shipped call uses unsupported model,
+  reasoning_effort, or invalid direct agent_type syntax.
+
+Atlas final-wave approval
+
+- Blocker: the prior regression did not invoke idle with complete plan progress
+  while final-wave approval remained pending.
+- Fix: added a complete-plan race scenario that proves the approval handler
+  emits a pause-side effect, progress is complete, no continuation dispatch
+  occurs, and boulder state is not marked completed.
+- Mutation proof: moving the guard below the complete-progress branch causes
+  the new test to fail.
+
+Remaining prose snapshots and assertions
+
+- Removed the built-in category snapshot that pinned every description and
+  promptAppend body; retained category order, model, variant, and gate
+  assertions only (authored-length checks were removed as prose contracts).
+- Rewrote release-note, LazyCodex PR template, hook status, installer status,
+  and ulw-loop default_prompt tests around machine tags, escaping, counts,
+  structured fields, state, commands, and runtime behavior.
+
+Evidence hygiene
+
+- Replaced host-specific worktree, home, database, and macOS temporary paths
+  with reviewer-readable placeholders.
+- Replaced real OpenCode session identifiers, hostname, database counts,
+  config hash, and PTY PID with redacted placeholders.
+- Second-round scanner hardening: callable assert(condition) forms and every
+  snapshot assertion are now covered; final state is 1,910 candidates,
+  1,910 allowed, 0 missing, 0 unclassified, 0 forbidden, 0 stale.
+- Codex spawn parser now distinguishes v1 by receiver: flat spawn_agent
+  rejects agent_type in object and keyword forms.
+- executeOnCompleteHook now takes injected platform/env, removing
+  process-global test mocks that leaked across Windows test ordering.
+- Final no-ignore search found no host path, hostname, count, hash, PID, or
+  real QA session identifier.
+
+FINAL AUTOMATED GATES
+
+- bun run typecheck: exit 0.
+- bun run build: exit 0.
+- bun run test:codex: exit 0; 492 passed, 0 failed in the final Node section.
+- bun test: exit 0; 15,613 passed, 7 existing platform/TUI skips, 0 failed,
+  131,764 assertions across 2,048 files.
+- git diff --check: exit 0.

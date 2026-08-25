@@ -98,6 +98,7 @@ async function probeChildModels(
   ], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   })
   const stdout: Buffer[] = []
   const stderr: Buffer[] = []
@@ -128,14 +129,14 @@ function parseModelCatalog(output: string): ReadonlySet<string> {
   if (headerIndex >= 0) {
     for (const line of lines.slice(headerIndex + 1)) {
       const columns = line.split(/\s{2,}/)
-      if (columns.length >= 2 && isModelPart(columns[0] ?? "") && isModelPart(columns[1] ?? "")) {
+      if (columns.length >= 2 && isProviderPart(columns[0] ?? "") && isModelIdPart(columns[1] ?? "")) {
         models.add(`${columns[0]}/${columns[1]}`)
       }
     }
     return models
   }
   for (const line of lines) {
-    if (/^[^\s/]+\/[^\s/]+$/.test(line)) models.add(line)
+    if (/^[^\s/]+\/[^\s]+$/.test(line)) models.add(line)
   }
   return models
 }
@@ -160,8 +161,16 @@ function asMemoryModelChain(candidates: readonly ReflectionModelCandidate[]): Me
   return [first, ...candidates.slice(1)]
 }
 
-function isModelPart(value: string): boolean {
+// A provider name never contains a slash, so the first column stays strict. A model id routinely does
+// (`z-ai/glm-5.2-ultrafast-unlocked`, `deepseek-ai/deepseek-v4-pro`, most OpenRouter ids), and senpi
+// resolves `<provider>/<model-id>` by splitting on the FIRST slash only, so the model column must keep
+// everything after it verbatim.
+function isProviderPart(value: string): boolean {
   return value.length > 0 && !/\s|\//.test(value)
+}
+
+function isModelIdPart(value: string): boolean {
+  return value.length > 0 && !/\s/.test(value)
 }
 
 function stripAnsi(value: string): string {

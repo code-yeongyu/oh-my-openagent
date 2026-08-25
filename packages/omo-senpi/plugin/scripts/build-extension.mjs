@@ -9,11 +9,16 @@ import { findStaleRuntimePersona, stageRuntimePersonas } from "./persona-artifac
 import {
   artifactsMatch,
   attachBuildMarker,
+  minifyBundle,
   normalizeBuiltinImports,
   toPortableBuildPath,
 } from "./build-artifact.mjs"
 
 export { toPortableBuildPath }
+
+export function resolveBunExecutable(platform = process.platform) {
+  return platform === "win32" ? "bun.exe" : "bun"
+}
 
 // Keep this list byte-for-byte aligned with senpi loader.ts lines 145-165.
 export const SENPI_LOADER_ALIASES = [
@@ -66,7 +71,10 @@ const externalSpecifiers = [
 const BUILD_SETTINGS = JSON.stringify({
   target: "node",
   format: "esm",
-  minify: true,
+  minifySyntax: true,
+  minifyWhitespace: true,
+  minifyIdentifiers: false,
+  secondaryMinifier: "terser@5.44.0",
   loaderAliases: SENPI_LOADER_ALIASES,
 })
 
@@ -113,13 +121,14 @@ async function buildEntry(entry, output, buildDefines) {
   await mkdir(dirname(output), { recursive: true })
   const metafile = `${output}.meta.json`
   try {
-    run("bun", [
+    run(resolveBunExecutable(), [
       "build", entry, "--target", "node", "--format", "esm", "--outfile", output,
-      "--minify", `--metafile=${metafile}`,
+      "--minify-syntax", "--minify-whitespace", `--metafile=${metafile}`,
       ...Object.entries(buildDefines).flatMap(([name, value]) => ["--define", `${name}=${JSON.stringify(value)}`]),
       ...externalSpecifiers.flatMap((specifier) => ["--external", specifier]),
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
+    await minifyBundle(output)
     return await attachBuildMarker({
       output,
       entry,
@@ -211,7 +220,6 @@ export async function checkExtensionCurrent(options = {}) {
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
-    shell: process.platform === "win32",
     stdio: "inherit",
   })
   if (result.error !== undefined) throw result.error

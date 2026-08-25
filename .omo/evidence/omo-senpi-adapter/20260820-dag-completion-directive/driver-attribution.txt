@@ -1,0 +1,41 @@
+task-e2e.mjs check-level attribution (same senpi binary, same host, same driver)
+
+MINE   FAIL checks (6): ['followup_revive', 'jsonl_sequence', 'resume_finished_steerable', 'resume_revived_resident', 'resume_ttl_not_revived', 'task_output_peek']
+BASE   FAIL checks (6): ['followup_revive', 'jsonl_sequence', 'resume_finished_steerable', 'resume_revived_resident', 'resume_ttl_not_revived', 'task_output_peek']
+
+MINE-ONLY failures (mine - baseline): NONE
+BASE-ONLY failures (baseline - mine): NONE
+IDENTICAL failure sets: True
+
+check-by-check verdict diff:
+  batch_fanout_two_children        mine=PASS   baseline=PASS   SAME
+  extension_suppression            mine=PASS   baseline=PASS   SAME
+  followup_revive                  mine=FAIL   baseline=FAIL   SAME
+  jsonl_sequence                   mine=FAIL   baseline=FAIL   SAME
+  negative_category_error          mine=PASS   baseline=PASS   SAME
+  no_leaked_pids                   mine=PASS   baseline=PASS   SAME
+  real_senpi_untouched             mine=PASS   baseline=PASS   SAME
+  resume_cancel_not_revived        mine=PASS   baseline=PASS   SAME
+  resume_cancel_setup              mine=PASS   baseline=PASS   SAME
+  resume_finished_no_nudge         mine=PASS   baseline=PASS   SAME
+  resume_finished_steerable        mine=FAIL   baseline=FAIL   SAME
+  resume_kill_setup                mine=PASS   baseline=PASS   SAME
+  resume_killed_not_revived        mine=PASS   baseline=PASS   SAME
+  resume_lru_evict_not_revived     mine=PASS   baseline=PASS   SAME
+  resume_lru_setup                 mine=PASS   baseline=PASS   SAME
+  resume_midturn_continuation      mine=PASS   baseline=PASS   SAME
+  resume_quit_suspends_both        mine=PASS   baseline=PASS   SAME
+  resume_revived_resident          mine=FAIL   baseline=FAIL   SAME
+  resume_spawn_children            mine=PASS   baseline=PASS   SAME
+  resume_ttl_expunged              mine=PASS   baseline=PASS   SAME
+  resume_ttl_not_revived           mine=FAIL   baseline=FAIL   SAME
+  resume_ttl_setup                 mine=PASS   baseline=PASS   SAME
+  resume_unrelated_no_revive       mine=PASS   baseline=PASS   SAME
+  spawn_background                 mine=PASS   baseline=PASS   SAME
+  sync_inline_no_notification      mine=PASS   baseline=PASS   SAME
+  task_output_peek                 mine=FAIL   baseline=FAIL   SAME
+  unconditional_wake               mine=PASS   baseline=PASS   SAME
+
+isolation: mine realSenpiUntouched=True changedPaths=[]
+isolation: base realSenpiUntouched=True changedPaths=[]
+leaked pids: mine=0 baseline=0

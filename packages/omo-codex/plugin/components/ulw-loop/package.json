@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-ulw-loop",
-	"version": "5.0.0-beta.7",
+	"version": "5.0.0-beta.19",
 	"description": "Codex plugin: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -47,10 +47,10 @@
 		"check": "tsc --noEmit && biome check . && npm run build"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.16",
-		"@types/node": "^25.9.3",
-		"typescript": "^6.0.3",
-		"vitest": "^4.1.8"
+		"@biomejs/biome": "2.5.9",
+		"@types/node": "^26.2.0",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.11"
 	},
 	"engines": {
 		"node": ">=20.0.0"

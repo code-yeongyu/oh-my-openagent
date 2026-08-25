@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { rmEfaultTolerant } from "../teardown.test-support"
 import {
   advanceTestClock,
   createTestClock,
@@ -21,6 +22,26 @@ const childFixture = join(import.meta.dir, "__fixtures__", "supervisor-child.ts"
 const parentFixture = join(import.meta.dir, "__fixtures__", "supervisor-parent.ts")
 const roots: string[] = []
 const processGroups = new Set<number>()
+const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
+
+// Windows releases file handles asynchronously when killed processes die, so an immediate recursive
+// rm can hit EBUSY there; bounded retries absorb the lag without weakening cleanup. A tree-killed
+// child can still outlast that window, and stalling here bills the next test file's budget, so the
+// platform's known cleanup races are tolerated while every other cleanup defect fails loudly.
+async function removeRoot(root: string): Promise<void> {
+  try {
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+  } catch (error) {
+    if (
+      process.platform === "win32"
+      && error instanceof Error
+      && "code" in error
+      && typeof error.code === "string"
+      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    ) return
+    throw error
+  }
+}
 
 interface Outcome {
   readonly version: 1
@@ -50,7 +71,10 @@ async function makeRun(options: {
     args: [childFixture, options.mode, runDir],
     cwd: runDir,
     env: { ...process.env },
-    hardDeadlineAt: options.hardDeadlineAt ?? Date.now() + 10_000,
+    // Non-deadline runs get a load-tolerant budget: cold bun spawns plus fsync'd identity
+    // writes overshoot 10s on a loaded windows-latest runner, and the supervisor records
+    // timedOut from the deadline instant being reached even when the child exited cleanly.
+    hardDeadlineAt: options.hardDeadlineAt ?? Date.now() + 45_000,
     terminationGraceMs: options.terminationGraceMs ?? 1_000,
     maxOutputBytes: 65_536,
     stdoutPath: join(runDir, "child-stdout.log"),
@@ -143,12 +167,29 @@ afterEach(async () => {
     }
   }
   processGroups.clear()
-  // Windows releases file handles asynchronously when killed processes die, so an immediate
-  // recursive rm can hit EBUSY there; bounded retries absorb the lag without weakening cleanup.
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map(removeRoot))
 })
 
 describe("memory run supervisor", () => {
+  test("#given an unrelated active handle #when the durable outcome is published #then the standalone supervisor exits", async () => {
+    // given
+    const runDir = await makeRun({ mode: "inspect" })
+    const keepalivePath = join(import.meta.dir, "__fixtures__", "supervisor-keepalive.ts")
+    const supervisor = spawn(process.execPath, [keepalivePath, runDir], {
+      detached: true,
+      stdio: "ignore",
+    })
+    if (supervisor.pid !== undefined) processGroups.add(supervisor.pid)
+    const exit = waitForExit(supervisor)
+
+    // when
+    const outcome = await readOutcome(runDir)
+
+    // then
+    expect(outcome.childExit).toEqual({ code: 23, signal: null })
+    await expect(exit).resolves.toEqual({ code: 0, signal: null })
+  }, 60_000)
+
   test("#given a retryable model miss and a next attempt #when the supervisor publishes the outcome #then the ledger advances first", async () => {
     // given
     const runDir = await makeRun({

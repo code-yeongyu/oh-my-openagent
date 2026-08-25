@@ -4,7 +4,7 @@ import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-r
 import type { FallbackEntry } from "./model-requirement-types"
 
 const LUNA_LOW = {
-  providers: ["quotio-openai"],
+  providers: ["openai-codex"],
   model: "gpt-5.6-luna-fast",
   variant: "low",
 } satisfies FallbackEntry

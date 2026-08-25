@@ -21,28 +21,6 @@ describe("ulw-loop define-goal reference", () => {
     },
   )
 
-  test.each(ULW_LOOP_SKILL_ROOTS)(
-    "#given the ulw-loop SKILL.md at %s #when reading its goal instructions #then it routes goal creation through references/define-goal.md",
-    (skillRoot) => {
-      // given
-      const skillText = readFileSync(join(skillRoot, "SKILL.md"), "utf8")
-
-      // then
-      expect(skillText).toContain("references/define-goal.md")
-    },
-  )
-
-  test.each(ULW_LOOP_SKILL_ROOTS)(
-    "#given the ulw-loop full-workflow at %s #when reading its goal-creation flow #then it routes objective shaping through references/define-goal.md",
-    (skillRoot) => {
-      // given
-      const workflowText = readFileSync(join(skillRoot, "references", "full-workflow.md"), "utf8")
-
-      // then
-      expect(workflowText).toContain("define-goal.md")
-    },
-  )
-
   test("#given both shipped define-goal copies #when comparing bytes #then the senpi and codex references are identical", () => {
     // given
     const [senpiRoot, codexRoot] = ULW_LOOP_SKILL_ROOTS

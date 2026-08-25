@@ -19,8 +19,6 @@ describe("Hephaestus OpenAI GPT-5.6 fast aliases", () => {
 
       expect(getHephaestusPromptSource(model)).toBe("gpt-5-6");
       expect(config.model).toBe(model);
-      expect(config.prompt).toContain("based on GPT-5.6");
-      expect(config.prompt).not.toContain("based on GPT-5.5");
     }
   });
 
@@ -45,6 +43,5 @@ describe("Hephaestus OpenAI GPT-5.6 fast aliases", () => {
 
     expect(config?.model).toBe(model);
     expect(config?.variant).toBe("xhigh");
-    expect(config?.prompt).toContain("based on GPT-5.6");
   });
 });

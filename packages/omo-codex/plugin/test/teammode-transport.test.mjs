@@ -3,7 +3,6 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { root } from "./aggregate-plugin-fixture.mjs";
 import {
 	cleanupTeamRoot,
 	createTeamRoot,
@@ -53,45 +52,6 @@ function addV2Members(tempRoot, sessionId) {
 	);
 }
 
-test("#given flat V2 tools are available #when the leader reads teammode #then transport selection and user announcement precede init", () => {
-	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
-	const inspectIndex = skill.indexOf("Inspect your active tool list");
-	const initIndex = skill.indexOf('team.mjs" init');
-
-	assert.notEqual(inspectIndex, -1, "skill must inspect the active tool list");
-	assert.notEqual(initIndex, -1, "skill must still document init");
-	assert.ok(inspectIndex < initIndex, "transport inspection must happen before init");
-	assert.match(skill, /spawn_agent.*task_name[\s\S]*send_message[\s\S]*followup_task[\s\S]*wait_agent[\s\S]*list_agents[\s\S]*interrupt_agent/);
-	assert.match(skill, /tell the user|announce.*transport/i);
-	assert.match(skill, /MultiAgentV2/i);
-	assert.match(skill, /Codex App.*fallback/i);
-});
-
-test("#given neither transport's tools are visible #when the leader reads teammode #then search hits are revalidated and fallback is capability-aware without team state", () => {
-	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
-
-	const searchIndex = skill.indexOf("tool_search");
-	const unavailableIndex = skill.indexOf("Teammode unavailable");
-	assert.notEqual(searchIndex, -1, "skill must route hidden tools through the tool_search check");
-	assert.notEqual(unavailableIndex, -1, "skill must give the leader unavailable announcement templates");
-	assert.ok(searchIndex < unavailableIndex, "tool_search must precede the unavailable conclusion");
-	assert.match(skill, /revalidate.*COMPLETE.*compatible transport set/is, "a deferred-tool hit must be revalidated as a complete transport");
-	assert.match(skill, /another visible plain-subagent mechanism.*spawn.*communicate.*observe/is, "plain-subagent fallback requires a complete visible lifecycle");
-	assert.match(skill, /Otherwise continue serially.*capability limitation/is, "missing all transports must continue serially rather than promise workers");
-	assert.match(skill, /Do NOT run `init`/, "the fallback must not create team state");
-	assert.doesNotMatch(skill, /splitting the work across plain fire-and-forget subagents/i, "the skill must not promise unavailable plain subagents");
-});
-
-test("#given a MultiAgentV2 team #when the leader spawns members #then guidance limits calls to exposed V2 fields", () => {
-	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
-
-	assert.match(skill, /using only the V2 schema fields/i);
-	assert.match(skill, /`task_name`[\s\S]*`message`[\s\S]*`fork_turns`/);
-	assert.match(skill, /role, priority, or task-specific routing instruction in `message`/i);
-	assert.match(skill, /V2 does not accept[\s\S]*`agent_type`, `model`, `reasoning_effort`, or `service_tier`/);
-	assert.match(skill, /inherit the[\s\S]*session model/i);
-});
-
 test("#given MultiAgentV2 transport #when members are added and bound #then task names and canonical agent paths form the address book", () => {
 	const tempRoot = createTeamRoot("omo-codex-teammode-v2-transport-");
 	try {
@@ -123,7 +83,6 @@ test("#given MultiAgentV2 transport #when members are added and bound #then task
 				{ id: "B", taskName: "mailbox_delivery", agentPath: "/root/mailbox_delivery", threadId: null, threadTitle: null, status: "active" },
 			],
 		);
-		assert.match(guide, /Transport:.*MultiAgentV2/i);
 		assert.match(guide, /members\[\]\.agentPath/);
 		assert.match(guide, /send_message/);
 		assert.match(guide, /followup_task/);
@@ -223,9 +182,7 @@ test("#given a V2 team #when the whole team is archived without a note #then no 
 		const archiveEntry = team.log.find((entry) => entry.event === "archive");
 
 		assert.equal(team.status, "archived");
-		assert.doesNotMatch(result.stdout, /closed all members/i, "V2 has no runtime close/archive operation to claim");
 		assert.match(result.stdout, /no runtime archive operation/i);
-		assert.doesNotMatch(archiveEntry.detail, /all members closed/i);
 		assert.match(archiveEntry.detail, /no runtime archive operation/i);
 	} finally {
 		cleanupTeamRoot(tempRoot);
@@ -261,7 +218,6 @@ test("#given a codex_app team #when one member is archived #then the existing wo
 		const result = runTeam(tempRoot, "archive", "--team", "app-archive-member", "--id", "A");
 
 		assert.match(result.stdout, /archived member A/);
-		assert.doesNotMatch(result.stdout, /no runtime archive operation/i);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

@@ -1,0 +1,55 @@
+CI PARTITION CONTRACT
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- bun test \
+    script/ci-root-test-partition.test.ts \
+    script/root-test-config.test.ts
+
+Observed:
+
+  8 pass
+  0 fail
+  35 expect() calls
+  Ran 8 tests across 2 files. [232.00ms]
+
+The contract proves:
+
+- required root matrix names use only `os` and `shard`;
+- global zauc mocks stay in one Windows process;
+- the dedicated Senpi suite is excluded from every root lane;
+- no unsupported native sharding or unsafe parallel flag is used;
+- Linux and macOS retain `bun --config=bunfig.root.toml test`;
+- the Windows groups are complementary.
+
+Merged owner:
+
+  PR #6925
+  https://github.com/code-yeongyu/oh-my-openagent/pull/6925
+  merge=581881f38bd906e3fd1e9f225cf81a35dbcc81db
+
+POST-MERGE TIMING
+
+From dev run:
+
+  https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380
+
+  root ubuntu: 328 seconds, success
+  root macOS: 371 seconds, success
+  root Windows group 1: 553 seconds, failed only on the now-fixed shell fixture
+  Senpi ubuntu: 300 seconds, success
+  Senpi macOS: 295 seconds, success
+  Senpi Windows: 872 seconds, success
+
+QUALITY AST AUDIT
+
+Final changed TypeScript files were structurally scanned.
+
+  test.skip matches=0
+  test.only matches=0
+  Bun.sleep matches=0
+  setInterval matches=0
+  `as any` matches=0
+
+No retry masking, skipped tests, polling intervals, fixed sleeps, or unsafe
+casts were added.

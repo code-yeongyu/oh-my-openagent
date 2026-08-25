@@ -186,7 +186,7 @@ export class FactsQueue {
     }
     const entries: (FactsQueueEntry & { readonly filePath: string })[] = []
     for (const name of names.sort()) {
-      if (!name.endsWith(".json") || name === "consumed.json") continue
+      if (!name.endsWith(".json") || name === "consumed.json" || name === "failures.json") continue
       const filePath = join(this.layout.queueDir, name)
       const raw = await readFile(filePath, "utf8").catch(() => undefined)
       if (raw === undefined) continue

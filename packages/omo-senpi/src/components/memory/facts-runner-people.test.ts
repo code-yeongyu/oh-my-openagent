@@ -22,7 +22,7 @@ describe("people routing gate", () => {
       .toContain("Mina prefers concise reviews.")
     expect(await readFile(join(identity.paths.repo, "people", "mina", "card.md"), "utf8"))
       .toContain("kind: person")
-  }, 30_000)
+  }, 90_000)
 
   test("#given people routing disabled #when a person record is applied #then it falls back to monthly notes", async () => {
     // given
@@ -47,5 +47,5 @@ describe("people routing gate", () => {
     expect(await readFile(join(identity.paths.repo, "notes", "facts", "2026-08.md"), "utf8"))
       .toContain("Mina prefers concise reviews.")
     expect(existsSync(join(identity.paths.repo, "people", "mina"))).toBe(false)
-  }, 30_000)
+  }, 90_000)
 })

@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig, shouldShowChatGPTOnlyWarning } from "./model-fallback"
+import { CLI_AGENT_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
 import type { InstallConfig } from "./types"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
@@ -10,6 +11,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     platform: "opencode",
     hasOpenCode: true,
     hasCodex: false,
+    hasSenpi: false,
     codexAutonomous: false,
     hasClaude: false,
     isMax20: false,
@@ -43,10 +45,8 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(createConfig({ hasAtlasCloud: true, hasVercelAiGateway: true }))
 
       expect(result.agents?.hephaestus?.model).toBe("atlascloud/openai/gpt-5.6-sol")
-      const sisyphusFallbacks = result.agents?.sisyphus?.fallback_models?.map((entry) => entry.model) ?? []
-      expect(sisyphusFallbacks.indexOf("atlascloud/moonshotai/kimi-k3")).toBeLessThan(
-        sisyphusFallbacks.indexOf("vercel/moonshotai/kimi-k3"),
-      )
+      const providers = CLI_AGENT_MODEL_REQUIREMENTS.hephaestus.fallbackChain[0]?.providers ?? []
+      expect(providers.indexOf("atlascloud")).toBeLessThan(providers.indexOf("vercel"))
     })
   })
 
@@ -237,6 +237,24 @@ describe("generateModelConfig provider routes", () => {
   })
 
   describe("Vercel AI Gateway provider", () => {
+    test("does not add gateway or OpenCode Zen routes to fallback lanes", () => {
+      // given native, OpenCode Zen, and Vercel AI Gateway providers are available
+      const config = createConfig({
+        hasOpenAI: true,
+        hasClaude: true,
+        hasOpencodeZen: true,
+        hasVercelAiGateway: true,
+      })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+      const serializedFallbacks = JSON.stringify(result.agents?.explore?.fallback_models ?? [])
+
+      // then only native provider routes remain in the fallback lane
+      expect(serializedFallbacks).not.toContain('"model":"opencode/')
+      expect(serializedFallbacks).not.toContain('"model":"vercel/')
+    })
+
     test("explore uses gateway minimax when only gateway is available", () => {
       // given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })

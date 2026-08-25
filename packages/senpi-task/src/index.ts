@@ -1,15 +1,22 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
 export {
+  BACKGROUND_MODES,
+  COST_REPORT_STATUSES,
+  DURATION_SOURCE_STATUSES,
   isSpawnSpecV1,
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
+  TOKEN_COVERAGE_STATUSES,
   createTaskRecord,
   markRecordLostForReconciliation,
   messageability,
   transitionTaskRecord,
 } from "./state"
 export type {
+  BackgroundMode,
+  CostReportStatus,
+  DurationSourceStatus,
   LegacyProcessSpawnSpec,
   Messageability,
   PendingSteeringEntry,
@@ -26,6 +33,7 @@ export type {
   TaskTransition,
   TaskTransitionAudit,
   TaskTransitionResult,
+  TokenCoverageStatus,
 } from "./state"
 export { TaskRecordCollisionError, createTaskRecordStore, resolveStateDir } from "./store"
 export type {
@@ -56,9 +64,11 @@ export {
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
 export {
+  MEMBER_IDENTITY_ENV,
   SenpiTeamSpecError,
   TEAM_LEAD_SENTINEL,
   ensureTeamRuntimeDirs,
+  isTeamMemberProcess,
   loadTeamRegistry,
   normalizeSenpiTeamSpec,
   resolveProjectTeamSpecPath,
@@ -236,11 +246,14 @@ export type {
   ResolvedAgentResult,
   SkillInvocationState,
 } from "./agents"
+export { buildNoticeBox, noticeTone } from "./notice-box"
+export type { NoticeLine, NoticeSpec, NoticeTheme, NoticeTone } from "./notice-box"
 export {
   buildCompletionDetails,
   buildCompletionMessage,
   completionMessageLines,
   createCompletionNotifier,
+  DAG_VERIFICATION_DIRECTIVE,
   routeCompletion,
   shouldNotifyStatus,
 } from "./completion"
@@ -312,6 +325,7 @@ export {
   resolvePromptCacheSafeWaitSeconds,
   createFsSkillLoader,
   createTaskTool,
+  evaluateSpawnPolicy,
   excerptRendererPromptText,
   excerptRendererText,
   joinRendererTokens,
@@ -341,6 +355,7 @@ export type {
   TaskTargetErrorCode,
   TaskTargetSelection,
   TaskToolContext,
+  SpawnPolicyVerdict,
   TaskToolDeps,
   TaskToolDetails,
   TaskToolMode,

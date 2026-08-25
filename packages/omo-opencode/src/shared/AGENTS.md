@@ -11,7 +11,7 @@ Cross-cutting adapter utilities used throughout the plugin. Barrel-exported from
 | Category | Files | Key Exports |
 |----------|-------|-------------|
 | **Model Resolution** | ~22 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
-| **Tmux Integration** | 11 | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health |
+| **Tmux Integration** | 8 + `tmux/tmux-utils/` | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health; pane/session/layout/sweep primitives live in [`tmux/tmux-utils/`](tmux/tmux-utils/AGENTS.md) (33 files, runner/injectable-spawn pattern) |
 | **Configuration & Paths** | 10 | `resolveOpenCodeConfigDir()`, `getDataPath()`, `parseJSONC()` |
 | **Session Management** | 8 | `SessionCursor`, `trackInjectedPath()`, `SessionToolsStore` |
 | **Git Worktree** | 7 | `parseGitStatusPorcelain()`, `collectGitDiffStats()`, `formatFileChanges()` |

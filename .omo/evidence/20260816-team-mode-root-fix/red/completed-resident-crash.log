@@ -1,0 +1,18 @@
+Command:
+  bun test packages/senpi-task/src/team/member-revival.test.ts -t 'died unexpectedly'
+
+Result:
+  RED (exit 1).
+
+Expected:
+  a completed but still-resident team member whose process died unexpectedly becomes `lost` when
+  reattach is disabled.
+
+Received:
+  two duplicate `deferred:reattach_disabled` outcomes, with the record silently converted from
+  `resident` to `rpc_detached` while status remained `completed`.
+
+Why this matters:
+  completed is a turn result, not proof that a resident team member process still exists. Deliberate
+  session shutdown pre-suspends members as `persisted_only`; an unsuspended resident with a dead PID is
+  a crash and must produce an abnormal liveness state.

@@ -1,0 +1,1 @@
+synced omo-senpi skills to /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-6987-skill-roster/packages/omo-senpi/plugin/skills

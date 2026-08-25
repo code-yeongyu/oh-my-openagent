@@ -51,7 +51,7 @@ describe("createAstGrepComponent", () => {
   it.each([
     { context: "parent", env: {} },
     { context: "child", env: { SENPI_CODING_AGENT_SESSION_DIR: "/tmp/senpi-child" } },
-  ])("#given a staged runtime in a $context session #when registered #then declares the Anthropic-safe _ast_grep MCP server", async ({ env }) => {
+  ])("#given a staged runtime in a $context session #when registered #then declares the lazy Anthropic-safe _ast_grep MCP server", async ({ env }) => {
     const entry = await makeStagedEntry()
     const pi = new FakeExtensionAPI()
     const component = createAstGrepComponent({
@@ -72,7 +72,7 @@ describe("createAstGrepComponent", () => {
           args: [entry, "mcp"],
           env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project" },
           enabled: true,
-          lifecycle: "eager",
+          lifecycle: "lazy",
         },
       },
     ])

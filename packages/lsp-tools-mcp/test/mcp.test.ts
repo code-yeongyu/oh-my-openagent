@@ -12,6 +12,27 @@ import {
 } from "../src/request-context.js";
 
 describe("lsp MCP server", () => {
+	const tempDirectories: string[] = [];
+
+	function createIsolatedRequestContext(): LspRequestContext {
+		const directory = mkdtempSync(join(tmpdir(), "lsp-mcp-status-"));
+		tempDirectories.push(directory);
+		return createStandaloneMcpRequestContext({
+			cwd: directory,
+			homeDir: directory,
+			env: {
+				HOME: directory,
+				USERPROFILE: directory,
+			},
+		});
+	}
+
+	afterEach(() => {
+		for (const directory of tempDirectories.splice(0)) {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	});
+
 	it("responds to initialize with tool capabilities", async () => {
 		const response = await handleLspMcpRequest({
 			jsonrpc: "2.0",
@@ -55,7 +76,7 @@ describe("lsp MCP server", () => {
 	});
 
 	it("calls status without starting a language server", async () => {
-		const response = await runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+		const response = await runWithRequestContext(createIsolatedRequestContext(), () =>
 			handleLspMcpRequest({
 				jsonrpc: "2.0",
 				id: 3,
@@ -75,7 +96,7 @@ describe("lsp MCP server", () => {
 	});
 
 	it("accepts legacy lsp-prefixed tool names without listing them", async () => {
-		const response = await runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+		const response = await runWithRequestContext(createIsolatedRequestContext(), () =>
 			handleLspMcpRequest({
 				jsonrpc: "2.0",
 				id: 4,

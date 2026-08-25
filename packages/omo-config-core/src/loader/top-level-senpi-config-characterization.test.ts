@@ -81,6 +81,7 @@ const EXPECTED_CONFIG = {
   },
   task: {
     default_concurrency: 5,
+    global_concurrency: Math.max(8, availableParallelism() * 2),
     default_execution_mode: "in-process",
     max_depth: 1,
     residency_max_children: Math.max(8, availableParallelism() * 3),

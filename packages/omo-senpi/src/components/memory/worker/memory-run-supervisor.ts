@@ -49,6 +49,9 @@ async function runChildBootstrap(runDir: string): Promise<void> {
     env: manifest.env,
     detached: false,
     stdio: ["ignore", "inherit", "inherit"],
+    // The bootstrap itself runs without a console on win32, so a console-subsystem child would
+    // allocate a fresh visible one for the whole run unless it is created hidden.
+    windowsHide: true,
   })
   writeBootstrapStatus({ code: child.pid ?? null, signal: "MODEL_PID" })
   const cascadeGraceful = () => {
@@ -99,6 +102,7 @@ async function runSupervisor(runDir: string): Promise<void> {
     env: process.env,
     detached: true,
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
+    windowsHide: true,
   })
   let childPid = bootstrap.pid
   let modelPid: number | undefined
@@ -195,6 +199,7 @@ async function runSupervisor(runDir: string): Promise<void> {
   }
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
+  process.exit(0)
 }
 const args = process.argv.slice(2)
 try {

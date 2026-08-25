@@ -147,3 +147,33 @@ describe("omo doctor", () => {
     })
   })
 })
+
+function envWithoutAgentDir(home: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home }
+  delete env.OMO_CODING_AGENT_DIR
+  delete env.SENPI_CODING_AGENT_DIR
+  delete env.PI_CODING_AGENT_DIR
+  return env
+}
+
+describe("omo doctor", () => {
+  describe("#given no agent directory is configured", () => {
+    describe("#when diagnostics run", () => {
+      test("#then the canonical branded directory is the one inspected", () => {
+        const fixture = createFixture()
+        const home = join(fixture.root, "home")
+        writeFile(
+          join(home, ".omo", "agent", "settings.json"),
+          JSON.stringify({ packages: ["@code-yeongyu/omo-senpi"] }),
+        )
+
+        const result = spawnSync(process.execPath, [fixture.launcher, "doctor"], {
+          encoding: "utf8",
+          env: envWithoutAgentDir(home),
+        })
+
+        expect(result.stdout).toContain("WARN duplicate @code-yeongyu/omo-senpi package entry")
+      })
+    })
+  })
+})

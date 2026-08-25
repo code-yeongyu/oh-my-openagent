@@ -12,7 +12,7 @@ Native Codex marketplace for the `omo` plugin.
 - `components/lsp`: exposes Language Server Protocol diagnostics, navigation, symbols, and rename tools through MCP and post-edit hooks.
 - `components/ultrawork`: injects the ultrawork orchestration directive when a user prompt contains `ultrawork` or `ulw`.
 - `components/ulw-loop`: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit (`.omo/ulw-loop/`).
-- `components/start-work-continuation`: resumes `.omo/boulder.json` start-work plans from stop boundaries.
+- `components/ulw-execute-continuation`: resumes `.omo/boulder.json` ulw-execute plans from stop boundaries.
 - `components/telemetry`: emits anonymous daily active telemetry when enabled.
 
 ## Install

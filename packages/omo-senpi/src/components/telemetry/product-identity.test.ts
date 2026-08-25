@@ -12,11 +12,14 @@ import {
   OMO_NATIVE_EVENT_SCHEMAS,
   OMO_NATIVE_POSTHOG_API_KEY,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
+  OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
   getOmoNativeStateDir,
   hashSessionId,
   maskProviderAndModel,
 } from "./product-identity"
+import { MAX_TRACKED_CALLS } from "./wave-assembler"
+import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
 
@@ -36,6 +39,17 @@ function useTemporaryAgentDir(): string {
   return root
 }
 
+// The stamped workspace version is the contract, not any single literal: the release pipeline
+// stamps this package.json on the release branch, so a pinned literal breaks every release cut.
+function readStampedWorkspaceVersion(): string {
+  const parsed: unknown = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"))
+  if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const version = Reflect.get(parsed, "version")
+    if (typeof version === "string") return version
+  }
+  throw new Error("packages/omo-senpi/package.json must expose a string version")
+}
+
 describe("OmO Native product identity", () => {
   test("#given the native product #when config is created #then identity derivation and effective geoip settings are fixed", () => {
     const config = createOmoNativeProductConfig()
@@ -44,7 +58,7 @@ describe("OmO Native product identity", () => {
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
     expect(config.machineIdPrefix).toBe("omo-senpi:")
-    expect(config.packageVersion).toBe("5.0.0-beta.7")
+    expect(config.packageVersion).toBe(readStampedWorkspaceVersion())
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip ?? false).toBe(false)
     expect(getTelemetryApiKey({ POSTHOG_API_KEY: "env-project-key" }, config.defaultApiKey)).toBe("env-project-key")
@@ -96,7 +110,60 @@ describe("OmO Native product identity", () => {
 
     expect(maskProviderAndModel(provider, knownModel ?? "")).toEqual({ provider, model_id: knownModel })
     expect(maskProviderAndModel(provider, "user-defined-model")).toEqual({ provider, model_id: "custom" })
-    expect(maskProviderAndModel("user-provider", knownModel ?? "")).toEqual({ provider: "custom", model_id: "custom" })
+    // the provider name is what is private here - it is masked, while the public model id survives
+    expect(maskProviderAndModel("user-provider", knownModel ?? "")).toEqual({
+      provider: "custom",
+      model_id: knownModel,
+    })
+  })
+
+  test("#given a publicly known model routed through an unknown gateway provider #when masked #then the model id is exported while the provider stays custom", () => {
+    // given: users route shipped models through OpenRouter, LiteLLM, or a self-hosted gateway.
+    // The gateway name is user-configured and private; the model id is a public product name.
+    // when/then: the private half is masked and the public half survives, so the dashboard can
+    // read real model preference instead of a wall of `custom/custom`.
+    expect(maskProviderAndModel("openrouter", "claude-opus-5")).toEqual({
+      provider: "custom",
+      model_id: "claude-opus-5",
+    })
+    expect(maskProviderAndModel("my-gateway", "gpt-5.6-sol")).toEqual({
+      provider: "custom",
+      model_id: "gpt-5.6-sol",
+    })
+  })
+
+  test("#given a private or fine-tuned model name #when masked #then it never leaves the machine regardless of provider", () => {
+    // This is the privacy guard the disclosure in docs/reference/senpi-telemetry.md promises:
+    // only exact matches against the shipped public vocabulary are exported. Anything the user
+    // named themselves - a fine-tune, an internal codename - is still `custom`.
+    expect(maskProviderAndModel("my-gateway", "my-finetune")).toEqual({ provider: "custom", model_id: "custom" })
+    expect(maskProviderAndModel("anthropic", "my-finetune")).toEqual({ provider: "anthropic", model_id: "custom" })
+    expect(maskProviderAndModel("openrouter", "acme-internal/claude-opus-5-ft").model_id).toBe("custom")
+    expect(maskProviderAndModel("my-gateway", "").model_id).toBe("custom")
+  })
+
+  test("#given every provider and model rung in CATEGORY_FALLBACK_CHAINS #when masked #then no shipped rung collapses to custom, while an arbitrary user provider and model still mask to custom", () => {
+    // given: every (provider, model) pair a shipped builtin category can actually execute
+    const shippedRungs = Object.values(CATEGORY_FALLBACK_CHAINS).flatMap((chain) =>
+      chain.flatMap((rung) => rung.providers.map((provider) => ({ provider, model: rung.model }))),
+    )
+    expect(shippedRungs.length).toBeGreaterThan(0)
+
+    // when: each rung is masked for export
+    const collapsed = shippedRungs.filter(({ provider, model }) => {
+      const masked = maskProviderAndModel(provider, model)
+      return masked.provider === "custom" || masked.model_id === "custom"
+    })
+
+    // then: no executable rung is exportable only as custom/custom - that is what makes the
+    // per-country category-model insight readable instead of a wall of `custom`
+    expect(collapsed).toEqual([])
+    // and: a public model id is exported even through a provider that does not ship it, because the
+    // id is a product name rather than user-authored text
+    expect(maskProviderAndModel("deepseek", "claude-opus-5").model_id).toBe("claude-opus-5")
+    // and: arbitrary user-configured provider and model names never leave the machine
+    expect(maskProviderAndModel("my-gateway", "my-finetune")).toEqual({ provider: "custom", model_id: "custom" })
+    expect(maskProviderAndModel("anthropic", "my-finetune")).toEqual({ provider: "anthropic", model_id: "custom" })
   })
 
   test("#given senpi-task builtins #when telemetry allowlists are loaded #then names exactly match imported sources", () => {
@@ -104,6 +171,79 @@ describe("OmO Native product identity", () => {
 
     expect([...CURATED_AGENTS].sort()).toEqual([...CURATED_READONLY_AGENT_NAMES].sort())
     expect([...BUILTIN_CATEGORY_NAMES].sort()).toEqual(categoryNames.sort())
+  })
+
+  test("#given the tracked-call cap #when the widest wave histogram is encoded #then it stays inside the 64 character privacy limit", () => {
+    // given: the wave assembler tracks at most MAX_TRACKED_CALLS (2000) calls, so no bucket count exceeds 4 digits
+    const bucketCount = 8
+    const widestBucketValue = String(MAX_TRACKED_CALLS)
+
+    // when: the fixed buckets (1, 2, 3, 4, 5_8, 9_16, 17_32, 33plus) are positionally encoded without labels
+    const worstCaseHistogram = Array.from({ length: bucketCount }, () => widestBucketValue).join(":")
+
+    // then: the encoded string is 39 characters, well under the wrapper's silent 64 character truncation
+    expect(widestBucketValue).toHaveLength(4)
+    expect(worstCaseHistogram).toHaveLength(bucketCount * 4 + (bucketCount - 1))
+    expect(worstCaseHistogram.length).toBeLessThanOrEqual(64)
+    expect(OMO_NATIVE_EVENT_SCHEMAS.parallelism_summary.non_eval_wave_size_histogram.type).toBe("string")
+    expect(OMO_NATIVE_PROPERTY_ALLOWLISTS.parallelism_summary).toContain("non_eval_wave_size_histogram")
+  })
+
+  test("#given the native event schemas #when inspected #then delegation_completed and category_config exist with exactly the planned property sets and enum vocabularies", () => {
+    // given: the two events the task-execution insights are built on
+    const delegation = OMO_NATIVE_EVENT_SCHEMAS.delegation_completed
+    const categoryConfig = OMO_NATIVE_EVENT_SCHEMAS.category_config
+
+    // then: property sets are exactly the planned ones - a stray property is a privacy defect
+    expect(Object.keys(delegation).sort()).toEqual([
+      "$session_id", "agent_type", "background_mode", "cache_read_tokens", "cache_write_tokens",
+      "category", "config_generation", "cost_status", "cost_usd", "duration_ms", "duration_status",
+      "execution_mode", "fallback_attempts", "input_tokens", "model_id", "model_source",
+      "output_tokens", "owner_kind", "provider", "reasoning_effort", "run_epoch", "start_reason",
+      "stats_status", "status", "task_send_queued_count", "task_send_running_count", "task_seq",
+      "token_status", "tool_calls", "total_tokens", "turns",
+    ].sort())
+    expect(Object.keys(categoryConfig).sort()).toEqual([
+      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep",
+      "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
+      "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
+      "user_category_count",
+    ].sort())
+
+    // and: every discriminating string is a closed vocabulary
+    expect(delegation.status.values).toEqual(["completed", "error", "cancelled", "interrupted", "lost"])
+    expect(delegation.start_reason.values).toEqual([
+      "initial_spawn", "runtime_fallback", "session_resume", "dag_retry", "revive_after_completed",
+      "revive_after_error", "revive_after_cancelled", "revive_after_interrupted", "revive_after_lost",
+      "unknown",
+    ])
+    expect(delegation.owner_kind.values).toEqual(["plain_child", "dag_node", "team_member", "unknown"])
+    expect(delegation.background_mode.values).toEqual(["foreground", "background", "promoted", "unknown"])
+    expect(delegation.execution_mode.values).toEqual(["in-process", "process"])
+    expect(delegation.reasoning_effort.values).toEqual([
+      "off", "minimal", "low", "medium", "high", "xhigh", "max", "other", "none",
+    ])
+    expect(delegation.model_source.values).toEqual(["category", "explicit", "agent", "none"])
+    expect(delegation.token_status.values).toEqual(["complete", "partial", "unavailable"])
+    expect(delegation.cost_status.values).toEqual(["reported", "unavailable", "invalid"])
+    expect(delegation.stats_status.values).toEqual(["complete", "partial", "unavailable"])
+    expect(delegation.duration_status.values).toEqual(["monotonic", "wall_clock", "unavailable"])
+    expect(delegation.category.values).toEqual([...BUILTIN_CATEGORY_NAMES, "custom", "none"])
+    expect(delegation.agent_type.values).toEqual([...CURATED_AGENTS, "custom", "none"])
+    expect(categoryConfig.source.values).toEqual(OMO_NATIVE_EVENT_SCHEMAS.session_started.reason.values)
+
+    // and: the join keys and every measurement stay unbucketed numbers
+    for (const key of ["task_seq", "run_epoch", "config_generation", "duration_ms", "turns", "tool_calls"] as const) {
+      expect(delegation[key]).toEqual({ type: "number" })
+    }
+    expect(categoryConfig.config_generation).toEqual({ type: "number" })
+
+    // and: session_started now carries the honestly-labeled timezone signal
+    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.timezone).toEqual({ type: "string" })
+  })
+
+  test("#given the shared schema version #when the native clients are configured #then one exported constant carries it", () => {
+    expect(OMO_NATIVE_SCHEMA_VERSION).toBe(2)
   })
 
   test("#given static telemetry inventories #when inspected #then they and every property allowlist are frozen", () => {
@@ -119,7 +259,7 @@ describe("OmO Native product identity", () => {
       expect(Object.isFrozen(properties)).toBe(true)
       for (const schema of Object.values(properties)) {
         expect(Object.isFrozen(schema)).toBe(true)
-        if (schema.values !== undefined) expect(Object.isFrozen(schema.values)).toBe(true)
+        if ("values" in schema) expect(Object.isFrozen(schema.values)).toBe(true)
       }
     }
     expect(Object.isFrozen(OMO_NATIVE_PROPERTY_ALLOWLISTS)).toBe(true)

@@ -19,9 +19,24 @@ describe("run terminalization gate", () => {
       observed = options
       return operation()
     }
+    const record: LockRecord = {
+      pid: 123,
+      process_start: "fixture",
+      hostname: "fixture",
+      nonce: "fixture",
+      created_at: "2026-08-16T00:00:00.000Z",
+      purpose: "reflection-finalize",
+      run_id: "run-1",
+    }
 
     // when
-    const value = await withRunTerminalGate("/tmp/run-1", "run-1", async () => "published", lock)
+    const value = await withRunTerminalGate(
+      "/tmp/run-1",
+      "run-1",
+      async () => "published",
+      lock,
+      async () => record,
+    )
 
     // then
     expect(value).toBe("published")

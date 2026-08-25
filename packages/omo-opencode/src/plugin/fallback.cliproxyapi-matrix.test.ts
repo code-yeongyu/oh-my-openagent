@@ -170,7 +170,7 @@ function createHarness(args: {
     keywordDetector: null,
     claudeCodeHooks: null,
     autoSlashCommand: null,
-    startWork: null,
+    ulwExecute: null,
     ralphLoop: null,
   }
 

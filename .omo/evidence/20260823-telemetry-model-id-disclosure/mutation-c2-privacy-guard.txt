@@ -1,0 +1,14 @@
+    "provider": "custom",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/telemetry-model-id-disclosure/packages/omo-senpi/src/components/telemetry/product-identity.test.ts:139:63)
+(fail) OmO Native product identity > #given a private or fine-tuned model name #when masked #then it never leaves the machine regardless of provider [0.64ms]
+
+ 0 pass
+ 13 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [536.00ms]
