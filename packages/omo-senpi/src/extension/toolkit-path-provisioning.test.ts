@@ -99,6 +99,46 @@ describe("toolkit path provisioning", () => {
       })
     })
   })
+
+  // Regression coverage for #6689 - Windows names the inherited variable `Path`
+  // (HKCU/HKLM Environment: Path) while JS object keys are case-sensitive. A
+  // hardcoded uppercase read yields undefined there and the write creates a
+  // SECOND `PATH` key holding only the toolkit dir; later `{ ...process.env }`
+  // spawn merges let the truncated entry shadow the inherited full value.
+  describe("#given a Windows-style env whose inherited path key is 'Path'", () => {
+    describe("#when provisioning prepends the toolkit dir", () => {
+      it("#then the full inherited Path survives under its original key and no duplicate uppercase PATH is created", async () => {
+        const baseDir = join(fixtureRoot, "agent-toolkit")
+        await mkdir(baseDir, { recursive: true })
+        const windowsEnv: Record<string, string | undefined> = {
+          Path: ["C:\\Windows\\System32", "C:\\Program Files\\nodejs"].join(delimiter),
+        }
+
+        createToolkitPathProvisioning({ baseDir, env: windowsEnv })()
+
+        expect(windowsEnv.Path).toBe([baseDir, "C:\\Windows\\System32", "C:\\Program Files\\nodejs"].join(delimiter))
+        expect(windowsEnv.PATH).toBeUndefined()
+      })
+    })
+  })
+
+  describe("#given an env that already carries both PATH spellings", () => {
+    describe("#when provisioning runs", () => {
+      it("#then it prepends onto the first resolved path key without adding a third variant", async () => {
+        const baseDir = join(fixtureRoot, "agent-toolkit")
+        await mkdir(baseDir, { recursive: true })
+        const mixedEnv: Record<string, string | undefined> = {
+          PATH: "C:\\truncated",
+          Path: "C:\\Windows\\System32",
+        }
+
+        createToolkitPathProvisioning({ baseDir, env: mixedEnv })()
+
+        expect(mixedEnv.PATH).toBe([baseDir, "C:\\truncated"].join(delimiter))
+        expect(mixedEnv.Path).toBe("C:\\Windows\\System32")
+      })
+    })
+  })
 })
 
 // Reads through a function boundary so `delete process.env.X` narrowing does not pin the
