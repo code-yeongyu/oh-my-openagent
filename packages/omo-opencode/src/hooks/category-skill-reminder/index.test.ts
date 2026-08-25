@@ -53,6 +53,42 @@ function createUserTurn(
   }
 }
 
+function createAssistantTurn(sessionID: string, id: string): MessageWithParts {
+  return {
+    info: unsafeTestValue({
+      id,
+      sessionID,
+      role: "assistant",
+      time: { created: 2 },
+      agent: "sisyphus",
+    }),
+    parts: [],
+  }
+}
+
+/** A tool-result turn: a user message whose parts are tool results, not text. */
+function createToolResultTurn(sessionID: string, id: string): MessageWithParts {
+  return {
+    info: {
+      id,
+      sessionID,
+      role: "user",
+      time: { created: 3 },
+      agent: "sisyphus",
+      model: { providerID: "test", modelID: "test" },
+    },
+    parts: [unsafeTestValue({
+      id: `prt_${id}_tool`,
+      sessionID,
+      messageID: id,
+      type: "tool",
+      callID: "call_1",
+      tool: "read",
+      state: { status: "completed", output: "file contents" },
+    })],
+  }
+}
+
 function findReminderParts(messages: MessageWithParts[]): Part[] {
   return messages.flatMap((message) => message.parts).filter(
     (part) => part.type === "text"
@@ -94,7 +130,7 @@ afterEach(() => {
 
 describe("category-skill-reminder hook", () => {
   test.each(["Sisyphus", "Atlas", "sisyphus-junior"])(
-    "#given target agent %s #when three delegatable tools finish #then one reminder is injected before the user text",
+    "#given target agent %s #when three delegatable tools finish #then one reminder is appended to the newest turn",
     async (agent) => {
       const hook = createHook()
       const sessionID = `target-${agent}`
@@ -106,8 +142,8 @@ describe("category-skill-reminder hook", () => {
 
       expect(output.output).toBe("result")
       expect(findReminderParts(messages)).toHaveLength(1)
-      expect(messages[0]?.parts[0]).toMatchObject({ synthetic: true, type: "text" })
-      expect(messages[0]?.parts[1]).toMatchObject({ text: "continue working", type: "text" })
+      expect(messages[0]?.parts[0]).toMatchObject({ text: "continue working", type: "text" })
+      expect(messages[0]?.parts[1]).toMatchObject({ synthetic: true, type: "text" })
     },
   )
 
@@ -210,6 +246,31 @@ describe("category-skill-reminder hook", () => {
     expect(output.output).toBe(original)
   })
 
+  test("#given the newest turn carries tool results #when a reminder is pending #then the sent prompt is left byte-identical", async () => {
+    // The defect this guards: the reminder used to look for the newest turn
+    // holding real user text, which skips a tool-result turn and lands on the
+    // original prompt. Rewriting a turn already sent changes the conversation
+    // prefix, so a proxy keying on it reads an unrelated conversation and the
+    // prompt cache misses from that turn on.
+    const hook = createHook()
+    const sessionID = "tool-result-newest"
+    updateSessionAgent(sessionID, "Sisyphus")
+    await useTools({ hook, sessionID, tools: ["read", "grep", "glob"] })
+
+    const prompt = createUserTurn(sessionID, "original prompt", { id: "msg_prompt" })
+    const promptPartsBefore = JSON.stringify(prompt.parts)
+    const toolTurn = createToolResultTurn(sessionID, "msg_tools")
+    const messages = [prompt, createAssistantTurn(sessionID, "msg_assistant"), toolTurn]
+
+    await transformMessages(hook, messages)
+
+    expect(findReminderParts(messages)).toHaveLength(1)
+    expect(JSON.stringify(prompt.parts)).toBe(promptPartsBefore)
+    expect(toolTurn.parts).toHaveLength(2)
+    expect(toolTurn.parts[0]).toMatchObject({ type: "tool" })
+    expect(toolTurn.parts[1]).toMatchObject({ synthetic: true, type: "text" })
+  })
+
   test("#given a queued reminder and no real user text #when messages transform retries #then pending is retained", async () => {
     const hook = createHook()
     const sessionID = "pending-without-text"
@@ -227,7 +288,7 @@ describe("category-skill-reminder hook", () => {
     expect(findReminderParts(realMessages)).toHaveLength(1)
   })
 
-  test("#given multiple real and synthetic user texts #when a reminder is pending #then exactly one is inserted before the latest real text", async () => {
+  test("#given multiple real and synthetic user texts #when a reminder is pending #then exactly one is appended to the newest turn holding client content", async () => {
     const hook = createHook()
     const sessionID = "latest-real-text"
     updateSessionAgent(sessionID, "Sisyphus")
@@ -264,11 +325,11 @@ describe("category-skill-reminder hook", () => {
       (part) => part.type === "text" && part.synthetic === true
       && part.id === `prt_category_skill_reminder_${part.messageID}`,
     )
-    const latestTextIndex = latestTurn.parts.findIndex(
-      (part) => part.type === "text" && part.text === "latest real text",
-    )
     expect(findReminderParts(messages)).toHaveLength(1)
-    expect(reminderIndex).toBe(latestTextIndex - 1)
+    // Appended, so every part the turn already carried keeps its index.
+    expect(reminderIndex).toBe(latestTurn.parts.length - 1)
+    expect(latestTurn.parts[0]).toMatchObject({ text: "earlier text in latest turn" })
+    expect(latestTurn.parts[2]).toMatchObject({ text: "latest real text" })
     expect(latestTurn.parts[reminderIndex]).toMatchObject({
       messageID: "msg_latest",
       sessionID,

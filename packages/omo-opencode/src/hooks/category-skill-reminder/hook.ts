@@ -54,9 +54,21 @@ interface ReminderInjectionTarget {
   messageID: string
   sessionID: string
   state: SessionState
-  textPartIndex: number
 }
 
+/**
+ * The newest user turn, which is the only one safe to add to.
+ *
+ * The reminder is queued from `tool.execute.after`, so by the time this runs
+ * the newest user turn carries the tool results for the call that queued it.
+ * Earlier turns were already sent, and rewriting one changes a prefix the
+ * provider has already seen: a proxy that identifies a conversation by its
+ * leading messages then reads the turn as a different conversation, and every
+ * prompt-cache entry keyed on that prefix misses.
+ *
+ * The previous rule looked for the newest turn holding real user text, which
+ * skips a tool-result-only turn and lands on the original prompt.
+ */
 function findLatestReminderTarget(
   messages: MessageWithParts[],
   sessionStates: Map<string, SessionState>,
@@ -71,12 +83,17 @@ function findLatestReminderTarget(
     const state = sessionStates.get(sessionID)
     if (!state?.reminderPending || state.reminderShown || state.delegationUsed) continue
 
-    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
-      const part = message.parts[partIndex]
-      if (part && isRealUserTextPart(part)) {
-        return { message, messageID, sessionID, state, textPartIndex: partIndex }
-      }
-    }
+    // A turn with nothing of the client's own in it is not the current turn:
+    // it is empty, or it holds only what this plugin injected. Skipping those
+    // keeps the reminder queued rather than attaching it to nothing. A
+    // non-text part is client content, which is what makes a tool-result turn
+    // a valid target.
+    const carriesClientContent = message.parts.some(
+      (part) => part.type !== "text" || isRealUserTextPart(part),
+    )
+    if (!carriesClientContent) continue
+
+    return { message, messageID, sessionID, state }
   }
 
   return undefined
@@ -156,7 +173,10 @@ export function createCategorySkillReminderHook(
     const target = findLatestReminderTarget(output.messages, sessionStates)
     if (!target) return
 
-    target.message.parts.splice(target.textPartIndex, 0, {
+    // Appended, never inserted. A tool-result turn must keep its tool_result
+    // blocks first for the provider to accept it, and appending is what leaves
+    // the parts already sent byte-identical.
+    target.message.parts.push({
       id: `prt_category_skill_reminder_${target.messageID}`,
       sessionID: target.sessionID,
       messageID: target.messageID,
