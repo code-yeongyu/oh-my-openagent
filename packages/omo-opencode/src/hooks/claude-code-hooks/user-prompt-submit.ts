@@ -1,6 +1,6 @@
 import type {
   UserPromptSubmitInput,
-  PostToolUseOutput,
+  UserPromptSubmitOutput,
   ClaudeHooksConfig,
 } from "./types"
 import { findMatchingHooks, log } from "../../shared"
@@ -11,6 +11,45 @@ import { normalizeHookText } from "./hook-text"
 
 const USER_PROMPT_SUBMIT_TAG_OPEN = "<user-prompt-submit-hook>"
 const USER_PROMPT_SUBMIT_TAG_CLOSE = "</user-prompt-submit-hook>"
+
+/**
+ * Claude Code reads hook stdout as control output only when it starts with `{`
+ * (`parseHookOutput`, hooks.ts). Anything else is plain text, which for
+ * UserPromptSubmit becomes context. A control output reaches the model through
+ * `hookSpecificOutput.additionalContext` and through nothing else, so injecting
+ * the raw JSON puts fields such as `continue` and `systemMessage` in front of
+ * the model as if the user had typed them.
+ *
+ * Returns undefined for stdout that is not a control output, which leaves the
+ * caller injecting it verbatim. Claude Code instead reports malformed JSON as a
+ * hook error, and falling back to the text matches the sibling handlers here.
+ */
+function parseControlOutput(
+  stdout: string | undefined
+): UserPromptSubmitOutput | undefined {
+  if (stdout === undefined) {
+    return undefined
+  }
+  const trimmed = stdout.trim()
+  if (!trimmed.startsWith("{")) {
+    return undefined
+  }
+  try {
+    return JSON.parse(trimmed) as UserPromptSubmitOutput
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error
+    }
+    return undefined
+  }
+}
+
+function asHookContext(text: string): string {
+  if (text.startsWith(USER_PROMPT_SUBMIT_TAG_OPEN)) {
+    return text
+  }
+  return `${USER_PROMPT_SUBMIT_TAG_OPEN}\n${text}\n${USER_PROMPT_SUBMIT_TAG_CLOSE}`
+}
 
 export interface MessagePart {
   type: "text" | "tool_use" | "tool_result"
@@ -96,33 +135,31 @@ export async function executeUserPromptSubmitHooks(
 
       const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
-      if (result.stdout) {
-        const output = normalizeHookText(result.stdout)
-        if (output === undefined) {
-          continue
-        }
-        if (output.startsWith(USER_PROMPT_SUBMIT_TAG_OPEN)) {
-          messages.push(output)
-        } else {
-          messages.push(`${USER_PROMPT_SUBMIT_TAG_OPEN}\n${output}\n${USER_PROMPT_SUBMIT_TAG_CLOSE}`)
+      const control = parseControlOutput(result.stdout)
+      const injected = control
+        ? normalizeHookText(control.hookSpecificOutput?.additionalContext)
+        : normalizeHookText(result.stdout)
+      if (injected !== undefined) {
+        messages.push(asHookContext(injected))
+      }
+
+      // Both stop the prompt whatever the hook exited with, matching
+      // processHookJSONOutput in Claude Code.
+      if (control?.continue === false) {
+        return {
+          block: true,
+          reason: normalizeHookText(control.stopReason) ?? normalizeHookText(result.stderr),
+          modifiedParts,
+          messages,
         }
       }
 
-      if (result.exitCode !== 0) {
-        try {
-          const output = JSON.parse(result.stdout || "{}") as PostToolUseOutput
-          if (output.decision === "block") {
-            return {
-              block: true,
-              reason: normalizeHookText(output.reason) ?? normalizeHookText(result.stderr),
-              modifiedParts,
-              messages,
-            }
-          }
-        } catch (error) {
-          if (!(error instanceof SyntaxError)) {
-            throw error
-          }
+      if (control?.decision === "block") {
+        return {
+          block: true,
+          reason: normalizeHookText(control.reason) ?? normalizeHookText(result.stderr),
+          modifiedParts,
+          messages,
         }
       }
     }
