@@ -247,11 +247,11 @@ describe("category-skill-reminder hook", () => {
   })
 
   test("#given the newest turn carries tool results #when a reminder is pending #then the sent prompt is left byte-identical", async () => {
-    // The defect this guards: the reminder used to look for the newest turn
-    // holding real user text, which skips a tool-result turn and lands on the
-    // original prompt. Rewriting a turn already sent changes the conversation
-    // prefix, so a proxy keying on it reads an unrelated conversation and the
-    // prompt cache misses from that turn on.
+    // A tool-result turn holds no text, so any rule that matches on real user
+    // text walks past it and reaches the prompt sent several turns earlier.
+    // Rewriting a turn already sent changes the conversation prefix, so a
+    // proxy keying on it reads an unrelated conversation and the prompt cache
+    // misses from that turn on.
     const hook = createHook()
     const sessionID = "tool-result-newest"
     updateSessionAgent(sessionID, "Sisyphus")
