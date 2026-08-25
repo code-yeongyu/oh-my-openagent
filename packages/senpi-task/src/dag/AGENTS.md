@@ -15,7 +15,7 @@ Compile a node definition into waves, run each wave through the shared task mana
 | `manager.ts` | `createDagManager`: start/amend/replay, `DagRunRecordV1` projection, fingerprint-keyed run reuse; amendment guards `invalid_amendment`, `amend_running_node`, `run_still_active`. |
 | `scheduler.ts` | `createDagScheduler`, `applyDagSchedulerEvent`, `observeDagSchedulers`: wave execution, admission settlement, task attach/outcome folding, dependent skip cascade, cancellation, event replay. |
 | `node-control-context.ts` + `node-retry.ts` + `node-send.ts` | Node-scoped recovery: retry failed/cancelled/skipped nodes (un-skips cascaded dependents), steer a running node's child or revive a finished one. Codes `node_not_found` / `node_not_retryable` / `node_not_continuable`. |
-| `recovery.ts` | `createDagRecovery`: durable-owner reconciliation, journal replay, result reuse, scheduler re-entry, lost-task handling. |
+| `recovery.ts` | `createDagRecovery`: durable-owner reconciliation, journal replay, result reuse, scheduler re-entry, lost-task handling. Reconciliation NEVER awaits a still-running reattached child; it hands the child to the scheduler through `preAttachedTasks`. |
 | `results.ts` | `persistDagNodeResult` / `readDagNodeResult`: terminal node final response + run_stats sidecar into the result store; paths relative to the state dir. |
 | `handle.ts` | `createDagWaitSurface`: resolves terminal `DagRunResult`s. |
 | `owner.ts` | `DagTaskOwner` identity (runId + nodeId + fingerprint over definition/node/execAttempt) for task-owner locks and ownership checks. |
@@ -34,7 +34,8 @@ Compile a node definition into waves, run each wave through the shared task mana
 
 - NEVER fold skill content, skill digests, or effective prompts into definition fingerprints; reuse must survive skill materialization changes.
 - NEVER key recovery by display attempt; read the persisted `execAttempt` (reattach bumps the display attempt).
-- NEVER resume a prior scheduler instance; cancellation deferreds and admission latches are single-shot. Use re-entry / retry / send controls.
+- NEVER resume a prior scheduler instance; cancellation deferreds and admission latches are single-shot. Use re-entry / retry / send controls. A re-entry drops `preAttachedTasks`: those ids describe children that were live for the PREVIOUS instance, and re-attaching a settled task folds its outcome onto the node twice.
+- NEVER block recovery's reconcile loop on a live child. A restart must emit reuse events and `dag.run.resumed` immediately and let the still-running child fold through the normal wave await, or the run sits in `paused` for as long as the slowest child runs and every operator lever (amend, retry) refuses on `run_still_active`.
 - NEVER put activity events or journal seq/lane metadata into boundary builders.
 - Missing skills never fail a run; they become `missing_skill` diagnostics. Resumed runs read creation-time materialization, never current `SKILL.md`.
 - Wait surfaces resolve (not reject) failed/cancelled runs; callers inspect `DagRunResult`.

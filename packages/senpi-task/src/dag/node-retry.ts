@@ -33,6 +33,10 @@ export type DagRetryOptions = {
  * second run on it would inherit a spent state machine. `dag.run.resumed` is journaled
  * SYNCHRONOUSLY here, before the run promise exists, so a caller that waits immediately after a
  * retry blocks on the NEW settle instead of short-circuiting on the stale terminal checkpoint.
+ *
+ * `preAttachedTasks` is deliberately dropped: it describes children that were live when the PREVIOUS
+ * instance was built, and re-attaching an already-settled task would fold its outcome onto the node
+ * a second time.
  */
 export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
   const current = readRecord(options.store, options.initialRecord.runId) ?? options.initialRecord
@@ -42,7 +46,8 @@ export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
     journal.append(dagRunResumedEvent({ generation: current.generation + 1 }))
     record = journal.snapshot()
   }
-  const scheduler = createDagScheduler({ ...options, initialRecord: record })
+  const { preAttachedTasks: _preAttachedTasks, ...reentryOptions } = options
+  const scheduler = createDagScheduler({ ...reentryOptions, initialRecord: record })
   return { record, scheduler, run: scheduler.run() }
 }
 

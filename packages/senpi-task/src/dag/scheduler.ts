@@ -59,6 +59,13 @@ export type DagSchedulerOptions = {
   readonly ancestry?: { readonly depth: number }
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
+  /**
+   * Children that are ALREADY running under a durable owner when this scheduler is built - a
+   * session restart reattaches them instead of waiting for them. Each entry is folded into the live
+   * wave await exactly like an admitted node, so recovery never has to block on a long-running child
+   * before the run leaves `paused`.
+   */
+  readonly preAttachedTasks?: ReadonlyMap<DagNodeId, string>
   // Skill materialization for a retry that carries a prompt override (it re-runs the amend path).
   readonly materializeSkills?: DagMaterializeSkills
   // Lease identity for the control verbs: a run leased by a DIFFERENT live process is not ours to
@@ -201,6 +208,10 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     cancellationStarted: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
+  }
+  for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
+    context.attachedTaskIds.set(nodeId, taskId)
+    attachTaskSettlement(context, nodeId, taskId)
   }
 
   const scheduler: DagScheduler = {
