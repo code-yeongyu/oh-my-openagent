@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -14,6 +14,15 @@ import type { ReflectionSandbox, ReflectionSpawnArgs } from "./worker"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
+
+async function waitForPath(path: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (existsSync(path)) return
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error(`timed out waiting for ${path}`)
+}
 
 describe("memory identity runtime", () => {
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
@@ -199,6 +208,44 @@ function sandboxGrantsAgentDir(renderedArgs: readonly string[], agentDirReal: st
   }
   return false
 }
+
+describe("memory identity runtime first-write seam", () => {
+  test("#given a fresh identity whose runtime directories were never created #when a reserved reflection run launches through the identity runtime #then the missing runtime/reflection-sessions is created before the runner settles the run", async () => {
+    // given - no mkdir anywhere under the identity root. Every other suite pre-creates
+    // these dirs, which is exactly what masked #7012: the lazy sandbox grants
+    // runtime/reflection-sessions as writable, and on Linux bwrap cannot bind an entry
+    // that does not exist yet, so the first reflection on a fresh identity died pre-spawn.
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-first-write-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-test")
+    expect(existsSync(paths.reflectionSessions)).toBe(false)
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test",
+      identityPaths: paths,
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const ctx = componentContext()
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      logger: ctx.logger,
+    })
+    const reserved = await runtime.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+
+    // when
+    runtime.launch(reserved.run)
+
+    // then: launch is fire-and-forget; assert side effects, not the return
+    await waitForPath(paths.reflectionSessions, 5000)
+    expect(existsSync(paths.reflectionSessions)).toBe(true)
+  }, 30_000)
+})
 
 describe("memory identity runtime agent-dir resolution", () => {
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(

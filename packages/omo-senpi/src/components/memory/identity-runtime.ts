@@ -13,6 +13,7 @@ import type { ComponentLogger } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
+import { ensureIdentityRuntimeDirs } from "./context"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import {
   resolveAgentReflectionSettings,
@@ -121,12 +122,26 @@ export function createIdentityRuntime(
       new TranscriptJournal({ journalDir: join(identity.identityPaths.transcripts, conversationId) }).getState(),
     ...(deps.liveSession === undefined ? {} : { liveSession: deps.liveSession }),
   })
+  // #7012 first-write seam: the lazy sandbox grants runtimeWrites including
+  // identityPaths.reflectionSessions, and bwrap cannot bind an entry that does not exist
+  // yet, so every launch must guarantee the identity runtime dirs (mkdir recursive)
+  // before the runner can build the sandbox or spawn a child.
+  let runtimeDirsReady: Promise<void> | undefined
+  const ensureRuntimeDirsOnce = (): Promise<void> => {
+    runtimeDirsReady ??= ensureIdentityRuntimeDirs(identity.identityPaths)
+    return runtimeDirsReady
+  }
+  const launchAsync = (run: ReservedRun): Promise<void> =>
+    ensureRuntimeDirsOnce()
+      .then(() => runner.launch(run))
+      .then((result) => {
+        if (result.launch !== undefined) void launchAsync(result.launch)
+      })
+      .catch((error: unknown) => {
+        deps.logger?.warn("memory reflection launch failed", { error: describe(error) })
+      })
   const launch = (run: ReservedRun): void => {
-    void runner.launch(run).then((result) => {
-      if (result.launch !== undefined) launch(result.launch)
-    }).catch((error: unknown) => {
-      deps.logger?.warn("memory reflection launch failed", { error: describe(error) })
-    })
+    void launchAsync(run)
   }
   const runtime: MemoryIdentityRuntime = {
     identity,
