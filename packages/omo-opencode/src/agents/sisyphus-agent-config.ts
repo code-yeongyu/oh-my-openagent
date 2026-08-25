@@ -65,6 +65,22 @@ export function buildGrokSisyphusAgentConfig(
   };
 }
 
+/**
+ * DeepSeek V4 is a reasoning-model family: it takes a reasoning effort
+ * (deepseek family caps allow high/max) and rejects Anthropic-style
+ * thinking blocks, so this is the base config plus effort only.
+ */
+export function buildDeepseekSisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return {
+    ...buildBaseSisyphusAgentConfig(mode, model, prompt),
+    reasoningEffort: "high",
+  };
+}
+
 export function buildClaudeSisyphusAgentConfig(
   mode: AgentMode,
   model: string,

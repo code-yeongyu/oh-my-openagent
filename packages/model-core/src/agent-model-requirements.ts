@@ -23,6 +23,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         ],
         model: "kimi-k3",
       },
+      {
+        providers: ["deepseek", "opencode-go", "vercel"],
+        model: "deepseek-v4-pro",
+        variant: "max",
+      },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5.2" },
       { providers: ["opencode"], model: "big-pickle" },
@@ -172,6 +177,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-5" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
+      { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.6-sol",

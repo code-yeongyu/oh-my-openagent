@@ -24,15 +24,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("sisyphus keeps opus primary before Kimi K3, gpt-5.6-sol, GLM 5.2, and big-pickle fallbacks", () => {
+  test("sisyphus keeps opus primary before Kimi K3, DeepSeek V4 Pro, gpt-5.6-sol, GLM 5.2, and big-pickle fallbacks", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, solFallback, fourth, last] = sisyphus.fallbackChain
+    const [primary, second, deepseekPro, solFallback, fifth, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(5)
+    expect(sisyphus.fallbackChain).toHaveLength(6)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -54,13 +54,18 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       ],
       model: "kimi-k3",
     })
+    expect(deepseekPro).toEqual({
+      providers: ["deepseek", "opencode-go", "vercel"],
+      model: "deepseek-v4-pro",
+      variant: "max",
+    })
     expect(solFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.6-sol",
       variant: "medium",
     })
-    expect(fourth?.providers[0]).toBe("zai-coding-plan")
-    expect(fourth?.model).toBe("glm-5.2")
+    expect(fifth?.providers[0]).toBe("zai-coding-plan")
+    expect(fifth?.model).toBe("glm-5.2")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
@@ -250,7 +255,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sixth?.providers[0]).toBe("opencode-go")
   })
 
-  test("sisyphus-junior keeps sonnet, Kimi, minimax, and big-pickle fallbacks", () => {
+  test("sisyphus-junior keeps sonnet, Kimi, DeepSeek V4 Flash, minimax, and big-pickle fallbacks", () => {
     // given
     const sisyphusJunior = AGENT_MODEL_REQUIREMENTS["sisyphus-junior"]
 
@@ -261,6 +266,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(modelIDs).toEqual([
       "claude-sonnet-5",
       "kimi-k3",
+      "deepseek-v4-flash",
       "gpt-5.6-sol",
       "minimax-m3",
       "MiniMax-M3",

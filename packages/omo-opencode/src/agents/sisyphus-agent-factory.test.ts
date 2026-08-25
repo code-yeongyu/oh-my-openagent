@@ -197,6 +197,24 @@ describe("createSisyphusAgent", () => {
     });
   });
 
+  describe("#given a DeepSeek Sisyphus model", () => {
+    test("#when creating agents #then keeps the plain fallback prompt with effort and no Claude thinking", () => {
+      // given - DeepSeek V4 drives reasoning via reasoningEffort, never the Anthropic thinking API
+      const models = ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"];
+      const minimaxPrompt = createSisyphusAgent("minimax-coding-plan/MiniMax-M3").prompt;
+
+      for (const model of models) {
+        // when
+        const agent = createSisyphusAgent(model);
+
+        // then - plain fallback body stays pinned (#6966), but the Claude thinking budget is gone
+        expect(agent.prompt).toBe(minimaxPrompt);
+        expect(agent.thinking).toBeUndefined();
+        expect(agent.reasoningEffort).toBe("high");
+      }
+    });
+  });
+
   describe("#given a Gemini model", () => {
     test("#when creating the agent #then uses the Gemini-corrected prompt with thinking enabled", () => {
       // given

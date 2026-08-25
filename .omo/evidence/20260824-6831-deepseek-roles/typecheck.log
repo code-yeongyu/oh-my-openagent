@@ -1,0 +1,8 @@
+$ bun run typecheck (root: tsgo --noEmit && typecheck:script && typecheck:packages)
+EXIT=0 - all 3 stages completed, no type errors
+
+$ bunx tsgo --noEmit -p packages/model-core/tsconfig.json
+model-core: OK
+
+$ bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+omo-opencode: OK

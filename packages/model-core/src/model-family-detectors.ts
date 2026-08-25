@@ -93,6 +93,11 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm")
 }
 
+export function isDeepseekModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("deepseek")
+}
+
 /**
  * Grok 4.5 / 4.6 need a digit boundary after the minor version: the xAI catalog
  * also ships grok-4.20 (and grok-4.1/4.2/4.3 fast tiers), so a bare substring

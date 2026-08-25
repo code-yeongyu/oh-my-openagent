@@ -15,6 +15,7 @@ import {
   isKimiK2Model,
   isKimiK27Model,
   isKimiK3Model,
+  isDeepseekModel,
   isMiniMaxModel,
 } from "./model-family-detectors"
 
@@ -163,5 +164,14 @@ describe("model family detectors", () => {
     expect(isMiniMaxModel("opencode/minimax-m2.7")).toBe(true)
     expect(isMiniMaxModel("minimax-m2.7-highspeed")).toBe(true)
     expect(isMiniMaxModel("moonshotai/kimi-k2.6")).toBe(false)
+  })
+
+  test("#given DeepSeek model ids #then detects DeepSeek family only", () => {
+    expect(isDeepseekModel("deepseek/deepseek-v4-flash")).toBe(true)
+    expect(isDeepseekModel("deepseek/deepseek-v4-pro")).toBe(true)
+    expect(isDeepseekModel("opencode-go/deepseek-v4-flash-0731")).toBe(true)
+    expect(isDeepseekModel("deepseek-r2")).toBe(true)
+    expect(isDeepseekModel("anthropic/claude-sonnet-5")).toBe(false)
+    expect(isDeepseekModel("zai/glm-5.2")).toBe(false)
   })
 })

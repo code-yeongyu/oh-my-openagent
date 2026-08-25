@@ -7,6 +7,7 @@ import type {
 } from "./dynamic-agent-prompt-builder";
 import {
   buildClaudeSisyphusAgentConfig,
+  buildDeepseekSisyphusAgentConfig,
   buildGlmSisyphusAgentConfig,
   buildGptSisyphusAgentConfig,
   buildGrokSisyphusAgentConfig,
@@ -29,6 +30,7 @@ import {
   isClaudeOpus47Model,
   isClaudeOpus48Model,
   isClaudeOpus5Model,
+  isDeepseekModel,
   isGlmModel,
   isGpt5_5Model,
   isGpt5_6Model,
@@ -168,6 +170,9 @@ export function createSisyphusAgent(
         categories,
         useTaskSystem,
       );
+      if (isDeepseekModel(model)) {
+        return buildDeepseekSisyphusAgentConfig(MODE, model, prompt);
+      }
       return isGptModel(model)
         ? buildGptSisyphusAgentConfig(MODE, model, prompt)
         : buildClaudeSisyphusAgentConfig(MODE, model, prompt);
