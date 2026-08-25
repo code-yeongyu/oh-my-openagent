@@ -222,6 +222,7 @@ describe("checkExtensionCurrent", () => {
     const manifest = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"))
 
     expect(main).toContain('import("#omo-task-runtime")')
+    expect(task).toContain('import("@earendil-works/pi-tui")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(manifest.imports).toEqual({ "#omo-task-runtime": "./extensions/omo-task.js" })
   })

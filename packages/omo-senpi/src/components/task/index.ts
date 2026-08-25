@@ -1,5 +1,6 @@
 import { loadSenpiOmoConfig } from "../config-resolution"
 import {
+  loadPiTui,
   TEAM_LEAD_SENTINEL,
   buildLeadTeamTools,
   createLeadDeliveryJournal,
@@ -63,6 +64,9 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       // Unconditional omo process hygiene (T16): fires on session_start before any
       // flag/capability gate can skip the rest of the component.
       wireSessionStartProcessSweep(pi, ctx)
+      // The task runtime is built into its own chunk, so compose's main-bundle warm-up does not
+      // initialize this chunk's private lazy pi-tui namespace.
+      await loadPiTui()
 
       registerTaskFlags(pi)
       if (pi.getFlag(TASK_ENABLED_FLAG) === false) {
