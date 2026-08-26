@@ -1,0 +1,4 @@
+real_db=/home/rate/.local/share/opencode/opencode.db before=5530
+fake_llm_port=36891
+session_id=ses_fc37839f1ffeLCN52wav8cwM8H
+after=5530 unchanged=yes

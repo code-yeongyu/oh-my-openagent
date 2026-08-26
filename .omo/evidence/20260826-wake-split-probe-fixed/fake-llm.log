@@ -1,0 +1,6 @@
+[2026-08-26T05:25:20.978Z] START port=36891
+[2026-08-26T05:25:30.588Z] branch=parent-tool-call call=1
+[2026-08-26T05:25:31.594Z] branch=child call=2
+[2026-08-26T05:25:31.706Z] branch=parent-hold call=3
+[2026-08-26T05:25:40.474Z] branch=default call=4
+[2026-08-26T05:25:41.038Z] FINAL_COUNTS title=0 parent-tool-call=1 parent-hold=1 child=1 wake=0 default=1
