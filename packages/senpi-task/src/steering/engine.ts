@@ -73,6 +73,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
         mode = messageability(record.status, record.residency_state)
       }
     }
+    if (mode === "not-continuable") {
+      return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: TASK_OUTPUT_SUGGESTION }
+    }
     if (handle === undefined) {
       return {
         kind: "not_continuable",
