@@ -60,6 +60,9 @@ Herdr's custom-agent API automatically:
 | `agent_settled` | `idle` |
 | `session_shutdown` | releases the `omo` agent claim |
 
+After a preceding `working` state, Herdr exposes the settled `idle` report as the
+user-facing `done` status.
+
 The integration activates only when Herdr provides `HERDR_ENV=1`, `HERDR_BIN_PATH`, and
 `HERDR_PANE_ID`. Outside Herdr it performs no command. A failed Herdr report is logged as a
 warning and does not interrupt the OMO session.

@@ -1,0 +1,9 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "<temporary-senpi-qa-root>/agent",
+  "sandboxCwd": "<temporary-senpi-qa-root>/project"
+}
