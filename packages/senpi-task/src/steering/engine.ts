@@ -59,7 +59,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
 
-    const mode = messageability(record.status, record.residency_state)
+    let mode = messageability(record.status, record.residency_state)
     if (mode === "not-continuable") {
       return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: TASK_OUTPUT_SUGGESTION }
     }
@@ -70,6 +70,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       const fresh = tryLoad(record.task_id)
       if (fresh !== undefined) {
         record = fresh
+        mode = messageability(record.status, record.residency_state)
       }
     }
     if (handle === undefined) {

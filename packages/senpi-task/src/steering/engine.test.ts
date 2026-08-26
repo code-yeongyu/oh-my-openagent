@@ -199,6 +199,49 @@ describe("steering engine scope + resolution guards", () => {
     expect(outcome.owning_session_id).toBe("parent-1")
   })
 
+  test("#given a running orphan that completes during handle recovery #when sent #then the refreshed terminal record is revived", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    toRunning(harness, record)
+    const fake = makeFakeHandle(record.task_id, "rpc")
+    let liveHandle: ManagedChildHandle | undefined
+    const reviveCalls: string[] = []
+    const engine = createSteeringEngine({
+      store: harness.store,
+      liveHandle: () => liveHandle,
+      recoverHandle: async (taskId) => {
+        harness.store.transition(taskId, {
+          type: "complete",
+          timestamp: new Date().toISOString(),
+          final_response: "completed during recovery",
+        })
+        liveHandle = fake.handle
+      },
+      reserveForRevive: (taskId) => ({
+        ok: true,
+        release: () => undefined,
+        commit: () => {
+          reviveCalls.push(taskId)
+        },
+      }),
+      dequeuePending: () => false,
+      runStatsSnapshot: () => undefined,
+      destruction: makeFakeDestruction(),
+      now: Date.now,
+    })
+
+    // when
+    const outcome = await engine.sendToTask({ idOrName: record.task_id, message: "continue after recovery" })
+
+    // then
+    expect(outcome.kind).toBe("revived")
+    expect(fake.steerCalls).toEqual([])
+    expect(fake.followUpCalls).toEqual(["continue after recovery"])
+    expect(reviveCalls).toEqual([record.task_id])
+    expect(harness.store.load(record.task_id)?.notification.run_epoch).toBe(1)
+  })
+
   test("#given a cross-session task #when sent with all_scope #then delivery is allowed", async () => {
     // given
     const harness = makeHarness()
