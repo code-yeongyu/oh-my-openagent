@@ -10,6 +10,7 @@ import {
   defaultResolveCallerSessionId,
   evaluateSpawnPolicy,
   isTeamMemberProcess,
+  loadPiTui,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
@@ -57,8 +58,19 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
   return {
     name: "task",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
       if (isTeamMemberProcess()) return
+
+      // Warm the pi-tui lazy boundary BEFORE any tool/renderer registration. This bundle-local
+      // warm-up is load-bearing even though composeOmoSenpiExtension also awaits loadPiTui():
+      // omo.js and omo-task.js are separate bundles, each with its own copy of the lazy module's
+      // memoized state, so compose's warm-up (omo.js) can never warm the copy the task runtime
+      // actually reads (omo-task.js). Worse, without an in-graph caller the bundler eliminates the
+      // loader entirely and constant-folds piTui() into an unconditional throw - the beta.20
+      // regression in issue #7339, where a worker spawn's debounced status-widget timer died on
+      // that throw and took the host down. The load is memoized, so this costs one small module
+      // load per host process; spawned rpc children never register this component.
+      await loadPiTui()
 
       // Unconditional omo process hygiene (T16): fires on session_start before any
       // flag/capability gate can skip the rest of the component.

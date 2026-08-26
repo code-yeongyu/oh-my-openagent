@@ -1,3 +1,5 @@
+import { loadPiTui } from "@oh-my-opencode/senpi-task"
+
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
@@ -98,6 +100,14 @@ export function composeOmoSenpiExtension(
         pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
       { scheduleFlush: (flush) => void setTimeout(flush, 200) },
     )
+
+    // Warm the pi-tui lazy boundary once for THIS bundle before any component registers. The
+    // memoized boundary state is per-bundle: this warm-up covers the components that live in
+    // omo.js (fallback-architect notices, memory worker entries) even when other components are
+    // disabled by flag or fail to register. It CANNOT warm the separately-bundled omo-task.js,
+    // whose own copy is warmed by createTaskComponent().register() - see issue #7339. The load is
+    // memoized, so this costs one small module load per process.
+    await loadPiTui()
 
     const ctx: ComponentContext = {
       logger,

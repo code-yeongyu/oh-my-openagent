@@ -4,6 +4,7 @@ import * as fs from "node:fs"
 import { join } from "node:path"
 
 import { defaultSignaller } from "../lifecycle/context"
+import { isSenpiBarrelLoaded, loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } from "./events"
 import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprintInputV1 } from "./fingerprint"
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
@@ -31,8 +32,10 @@ const LIST_DEFAULT_LIMIT = 100
 const LIST_MAX_LIMIT = 256
 
 // Fixed scheduler identity of this engine: the fingerprint must change if these semantics change.
+// waveAdmission moved strict-barrier -> dependency-frontier on 2026-08-25 (dag_530ad299): old
+// runs keyed under the barrier fingerprint are deliberately not reused by the new semantics.
 const SCHEDULER_FINGERPRINT_INPUT = {
-  waveAdmission: "strict-barrier",
+  waveAdmission: "dependency-frontier",
   failurePolicy: "continue-independent",
   dependencyData: "filesystem-only",
 } as const
@@ -114,6 +117,10 @@ export type DagRunRecordV1 = DagJournalCheckpoint & {
   readonly bottlenecks: readonly DagBottleneck[]
   readonly diagnostics: readonly DagDiagnostic[]
   readonly amendHistory?: readonly AmendRecord[]
+  // Resume lease: recovery claims a paused run by writing the claiming host pid here and drops the
+  // field on shutdown pause (see recovery.ts). Absent on records written before the lease existed.
+  readonly leaseHolderPid?: number
+  readonly previousLeaseHolderPid?: number
 }
 
 export type DagRunSummary = {
@@ -213,19 +220,32 @@ export function createDagManager(options: DagManagerOptions): DagManager {
   return {
     // start is async so every rejection path (invalid_definition, definition_conflict) reaches the
     // caller as a promise rejection rather than a synchronous throw.
-    start: async (params) => startRun(params, {
-      store,
-      now,
-      newRunId,
-      settings,
-      ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-    }),
-    amend: async (params) => amendRun(params, {
-      store,
-      now,
-      settings,
-      ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-    }),
+    start: async (params) => {
+      // Skill materialization runs synchronously inside startRun and reads the senpi barrel
+      // through the default filesystem skill loader's discovery, so this async entry point must
+      // await the barrel load first (issue #7339: a cold barrel crashed dag start before any node
+      // was dispatched). The loaded-check keeps the warm-barrel path synchronous: node-retry's
+      // prompt override fires amend as `void manager.amend(...)` and reads the mutated checkpoint
+      // WITHOUT awaiting, which only works while the wrapper body runs without yielding.
+      if (options.materializeSkills !== undefined && !isSenpiBarrelLoaded()) await loadSenpiBarrel()
+      return startRun(params, {
+        store,
+        now,
+        newRunId,
+        settings,
+        ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
+      })
+    },
+    amend: async (params) => {
+      // Same seam as start, with the same synchronous-when-warm requirement (see above).
+      if (options.materializeSkills !== undefined && !isSenpiBarrelLoaded()) await loadSenpiBarrel()
+      return amendRun(params, {
+        store,
+        now,
+        settings,
+        ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
+      })
+    },
     attach(runId, parentSessionId) {
       ownedRecord(runId, parentSessionId)
       return {
@@ -616,8 +636,7 @@ function transitiveDependents(edges: readonly DagEdge[], seeds: readonly DagNode
 }
 
 function liveLeaseHolder(record: DagRunRecordV1): boolean {
-  const leaseRecord = record as DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
-  const pid = leaseRecord.leaseHolderPid ?? leaseRecord.previousLeaseHolderPid
+  const pid = record.leaseHolderPid ?? record.previousLeaseHolderPid
   if (pid === undefined) return false
   return defaultSignaller.isAlive(pid)
 }
@@ -690,6 +709,7 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     diagnostics: record.diagnostics,
     counts: countNodes(record.nodes),
     ...(record.amendHistory === undefined ? {} : { amendHistory: record.amendHistory }),
+    ...(record.leaseHolderPid === undefined ? {} : { leaseHolderPid: record.leaseHolderPid }),
   }
 }
 
