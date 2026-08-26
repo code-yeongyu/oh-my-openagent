@@ -2,12 +2,18 @@
 
 > `r.jina.ai/URL` 한 줄로 거의 모든 공개 URL을 마크다운으로 변환.
 > Puppeteer 기반 실제 브라우저 렌더링 — JS SPA까지 처리.
-> **API 키 불필요. 무료: 분당 500 RPM.**
+>
+> **2026-08-09 probe 기준 무료 무키 경로는 종료됨.** 익명 호출은 401이며,
+> 리다이렉트를 따라가면 Cloudflare Turnstile(`Just a moment...`)에 막힌다.
+> **이제 `JINA_API_KEY` 환경 변수가 필요**하다 — `Authorization: Bearer <key>` 헤더.
+> 엔진에서는 `engine/surrogates.yaml`의 `jina_reader` 엔트리가 키가 있을 때만 활성화된다
+> (kind=reader, provenance=live — 서버 측 재렌더링).
+> 예전 "무료 500 RPM" 안내는 모두 폐기되었으므로 따르지 않는다.
 
 ## 기본 사용
 
 ```bash
-curl -s "https://r.jina.ai/{URL}"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/{URL}"
 ```
 
 ## 고급 기능

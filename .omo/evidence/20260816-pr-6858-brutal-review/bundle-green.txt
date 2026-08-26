@@ -1,0 +1,12 @@
+Exact build:
+npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs'
+
+Exact freshness check:
+npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+
+Observed:
+- All generated extension bundles rebuilt deterministically.
+- Only `packages/omo-senpi/plugin/extensions/omo-task.js` changed across the conflict resolution.
+- Freshness check exited 0.
+- Regenerated task bundle contains three `windowsHide:!0` occurrences, one more than current dev.
+- No conflict markers remain.

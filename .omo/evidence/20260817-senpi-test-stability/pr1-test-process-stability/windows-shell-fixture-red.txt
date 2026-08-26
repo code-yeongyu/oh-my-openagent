@@ -1,0 +1,56 @@
+WHAT WAS TESTED
+
+Live first post-partition dev CI:
+
+  run=https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380
+  job=https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899229
+  command=bun test packages/omo-opencode packages/memory-core
+
+Local faithful reproduction:
+
+  MSYSTEM=MINGW64 BASH_VERSION=5.2 WSL_DISTRO_NAME= \
+    npm exec --yes --package=bun@1.3.12 -- \
+    bun test packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+RED OBSERVED
+
+  packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+  error: expect(received).toEqual(expected)
+  - Expected  - 3
+  + Received  + 2
+  at on-complete-hook.test.ts:134:18
+  (fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows
+
+  error: expect(received).toEqual(expected)
+  - Expected  - 4
+  + Received  + 2
+  at on-complete-hook.test.ts:179:18
+  (fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected
+
+  local_exit=1
+
+ROOT CAUSE
+
+The tests spoof `process.platform` as `win32` and delete `SHELL`, but they do
+not clear the Git Bash/WSL indicators checked by `detectShellType()`:
+
+- `BASH_VERSION`
+- `MSYSTEM`
+- `WSL_DISTRO_NAME`
+
+The GitHub Windows job runs through Git Bash, so production correctly returns
+the Unix shell type and launches `sh -c`. The fixture incorrectly expects a
+pure PowerShell or cmd environment.
+
+WHY THIS IS FAITHFUL
+
+The local command injects the same Git Bash indicator that exists on the
+Windows runner and reproduces the same two assertion failures with Bun
+1.3.12. No production source is changed; the fix must make the test fixture
+declare its intended shell environment completely.
+
+OMITTED
+
+The million-line successful-test portion of the CI log was omitted. No
+credentials, auth headers, or environment dumps were recorded.

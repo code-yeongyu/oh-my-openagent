@@ -1,12 +1,14 @@
-import { afterEach, beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createOpencodeClient } from "@opencode-ai/sdk"
-import type { AssistantMessage, Session } from "@opencode-ai/sdk"
-import type { BoulderState } from "../../features/boulder-state"
-import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
+import {
+  createFinalWaveAfterHandlerHarness,
+  createFinalWaveMockPluginInput,
+  registerFinalWaveTestEnvironment,
+  writeFinalWavePlanState,
+} from "./final-wave-approval-gate.test-support"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-final-wave-regression-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -31,54 +33,24 @@ mock.module("../../shared/opencode-storage-detection", () => ({
 
 afterAll(() => { mock.restore() })
 
-const { createAtlasHook } = await import("./index")
+const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
-type AtlasHookContext = Parameters<typeof createAtlasHook>[0]
-
 describe("Atlas final-wave approval gate regressions", () => {
-  let testDirectory = ""
+  const env = registerFinalWaveTestEnvironment()
 
-  function createMockPluginInput(): AtlasHookContext {
-    const client = createOpencodeClient({ baseUrl: "http://localhost" })
+  const resolveParentSessionID = (taskSessionID: string): string => {
+    if (taskSessionID === "ses_nested_scope_review") return "atlas-nested-final-wave-session"
+    if (taskSessionID.startsWith("ses_parallel_review_")) return "atlas-parallel-final-wave-session"
+    return "main-session-123"
+  }
 
-    Reflect.set(client.session, "prompt", async () => ({
-      data: { info: {} as AssistantMessage, parts: [] },
-      request: new Request("http://localhost/session/prompt"),
-      response: new Response(),
-    }))
-
-    Reflect.set(client.session, "promptAsync", async () => ({
-      data: undefined,
-      request: new Request("http://localhost/session/prompt_async"),
-      response: new Response(),
-    }))
-
-    Reflect.set(client.session, "get", async ({ path }: { path: { id: string } }) => {
-      const parentID = path.id === "ses_nested_scope_review"
-        ? "atlas-nested-final-wave-session"
-        : path.id.startsWith("ses_parallel_review_")
-          ? "atlas-parallel-final-wave-session"
-          : "main-session-123"
-
-      return {
-        data: {
-          id: path.id,
-          parentID,
-        } as Session,
-        request: new Request(`http://localhost/session/${path.id}`),
-        response: new Response(),
-      }
+  function createHandler(sessionID: string) {
+    return createFinalWaveAfterHandlerHarness({
+      sessionID,
+      ctx: createFinalWaveMockPluginInput({ directory: env.directory, resolveParentSessionID }),
+      createHandler: createToolExecuteAfterHandler,
     })
-
-    return {
-      directory: testDirectory,
-      project: {} as AtlasHookContext["project"],
-      worktree: testDirectory,
-      serverUrl: new URL("http://localhost"),
-      $: {} as AtlasHookContext["$"],
-      client,
-    }
   }
 
   function setupMessageStorage(sessionID: string): void {
@@ -96,39 +68,15 @@ describe("Atlas final-wave approval gate regressions", () => {
     )
   }
 
-  function writePlanState(sessionID: string, planName: string, planContent: string): void {
-    const planPath = join(testDirectory, `${planName}.md`)
-    writeFileSync(planPath, planContent)
-
-    const state: BoulderState = {
-      active_plan: planPath,
-      started_at: "2026-01-02T10:00:00Z",
-      session_ids: [sessionID],
-      plan_name: planName,
-      agent: "atlas",
-    }
-
-    writeBoulderState(testDirectory, state)
-  }
-
-  beforeEach(() => {
-    testDirectory = join(tmpdir(), `atlas-final-wave-regression-${randomUUID()}`)
-    mkdirSync(join(testDirectory, ".omo"), { recursive: true })
-    clearBoulderState(testDirectory)
-  })
-
-  afterEach(() => {
-    clearBoulderState(testDirectory)
-    if (existsSync(testDirectory)) {
-      rmSync(testDirectory, { recursive: true, force: true })
-    }
-  })
-
   test("waits for approval when nested plan checkboxes remain but the only pending top-level task is final-wave", async () => {
     // given
     const sessionID = "atlas-nested-final-wave-session"
     setupMessageStorage(sessionID)
-    writePlanState(sessionID, "nested-final-wave-plan", `# Plan
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "nested-final-wave-plan",
+      planContent: `# Plan
 
 ## TODOs
 - [x] 1. Implement feature
@@ -147,12 +95,10 @@ describe("Atlas final-wave approval gate regressions", () => {
 
 ## Final Checklist
 - [ ] All tests pass
-`)
-
-    const hook = createAtlasHook(createMockPluginInput(), {
-      directory: testDirectory,
-      isCallerOrchestrator: async () => true,
+`,
     })
+
+    const handler = createHandler(sessionID)
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Tasks [1/1 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
@@ -164,19 +110,21 @@ session_id: ses_nested_scope_review
     }
 
     // when
-    await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    await handler.run(toolOutput)
 
-    // then
-    expect(toolOutput.output).toContain("FINAL WAVE APPROVAL GATE")
-    expect(toolOutput.output).toContain("explicit user approval")
-    expect(toolOutput.output).not.toContain("STEP 8: PROCEED TO NEXT TASK")
+    // then - nested non-top-level checkboxes do not block the approval wait state
+    expect(handler.sessionState.waitingForFinalWaveApproval).toBe(true)
   })
 
   test("waits for approval after the final parallel reviewer approves before plan checkboxes are updated", async () => {
     // given
     const sessionID = "atlas-parallel-final-wave-session"
     setupMessageStorage(sessionID)
-    writePlanState(sessionID, "parallel-final-wave-plan", `# Plan
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "parallel-final-wave-plan",
+      planContent: `# Plan
 
 ## TODOs
 - [x] 1. Ship implementation
@@ -187,12 +135,10 @@ session_id: ses_nested_scope_review
 - [ ] F2. **Code Quality Review** - \`unspecified-high\`
 - [ ] F3. **Real Manual QA** - \`unspecified-high\`
 - [ ] F4. **Scope Fidelity Check** - \`deep\`
-`)
-
-    const hook = createAtlasHook(createMockPluginInput(), {
-      directory: testDirectory,
-      isCallerOrchestrator: async () => true,
+`,
     })
+
+    const handler = createHandler(sessionID)
     const firstThreeOutputs = [1, 2, 3].map((index) => ({
       title: `Final review ${index}`,
       output: `Reviewer ${index} | VERDICT: APPROVE
@@ -212,19 +158,18 @@ session_id: ses_parallel_review_4
       metadata: {},
     }
 
-    // when
+    // when - three of the four final-wave reviewers approve
     for (const toolOutput of firstThreeOutputs) {
-      await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+      await handler.run(toolOutput)
     }
-    await hook["tool.execute.after"]({ tool: "task", sessionID }, lastOutput)
 
-    // then
-    for (const toolOutput of firstThreeOutputs) {
-      expect(toolOutput.output).toContain("STEP 8: PROCEED TO NEXT TASK")
-      expect(toolOutput.output).not.toContain("FINAL WAVE APPROVAL GATE")
-    }
-    expect(lastOutput.output).toContain("FINAL WAVE APPROVAL GATE")
-    expect(lastOutput.output).toContain("explicit user approval")
-    expect(lastOutput.output).not.toContain("STEP 8: PROCEED TO NEXT TASK")
+    // then - not every reviewer has approved yet, so the session has not paused
+    expect(handler.sessionState.waitingForFinalWaveApproval).toBe(false)
+
+    // when - the last reviewer approves
+    await handler.run(lastOutput)
+
+    // then - the session flips into the approval-wait state
+    expect(handler.sessionState.waitingForFinalWaveApproval).toBe(true)
   })
 })

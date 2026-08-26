@@ -1,5 +1,5 @@
-import { existsSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import {
 	canonicalizeExistingOrNearestAncestor,
 	contextCwd,
@@ -16,11 +16,11 @@ import {
 	LspServerLookupError,
 } from "./errors.js";
 import { getLspManager, type LspManager } from "./manager.js";
+import { findWorkspaceRootOutsideContext } from "./outside-context-workspace.js";
 import { loadInstallDecision } from "./server-install-state.js";
 import { findServerForExtension } from "./server-resolution.js";
 import type { ServerLookupResult } from "./types.js";
-
-const WORKSPACE_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"];
+import { WORKSPACE_MARKERS } from "./workspace-markers.js";
 
 export function isDirectoryPath(filePath: string): boolean {
 	try {
@@ -31,35 +31,85 @@ export function isDirectoryPath(filePath: string): boolean {
 }
 
 export function findWorkspaceRoot(filePath: string): string {
-	const abs = resolvePathInsideContext(filePath);
+	const cwd = contextCwd();
+	const abs = resolveReadablePathInsideContext(filePath);
 	let dir = abs;
 
 	if (!isDirectoryPath(dir)) {
 		dir = dirname(dir);
 	}
 
-	let prevDir = "";
-	while (dir !== prevDir) {
-		for (const marker of WORKSPACE_MARKERS) {
-			if (existsSync(join(dir, marker))) {
-				return dir;
+	if (!isPathInside(cwd, abs)) return findWorkspaceRootOutsideContext(dir);
+
+	const fallbackRoot = nearestExistingDirectoryInsideContext(dir, cwd) ?? cwd;
+	while (isPathInside(cwd, dir)) {
+		const canonicalDir = existingDirectoryInsideContext(dir, cwd);
+		if (canonicalDir !== undefined) {
+			for (const marker of WORKSPACE_MARKERS) {
+				if (existsSync(join(dir, marker))) {
+					return canonicalDir;
+				}
 			}
 		}
-		prevDir = dir;
+		if (dir === cwd) break;
 		dir = dirname(dir);
 	}
 
-	return dirname(abs);
+	return fallbackRoot;
+}
+
+export function resolveReadablePathInsideContext(filePath: string): string {
+	const cwd = contextCwd();
+	const abs = resolve(cwd, filePath);
+	if (isPathInside(cwd, abs)) return abs;
+
+	const rebased = rebaseThroughCanonicalAncestor(abs, cwd);
+	if (rebased !== undefined) return rebased;
+
+	return canonicalizeExistingOrNearestAncestor(abs);
 }
 
 export function resolvePathInsideContext(filePath: string): string {
 	const cwd = contextCwd();
-	const abs = resolve(cwd, filePath);
+	const abs = resolveReadablePathInsideContext(filePath);
 	const canonical = canonicalizeExistingOrNearestAncestor(abs);
 	if (!isPathInside(cwd, canonical)) {
 		throw new LspInvalidPathError(`LSP file path must be inside request cwd: ${filePath}`);
 	}
 	return canonical;
+}
+
+function rebaseThroughCanonicalAncestor(path: string, cwd: string): string | undefined {
+	let current = path;
+	const suffix: string[] = [];
+	while (true) {
+		if (existsSync(current)) {
+			const canonical = realpathSync(current);
+			if (isPathInside(cwd, canonical)) return suffix.length === 0 ? canonical : join(canonical, ...suffix);
+		}
+		const parent = dirname(current);
+		if (parent === current) return undefined;
+		suffix.unshift(basename(current));
+		current = parent;
+	}
+}
+
+function existingDirectoryInsideContext(directory: string, cwd: string): string | undefined {
+	if (!existsSync(directory)) return undefined;
+	const canonical = realpathSync(directory);
+	if (!statSync(canonical).isDirectory()) return undefined;
+	return isPathInside(cwd, canonical) ? canonical : undefined;
+}
+
+function nearestExistingDirectoryInsideContext(directory: string, cwd: string): string | undefined {
+	let current = directory;
+	while (isPathInside(cwd, current)) {
+		const canonical = existingDirectoryInsideContext(current, cwd);
+		if (canonical !== undefined) return canonical;
+		if (current === cwd) return undefined;
+		current = dirname(current);
+	}
+	return undefined;
 }
 
 export function formatServerLookupError(result: Exclude<ServerLookupResult, { status: "found" }>): string {
@@ -143,7 +193,7 @@ export interface WithLspClientOptions {
 	manager?: LspManager;
 }
 
-const READ_ONLY_RETRY_TOOLS = new Set([
+const READ_ONLY_TOOLS = new Set([
 	"diagnostics",
 	"definition",
 	"references",
@@ -154,11 +204,13 @@ const READ_ONLY_RETRY_TOOLS = new Set([
 
 export async function withLspClient<T>(
 	filePath: string,
-	fn: (client: LspClient, workspaceRoot: string) => Promise<T>,
+	fn: (client: LspClient, workspaceRoot: string, resolvedFilePath: string) => Promise<T>,
 	toolName: string,
 	options: WithLspClientOptions = {},
 ): Promise<T> {
-	const absPath = resolvePathInsideContext(filePath);
+	const absPath = READ_ONLY_TOOLS.has(toolName)
+		? resolveReadablePathInsideContext(filePath)
+		: resolvePathInsideContext(filePath);
 
 	if (isDirectoryPath(absPath)) {
 		throw new LspInvalidPathError(
@@ -181,9 +233,9 @@ export async function withLspClient<T>(
 		const client = await manager.getClient(root, server, options.signal);
 
 		try {
-			return await fn(client, root);
+			return await fn(client, root, absPath);
 		} catch (err) {
-			if (allowRetry && READ_ONLY_RETRY_TOOLS.has(toolName) && isLspDeadConnectionError(err)) {
+			if (allowRetry && READ_ONLY_TOOLS.has(toolName) && isLspDeadConnectionError(err)) {
 				manager.invalidateClient(root, server.id, client);
 				return acquireAndCall(false);
 			}

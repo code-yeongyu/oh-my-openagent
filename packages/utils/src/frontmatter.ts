@@ -1,4 +1,4 @@
-import yaml from "js-yaml"
+import * as yaml from "js-yaml"
 
 export type FrontmatterMode = "default" | "rule"
 

@@ -37,10 +37,10 @@ describe("omo-senpi ulw-loop omo-command spawn target", () => {
   })
 
   it("#given a plain bin on darwin #when building the spawn target #then it is unchanged", () => {
-    const target = toSpawnTarget("/usr/local/bin/omo", ["ulw-loop", "status", "--json"], "darwin")
+    const target = toSpawnTarget("/usr/local/bin/omo-agent-toolkit", ["ulw-loop", "status", "--json"], "darwin")
 
     expect(target).toEqual({
-      command: "/usr/local/bin/omo",
+      command: "/usr/local/bin/omo-agent-toolkit",
       args: ["ulw-loop", "status", "--json"],
     })
   })
@@ -50,5 +50,39 @@ describe("omo-senpi ulw-loop omo-command spawn target", () => {
 
     expect(target.command).toBe("/home/u/omo.cmd")
     expect(target.args).toEqual(["status"])
+  })
+})
+
+describe("omo-senpi ulw-loop omo-command .js spawn target", () => {
+  it("#given a .js target on win32 #when building the spawn target #then it spawns via process.execPath with the target as argv1", () => {
+    const target = toSpawnTarget(
+      "C:\\tools\\omo-agent-toolkit.js",
+      ["ulw-loop", "status", "--json"],
+      "win32",
+    )
+
+    expect(target.command).toBe(process.execPath)
+    expect(target.args).toEqual(["C:\\tools\\omo-agent-toolkit.js", "ulw-loop", "status", "--json"])
+  })
+
+  it("#given a .js target on darwin #when building the spawn target #then it spawns via process.execPath", () => {
+    const target = toSpawnTarget("/usr/local/lib/omo-agent-toolkit.js", ["--version"], "darwin")
+
+    expect(target.command).toBe(process.execPath)
+    expect(target.args).toEqual(["/usr/local/lib/omo-agent-toolkit.js", "--version"])
+  })
+
+  it("#given a .js target with the default platform #when building the spawn target #then it spawns via process.execPath", () => {
+    const target = toSpawnTarget("/opt/omo/bin/oh-my-opencode.js", ["doctor"])
+
+    expect(target.command).toBe(process.execPath)
+    expect(target.args).toEqual(["/opt/omo/bin/oh-my-opencode.js", "doctor"])
+  })
+
+  it("#given an uppercase .JS target on win32 #when building the spawn target #then it still spawns via process.execPath", () => {
+    const target = toSpawnTarget("D:\\tools\\OMO-AGENT-TOOLKIT.JS", ["status"], "win32")
+
+    expect(target.command).toBe(process.execPath)
+    expect(target.args).toEqual(["D:\\tools\\OMO-AGENT-TOOLKIT.JS", "status"])
   })
 })

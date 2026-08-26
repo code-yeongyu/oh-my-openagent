@@ -1,0 +1,18 @@
+$ bun test packages/omo-opencode/src/features/monitor/monitor-terminal-wake.test.ts
+bun test v1.3.14-canary.1 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [120.00ms]
+
+$ bun test packages/omo-opencode/src/features/monitor/
+bun test v1.3.14-canary.1 (0d9b296a)
+
+ 94 pass
+ 0 fail
+ 198 expect() calls
+Ran 94 tests across 13 files. [167.00ms]
+
+$ bun run typecheck
+exit=0

@@ -1,0 +1,262 @@
+{
+  "version": 1,
+  "domain": "node-assert-codex-cleanup",
+  "rule": "Allow current Node assert candidates in the four Codex cleanup tests only when they verify machine sentinels, parser fixtures, shipped-copy equality, runtime behavior, or security boundaries without pinning authored prose, headings, tone, or status wording.",
+  "candidate_occurrence_count": 29,
+  "candidate_fingerprint_count": 28,
+  "allowed": [
+    {
+      "fingerprint": "5572f491f0280a36f7675f5d108af0cb8092b7ea55eacc56676be17b9f8ba98d",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that the auto-update command entered the started state; the boolean is observable control-flow state and does not constrain notice wording.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 45,
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "3612adc8979a05be000bf422b689bada71df9a693459edaed355e0aee15aadd5",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the spawned update command completed with exit status zero, an executable runtime result independent of generated notice copy.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 46,
+      "expected": "<expression:0>"
+    },
+    {
+      "fingerprint": "4c7f896c6ea829a10d6967313d531972c79de4eb1de22f2a5fe461ed5483515f",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies one notice is emitted in both the successful-update and marketplace-flow branches; the duplicated occurrence checks result cardinality without pinning either notice's prose.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 48,
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "1e551b6fcff0b6d1c53561d1cefee6a604ead024795d4209e0a8245553686332",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks propagation of the structured fromVersion and toVersion state into the update result while leaving all surrounding notice wording unrestricted.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 49,
+      "expected": "/v1\\.0\\.0 -> v1\\.0\\.1/"
+    },
+    {
+      "fingerprint": "755042ecb1881aaa6783ec045026e2c3f25b5aa0f3ec2ea4e92b032ec31d829b",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Uses a synthetic sentinel to prove the LazyCodex release-note section parser retains selected fixture data; no authored release-note sentence is required.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 50,
+      "expected": "/INCLUDED_RELEASE_NOTE_SENTINEL/"
+    },
+    {
+      "fingerprint": "3f720c160beb6e3f3ae3ed26d49d4050f08ac8e3d15677c59dc8f595cab7f904",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Uses a synthetic sentinel to prove release-note data outside the selected section is filtered out, without constraining editorial release-note content.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 51,
+      "expected": "/EXCLUDED_RELEASE_NOTE_SENTINEL/"
+    },
+    {
+      "fingerprint": "bc4da5a012007207b814fbb8ed24c4d8a7b0fc34f9f87a8ba62221825b7118f6",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the opening lazycodex_release_notes tag because downstream trust-boundary parsing consumes that structured delimiter, not because of presentation wording.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 52,
+      "expected": "/<lazycodex_release_notes>/g"
+    },
+    {
+      "fingerprint": "d4a0b0321fc7d2b162f62f429349b28b895700fdebc98b585fb0c419efec63e6",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Requires exactly one opening trust-boundary tag so untrusted release-note data cannot create ambiguous nested regions.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 52,
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "d757f044bd3a7dfe7fbc4796f4ac26fd1f1cb99fdc59153cd7f3a4635232d502",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the closing lazycodex_release_notes tag as the machine-recognized terminator for the untrusted release-note region.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 53,
+      "expected": "/<\\/lazycodex_release_notes>/g"
+    },
+    {
+      "fingerprint": "b43bfaec1bfc99ef4115758aa10dae34c9a92075933904289156965649c17c6c",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Requires exactly one closing trust-boundary tag so injected fixture delimiters cannot terminate or duplicate the protected region.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 53,
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "ac79a3866b07310609bee0874c23b0121dfb279140bfe1eca837ad9ef5a225bb",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Verifies an injected closing tag is HTML-escaped and remains inert data inside the release-note boundary.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 54,
+      "expected": "/&lt;\\/lazycodex_release_notes&gt;/"
+    },
+    {
+      "fingerprint": "ff2a9c4915edfe75e5ede8ea39a92dbf2575bd6023e4e1e32d3f4a80e96c395e",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Verifies an injected opening tag is HTML-escaped rather than becoming a nested machine delimiter.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 55,
+      "expected": "/&lt;lazycodex_release_notes&gt;/"
+    },
+    {
+      "fingerprint": "28eb4507e8d58d2887759517a475457d1db164069b21a62436d2af8d3658edea",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Uses the structured opening and closing tags to extract only the bounded untrusted payload; the regex defines the trust boundary rather than user-facing prose.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 56,
+      "expected": "/<lazycodex_release_notes>\\n(?<notes>[\\s\\S]*?)\\n<\\/lazycodex_release_notes>/"
+    },
+    {
+      "fingerprint": "3e3390ff4bbf3446391e4dda91b23ea0b0f5f2a6f5d64e8029a8ff182633b546",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "The derived candidate repeats the same structured extraction regex while checking that a bounded payload was produced; it contracts delimiters, not authored text.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 56,
+      "expected": "/<lazycodex_release_notes>\\n(?<notes>[\\s\\S]*?)\\n<\\/lazycodex_release_notes>/"
+    },
+    {
+      "fingerprint": "f8c2ac884120a0756f3ebe99625e127a573075ae5130b13e007a203f44374a28",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks that structured tag extraction produced a string payload before inspecting it, without imposing payload wording.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 57,
+      "expected": "string"
+    },
+    {
+      "fingerprint": "c34d525cb2718ae4d5ab2ed4039c408e2cdd25349562dc73264a2df878fc614e",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "Uses a synthetic untrusted-data sentinel to prove hostile fixture content remains present inside the bounded payload instead of being interpreted or moved outside it.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 58,
+      "expected": "/UNTRUSTED_INSTRUCTION_SENTINEL/"
+    },
+    {
+      "fingerprint": "82d4e720fa32581c38ad7692de345ad746572bc1ff535dd85e11e48cb5116bbe",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies marketplace-managed installs do not start the self-update command when version lookup times out; this is fail-closed dispatch state.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 83,
+      "expected": "<expression:false>"
+    },
+    {
+      "fingerprint": "12ca971acab475bf8afd48ba6ac861d3e2a3217d6114ada93d9adcf850698ce9",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "marketplace-flow is the structured reason code returned by auto-update dispatch and consumed as state, not authored notice wording.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 84,
+      "expected": "marketplace-flow"
+    },
+    {
+      "fingerprint": "523117d51dbe9d715b68f414549726c325cfc5a91e62f978de83dc5efecaa6e6",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Checks presence of a string notice in the marketplace-flow result while deliberately leaving its status wording unrestricted.",
+      "path": "packages/omo-codex/plugin/test/auto-update-release-notes.test.mjs",
+      "line": 87,
+      "expected": "string"
+    },
+    {
+      "fingerprint": "9c766176a78065048ee761d8b5e38962e73b5fe248f08d3bb0ac323d8b0a56f3",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Verifies each dynamically selected input evidence field is reflected into the generated body; the assertion follows fixture values and does not pin headings or fixed prose.",
+      "path": "packages/omo-codex/plugin/test/lcx-contribute-bug-fix-template.test.mjs",
+      "line": 31,
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "642b30e5efb89b1654638b41457584a40af7b826c550c0ca0663485c47f7386d",
+      "status": "allowed",
+      "category": "parser-fixture",
+      "rationale": "Verifies every dynamic verification-command fixture is emitted by the body serializer without requiring a Verification heading or surrounding authored copy.",
+      "path": "packages/omo-codex/plugin/test/lcx-contribute-bug-fix-template.test.mjs",
+      "line": 33,
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "62dc8ad881b3550e639d2003e7cc501fcb4b057e38cdaa72d9f72bc7dac4ee91",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Pins the lazycodex-generated tag as a machine label used to identify generated PR bodies, not as editorial PR-body prose.",
+      "path": "packages/omo-codex/plugin/test/lcx-contribute-bug-fix-template.test.mjs",
+      "line": 34,
+      "expected": "/^Tag: lazycodex-generated$/m"
+    },
+    {
+      "fingerprint": "ccaab22e71c7f47bc063798a0abc6200f534b8ac6e80782c480f09e916c09027",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the PR-body CLI exits successfully after reading JSON and writing the requested output file.",
+      "path": "packages/omo-codex/plugin/test/lcx-contribute-bug-fix-template.test.mjs",
+      "line": 83,
+      "expected": "<expression:0>"
+    },
+    {
+      "fingerprint": "eece3852859954b43e472698c614042d0a52e50127ebc9a6633b9eacf000a5ea",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares CLI-written bytes with the exported production formatter for the same dynamic input, so editorial rewrites remain allowed while CLI and library output must stay identical.",
+      "path": "packages/omo-codex/plugin/test/lcx-contribute-bug-fix-template.test.mjs",
+      "line": 84,
+      "expected": "<expression:createLazyCodexBugFixPrBody(input)>"
+    },
+    {
+      "fingerprint": "9012dd85a10a9bec225ac3c699df42b2405e248893e88cb9d3e8ad9be8d0ea30",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies exactly one ulw-loop UserPromptSubmit handler is dispatched for the aggregate plugin, independent of hook status copy.",
+      "path": "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+      "line": 183,
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "2810f6a679526638b8b5376b1ac905bcd382cceeedaa020d85759cf1fd660893",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies exactly one dedicated ultrawork UserPromptSubmit handler is dispatched, preserving routing and deduplication without testing UI wording.",
+      "path": "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+      "line": 184,
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "7dad0a0fb0f3a3a91d250f043b9ff24b4b103c80466d893e4db415d3fc1145d8",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "Checks only the structured OmO version prefix and non-empty suffix after installation; the actual user-visible status wording remains free to change.",
+      "path": "packages/omo-codex/scripts/install-lazycodex-version-stamp.test.mjs",
+      "line": 84,
+      "expected": "/^\\(OmO 4\\.7\\.6\\) \\S/"
+    },
+    {
+      "fingerprint": "b91998864c8ace8c5df7f3cfd41b39ec2f1c1e9531491cf4dc27148b510d12f7",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the installer removed the stale source version from each status field during version-stamp transformation without constraining the remaining status text.",
+      "path": "packages/omo-codex/scripts/install-lazycodex-version-stamp.test.mjs",
+      "line": 85,
+      "expected": "/0\\.1\\.0/"
+    }
+  ],
+  "forbidden": []
+}

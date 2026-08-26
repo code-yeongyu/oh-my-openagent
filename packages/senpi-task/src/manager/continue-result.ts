@@ -11,10 +11,14 @@ export function toContinueResult(outcome: SendOutcome): ContinueResult {
       return { kind: "continued", task_id: outcome.task_id, status: outcome.status, delivered: outcome.delivered }
     case "revived":
       return { kind: "continued", task_id: outcome.task_id, status: "running", delivered: "revive" }
+    case "capacity_deferred":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: "Retry the send after capacity frees." }
     case "queued":
       return { kind: "continued", task_id: outcome.task_id, status: "pending", delivered: "followUp" }
     case "not_continuable":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: outcome.suggestion }
+    case "one_shot_agent":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.message, suggestion: CONTINUE_SUGGESTION }
     case "scope_denied":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: CONTINUE_SUGGESTION }
     case "not_found":

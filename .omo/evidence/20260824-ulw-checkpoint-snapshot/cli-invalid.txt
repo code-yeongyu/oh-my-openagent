@@ -1,0 +1,21 @@
+WHAT WAS TESTED
+After all G002 criteria were marked pass, the built local CLI received a snapshot with a complete status but no objective or title:
+
+node dist/cli.js ulw-loop checkpoint \
+  --goal-id G002-goal-b \
+  --status complete \
+  --evidence "done" \
+  --codex-goal-json '{"status":"complete"}' \
+  --json
+
+OBSERVED
+Exit code: 1.
+JSON: ok=false.
+Error code: ulw_loop_codex_snapshot_mismatch.
+Error message: Codex goal snapshot is missing objective text.
+
+WHY IT IS ENOUGH
+The new title compatibility does not weaken the missing-objective guard. A malformed snapshot still fails closed with the existing precise error.
+
+WHAT WAS OMITTED
+No credentials, auth headers, or secret-bearing logs were captured.

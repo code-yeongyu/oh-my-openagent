@@ -40,7 +40,9 @@ export type { TeamCoreConfig, TeamCoreSpecSource } from "./runtime-config"
 export { memberTaskMapPath, readMemberTaskMap, writeMemberTaskMap } from "./member-map"
 export type { MemberTaskMap } from "./member-map"
 export { projectMemberStatus, refreshTeamMemberStatuses } from "./member-projection"
+export { isOwnedTeamMemberTask, parseTeamMemberTaskIdentity } from "./liveness-ownership"
 export type { MemberStatusPort, RefreshTeamMemberStatusesDeps, RuntimeMemberStatus } from "./member-projection"
+export type { TeamMemberOwnershipDeps, TeamMemberTaskIdentity } from "./liveness-ownership"
 export { memberTaskName, spawnTeamMembers } from "./spawn-members"
 export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spawn-members"
 export { createTeamMemberRespawnLaunchResolver, TeamMemberRespawnLaunchError } from "./member-respawn"
@@ -50,11 +52,11 @@ export {
   buildTeamMessage,
   createLeadDeliveryJournal,
   createLeadPoller,
+  createIncrementalSessionMarkerIndex,
   DEFAULT_STALE_RESERVATION_TTL_MS,
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   sendTeamMessage,
-  WaitRegistry,
 } from "./messaging"
 export type {
   BuildTeamMessageOptions,
@@ -66,17 +68,18 @@ export type {
   LeadPoller,
   LeadPollerDeps,
   MessagingEngineDeps,
+  SessionMarkerExtractor,
+  SessionMarkerIndex,
+  SessionSliceReader,
   ReclaimResult,
   ReconcileTeamMailboxDeps,
   SendTeamMessageInput,
   SendTeamMessageResult,
-  WaitClaim,
-  WaitFilter,
-  WaitMessage,
-  WaitRegistration,
 } from "./messaging"
 export {
   MEMBER_EXTENSION_BUNDLE_NAME,
+  MEMBER_IDENTITY_ENV,
+  isTeamMemberProcess,
   parseMemberExtensionEnv,
   resolveMemberExtensionEntryPath,
 } from "./member-extension"

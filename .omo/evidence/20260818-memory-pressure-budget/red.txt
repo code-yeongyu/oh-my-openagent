@@ -1,0 +1,130 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/reflection/completion-validation.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'validateDreamTokenBudget' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-system-token-budget/packages/memory-core/src/reflection/completion-validation.ts'.
+-------------------------------
+
+
+packages/memory-core/src/reflection/assets/assets.test.ts:
+(pass) dream persona asset > #given the source asset and the packaged plugin copy #when loaded and read #then all copies are identical [0.94ms]
+24 |   })
+25 | 
+26 |   it("#given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded", () => {
+27 |     const { sections } = loadDreamPersona()
+28 | 
+29 |     expect(sections.some((section) => section.heading === "System Token Budget Contract")).toBe(true)
+                                                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-system-token-budget/packages/memory-core/src/reflection/assets/assets.test.ts:29:92)
+(fail) dream persona asset > #given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded [0.26ms]
+(pass) reflection persona asset > #given the source asset #when loaded through assets.ts #then it equals the real source [0.24ms]
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.21ms]
+
+packages/omo-senpi/src/components/memory/worker/remediation.test.ts:
+(pass) reflectionRemediation > #given a category_unavailable failure > #when remediated #then it names the config escape hatches instead of a nonexistent child log [0.13ms]
+(pass) reflectionRemediation > #given the senpi child's verbatim model-not-found error > #when remediated #then it names the model the child could not see instead of the generic child log [0.09ms]
+38 |   })
+39 | 
+40 |   describe("#given a pressure dream budget warning", () => {
+41 |     test("#when remediated #then it tells the next run to trim system memory below the supplied target", () => {
+42 |       expect(reflectionRemediation("budget_not_met", "Committed system/ estimate is 90 tokens; pressure dream target is below 80 tokens"))
+43 |         .toBe("run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET")
+              ^
+error: expect(received).toBe(expected)
+
+Expected: "run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET"
+Received: "inspect runtime/reflection-sessions/<runId>/child-stderr.log"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-system-token-budget/packages/omo-senpi/src/components/memory/worker/remediation.test.ts:43:10)
+(fail) reflectionRemediation > #given a pressure dream budget warning > #when remediated #then it tells the next run to trim system memory below the supplied target [0.19ms]
+(pass) reflectionRemediation > #given the pre-existing failure taxonomies > #when the child could not see the model #then the category/model hint is kept [0.06ms]
+(pass) reflectionRemediation > #given the pre-existing failure taxonomies > #when spawn failed #then the SENPI_BIN hint is kept [0.06ms]
+(pass) reflectionRemediation > #given the pre-existing failure taxonomies > #when nothing matches #then the child log hint remains the default for post-spawn failures [0.05ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn.test.ts:
+(pass) worker payload mode relaxation > #given a missing facts payload from the first launch #when mode relaxation reports ENOENT #then preparation continues [2.72ms]
+(pass) worker payload mode relaxation > #given facts payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.74ms]
+(pass) worker payload mode relaxation > #given reflection payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [7.63ms]
+124 |       systemTokenBudget: 100,
+125 |       systemTokenTarget: 80,
+126 |     })
+127 | 
+128 |     expect(prepared.env.SYSTEM_TOKENS_PATH).toBe(prepared.paths.systemTokens)
+129 |     expect(prepared.env.SYSTEM_TOKEN_BUDGET).toBe("100")
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "100"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-system-token-budget/packages/omo-senpi/src/components/memory/worker/spawn.test.ts:129:46)
+(fail) dream token budget launch contract > #given a pressure dream fixture repo #when its spawn is prepared #then all three budget inputs carry the committed per-file estimate [2.78ms]
+(pass) worker senpi command resolution > #given an env whose PATH cannot resolve senpi #when a facts spawn is prepared #then the command is executable rather than the bare name [0.89ms]
+(pass) worker senpi command resolution > #given an explicit senpiCommand #when a facts spawn is prepared #then the override is preserved [0.59ms]
+
+ 13 pass
+ 4 fail
+ 1 error
+ 23 expect() calls
+Ran 17 tests across 4 files. [1202.00ms]
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-crash.test.ts:
+(pass) reflection finalization crash recovery > #given integration landed before its checkpoint #when finalization retries #then receipt recovery settles exactly once [623.25ms]
+(pass) reflection finalization crash recovery > #given merge cleanup and settlement completed before final publication #when retried #then completion and final repair without duplicate settlement [650.45ms]
+183 |       reservation: item.store,
+184 |       now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+185 |       withWriterLock: async (operation) => operation(),
+186 |     }, item.runDir, dreamLedger)
+187 | 
+188 |     expect(result).toMatchObject({
+                         ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "detail": "Committed system/ estimate is 109 tokens; pressure dream target is below 80 tokens",
++   "completion": {
++     "category": "quick",
++     "consecutiveFailures": 0,
++     "conversationIds": [
++       "conversation-a",
++     ],
++     "delivery": {
++       "status": "pending",
++     },
++     "durationMs": 60000,
++     "filesChanged": 1,
++     "finishedAt": "2026-08-11T10:01:00.000Z",
++     "identity": "agent-test",
++     "mergedCommitSha": "3c9c61bc026a32fe42d04aae4052622df0d38e43",
++     "model": "fixture/model",
++     "origin": "pressure",
++     "outcome": "merged",
++     "runId": "run-1",
++     "schemaVersion": 1,
++     "startedAt": "2026-08-11T10:00:00.000Z",
++     "trigger": "dream",
++   },
+    "outcome": "merged",
+-   "reason": "budget_not_met",
++   "runId": "run-1",
+  }
+
+- Expected  - 2
++ Received  + 23
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-system-token-budget/packages/omo-senpi/src/components/memory/worker/run-finalization-crash.test.ts:188:20)
+(fail) reflection finalization crash recovery > #given a pressure dream merges above its token target #when finalization validates committed system memory #then the merge records a budget_not_met warning [663.13ms]
+(pass) reflection finalization crash recovery > #given parent_dirty was checkpointed before cleanup #when finalization retries #then the durable decision and user edit are preserved [444.57ms]
+
+ 3 pass
+ 1 fail
+ 15 expect() calls
+Ran 4 tests across 1 file. [2.49s]

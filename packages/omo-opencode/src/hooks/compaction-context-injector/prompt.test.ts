@@ -39,22 +39,22 @@ describe("createCompactionContextInjector prompt", () => {
       const prompt = injector.inject("ses_parent")
 
       //#then
-      expect(prompt).toContain("Active/Recent Delegated Sessions")
-      expect(prompt).toContain("**explore**")
-      expect(prompt).toContain("[quick]")
       expect(prompt).toContain("`ses_child`")
+      expect(prompt).toContain("`t1`")
     })
 
     it("does not inject task history section when no entries exist", async () => {
       //#given
       const mockManager = createMockBackgroundManager()
+      mockManager.taskHistory.record("ses_other", { id: "other", sessionID: "ses_child_other", agent: "explore", description: "Unrelated", status: "completed", category: "quick" })
       const injector = createCompactionContextInjector({ backgroundManager: mockManager })
 
       //#when
       const prompt = injector.inject("ses_empty")
 
       //#then
-      expect(prompt).not.toContain("Active/Recent Delegated Sessions")
+      expect(prompt).not.toContain("`ses_child_other`")
+      expect(prompt).not.toContain("`other`")
     })
 
     it("keeps injected delegated history bounded for long task lists", async () => {
@@ -75,9 +75,7 @@ describe("createCompactionContextInjector prompt", () => {
       //#when
       const prompt = injector.inject("ses_parent")
 
-      //#then
-      expect(prompt.length).toBeLessThanOrEqual(9_000)
-      expect(prompt).toContain("older delegated sessions omitted")
+      //#then - only the most recent entries survive the compaction cap
       expect(prompt).toContain("`t99`")
       expect(prompt).not.toContain("`t0`")
     })

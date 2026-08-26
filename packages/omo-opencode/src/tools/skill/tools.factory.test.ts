@@ -171,7 +171,6 @@ describe("createSkillTool", () => {
     })
 
     // then
-    expect(skillTool.description).toContain("<available_items>")
     expect(skillTool.description).toContain("<name>/seeded-command</name>")
     expect(skillTool.description).not.toContain("<name>/lazy-skill</name>")
   })

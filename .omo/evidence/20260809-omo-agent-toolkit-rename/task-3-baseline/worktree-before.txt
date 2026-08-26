@@ -1,0 +1,15 @@
+$ git rev-parse HEAD
+8b33ac9592931b2387eb4d3a11423a8a856e2105
+$ git status --short
+ M package.json
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/plugin/components/codegraph/dist/serve.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-opencode/src/cli/cli-program.ts
+ M packages/omo-opencode/src/cli/doctor/doctor-target.test.ts
+ M packages/omo-opencode/src/cli/doctor/framework/doctor-target.ts
+ M packages/omo-opencode/src/cli/install-platform-resolution.test.ts
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M script/build-binaries.test.ts
+?? script/bin-map.test.ts
+$ git diff -- packages/omo-codex/src/install packages/omo-codex/plugin/components/bootstrap/src packages/omo-opencode/src/cli/doctor/checks/codex.ts packages/omo-opencode/src/cli/doctor/checks/codex-runtime-wrapper.ts

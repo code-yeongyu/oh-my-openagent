@@ -1,0 +1,36 @@
+WHAT WAS TESTED
+Commands:
+  cd packages/shared-skills/skills/coding-agent-sessions
+  uv run --with basedpyright basedpyright \
+    scripts/agent_sessions/pi_family.py \
+    scripts/tests/test_pi_family_scanners.py
+
+  uv run /Users/yeongyu/.bun/install/global/node_modules/omo-ai/plugin/skills/programming/scripts/python/check-no-excuse-rules.py \
+    scripts/agent_sessions/pi_family.py \
+    scripts/tests/test_pi_family_scanners.py
+
+  awk pure-LOC count for both changed Python files.
+
+WHAT WAS OBSERVED
+BasedPyright:
+  0 errors, 0 warnings, 0 notes
+
+No-excuse audit:
+  no violations in 2 file(s)
+
+Pure LOC:
+  pi_family.py: 32
+  test_pi_family_scanners.py: 150
+
+Built-in LSP limitation:
+  The session LSP is rooted at the main checkout and rejected the task-worktree
+  paths as outside request cwd. This is recorded as unavailable, not as a pass.
+  BasedPyright CLI provided the authoritative changed-file diagnostics.
+
+WHY IT IS ENOUGH
+The repository-configured Python checker reports no diagnostics, the mandatory
+programming-skill audit reports no banned patterns, and both edited Python
+files remain below the 250 pure-LOC ceiling.
+
+WHAT WAS OMITTED
+No environment dumps or credentials were captured.

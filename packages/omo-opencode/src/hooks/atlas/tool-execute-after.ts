@@ -24,8 +24,16 @@ export function createToolExecuteAfterHandler(input: {
   const collectGitDiffStatsImpl = input.collectGitDiffStats ?? collectGitDiffStats
   const formatFileChangesImpl = input.formatFileChanges ?? formatFileChanges
   return async (toolInput, toolOutput): Promise<void> => {
+    const clearPendingCall = (): void => {
+      if (!toolInput.callID) return
+      pendingFilePaths.delete(toolInput.callID)
+      pendingPlanSnapshots?.delete(toolInput.callID)
+      pendingTaskRefs.delete(toolInput.callID)
+    }
+
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
+      clearPendingCall()
       return
     }
 
@@ -34,6 +42,7 @@ export function createToolExecuteAfterHandler(input: {
     }
 
     if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
+      clearPendingCall()
       return
     }
 

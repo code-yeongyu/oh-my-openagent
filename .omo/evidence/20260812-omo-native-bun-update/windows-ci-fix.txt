@@ -1,0 +1,31 @@
+PR #6775 Windows CI repair
+
+Failed run:
+https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31561555844
+
+Branch-caused RED:
+
+```text
+Expected: omo is updated via bun: bun add --cwd 'C:\...\omo-ai' -g omo-ai@beta
+Received: omo is updated via bun: bun add --cwd "C:/.../omo-ai" -g omo-ai@beta
+```
+
+Two launcher integration tests hardcoded POSIX quoting when running on Windows.
+Production output was the intended Windows-compatible form.
+
+Fix:
+
+- derive the expected integration command from `process.platform`;
+- POSIX expects single-quoted native paths;
+- Windows expects forward-slash paths inside double quotes;
+- keep the direct `updateTarget(root, "win32")` contract test.
+
+GREEN:
+
+- launcher suite: 32 pass, 0 fail;
+- OMO Native suite: 74 pass, 6 documented environment skips, 0 fail;
+- full repository typecheck: PASS.
+
+The same Windows run also timed out in an unrelated OmO Native telemetry
+tight-loop test after 5 seconds. That test is not changed or suppressed here;
+the fresh CI rerun will determine whether it recurs independently.

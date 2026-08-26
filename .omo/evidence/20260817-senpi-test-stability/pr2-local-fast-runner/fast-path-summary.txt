@@ -1,0 +1,27 @@
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] opencode-memory: exit 0
+[test-fast] root-rest: exit 0
+[test-fast] senpi: exit 0
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] opencode-memory: exit 0
+[test-fast] root-rest: exit 3
+[test-fast] senpi: exit 0
+ 5003 pass
+ 11 skip
+ 0 fail
+Ran 5014 tests across 730 files. [97.82s]
+[test-fast] root-rest: exit 0
+ 1907 pass
+ 1 skip
+ 0 fail
+Ran 1908 tests across 279 files. [149.16s]
+[test-fast] senpi: exit 0
+ 8898 pass
+ 1 skip
+ 0 fail
+Ran 8899 tests across 1051 files. [162.51s]
+[test-fast] opencode-memory: exit 0
+real 163.55
+user 168.33
+sys 148.67

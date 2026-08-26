@@ -1,0 +1,35 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/dag-lint.test.ts:
+(pass) dag definition lint > #given nodes carrying the full prompt contract #when linted #then no warnings [3.49ms]
+(pass) dag definition lint > #given a node missing the TASK marker #when linted #then the warning names the node and the contract [0.12ms]
+(pass) dag definition lint > #given a node missing STOP WHEN #when linted #then the warning names the node and the stop condition [0.09ms]
+(pass) dag definition lint > #given a multi-node run without a verification node #when linted #then one run-level warning fires [0.10ms]
+(pass) dag definition lint > #given a multi-node run whose verification lives in a node id #when linted #then no run-level warning [0.10ms]
+(pass) dag definition lint > #given a single-node run without verification shape #when linted #then no run-level warning [0.10ms]
+
+packages/omo-senpi/src/components/task/dag-tool.test.ts:
+(pass) dag tool registration > #given the dag tool factory #when a tool is created #then it registers exactly one tool named dag [1.70ms]
+(pass) dag tool start action > #given a valid definition #when start runs #then a run_id and snapshot round-trip through the DagManager [7.93ms]
+(pass) dag tool start action > #given an identical definition #when start runs twice #then the second call reuses the same run [6.42ms]
+(pass) dag tool start action > #given start without a definition #when the tool runs #then it rejects with invalid_definition [1.14ms]
+(pass) dag tool definition validation > #given a cyclic definition #when start runs #then it is rejected with diagnostics and NO run is created [3.62ms]
+(pass) dag tool definition validation > #given a node with both category and model #when start runs #then it is rejected with category_with_model [1.24ms]
+(pass) dag tool definition validation > #given a node with both category and subagent_type #when start runs #then it is rejected with both_targets [1.12ms]
+(pass) dag tool definition validation > #given a node with neither category nor subagent_type #when start runs #then it is rejected with no_target [0.97ms]
+(pass) dag tool definition validation > #given a node with subagent_type and model #when start runs #then the explicit-model spawn is accepted [5.06ms]
+(pass) dag tool attach and snapshot actions > #given a started run #when attach runs #then it round-trips the live snapshot [6.73ms]
+(pass) dag tool attach and snapshot actions > #given a started run #when snapshot runs #then it returns the manager's projection [6.40ms]
+(pass) dag tool attach and snapshot actions > #given an unknown run id #when snapshot runs #then it rejects with run_not_found [1.45ms]
+(pass) dag tool attach and snapshot actions > #given a run owned by another session #when snapshot runs #then it rejects with run_not_owned [5.69ms]
+(pass) dag tool wait action > #given a started run #when wait runs #then it resolves through the injected wait surface [5.38ms]
+(pass) dag tool wait action > #given no wait surface is wired #when wait runs #then ownership is still enforced before dispatch [1.28ms]
+(pass) dag tool cancel action > #given a started run #when cancel runs #then the reason reaches the injected cancel seam [5.40ms]
+(pass) dag tool cancel action > #given a run owned by another session #when cancel runs #then it rejects with run_not_owned and never dispatches [6.01ms]
+(pass) dag tool start warnings > #given a definition violating the node prompt contract #when start runs #then the run starts AND the result carries advisory warnings [5.67ms]
+(pass) dag tool start warnings > #given a contract-complete definition #when start runs #then warnings are empty [6.11ms]
+
+ 25 pass
+ 0 fail
+ 69 expect() calls
+Ran 25 tests across 2 files. [1070.00ms]

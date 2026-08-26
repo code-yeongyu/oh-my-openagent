@@ -5,9 +5,9 @@ import {
 	DEFAULT_POSTHOG_HOST,
 	getTelemetryDiagnosticsFilePath,
 	resolveTelemetryStateDir,
-	writeTelemetryDiagnostic,
 	type TelemetryDiagnosticInput,
 	type TelemetryProductConfig,
+	writeTelemetryDiagnostic,
 } from "@oh-my-opencode/telemetry-core";
 
 export { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST };

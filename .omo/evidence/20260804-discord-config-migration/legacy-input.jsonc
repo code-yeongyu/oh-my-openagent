@@ -1,0 +1,16 @@
+{
+  "[opencode]": {
+    "agents": {
+      "explore": {
+        "model": "anthropic/claude-fable-5",
+        "variant": "high",
+        "fallback_models": [
+          {
+            "model": "openai/gpt-5.6-sol-fast",
+            "variant": "medium"
+          }
+        ]
+      }
+    }
+  }
+}

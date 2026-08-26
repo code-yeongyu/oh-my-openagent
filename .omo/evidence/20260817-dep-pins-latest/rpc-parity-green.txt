@@ -1,0 +1,33 @@
+=== GREEN focused RPC parity ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts:
+(pass) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [1109.83ms]
+(pass) task RPC launch profile parity > #given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch [831.21ms]
+
+ 2 pass
+ 0 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [2.03s]
+
+=== GREEN env-mutator contention stress: 20 runs ===
+run 01 PASS
+run 02 PASS
+run 03 PASS
+run 04 PASS
+run 05 PASS
+run 06 PASS
+run 07 PASS
+run 08 PASS
+run 09 PASS
+run 10 PASS
+run 11 PASS
+run 12 PASS
+run 13 PASS
+run 14 PASS
+run 15 PASS
+run 16 PASS
+run 17 PASS
+run 18 PASS
+run 19 PASS
+run 20 PASS

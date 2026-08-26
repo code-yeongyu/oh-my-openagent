@@ -1,0 +1,1 @@
+tsgo clean on both omo-senpi + memory-core

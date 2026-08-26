@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-45 non-test files. Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
+50 non-test files (~110 `.ts` total incl. tests + `spawner/`). Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
 
 ## TASK LIFECYCLE
 
@@ -16,12 +16,12 @@ LaunchInput → pending → [ConcurrencyManager queue] → running → polling �
 
 | File | Purpose |
 |------|---------|
-| `manager.ts` | `BackgroundManager` — main class: launch, cancel, getTask, listTasks |
+| `manager.ts` | `BackgroundManager` — main class (3.2k LOC, the production hotspot): launch, cancel, resume, getTask, listTasks, event handling, stale cleanup, archive |
 | `spawner.ts` | Task spawning: create session → inject prompt → start polling |
 | `concurrency.ts` | `ConcurrencyManager` — FIFO queue per concurrency key, slot acquisition/release |
 | `task-poller.ts` | 3s interval polling, completion via idle events + stability detection (10s unchanged) |
 | `types.ts` | `BackgroundTask`, `LaunchInput`, `ResumeInput`, `BackgroundTaskStatus` |
-| `parent-wake-notifier.ts` | 587 LOC. Dependency-injected client + enqueue callback. Notifies parent session when a background task wants attention. |
+| `parent-wake-notifier.ts` | Coordinates parent-session wake notification; queue/dedupe/dispatch/history/activity/recovery helpers are split into sibling `parent-wake-*.ts` modules |
 | `loop-detector.ts` | Detects polling/event loops that would otherwise burn budget. |
 | `error-classifier.ts` | Maps raw provider errors → `BackgroundTaskError` categories. |
 | `fallback-retry-handler.ts` | Coordinates retries with the runtime-fallback system. |

@@ -20,18 +20,20 @@ export interface LegacyDaemonFixture {
 export type SpawnedChild = ChildProcessByStdio<null, Readable, Readable>
 type LegacyEndpointKind = "natural" | "hashed" | "windowsPipe"
 
+const NODE_BINARY_LOOKUP_TIMEOUT_MS = 5_000
+
 function nodeBinary(): string {
   if (process.env.NODE_BINARY) return process.env.NODE_BINARY
   if (platform() === "win32") {
     const candidate = firstCommandLine("where.exe", ["node"]) ?? firstCommandLine("which", ["node"])
     if (candidate) return normalizeWindowsNodeCandidate(candidate)
   }
-  return execFileSync("which", ["node"], { encoding: "utf8" }).trim()
+  return execFileSync("which", ["node"], { encoding: "utf8", timeout: NODE_BINARY_LOOKUP_TIMEOUT_MS }).trim()
 }
 
 function firstCommandLine(command: string, args: readonly string[]): string | null {
   try {
-    const output = execFileSync(command, [...args], { encoding: "utf8" })
+    const output = execFileSync(command, [...args], { encoding: "utf8", timeout: NODE_BINARY_LOOKUP_TIMEOUT_MS })
     return output.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim() ?? null
   } catch {
     return null

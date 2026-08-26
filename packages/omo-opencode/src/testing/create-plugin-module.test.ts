@@ -21,7 +21,20 @@ const mockGetDuplicateOmoPluginWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRunOpenCodeStartupMigration = mock(() => ({
+  journalResumed: false,
+  migratedFrom: [],
+  reloadRequired: false,
+  results: [],
+  skippedConflictCount: 0,
+}))
 const mockLoadPluginConfig = mock(() => ({}))
+const mockLoadConfigChain = mock((directory: string) => ({
+  config: mockLoadPluginConfig(directory, {}),
+  messages: [],
+  path: null,
+  valid: true,
+}))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,
 )
@@ -80,6 +93,8 @@ function createTestPluginModule(overrides: Parameters<typeof createPluginModule>
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
+    loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
@@ -105,12 +120,21 @@ describe("createPluginModule()", () => {
     mockGetDuplicateOmoPluginWarning.mockClear()
     mockInjectServerAuthIntoClient.mockClear()
     mockLoadPluginConfig.mockClear()
+    mockLoadConfigChain.mockClear()
+    mockRunOpenCodeStartupMigration.mockClear()
     mockCreateManagers.mockClear()
     mockRuntimeSkillSourceStop.mockClear()
     mockCreateRuntimeSkillSourceServer.mockClear()
     mockCreateTools.mockClear()
     mockCreateHooks.mockClear()
     mockCreatePluginInterface.mockClear()
+    mockRunOpenCodeStartupMigration.mockReturnValue({
+      journalResumed: false,
+      migratedFrom: [],
+      reloadRequired: false,
+      results: [],
+      skippedConflictCount: 0,
+    })
     mockDetectDuplicateOmoPlugin.mockReturnValue({
       detected: false,
       pluginName: null,
@@ -170,7 +194,7 @@ describe("createPluginModule()", () => {
       }
     })
 
-    it("#given sidebar is disabled #then startup does not write a TUI plugin entry", async () => {
+    it("#given sidebar is disabled #then startup still writes the TUI entry for BTW", async () => {
       // given
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
       const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-disabled-"))
@@ -188,7 +212,7 @@ describe("createPluginModule()", () => {
         } as Parameters<typeof pluginModule.server>[0])
 
         // then
-        expect(() => readFileSync(join(configDir, "tui.json"), "utf-8")).toThrow()
+        expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
       } finally {
         rmSync(configDir, { recursive: true, force: true })
         if (originalConfigDir === undefined) {
@@ -329,6 +353,101 @@ describe("createPluginModule()", () => {
         expect(mockCreateTools).not.toHaveBeenCalled()
         expect(mockCreateHooks).not.toHaveBeenCalled()
         expect(mockCreatePluginInterface).not.toHaveBeenCalled()
+      } finally {
+        console.warn = originalWarn
+      }
+    })
+  })
+
+  describe("#given startup migration consumes legacy configuration", () => {
+    it("#then startup reloads the config and emits one migration summary toast", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        migratedFrom: ["/home/alice/.config/opencode/omo.json"],
+        reloadRequired: true,
+        results: [],
+        skippedConflictCount: 2,
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(runOpenCodeStartupMigration).toHaveBeenCalledWith({ cwd: "/tmp/project" })
+      expect(showToast).toHaveBeenCalledTimes(1)
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: {
+          title: "Configuration migrated",
+          message: expect.stringContaining("1 legacy source"),
+          variant: "success",
+        },
+      })
+      expect(mockLoadPluginConfig).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("#given serverPlugin is initialized twice in one process", () => {
+    it("#then startup migration predicates run only once", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        migratedFrom: [],
+        reloadRequired: false,
+        results: [],
+        skippedConflictCount: 0,
+      }))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      const input = { directory: "/tmp/project", client: {} } as Parameters<typeof pluginModule.server>[0]
+
+      // when
+      await pluginModule.server(input)
+      await pluginModule.server(input)
+
+      // then
+      expect(runOpenCodeStartupMigration).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("#given startup migration fails", () => {
+    it("#then startup keeps defaults and reports one loud error toast", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        error: "Migration validation failed for ~/.omo/omo.jsonc",
+        journalResumed: false,
+        migratedFrom: [],
+        reloadRequired: false,
+        results: [],
+        skippedConflictCount: 0,
+      }))
+      const loadConfigChain = mock(() => ({ config: {}, messages: ["invalid config"], path: null, valid: false }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ loadConfigChain, runOpenCodeStartupMigration })
+      const consoleWarn = mock(() => {})
+      const originalWarn = console.warn
+      console.warn = consoleWarn
+
+      try {
+        // when
+        const hooks = await pluginModule.server({
+          directory: "/tmp/project",
+          client: { tui: { showToast } },
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(hooks).toBeDefined()
+        expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining("legacy configuration changes were not applied"))
+        expect(showToast).toHaveBeenCalledTimes(1)
+        expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+          body: { title: "Configuration migration failed", variant: "error" },
+        })
+        expect(mockCreateManagers.mock.calls.at(-1)?.[0]?.pluginConfig).toEqual({})
       } finally {
         console.warn = originalWarn
       }

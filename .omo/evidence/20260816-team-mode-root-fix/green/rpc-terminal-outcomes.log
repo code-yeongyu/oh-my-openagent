@@ -1,0 +1,39 @@
+Focused GREEN command:
+  bun test \
+    packages/senpi-task/src/manager/rpc-terminal-outcome.test.ts \
+    packages/senpi-task/src/runners/rpc-process.test.ts \
+    packages/senpi-task/src/runners/rpc/protocol-client.test.ts \
+    packages/senpi-task/src/manager/child-handle.test.ts
+
+Result:
+  25 pass
+  0 fail
+  59 expectations
+
+Observed behavior:
+  - RpcProcessRunner now awaits Senpi's authoritative prompt-preflight response before returning a handle.
+  - Prompt preflight rejection becomes typed `child-prompt-failed`, terminates the resident child,
+    transitions the already-created running record to error, and produces no unhandled rejection.
+  - A final `agent_end` with assistant stopReason=error becomes typed `child-turn-failed`.
+  - The manager persists the provider failure as terminal error instead of completed with empty output.
+  - Abnormal pre-admission child exit is reported as start failure with the captured stderr tail.
+  - Successful prompt admission still returns while the turn is in flight, so steer and follow-up remain usable.
+  - Resume-session startup now awaits switch_session acknowledgement and does not replay the prompt.
+
+Type and language-server verification:
+  bun run --cwd packages/senpi-task typecheck
+    exit 0
+
+  bun run --cwd packages/omo-senpi typecheck
+    exit 0
+
+  LSP diagnostics on:
+    packages/senpi-task/src/runners/rpc/handle.ts
+    packages/senpi-task/src/runners/rpc-process.ts
+    packages/senpi-task/src/manager/rpc-terminal-outcome.test.ts
+    0 diagnostics
+
+Why this is enough for the B4 increment:
+  The suite crosses the real process runner, newline-delimited RPC protocol, managed-handle adapter,
+  task manager, and durable store. It pins both failure timing boundaries: before launch admission and
+  after a provider turn has begun.

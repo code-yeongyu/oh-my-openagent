@@ -1,0 +1,2 @@
+=== typecheck: tsgo --noEmit -p packages/omo-senpi/tsconfig.json ===
+exit=0

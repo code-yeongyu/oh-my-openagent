@@ -7,9 +7,11 @@ import { join } from "node:path"
 import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
+  UNCONFIGURED_POSTHOG_API_KEY,
   createTelemetryClient,
   getTelemetryActivityStateFilePath,
   getTelemetryDistinctId,
+  isTelemetryClientEnabled,
   recordDailyActive,
 } from "./index"
 import type {
@@ -54,6 +56,61 @@ function createCapturingFactory(capturedMessages: TelemetryCaptureMessage[]): Te
 }
 
 describe("posthog telemetry client", () => {
+  test("#given the unconfigured OmO Native placeholder and clean env #when clients are created #then telemetry fails closed without constructing transports", () => {
+    let transportsCreated = 0
+    const input = {
+      env: {},
+      osProvider: OS_PROVIDER,
+      product: {
+        ...PRODUCT,
+        defaultApiKey: UNCONFIGURED_POSTHOG_API_KEY,
+        productEnvPrefix: "OMO_SENPI",
+      },
+      source: "plugin",
+      transportFactory: () => {
+        transportsCreated += 1
+        return {
+          capture: () => undefined,
+          shutdown: async () => undefined,
+        }
+      },
+    } as const
+
+    const first = createTelemetryClient(input)
+    const second = createTelemetryClient(input)
+
+    expect(isTelemetryClientEnabled(input)).toBe(false)
+    expect([first.enabled, second.enabled]).toEqual([false, false])
+    expect(transportsCreated).toBe(0)
+  })
+
+  test("#given the placeholder default and a real env override #when enabled state is checked #then telemetry is enabled", () => {
+    expect(isTelemetryClientEnabled({
+      env: { POSTHOG_API_KEY: "phc_test" },
+      product: {
+        defaultApiKey: UNCONFIGURED_POSTHOG_API_KEY,
+        productEnvPrefix: "OMO_SENPI",
+      },
+    })).toBe(true)
+  })
+
+  test("#given the legacy shared key as the default #when enabled state is checked #then telemetry remains enabled", () => {
+    expect(isTelemetryClientEnabled({
+      env: {},
+      product: PRODUCT,
+    })).toBe(true)
+  })
+
+  test("#given a real OmO Native default replaces the placeholder #when enabled state is checked #then telemetry activates without another flag", () => {
+    expect(isTelemetryClientEnabled({
+      env: {},
+      product: {
+        defaultApiKey: "phc_omo_native_project_key",
+        productEnvPrefix: "OMO_SENPI",
+      },
+    })).toBe(true)
+  })
+
   test("#given codex product parameters #when daily active is captured #then payload shape matches current contract", async () => {
     // given
     const capturedMessages: TelemetryCaptureMessage[] = []

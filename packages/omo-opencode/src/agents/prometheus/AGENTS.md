@@ -43,7 +43,7 @@ The prompt requires Prometheus to load `ulw-plan` as its first action with the s
 - High-accuracy review expectations
 - Worker-ready task graphs and verification criteria
 
-Prometheus itself stays a planner. It reads, searches, and writes planning artifacts only; implementation belongs to downstream workers after explicit start-work approval.
+Prometheus itself stays a planner. It reads, searches, and writes planning artifacts only; implementation belongs to downstream workers after explicit ulw-execute approval.
 
 ## KEY CONSTRAINTS
 

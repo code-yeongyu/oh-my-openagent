@@ -28,6 +28,20 @@ export async function sendTeamMessage(
     isLead,
     activeMembers: [...deps.activeMembers],
     ...(input.to === TEAM_LEAD_SENTINEL ? { leadRecipient: TEAM_LEAD_SENTINEL } : {}),
+  }).catch((error: unknown) => {
+    // team-core does not re-export InvalidRecipientError; key on its stable name like classify-error does.
+    if (error instanceof Error && error.name === "InvalidRecipientError") {
+      const members = [...deps.activeMembers].sort().join(", ")
+      // Keep the stable error name so the tool layer still maps this to invalid_recipient.
+      throw Object.assign(
+        new Error(
+          `unknown or inactive team recipient: ${input.to}. Members: ${members}. Use a member name, '${TEAM_LEAD_SENTINEL}', or '*' (lead-only broadcast).`,
+          { cause: error },
+        ),
+        { name: "InvalidRecipientError" },
+      )
+    }
+    throw error
   })
 
   const event = {

@@ -1,0 +1,31 @@
+REVIEW REMEDIATION RED
+
+Command:
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts packages/omo-senpi/src/components/task/status-ui.test.ts
+
+Observed before remediation:
+  Expected list calls: 1
+  Received list calls: 2
+  The 250ms timer reread the disk-backed store.
+
+  Expected static-row timers: 0
+  Received static-row timers: 1
+  A list-only manager animated a row rendered by static `buildWidgetRows()`.
+
+  11 pass
+  2 fail
+
+REVIEW REMEDIATION GREEN
+
+Command:
+  bun test packages/omo-senpi/src/components/task/status-ui-background.test.ts packages/omo-senpi/src/components/task/status-ui.test.ts packages/omo-senpi/src/components/task/status-row-format.test.ts
+
+Observed after remediation:
+  27 pass
+  0 fail
+
+Behavior proven:
+  - The initial reconciliation reads scoped records once.
+  - Periodic live ticks render the cached records and reread only in-memory activity/run stats.
+  - Store/session events refresh the cache before the next paint.
+  - Managers without `wasBackground()` render static rows and never schedule the live animation timer.

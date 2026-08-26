@@ -205,11 +205,8 @@ describe("ralph-loop dispatch failure invariants", () => {
 						}
 						return { data: [] }
 					},
-					promptAsync: async (options: { body: { parts: Array<{ type: string; text: string }> } }) => {
-						if (options.body.parts[0]?.text.includes("Verification failed")) {
-							throw new Error("simulated dispatch failure")
-						}
-						return {}
+					promptAsync: async () => {
+						throw new Error("simulated dispatch failure")
 					},
 					prompt: async () => ({}),
 					abort: async () => ({}),
@@ -275,15 +272,10 @@ describe("ralph-loop dispatch failure invariants", () => {
 						}
 						return { data: [] }
 					},
-					promptAsync: async (options: { body: { parts: Array<{ type: string; text: string }> } }) => {
-						if (options.body.parts[0]?.text.includes("Verification failed")) {
-							return {
-								error: { message: "verification continuation rejected by OpenCode" },
-								response: { status: 400 },
-							}
-						}
-						return {}
-					},
+					promptAsync: async () => ({
+						error: { message: "verification continuation rejected by OpenCode" },
+						response: { status: 400 },
+					}),
 					prompt: async () => ({}),
 					abort: async () => ({}),
 					create: async () => ({ data: { id: "new-session-id" } }),

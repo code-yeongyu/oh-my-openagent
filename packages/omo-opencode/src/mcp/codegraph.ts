@@ -33,7 +33,7 @@ function provisionedBinFromInstallDir(
 }
 
 function codegraphEnvForConfig(config: Partial<CodegraphConfig> | undefined, homeDir: string | undefined): Record<string, string> {
-  const env = buildCodegraphEnv({ homeDir, daemon: config?.daemon === true })
+  const env = buildCodegraphEnv({ homeDir, daemon: config?.daemon !== false })
   return config?.install_dir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.install_dir }
 }
 

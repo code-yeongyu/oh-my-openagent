@@ -37,7 +37,7 @@ Read the matching reference before acting: [`references/insane-search/README.md`
 ## Tier 1 — insane-search (headless extraction)
 
 **When**: content extraction, blocked-URL bypass, media metadata — no browser UI needed.
-**Why first**: ~10x faster than a browser, no process spin-up; handles most "fetch this blocked page" requests via curl_cffi TLS impersonation, yt-dlp (1858 sites), Jina Reader, official public APIs, mobile URL transforms, and a Playwright real-Chrome fallback. The engine lives **inside this skill** at `engine/` and is invoked as a module.
+**Why first**: ~10x faster than a browser, no process spin-up; handles most "fetch this blocked page" requests via curl_cffi TLS impersonation, yt-dlp (1858 sites), official public APIs, mobile URL transforms, **Phase-2.5 surrogate archives** (Wayback / archive.today snapshots, provenance-tagged — see [`references/insane-search/cache-archive.md`](references/insane-search/cache-archive.md)), a key-gated Jina Reader (`JINA_API_KEY`), and a Playwright real-Chrome fallback. The engine lives **inside this skill** at `engine/` and is invoked as a module. Surrogate results are dated COPIES: a result whose `provenance` is `snapshot` must be reported with its `snapshot_timestamp`, never presented as the live page.
 
 ```bash
 # Core command — auto-detects WAF, runs the full fetch grid (run from the skill dir):
@@ -60,7 +60,7 @@ The full engine harness (rules R1-R7, the Phase 0 official-API index, the no-sit
 
 ## Tier 1.5 — agent-reach (platform-native readers)
 
-**When**: the target is a platform with a first-class API/CLI that beats generic fetching — especially Chinese platforms that stealth browsers still cannot reach cleanly. Several channels are zero-config (Douyin, Weibo via Jina, V2EX, Reddit, Jina Reader, RSS, YouTube); others need a one-time auth you supply via environment variables if you have access.
+**When**: the target is a platform with a first-class API/CLI that beats generic fetching — especially Chinese platforms that stealth browsers still cannot reach cleanly. Several channels are zero-config (Douyin, V2EX, Reddit, RSS, YouTube); others need a one-time auth you supply via environment variables if you have access (`JINA_API_KEY` for Jina Reader — anonymous access is dead, see `references/insane-search/jina.md`; `TWITTER_*` for X; a transcription key for podcasts).
 
 | Category | Platforms | Entry |
 |---|---|---|
@@ -85,6 +85,8 @@ Routing table, per-platform auth (set `TWITTER_*` env vars, `gh auth login`, a t
 **When**: real interaction is needed (clicks, forms, screenshots, video, persistent login), or Tier 1/1.5 failed.
 
 CloakBrowser is a stealth Chromium with source-level fingerprint patches that passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors; agent-browser is the CDP automation CLI that drives it. Both are runtime-installed tools (not vendored here). Full setup, version pins, launch flow, cookie login, and cross-platform notes are in [references/chrome-stealth.md](references/chrome-stealth.md).
+
+NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state everywhere. If the task needs that profile's login state, clone the profile directory first (`rsync -a <profile>/ <tmp-clone>/`) and launch CloakBrowser / agent-browser with the clone as the user-data-dir; run any clearing on the clone only.
 
 ```bash
 # 1. Launch CloakBrowser with CDP on :9242 (see chrome-stealth.md for install + venv).

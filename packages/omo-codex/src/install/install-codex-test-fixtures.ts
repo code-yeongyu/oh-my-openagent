@@ -1,16 +1,21 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+export const EXPECTED_GIT_BASH_HOOKS = [
+  "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
+  "./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
+] as const
+
 export const EXPECTED_OMO_COMPONENT_BINS = [
-  { name: "omo", target: join("dist", "cli", "index.js"), kind: "runtime-wrapper" },
+  { name: "omo-agent-toolkit", target: join("dist", "cli", "index.js"), kind: "runtime-wrapper" },
   { name: "omo-comment-checker", target: join("components", "comment-checker", "dist", "cli.js") },
   { name: "omo-git-bash-hook", target: join("components", "git-bash", "dist", "cli.js") },
   { name: "lazycodex-executor-verify", target: join("components", "lazycodex-executor-verify", "dist", "cli.js") },
   { name: "omo-lsp", target: join("components", "lsp", "dist", "cli.js") },
   { name: "omo-rules", target: join("components", "rules", "dist", "cli.js") },
-  { name: "omo-start-work-continuation", target: join("components", "start-work-continuation", "dist", "cli.js") },
   { name: "omo-telemetry", target: join("components", "telemetry", "dist", "cli.js") },
+  { name: "omo-ulw-execute-continuation", target: join("components", "ulw-execute-continuation", "dist", "cli.js") },
   { name: "omo-ulw-loop", target: join("components", "ulw-loop", "dist", "cli.js") },
   { name: "ulw", target: join("components", "ulw-loop", "dist", "cli.js") },
   { name: "ulw-loop", target: join("components", "ulw-loop", "dist", "cli.js") },
@@ -23,7 +28,9 @@ export function expectedBinName(name: string): string {
 
 export async function createRepoWithBuiltComponentBins(
   input: {
+    readonly agentNames?: readonly string[]
     readonly includeBundledGitBashMcp?: boolean
+    readonly includeComponentBins?: boolean
     readonly includeRootCliDist?: boolean
   } = {},
 ): Promise<string> {
@@ -53,6 +60,16 @@ export async function createRepoWithBuiltComponentBins(
   await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify(pluginManifest))
   await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }))
 
+  if (input.agentNames !== undefined) {
+    const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
+    await mkdir(agentsRoot, { recursive: true })
+    await Promise.all(
+      input.agentNames.map((agentName) =>
+        writeFile(join(agentsRoot, `${agentName}.toml`), `name = "${agentName}"\n`, "utf8"),
+      ),
+    )
+  }
+
   if (input.includeBundledGitBashMcp === true) {
     await createBundledGitBashMcpFixture({ pluginRoot, repoRoot })
   }
@@ -70,10 +87,51 @@ export async function createRepoWithBuiltComponentBins(
   for (const [componentName, bins] of componentBins) {
     const componentRoot = join(pluginRoot, "components", componentName)
     await mkdir(join(componentRoot, "dist"), { recursive: true })
-    await writeFile(join(componentRoot, "package.json"), JSON.stringify({ name: `@sisyphuslabs/${componentName}`, bin: bins }))
+    await writeFile(
+      join(componentRoot, "package.json"),
+      JSON.stringify({
+        name: `@sisyphuslabs/${componentName}`,
+        ...(input.includeComponentBins === false ? {} : { bin: bins }),
+      }),
+    )
     await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
   }
 
+  return repoRoot
+}
+
+export async function createRepoWithGitBashHooksFixture(sourceRepoRoot: string): Promise<string> {
+  const repoRoot = await createRepoWithBuiltComponentBins({
+    includeBundledGitBashMcp: true,
+    includeComponentBins: false,
+    includeRootCliDist: false,
+  })
+  const sourcePluginRoot = join(sourceRepoRoot, "packages", "omo-codex", "plugin")
+  const fixturePluginRoot = join(repoRoot, "packages", "omo-codex", "plugin")
+  const sourceManifest: unknown = JSON.parse(
+    await readFile(join(sourcePluginRoot, ".codex-plugin", "plugin.json"), "utf8"),
+  )
+  if (!isRecord(sourceManifest) || !Array.isArray(sourceManifest.hooks)) {
+    throw new Error("shipped Codex plugin manifest must declare hook files")
+  }
+
+  const sourceHooks = new Set(sourceManifest.hooks.filter((hook): hook is string => typeof hook === "string"))
+  if (!EXPECTED_GIT_BASH_HOOKS.every((hook) => sourceHooks.has(hook))) {
+    throw new Error("shipped Codex plugin manifest is missing Git Bash hook declarations")
+  }
+  const gitBashHooks = EXPECTED_GIT_BASH_HOOKS
+
+  await writeFile(
+    join(fixturePluginRoot, ".codex-plugin", "plugin.json"),
+    JSON.stringify({ name: "omo", version: "0.1.0", hooks: gitBashHooks }),
+  )
+  for (const hook of gitBashHooks) {
+    const relativeHookPath = hook.startsWith("./") ? hook.slice(2) : hook
+    await copyFile(join(sourcePluginRoot, relativeHookPath), join(fixturePluginRoot, relativeHookPath))
+  }
+  const bootstrapScriptPath = join("components", "bootstrap", "scripts", "node-dispatch.ps1")
+  await mkdir(join(fixturePluginRoot, "components", "bootstrap", "scripts"), { recursive: true })
+  await copyFile(join(sourcePluginRoot, bootstrapScriptPath), join(fixturePluginRoot, bootstrapScriptPath))
   return repoRoot
 }
 
@@ -110,4 +168,8 @@ async function createBundledGitBashMcpFixture(input: { readonly pluginRoot: stri
   )
   await mkdir(join(input.repoRoot, "packages", "git-bash-mcp", "dist"), { recursive: true })
   await writeFile(join(input.repoRoot, "packages", "git-bash-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

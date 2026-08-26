@@ -1,0 +1,124 @@
+commit e1aad99bcb58583be46a74e2a2b45c42e38aac0b (HEAD -> main)
+Author:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:25+09:00
+Commit:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:25+09:00
+
+    chore(facts): extract 1 fact
+    
+    Generated-By: facts-extractor
+    Omo-Writer: facts-extractor
+    Omo-Facts-Batch: aff12fff-3158-4a37-ac87-7bce58b44ed1
+
+M	people/mina-kim/observations.md
+
+commit 73bb32461f9cd4f903ec508b97d9b497e3c01178
+Author:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:18+09:00
+Commit:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:18+09:00
+
+    chore(facts): extract 1 fact
+    
+    Generated-By: facts-extractor
+    Omo-Writer: facts-extractor
+    Omo-Facts-Batch: 82319d04-e877-4aef-88d5-d2dd65f8d817
+
+M	people/mina-kim/observations.md
+
+commit 0f82863189211c08655801250dc9a3190db0d5d3
+Author:     f3-qa-agent-88506410 <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:16+09:00
+Commit:     f3-qa-agent-88506410 <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:16+09:00
+
+    F3 soul edit notice
+    
+    Omo-Writer: memory-tool
+    Omo-Session: omo-memory-f3-rerun-session
+    Omo-Turn: 6
+
+M	system/persona.md
+
+commit 25f0d8ea0c1fe665fa679511cb0d5d64bd52bb25
+Author:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:16+09:00
+Commit:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:16+09:00
+
+    chore(facts): extract 1 fact
+    
+    Generated-By: facts-extractor
+    Omo-Writer: facts-extractor
+    Omo-Facts-Batch: 799f4419-a4c5-432c-b320-513d33510126
+
+M	people/mina-kim/observations.md
+
+commit 1a887f64a327d22193599695441b8bc7f2f548cc
+Author:     f3-qa-agent-88506410 <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:12+09:00
+Commit:     f3-qa-agent-88506410 <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:12+09:00
+
+    F3 nudge self-clear save
+    
+    Omo-Writer: memory-tool
+    Omo-Session: omo-memory-f3-rerun-session
+    Omo-Turn: 4
+
+A	notes/f3-save.md
+
+commit 3574f0c4e577d8ef7ea802008b2c302b358a5e62
+Author:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:11+09:00
+Commit:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:11+09:00
+
+    chore(facts): extract 1 fact
+    
+    Generated-By: facts-extractor
+    Omo-Writer: facts-extractor
+    Omo-Facts-Batch: 045c7df9-2884-42bd-a4b4-b97ad136eefe
+
+M	people/mina-kim/observations.md
+
+commit 026dcd5384a68cf9cae4f9f8f520cabc4e2f483c
+Author:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:09+09:00
+Commit:     Facts Extractor <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:09+09:00
+
+    chore(facts): extract 1 fact
+    
+    Generated-By: facts-extractor
+    Omo-Writer: facts-extractor
+    Omo-Facts-Batch: e0c8c61d-7ad3-4731-99e8-cae6d72fa1af
+
+A	people/mina-kim/card.md
+A	people/mina-kim/observations.md
+
+commit 704f1784a6b7db5c63fc8cc8ce56652c0e11cf93
+Author:     f3-qa-agent-88506410 <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:05+09:00
+Commit:     f3-qa-agent-88506410 <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:05+09:00
+
+    F3 initialize isolated memory
+    
+    Omo-Writer: memory-tool
+    Omo-Session: omo-memory-f3-rerun-session
+    Omo-Turn: 1
+
+A	notes/f3-initial.md
+
+commit d1b2281a183b6e3aceca5639cf252e78474c4d53
+Author:     Omo Agent <f3-qa-agent-88506410@omo.local>
+AuthorDate: 2026-08-10T20:37:05+09:00
+Commit:     Omo Agent <f3-qa-agent-88506410@omo.local>
+CommitDate: 2026-08-10T20:37:05+09:00
+
+    chore: initialize local memory
+
+A	skills/memory-discipline/SKILL.md
+A	system/human.md
+A	system/persona.md

@@ -1,0 +1,587 @@
+{
+  "version": 1,
+  "domain": "post-cleanup-supplemental",
+  "rule": "Current-only allowed seams introduced by mutation-proven cleanup replacements.",
+  "allowed": [
+    {
+      "fingerprint": "02efaeb5fa872fc58cf04f96e607716252cdf410de64080a88854245c735c124",
+      "category": "machine-sentinel",
+      "rationale": "non-plan-task-input-sentinel is an opaque token proving non-plan task input propagation.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/tools.test.ts",
+      "expected": "non-plan-task-input-sentinel"
+    },
+    {
+      "fingerprint": "04d3c8da9b04a58cabe577c8b398e5ee0367567bf8ea7aa3dc27189ea7bcf20f",
+      "category": "parser-fixture",
+      "rationale": "Uses /Custom agent: researcher/gi to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/agents/utils.test.ts",
+      "line": 606,
+      "expected": "/Custom agent: researcher/gi"
+    },
+    {
+      "fingerprint": "04f7a09e1e970ae5d59675f41d9007115e7e39fafc1f6b2391f177e73e4855ae",
+      "category": "runtime-behavior",
+      "rationale": "Checks that definition.description?.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/senpi-task/src/agents/builtin/builtin-agents.test.ts",
+      "line": 62,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "090464d94e60f2a83d074ab45c36b5431a0ada15d1dd683a4bab80821b3c5a3c",
+      "category": "parser-fixture",
+      "rationale": "Uses /to continue:/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/hooks/task-resume-info/index.test.ts",
+      "line": 132,
+      "expected": "/to continue:/g"
+    },
+    {
+      "fingerprint": "0a7e983ef4aa2d332f31eaeadab89e94e6f1ac812b4276e27126e50fa6a3ee78",
+      "category": "machine-sentinel",
+      "rationale": "Uses /\"?\\bid\\b\"?\\s*:/ to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 163,
+      "expected": "/\"?\\bid\\b\"?\\s*:/"
+    },
+    {
+      "fingerprint": "0bf1047873a932efb2d2eb58aca1d067b456c9315d5f669dbfe611bb7367e489",
+      "category": "runtime-behavior",
+      "rationale": "Checks that promptCalls.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/omo-opencode/src/hooks/todo-continuation-enforcer/todo-continuation-enforcer.test.ts",
+      "line": 1516,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "0c411c49d167c9f78626369facb2c9bf6505ed4b5c8b741b93a10035f39c30d1",
+      "category": "runtime-behavior",
+      "rationale": "Checks that BUILTIN_SKILL_NAMES.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/omo-senpi/src/components/telemetry/product-identity.test.ts",
+      "line": 133,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "1919d6d1acd79e2c7369e606240177878ee30db1f623970e9b231afba316247d",
+      "category": "runtime-behavior",
+      "rationale": "Verifies buildResumePrompt changes when the dynamic objective input changes; no authored prompt wording is asserted.",
+      "path": "packages/pi-goal/test/prompt.test.ts",
+      "expected": "<expression:prompt>"
+    },
+    {
+      "fingerprint": "1bd619c27307a67f9ffa924bb4eca0306cc38dc490430474e0655da03a473961",
+      "category": "parser-fixture",
+      "rationale": "Uses /tool\\.dag\\(([\\s\\S]*?)\\)\\n/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 258,
+      "expected": "/tool\\.dag\\(([\\s\\S]*?)\\)\\n/g"
+    },
+    {
+      "fingerprint": "1d1a2a13410f86b513800418d8ebf6eb2d9928e13cd181909f75ca882ff33a4f",
+      "category": "parser-fixture",
+      "rationale": "Checks that body.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/skills/playwright.test.ts",
+      "line": 134,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "1db39ee55e2a2b65d5cc65a067630a54be2ada0c79207fd63799c8659963a469",
+      "category": "machine-sentinel",
+      "rationale": "Uses /\\brun\\[\"run_id\"\\]/g to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 259,
+      "expected": "/\\brun\\[\"run_id\"\\]/g"
+    },
+    {
+      "fingerprint": "1fbaa0f7c8d741ef1deadedf0c157e6d5a69d4da1f0909adc8c874d6e2afb20a",
+      "category": "machine-sentinel",
+      "rationale": "Uses /\\brun\\[\"run_id\"\\]/g to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 259,
+      "expected": "/\\brun\\[\"run_id\"\\]/g"
+    },
+    {
+      "fingerprint": "23d6cc473db910c08d8e641012c393fb6e110c86de1cbaedb3a6595fc271b37f",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the resolved category prompt to the exported default prompt source, verifying source selection rather than prose fragments.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "<expression:DEEP_CATEGORY_PROMPT_APPEND>"
+    },
+    {
+      "fingerprint": "2615385354fa7c76a7138df97c535541363562b7c5ecdecfa4864c5079a21e91",
+      "category": "parser-fixture",
+      "rationale": "Checks that BUILTIN_SKILL_NAMES.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "line": 100,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "28802a94998b649fb120fb8fff6e1b35a7a80421d19414e29e1c5ee39d7f89c1",
+      "category": "runtime-behavior",
+      "rationale": "Verifies continuation output changes when dynamic usage-token accounting changes; no authored prompt wording is asserted.",
+      "path": "packages/pi-goal/test/prompt.test.ts",
+      "expected": "<expression:baseline>"
+    },
+    {
+      "fingerprint": "32e025ed8bbd699207d04ea7ac822d70ab9f27693ec40e75afe17d6265659165",
+      "category": "runtime-behavior",
+      "rationale": "Checks that (command.options.description as string).length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/omo-senpi/src/components/memory/commands/register.test.ts",
+      "line": 58,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "4195c091a7e5b49c9f8171f963cce1178c8af8796d007b1eb5690f03bb8e3df7",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares composed output to the exported default prompt source plus caller-provided dynamic content.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "<expression:`${DEEP_CATEGORY_PROMPT_APPEND}\\n\\n${userPromptAppend}`>"
+    },
+    {
+      "fingerprint": "46c8e6e46a1ed3968e9542c987771751a9d19f4e5400cda0d5c2fb91910bc4be",
+      "category": "machine-sentinel",
+      "rationale": "git status is an executable command token whose prefix transformation is the runtime behavior under test.",
+      "path": "packages/omo-opencode/src/features/opencode-skill-loader/git-master-template-injection.test.ts",
+      "expected": "git status"
+    },
+    {
+      "fingerprint": "4a9eee6c23cfff9e3540326fe4231b45fc8dfc4ee657016c3b1f057c895480a7",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies the GPT-5.5 route does not resolve to the exported default prompt source.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "<expression:DEEP_CATEGORY_PROMPT_APPEND>"
+    },
+    {
+      "fingerprint": "4b8a4271e3ea9fa42170905e8d7b257e4d1ae8aa01a9e7c250a43dafbe9160a8",
+      "category": "parser-fixture",
+      "rationale": "Uses /tool\\.dag\\(([\\s\\S]*?)\\)\\n/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 258,
+      "expected": "/tool\\.dag\\(([\\s\\S]*?)\\)\\n/g"
+    },
+    {
+      "fingerprint": "4fdf09375b29f43e05e528115799332d42a68ec716c12c2d14007a64e472660e",
+      "category": "parser-fixture",
+      "rationale": "Uses /<!-- omo-start-work-context -->/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/hooks/start-work/index.test.ts",
+      "line": 1202,
+      "expected": "/<!-- omo-start-work-context -->/g"
+    },
+    {
+      "fingerprint": "502e1980ca321af702ccdebe197bbc1c8898e0c63009e5b448433926ca2f490f",
+      "category": "runtime-behavior",
+      "rationale": "Checks that TASK_PROMPT_GUIDELINES.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 71,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "53c6b69aae93a6c0a32d97bef5f3d3b8b2addd8be5d8989b359592f1c8769e51",
+      "category": "parser-fixture",
+      "rationale": "Uses /tool\\.dag\\(([\\s\\S]*?)\\)\\n/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 258,
+      "expected": "/tool\\.dag\\(([\\s\\S]*?)\\)\\n/g"
+    },
+    {
+      "fingerprint": "54775d3dafe806823dc3af8ad2187ba7131b61fdba97b2ab14aef861e8f83308",
+      "category": "security-boundary",
+      "rationale": "Uses /<untrusted_objective>\\n([\\s\\S]*?)\\n<\\/untrusted_objective>/ to derive or validate the untrusted-objective security wrapper; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/hooks/goal/prompt.test.ts",
+      "line": 40,
+      "expected": "/<untrusted_objective>\\n([\\s\\S]*?)\\n<\\/untrusted_objective>/"
+    },
+    {
+      "fingerprint": "5729474142848ce235392ff0e0f887fbae4e114839d83050274c777186388b19",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix --- after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/omo-opencode/src/shared-skills-package.test.ts",
+      "line": 50,
+      "expected": "---"
+    },
+    {
+      "fingerprint": "59cedbf0a914ab86ec4300ea7a28701014ac6914b70709806ad1f6900d95be1a",
+      "category": "parser-fixture",
+      "rationale": "Uses /<!-- omo-start-work-context -->/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/hooks/start-work/index.test.ts",
+      "line": 1193,
+      "expected": "/<!-- omo-start-work-context -->/g"
+    },
+    {
+      "fingerprint": "6152b7fa12b94625cfe71bc16fa6f0ec59d9c53c0a269bcabe69f63493670bbe",
+      "category": "machine-sentinel",
+      "rationale": "Uses /\\brun\\[\"run_id\"\\]/g to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 259,
+      "expected": "/\\brun\\[\"run_id\"\\]/g"
+    },
+    {
+      "fingerprint": "6745a6899eaa1f4c37f47d2c448253aa37e876a5692015a2c6139fa0b7342768",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix <ultrawork-mode> after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/skill-pointer.test.ts",
+      "line": 43,
+      "expected": "<ultrawork-mode>"
+    },
+    {
+      "fingerprint": "6da81ca70ed03959415a1203f111992d1eb7e4f1743e0b18062d1ea02c8892ad",
+      "category": "parser-fixture",
+      "rationale": "fixture-quick-overlay is a test sentinel proving configured category overlay composition.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "expected": "fixture-quick-overlay"
+    },
+    {
+      "fingerprint": "72650d09798b4b90ea3b65839229a2f23b8a81bb7ef035d24cf241e98118b1d7",
+      "category": "machine-sentinel",
+      "rationale": "non-plan-task-input-sentinel is an opaque token proving non-plan task input propagation through a distinct runtime branch.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/tools.test.ts",
+      "expected": "non-plan-task-input-sentinel"
+    },
+    {
+      "fingerprint": "72a0229d230840161b2ed3084d2cbc22ce90eb09535d226acdcdff037b2bd877",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the resolved category prompt to the exported GPT-5.5 prompt source, verifying source selection rather than prose fragments.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "<expression:DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5>"
+    },
+    {
+      "fingerprint": "744c882b651f85cc48088356bf8d9f348b3f5f9141b3ea7d47733f6d615dec92",
+      "category": "runtime-behavior",
+      "rationale": "Verifies continuation output changes when dynamic elapsed-time accounting changes; no authored prompt wording is asserted.",
+      "path": "packages/pi-goal/test/prompt.test.ts",
+      "expected": "<expression:baseline>"
+    },
+    {
+      "fingerprint": "78610da041e45f950c48569de5078ef3f4692dab22bb468a42c92ae5694241cc",
+      "category": "parser-fixture",
+      "rationale": "Uses /\\r?\\n/ to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/shared-skills-package.test.ts",
+      "line": 64,
+      "expected": "/\\r?\\n/"
+    },
+    {
+      "fingerprint": "893638a638d8b1b667218bfad606c679cc7ec6ffbabd87131de731b81dc7fe98",
+      "category": "parser-fixture",
+      "rationale": "Checks that skill.template.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/skills/playwright.test.ts",
+      "line": 135,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "90f2030b8997e7df28ef5b7b57ee35df429eee6f49d1682a17f6702f41b1fcfc",
+      "category": "parser-fixture",
+      "rationale": "Uses /path\\s*=\\s*(.+)/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/shared-skills/provenance-gate.test.ts",
+      "line": 91,
+      "expected": "/path\\s*=\\s*(.+)/g"
+    },
+    {
+      "fingerprint": "93868609ebdd0b6b320ca5b0a7cd414aa69f5819a9bf59aa78766b3833e15777",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies the default route does not resolve to the exported GPT-5.5 prompt source.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "<expression:DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5>"
+    },
+    {
+      "fingerprint": "96092163c4fa1f316a002fcbbf97046912b0f6a7d94ab8121030b8f4a0780888",
+      "category": "parser-fixture",
+      "rationale": "fixture-overlay is a test sentinel proving configured category overlay composition.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "expected": "fixture-overlay"
+    },
+    {
+      "fingerprint": "97239ba31aab0a6306fe98b3eff1d4886223824840afd66d7818fa7c88158a69",
+      "category": "parser-fixture",
+      "rationale": "Asserts the resolved quick-category prompt ends with the configured fixture overlay sentinel.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "expected": "fixture-quick-overlay"
+    },
+    {
+      "fingerprint": "9b3e4dddd4ed2cabcad83ac91d2be597470faf8ff3db1efbe7386c831e6a882b",
+      "category": "machine-sentinel",
+      "rationale": "Uses /Pinned upstream commit:\\s*([0-9a-f]{40})/g to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/shared-skills/provenance-gate.test.ts",
+      "line": 80,
+      "expected": "/Pinned upstream commit:\\s*([0-9a-f]{40})/g"
+    },
+    {
+      "fingerprint": "9ea9bfcb1e1a6b3f49894532c92c06abe08033f7563b9613efa4e1712523694d",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix --- after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/skills/playwright.test.ts",
+      "line": 136,
+      "expected": "---"
+    },
+    {
+      "fingerprint": "a669ca503d13a205968f7d350664c5e4e4310e8799b3f2be8ac512794d70190a",
+      "category": "machine-sentinel",
+      "rationale": "Asserts the machine-recognized prefix Audit the boundary after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/senpi-task/src/progress.test.ts",
+      "line": 24,
+      "expected": "Audit the boundary"
+    },
+    {
+      "fingerprint": "ab683b6a26b79447640b64806865e96efd014528283a1614aa60c1e1e2c2fcf3",
+      "category": "machine-sentinel",
+      "rationale": "Uses /import\\.meta\\.(?:dir|file)\\b/ to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/src/extension-node-runtime-audit.test.ts",
+      "line": 25,
+      "expected": "/import\\.meta\\.(?:dir|file)\\b/"
+    },
+    {
+      "fingerprint": "bc5152b4b01f5c6027032de657cc705f1b3bae24a8341e89f0e9f2cc26ffabbe",
+      "category": "machine-sentinel",
+      "rationale": "git merge-base HEAD main is an executable command token whose prefix transformation is the runtime behavior under test.",
+      "path": "packages/omo-opencode/src/features/opencode-skill-loader/git-master-template-injection.test.ts",
+      "expected": "git merge-base HEAD main"
+    },
+    {
+      "fingerprint": "c05d789823e1543620d93d8f2c9c91ed9af831dd2a7f0eddac27398b010664d4",
+      "category": "runtime-behavior",
+      "rationale": "Checks that STOP_CONTINUATION_TEMPLATE.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/omo-opencode/src/features/builtin-commands/templates/stop-continuation.test.ts",
+      "line": 12,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "c1f3f21b29a316c6d902158da425d1cce0b1bb2432bc4305bf9bfe9c2950121c",
+      "category": "machine-sentinel",
+      "rationale": "Uses /\\brun\\[\"run_id\"\\]/g to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 259,
+      "expected": "/\\brun\\[\"run_id\"\\]/g"
+    },
+    {
+      "fingerprint": "cb1f0bf6059808e4c484ec00a1fe72b353277d7fd70cb97ce6bb0fb30fd803e9",
+      "category": "parser-fixture",
+      "rationale": "Asserts the resolved category prompt ends with the configured fixture overlay sentinel.",
+      "path": "packages/senpi-task/src/category/resolve-category.test.ts",
+      "expected": "fixture-overlay"
+    },
+    {
+      "fingerprint": "ccfb859c0aeb15d3fc387a20a3c50eb63c7f70ad711b39e66a9e996a829ddc37",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix <system-reminder> [BACKGROUND TASK COMPLETED] [ALL BACKGROUND TASKS COMPLETE] after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/omo-opencode/src/features/background-agent/parent-wake-final-notification-merge.test.ts",
+      "line": 83,
+      "expected": "<system-reminder> [BACKGROUND TASK COMPLETED] [ALL BACKGROUND TASKS COMPLETE]"
+    },
+    {
+      "fingerprint": "cd1d3fea63c98d2df056a38f2e5381ec0b888285cdf73a181dbd8f5c98f27e5a",
+      "category": "security-boundary",
+      "rationale": "Uses /<untrusted_objective>\\n([\\s\\S]*?)\\n<\\/untrusted_objective>/ to derive or validate the untrusted-objective security wrapper; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-opencode/src/hooks/goal/prompt.test.ts",
+      "line": 40,
+      "expected": "/<untrusted_objective>\\n([\\s\\S]*?)\\n<\\/untrusted_objective>/"
+    },
+    {
+      "fingerprint": "cec94c29fc03c354fc712c61803796764b4d0d748b4d2a4548e6e7a5c58fbe5e",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix <Category_Context> after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/tools.test.ts",
+      "line": 3407,
+      "expected": "<Category_Context>"
+    },
+    {
+      "fingerprint": "d04884bdbbc775df4663c78530eb3f7aa34e0b1beb72b95872d685763765207f",
+      "category": "runtime-behavior",
+      "rationale": "Checks that TASK_PROMPT_SNIPPET.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/senpi-task/src/tools/task/description.test.ts",
+      "line": 70,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "d30e6ac1f586ad2974b74bd5bd7f4ea6e8f1a543b75fb2fca50dd9201897dd9c",
+      "category": "runtime-behavior",
+      "rationale": "Checks that tool.description.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/senpi-task/src/tools/control/factory.test.ts",
+      "line": 35,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "d32bd0ab014b8af85673d28d75ef74e31c70338e261bb4be840fe17ffa0988aa",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix --- name: ultrawork after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/directive-source.test.ts",
+      "line": 25,
+      "expected": "--- name: ultrawork"
+    },
+    {
+      "fingerprint": "d931ccf9507756c35ad56b5e2e7dae6f7102c355e5cc6b9885983e2aacc6172a",
+      "category": "machine-sentinel",
+      "rationale": "non-plan-task-input-sentinel is an opaque token proving non-plan task input propagation through a distinct model route.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/tools.test.ts",
+      "expected": "non-plan-task-input-sentinel"
+    },
+    {
+      "fingerprint": "d9fb547debc18ebd8644e579a536008cbb049a0102cad44ce2138a74b6a011ab",
+      "category": "machine-sentinel",
+      "rationale": "plan-sentinel-9f2c is an opaque test token proving the plan-specific reminder path without pinning authored prose.",
+      "path": "packages/omo-opencode/src/hooks/atlas/verification-reminders.test.ts",
+      "expected": "plan-sentinel-9f2c"
+    },
+    {
+      "fingerprint": "dfe4caf906e8c23489dc6b45f7c3fca51bdc9845e4727c8f72847327cedf3578",
+      "category": "machine-sentinel",
+      "rationale": "git commit -m sentinel is an executable command token whose prefix transformation is the runtime behavior under test.",
+      "path": "packages/omo-opencode/src/features/opencode-skill-loader/git-master-template-injection.test.ts",
+      "expected": "git commit -m sentinel"
+    },
+    {
+      "fingerprint": "e2d010bac9bcf547342a64dde3f0099ba50235ef65a1c57aca99df1068f35edc",
+      "category": "parser-fixture",
+      "rationale": "Uses /```bash\\r?\\n([\\s\\S]*?)```/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/skills-loader-core/src/features/opencode-skill-loader/git-master-shell-detection.test.ts",
+      "line": 109,
+      "expected": "/```bash\\r?\\n([\\s\\S]*?)```/g"
+    },
+    {
+      "fingerprint": "e7a487453212b8c78b744a00b1af59432c8cbb66fdf5dee8a1bd14d8de76f7e6",
+      "category": "machine-sentinel",
+      "rationale": "Uses /\"?\\bid\\b\"?\\s*:/ to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 163,
+      "expected": "/\"?\\bid\\b\"?\\s*:/"
+    },
+    {
+      "fingerprint": "ea4a42e9487a0d3ad9c8976273d5857f5cdcebe759e4eb1268b99ac9718629f7",
+      "category": "parser-fixture",
+      "rationale": "Uses /export const ULTRAWORK_SKILL_POINTER_TEMPLATE = `[\\s\\S]*?`;\\n/ to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/ultrawork-directive.test.ts",
+      "line": 105,
+      "expected": "/export const ULTRAWORK_SKILL_POINTER_TEMPLATE = `[\\s\\S]*?`;\\n/"
+    },
+    {
+      "fingerprint": "ec23d72453ca7e6c8850a29af6fd9172677b3d2cca0a884915cdf892f4070b6d",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares composed output to the exported GPT-5.5 prompt source plus caller-provided dynamic content.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "<expression:`${DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5}\\n\\n${userPromptAppend}`>"
+    },
+    {
+      "fingerprint": "f59094f9c4f39a027165aec5b005cf1e5c6a28ddf0731869be72c95bf5b2dd60",
+      "category": "parser-fixture",
+      "rationale": "Checks that tool.description.length is populated by the real loader/parser/runtime boundary; it asserts no authored phrase and only guards the required non-empty API result.",
+      "path": "packages/ast-grep-mcp/src/mcp-protocol-pin.test.ts",
+      "line": 50,
+      "expected": "<non-empty authored text>"
+    },
+    {
+      "fingerprint": "f7cea0cad66caec38cc4314396ad9eb0835a7b5f985870c5007ceb423a01adae",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares resolved planner instructions to the real BUILTIN_AGENTS explore prompt source rather than a prose fragment.",
+      "path": "packages/omo-senpi/src/components/task/planner.test.ts",
+      "expected": "<expression:BUILTIN_AGENTS.explore?.prompt>"
+    },
+    {
+      "fingerprint": "f8b182fab1c2f8dd5a667d648373405f1aad650e7cf7947709ba88036f579ce0",
+      "category": "machine-sentinel",
+      "rationale": "Uses /(^|\\/)skills\\// to derive or validate machine-consumed identifiers or source metadata; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/shared-skills/provenance-gate.test.ts",
+      "line": 94,
+      "expected": "/(^|\\/)skills\\//"
+    },
+    {
+      "fingerprint": "ff8290185c113c99ed35bc49727c671542f0179c193e899e0dadda30af1d42ee",
+      "category": "parser-fixture",
+      "rationale": "Asserts the machine-recognized prefix #!/usr/bin/env bash after runtime loading/formatting; the prefix selects a parser or protocol branch rather than contracting surrounding prose.",
+      "path": "script/agent-env.test.ts",
+      "line": 18,
+      "expected": "#!/usr/bin/env bash"
+    },
+    {
+      "fingerprint": "ffa82235dde60ae3f425f1a68c903388051384035ad551915394470f94693f4a",
+      "category": "parser-fixture",
+      "rationale": "Uses /tool\\.dag\\(([\\s\\S]*?)\\)\\n/g to derive or validate structured syntax extracted by the parser fixture; the assertion covers parsing/structure rather than free-form authored wording.",
+      "path": "packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts",
+      "line": 258,
+      "expected": "/tool\\.dag\\(([\\s\\S]*?)\\)\\n/g"
+    },
+    {
+      "fingerprint": "919d529fbf42c196f1f47a257c14f168446ceac9adb13aa46ea84da6b3b5471c",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that the adapter resolves and injects caller-provided shared skill bytes into the child prompt; SHARED BODY is fixture input, not authored production prose.",
+      "path": "packages/omo-senpi/src/components/task/dag-runtime-skills.test.ts",
+      "line": 109,
+      "expected": "SHARED BODY"
+    },
+    {
+      "fingerprint": "e97f1837eb50d3fa1722056df35180f4ea1238300eccc47af0ce57f5b4aa640a",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that DAG skill injection preserves the caller-provided original prompt after prepending resolved skill bytes.",
+      "path": "packages/omo-senpi/src/components/task/dag-runtime-skills.test.ts",
+      "line": 110,
+      "expected": "original prompt"
+    },
+    {
+      "fingerprint": "f82b2f83609a106122adb8f1d79265f63675e321ad72bafe9a2448856e496492",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares materialized DAG output to the real skillPrompt formatter using caller-provided path, skill body, and prompt inputs.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 81,
+      "expected": "<expression:skillPrompt(cwd, \"programming\", \"programming skill body\", \"ship the feature\")>"
+    },
+    {
+      "fingerprint": "7aa3622895139a09c891d5d300a1b425f4558c0477b6c64f342afeb90a59911e",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares missing-skill fallback materialization to the real skillPrompt formatter while separately asserting the machine-consumed missing-skill diagnostic.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 132,
+      "expected": "<expression:skillPrompt(cwd, \"programming\", \"programming skill body\", \"ship the feature\")>"
+    },
+    {
+      "fingerprint": "0bdaad18ab042551e51a2b83d064d1f08217814f024a601c66bb755e450fe523",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares persisted creation-time DAG output to the real skillPrompt formatter after the source skill is removed, proving snapshot stability.",
+      "path": "packages/senpi-task/src/dag/skills.test.ts",
+      "line": 200,
+      "expected": "<expression:skillPrompt(cwd, \"programming\", \"v1 skill body\", \"ship the feature\")>"
+    },
+    {
+      "fingerprint": "b5917132651cd0752ec6803e3393a6c4177a45fb6cde0357b95939e44cf9b3da",
+      "category": "runtime-behavior",
+      "rationale": "Verifies background batch execution injects the shared resolver result into the first child; the directive text is a caller-provided fixture sentinel.",
+      "path": "packages/senpi-task/src/tools/task/execute-batch-background.test.ts",
+      "line": 111,
+      "expected": "shared DIRECTIVE one"
+    },
+    {
+      "fingerprint": "70aebca9e0710ef44f1485574f5fbdb020589e3800b090bc7dcb952ca6a00542",
+      "category": "runtime-behavior",
+      "rationale": "Verifies a per-item load_skills override replaces the shared resolver result for the second batch child.",
+      "path": "packages/senpi-task/src/tools/task/execute-batch-background.test.ts",
+      "line": 111,
+      "expected": "specific DIRECTIVE two"
+    },
+    {
+      "fingerprint": "5ce1e255c34ba8a864b07385dae6475f62896c745e52b684786d09c0a477e3bd",
+      "category": "machine-sentinel",
+      "rationale": "SKILL DIRECTIVE is an opaque fixture prefix proving load_skills output is prepended before the original task prompt.",
+      "path": "packages/senpi-task/src/tools/task/execute-skills.test.ts",
+      "line": 32,
+      "expected": "SKILL DIRECTIVE"
+    },
+    {
+      "fingerprint": "94eb1da5357d45a522af6445c31c1641931075f3efafdf7b2a12b7db20179b14",
+      "category": "parser-fixture",
+      "rationale": "Verifies the markdown frontmatter parser strips the fixture description field before injecting the skill body.",
+      "path": "packages/senpi-task/src/tools/task/skills.test.ts",
+      "line": 165,
+      "expected": "description: Direct root skill"
+    },
+    {
+      "fingerprint": "5604c49d0e975529c25a2f3e8d6d896cc9684de2802ff6ad7392b0dcd914f91e",
+      "category": "runtime-behavior",
+      "rationale": "Verifies publish runbooks embed the exact gh workflow run dispatch contract that extracts the run id from the dispatch URL; machine-consumed CLI command routing, not authored prose.",
+      "path": "script/release-skill-layering.test.ts",
+      "line": 93,
+      "expected": "RUN_URL=\"$(gh workflow run"
+    },
+    {
+      "fingerprint": "09aa66ef3cf3502c0e7d8c276c2be72cca0c65aa1ffcd41b5e6a7b037dc98001",
+      "category": "runtime-behavior",
+      "rationale": "Verifies publish runbooks do not fall back to ambiguous latest-run listing; the forbidden gh run list command is a machine-consumed CLI routing contract.",
+      "path": "script/release-skill-layering.test.ts",
+      "line": 96,
+      "expected": "gh run list --workflow=publish --limit=1"
+    }
+  ],
+  "forbidden": []
+}

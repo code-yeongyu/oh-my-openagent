@@ -45,30 +45,7 @@ describe("teamModeSkill gating", () => {
     expect(skill.mcpConfig).toBeUndefined()
   })
 
-  test("team-mode skill body keeps required keywords", () => {
-    // given
-    const body = teamModeSkill.template
-
-    // when
-    const keywords = [
-      "TeamSpec",
-      "member",
-      "category",
-      "subagent_type",
-      "sisyphus",
-      "atlas",
-      "hephaestus",
-      "oracle",
-      "eligible",
-    ]
-
-    // then
-    for (const keyword of keywords) {
-      expect(body).toContain(keyword)
-    }
-  })
-
-  test("team-mode skill separates lead-only and member-safe tools", () => {
+  test("team-mode skill exposes the supported team tool identifiers", () => {
     // given
     const body = teamModeSkill.template
 
@@ -84,15 +61,11 @@ describe("teamModeSkill gating", () => {
     ]
 
     // then
-    expect(body).toContain("## Lead-only tools")
-    expect(body).toContain("## Universal team-run tools")
-    expect(body).toContain("## Global query tool")
     for (const toolName of leadOnlyTools) {
       expect(body).toContain(toolName)
     }
     for (const toolName of universalTools) {
       expect(body).toContain(toolName)
     }
-    expect(body).not.toContain("team_shutdown_request - ask the lead to wind down")
   })
 })

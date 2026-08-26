@@ -4,7 +4,7 @@ import type { Static } from "typebox"
 
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
-import { clampWaitTimeout, defaultResolveCallerSessionId, isTerminalStatus, toolResult } from "../control"
+import { defaultResolveCallerSessionId, toolResult } from "../control"
 import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText } from "./renderers"
 import { renderTranscript } from "./render"
 import { buildTaskSnapshot } from "./snapshot"
@@ -12,8 +12,8 @@ import { defaultTranscriptReader } from "./transcript"
 import type { TaskOutputDeps, TaskOutputDetails, TaskOutputToolResult, TaskSnapshot, TranscriptReader } from "./types"
 
 export const TaskOutputParams = Type.Object({
-  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to read." })),
-  name: Type.Optional(Type.String({ description: "Canonical task name, as an alternative to task_id." })),
+  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to read. Provide exactly one of task_id or name." })),
+  name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
   mode: Type.Optional(
     Type.Union([Type.Literal("status"), Type.Literal("tail"), Type.Literal("full")], {
       description: "status (default) = record snapshot + final result; tail = last lines of the transcript; full = whole transcript.",
@@ -22,28 +22,16 @@ export const TaskOutputParams = Type.Object({
   tail_lines: Type.Optional(
     Type.Integer({ minimum: 1, description: "Lines to keep in tail mode. Defaults to 60." }),
   ),
-  block: Type.Optional(Type.Boolean({ description: "Defaults true. Wait for a running child to become terminal before reading." })),
-  timeout_ms: Type.Optional(
-    Type.Integer({ minimum: 0, description: "Deadline in ms for block:true. Clamped to the configured wait bounds." }),
-  ),
 })
 
 export type TaskOutputInput = Static<typeof TaskOutputParams>
 
 const DEFAULT_TAIL_LINES = 60
-
-type WaitRaceInput = {
-  readonly completion: Promise<TaskRecord>
-  readonly timeoutMs: number
-  readonly now: () => number
-  readonly startedAt: number
-  readonly onTimeout: () => void
-}
+const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
-  "Read one child task, keyed by task_id or name. mode='status' (default) returns the record snapshot plus the final response once terminal.",
-  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker).",
-  "block defaults true: running children wait until terminal or timeout_ms elapses; pass block=false for a non-blocking peek.",
+  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns the record snapshot plus the final response once terminal.",
+  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker). Completion notifications already include the final result.",
   "READ-ONLY: this never revives, steers, or otherwise touches the child. A lost task returns a status view with a lost explanation and pid/session-dir breadcrumbs.",
   "Only the current session's children are visible.",
 ].join(" ")
@@ -52,9 +40,9 @@ export function runTaskOutput(
   deps: TaskOutputDeps,
   params: TaskOutputInput,
   callerSessionId: string | undefined,
-  signal?: AbortSignal,
-  onUpdate?: (result: TaskOutputToolResult) => void,
 ): Promise<TaskOutputToolResult> {
+  if (hasLegacyBlockingParam(params)) return Promise.resolve(invalidArguments(BLOCKING_REMOVED_GUIDANCE))
+
   const idOrName = params.task_id ?? params.name
   if (idOrName === undefined) return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
 
@@ -62,12 +50,11 @@ export function runTaskOutput(
   const record = resolveTarget(candidates, idOrName)
   if (record === undefined) return Promise.resolve(notFound(candidates, idOrName))
 
-  const shouldBlock = params.block ?? true
-  if (shouldBlock && !isTerminalStatus(record.status)) {
-    return blockedResult(deps, record, params, signal, onUpdate)
-  }
-
   return Promise.resolve(outputForRecord(deps, record, params))
+}
+
+function hasLegacyBlockingParam(params: object): boolean {
+  return Reflect.get(params, "block") !== undefined || Reflect.get(params, "timeout_ms") !== undefined
 }
 
 function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskOutputInput): TaskOutputToolResult {
@@ -82,72 +69,6 @@ function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskO
   return transcriptResult(deps, record, snapshot, mode, params.tail_lines ?? DEFAULT_TAIL_LINES)
 }
 
-async function blockedResult(
-  deps: TaskOutputDeps,
-  record: TaskRecord,
-  params: TaskOutputInput,
-  signal: AbortSignal | undefined,
-  onUpdate: ((result: TaskOutputToolResult) => void) | undefined,
-): Promise<TaskOutputToolResult> {
-  const startedAt = (deps.now ?? Date.now)()
-  const timeoutMs = clampWaitTimeout(params.timeout_ms, deps.waitConfig)
-  const activity = `waiting for ${record.task_id} (${record.status})`
-  onUpdate?.(toolResult(activity, { kind: "waiting", progress: { activity, startedAt, maxWaitMs: timeoutMs } }))
-
-  const waitController = new AbortController()
-  const removeParentAbort = forwardAbort(signal, waitController)
-  try {
-    const winner = await raceWaitFor({
-      completion: deps.manager.waitFor(record.task_id, { signal: waitController.signal }),
-      timeoutMs,
-      now: deps.now ?? Date.now,
-      startedAt,
-      onTimeout: () => waitController.abort(new Error("task_output wait timed out")),
-    })
-    if (winner.kind === "timed_out") {
-      return toolResult(`${record.task_id} still running after ${winner.waited_ms}ms`, {
-        kind: "timed_out",
-        task_id: record.task_id,
-        waited_ms: winner.waited_ms,
-      })
-    }
-    return outputForRecord(deps, deps.manager.get(record.task_id) ?? winner.record, params)
-  } finally {
-    removeParentAbort()
-  }
-}
-
-async function raceWaitFor(
-  input: WaitRaceInput,
-): Promise<{ readonly kind: "completed"; readonly record: TaskRecord } | { readonly kind: "timed_out"; readonly waited_ms: number }> {
-  let resolveTimeout: () => void = () => {}
-  const timeout = new Promise<void>((resolve) => {
-    resolveTimeout = resolve
-  })
-  const handle = setTimeout(resolveTimeout, input.timeoutMs)
-  handle.unref?.()
-  try {
-    const winner = await Promise.race([
-      input.completion.then((completed) => ({ kind: "completed" as const, record: completed })),
-      timeout.then(() => {
-        input.onTimeout()
-        return { kind: "timed_out" as const, waited_ms: Math.max(0, input.now() - input.startedAt) }
-      }),
-    ])
-    return winner
-  } finally {
-    clearTimeout(handle)
-  }
-}
-
-function forwardAbort(signal: AbortSignal | undefined, controller: AbortController): () => void {
-  if (signal === undefined) return () => undefined
-  const abort = (): void => controller.abort(signal.reason)
-  if (signal.aborted) abort()
-  else signal.addEventListener("abort", abort, { once: true })
-  return () => signal.removeEventListener("abort", abort)
-}
-
 function transcriptResult(
   deps: TaskOutputDeps,
   record: TaskRecord,
@@ -156,14 +77,17 @@ function transcriptResult(
   tailLines: number,
 ): TaskOutputToolResult {
   const reader: TranscriptReader = deps.transcriptReader ?? defaultTranscriptReader
-  const { entries, source } = reader({ taskId: record.task_id, stateDir: deps.stateDir })
+  const { entries, source, truncated: sourceTruncated } = reader({
+    taskId: record.task_id,
+    stateDir: deps.stateDir,
+  })
   const rendered = renderTranscript(entries, { mode, tailLines })
   const details: TaskOutputDetails = {
     kind: "transcript",
     mode,
     source,
     transcript: rendered.text,
-    truncated: rendered.truncated,
+    truncated: rendered.truncated || sourceTruncated === true,
     snapshot,
   }
   return toolResult(`${record.task_id} [${record.status}] transcript via ${source}:\n${rendered.text}`, details)
@@ -185,6 +109,7 @@ function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): Tas
 
 function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
+  if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
   if (snapshot.pid !== undefined) parts.push(`pid ${snapshot.pid}`)
   if (snapshot.lost !== undefined) parts.push(snapshot.lost.explanation)
   if (snapshot.error_message !== undefined) parts.push(`error: ${snapshot.error_message}`)
@@ -209,7 +134,7 @@ export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeo
     label: "Task Output",
     description: DESCRIPTION,
     parameters: TaskOutputParams,
-    execute: (_toolCallId, params, signal, onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx), signal, onUpdate),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx)),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
   }

@@ -1,0 +1,14 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/git/config-lock.test.ts:
+(pass) serialized git config > #given transient config.lock failures #when a mutation runs #then it retries with bounded backoff [79.06ms]
+(pass) serialized git config > #given two concurrent configSet calls #when they mutate one repo #then their git config processes do not overlap [220.75ms]
+(pass) git lock error classification > #given a real index.lock contention message #when classified #then it is a retryable lock error [0.14ms]
+(pass) git lock error classification > #given a ref lock failure #when classified #then it is a retryable lock error [0.06ms]
+(pass) git lock error classification > #given the config.lock message #when classified #then it stays a retryable lock error [0.05ms]
+(pass) git lock error classification > #given an unrelated git failure #when classified #then it is NOT retryable [0.05ms]
+
+ 6 pass
+ 0 fail
+ 8 expect() calls
+Ran 6 tests across 1 file. [383.00ms]

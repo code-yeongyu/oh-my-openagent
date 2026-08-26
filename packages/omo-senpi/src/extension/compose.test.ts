@@ -137,6 +137,7 @@ describe("composeOmoSenpiExtension", () => {
       userMessages: [],
       messageRenderers: [],
       mcpServers: [],
+      rpcEvents: [],
       on(event, handler) {
         this.handlers.push({ event, handler })
       },
@@ -172,7 +173,7 @@ describe("composeOmoSenpiExtension", () => {
     const logger = createRecordingLogger()
     const components: OmoSenpiComponent[] = [
       {
-        name: "codegraph-like",
+        name: "mcp-like",
         register(api, ctx) {
           if (typeof api.registerMcpServer !== "function") {
             ctx.logger.info("skipped: missing registerMcpServer")
@@ -202,7 +203,7 @@ describe("composeOmoSenpiExtension", () => {
     })
   })
 
-  it("#given a fake missing sendUserMessage #when composed #then logs one version mismatch and registers nothing", async () => {
+  it("#given a fake missing sendMessage #when composed #then logs one version mismatch and registers nothing", async () => {
     // given
     const logger = createRecordingLogger()
     let registrationCalls = 0
@@ -222,7 +223,7 @@ describe("composeOmoSenpiExtension", () => {
       registerCommand() {
         registrationCalls += 1
       },
-      sendMessage() {
+      sendUserMessage() {
         registrationCalls += 1
       },
     }
@@ -247,8 +248,8 @@ describe("composeOmoSenpiExtension", () => {
         level: "warn",
         message: "omo-senpi ExtensionAPI version mismatch; extension disabled",
         details: {
-          expected: ["on", "registerFlag", "getFlag", "registerTool", "registerCommand", "sendUserMessage"],
-          missing: ["sendUserMessage"],
+          expected: ["on", "registerFlag", "getFlag", "registerTool", "registerCommand", "sendMessage", "sendUserMessage"],
+          missing: ["sendMessage"],
         },
       },
     ])

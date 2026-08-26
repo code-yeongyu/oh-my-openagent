@@ -47,7 +47,7 @@ export async function qualityGateJson(
 					id: "surface-cli-pass",
 					criterionRef: "C001",
 					surface: "cli",
-					invocation: "omo ulw-loop checkpoint --status complete",
+					invocation: "omo-agent-toolkit ulw-loop checkpoint --status complete",
 					verdict: "passed",
 					artifactRefs: ["artifact-cli-pass"],
 				},

@@ -668,11 +668,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: "gpt-5.6-luna-fast",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -683,7 +683,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(createdSessions).toEqual(["ses_first", "ses_second"])
     expect(polledSessions).toEqual(["ses_first", "ses_second"])
     expect(attemptedModels).toEqual([
-      { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini", variant: undefined },
+      { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast", variant: undefined },
       { providerID: "genai-proxy-aws", modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0", variant: undefined },
     ])
     expect(result).toContain("Result from ses_second")
@@ -958,11 +958,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: "gpt-5.6-luna-fast",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -1032,11 +1032,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: "gpt-5.6-luna-fast",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 

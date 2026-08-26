@@ -56,9 +56,11 @@ Log where the system decides something, not where it does something:
 - **Decision points** — retry chosen, fallback engaged, cache bypassed, degraded mode entered.
 - **The one place an error is finally handled.**
 
-Never log inside pure functions, utilities, or private helpers — callers with context log outcomes; internals stay silent. Two mechanical rules:
+Never log inside pure functions, utilities, or private helpers — callers with context log outcomes; internals stay silent. The mechanical rules:
 
 - **One event, one line.** Log-and-rethrow at every layer turns one incident into five look-alike incidents. Log where the error is handled; layers that only propagate stay silent.
+- **Answering the caller is not logging.** Converting a failure into a response — an HTTP 5xx body, an SSE error event, an error string returned to an LLM as a tool result, a non-zero exit code — satisfies the caller and leaves operations blind. This is the dominant finding when error paths are audited: the caller got an answer, the on-call got nothing. Every path that converts a failure into a caller-facing signal logs that failure exactly once, at the layer that handles it. When conversion layers stack, mark the error as logged at the handling layer (a symbol/flag on the error object) so outer catch-all handlers skip it — one incident, one line.
+- **Expected feedback returned to the caller is not an event.** Validation results delivered as a normal response — including tool output an LLM agent consumes ("string not found", lint findings, a sandbox-boundary notice) — are response content, not anomalies. Log only the genuine I/O and subprocess failures behind them, and security rejections.
 - **Mechanical logging belongs to middleware.** Request/response logging is wired once at the framework layer, never hand-assembled per handler. High-volume zero-signal paths (health probes, metrics scrapes) are excluded there as data — an exclusion set — not as scattered `if` statements.
 
 **No speculative logs.** "Might need it later" is not a consumer. A log line earns its place through evidence: a debugging session that burned rounds because this state was invisible (see the debugging bridge below), an incident postmortem, an alert that needs the field.
@@ -69,6 +71,7 @@ Never log inside pure functions, utilities, or private helpers — callers with 
 - **Correlation or it did not happen.** Request-scoped lines carry the trace/request id; entity-scoped lines carry the entity id. A line you cannot join to its request is noise during the only moments logs matter.
 - **Name events semantically** (`session.destroy`, `payment.fallback`), never positionally ("Step 3"). Step numbers couple the log stream to today's call structure; the first refactor makes them lie.
 - **No secrets.** Tokens, credentials, session cookies, and PII never enter a log line; URLs are sanitized (strip or redact query params like `token`, `key`) before logging. A leaked log is a leaked credential.
+- **Payload content belongs to the tracing channel, not the log stream.** In LLM/agent systems, user messages, model responses, and tool outputs are captured by the tracing product (turn recorder, trace exporter); a log line carries a hash, a length, and at most a short excerpt for correlation. Dumping conversation content into logs bloats the store and leaks data the log pipeline was never hardened for.
 - **The logging path may not break the program.** If a log call can itself fail (serializing exotic state, a wrapper that touches I/O), that failure is caught, downgraded to a `warn` through a channel that cannot fail, and the operation continues. An empty catch around logging is still an empty catch.
 
 ## Anti-patterns
@@ -79,6 +82,8 @@ Never log inside pure functions, utilities, or private helpers — callers with 
 | Introducing a logging framework to a project that has none | Uninvited behavior change; Rule 0 violation |
 | 4xx logged as `error` | Alert noise buries real pages |
 | Log-and-rethrow at every layer | One incident looks like five |
+| Failure converted to a caller response (5xx body, SSE error, LLM tool-error string, exit code) with no log | The caller got an answer; operations got nothing |
+| Logging expected validation feedback that is returned to the caller | Response content, not an event — buries real failures |
 | Variables interpolated into the message string | Un-aggregatable, un-alertable |
 | "Might need it later" logs | No consumer → pure cost |
 | Debug-time prints promoted to permanent `info` | Narration, not state transitions |

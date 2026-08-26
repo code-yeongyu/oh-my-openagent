@@ -82,7 +82,7 @@ describe("loadTeamRegistry", () => {
     // given
     const projectRoot = makeProjectDir()
     const omoTeams = {
-      "bad-team": { members: [{ kind: "oracle-like-unknown", name: "x" }] },
+      "bad-team": { members: [{ kind: "unresolvable-kind", name: "x" }] },
     }
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => false,

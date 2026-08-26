@@ -3,9 +3,19 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
 export interface SenpiExtensionAPI {
+  /**
+   * Absolute cwd of the session this extension instance was loaded for. senpi builds one
+   * ExtensionAPI per session and already knows the value at load time. Optional because hosts
+   * older than the release that added it do not report one; consumers fall back to process.cwd().
+   */
+  readonly cwd?: string
   on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
+  rpc?: {
+    emit(name: string, data: unknown): void
+    handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
+  }
   events?: {
-    emit(name: string, payload: unknown): void
+    emit(name: string, data: unknown): void
     on(name: string, handler: (payload: unknown) => void): () => void
   }
   registerTool(tool: Record<string, unknown>): void
@@ -19,9 +29,11 @@ export interface SenpiExtensionAPI {
     },
   ): void
   getFlag(name: string): boolean | string | undefined
-  sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void
+  sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  registerRemovedToolHint?(name: string, hint: string): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
+  appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
 }
 

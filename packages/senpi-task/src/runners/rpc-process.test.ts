@@ -1,4 +1,4 @@
-import { type ChildProcess } from "node:child_process"
+import { type ChildProcess, type SpawnOptions } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
@@ -22,7 +22,7 @@ function makeSpec(overrides: Partial<RpcRunnerSpec> = {}): RpcRunnerSpec {
   return { task_id: "st_deadbeef", cwd: process.cwd(), state_dir: stateDir, prompt: "hello", ...overrides }
 }
 
-function makeRunner(extra: { heartbeatIntervalMs?: number } = {}): {
+function makeRunner(extra: { heartbeatIntervalMs?: number; now?: () => number } = {}): {
   runner: RpcProcessRunner
   captured: () => RpcSpawnDescriptor | undefined
 } {
@@ -65,12 +65,33 @@ afterEach(async () => {
 })
 
 describe("RpcProcessRunner", () => {
+  test("#given the default RPC child spawner #when started #then Windows hides the child console", async () => {
+    let capturedOptions: SpawnOptions | undefined
+    const runner = new RpcProcessRunner({
+      spawnProcess: (_command, _args, options) => {
+        capturedOptions = options
+        const child = spawnFakeChild()
+        children.push(child)
+        return child
+      },
+    })
+
+    await runner.start(makeSpec())
+
+    expect(capturedOptions).toMatchObject({
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+      windowsHide: true,
+      detached: process.platform !== "win32",
+    })
+  })
+
   test("#given a completing child #when started #then the handle reports final text and a clean exit", async () => {
     // given
     const { runner } = makeRunner()
 
     // when
-    const handle = runner.start(makeSpec({ prompt: "finish:final answer" }))
+    const handle = await runner.start(makeSpec({ prompt: "finish:final answer" }))
     await handle.waitForIdle()
     const outcome = await handle.waitForExit()
 
@@ -84,10 +105,9 @@ describe("RpcProcessRunner", () => {
   test("#given a busy child #when steered #then the steer is acked while the turn is in flight", async () => {
     // given
     const { runner } = makeRunner()
-    const handle = runner.start(makeSpec({ prompt: "hold" }))
+    const handle = await runner.start(makeSpec({ prompt: "hold" }))
     const events: AgentSessionEvent[] = []
     handle.subscribe((event) => events.push(event))
-    await waitFor(() => events.some((e) => e.type === "agent_start"))
 
     // when
     await handle.steer("mid-course")
@@ -101,10 +121,9 @@ describe("RpcProcessRunner", () => {
   test("#given a busy child #when followUp is sent #then it is routed as a prompt with followUp streaming behavior", async () => {
     // given
     const { runner } = makeRunner()
-    const handle = runner.start(makeSpec({ prompt: "hold" }))
+    const handle = await runner.start(makeSpec({ prompt: "hold" }))
     const events: AgentSessionEvent[] = []
     handle.subscribe((event) => events.push(event))
-    await waitFor(() => events.some((e) => e.type === "agent_start"))
 
     // when
     await handle.followUp("later note")
@@ -122,7 +141,7 @@ describe("RpcProcessRunner", () => {
       const { runner } = makeRunner()
 
       // when
-      const handle = runner.start(makeSpec({ prompt: "diesignal" }))
+      const handle = await runner.start(makeSpec({ prompt: "diesignal" }))
       const outcome = await handle.waitForExit()
 
       // then
@@ -145,38 +164,57 @@ describe("RpcProcessRunner", () => {
     const { runner } = makeRunner()
 
     // when
-    const handle = runner.start(makeSpec({ prompt: "crash:4:boom stderr detail" }))
-    const outcome = await handle.waitForExit()
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    const start = runner.start(makeSpec({ prompt: "crash:4:boom stderr detail" }))
+    await expect(start).rejects.toMatchObject({
+      failure: {
+        kind: "child-prompt-failed",
+        message: expect.stringContaining("boom stderr detail"),
+      },
+    })
+    await Promise.resolve()
     process.off("unhandledRejection", onRejection)
 
     // then
-    expect(outcome.kind).toBe("crashed")
-    expect(outcome.facts.code).toBe(4)
-    expect(mapExitOutcomeToError(outcome, { alreadyTerminal: false })?.error_message).toContain("boom stderr detail")
     expect(rejections).toEqual([])
   })
 
   test("#given a resident child #when heartbeats poll #then lastSeen and sessionId are recorded", async () => {
     // given
-    const { runner } = makeRunner({ heartbeatIntervalMs: 20 })
-    const handle = runner.start(makeSpec({ prompt: "hold" }))
+    let signalHeartbeat: (() => void) | undefined
+    const heartbeatObserved = new Promise<void>((resolve) => {
+      signalHeartbeat = resolve
+    })
+    const observedAt = 123_456
+    const { runner } = makeRunner({
+      heartbeatIntervalMs: 20,
+      now: () => {
+        signalHeartbeat?.()
+        return observedAt
+      },
+    })
+    const handle = await runner.start(makeSpec({ prompt: "hold" }))
 
     // when
-    await waitFor(() => handle.lastSeen() !== undefined)
+    await Promise.race([
+      heartbeatObserved,
+      new Promise<never>((_, reject) => {
+        const timeout = setTimeout(() => reject(new Error("timed out waiting for heartbeat update")), 2_000)
+        timeout.unref?.()
+      }),
+    ])
 
     // then
-    expect(handle.lastSeen()).toBeDefined()
+    expect(handle.lastSeen()).toBe(observedAt)
     expect(handle.sessionId).toBe("fake-session")
   })
 
-  test("#given a spawn #when the descriptor is built #then the child gets an isolated session dir, not the real HOME", () => {
+  test("#given a spawn #when the descriptor is built #then the child gets an isolated session dir, not the real HOME", async () => {
     // given
     const { runner, captured } = makeRunner()
     const spec = makeSpec({ prompt: "hold" })
 
     // when
-    const handle = runner.start(spec)
+    const handle = await runner.start(spec)
     const descriptor = captured()
 
     // then
@@ -190,7 +228,7 @@ describe("RpcProcessRunner", () => {
   test("#given an idle resident child #when revived with a follow-up #then waitForIdle re-arms for the new turn instead of the consumed first idle", async () => {
     // given a first turn that completed while the child stays resident
     const { runner } = makeRunner()
-    const handle = runner.start(makeSpec({ prompt: "first" }))
+    const handle = await runner.start(makeSpec({ prompt: "first" }))
     await handle.waitForIdle()
     expect(handle.lastAssistantText()).toBe("first")
 
@@ -211,7 +249,26 @@ describe("RpcProcessRunner", () => {
     expect(handle.lastAssistantText()).toBe("steered-complete")
   })
 
-  test("#given inheritedExtensions and a spec without its own extensions #when started #then the child spec carries the inherited entries", () => {
+  test("#given prior assistant text #when a revived turn produces no output #then the stale text cannot become a fresh success", async () => {
+    // given
+    const { runner } = makeRunner()
+    const handle = await runner.start(makeSpec({ prompt: "first" }))
+    if (handle.waitForOutcome === undefined) throw new Error("waitForOutcome was not exposed")
+    expect(await handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "first" })
+
+    // when
+    await handle.followUp("empty-followup")
+    const outcome = await handle.waitForOutcome()
+
+    // then
+    expect(outcome).toMatchObject({
+      status: "error",
+      failure: { kind: "child-turn-failed", message: "RPC child turn produced no assistant output" },
+    })
+    expect(handle.lastAssistantText()).toBe("first")
+  })
+
+  test("#given inheritedExtensions and a spec without its own extensions #when started #then the child spec carries the inherited entries", async () => {
     // given
     let seen: RpcRunnerSpec | undefined
     const runner = new RpcProcessRunner({
@@ -228,13 +285,13 @@ describe("RpcProcessRunner", () => {
     })
 
     // when
-    runner.start(makeSpec())
+    await runner.start(makeSpec())
 
     // then
     expect(seen?.extensions).toEqual(["/tmp/mock.ts"])
   })
 
-  test("#given a spec that already carries extensions #when started #then inheritedExtensions do NOT override them", () => {
+  test("#given a spec that already carries extensions #when started #then inheritedExtensions do NOT override them", async () => {
     // given
     let seen: RpcRunnerSpec | undefined
     const runner = new RpcProcessRunner({
@@ -251,7 +308,7 @@ describe("RpcProcessRunner", () => {
     })
 
     // when
-    runner.start(makeSpec({ extensions: ["/tmp/explicit.ts"] }))
+    await runner.start(makeSpec({ extensions: ["/tmp/explicit.ts"] }))
 
     // then
     expect(seen?.extensions).toEqual(["/tmp/explicit.ts"])

@@ -1,0 +1,19 @@
+surface=Codex compatibility gate
+command=bun run test:codex
+cwd=/home/codexqa/oh-my-openagent-6376-gate
+user=codexqa
+bun=1.3.14
+node=v24.18.0
+codex=0.146.0
+python=3.11 with tomllib
+exit_code=0
+lsp_tools_test_files=25 passed
+lsp_tools_tests=95 passed
+ulw_loop_test_files=40 passed
+ulw_loop_tests=420 passed
+toml_migration_tests=17 passed
+result=PASS
+
+The first root-user attempt was rejected as evidence because root bypasses Unix
+read permissions and invalidated the unreadable-config test premise. The final
+record above is the complete non-root run.

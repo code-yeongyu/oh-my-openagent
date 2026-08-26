@@ -1,0 +1,13 @@
+Command: bun test
+
+Initial run before refreshing worktree dependencies:
+- Stopped because @oh-my-opencode/omo-opencode/config-migration could not be resolved from untouched omo-senpi code.
+- Resolution: ran bun install to restore workspace package links, then reran the full suite.
+
+Passing run after dependency refresh and rebase onto current origin/dev:
+- 12665 pass
+- 3 skip
+- 0 fail
+- 1 snapshot
+- 118851 expect() calls
+- Ran 12668 tests across 1667 files in 134.26s

@@ -1,0 +1,38 @@
+== ROOT=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-npm-qa.3dEGWj2MmD ==
+== packing the working tree ==
+PASS: npm pack produced a tarball
+== tarball bin map (source of truth for what npm will link) ==
+packed bin map: {"oh-my-opencode":"bin/oh-my-opencode.js","oh-my-openagent":"bin/oh-my-opencode.js","omo-agent-toolkit":"bin/oh-my-opencode.js","lazycodex":"bin/oh-my-opencode.js","lazycodex-ai":"bin/oh-my-opencode.js"}
+PASS: packed bin map has NO omo entry
+PASS: packed bin map HAS omo-agent-toolkit
+PASS: packed bin map is exactly the five surviving names
+  expected: ["lazycodex","lazycodex-ai","oh-my-openagent","oh-my-opencode","omo-agent-toolkit"]
+  actual:   ["lazycodex","lazycodex-ai","oh-my-openagent","oh-my-opencode","omo-agent-toolkit"]
+== fresh global install into a disposable prefix ==
+install exit=0 (see install-new.log)
+-- linked bins --
+lazycodex
+lazycodex-ai
+oh-my-openagent
+oh-my-opencode
+omo-agent-toolkit
+PASS: fresh install links omo-agent-toolkit
+PASS: fresh install does NOT link omo
+== postinstall notice is visible with --foreground-scripts ==
+notice lines seen: 1
+PASS: postinstall rename notice appears with --foreground-scripts
+== upgrade-in-place: published old package, then this one over it ==
+PASS: baseline: published package DOES link an omo bin (upgrade is meaningful)
+-- bins after upgrade --
+lazycodex
+lazycodex-ai
+oh-my-openagent
+oh-my-opencode
+omo-agent-toolkit
+PASS: upgrade PRUNES the stale omo bin
+PASS: upgrade links omo-agent-toolkit
+
+== CLEANUP ==
+cleanup receipt: rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-npm-qa.3dEGWj2MmD (verified absent)
+
+RESULT: 10 passed, 0 failed

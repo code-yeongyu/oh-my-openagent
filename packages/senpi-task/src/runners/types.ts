@@ -1,4 +1,5 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
+import type { RunnerOutcome } from "./in-process/child-handle"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -22,6 +23,8 @@ export type RpcRunnerSpec = {
   // The provider/modelId the child must resolve. A separate OS process cannot share the parent's
   // in-memory registry, so the model is threaded onto the child command line (`--model`).
   readonly model?: string
+  // The resolved reasoning the child must apply as its thinking level (`--thinking`).
+  readonly reasoning?: string
   // The resolved variant the child must apply as its thinking level (`--thinking`).
   readonly variant?: string
   // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and
@@ -42,6 +45,7 @@ export type ChildHandle = {
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
   waitForIdle(): Promise<void>
+  waitForOutcome?(): Promise<RunnerOutcome>
   lastAssistantText(): string | undefined
   dispose(): Promise<void>
 }
@@ -70,8 +74,16 @@ export type TerminateOptions = {
   readonly sigkillDelayMs?: number
 }
 
+export type RpcTerminalAssistantMessage = {
+  readonly text?: string
+  readonly stopReason?: string
+  readonly errorMessage?: string
+}
+
 export type RpcChildHandle = ChildHandle & {
   readonly spawnSpec?: RpcSpawnSpec
+  terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
+  wasAbortedByUser?(): boolean
   switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
   getEntries?(since?: string): Promise<RpcEntriesResult>
   terminate(options?: TerminateOptions): Promise<void>

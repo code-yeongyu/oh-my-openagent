@@ -1,0 +1,128 @@
+=== 2026-08-19T14:18:42Z /get-unpublished-changes analysis ===
+--- beta-channel delta (v5.0.0-beta.11..origin/dev) ---
+030ee931a chore(senpi): regenerate the plugin bundle for the Windows kill fix
+c5667bb7a fix(senpi-task): record Windows external termination as killed
+89f7ca6f9 test(senpi-task): pin Windows external termination as a killed exit
+211d79e0f chore(omo-senpi): regenerate omo-task plugin bundle
+4e8be26d0 fix(senpi-task): deliver RPC child messages with explicit steer semantics
+3b46d59f5 test(senpi-task): prove RPC delivery omits queueing semantics on a busy child
+2b9754f97 test: give the remaining shared-prefix suites unique temp roots
+da60bd53f test(senpi-task): record win2 timeout-family classification and QA evidence
+a327b3e5e test(senpi-task): set the DAG e2e failure timeout in-file, not via preload
+53befd71f test(senpi-task): set the deleteTeam timeout in-file, not via preload
+319fadf85 test: give the last shared-prefix suites unique temp roots
+007a58c69 test: give MCP loader suites unique temp roots instead of a clock-derived name
+4124e3b4b build(omo-senpi): regenerate extension bundles for the confirming probe
+261ba3b68 test(omo-senpi): budget RPC launch parity for the confirming probe
+c7c326140 fix(senpi-task): confirm missing-model verdicts with a fresh catalog probe
+18e384fe6 refactor(senpi-task): extract the RPC model catalog probe transport
+68e4e30b4 build(omo-senpi): regenerate extension bundles for sandbox path fix
+12c176e02 fix(omo-senpi): canonicalize sandbox paths that do not exist yet
+4729336dc ci: keep heavy pull-request work on ubuntu unless the full matrix is needed
+c0dc53a32 feat(ci): classify when a pull request needs the full 3-OS matrix
+b2c54ffa2 build(omo-senpi): regenerate extension bundles on Linux for CI freshness
+b28ede5ed build(omo-senpi): regenerate extension bundles for memory notice surfaces
+b287390a8 feat(omo-senpi): emit memory write notice on MCP surface via shared receipt consumer
+dfa3de422 test(omo-senpi): add visual QA driver for the memory write notice row
+f3dfe8e34 feat(omo-senpi): render soul-updated entry with notice contract
+42e73afe0 feat(omo-senpi): self-render memory write result as notice
+b7972588a feat(omo-senpi): extract shared memory snapshot builder with size and timeline fields
+0c388091c feat(omo-senpi): align reflection, health, and nudge entries to notice contract
+20985fe53 feat(memory-core): add sized ls-tree and single-call system token estimator
+--- merge PRs ---
+74557647c Merge pull request #7052 from code-yeongyu/fix/windows-kill-facts
+09f70aab7 Merge pull request #7050 from code-yeongyu/fix/rpc-steer-delivery
+5f7e9e877 Merge pull request #7047 from code-yeongyu/fix/win2-timeout-family
+1c46238f6 Merge pull request #7048 from code-yeongyu/fix/test-tempdir-collisions-round2
+6b7619c7e Merge pull request #7046 from code-yeongyu/fix/test-tempdir-collisions
+d507bd276 Merge pull request #7044 from code-yeongyu/fix/model-admission-confirm-probe
+d9cb02fec Merge pull request #7043 from code-yeongyu/fix/mcp-scope-filtering-test-race
+c2ece6788 Merge pull request #7039 from code-yeongyu/fix/memory-sandbox-absent-path-enoent
+2086f2db6 Merge pull request #7038 from code-yeongyu/ci/ubuntu-first-pr-matrix
+61c6938de Merge pull request #7037 from code-yeongyu/feat/memory-notice-style
+ff47efb8b Merge remote-tracking branch 'origin/dev' into feat/memory-notice-style
+460b456e1 Merge remote-tracking branch 'origin/dev' into feat/memory-notice-style
+--- diffstat ---
+ .github/workflows/ci.yml                           |  57 +--
+ .../01-classification-ci-log.txt                   |  21 +
+ .../02-mutation-red.txt                            |  42 ++
+ .../20260819-win2-timeout-family/03-green.txt      |  32 ++
+ .../20260819-win2-timeout-family/04-loop-10x.txt   |  13 +
+ .../20260819-win2-timeout-family/05-typecheck.txt  |   3 +
+ .../06-package-suite.txt                           |  25 ++
+ assets/omo.schema.json                             | 116 ++++++
+ docs/reference/configuration.md                    |   6 +
+ .../claude-code-command-loader/loader.test.ts      |  10 +-
+ .../features/claude-code-mcp-loader/loader.test.ts |  13 +-
+ .../claude-code-mcp-loader/scope-filtering.test.ts |  31 +-
+ .../mcp-server-loader.test.ts                      |  43 +-
+ .../mcp-client-core/src/mcp-oauth/storage.test.ts  |  10 +-
+ .../memory-core/src/git/repo-ls-tree-sized.test.ts |  97 +++++
+ packages/memory-core/src/git/repo-types.ts         |   5 +
+ packages/memory-core/src/git/repo.ts               |  26 +-
+ packages/omo-config-core/src/schema/memory.test.ts |  46 +++
+ packages/omo-config-core/src/schema/memory.ts      |  16 +
+ .../claude-code-command-loader/loader.test.ts      |  10 +-
+ .../features/claude-code-mcp-loader/loader.test.ts |  13 +-
+ .../claude-code-mcp-loader/scope-filtering.test.ts |  31 +-
+ .../mcp-server-loader.test.ts                      |  51 +--
+ .../src/features/mcp-oauth/storage.test.ts         |  10 +-
+ .../config-source-discovery.test.ts                |  10 +-
+ .../features/opencode-skill-loader/loader.test.ts  |  13 +-
+ .../merger/config-skill-entry-loader.test.ts       |  21 +-
+ .../plugin/extensions/memory-run-supervisor.mjs    |   2 +-
+ .../omo-senpi/plugin/extensions/omo-memory-mcp.js  |   4 +-
+ packages/omo-senpi/plugin/extensions/omo-task.js   |   4 +-
+ packages/omo-senpi/plugin/extensions/omo.js        |   4 +-
+ .../scripts/qa/memory-write-visual-qa.mjs          | 122 ++++++
+ packages/omo-senpi/src/components/memory/AGENTS.md |   3 +-
+ .../omo-senpi/src/components/memory/index.test.ts  |   2 +
+ .../components/memory/memory-notice-wiring.test.ts | 431 +++++++++++++++++++++
+ .../src/components/memory/memory-notice-wiring.ts  | 163 ++++++++
+ .../components/memory/memory-rpc-bridge.test.ts    |  36 +-
+ .../src/components/memory/memory-rpc-bridge.ts     |  55 ++-
+ .../memory/memory-rpc-snapshot-state.test.ts       | 393 +++++++++++++++++++
+ .../components/memory/memory-rpc-snapshot-state.ts | 243 +++++++++++-
+ .../components/memory/memory-write-render.test.ts  | 393 +++++++++++++++++++
+ .../src/components/memory/memory-write-render.ts   | 204 ++++++++++
+ .../src/components/memory/memory.test-support.ts   |   1 +
+ .../src/components/memory/nudge-wiring.test.ts     | 107 +++++
+ .../src/components/memory/nudge-wiring.ts          |  25 ++
+ .../components/memory/sandbox-absent-paths.test.ts | 159 ++++++++
+ .../src/components/memory/sandbox-platform.ts      |  23 +-
+ .../src/components/memory/soul-notice.test.ts      | 280 +++++--------
+ .../omo-senpi/src/components/memory/soul-notice.ts | 106 ++---
+ .../components/memory/tools-write-notice.test.ts   | 286 ++++++++++++++
+ packages/omo-senpi/src/components/memory/tools.ts  | 206 +++++++++-
+ .../components/memory/wiring-mcp-notice.test.ts    |  95 +++++
+ .../src/components/memory/wiring-static.ts         |  35 +-
+ .../components/memory/wiring-write-notice.test.ts  |  95 +++++
+ packages/omo-senpi/src/components/memory/wiring.ts |  17 +-
+ .../memory/worker/entry-renderers.test.ts          |  39 ++
+ .../components/memory/worker/health-alert.test.ts  |  55 ++-
+ .../src/components/memory/worker/health-alert.ts   |  10 +-
+ .../components/task/task-rpc-launch-parity.test.ts |  13 +-
+ packages/senpi-task/src/dag/e2e-failure.test.ts    |   9 +-
+ .../src/runners/rpc/delivery-semantics.ts          |  36 ++
+ .../src/runners/rpc/exit-mapping.test.ts           |  59 +++
+ .../senpi-task/src/runners/rpc/exit-mapping.ts     |  32 +-
+ .../src/runners/rpc/handle-steer-delivery.test.ts  | 102 +++++
+ packages/senpi-task/src/runners/rpc/handle.ts      |  32 +-
+ .../runners/rpc/model-admission-confirm.test.ts    |  92 +++++
+ .../senpi-task/src/runners/rpc/model-admission.ts  | 184 +++------
+ .../src/runners/rpc/model-catalog-probe.ts         | 120 ++++++
+ .../senpi-task/src/team/runtime-delete.test.ts     |   9 +-
+ .../async-loader-concurrency.test.ts               |  13 +-
+ .../async-loader-discovery-mcp.test.ts             |  13 +-
+ .../async-loader-path-and-mcp.test.ts              |  13 +-
+ .../opencode-skill-loader/async-loader.test.ts     |  13 +-
+ .../config-source-discovery.test.ts                |  10 +-
+ .../loader-allowed-tools.test.ts                   |  13 +-
+ .../loader-deduplication.test.ts                   |  13 +-
+ .../loader-project-discovery.test.ts               |  13 +-
+ .../loader-skill-lookup.test.ts                    |  13 +-
+ .../features/opencode-skill-loader/loader.test.ts  |  13 +-
+ .../merger/config-skill-entry-loader.test.ts       |  21 +-
+ script/ci-fast-path.full-matrix.test.ts            | 267 +++++++++++++
+ script/ci-fast-path.mjs                            |  45 ++-
+ 82 files changed, 4856 insertions(+), 661 deletions(-)

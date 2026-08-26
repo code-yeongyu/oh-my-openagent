@@ -1,4 +1,5 @@
 import { lstatSync, statSync } from "node:fs"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import {
@@ -13,12 +14,20 @@ import {
 const MAX_ANCESTOR_WATCH_TARGETS = 128
 const SENPI_AGENT_DIR_ENV = "SENPI_CODING_AGENT_DIR"
 
-export const OMO_CONFIG_FILE_FILTER_GLOBS = ["omo.jsonc", "omo.json"] as const
+// Root-anchored: senpi maps a `dir` target to a RECURSIVE watch, so unanchored
+// globs make it hash the entire subtree. A `.omo` directory also holds runtime
+// state (senpi-task/ and runtime/ including runtime/ast-grep/), which reached tens of thousands of
+// files and gigabytes of hashing per watcher rebuild. Config lives only at the
+// top level, so anchoring keeps the scan to those two files.
+export const OMO_CONFIG_FILE_FILTER_GLOBS = ["/omo.jsonc", "/omo.json"] as const
 // Keep listening for config-file writes below a new `.omo` directory. If its first
 // config is rejected, no reload occurs to rebuild the target set, so the original
 // ancestor watch must observe the fix that clears the sticky rejection.
-export const OMO_CONFIG_DIRECTORY_FILTER_GLOBS = [".omo", ".omo/omo.jsonc", ".omo/omo.json"] as const
-export const USER_OMO_CONFIG_DIRECTORY_FILTER_GLOBS = ["omo"] as const
+// The leading `/` anchors each glob to its watch root: senpi matches unanchored
+// globs at any depth, which made an ancestor target cover every `.omo` directory
+// in the whole subtree.
+export const OMO_CONFIG_DIRECTORY_FILTER_GLOBS = ["/.omo", "/.omo/omo.jsonc", "/.omo/omo.json"] as const
+export const USER_OMO_CONFIG_DIRECTORY_FILTER_GLOBS = ["/omo"] as const
 
 /** Matches the frozen config-watch wire target shape without importing senpi internals. */
 export interface OmoConfigWatchTarget {
@@ -56,7 +65,7 @@ function containsPath(parent: string, child: string): boolean {
  * are unaffected).
  */
 function resolveSenpiProtectedPaths(env: OmoConfigEnv): readonly string[] {
-  const agentDir = resolve(env[SENPI_AGENT_DIR_ENV] ?? join(resolveHomeDir(env), ".senpi", "agent"))
+  const agentDir = resolveAgentHome({ env, homeDir: resolveHomeDir(env) })
   return [join(agentDir, "auth.json"), join(agentDir, "sessions"), join(agentDir, "logs")]
 }
 
@@ -125,7 +134,7 @@ export function resolveOmoConfigWatchTargetResolution(
 ): OmoConfigWatchTargetResolution {
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
-  const userConfigDirectory = resolveUserOmoConfigDirectory(env, platform)
+  const userConfigDirectory = resolveUserOmoConfigDirectory(env)
   const ancestorDirectories = findAncestorDirectories(options.cwd, resolveHomeDir(env))
   const resolvedConfigPaths = resolveOmoConfigPaths({ cwd: options.cwd, env, platform })
   const configuredProjectDirectories = new Set([
@@ -159,8 +168,12 @@ export function resolveOmoConfigWatchTargetResolution(
   const senpiProtectedPaths = resolveSenpiProtectedPaths(env)
   const permittedTargets = targets.filter((target) => !isSenpiRestrictedTarget(target.path, senpiProtectedPaths))
 
-  const userConfigCreationWatched = isExistingDirectory(userConfigDirectory)
-    || isExistingDirectory(dirname(userConfigDirectory))
+  // Derived from the SURVIVING targets, not from directory existence: `~/.omo`'s parent
+  // is `$HOME`, whose creation target is always dropped by the protected-path filter, so
+  // an existence check would report a watch that was never registered.
+  const userConfigCreationWatched = permittedTargets.some(
+    (target) => target.path === userConfigDirectory || target.path === dirname(userConfigDirectory),
+  )
   return {
     targets: permittedTargets,
     userConfigCreationWatched,

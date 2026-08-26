@@ -10,6 +10,8 @@ export type MonitorOutputInjectorDeps = {
   readonly acceptedMessageSkewMs: number
   readonly userMessageInProgressWindowMs: number
   readonly postDispatchHoldMs: number
+  /** Undefined keeps the unbounded legacy deferral. */
+  readonly maxActiveDeferMs?: number
   readonly dispatchInternalPrompt?: (args: InternalPromptDispatchArgs<PromptAsyncInput>) => Promise<InternalPromptDispatchResult>
   readonly now?: () => number
   readonly settleAfterSessionIdle?: () => Promise<void>

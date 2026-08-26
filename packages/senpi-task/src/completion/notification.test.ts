@@ -1,7 +1,25 @@
-import { describe, expect, test } from "bun:test"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
+import { afterEach, describe, expect, test } from "bun:test"
+
+import type { DagNodeId, DagRunId } from "../dag/types"
+import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import { buildCompletionDetails, buildCompletionMessage } from "./notification"
 import type { TaskRecord } from "../state"
+
+const tempDirs: string[] = []
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+function tempStateDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "senpi-task-completion-"))
+  tempDirs.push(dir)
+  return dir
+}
 
 function completedRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
@@ -17,13 +35,14 @@ function completedRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
     created_at: "2026-07-06T01:00:00.000Z",
     updated_at: "2026-07-06T01:00:03.000Z",
     final_response: "the final answer",
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
     ...overrides,
   }
 }
 
 describe("buildCompletionDetails", () => {
-  test("#given completed record #when details built #then core facts and duration are populated", () => {
+  test("#given completed record #when details built #then core facts, full result, and duration are populated", () => {
     // given
     const record = completedRecord()
 
@@ -35,22 +54,38 @@ describe("buildCompletionDetails", () => {
     expect(details.name).toBe("summarize-logs")
     expect(details.status).toBe("completed")
     expect(details.duration_ms).toBe(3000)
-    expect(details.final_response_head).toBe("the final answer")
+    expect(details.final_response).toBe("the final answer")
     expect(details.continuation_hint).toContain("st_deadbeef")
   })
 
-  test("#given long final response #when details built #then head is capped at 700 chars", () => {
+  test("#given a result longer than the former 700-char cap #when details built #then the full result is included", () => {
     // given
-    const record = completedRecord({ final_response: "x".repeat(2000) })
+    const result = "x".repeat(2_000)
 
     // when
-    const details = buildCompletionDetails(record)
+    const details = buildCompletionDetails(completedRecord({ final_response: result }))
 
     // then
-    expect(details.final_response_head.length).toBe(700)
+    expect(details.final_response).toBe(result)
   })
 
-  test("#given resident completed record #when details built #then continuation hint names task_send and task_output", () => {
+  test("#given a result beyond transport capacity #when details built #then its full text is spilled to a local file", () => {
+    // given
+    const stateDir = tempStateDir()
+    const result = "x".repeat(32_001)
+
+    // when
+    const details = buildCompletionDetails(completedRecord({ final_response: result }), { stateDir })
+
+    // then
+    expect(details.final_response_file).toStartWith("local://")
+    expect(details.final_response.length).toBeLessThan(result.length)
+    const spillPath = details.final_response_file?.slice("local://".length) ?? ""
+    expect(existsSync(spillPath)).toBe(true)
+    expect(readFileSync(spillPath, "utf8")).toBe(result)
+  })
+
+  test("#given resident completed record #when details built #then continuation hint names task_send but never task_output", () => {
     // given
     const record = completedRecord()
 
@@ -59,7 +94,7 @@ describe("buildCompletionDetails", () => {
 
     // then
     expect(details.continuation_hint).toContain("task_send")
-    expect(details.continuation_hint).toContain("task_output")
+    expect(details.continuation_hint).not.toContain("task_output")
   })
 
   test("#given resident completed record #when details built #then task_send hint uses to and message params", () => {
@@ -76,7 +111,7 @@ describe("buildCompletionDetails", () => {
     expect(details.continuation_hint).not.toContain("prompt:")
   })
 
-  test("#given error record #when details built #then error message feeds the head", () => {
+  test("#given error record #when details built #then error message feeds the full result", () => {
     // given
     const record = completedRecord({
       status: "error",
@@ -89,7 +124,7 @@ describe("buildCompletionDetails", () => {
 
     // then
     expect(details.status).toBe("error")
-    expect(details.final_response_head).toBe("child crashed")
+    expect(details.final_response).toBe("child crashed")
   })
 
   test("#given tokens provided #when details built #then tokens are attached", () => {
@@ -105,9 +140,10 @@ describe("buildCompletionDetails", () => {
 })
 
 describe("buildCompletionMessage", () => {
-  test("#given single detail #when message built #then friendly task facts replace protocol markup", () => {
+  test("#given a complete result #when notification built #then the body contains it without a follow-up task_output instruction", () => {
     // given
-    const details = buildCompletionDetails(completedRecord())
+    const fullResult = "child final text ".repeat(100)
+    const details = buildCompletionDetails(completedRecord({ final_response: fullResult }))
 
     // when
     const message = buildCompletionMessage([details])
@@ -120,10 +156,25 @@ describe("buildCompletionMessage", () => {
     expect(message.content).toContain("id:st_deadbeef")
     expect(message.content).toContain("status:completed")
     expect(message.content).toContain("duration:3s")
-    expect(message.content).toContain('result:"the final answer"')
+    expect(message.content).toContain(fullResult)
     expect(message.content).toContain("task_send")
+    expect(message.content).not.toContain("task_output")
     expect(message.content).not.toContain("<task-notification>")
     expect(message.content).not.toContain("<head>")
+  })
+
+  test("#given a spilled result #when notification built #then the body names its local file", () => {
+    // given
+    const details = buildCompletionDetails(
+      completedRecord({ final_response: "x".repeat(32_001) }),
+      { stateDir: tempStateDir() },
+    )
+
+    // when
+    const message = buildCompletionMessage([details])
+
+    // then
+    expect(message.content).toContain(details.final_response_file ?? "")
   })
 
   test("#given two details #when message built #then both completions appear in one content block", () => {
@@ -140,6 +191,83 @@ describe("buildCompletionMessage", () => {
     expect(message.content).toContain("two")
     expect(message.content.match(/task completion/gu)).toHaveLength(2)
     expect(message.content).not.toContain("<task-notification>")
+  })
+})
+
+function directiveOccurrences(content: string): number {
+  let count = 0
+  let index = content.indexOf(DAG_VERIFICATION_DIRECTIVE)
+  while (index !== -1) {
+    count += 1
+    index = content.indexOf(DAG_VERIFICATION_DIRECTIVE, index + DAG_VERIFICATION_DIRECTIVE.length)
+  }
+  return count
+}
+
+describe("dag-owned completions", () => {
+  test("#given a dag-owned record #when details built #then the owning run and node are attached", () => {
+    // given
+    const record = completedRecord({
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+    })
+
+    // when
+    const details = buildCompletionDetails(record)
+
+    // then
+    expect(details.dag).toEqual({ run_id: "dag_run_1", node_id: "build" })
+  })
+
+  test("#given a dag-owned detail #when message built #then the verification directive is appended once", () => {
+    // given
+    const details = buildCompletionDetails(completedRecord({
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+    }))
+
+    // when
+    const message = buildCompletionMessage([details])
+
+    // then
+    expect(directiveOccurrences(message.content)).toBe(1)
+    expect(message.content).toEndWith(DAG_VERIFICATION_DIRECTIVE)
+    expect(message.content).toContain(`\n\n${DAG_VERIFICATION_DIRECTIVE}`)
+  })
+
+  test("#given a plain record #when details and message built #then no dag facts and no directive appear", () => {
+    // given
+    const record = completedRecord()
+
+    // when
+    const details = buildCompletionDetails(record)
+    const message = buildCompletionMessage([details])
+
+    // then
+    expect(details.dag).toBeUndefined()
+    expect(directiveOccurrences(message.content)).toBe(0)
+  })
+
+  test("#given one plain and two dag details #when message built #then the directive appears exactly once", () => {
+    // given
+    const plain = buildCompletionDetails(completedRecord({ task_id: "st_plain", name: "plain" }))
+    const firstDag = buildCompletionDetails(completedRecord({
+      task_id: "st_dag1",
+      name: "dag-one",
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+    }))
+    const secondDag = buildCompletionDetails(completedRecord({
+      task_id: "st_dag2",
+      name: "dag-two",
+      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "test" as DagNodeId, fingerprint: "fp-2" },
+    }))
+
+    // when
+    const message = buildCompletionMessage([plain, firstDag, secondDag])
+
+    // then
+    expect(directiveOccurrences(message.content)).toBe(1)
+    expect(message.content).toContain("name:plain")
+    expect(message.content).toContain("name:dag-one")
+    expect(message.content).toContain("name:dag-two")
   })
 })
 

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
-import { createLegacyCodexHome, liveLegacyEndpointFor, startIdleNodeProcess, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
+import { createLegacyCodexHome, liveLegacyEndpointFor, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -247,11 +247,11 @@ describe("install-codex", () => {
 
     // then
     const cliPath = join(repoRoot, "dist", "cli", "index.js")
-    const wrapperWarnings = logs.filter((line) => line.includes("omo runtime wrapper"))
+    const wrapperWarnings = logs.filter((line) => line.includes("omo-agent-toolkit runtime wrapper"))
     expect(wrapperWarnings.length).toBeGreaterThan(0)
     expect(wrapperWarnings.join("\n")).toContain(cliPath)
     const linkedNames = await readdir(binDir)
-    const rootCliBinName = process.platform === "win32" ? "omo.cmd" : "omo"
+    const rootCliBinName = process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit"
     expect(linkedNames).not.toContain(rootCliBinName)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
@@ -262,12 +262,11 @@ describe("install-codex", () => {
     const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-legacy-daemon-"))
     const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
     const daemon = startLegacyDaemonProcess({ endpoint })
-    const unrelated = startIdleNodeProcess()
     await waitForChildReady(daemon)
     const version = await writeLegacyVersionState({
       codexHome,
       version: "0.1.0",
-      pid: String(unrelated.pid ?? 0),
+      pid: String(process.pid),
       endpoint,
     })
     const logs: string[] = []
@@ -292,7 +291,6 @@ describe("install-codex", () => {
       await expect(stat(join(home, ".omo", "lsp-daemon"))).rejects.toThrow()
     } finally {
       await stopChild(daemon)
-      await stopChild(unrelated)
     }
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 

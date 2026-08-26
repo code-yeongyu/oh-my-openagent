@@ -1,0 +1,23 @@
+Verification summary (2026-08-12)
+
+PASS: bun test packages/omo-senpi/src/components/memory
+Result: 498 pass, 0 fail, 1469 expect() calls, 91 files, 124.61s.
+
+PASS: bun run --cwd packages/omo-senpi typecheck
+Result: tsgo --noEmit -p tsconfig.json, exit 0.
+
+ROOT: bun test
+Result: 14909 pass, 5 skip, 1 fail; 14915 tests across 1950 files, 503.48s.
+Failure: pre-existing/timing-sensitive MemoryBlockCache test exceeded its 5000ms default by 6.70ms:
+MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry
+
+Focused probe (not a replacement for root gate):
+bun test ./packages/memory-core/src/compile/cache.test.ts --test-name-pattern '100 changing nudge variants'
+Result: 1 pass, 0 fail, 4339.89ms.
+
+Bundle regeneration:
+npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs'
+Result: omo.js rebuilt; only omo.js changed (188 insertions, 188 deletions).
+Freshness check:
+npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+Result: current, exit 0.

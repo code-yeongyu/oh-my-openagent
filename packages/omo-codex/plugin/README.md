@@ -8,7 +8,7 @@ Internally each component remains isolated under `components/`:
 - `components/rules`
 - `components/lsp`
 - `components/git-bash`
-- `components/start-work-continuation`
+- `components/ulw-execute-continuation`
 - `components/ultrawork`
 - `components/ulw-loop`
 - `components/telemetry`

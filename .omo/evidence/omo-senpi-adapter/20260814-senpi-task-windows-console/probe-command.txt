@@ -1,0 +1,15 @@
+Focused Windows console command:
+
+bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts --bail
+
+Full Windows root surface:
+
+bun test
+
+Expected log sentinel:
+
+WINDOWS_CONSOLE_PROBE
+
+Checked-in executable fixture:
+
+packages/senpi-task/src/runners/rpc/__fixtures__/windows-console-probe.ts

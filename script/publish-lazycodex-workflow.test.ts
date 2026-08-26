@@ -30,7 +30,7 @@ const lazycodexRuntimePayloadPaths = [
   "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",
   "packages/omo-codex/plugin/components/lsp/dist/cli.js",
   "packages/omo-codex/plugin/components/rules/dist/cli.js",
-  "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js",
+  "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js",
   "packages/omo-codex/plugin/components/teammode/dist/cli.js",
   "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
   "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
@@ -298,17 +298,19 @@ describe("LazyCodex publish workflow", () => {
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const publishIndex = workflow.indexOf("name: Publish lazycodex-ai")
     const smokeIndex = workflow.indexOf("name: Smoke test published lazycodex-ai")
-    const restoreIndex = workflow.indexOf("name: Restore package.json after lazycodex-ai publish attempt")
+    // The smoke moved out of publish-main into the post-publish-verify job, which runs after the release
+    // exists, so it is no longer bounded by the publish-main package restore step.
+    const postPublishVerifyIndex = workflow.indexOf("  post-publish-verify:")
     const smokeStep = sliceWorkflowSection(
       workflow,
       "      - name: Smoke test published lazycodex-ai",
-      "      - name: Restore package.json after lazycodex-ai publish attempt",
+      "      - name: Write job summary",
     )
 
     // #when
-    const smokeRunsAfterPublishBeforeRestore = publishIndex >= 0 &&
-      smokeIndex > publishIndex &&
-      restoreIndex > smokeIndex
+    const smokeRunsAfterPublishInPostVerifyJob = publishIndex >= 0 &&
+      postPublishVerifyIndex > publishIndex &&
+      smokeIndex > postPublishVerifyIndex
     const smokesReleaseVersion = smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"')
     const smokesStableLatestOnly = smokeStep.includes('if [ -z "$DIST_TAG" ]; then') &&
       smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
@@ -330,24 +332,46 @@ describe("LazyCodex publish workflow", () => {
       !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
       !smokeStep.includes("--platform=claude-code") &&
       !smokeStep.includes("--platform=gemini")
-    const installsRealPackageAndVerifiesOmoBin =
+    const installsRealPackageAndVerifiesOmoAgentToolkitBin =
       smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
-      smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
-      smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
-      smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
-      smokeStep.includes('ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help 2>&1)') &&
+      smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ]') &&
+      smokeStep.includes('omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1)') &&
+      smokeStep.includes('[ "$omo_agent_toolkit_version_output" = "$OMO_VERSION" ]') &&
+      smokeStep.includes('ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1)') &&
       smokeStep.includes('printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"')
+    const assertsLegacyOmoBinIsRemoved =
+      smokeStep.includes('[ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      !smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      !smokeStep.includes('"$CODEX_LOCAL_BIN_DIR/omo" --version') &&
+      !smokeStep.includes('"$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help')
+    const simulatesLegacyOmoUpgrade =
+      smokeStep.includes('simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-marked" marked') &&
+      smokeStep.includes('simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-unmarked" unmarked') &&
+      smokeStep.includes("# OMO_GENERATED_RUNTIME_WRAPPER") &&
+      smokeStep.includes('if [ -e "$CODEX_LOCAL_BIN_DIR/omo" ]; then') &&
+      smokeStep.includes('if ! cmp -s "$scenario_root/omo.seeded" "$CODEX_LOCAL_BIN_DIR/omo"; then')
 
     // #then
-    expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
+    expect(
+      smokeRunsAfterPublishInPostVerifyJob,
+      "post-publish smoke must run after the lazycodex publish, inside the post-publish-verify job that cannot block the release",
+    ).toBe(true)
     expect(smokesReleaseVersion, "post-publish smoke must verify the exact release version").toBe(true)
     expect(smokesStableLatestOnly, "post-publish smoke must verify latest only for stable releases").toBe(true)
     expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)
     expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
     expect(
-      installsRealPackageAndVerifiesOmoBin,
-      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes ulw-loop",
+      installsRealPackageAndVerifiesOmoAgentToolkitBin,
+      "post-publish smoke must run a real install and verify the omo-agent-toolkit runtime wrapper exists, reports the release version, and executes ulw-loop",
+    ).toBe(true)
+    expect(
+      assertsLegacyOmoBinIsRemoved,
+      "post-publish smoke must assert the removed legacy omo wrapper is absent and must not invoke it",
+    ).toBe(true)
+    expect(
+      simulatesLegacyOmoUpgrade,
+      "post-publish smoke must simulate upgrades: a marker-bearing legacy omo is reclaimed and an unmarked user-owned omo survives byte-identical",
     ).toBe(true)
   })
 

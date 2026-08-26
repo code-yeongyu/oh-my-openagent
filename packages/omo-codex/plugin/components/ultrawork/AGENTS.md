@@ -34,6 +34,11 @@ Conventions for human contributors and AI agents working on this repository.
 ## Commands
 
 ```bash
+# build / test / check (from the component directory)
+npm run build        # sync-directive -> wipe dist -> bun bundle src/cli.ts to dist/cli.js
+npm test             # vitest once (test:watch for watch mode)
+npm run check        # typecheck + biome + build
+
 # smoke test the hook
 PAYLOAD='{"cwd":"/tmp","hook_event_name":"UserPromptSubmit","model":"gpt-5.5","permission_mode":"default","session_id":"x","transcript_path":"","turn_id":"y","prompt":"please ultrawork"}'
 npm run build

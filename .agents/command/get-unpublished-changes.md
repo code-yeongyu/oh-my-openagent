@@ -22,6 +22,8 @@ Analyze every change against these exact layers:
 | `omo opencode` | Root `oh-my-opencode` / `oh-my-openagent`, `src/`, `.opencode/`, `.agents/`, CLI, config, hooks, tools, docs | What semver bump should the OpenCode/OpenAgent npm packages use? |
 | `omo codex` | `packages/omo-codex`, `lazycodex-ai`, Codex plugin metadata/hooks, bundled MCP runtimes, `code-yeongyu/lazycodex` marketplace payload | Does LazyCodex need the same bump, a Codex-only note, or a marketplace release? |
 
+Exclude commits and paths matching `senpi`, `omo-senpi`, `senpi-task`, `pi-goal`, or `pi-webfetch` from user-facing notes and version recommendations. Record them only in a separate internal-adapter exclusion ledger.
+
 ## Steps:
 1. Detect latest published versions for `oh-my-opencode`, `oh-my-openagent`, and `lazycodex-ai`.
 2. Run `git diff v{published-version}..HEAD` to see actual changes.

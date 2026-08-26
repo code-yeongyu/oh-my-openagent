@@ -97,8 +97,8 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 		try {
 			mkdirSync(join(homeDir, ".omo"), { recursive: true });
 			mkdirSync(join(workspace, ".omo"), { recursive: true });
-			writeFileSync(join(homeDir, ".omo", "config.jsonc"), '{ "codegraph": { "enabled": true } }\n');
-			writeFileSync(join(workspace, ".omo", "config.jsonc"), '{ "[codex]": { "codegraph": { "enabled": false } } }\n');
+			writeFileSync(join(homeDir, ".omo", "omo.jsonc"), '{ "codegraph": { "enabled": true } }\n');
+			writeFileSync(join(workspace, ".omo", "omo.jsonc"), '{ "[codex]": { "codegraph": { "enabled": false } } }\n');
 
 			// when
 			const exitCode = await runCodegraphServe({

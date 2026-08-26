@@ -1,270 +1,277 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadPluginConfig } from "../plugin-config/layered-config-loader"
 import { validatePluginConfig } from "./validate"
 
 type EnvSnapshot = {
   readonly HOME: string | undefined
+  readonly OCX_PROFILE: string | undefined
+  readonly OMO_PROFILE: string | undefined
   readonly OPENCODE_CONFIG_DIR: string | undefined
-  readonly XDG_CONFIG_HOME: string | undefined
 }
 
-const ENV_KEYS = ["HOME", "OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME"] as const
+type Fixture = {
+  readonly project: string
+  readonly root: string
+}
+
+const ENV_KEYS = ["HOME", "OCX_PROFILE", "OMO_PROFILE", "OPENCODE_CONFIG_DIR"] as const
 
 function restoreEnv(snapshot: EnvSnapshot): void {
   for (const key of ENV_KEYS) {
     const value = snapshot[key]
-    if (value === undefined) {
-      delete process.env[key]
-    } else {
-      process.env[key] = value
-    }
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
   }
 }
 
-function withIsolatedConfig<T>(name: string, run: (root: string) => T): T {
-  const original: EnvSnapshot = {
+function withOmoConfig<T>(name: string, run: (fixture: Fixture) => T): T {
+  const snapshot: EnvSnapshot = {
     HOME: process.env.HOME,
+    OCX_PROFILE: process.env.OCX_PROFILE,
+    OMO_PROFILE: process.env.OMO_PROFILE,
     OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
   }
-  const root = join(tmpdir(), `omo-config-validate-${name}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const root = mkdtempSync(join(tmpdir(), `omo-config-validate-${name}-`))
+  const fixture = { root, project: join(root, "project") }
 
   try {
-    mkdirSync(root, { recursive: true })
+    mkdirSync(fixture.project, { recursive: true })
     process.env.HOME = root
-    process.env.OPENCODE_CONFIG_DIR = join(root, "custom-config")
-    process.env.XDG_CONFIG_HOME = join(root, "xdg-config")
-    return run(root)
+    delete process.env.OCX_PROFILE
+    delete process.env.OMO_PROFILE
+    delete process.env.OPENCODE_CONFIG_DIR
+    return run(fixture)
   } finally {
     rmSync(root, { recursive: true, force: true })
-    restoreEnv(original)
+    restoreEnv(snapshot)
   }
 }
 
-function writeJson(filePath: string, value: unknown): void {
-  mkdirSync(join(filePath, ".."), { recursive: true })
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf-8")
+function writeJsonc(path: string, config: unknown): void {
+  mkdirSync(join(path, ".."), { recursive: true })
+  writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, "utf-8")
 }
 
-function snapshotFiles(directory: string): Record<string, number> {
-  const files: Record<string, number> = {}
-  for (const fileName of readdirSync(directory)) {
-    const filePath = join(directory, fileName)
-    files[fileName] = statSync(filePath).mtimeMs
-  }
-  return files
+function writeUserConfig(fixture: Fixture, config: unknown): void {
+  writeJsonc(join(fixture.root, ".omo", "omo.jsonc"), config)
 }
 
-function pickRenderedConfigFields(config: ReturnType<typeof validatePluginConfig>["config"]): unknown {
-  return {
-    agents: config.agents,
-    categories: config.categories,
-    disabled_providers: config.disabled_providers,
-    mcp_env_allowlist: config.mcp_env_allowlist,
-    browser_automation_engine: config.browser_automation_engine,
-    team_mode: config.team_mode,
-    tui: config.tui,
-  }
+function writeProjectConfig(fixture: Fixture, config: unknown): void {
+  writeJsonc(join(fixture.project, ".omo", "omo.jsonc"), config)
 }
 
 describe("validatePluginConfig", () => {
-  it("returns defaults with tui sidebar enabled when no config exists", () => {
-    withIsolatedConfig("defaults", (root) => {
-      const project = join(root, "project")
-      mkdirSync(project, { recursive: true })
+  it("#given no omo config #when validating #then returns plugin defaults", () => {
+    withOmoConfig("defaults", (fixture) => {
+      const result = validatePluginConfig(fixture.project)
 
-      const result = validatePluginConfig(project)
-
-      expect(result.valid).toBe(true)
       expect(result.messages).toEqual([])
+      expect(result.valid).toBe(true)
       expect(result.path).toBeNull()
       expect(result.config.tui?.sidebar.enabled).toBe(true)
     })
   })
 
-  it("allows tui sidebar to be disabled by config", () => {
-    withIsolatedConfig("disabled", (root) => {
-      const project = join(root, "project")
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        tui: { sidebar: { enabled: false } },
-      })
+  it("#given a project omo harness block #when validating #then loads the opencode view", () => {
+    withOmoConfig("project-view", (fixture) => {
+      writeProjectConfig(fixture, { "[opencode]": { tui: { sidebar: { enabled: false } } } })
 
-      const result = validatePluginConfig(project)
+      const result = validatePluginConfig(fixture.project)
 
       expect(result.valid).toBe(true)
       expect(result.config.tui?.sidebar.enabled).toBe(false)
     })
   })
 
-  it("detects invalid ancestor configs from a child directory", () => {
-    withIsolatedConfig("ancestor-invalid", (root) => {
-      const project = join(root, "project")
-      const child = join(project, "child", "deep")
+  it("#given an invalid ancestor omo harness block #when validating from a child #then reports the schema path", () => {
+    withOmoConfig("ancestor-invalid", (fixture) => {
+      const child = join(fixture.project, "child", "deep")
       mkdirSync(child, { recursive: true })
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        agents: { sisyphus: { model: 123 } },
-      })
+      writeProjectConfig(fixture, { "[opencode]": { agents: { sisyphus: { model: 123 } } } })
 
       const result = validatePluginConfig(child)
 
       expect(result.valid).toBe(false)
-      expect(result.messages.some((message: string) => message.includes("agents.sisyphus.model"))).toBe(true)
+      expect(result.messages.some((message) => message.includes("agents.sisyphus.model"))).toBe(true)
     })
   })
 
-  it("uses nearest ancestor precedence and matches the runtime rendered config fields", () => {
-    withIsolatedConfig("precedence", (root) => {
-      const far = join(root, "project")
-      const near = join(far, "near")
-      const child = join(near, "child")
-      mkdirSync(child, { recursive: true })
-      writeJson(join(far, ".opencode", "oh-my-openagent.json"), {
-        tui: { sidebar: { enabled: false } },
-        team_mode: { enabled: false },
-      })
-      writeJson(join(near, ".opencode", "oh-my-openagent.json"), {
-        tui: { sidebar: { enabled: true } },
-        team_mode: { enabled: true },
-      })
-
-      const readonlyResult = validatePluginConfig(child)
-      const runtimeConfig = loadPluginConfig(child, {})
-
-      expect(readonlyResult.config.tui?.sidebar.enabled).toBe(true)
-      expect(pickRenderedConfigFields(readonlyResult.config)).toEqual(pickRenderedConfigFields(runtimeConfig))
-    })
-  })
-
-  it("preserves user-only playwright MCP arguments like the runtime loader", () => {
-    withIsolatedConfig("playwright-user-only", (root) => {
-      const userConfigDir = process.env.OPENCODE_CONFIG_DIR
-      if (!userConfigDir) throw new Error("OPENCODE_CONFIG_DIR must be set by the test harness")
-
-      const project = join(root, "project")
-      writeJson(join(userConfigDir, "oh-my-openagent.json"), {
-        browser_automation_engine: {
-          provider: "playwright",
-          playwright_mcp_args: ["--headless"],
+  it("#given user and project omo views #when validating #then preserves plugin merge and disabled-set semantics", () => {
+    withOmoConfig("merge", (fixture) => {
+      writeUserConfig(fixture, {
+        "[opencode]": {
+          agents: { sisyphus: { model: "user/model", prompt: "user prompt" } },
+          categories: { deep: { model: "user/deep", temperature: 0.2 } },
+          claude_code: { mcp: true },
+          disabled_agents: ["user-agent"],
+          tui: { sidebar: { enabled: false } },
         },
       })
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        browser_automation_engine: {
-          provider: "playwright",
-          playwright_mcp_args: ["--user-agent", "${GITHUB_TOKEN}"],
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          agents: { sisyphus: { model: "project/model", temperature: 0.7 } },
+          categories: { deep: { prompt_append: "project appendix" } },
+          claude_code: { commands: true },
+          disabled_agents: ["project-agent"],
         },
       })
 
-      const readonlyResult = validatePluginConfig(project)
-      const runtimeConfig = loadPluginConfig(project, {})
+      const result = validatePluginConfig(fixture.project)
 
-      expect(readonlyResult.config.browser_automation_engine).toEqual(
-        runtimeConfig.browser_automation_engine,
-      )
-      expect(readonlyResult.config.browser_automation_engine?.playwright_mcp_args).toEqual([
-        "--headless",
-      ])
+      expect(result.config.agents?.sisyphus).toMatchObject({ model: "project/model", prompt: "user prompt", temperature: 0.7 })
+      expect(result.config.categories?.deep).toMatchObject({ model: "user/deep", temperature: 0.2, prompt_append: "project appendix" })
+      expect(result.config.claude_code).toMatchObject({ mcp: true, commands: true })
+      expect(result.config.disabled_agents).toEqual(["user-agent", "project-agent"])
+      expect(result.config.tui?.sidebar.enabled).toBe(false)
     })
   })
 
-  it("keeps valid config sections from a partially invalid layer", () => {
-    withIsolatedConfig("partial", (root) => {
-      const project = join(root, "project")
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        agents: { sisyphus: { model: 123 } },
-        tui: { sidebar: { enabled: false } },
+  it("#given protected fields in user and project base blocks #when validating #then honors only the user base values", () => {
+    withOmoConfig("protected-user-base", (fixture) => {
+      writeUserConfig(fixture, {
+        "[opencode]": {
+          mcp_env_allowlist: ["USER_BASE_TOKEN"],
+          browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--user-base"] },
+        },
+      })
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          mcp_env_allowlist: ["PROJECT_BASE_TOKEN"],
+          browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--project-base"] },
+        },
+        profiles: {
+          kimi: {
+            "[opencode]": {
+              mcp_env_allowlist: ["PROJECT_PROFILE_TOKEN"],
+              browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--project-profile"] },
+            },
+          },
+        },
+      })
+      process.env.OCX_PROFILE = "kimi"
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.mcp_env_allowlist).toEqual(["USER_BASE_TOKEN"])
+      expect(result.config.browser_automation_engine?.playwright_mcp_args).toEqual(["--user-base"])
+    })
+  })
+
+  it("#given protected fields in an active user profile and project profile #when validating #then honors only the user profile values", () => {
+    withOmoConfig("protected-user-profile", (fixture) => {
+      writeUserConfig(fixture, {
+        "[opencode]": {
+          mcp_env_allowlist: ["USER_BASE_TOKEN"],
+          browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--user-base"] },
+        },
+        profiles: {
+          kimi: {
+            "[opencode]": {
+              mcp_env_allowlist: ["USER_PROFILE_TOKEN"],
+              browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--user-profile"] },
+            },
+          },
+        },
+      })
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          mcp_env_allowlist: ["PROJECT_BASE_TOKEN"],
+          browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--project-base"] },
+        },
+        profiles: {
+          kimi: {
+            "[opencode]": {
+              mcp_env_allowlist: ["PROJECT_PROFILE_TOKEN"],
+              browser_automation_engine: { provider: "playwright", playwright_mcp_args: ["--project-profile"] },
+            },
+          },
+        },
+      })
+      process.env.OCX_PROFILE = "kimi"
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.mcp_env_allowlist).toEqual(["USER_PROFILE_TOKEN"])
+      expect(result.config.browser_automation_engine?.playwright_mcp_args).toEqual(["--user-profile"])
+    })
+  })
+
+  it("#given unknown opencode keys #when validating #then reports and strips every unknown path without losing known values", () => {
+    withOmoConfig("unknown-keys", (fixture) => {
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          unknown_switch: true,
+          tui: { sidebar: { enabled: false, unknown_sidebar_switch: true } },
+        },
       })
 
-      const result = validatePluginConfig(project)
+      const result = validatePluginConfig(fixture.project)
 
       expect(result.valid).toBe(false)
+      expect(result.messages.some((message) => message.includes("Unknown config key: unknown_switch"))).toBe(true)
+      expect(result.messages.some((message) => message.includes("Unknown config key: tui.sidebar.unknown_sidebar_switch"))).toBe(true)
+      expect(Object.hasOwn(result.config, "unknown_switch")).toBe(false)
+      expect(Object.hasOwn(result.config.tui?.sidebar ?? {}, "unknown_sidebar_switch")).toBe(false)
       expect(result.config.tui?.sidebar.enabled).toBe(false)
-      expect(result.messages.some((message: string) => message.includes("agents.sisyphus.model"))).toBe(true)
     })
   })
 
-  it("applies disabled provider substitutions like the runtime loader", () => {
-    withIsolatedConfig("disabled-provider", (root) => {
-      const project = join(root, "project")
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        disabled_providers: ["blocked"],
-        agents: {
-          sisyphus: {
-            model: "blocked/primary",
-            fallback_models: ["allowed/fallback"],
+  it("#given an OCX profile overlay #when OCX_PROFILE changes #then flips the resolved sisyphus model", () => {
+    withOmoConfig("ocx-profile", (fixture) => {
+      writeUserConfig(fixture, {
+        "[opencode]": { agents: { sisyphus: { model: "base/model" } } },
+        profiles: { kimi: { "[opencode]": { agents: { sisyphus: { model: "kimi/model" } } } } },
+      })
+
+      const base = validatePluginConfig(fixture.project)
+      process.env.OCX_PROFILE = "kimi"
+      const kimi = validatePluginConfig(fixture.project)
+
+      expect(base.config.agents?.sisyphus?.model).toBe("base/model")
+      expect(kimi.config.agents?.sisyphus?.model).toBe("kimi/model")
+    })
+  })
+
+  it("#given a model catalog reference in the opencode view #when validating #then resolves the model identifier", () => {
+    withOmoConfig("model-catalog", (fixture) => {
+      writeProjectConfig(fixture, {
+        models: { kimi: { model: "provider/kimi" } },
+        "[opencode]": { agents: { sisyphus: { model: "kimi" } } },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.agents?.sisyphus?.model).toBe("provider/kimi")
+    })
+  })
+
+  it("#given a migrated canonical agent model chain #when validating #then materializes the runtime model fields", () => {
+    withOmoConfig("canonical-agent-models", (fixture) => {
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          agents: {
+            explore: {
+              models: [
+                { model: "provider/primary", reasoning: "low" },
+                { model: "provider/fallback", reasoning: "medium" },
+              ],
+            },
           },
         },
       })
 
-      const readonlyResult = validatePluginConfig(project)
-      const runtimeConfig = loadPluginConfig(project, {})
+      const result = validatePluginConfig(fixture.project)
 
-      expect(readonlyResult.config.agents?.sisyphus?.model).toBe("allowed/fallback")
-      expect(readonlyResult.config.agents?.sisyphus?.model).toBe(runtimeConfig.agents?.sisyphus?.model)
-    })
-  })
-
-  it("does not migrate or rewrite legacy config files", () => {
-    withIsolatedConfig("no-write", (root) => {
-      const project = join(root, "project")
-      const configDir = join(project, ".opencode")
-      mkdirSync(configDir, { recursive: true })
-      writeJson(join(configDir, "oh-my-opencode.json"), {
-        tui: { sidebar: { enabled: false } },
-      })
-      const before = snapshotFiles(configDir)
-
-      const result = validatePluginConfig(project)
-
+      expect(result.messages).toEqual([])
       expect(result.valid).toBe(true)
-      expect(result.config.tui?.sidebar.enabled).toBe(false)
-      expect(snapshotFiles(configDir)).toEqual(before)
-      expect(existsSync(join(configDir, "oh-my-openagent.json"))).toBe(false)
-    })
-  })
-
-  it("migrates deprecated ralph_loop config to goal", () => {
-    withIsolatedConfig("ralph-loop-migration", (root) => {
-      const project = join(root, "project")
-      mkdirSync(join(project, ".opencode"), { recursive: true })
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        ralph_loop: {
-          enabled: true,
-          default_max_iterations: 50,
-        },
-      })
-
-      const result = validatePluginConfig(project)
-
-      expect(result.valid).toBe(true)
-      expect(result.config.goal?.enabled).toBe(true)
-      expect(result.config.goal?.auto_start).toBe(false)
-      expect(result.config.goal?.default_max_iterations).toBe(50)
-    })
-  })
-
-  it("preserves explicit goal config over migrated ralph_loop values", () => {
-    withIsolatedConfig("ralph-loop-goal-override", (root) => {
-      const project = join(root, "project")
-      mkdirSync(join(project, ".opencode"), { recursive: true })
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        goal: {
-          enabled: false,
-          default_max_iterations: 75,
-        },
-        ralph_loop: {
-          enabled: true,
-          default_max_iterations: 50,
-        },
-      })
-
-      const result = validatePluginConfig(project)
-
-      expect(result.config.goal?.enabled).toBe(false)
-      expect(result.config.goal?.default_max_iterations).toBe(75)
+      expect(result.config.agents?.explore?.model).toBe("provider/primary")
+      expect(result.config.agents?.explore?.reasoning).toBe("low")
+      expect(result.config.agents?.explore?.fallback_models).toEqual([
+        { model: "provider/fallback", reasoning: "medium" },
+      ])
     })
   })
 })

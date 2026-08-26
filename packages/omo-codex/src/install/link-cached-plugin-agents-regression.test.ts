@@ -9,8 +9,8 @@ describe("managed bundled agent effort migration", () => {
     const { codexHome, pluginRoot } = await makeAgentFixture()
     await mkdir(join(codexHome, "agents"), { recursive: true })
     await writeFile(join(codexHome, "agents", "momus.toml"), agentToml("momus", "gpt-5.5", "xhigh"))
-    await writeFile(join(codexHome, "agents", "explorer.toml"), agentToml("explorer", "gpt-5.4-mini", "low"))
-    await writeFile(join(codexHome, "agents", "librarian.toml"), agentToml("librarian", "gpt-5.4-mini", "low"))
+    await writeFile(join(codexHome, "agents", "explorer.toml"), agentToml("explorer", "gpt-5.6-luna-fast", "low"))
+    await writeFile(join(codexHome, "agents", "librarian.toml"), agentToml("librarian", "gpt-5.6-luna-fast", "low"))
     const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
 
     await linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning })

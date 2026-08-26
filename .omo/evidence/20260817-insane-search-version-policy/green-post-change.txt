@@ -1,0 +1,42 @@
+# GREEN capture - post-change state
+Captured: 2026-08-17T11:48:23.103941+00:00
+Worktree HEAD: 04ccd594314cd7cdcc58e3f4fb2c8471b2c2ed5c
+Upstream HEAD verified: 019ee16bbf471595f9b67b164e4a92208183af2d
+Baseline correction: vendored 2026-06-21; upstream 0.7.0 dated 2026-06-22, therefore pre-0.7.0.
+
+$ rg -n 'project-original|no third-party source vendored|fivetaku/insane-search|a4e4ed797|pre-0\.7\.0' packages/shared-skills/skills/ultimate-browsing/ATTRIBUTION.md
+rc=0
+4:project-original content, one vendored-and-modified upstream engine, plus two
+13:project-original code, despite being heavily modified since import.
+15:- Upstream source: https://github.com/fivetaku/insane-search
+17:  **`a4e4ed797`** (`feat(ultimate-browsing): vendor insane-search engine (junk-excluded)`),
+19:- Baseline: the upstream state as of that date, a **pre-0.7.0 snapshot**.
+30:  project-original licensing from that absence; treat `engine/**` as
+39:## 2. Project-original content (no third-party source vendored)
+
+
+$ rg -n 'UPSTREAM BASELINE AND VERSION POLICY|Why we do not blind-rebase|### KEEP|### WANT|### OUT OF SCOPE|### THE SYNC RULE|pre-0\.7\.0' packages/shared-skills/skills/ultimate-browsing/engine/AGENTS.md
+rc=0
+5:## UPSTREAM BASELINE AND VERSION POLICY
+20:| Pinned upstream baseline | upstream state as of 2026-06-21, **pre-0.7.0** (0.7.0 is dated 2026-06-22) |
+28:### Why we do not blind-rebase onto upstream HEAD
+47:### KEEP — our divergences a re-vendor MUST NOT regress
+70:### WANT — upstream improvements worth porting forward
+90:### OUT OF SCOPE
+101:### THE SYNC RULE
+
+
+$ rg -n 'deliberately pinned|upstream-baseline-and-version-policy' packages/shared-skills/AGENTS.md
+rc=0
+13:`ultimate-browsing` is the one skill carrying a real sub-project: `skills/ultimate-browsing/engine/` is a 17-module Python package with its own CLI, config schemas, and test suite. It is a deliberately pinned, locally diverged snapshot of `fivetaku/insane-search`, not a follow-HEAD mirror. Before changing or re-vendoring it, read [`skills/ultimate-browsing/engine/AGENTS.md` §UPSTREAM BASELINE AND VERSION POLICY](skills/ultimate-browsing/engine/AGENTS.md#upstream-baseline-and-version-policy).
+
+
+$ git diff --check
+rc=0
+
+Evidence-bound staged tree: 42189ed4dc6aecbe5407aa381d37150bbc65fbd5
+
+Post-rebase verification:
+- Rebased onto origin/dev at 105258b24, including per-process XDG test isolation commit 3b00103ff.
+- Policy anchors remained byte-identical.
+- Evidence-bound rebased source tree: 3a193c39b7ba1696203f5e5866f7dd70534691a8

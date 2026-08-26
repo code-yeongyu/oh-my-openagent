@@ -1,0 +1,73 @@
+Task 2: memory-core REMINDER v2 rewrite
+=========================================
+
+## TDD sequence
+
+### RED — normalization added to test harness, golden fixtures not yet updated
+
+Command: bun test packages/memory-core/src/compile/compile.test.ts
+
+Result: 2 fail, 4 pass (exit 1)
+
+The two golden fixtures that embed a `Reminder: ...` line (full.golden.txt,
+persona-only.golden.txt) fail against the prose-agnostic harness because the
+compiled block is normalized to `<reminder/>` while the golden file still
+contains the literal reminder paragraph.  empty.golden.txt has no reminder line
+(no persona/system files) so it passes unchanged.
+
+### GREEN — golden fixtures updated to `<reminder/>` placeholder
+
+Updated full.golden.txt and persona-only.golden.txt: replaced the literal
+`Reminder: ...` paragraph with `<reminder/>`.
+
+Command: bun test packages/memory-core/src/compile/compile.test.ts
+
+Result: 6 pass, 0 fail
+
+### INVARIANCE — REMINDER constant replaced with v2 text
+
+Replaced the REMINDER constant in compile.ts with the v2 text from the plan
+(line 53 of .omo/plans/memory-v2-active-learning.md), verbatim:
+
+  Reminder: <projection> holds local paths of memory projections. <memory> is
+  your persistent memory across conversations. Consult it BEFORE asking the
+  user anything it may already answer. Save durable facts, preferences,
+  decisions, and corrections with the memory tools THE MOMENT they emerge.
+  Route facts about a person to their record under people/ (the primary
+  human's card is system/human.md).
+
+Command: bun test packages/memory-core/src/compile
+
+Result: 13 pass, 0 fail
+
+Structural goldens pass UNCHANGED before and after the reminder rewrite — that
+invariance IS the test.  No test asserts any reminder sentence, substring, or
+length.
+
+## Full package test
+
+Command: bun test packages/memory-core
+
+Result: 299 pass, 0 fail
+
+## Typecheck
+
+Command: npx tsc --noEmit -p packages/memory-core/tsconfig.json
+
+Result: clean (no output)
+
+## QA-by-read note
+
+The REMINDER wording change is PURE PROSE with no machine consumer (no parser
+reads it, no hook greps it, no validator runs on it).  Per
+.omo/rules/test-discipline.md:74-75 the wording change ships on review + QA-by-read
+with no prose-pinning test.  The structural golden invariance (goldens pass
+before and after the rewrite) is the automated guard; the wording quality is
+verified by reading the new constant against the plan's design context.
+
+## Files changed
+
+- packages/memory-core/src/compile/compile.ts (REMINDER constant replaced with v2 text)
+- packages/memory-core/src/compile/compile.test.ts (prose-agnostic normalization harness)
+- packages/memory-core/src/compile/fixtures/full.golden.txt (reminder line -> <reminder/>)
+- packages/memory-core/src/compile/fixtures/persona-only.golden.txt (reminder line -> <reminder/>)

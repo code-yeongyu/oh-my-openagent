@@ -1,6 +1,5 @@
-import { SOURCE_PRIORITY } from "@oh-my-opencode/rules-engine/engine";
-import { defaultConfig } from "@oh-my-opencode/rules-engine/engine";
 import type { PiRulesConfig, RuleSource } from "@oh-my-opencode/rules-engine/engine";
+import { defaultConfig, SOURCE_PRIORITY } from "@oh-my-opencode/rules-engine/engine";
 
 export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiRulesConfig {
 	const config = defaultConfig();

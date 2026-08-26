@@ -12,7 +12,7 @@ const targetPath = resolve(packageRoot, "src/components/ultrawork/generated-dire
 
 // The directive is authored senpi-native (skills/ultrawork/SKILL.md) and senpi HAS
 // goal/todo/task/team tools, so the source speaks them directly. These tokens name
-// harness surfaces senpi does not have; any match means other-edition text leaked in,
+// harness surfaces senpi does not have (or no longer has); any match means other-edition text leaked in,
 // and the build MUST fail loudly — silently stripping blocks is how the old
 // codex-derived pipeline shipped mangled sentences.
 const forbiddenDirectiveTokens = [
@@ -23,6 +23,7 @@ const forbiddenDirectiveTokens = [
   "fork_context",
   "fork_turns",
   "codex",
+  "wait_for",
 ]
 
 const forbiddenPatterns = forbiddenDirectiveTokens.map((token) => new RegExp(token, "i"))

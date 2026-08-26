@@ -19,6 +19,7 @@ function baseRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
     created_at: "2026-07-12T01:00:00.000Z",
     updated_at: "2026-07-12T01:00:03.000Z",
     final_response: "done",
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
     ...overrides,
   }
@@ -30,17 +31,26 @@ function failedRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
 
 function fakeStore(seed: readonly TaskRecord[]) {
   const records = new Map(seed.map((record) => [record.task_id, record]))
-  const replaced: TaskRecord[] = []
+  const mutated: TaskRecord[] = []
   const store = {
     load: (taskId: string): TaskRecord | null => records.get(taskId) ?? null,
     list: () => ({ records: [...records.values()], diagnostics: [] }),
     replace: (record: TaskRecord): void => {
       records.set(record.task_id, record)
-      replaced.push(record)
+    },
+    mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord): TaskRecord | null => {
+      const current = records.get(taskId)
+      if (current === undefined) return null
+      const next = mutation(current)
+      if (next !== current) {
+        records.set(taskId, next)
+        mutated.push(next)
+      }
+      return next
     },
     appendEvent: (taskId: string, _event: PersistedTaskEvent): string => `${taskId}.jsonl`,
   }
-  return { store, records, replaced }
+  return { store, records, mutated }
 }
 
 function scriptedNotifier(failuresBeforeSuccess: number) {
@@ -96,7 +106,7 @@ describe("createCompletionNotifier scheduled retries", () => {
   test("#given two immediate failures w2notif #when the first timer fires #then delivery persists exactly once", () => {
     // given
     const record = baseRecord()
-    const { store, replaced } = fakeStore([record])
+    const { store, mutated } = fakeStore([record])
     const parent = scriptedNotifier(2)
     const scheduler = fakeScheduler()
     const completion = createCompletionNotifier(notifierDeps({ store, notifier: parent.notifier, scheduler }))
@@ -109,7 +119,7 @@ describe("createCompletionNotifier scheduled retries", () => {
     expect(scheduler.calls[0]?.delayMs).toBeGreaterThanOrEqual(500)
     expect(scheduler.calls[0]?.delayMs).toBeLessThan(700)
     expect(parent.calls).toHaveLength(1)
-    expect(replaced.filter((item) => item.notification.notified_epoch === 0)).toHaveLength(1)
+    expect(mutated.filter((item) => item.notification.notified_epoch === 0)).toHaveLength(1)
   })
 
   test("#given a failed epoch w2notif #when revive advances the epoch before retry #then stale delivery drops", () => {

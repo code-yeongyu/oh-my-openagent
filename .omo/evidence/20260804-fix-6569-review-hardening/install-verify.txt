@@ -1,0 +1,13 @@
+bash.exe : installing local omo into /tmp/cqa-home.ntU8HX/codex ...
+At line:6 char:1
++ & $gb -lc "cd '$wp' && REPO_ROOT='$wp' bash .agents/skills/codex-qa/s ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (installing loca...tU8HX/codex ...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+PASS: plugin cache present (4.19.4)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (9 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged (05cb7d5a3b6147a929bff1781ba258237c7744e0)
+PASS: install-verify

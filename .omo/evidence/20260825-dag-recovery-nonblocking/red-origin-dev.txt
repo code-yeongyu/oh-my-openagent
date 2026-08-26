@@ -1,0 +1,28 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/recovery-nonblocking.test.ts:
+243 |     const missing = await resumeBoundary.missing
+244 |     resumeBoundary.stop()
+245 | 
+246 |     // then - the run left "paused" and reused durable work while the child is still running
+247 |     const midFlight = store.readCheckpoint<DagRunRecordV1>(runId)
+248 |     expect(missing).toEqual([])
+                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "dag.node.reused",
++   "dag.run.resumed",
++ ]
+
+- Expected  - 1
++ Received  + 4
+
+      at <anonymous> (/private/tmp/omo-red-baseline/packages/senpi-task/src/dag/recovery-nonblocking.test.ts:248:21)
+(fail) DAG resume without blocking on a reattached child > #given a paused run whose first node is still running #when the session resumes #then reuse and dag.run.resumed land while that child keeps running [5016.58ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [5.45s]

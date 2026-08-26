@@ -1,0 +1,60 @@
+=== ISOLATION ===
+CODEX_HOME=<SANDBOX>\codex
+CODEX_LOCAL_BIN_DIR=<SANDBOX>\bin
+
+=== REAL INSTALL: node packages/omo-codex/scripts/install-local.mjs ===
+  Bundling components/ulw-loop/dist/cli.js
+  Bundled 38 modules in 24ms
+  
+    cli.js  153.33 KB  (entry point)
+  
+  
+  added 18 packages in 4s
+  npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+  npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+  npm warn allow-scripts
+  npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+  Installed 1 plugin(s) from sisyphuslabs.
+  install exit=0
+  bin dir after install: lazycodex-executor-verify.cmd, omo.cmd, omo-codegraph.cmd, omo-comment-checker.cmd, omo-git-bash-hook.cmd, omo-lsp.cmd, omo-rules.cmd, omo-start-work-continuation.cmd, omo-telemetry.cmd, omo-ultrawork.cmd, omo-ulw-loop.cmd, ulw.cmd, ulw-loop.cmd
+
+=== REAL UNINSTALL: the INSTALLED wrapper first ===
+  installed wrapper present: True
+  <BIN>\omo.cmd uninstall --platform=codex -> exit=255
+    Active code page: 65001
+    The syntax of the command is incorrect.
+  wrapper failed (known lazycodex#142 on Windows); falling back to the bundle it execs
+=== REAL UNINSTALL: bun dist/cli/index.js uninstall --platform=codex (the SHIPPED bundle) ===
+  path used: shipped dist/cli bundle (bun, as the wrapper execs it)
+  Codex Light cleanup complete: <SANDBOX>\codex
+  - Updated <SANDBOX>\codex\config.toml
+  - Backup <SANDBOX>\codex\config.toml.backup-2026-08-03T09-57-36-030Z
+  - Removed <SANDBOX>\codex\plugins\cache\sisyphuslabs
+  - Removed <SANDBOX>\codex\.tmp\marketplaces\sisyphuslabs
+  - Removed managed agent link <SANDBOX>\codex\agents\explorer.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\lazycodex-worker-high.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\lazycodex-worker-low.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\lazycodex-worker-medium.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\librarian.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\metis.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\momus.toml
+  - Removed managed agent link <SANDBOX>\codex\agents\plan.toml
+  - Skipped agent path outside managed scope <SANDBOX>\codex\agents\lazycodex-clone-fidelity-reviewer.toml
+  - Skipped agent path outside managed scope <SANDBOX>\codex\agents\lazycodex-code-reviewer.toml
+  - Skipped agent path outside managed scope <SANDBOX>\codex\agents\lazycodex-gate-reviewer.toml
+  - Skipped agent path outside managed scope <SANDBOX>\codex\agents\lazycodex-qa-executor.toml
+  uninstall exit=0
+  bin dir after uninstall: omo.backup
+
+=== ASSERTIONS ===
+  installed root omo.cmd        : True
+  uninstall removed omo.cmd     : True
+  kept user copy omo.backup     : True
+  no managed bins left behind   : True
+  real ~/.codex/config.toml same: True
+  real ~/.local/bin listing same: True
+
+RESULT: PASS
+
+
+EXIT=0

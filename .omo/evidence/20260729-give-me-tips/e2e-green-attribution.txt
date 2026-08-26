@@ -1,0 +1,22 @@
+e2e exit=1
+auth.json unchanged: YES
+=== files changed under ~/.senpi/agent during run ===
+/Users/yeongyu/.senpi/agent/settings.json
+/Users/yeongyu/.senpi/agent/senpi-debug.log
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-29T03-18-08-971Z_019fabe1-2d4b-7426-a4a3-84f181f95c12.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-29T03-27-26-115Z_019fabe9-ada3-7b79-bd86-486d386f13a6.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-29T03-49-50-317Z_019fabfe-306d-7141-8643-a65274c30d5f.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-29T03-47-34-201Z_019fabfc-1cb9-7c5f-a717-8ed746d7260f.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/extensions/goal/019fabfd-1cb7-7f7a-b435-2ac2f8a22162.json
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-29T03-48-39-735Z_019fabfd-1cb7-7f7a-b435-2ac2f8a22162.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-29T02-21-34-444Z_019fabad-616c-7824-8d7e-9cb407a83d4b.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-omo-desktop-app--/2026-07-29T02-22-23-868Z_019fabae-227c-795e-be47-b615068e12d7.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-29T03-06-54-551Z_019fabd6-e2d7-7ae9-89ca-fb5e650b07df.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-omo--/extensions/goal/019fabaa-7bc4-72b5-87b2-9227f44a1560.json
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-29T02-18-24-580Z_019fabaa-7bc4-72b5-87b2-9227f44a1560.jsonl
+/Users/yeongyu/.senpi/agent/sessions/--Users-yeongyu-local-workspaces-apitopia--/2026-07-29T03-37-55-002Z_019fabf3-463a-7ab0-972e-7785052661f3.jsonl
+/Users/yeongyu/.senpi/agent/logs/config-reload.log
+=== overall result ===
+{
+  "result": "FAIL",
+  "isolatedRealAgentDir": false,

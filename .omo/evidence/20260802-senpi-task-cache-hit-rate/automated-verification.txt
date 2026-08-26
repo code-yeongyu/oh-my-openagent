@@ -1,0 +1,44 @@
+Focused RED (before implementation)
+  command: bun test packages/senpi-task/src/run-stats.test.ts packages/senpi-task/src/status-line.test.ts packages/senpi-task/src/state/run-stats-record.test.ts packages/senpi-task/src/manager/run-stats-wiring.test.ts packages/senpi-task/src/tools/output/renderers.test.ts packages/senpi-task/src/tools/task/renderers-run-stats.test.ts packages/omo-senpi/src/components/task/status-ui-background.test.ts
+  observed: expected failure; 15 failing semantic assertions plus one missing fresh-worktree peer dependency before the local dependency overlay was completed
+  artifact: red-focused-tests.txt
+
+Focused GREEN
+  command: same focused Bun test selection after implementation
+  observed: 76 pass, 0 fail, 179 assertions
+
+senpi-task package
+  command: bun test packages/senpi-task
+  observed: 1135 pass, 0 fail, 1 snapshot, 3463 assertions
+
+omo-senpi task component
+  command: bun test packages/omo-senpi/src/components/task
+  observed: 182 pass, 0 fail, 435 assertions
+
+omo-senpi package gate
+  command: bun run test:senpi
+  observed: generated extension rebuilt; 524 pass, 0 fail, 1452 assertions
+
+QA driver self-test
+  command: node packages/omo-senpi/scripts/qa/task-tui-e2e.mjs --self-test
+  observed: SELF-TEST OK
+
+Repository typecheck
+  command: bun run typecheck
+  observed: PASS after completing fresh-worktree peer dependency links; root, script, and every package tsconfig checked
+
+Repository build
+  command: bun run build
+  observed: PASS; build reported "build: all steps completed", including root bundles, schemas, LSP runtimes, Senpi extension, and Codex plugin prerequisites
+
+Repository Bun suite (available workstation Bun after generated prerequisites)
+  command: bun test
+  observed: 12667 pass, 3 skip, 0 fail, 1 snapshot, 92768 assertions across 1667 files
+
+Pinned CI Bun 1.3.12
+  commands: PATH=/tmp/omo-bun-1.3.12/bin:$PATH bun test packages/senpi-task; bun test packages/omo-senpi/src/components/task; bun run typecheck; bun test
+  observed: changed-package gates and typecheck passed (1135 senpi-task tests; 182 task-component tests). The root suite reached 12666 pass / 3 skip with one pre-existing base failure: committed packages/omo-codex/scripts/install-dist/install-local.mjs embeds 4.19.3 while root is 4.19.4. Transient `bun run build:codex-install` made that isolated test pass; the unrelated generated file was reverted from this focused change.
+
+Diff validation
+  command: git diff --check
+  observed: PASS

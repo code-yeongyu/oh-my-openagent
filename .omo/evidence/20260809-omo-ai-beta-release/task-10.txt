@@ -1,0 +1,103 @@
+# Task 10 - PR-level omo-ai payload check CI job
+
+Date: 2026-08-09
+Branch: feat/omo-ai-beta-release
+Plan: .omo/plans/omo-ai-beta-release.md (todo 10)
+Commit subject: ci: PR-level omo-ai payload publishability check
+
+## Deliverable
+
+New job `omo-ai-payload-check` in `.github/workflows/ci.yml`, placed between
+`build` and `auto-commit-schema`. Mirrors sibling job conventions (test,
+typecheck, codex-compatibility, senpi-compatibility): checkout@v5,
+setup-node@v6 (node 24), oven-sh/setup-bun@v2 (bun 1.3.12), cache@v5,
+job summary step via write-job-summary.sh.
+
+Steps:
+  1. actions/checkout@v5
+  2. actions/setup-node@v6 (node 24)
+  3. oven-sh/setup-bun@v2 (bun 1.3.12)
+  4. actions/cache@v5 (bun install cache)
+  5. Install dependencies: bun install --frozen-lockfile
+  6. Build omo-native: bun run build:omo-native
+  7. Verify omo-ai payload: node script/verify-omo-ai-payload.mjs
+  8. Dry-run publish: npm publish --dry-run --ignore-scripts --tag beta
+     (working-directory: packages/omo-native)
+  9. Write job summary (if: always())
+
+No npm auth is configured. The --dry-run flag ensures the job never
+publishes for real.
+
+The new job is wired into the `needs` arrays of both `auto-commit-schema`
+and `draft-release`:
+
+  needs: [test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
+
+## Files modified
+
+- .github/workflows/ci.yml (new job + two needs wirings)
+- script/ci-job-summary-workflow.test.ts (added omo-ai-payload-check to
+  expected ci.yml job list so the summary-coverage assertion stays green)
+- script/omo-ai-ci-job.test.ts (new given/when/then test asserting job
+  presence, step list, dry-run safety, and both needs wirings)
+
+## Verification
+
+### actionlint
+
+Command:
+
+  actionlint .github/workflows/ci.yml
+
+Exit code: 0
+
+No diagnostics. Clean.
+
+### omo-ai-ci-job.test.ts
+
+Command:
+
+  bun test script/omo-ai-ci-job.test.ts
+
+Result: 6 pass, 0 fail, 12 expect() calls
+
+Tests:
+  1. #given the ci workflow #when the omo-ai-payload-check job is inspected
+     #then it runs on ubuntu-latest with the sibling action versions
+     - Asserts runs-on is ubuntu-latest
+     - Asserts checkout@v5, setup-node@v6, setup-bun@v2 are present
+
+  2. #given the omo-ai-payload-check install step #when inspected #then it
+     uses frozen lockfile without ignore-scripts
+     - Asserts run is "bun install --frozen-lockfile"
+
+  3. #given the omo-ai-payload-check build and verify steps #when inspected
+     #then they run the specified commands
+     - Asserts build step runs "bun run build:omo-native"
+     - Asserts verify step runs "node script/verify-omo-ai-payload.mjs"
+
+  4. #given the omo-ai-payload-check dry-run publish step #when inspected
+     #then it never publishes for real and targets the beta tag from the
+     native package directory
+     - Asserts run is "npm publish --dry-run --ignore-scripts --tag beta"
+     - Asserts working-directory is "packages/omo-native"
+     - Asserts no NODE_AUTH_TOKEN or NPM_TOKEN env on any step
+
+  5. #given the auto-commit-schema job #when its needs array is inspected
+     #then omo-ai-payload-check is wired as a dependency
+     - Asserts needs contains "omo-ai-payload-check"
+
+  6. #given the draft-release job #when its needs array is inspected #then
+     omo-ai-payload-check is wired as a dependency
+     - Asserts needs contains "omo-ai-payload-check"
+
+### ci-job-summary-workflow.test.ts (regression)
+
+Command:
+
+  bun test script/ci-job-summary-workflow.test.ts
+
+Result: 4 pass, 0 fail, 57 expect() calls
+
+Confirms the new job is discovered as a step-based job, appears in the
+expected job list, and writes a job summary.

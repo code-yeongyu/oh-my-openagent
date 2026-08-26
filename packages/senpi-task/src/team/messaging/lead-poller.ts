@@ -6,12 +6,10 @@ import { getInboxDir, resolveBaseDir } from "@oh-my-opencode/team-core/team-regi
 import { MessageSchema, type Message } from "@oh-my-opencode/team-core/types"
 
 import { TEAM_LEAD_SENTINEL } from "../normalize"
-import { appendDeliveredEvent, appendWaitedEvent } from "./delivery-events"
-import { createDeliverySuppression } from "./delivery-suppression"
+import { appendDeliveredEvent } from "./delivery-events"
 import { InvalidReservedLeadMessageError, type LeadPoller, type LeadPollerDeps, type LeadPollState, type PendingDelivery } from "./lead-poller-types"
 import { buildPeerMessageEnvelope } from "./message"
 import { createSessionMarkerIndex } from "./session-marker-index"
-import type { WaitClaim } from "./wait-registry"
 
 export type { LeadInjection, LeadInjectionSink, LeadPollFilter, LeadPoller, LeadPollerDeps } from "./lead-poller-types"
 
@@ -40,7 +38,6 @@ export function createLeadPoller(deps: LeadPollerDeps): LeadPoller {
         }
       })
     },
-    suppressDelivered: createDeliverySuppression(deps, state, withLease),
     shutdown() {
       stopped = true
     },
@@ -99,13 +96,6 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
     return
   }
 
-  const waitClaim = deps.waitRegistry.takeMatch(deps.teamRunId, message)
-  if (waitClaim !== undefined) {
-    deps.deliveryJournal?.markReported(deps.teamRunId, message.messageId)
-    await resolveWait(deps, { message, reservation, phase: "awaiting_persistence" }, waitClaim)
-    return
-  }
-
   const delivery: PendingDelivery = { message, reservation, phase: "awaiting_flush" }
   state.pending.set(message.messageId, delivery)
   try {
@@ -121,36 +111,6 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
   } catch (error) {
     state.pending.delete(message.messageId)
     await releaseDeliveryReservation(reservation)
-    throw error
-  }
-}
-
-async function resolveWait(
-  deps: LeadPollerDeps,
-  delivery: PendingDelivery,
-  claim: WaitClaim<Message>,
-): Promise<void> {
-  if (!claim.isActive()) {
-    await releaseDeliveryReservation(delivery.reservation)
-    claim.abandon()
-    return
-  }
-
-  let committed = false
-  try {
-    await commitDeliveryReservation(delivery.reservation)
-    committed = true
-    try {
-      appendDeliveredEvent(deps, delivery.message)
-      appendWaitedEvent(deps, delivery.message)
-    } finally {
-      claim.resolve()
-    }
-  } catch (error) {
-    if (!committed) {
-      await releaseDeliveryReservation(delivery.reservation)
-      claim.abandon()
-    }
     throw error
   }
 }

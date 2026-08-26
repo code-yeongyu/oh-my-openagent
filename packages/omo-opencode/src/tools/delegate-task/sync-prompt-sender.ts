@@ -92,7 +92,13 @@ export async function sendSyncPrompt(
   const tools = buildSyncPromptTools(input.agentToUse, userPermission)
   setSessionTools(input.sessionID, tools)
 
-  applySessionPromptParams(input.sessionID, input.categoryModel)
+  const loweredReasoning = applySessionPromptParams(input.sessionID, input.categoryModel)
+  const promptModel = input.categoryModel?.reasoning !== undefined
+    ? { ...input.categoryModel, reasoningEffort: loweredReasoning.reasoningEffort }
+    : input.categoryModel
+  const promptVariant = input.categoryModel?.reasoning !== undefined
+    ? loweredReasoning.variant
+    : input.categoryModel?.variant
 
   const promptArgs = {
     path: { id: input.sessionID },
@@ -109,8 +115,8 @@ export async function sendSyncPrompt(
             },
           }
         : {}),
-      ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),
-      ...buildPromptGenerationParams(input.categoryModel),
+      ...(promptVariant ? { variant: promptVariant } : {}),
+      ...buildPromptGenerationParams(promptModel),
     },
   }
 

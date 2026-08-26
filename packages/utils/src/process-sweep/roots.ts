@@ -15,8 +15,9 @@ export interface CodegraphOwnedRootsOptions {
 
 /**
  * OMO-owned plugin roots trusted for process matching: the provisioned
- * codegraph install dir, the plugin root, and the codex plugin cache. These
- * roots are plugin-wide — every sweep family (codegraph, lsp-daemon proxy)
+ * codegraph install dir, the Claude OMO install, the plugin root, and the
+ * Codex plugin cache. These roots are plugin-wide; every sweep family
+ * (codegraph, lsp-daemon proxy)
  * matches its processes against the same set.
  */
 export function discoverCodegraphOwnedRoots(options: CodegraphOwnedRootsOptions = {}): string[] {
@@ -25,6 +26,7 @@ export function discoverCodegraphOwnedRoots(options: CodegraphOwnedRootsOptions 
   const roots = new Set<string>()
   addRoot(roots, options.trustedCodegraphInstallDir)
   addRoot(roots, buildCodegraphEnv({ homeDir })[CODEGRAPH_INSTALL_DIR_ENV])
+  addRoot(roots, join(homeDir, ".claude", "omo"))
   addRoot(roots, options.pluginRoot)
   for (const root of options.extraRoots ?? []) addRoot(roots, root)
   for (const root of readCodexPluginCacheRoots(options.codexHome ?? env["CODEX_HOME"] ?? join(homeDir, ".codex"))) {

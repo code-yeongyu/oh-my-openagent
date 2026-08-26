@@ -1,15 +1,14 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-
 import {
 	findPluginBundledCandidates,
 	matchRule,
 	parseRule,
-	scanRuleFiles,
 	SOURCE_PRIORITY,
+	scanRuleFiles,
 } from "@oh-my-opencode/rules-engine/engine";
+import { afterEach, describe, expect, it } from "vitest";
 
 const tempDirectories: string[] = [];
 
@@ -37,9 +36,7 @@ describe("rules-engine package consumption", () => {
 
 		// then
 		expect(SOURCE_PRIORITY.get("plugin-bundled")).toBe(200);
-		expect(nonWindowsCandidates.map((candidate) => candidate.relativePath)).toEqual([
-			"bundled-rules/hephaestus.md",
-		]);
+		expect(nonWindowsCandidates.map((candidate) => candidate.relativePath)).toEqual(["bundled-rules/hephaestus.md"]);
 		expect(windowsCandidates.map((candidate) => candidate.relativePath)).toEqual([
 			"bundled-rules/hephaestus.md",
 			"bundled-rules/windows-git-bash.md",

@@ -2,85 +2,125 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
 // Source of truth mirrored from packages/model-core/src/category-model-requirements.ts.
 // senpi-task cannot import model-core here without adding a package dependency outside this task's scope.
+// senpi-only difference: kimi rungs carry BOTH provider ids ("kimi-coding" senpi registry id and the
+// "kimi-for-coding" models.dev/opencode id); model-core/omo-opencode carry "kimi-for-coding" only.
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   "visual-engineering": [
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-    { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
-    { providers: ["kimi-for-coding"], model: "kimi-k3" },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "max",
+    },
+    {
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
+      variant: "max",
+    },
+    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.2", variant: "max" },
+    {
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    }
+  ],
+  architect: [
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5",
+      variant: "xhigh",
+    }
   ],
   ultrabrain: [
-    { providers: ["openai", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
-    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
-    { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+    { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "max" },
+    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
+    { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "max" }
   ],
   deep: [
-    { providers: ["openai", "vercel"], model: "gpt-5.6-terra", variant: "xhigh" },
-    { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
-    { providers: ["openai", "github-copilot", "vercel"], model: "gpt-5.6-sol", variant: "high" },
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-    { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+    {
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    }
   ],
   artistry: [
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "high" },
-    { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["opencode-go", "vercel"], model: "glm-5.2" }
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5",
+      variant: "xhigh",
+    },
+    {
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
+      variant: "max",
+    },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "xhigh",
+    }
   ],
   quick: [
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4-mini" },
-    { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
-    { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
-    { providers: ["opencode", "vercel"], model: "gpt-5-nano" },
+    { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
+    { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
+    { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "off" },
+    {
+      providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
+      model: "qwen3.6-flash",
+      variant: "low",
+    },
+    { providers: ["opencode-go"], model: "minimax-m3", variant: "max" },
+    { providers: ["opencode-go"], model: "minimax-m2.7", variant: "max" },
+    { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot"],
+      model: "claude-haiku-4-5",
+      variant: "off",
+    }
   ],
   "unspecified-low": [
-    { providers: ["openai", "vercel"], model: "gpt-5.6-luna", variant: "xhigh" },
-    { providers: ["github-copilot"], model: "gpt-5.6-luna", variant: "high" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
-    { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
-    { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
-    { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    { providers: ["xai", "github-copilot", "opencode"], model: "grok-4.6", variant: "xhigh" },
+    {
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      model: "gpt-5.6-terra",
+      variant: "high",
+    },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-sonnet-5",
+      variant: "low",
+    },
+    {
+      providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
+      model: "qwen3.8-max-preview",
+      variant: "max",
+    },
+    { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
+    { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "max" }
   ],
   "unspecified-high": [
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "high" },
-    { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
-    { providers: ["kimi-for-coding"], model: "kimi-k3" },
-    { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
     {
-      providers: [
-        "opencode",
-        "bailian-coding-plan",
-        "vercel",
-        "moonshotai",
-        "moonshotai-cn",
-        "firmware",
-        "ollama-cloud",
-        "aihubmix",
-      ],
-      model: "kimi-k3",
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "xhigh",
     },
+    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
+    {
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
+      variant: "max",
+    }
   ],
   writing: [
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
-    { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
-    { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    {
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
+      variant: "low",
+    },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "low",
+    },
+    { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" }
   ],
 }

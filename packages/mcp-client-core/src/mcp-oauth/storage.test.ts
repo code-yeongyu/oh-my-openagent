@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
@@ -18,14 +18,18 @@ function expectedServerHash(serverHost: string, resource: string): string {
 }
 
 describe("mcp-oauth storage", () => {
-  const TEST_CONFIG_DIR = join(tmpdir(), "mcp-oauth-test-" + Date.now())
+  // mkdtempSync, never a clock-derived name: consecutive Date.now() calls in one process
+  // return the same millisecond, so sibling suites sharing this prefix collided on one
+  // directory and each teardown removed the other's live fixture. On Windows, removing an
+  // in-use tree blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+  let TEST_CONFIG_DIR = ""
   let originalConfigDir: string | undefined
 
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     process.env.OPENCODE_CONFIG_DIR = TEST_CONFIG_DIR
     if (!existsSync(TEST_CONFIG_DIR)) {
-      mkdirSync(TEST_CONFIG_DIR, { recursive: true })
+      TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mcp-oauth-test-"))
     }
   })
 

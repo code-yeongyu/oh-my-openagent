@@ -1,6 +1,6 @@
 import { PostHog } from "posthog-node"
 
-import { getTelemetryApiKey, getTelemetryHost, shouldDisableTelemetry } from "./env"
+import { getTelemetryApiKey, getTelemetryHost, hasTelemetryApiKey, shouldDisableTelemetry } from "./env"
 import { getDefaultTelemetryOsProvider } from "./machine-id"
 import type {
   TelemetryCaptureProperties,
@@ -66,7 +66,7 @@ export function isTelemetryClientEnabled(input: TelemetryClientEnabledInput): bo
   const env = input.env ?? process.env
   return (
     !shouldDisableTelemetry({ env, productEnvPrefix: input.product.productEnvPrefix }) &&
-    getTelemetryApiKey(env, input.product.defaultApiKey).length > 0
+    hasTelemetryApiKey(env, input.product.defaultApiKey)
   )
 }
 
@@ -139,7 +139,8 @@ function createTransport(input: CreateTelemetryClientInput): TelemetryTransport 
       flushAt: 1,
       flushInterval: 0,
       host: getTelemetryHost(env, input.product.defaultHost),
-      disableGeoip: false,
+      disableGeoip: input.product.disableGeoip ?? false,
+      ...input.product.transportOptions,
     })
   } catch (error) {
     input.diagnostics?.({

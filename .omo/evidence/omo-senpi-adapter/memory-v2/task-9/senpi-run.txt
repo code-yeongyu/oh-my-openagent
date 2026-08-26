@@ -1,0 +1,26 @@
+Bundled 790 modules in 35ms
+
+  omo.js  0.94 MB  (entry point)
+
+Bundled 278 modules in 10ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 73 modules in 5ms
+
+  omo-memory-mcp.js  57.83 KB  (entry point)
+
+Bundled 3 modules in 2ms
+
+  memory-run-supervisor.mjs  7.0 KB  (entry point)
+
+{
+  "root": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-live-YSZoEg",
+  "cwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-live-YSZoEg/project",
+  "agent": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-live-YSZoEg/agent",
+  "memory": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-live-YSZoEg/memory",
+  "firstSurface": "senpi -p session_start recovery over a durable pending queue; four-settle gating is covered deterministically in facts-wiring.test.ts because print mode is single-shot",
+  "result": "FAIL",
+  "error": "AbortError: The operation was aborted\n    at watch (node:internal/fs/watchers:479:13)\n    at async _watch (node:internal/fs/promises:2178:3)\n    at async waitRunDir (file:///private/tmp/memv2-task9-qa.mjs:73:145)\n    at async file:///private/tmp/memv2-task9-qa.mjs:109:16"
+}
+{"teardown":"rm -rf","root":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-facts-live-YSZoEg","existsAfter":false}

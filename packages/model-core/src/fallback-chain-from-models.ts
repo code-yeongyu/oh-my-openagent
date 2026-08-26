@@ -1,9 +1,14 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeFallbackModels } from "./model-resolver"
-import { KNOWN_VARIANTS } from "./known-variants"
+import { splitReasoningSuffix } from "./reasoning-level"
 
 function parseVariantFromModel(rawModel: string): { modelID: string; variant?: string } {
+  const parsed = splitReasoningSuffix(rawModel)
+  if (parsed.level) {
+    return { modelID: parsed.base, variant: parsed.level }
+  }
+
   if (typeof rawModel !== "string") {
     return { modelID: "" }
   }
@@ -23,7 +28,7 @@ function parseVariantFromModel(rawModel: string): { modelID: string; variant?: s
   if (spaceVariant) {
     const modelID = spaceVariant[1]?.trim() ?? ""
     const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant && KNOWN_VARIANTS.has(variant)) {
+    if (variant) {
       return { modelID, variant }
     }
   }
@@ -67,6 +72,7 @@ export function parseFallbackModelObjectEntry(
   return {
     ...base,
     variant: obj.variant ?? base.variant,
+    reasoning: obj.reasoning,
     reasoningEffort: obj.reasoningEffort,
     temperature: obj.temperature,
     top_p: obj.top_p,

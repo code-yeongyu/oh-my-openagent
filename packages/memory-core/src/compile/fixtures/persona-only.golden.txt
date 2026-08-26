@@ -1,0 +1,10 @@
+<reminder/>
+
+<self>
+<projection>$MEMORY_DIR/system/persona.md</projection>
+Committed persona.
+</self>
+
+<memory_metadata>
+- AGENT_ID: persona-agent
+</memory_metadata>

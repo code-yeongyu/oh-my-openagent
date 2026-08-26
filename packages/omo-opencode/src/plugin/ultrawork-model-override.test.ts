@@ -1,4 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, spyOn, setDefaultTimeout } from "bun:test"
+
+// Set in-file, never via preload: bun applies a preload setDefaultTimeout only to the FIRST test
+// file of a run, so every later file silently reverts to the built-in 5000ms. This suite timed out
+// at exactly 5000ms on a loaded windows runner while its work is event-driven, not slow.
+setDefaultTimeout(30_000)
 import * as sharedModule from "../shared"
 import * as dbOverrideModule from "./ultrawork-db-model-override"
 import * as sessionStateModule from "../features/claude-code-session-state"

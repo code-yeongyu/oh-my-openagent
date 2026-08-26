@@ -1,5 +1,6 @@
-import { createExtensionRuntime, type ResourceLoader } from "@code-yeongyu/senpi"
+import type { ResourceLoader } from "@code-yeongyu/senpi"
 
+import { senpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
 
 // CHILD EXTENSION SUPPRESSION.
@@ -17,5 +18,7 @@ import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-l
 // inside children); the core read/bash/edit tools plus the injected customTools remain. Skills
 // and context per spec are still delivered through prompt injection.
 export function createChildResourceLoader(): ResourceLoader {
-  return createMinimalSenpiResourceLoader({ runtime: createExtensionRuntime() })
+  // createExtensionRuntime is read through the lazy barrel boundary; every caller reaches here
+  // from InProcessRunner.start/resume, which awaits loadSenpiBarrel() beforehand.
+  return createMinimalSenpiResourceLoader({ runtime: senpiBarrel().createExtensionRuntime() })
 }

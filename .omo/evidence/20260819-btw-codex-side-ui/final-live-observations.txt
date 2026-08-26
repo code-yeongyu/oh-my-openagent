@@ -1,0 +1,57 @@
+Surface: OpenCode 1.18.18 TUI with an isolated XDG sandbox
+Model: local OpenAI Responses-compatible mock on 127.0.0.1:46731
+TUI: worktree dist/tui.js on 127.0.0.1:46732
+
+Mock output:
+
+  MOCK_LISTENING 46731
+  PARENT_HELD
+  PARENT_HELD
+  SIDE_CONTEXT_OK
+  PARENT_RELEASED
+  PARENT_RELEASED
+  SIDE_CONTEXT_OK
+
+The two SIDE_CONTEXT_OK lines prove that both consecutive side turns received
+the bounded parent token and the hidden <omo-btw-boundary> sentinel.
+
+Side transcript screen:
+
+  first side question
+  SIDE-CONTEXT-PROOF
+
+  second side question
+  SIDE-CONTEXT-PROOF
+
+  BTW from main · main ready · ctrl+/ switch · ctrl+c close
+
+Parent screen after enhanced Ctrl+/:
+
+  PARENT-CONTINUED
+  BTW open · ctrl+/ switch
+
+Side screen after the second enhanced Ctrl+/:
+
+  first side question
+  SIDE-CONTEXT-PROOF
+  second side question
+  SIDE-CONTEXT-PROOF
+  BTW from main · main ready · ctrl+/ switch · ctrl+c close
+
+After physical Ctrl+C:
+
+  - the TUI returned to the parent;
+  - the BTW status label disappeared;
+  - GET /session returned only the parent session;
+  - the isolated database session count was 1.
+
+Teardown:
+
+  46731 released
+  46732 released
+  isolated=1
+  real=7526
+
+The real database count was 7526 immediately before and after final teardown.
+An earlier helper run observed 7518 before unrelated shared-host OpenCode
+activity occurred; every BTW QA process used isolated XDG directories.

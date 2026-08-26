@@ -28,12 +28,16 @@ function toAgentDefinition(name: string, def: OmoAgentDef): AgentDefinition {
     ...(def.prompt === undefined ? {} : { prompt: def.prompt }),
     ...(def.model === undefined ? {} : { model: def.model }),
     ...(def.models === undefined ? {} : { models: def.models }),
+    ...(def.variant === undefined ? {} : { variant: def.variant }),
+    ...(def.reasoning === undefined && def.reasoningEffort === undefined ? {} : { reasoningEffort: def.reasoning ?? def.reasoningEffort }),
     ...(def.temperature === undefined ? {} : { temperature: def.temperature }),
     ...(tools === undefined ? {} : { tools }),
     ...(def.disable === undefined ? {} : { disable: def.disable }),
     ...(def.background === undefined ? {} : { background: def.background }),
     ...(def.execution_mode === undefined ? {} : { executionMode: def.execution_mode }),
     ...(def.allowed_subagents === undefined ? {} : { allowedSubagents: def.allowed_subagents }),
+    ...(def.disallowed_tools === undefined ? {} : { disallowedTools: def.disallowed_tools }),
     ...(def.max_depth === undefined ? {} : { maxDepth: def.max_depth }),
+    ...(def.max_turns === undefined ? {} : { maxTurns: def.max_turns }),
   }
 }

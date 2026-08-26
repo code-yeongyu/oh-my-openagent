@@ -77,19 +77,19 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 							source: provisioned === null ? "path" : "provisioned",
 						};
 					},
+					resolveManagedBin: () => binPath,
 					runCommand: (_projectRoot, command, args) => {
 						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						mkdirSync(join(workspace, ".codegraph"), { recursive: true });
+						writeFileSync(join(workspace, ".codegraph", "codegraph.db"), "fixture");
+						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
 					},
 				},
 			});
 
 			// then
 			expect(result).toEqual({ action: "initialized" });
-			expect(calls).toEqual([
-				{ args: ["status", "--json"], command: binPath },
-				{ args: ["init"], command: binPath },
-			]);
+			expect(calls).toEqual([{ args: ["init"], command: binPath }]);
 			expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "provisioned", timedOut: false }]);
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });

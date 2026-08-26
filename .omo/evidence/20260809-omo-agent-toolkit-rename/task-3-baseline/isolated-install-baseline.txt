@@ -1,0 +1,263 @@
+ROOT=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO
+$ node packages/omo-codex/scripts/install-local.mjs install
+
+removed 1 package, changed 9 packages, and audited 94 packages in 504ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice
+npm notice New major version of npm available! 11.18.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+
+> @sisyphuslabs/omo-codex-plugin@4.19.4 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 4.19.4 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 12ms
+
+  cli.js  19.23 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 7ms
+
+  cli.js  4.18 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 8ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 13ms
+
+  cli.js  155.41 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 21ms
+
+  cli.js  204.84 KB  (entry point)
+
+Bundled 76 modules in 15ms
+
+  posthog.js  202.42 KB  (entry point)
+
+Building components/codegraph
+
+> @sisyphuslabs/codex-codegraph@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 159 modules in 24ms
+
+  serve.js  0.33 MB  (entry point)
+
+Bundled 182 modules in 16ms
+
+  cli.js  0.42 MB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 5ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 8ms
+
+  cli.js  155.62 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 5ms
+
+  cli.js  14.55 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 14ms
+
+  cli.js  204.57 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 5 modules in 8ms
+
+  cli.js  14.79 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.19.4 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 4 modules in 7ms
+
+  cli.js  7.30 KB  (entry point)
+
+Bundling components/codegraph/dist/cli.js
+Bundled 182 modules in 18ms
+
+  cli.js  0.42 MB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.19.4 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.19.4 build
+> node scripts/build-runtime.mjs
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 4 modules in 6ms
+
+  cli.js  7.44 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@4.19.4 build
+> node scripts/build.mjs
+
+
+  dist/cli.js  147.4kb
+
+⚡ Done in 13ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 7ms
+
+  cli.js  151.81 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 3ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  8.33 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 38 modules in 4ms
+
+  cli.js  153.31 KB  (entry point)
+
+
+added 18 packages in 2s
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+Installed 1 plugin(s) from sisyphuslabs.
+$ find "$ROOT/bin" -maxdepth 1 -mindepth 1 -print | sort
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/lazycodex-executor-verify
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-codegraph
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-comment-checker
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-git-bash-hook
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-lsp
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-rules
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-start-work-continuation
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-telemetry
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-ultrawork
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/omo-ulw-loop
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/ulw
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/bin/ulw-loop
+$ ls -la "$ROOT/bin"
+total 8
+drwxr-xr-x  15 yeongyu  staff   480 Aug  9 17:38 .
+drwx------   5 yeongyu  staff   160 Aug  9 17:38 ..
+lrwxr-xr-x   1 yeongyu  staff   156 Aug  9 17:38 lazycodex-executor-verify -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/lazycodex-executor-verify/dist/cli.js
+-rwxr-xr-x   1 yeongyu  staff  2263 Aug  9 17:38 omo
+lrwxr-xr-x   1 yeongyu  staff   140 Aug  9 17:38 omo-codegraph -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/codegraph/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   146 Aug  9 17:38 omo-comment-checker -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/comment-checker/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   139 Aug  9 17:38 omo-git-bash-hook -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/git-bash/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   134 Aug  9 17:38 omo-lsp -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/lsp/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   136 Aug  9 17:38 omo-rules -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/rules/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   154 Aug  9 17:38 omo-start-work-continuation -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/start-work-continuation/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   140 Aug  9 17:38 omo-telemetry -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/telemetry/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   140 Aug  9 17:38 omo-ultrawork -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ultrawork/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   139 Aug  9 17:38 omo-ulw-loop -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   139 Aug  9 17:38 ulw -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/dist/cli.js
+lrwxr-xr-x   1 yeongyu  staff   139 Aug  9 17:38 ulw-loop -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/dist/cli.js
+$ test -e "$ROOT/bin/omo" && echo legacy-omo-present
+legacy-omo-present
+$ grep -n "OMO_GENERATED_RUNTIME_WRAPPER\\|OMO_INVOCATION_NAME\\|OMO_EDITION" "$ROOT/bin/omo"
+2:# OMO_GENERATED_RUNTIME_WRAPPER
+$ readlink outputs for component bins
+lazycodex-executor-verify -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/lazycodex-executor-verify/dist/cli.js
+omo-codegraph -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/codegraph/dist/cli.js
+omo-comment-checker -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/comment-checker/dist/cli.js
+omo-git-bash-hook -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/git-bash/dist/cli.js
+omo-lsp -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/lsp/dist/cli.js
+omo-rules -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/rules/dist/cli.js
+omo-start-work-continuation -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/start-work-continuation/dist/cli.js
+omo-telemetry -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/telemetry/dist/cli.js
+omo-ultrawork -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ultrawork/dist/cli.js
+omo-ulw-loop -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/dist/cli.js
+ulw -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/dist/cli.js
+ulw-loop -> /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/dist/cli.js
+$ installed hook sha256
+94c7e4cccca5948e7349d4824e8570925b8a9733c3e2fc1f59ed2f9b9eb5e686  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/.codex-plugin/plugin.json
+51fd789bd7930feb6f4ff90424d0a594abae09e5f544fe018b8e478530598e9c  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/bootstrap/hooks/hooks.json
+0e330292b0b44a552fcba4b3aca4b698043fe1fed0a0c260be7f63ca07b32d58  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/comment-checker/hooks/hooks.json
+160d7904a702c3dc557852f71b4f2ca821e3a092510e4912371b072e07d2f792  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/git-bash/hooks/hooks.json
+0388c7a605f66073896518661bc0943bb5b133e4276ccd920d43fc25d26ea916  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/lazycodex-executor-verify/hooks/hooks.json
+af71b9d2a20705f62246329dc4e51b0f1ec16456c3636f05a44e45fb0b3af05e  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/lsp/hooks/hooks.json
+e1a4131c3f0514b73c9d69af51dd5632145967b6fb1f1fc6d2ade22b344b887f  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/rules/.codex-plugin/plugin.json
+765c5fa7c9657953d5b8d2a403eebc52a0da4bf91810576e8761a2e515eac0a4  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/rules/hooks/hooks.json
+f76ea51f5cd60d9fa2c937376ff79481d0fa8608a10c06b4fd463edade250033  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/start-work-continuation/hooks/hooks.json
+ebb1445c28d36ce7477e09bdf9f975ae6a11873b6e7a56a2ce96063cfadab363  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/teammode/hooks/hooks.json
+2fa43fa7c0ec1df473291581e04f4c7c6bc4b152197f1305cda6ef28bcf9ba7e  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/telemetry/hooks/hooks.json
+cd8b8829dbae8dfce153b515a9454aded47a159b1af2d82d0a122a329228921a  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ultrawork/hooks/hooks.json
+af83fe88da1cc4fbde13d080e45a20efae4c7e4f9c10aecae63a76384ee3c102  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO/codex/plugins/cache/sisyphuslabs/omo/4.19.4/components/ulw-loop/hooks/hooks.json
+cleanup: removed /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.dCeaXPRqOO
+cleanup receipt: root absent

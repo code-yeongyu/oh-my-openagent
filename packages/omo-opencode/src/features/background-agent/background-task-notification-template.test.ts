@@ -27,129 +27,12 @@ describe("buildBackgroundTaskNotificationText", () => {
       expect(notification).toContain("You WILL be notified when ALL complete.")
     })
 
-    test("#when building the partial notification #then it preserves the existing completed-task format", () => {
-      // given
-      const notification = buildBackgroundTaskNotificationText({
-        task: {
-          id: "task-1",
-          description: "Index repo",
-          status: "completed",
-        },
-        duration: "42s",
-        statusText: "COMPLETED",
-        allComplete: false,
-        remainingCount: 1,
-        completedTasks: [],
-      })
-
-      // when
-      const expectedNotification = `<system-reminder>
-[BACKGROUND TASK RESULT READY]
-**ID:** \`task-1\`
-**Description:** Index repo
-**Duration:** 42s
-
-**1 task still in progress.** You WILL be notified when ALL complete.
-Do NOT poll - continue productive work.
-
-Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
-</system-reminder>`
-
-      // then
-      expect(notification).toBe(expectedNotification)
-    })
   })
 
   describe("#given one task still running after a failed task notification", () => {
-    test("#when building the partial notification #then it preserves the existing failure format", () => {
-      // given
-      const notification = buildBackgroundTaskNotificationText({
-        task: {
-          id: "task-2",
-          description: "Summarize logs",
-          status: "error",
-          error: "Timed out",
-        },
-        duration: "3m 4s",
-        statusText: "ERROR",
-        allComplete: false,
-        remainingCount: 2,
-        completedTasks: [],
-      })
-
-      // when
-      const expectedNotification = `<system-reminder>
-[BACKGROUND TASK ERROR]
-**ID:** \`task-2\`
-**Description:** Summarize logs
-**Duration:** 3m 4s
-**Error:** Timed out
-
-**2 tasks still in progress.** You WILL be notified when ALL complete.
-**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue.
-
-Use \`background_output(task_id="task-2")\` to retrieve this result when ready.
-</system-reminder>`
-
-      // then
-      expect(notification).toBe(expectedNotification)
-    })
   })
 
   describe("#given all sibling tasks completed with mixed outcomes", () => {
-    test("#when building the final notification #then it preserves the existing summary format", () => {
-      // given
-      const notification = buildBackgroundTaskNotificationText({
-        task: {
-          id: "task-3",
-          description: "Fallback task",
-          status: "error",
-          error: "Denied",
-        },
-        duration: "10s",
-        statusText: "ERROR",
-        allComplete: true,
-        remainingCount: 0,
-        completedTasks: [
-          {
-            id: "task-1",
-            description: "Index repo",
-            status: "completed",
-          },
-          {
-            id: "task-2",
-            description: "Summarize logs",
-            status: "cancelled",
-            error: "User aborted",
-          },
-          {
-            id: "task-3",
-            description: "Fallback task",
-            status: "error",
-            error: "Denied",
-          },
-        ],
-      })
-
-      // when
-      const expectedNotification = `<system-reminder>
-[ALL BACKGROUND TASKS FINISHED - 2 FAILED]
-
-**Completed:**
-- \`task-1\`: Index repo
-
-**Failed:**
-- \`task-2\`: Summarize logs [CANCELLED] - User aborted
-- \`task-3\`: Fallback task [ERROR] - Denied
-
-All sibling background tasks are complete. Your next action should be to call \`background_output(task_id="<id>")\` for each task ID above.
-
-**ACTION REQUIRED:** 2 task(s) failed. Check errors above and decide whether to retry or proceed.
-</system-reminder>`
-
-      // then
-      expect(notification).toBe(expectedNotification)
-    })
   })
 
   describe("#given all tasks completed with undefined descriptions", () => {
@@ -228,7 +111,6 @@ All sibling background tasks are complete. Your next action should be to call \`
 
       // then
       expect(notification).toContain("All sibling background tasks are complete.")
-      expect(notification).toContain("Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above.")
       expect(notification).not.toContain("Wait for the all-complete notification")
     })
 
@@ -245,7 +127,7 @@ All sibling background tasks are complete. Your next action should be to call \`
               attemptNumber: 1,
               sessionId: "ses-primary",
               providerId: "genai-proxy-openai",
-              modelId: "gpt-5.4-mini",
+              modelId: "gpt-5.6-luna-fast",
               status: "error",
               error: "Forbidden: Selected provider is forbidden",
             },
@@ -274,7 +156,7 @@ All sibling background tasks are complete. Your next action should be to call \`
                 attemptNumber: 1,
                 sessionId: "ses-primary",
                 providerId: "genai-proxy-openai",
-                modelId: "gpt-5.4-mini",
+                modelId: "gpt-5.6-luna-fast",
                 status: "error",
                 error: "Forbidden: Selected provider is forbidden",
               },
@@ -295,7 +177,7 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
       expect(notification).toContain("- `task-3`: Fallback task")
       expect(notification).toContain("Background task attempts:")
-      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.4-mini — ses-primary")
+      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.6-luna-fast — ses-primary")
       expect(notification).toContain("    Error: Forbidden: Selected provider is forbidden")
       expect(notification).toContain("  - Attempt 2 — COMPLETED — anthropic/claude-haiku-4.5 — ses-fallback")
     })

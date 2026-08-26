@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
@@ -20,6 +21,12 @@ async function makePackagedPlugin(): Promise<string> {
   tempDirs.push(pluginPath)
   await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
   await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
   const requiredSkillNames = [
     "ast-grep",
     "coding-agent-sessions",
@@ -32,9 +39,9 @@ async function makePackagedPlugin(): Promise<string> {
     "refactor",
     "remove-ai-slops",
     "review-work",
-    "start-work",
     "ultimate-browsing",
     "ultrawork",
+    "ulw-execute",
     "ulw-loop",
     "ulw-plan",
     "ulw-research",
@@ -43,6 +50,24 @@ async function makePackagedPlugin(): Promise<string> {
   for (const skillName of requiredSkillNames) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+  await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
+  await chmod(astGrepRuntime, 0o755)
+  await writeFixtureFile(
+    join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
+    `${JSON.stringify({
+      sha256: createHash("sha256").update(await readFile(astGrepRuntime)).digest("hex"),
+      mode: 0o755,
+      stagedAtUtc: "2026-08-03T00:00:00.000Z",
+    }, null, 2)}\n`,
+  )
+  const toolkitDispatcher = join(pluginPath, "runtime", "agent-toolkit", "cli.js")
+  await writeFixtureFile(toolkitDispatcher, "console.log('agent-toolkit')\n")
+  await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "ulw-loop", "cli.js"), "console.log('ulw-loop')\n")
+  const toolkitShim = join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit")
+  await writeFixtureFile(toolkitShim, "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n")
+  await chmod(toolkitShim, 0o755)
+  await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"), "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
@@ -91,7 +116,12 @@ async function runCliLocal(
 ): Promise<{ readonly exitCode: number; readonly stdout: string; readonly stderr: string }> {
   const proc = Bun.spawn(["node", join(pluginPath, "scripts", "install.mjs"), action], {
     cwd: repoRoot,
-    env: { ...process.env, SENPI_CODING_AGENT_DIR: agentDir },
+    env: {
+      ...process.env,
+      OMO_CODING_AGENT_DIR: agentDir,
+      SENPI_CODING_AGENT_DIR: agentDir,
+      PI_CODING_AGENT_DIR: agentDir,
+    },
     stdout: "pipe",
     stderr: "pipe",
   })

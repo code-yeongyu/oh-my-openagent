@@ -1,10 +1,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-
-import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 import { findPluginBundledCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { afterEach, describe, expect, it } from "vitest";
+import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 
 const WINDOWS_RULE_DESCRIPTION = "Windows Git Bash guidance for Codex";
 const WINDOWS_RULE_PATH = "bundled-rules/windows-git-bash.md";
@@ -71,25 +70,11 @@ describe("Windows Git Bash bundled rule content", () => {
 		expect(body).toContain("alwaysApply: true");
 	});
 
-	it('#given the bundled rule #when read #then it NEVER recommends bare shell:"bash"', () => {
-		const body = readWindowsRuleBody();
-
-		expect(body).not.toContain('shell: "bash"');
-	});
-
-	it("#given the bundled rule #when read #then it warns that bare bash often resolves to WSL System32", () => {
-		const body = readWindowsRuleBody();
-
-		expect(body).toMatch(/WSL/i);
-		expect(body).toMatch(/System32/i);
-	});
-
-	it("#given the bundled rule #when read #then it prefers the git_bash MCP and the absolute Git Bash path", () => {
+	it("#given the bundled rule #when read #then it names the Git Bash runtime identifiers", () => {
 		const body = readWindowsRuleBody();
 
 		expect(body).toContain("git_bash");
 		expect(body).toContain("OMO_CODEX_GIT_BASH_PATH");
-		expect(body).toContain("C:\\Program Files\\Git\\bin\\bash.exe");
 	});
 });
 

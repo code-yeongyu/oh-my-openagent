@@ -1,111 +1,66 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
-  buildOrchestratorReminder,
-  buildCompletionGate,
-  buildMissingVerdictEscalation,
   buildAdvanceDirective,
+  buildCompletionGate,
+  buildFinalWaveApprovalReminder,
+  buildMissingVerdictEscalation,
+  buildOrchestratorReminder,
+  buildRejectedVerdictEscalation,
+  buildStandaloneVerificationReminder,
 } from "./verification-reminders"
 
-// Test helpers for given/when/then pattern
-const given = describe
-const when = describe
-const then = it
+// Fixed sentinels: unique per slot, deterministic across runs, and absent
+// from every builder template, so containment proves interpolation.
+const PLAN_NAME = "plan-sentinel-9f2c"
+const SESSION_ID = "ses_sentinel_5e17"
+const TASK_LABEL = "task-sentinel-3b81"
 
-describe("buildCompletionGate", () => {
-  given("a plan name and session id", () => {
-    const planName = "test-plan"
-    const sessionId = "test-session-123"
+describe("verification reminder builders", () => {
+  test("completion gate propagates the plan and continuation session", () => {
+    const result = buildCompletionGate(PLAN_NAME, SESSION_ID)
 
-    when("buildCompletionGate is called", () => {
-      const gate = buildCompletionGate(planName, sessionId)
-
-      then("completion gate text is present", () => {
-        expect(gate).toContain("COMPLETION GATE")
-      })
-
-      then("gate appears before verification phase text", () => {
-        const gateIndex = gate.indexOf("COMPLETION GATE")
-        const verificationIndex = gate.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-
-      then("gate interpolates the plan name path", () => {
-        expect(gate).toContain(planName)
-        expect(gate).toContain(`.omo/plans/${planName}.md`)
-      })
-    })
+    expect(result).toContain(PLAN_NAME)
+    expect(result).toContain(SESSION_ID)
   })
-})
 
-describe("buildOrchestratorReminder", () => {
-  given("progress with completed tasks", () => {
-    const planName = "my-test-plan"
-    const sessionId = "session-abc"
-    const progress = { total: 10, completed: 3 }
+  test("orchestrator reminder propagates plan, session, and progress values", () => {
+    const progress = { total: 11, completed: 4 }
 
-    when("buildOrchestratorReminder is called with autoCommit true", () => {
-      const reminder = buildOrchestratorReminder(planName, progress, sessionId, true)
+    const result = buildOrchestratorReminder(PLAN_NAME, progress, SESSION_ID, false)
 
-      then("completion gate appears before verification reminder", () => {
-        const gateIndex = reminder.indexOf("COMPLETION GATE")
-        const verificationIndex = reminder.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeGreaterThanOrEqual(0)
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-    })
-
-    when("buildOrchestratorReminder is called with autoCommit false", () => {
-      const reminder = buildOrchestratorReminder(planName, progress, sessionId, false)
-
-      then("completion gate appears before verification reminder", () => {
-        const gateIndex = reminder.indexOf("COMPLETION GATE")
-        const verificationIndex = reminder.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeGreaterThanOrEqual(0)
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-    })
+    expect(result).toContain(PLAN_NAME)
+    expect(result).toContain(SESSION_ID)
+    expect(result).toContain(`${progress.completed}/${progress.total}`)
+    expect(result).toContain(String(progress.total - progress.completed))
   })
-})
 
-describe("buildMissingVerdictEscalation", () => {
-  given("a plan name, task label, and session id", () => {
-    const planName = "atlas-loop-compaction-bg-fixes"
-    const taskLabel = "T13: add builders"
-    const sessionId = "ses_review_abc"
+  test("final-wave reminder propagates plan, session, and progress values", () => {
+    const progress = { total: 9, completed: 5 }
 
-    when("buildMissingVerdictEscalation is called", () => {
-      const message = buildMissingVerdictEscalation(planName, taskLabel, sessionId)
+    const result = buildFinalWaveApprovalReminder(PLAN_NAME, progress, SESSION_ID)
 
-      then("output names the task label", () => {
-        expect(message).toContain(taskLabel)
-      })
-
-      then("output names the plan", () => {
-        expect(message).toContain(planName)
-      })
-
-      then("output includes a reuse hint for the session", () => {
-        expect(message).toContain(sessionId)
-      })
-
-      then("output includes the machine-parsed verdict sentinels", () => {
-        expect(message).toContain("VERDICT: APPROVE")
-        expect(message).toContain("VERDICT: REJECT")
-      })
-    })
+    expect(result).toContain(PLAN_NAME)
+    expect(result).toContain(SESSION_ID)
+    expect(result).toContain(`${progress.completed}/${progress.total}`)
+    expect(result).toContain(String(progress.total - progress.completed))
   })
-})
 
-describe("buildAdvanceDirective", () => {
-  given("a plan name", () => {
-    const planName = "atlas-loop-compaction-bg-fixes"
+  test("standalone reminder propagates the continuation session", () => {
+    expect(buildStandaloneVerificationReminder(SESSION_ID)).toContain(SESSION_ID)
+  })
 
-    when("buildAdvanceDirective is called", () => {
-      const directive = buildAdvanceDirective(planName)
+  test("missing and rejected verdict reminders propagate plan, task, and session values", () => {
+    for (const result of [
+      buildMissingVerdictEscalation(PLAN_NAME, TASK_LABEL, SESSION_ID),
+      buildRejectedVerdictEscalation(PLAN_NAME, TASK_LABEL, SESSION_ID),
+    ]) {
+      expect(result).toContain(PLAN_NAME)
+      expect(result).toContain(TASK_LABEL)
+      expect(result).toContain(SESSION_ID)
+    }
+  })
 
-      then("output names the plan file path", () => {
-        expect(directive).toContain(`.omo/plans/${planName}.md`)
-      })
-    })
+  test("advance directive propagates the active plan", () => {
+    expect(buildAdvanceDirective(PLAN_NAME)).toContain(PLAN_NAME)
   })
 })

@@ -36,8 +36,6 @@ describe("init-deep slash surface", () => {
 
 		// then
 		expect(result.success).toBe(true)
-		expect(result.replacementText).toContain("**Scope**: skill")
 		expect(result.replacementText).toContain("--max-depth=2")
-		expect(result.replacementText).toContain("Generate hierarchical AGENTS.md files")
 	})
 })

@@ -150,7 +150,7 @@ If a verification command is unavailable or not applicable, state the exact reas
 
 ## GOAL REGISTRATION
 
-When a `create_goal` tool exists, register the run's goal with it before implementation: the objective, the scenario contract, and one WHEN TO STOP line naming the observable end state. Without the tool, record the same contract in your working notes and treat it as binding.
+When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, written outcome-first: the concrete outcome that will be true (never an activity), the named deliverable surfaces, the scenario contract as success criteria that can fail, scope bounds, and one WHEN TO STOP line naming the observable end state. Never invent a budget or deadline the user did not state. Without the tool, record the same contract in your working notes and treat it as binding.
 
 ## TODO DISCIPLINE
 
@@ -170,7 +170,7 @@ Each scenario needs a binary pass condition. "Looks good" is not a pass conditio
 
 ## TDD WORKFLOW
 
-TDD is mandatory on production behavior changes.
+TDD is mandatory on production code changes with a test seam; prose, docs, and visual-only changes take review + real-surface QA instead (a test pinning their text is pretend-coverage).
 
 1. RED: write or identify a failing test that proves the needed behavior.
 2. GREEN: make the smallest change that flips the test to passing.

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
@@ -60,6 +61,10 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
   }
 }
 
+afterEach(() => {
+  SessionCategoryRegistry.clear()
+})
+
 describe("createEventHandler", () => {
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
@@ -71,7 +76,7 @@ describe("createEventHandler", () => {
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     deps.sessionRetryInFlight.add(sessionID)
-    deps.sessionStatusRetryKeys.set(sessionID, "retry:1")
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:1"]))
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
     // when
@@ -94,7 +99,7 @@ describe("createEventHandler", () => {
     deps.sessionStates.set(sessionID, state)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionFallbackTimeouts.set(sessionID, 1)
-    deps.sessionStatusRetryKeys.set(sessionID, "retry:1")
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:1"]))
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
     // when
@@ -121,7 +126,7 @@ describe("createEventHandler", () => {
     deps.sessionStates.set(sessionID, state)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionAwaitingFallbackResult.add(sessionID)
-    deps.sessionStatusRetryKeys.set(sessionID, "retry:2")
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:2"]))
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
     await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "AbortError" } } } })
@@ -239,7 +244,9 @@ describe("createEventHandler", () => {
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
 
     // simulate the next retry signal advancing the counter
-    const advanced = deps.sessionStates.get(sessionID)!
+    const advanced = deps.sessionStates.get(sessionID)
+    expect(advanced).toBeDefined()
+    if (!advanced) return
     advanced.attemptCount = 2
 
     // iteration 2: another internal abort
@@ -270,8 +277,191 @@ describe("createEventHandler", () => {
 
     // then - the stored model is the canonical string form, not the object
     const created = deps.sessionStates.get(sessionID)
-    expect(created?.originalModel).toBe("openai/gpt-5.5-codex")
-    expect(created?.currentModel).toBe("openai/gpt-5.5-codex")
+    expect(created?.originalModel).toBe("openai/gpt-5.5-codex(medium)")
+    expect(created?.currentModel).toBe("openai/gpt-5.5-codex(medium)")
     expect(typeof created?.currentModel).toBe("string")
+  })
+
+  it("#given session.created on an inherited-variant fallback #when the configured fallback is base-only #then the fallback index is retained", async () => {
+    // given
+    const sessionID = "session-inherited-variant-fallback-created"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-7",
+          variant: "high",
+          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            agent: "sisyphus",
+            model: {
+              id: "gpt-5.4",
+              providerID: "openai",
+              variant: "high",
+            },
+          },
+        },
+      },
+    })
+
+    // then
+    const created = deps.sessionStates.get(sessionID)
+    expect(created?.originalModel).toBe("anthropic/claude-opus-4-7")
+    expect(created?.currentModel).toBe("openai/gpt-5.4(high)")
+    expect(created?.fallbackIndex).toBe(0)
+  })
+
+  it("#given session.created on a category-variant fallback #when the configured fallback is base-only #then the fallback index is retained", async () => {
+    // given
+    const sessionID = "session-category-variant-fallback-created"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-7",
+          category: "deep",
+          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+        },
+      },
+      categories: {
+        deep: {
+          variant: "high",
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            agent: "sisyphus",
+            model: {
+              id: "gpt-5.4",
+              providerID: "openai",
+              variant: "high",
+            },
+          },
+        },
+      },
+    })
+
+    // then
+    const created = deps.sessionStates.get(sessionID)
+    expect(created?.originalModel).toBe("anthropic/claude-opus-4-7")
+    expect(created?.currentModel).toBe("openai/gpt-5.4(high)")
+    expect(created?.fallbackIndex).toBe(0)
+  })
+
+  it("#given session.created on a registered-category fallback #when that category supplies the effective reasoning #then the active fallback is indexed with the category identity", async () => {
+    // given
+    const sessionID = "session-registered-category-fallback-created"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          reasoning: "low",
+        },
+      },
+      categories: {
+        deep: {
+          model: "anthropic/claude-opus-4-7",
+          reasoning: "high",
+          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+        },
+      },
+    }
+    SessionCategoryRegistry.register(sessionID, "deep")
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            agent: "sisyphus",
+            model: {
+              id: "gpt-5.4",
+              providerID: "openai",
+              variant: "high",
+            },
+          },
+        },
+      },
+    })
+
+    // then
+    const created = deps.sessionStates.get(sessionID)
+    expect(created?.originalModel).toBe("anthropic/claude-opus-4-7")
+    expect(created?.currentModel).toBe("openai/gpt-5.4(high)")
+    expect(created?.fallbackIndex).toBe(0)
+  })
+
+  it("#given session.created on a fallback whose inherited reasoning lowers to effort #when the event reports the base model #then the fallback index is retained", async () => {
+    // given
+    const sessionID = "session-category-reasoning-fallback-created"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-7",
+          category: "deep",
+          fallback_models: ["test-provider/test-model", "google/gemini-2.5-pro"],
+        },
+      },
+      categories: {
+        deep: {
+          reasoning: "high",
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            agent: "sisyphus",
+            model: {
+              id: "test-model",
+              providerID: "test-provider",
+            },
+          },
+        },
+      },
+    })
+
+    // then
+    const created = deps.sessionStates.get(sessionID)
+    expect(created?.originalModel).toBe("anthropic/claude-opus-4-7")
+    expect(created?.currentModel).toBe("test-provider/test-model")
+    expect(created?.fallbackIndex).toBe(0)
   })
 })

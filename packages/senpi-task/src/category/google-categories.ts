@@ -110,13 +110,13 @@ Approach:
 export const GOOGLE_CATEGORIES = [
   {
     name: "visual-engineering",
-    config: { model: "google/gemini-3.1-pro", variant: "high" },
+    config: { model: "anthropic/claude-opus-5", variant: "max" },
     description: "Frontend, UI/UX, design, styling, animation",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "artistry",
-    config: { model: "google/gemini-3.1-pro", variant: "high" },
+    config: { model: "anthropic/claude-fable-5", variant: "xhigh" },
     description: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
     promptAppend: ARTISTRY_CATEGORY_PROMPT_APPEND,
   },

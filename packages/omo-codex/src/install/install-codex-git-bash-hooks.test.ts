@@ -1,80 +1,99 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, stat } from "node:fs/promises"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createRepoWithGitBashHooksFixture, EXPECTED_GIT_BASH_HOOKS } from "./install-codex-test-fixtures"
 
-const INSTALL_CODEX_GIT_BASH_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
-const GIT_BASH_PRE_TOOL_USE_HOOK = "./hooks/pre-tool-use-recommending-git-bash-mcp.json"
-const GIT_BASH_POST_COMPACT_HOOK = "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
+const [GIT_BASH_PRE_TOOL_USE_HOOK, GIT_BASH_POST_COMPACT_HOOK] = EXPECTED_GIT_BASH_HOOKS
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
+// Each case runs the real installer against a fresh repository fixture; the 5s default is not a budget
+// that filesystem work fits on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 describe("install-codex Git Bash hooks", () => {
   test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-win-"))
-    const repoRoot = process.cwd()
+    const testRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-win-"))
+    const repoRoot = await createRepoWithGitBashHooksFixture(process.cwd())
+    const codexHome = join(testRoot, "codex")
+    const binDir = join(testRoot, "bin")
 
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "win32",
-      astGrepInstaller: skipAstGrepInstall,
-      gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
-      runCommand: async () => undefined,
-    })
+    try {
+      // when
+      const result = await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot,
+        platform: "win32",
+        astGrepInstaller: skipAstGrepInstall,
+        gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
+        runCommand: async () => undefined,
+      })
 
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(configContent).toContain("enabled = true")
-    expect(configContent).toContain(GIT_BASH_PRE_TOOL_USE_HOOK.slice(2))
-    expect(configContent).toContain(GIT_BASH_POST_COMPACT_HOOK.slice(2))
-    expect(result.gitBashPath).toBe("C:\\Program Files\\Git\\bin\\bash.exe")
-    const pluginPath = result.installed[0]?.path ?? ""
-    const hooks = await readInstalledPluginHooks(pluginPath)
-    expect(hooks).toContain(GIT_BASH_PRE_TOOL_USE_HOOK)
-    expect(hooks).toContain(GIT_BASH_POST_COMPACT_HOOK)
-    const gitBashMcpPath = await readGitBashMcpPath(pluginPath)
-    expect(gitBashMcpPath).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-    expect((await stat(gitBashMcpPath)).isFile()).toBe(true)
-  }, { timeout: INSTALL_CODEX_GIT_BASH_TEST_TIMEOUT_MS })
+      // then
+      const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+      expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+      expect(configContent).toContain("enabled = true")
+      expect(configContent).toContain(GIT_BASH_PRE_TOOL_USE_HOOK.slice(2))
+      expect(configContent).toContain(GIT_BASH_POST_COMPACT_HOOK.slice(2))
+      expect(result.gitBashPath).toBe("C:\\Program Files\\Git\\bin\\bash.exe")
+      const pluginPath = result.installed[0]?.path ?? ""
+      const hooks = await readInstalledPluginHooks(pluginPath)
+      expect(hooks).toContain(GIT_BASH_PRE_TOOL_USE_HOOK)
+      expect(hooks).toContain(GIT_BASH_POST_COMPACT_HOOK)
+      const gitBashMcpPath = await readGitBashMcpPath(pluginPath)
+      expect(gitBashMcpPath).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
+      expect((await stat(gitBashMcpPath)).isFile()).toBe(true)
+    } finally {
+      await Promise.all([
+        rm(testRoot, { recursive: true, force: true }),
+        rm(repoRoot, { recursive: true, force: true }),
+      ])
+    }
+  })
 
   test("#given simulated Linux Codex install #when installing omo #then keeps git_bash MCP disabled without registering shell reminder hooks", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-linux-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-linux-"))
-    const repoRoot = process.cwd()
+    const testRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-linux-"))
+    const repoRoot = await createRepoWithGitBashHooksFixture(process.cwd())
+    const codexHome = join(testRoot, "codex")
+    const binDir = join(testRoot, "bin")
 
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "linux",
-      astGrepInstaller: skipAstGrepInstall,
-      runCommand: async () => undefined,
-    })
+    try {
+      // when
+      const result = await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot,
+        platform: "linux",
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+      })
 
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(configContent).toContain("enabled = false")
-    expect(configContent).not.toContain(GIT_BASH_PRE_TOOL_USE_HOOK.slice(2))
-    expect(configContent).not.toContain(GIT_BASH_POST_COMPACT_HOOK.slice(2))
-    const pluginPath = result.installed[0]?.path ?? ""
-    const hooks = await readInstalledPluginHooks(pluginPath)
-    expect(hooks).not.toContain(GIT_BASH_PRE_TOOL_USE_HOOK)
-    expect(hooks).not.toContain(GIT_BASH_POST_COMPACT_HOOK)
-    expect(await readGitBashMcpPath(pluginPath)).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-  }, { timeout: INSTALL_CODEX_GIT_BASH_TEST_TIMEOUT_MS })
+      // then
+      const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+      expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+      expect(configContent).toContain("enabled = false")
+      expect(configContent).not.toContain(GIT_BASH_PRE_TOOL_USE_HOOK.slice(2))
+      expect(configContent).not.toContain(GIT_BASH_POST_COMPACT_HOOK.slice(2))
+      const pluginPath = result.installed[0]?.path ?? ""
+      const hooks = await readInstalledPluginHooks(pluginPath)
+      expect(hooks).not.toContain(GIT_BASH_PRE_TOOL_USE_HOOK)
+      expect(hooks).not.toContain(GIT_BASH_POST_COMPACT_HOOK)
+      expect(await readGitBashMcpPath(pluginPath)).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
+    } finally {
+      await Promise.all([
+        rm(testRoot, { recursive: true, force: true }),
+        rm(repoRoot, { recursive: true, force: true }),
+      ])
+    }
+  })
 })
 
 async function readInstalledPluginHooks(pluginPath: string): Promise<readonly string[]> {

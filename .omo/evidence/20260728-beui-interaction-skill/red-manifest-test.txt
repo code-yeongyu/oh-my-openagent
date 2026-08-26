@@ -1,0 +1,18 @@
+manifest designOriginals += interaction-skill.md BEFORE file creation:
+
+manifest designOriginals += interaction-skill.md BEFORE the file exists:
+```
+ay committed.\n!references/design/README.md\n!references/design/_INDEX.md\n!references/design/aside.md\n!references/design/clone-from-url.md\n!references/design/design-system-architecture.md\n!references/design/layout-skill.md\n!references/design/lazyweb.md\n!references/design/react-dev-tooling-skill.md\n\n# UI/UX intelligence database (ui-ux-pro-max upstream), entirely materialized.\nreferences/ui-ux-db/\n\n# designpowers role/ruleset corpus, materialized from the pinned upstream.\nreferences/designpowers/vendor/\n"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/beui-interaction-skill/packages/shared-skills/frontend-thirdparty-manifest.test.ts:45:22)
+(fail) frontend third-party manifest partition > unignores every project-original design file [0.30ms]
+(pass) frontend third-party manifest partition > no ui-ux-db file is committed [0.07ms]
+(pass) frontend third-party manifest partition > no designpowers vendor file is committed [0.06ms]
+(pass) frontend third-party manifest partition > third-party manifest covers design brand, taste-skill, ui-ux-db, and designpowers [0.12ms]
+
+ 4 pass
+ 2 fail
+ 18 expect() calls
+Ran 6 tests across 1 file. [156.00ms]
+
+```

@@ -1,0 +1,50 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/facts/extraction.test.ts:
+(pass) facts extraction JSONL validation > #given valid project and person arms #when parsed #then scope remains a discriminated union [0.89ms]
+(pass) facts extraction JSONL validation > #given a project record carrying person #when parsed #then the whole extraction is rejected [0.15ms]
+(pass) facts extraction JSONL validation > #given a person record missing person #when parsed #then the whole extraction is rejected [0.06ms]
+(pass) atomic facts batch application > #given project and resolved person records #when applied before people routing lands #then one notes commit preserves both texts and trailers [294.79ms]
+(pass) atomic facts batch application > #given zero applicable records #when applied #then no commit is attempted [212.12ms]
+(pass) atomic facts batch application > #given git commit fails after staging #when the batch aborts #then index and working tree are restored [281.91ms]
+
+packages/memory-core/src/facts/queue.test.ts:
+(pass) facts queue enqueue > #given a fresh journal delta #when enqueue runs #then one queue file holds the full canonical range [8.79ms]
+(pass) facts queue enqueue > #given an identical settle #when enqueue runs again #then the duplicate endpoint is skipped [7.14ms]
+(pass) facts queue enqueue > #given a retained entry ending at m2 #when a later settle arrives #then the new range starts strictly after it [9.56ms]
+(pass) facts queue enqueue > #given the consumed watermark already covers the endpoint #when enqueue runs #then nothing is published [16.23ms]
+(pass) facts queue enqueue > #given only non-canonical trailing entries #when enqueue runs #then no queue file is published [3.72ms]
+(pass) facts queue file naming > #given a published entry #when the filename is inspected #then it is colon-free and hashes the conversation id [4.01ms]
+(pass) facts queue file naming > #given two publications in the same millisecond #when both land #then the endpoint hash keeps them distinct [7.21ms]
+(pass) facts queue concurrency > #given two concurrent enqueue attempts for the same delta #when both run #then exactly one entry is published [34.27ms]
+(pass) facts queue watermark monotonicity > #given an older batch settling after a newer one was queued #when it is consumed #then the enqueue watermark never rolls back [22.52ms]
+(pass) facts queue watermark monotonicity > #given a late older batch consumed #when the next settle runs #then no range overlapping the retained newer entry is republished [22.88ms]
+(pass) facts queue watermark monotonicity > #given a failed batch #when it is retained #then the enqueue watermark does not roll back and the entry survives [12.51ms]
+(pass) facts queue watermark monotonicity > #given a queue file that landed without its cursor write #when the next settle runs #then the retained endpoint anchors the range [10.19ms]
+(pass) facts queue reconcile > #given a leftover queue file with no completion #when reconcile runs #then it is listed as launchable [6.46ms]
+(pass) facts queue reconcile > #given a malformed queue file #when listPending runs #then it is ignored instead of throwing [6.74ms]
+(pass) facts queue reconcile > #given consumed entries #when markConsumed runs #then the files are deleted and the watermark records the endpoint [9.75ms]
+
+packages/omo-senpi/src/components/memory/facts-wiring.test.ts:
+(pass) facts wiring settle enqueue > #given debounce four #when four settles complete #then exactly one all-pending extractor launch fires [15.24ms]
+(pass) facts wiring settle enqueue > #given facts enabled and a new journal delta #when settle runs #then one queue file is published [5.33ms]
+(pass) facts wiring settle enqueue > #given the same cursor #when settle runs twice #then no duplicate entry is published [7.95ms]
+(pass) facts wiring settle enqueue > #given facts disabled #when settle runs #then nothing is enqueued [1.74ms]
+(pass) facts wiring settle enqueue > #given an empty journal #when settle runs #then nothing is enqueued [1.28ms]
+(pass) facts wiring session_start reconcile > #given a leftover queue file from a crashed run #when reconcile runs #then it is reported launchable [8.70ms]
+(pass) facts wiring session_start reconcile > #given facts disabled #when reconcile runs #then no leftover work is reported [4.97ms]
+(pass) facts wiring session_start reconcile > #given a consumed batch #when reconcile runs #then nothing is left to relaunch [14.66ms]
+
+packages/omo-senpi/src/components/memory/facts-runner.test.ts:
+(pass) quick-pinned facts launch > #given quick cannot resolve #when pending facts are launched #then no child spawns and the queue stays intact with one warning [17.57ms]
+(pass) quick-pinned facts launch > #given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit [469.82ms]
+(pass) quick-pinned facts launch > #given a commit lands before queue cleanup crashes #when a fresh runner reconciles #then the batch receipt prevents a duplicate commit [490.25ms]
+(pass) quick-pinned facts launch > #given a valid empty extraction #when finalized #then no commit lands and the queue is consumed as no_facts [342.61ms]
+(pass) quick-pinned facts launch > #given a schema-invalid project record carrying person #when finalized #then the queue is retained [325.92ms]
+(pass) deterministic facts writer-lock interleavings > #given the lock releases through the injected retry boundary #when finalization retries #then the batch commits and the queue empties [512.13ms]
+(pass) deterministic facts writer-lock interleavings > #given the lock remains held for all three attempts #when finalization exhausts retries #then no commit lands and one warning leaves queue and watermarks unchanged [366.80ms]
+
+ 36 pass
+ 0 fail
+ 116 expect() calls
+Ran 36 tests across 4 files. [5.01s]

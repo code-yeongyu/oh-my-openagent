@@ -64,6 +64,11 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.unrecoverableErrorDetected) {
+    log(`[${HOOK_NAME}] Skipped: non-retryable request error detected, re-injecting would rebuild the same request`, { sessionID })
+    return
+  }
+
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {

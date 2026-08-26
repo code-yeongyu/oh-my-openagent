@@ -15,6 +15,39 @@ const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 const commentCheckerHeader = "comment-checker found issues in"
 
+// Isolation is proven by these four files staying byte-identical: a live dev machine writes
+// senpi-debug.log, mcp caches, and concurrent session JSONL into the real agent dir throughout any
+// run, so a whole-directory digest can only ever be informational. settings.json is compared after
+// dropping its volatile interactive-session stamps (tipsHistory, lastChangelogVersion): a concurrent
+// host TUI rewrites those on its own lifecycle events, which cannot identify QA pollution.
+const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
+
+export function credentialDigest(agentDir) {
+  const hash = createHash("sha256")
+  for (const name of CREDENTIAL_FILES) {
+    const path = join(agentDir, name)
+    hash.update(name)
+    hash.update("\0")
+    hash.update(existsSync(path) ? credentialBytes(path, name) : Buffer.from("absent"))
+    hash.update("\0")
+  }
+  return hash.digest("hex")
+}
+
+function credentialBytes(path, name) {
+  const content = readFileSync(path)
+  if (name !== "settings.json") return content
+  try {
+    const settings = JSON.parse(content.toString("utf8"))
+    if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return content
+    delete settings.tipsHistory
+    delete settings.lastChangelogVersion
+    return JSON.stringify(settings)
+  } catch {
+    return content
+  }
+}
+
 export function digestDirectory(root) {
   if (!existsSync(root)) return "absent"
   const files = []
@@ -31,16 +64,25 @@ export function digestDirectory(root) {
 }
 
 export function createSandbox() {
-  const root = mkdtempSync(join(tmpdir(), "omo-senpi-qa-"))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-senpi-qa-")))
   const cwd = join(root, "project")
   const agentDir = join(root, "agent")
-  const canonicalCwd = realpathSync(root)
-  return { root, cwd, agentDir, canonicalCwd: join(canonicalCwd, "project") }
+  const xdgConfigHome = join(root, "xdg")
+  const xdgDataHome = join(root, "xdg-data")
+  const xdgCacheHome = join(root, "xdg-cache")
+  const homeDir = join(root, "home")
+  return { root, cwd, agentDir, xdgConfigHome, xdgDataHome, xdgCacheHome, homeDir, canonicalCwd: cwd }
 }
 
-export function seedSandbox({ cwd, agentDir, canonicalCwd }) {
+export function seedSandbox({ cwd, agentDir, xdgConfigHome, xdgDataHome, xdgCacheHome, homeDir, canonicalCwd }) {
   mkdirp(cwd)
   mkdirp(agentDir)
+  if (homeDir !== undefined) mkdirp(homeDir)
+  // The omo config loader reads the user scope from XDG_CONFIG_HOME; without an isolated one every
+  // lane inherits the developer's real ~/.config/omo agents and categories and stops being reproducible.
+  if (xdgConfigHome !== undefined) mkdirp(xdgConfigHome)
+  if (xdgDataHome !== undefined) mkdirp(xdgDataHome)
+  if (xdgCacheHome !== undefined) mkdirp(xdgCacheHome)
   const settings = {
     defaultProjectTrust: "ask",
     packages: [pluginRoot],
@@ -65,6 +107,8 @@ function runSelfTest() {
     const trust = JSON.parse(readFileSync(join(sandbox.agentDir, "trust.json"), "utf8"))
     if (trust[sandbox.canonicalCwd] !== true) throw new Error("trust.json missing canonical cwd")
     if (sandbox.agentDir === process.env.SENPI_CODING_AGENT_DIR) throw new Error("sandbox reused caller agent dir")
+    if (sandbox.xdgConfigHome === process.env.XDG_CONFIG_HOME) throw new Error("sandbox reused caller xdg config home")
+    if (!existsSync(sandbox.xdgConfigHome)) throw new Error("sandbox xdg config home missing")
     const before = digestDirectory(join(sandbox.root, "missing"))
     if (before !== "absent") throw new Error("missing directory digest should be absent")
   } finally {
@@ -79,7 +123,15 @@ function runSenpi(senpiBin, sandbox, prompt, script, extraEnv = {}) {
     env: {
       ...process.env,
       ...extraEnv,
+      OMO_CODING_AGENT_DIR: sandbox.agentDir,
       SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+      PI_CODING_AGENT_DIR: sandbox.agentDir,
+      HOME: sandbox.homeDir,
+      USERPROFILE: sandbox.homeDir,
+      XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+      XDG_DATA_HOME: sandbox.xdgDataHome,
+      XDG_CACHE_HOME: sandbox.xdgCacheHome,
+      PI_OFFLINE: "1",
       OMO_SENPI_QA: "1",
     },
     encoding: "utf8",

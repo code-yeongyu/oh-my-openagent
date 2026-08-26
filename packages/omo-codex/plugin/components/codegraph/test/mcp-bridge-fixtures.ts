@@ -1,6 +1,6 @@
 import { chmodSync, writeFileSync } from "node:fs";
 
-export const CODEGRAPH_141_DEFAULT_TOOLS: readonly Record<string, unknown>[] = [
+export const CODEGRAPH_150_DEFAULT_TOOLS: readonly Record<string, unknown>[] = [
 	{
 		name: "codegraph_explore",
 		description:
@@ -41,10 +41,10 @@ export function writeFakeNewlineCodegraph(filePath: string): void {
 			"rl.on('line', (line) => {",
 			"  const request = JSON.parse(line);",
 			"  if (request.method === 'initialize') {",
-			"    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { capabilities: { tools: { listChanged: false } }, protocolVersion: request.params.protocolVersion, serverInfo: { name: 'codegraph', version: '1.4.1' } } }) + '\\n');",
+			"    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { capabilities: { tools: { listChanged: false } }, protocolVersion: request.params.protocolVersion, serverInfo: { name: 'codegraph', version: '1.5.0' } } }) + '\\n');",
 			"  }",
 			"  if (request.method === 'tools/list') {",
-			`    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { tools: ${JSON.stringify(CODEGRAPH_141_DEFAULT_TOOLS)} } }) + '\\n');`,
+			`    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { tools: ${JSON.stringify(CODEGRAPH_150_DEFAULT_TOOLS)} } }) + '\\n');`,
 			"  }",
 			"});",
 		].join("\n"),

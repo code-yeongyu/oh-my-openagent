@@ -1,0 +1,7 @@
+npm error code EEXIST
+npm error path /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/prefix/bin/omo
+npm error EEXIST: file already exists
+npm error File exists: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/prefix/bin/omo
+npm error Remove the existing file and try again, or run npm
+npm error with --force to overwrite files recklessly.
+npm error A complete log of this run can be found in: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-eexist.XXXXXX.DS7hmQsNMo/npm-cache/_logs/2026-08-09T15_45_38_253Z-debug-0.log

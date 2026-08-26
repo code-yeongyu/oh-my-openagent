@@ -1,4 +1,6 @@
 import { detectHeuristicModelFamily } from "./model-capability-heuristics"
+import { isClaudeOpus47OrLaterModel } from "./model-family-detectors"
+import { clampReasoningLevel, REASONING_LEVELS } from "./reasoning-level"
 
 type CompatibilityField = "variant" | "reasoningEffort" | "temperature" | "topP" | "maxTokens" | "thinking"
 
@@ -48,20 +50,8 @@ export type ModelSettingsCompatibilityResult = {
   changes: ModelSettingsCompatibilityChange[]
 }
 
-const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
-const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
-
-function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
-  const requestedIndex = ladder.indexOf(value)
-  if (requestedIndex === -1) return undefined
-
-  for (let index = requestedIndex; index >= 0; index -= 1) {
-    if (allowed.includes(ladder[index])) {
-      return ladder[index]
-    }
-  }
-
-  return undefined
+function downgradeWithinLadder(value: string, allowed: string[]): string | undefined {
+  return clampReasoningLevel(value, allowed)
 }
 
 function normalizeCapabilitiesVariants(capabilities: CompatibilityCapabilities | undefined): string[] | undefined {
@@ -96,7 +86,7 @@ function resolveField(
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
     return {
-      value: downgradeWithinLadder(normalized, metadataOverride, ladder),
+      value: downgradeWithinLadder(normalized, metadataOverride),
       reason: "unsupported-by-model-metadata",
     }
   }
@@ -104,7 +94,7 @@ function resolveField(
   if (familyCaps) {
     if (familyCaps.includes(normalized)) return { value: normalized }
     return {
-      value: downgradeWithinLadder(normalized, familyCaps, ladder),
+      value: downgradeWithinLadder(normalized, familyCaps),
       reason: "unsupported-by-model-family",
     }
   }
@@ -128,7 +118,7 @@ export function resolveCompatibleModelSettings(
   let variant = input.desired.variant
   if (variant !== undefined) {
     const normalized = variant.toLowerCase()
-    const resolved = resolveField(normalized, family?.variants, VARIANT_LADDER, familyKnown, metadataVariants)
+    const resolved = resolveField(normalized, family?.variants, REASONING_LEVELS as unknown as string[], familyKnown, metadataVariants)
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "variant", from: variant, to: resolved.value, reason: resolved.reason })
     }
@@ -141,7 +131,7 @@ export function resolveCompatibleModelSettings(
     const resolved = resolveField(
       normalized,
       family?.reasoningEfforts,
-      REASONING_LADDER,
+      REASONING_LEVELS as unknown as string[],
       familyKnown,
       metadataReasoningEfforts,
       family?.reasoningEffortAliases,
@@ -153,12 +143,22 @@ export function resolveCompatibleModelSettings(
   }
 
   let temperature = input.desired.temperature
-  if (temperature !== undefined && input.capabilities?.supportsTemperature === false) {
+  const metadataSupportsTemperature = input.capabilities?.supportsTemperature
+  const familyDisallowsTemperature =
+    metadataSupportsTemperature === undefined &&
+    (isClaudeOpus47OrLaterModel(input.modelID) || family?.supportsTemperature === false)
+  if (
+    temperature !== undefined &&
+    (metadataSupportsTemperature === false || familyDisallowsTemperature)
+  ) {
     changes.push({
       field: "temperature",
       from: String(temperature),
       to: undefined,
-      reason: "unsupported-by-model-metadata",
+      reason:
+        metadataSupportsTemperature === false
+          ? "unsupported-by-model-metadata"
+          : "unsupported-by-model-family",
     })
     temperature = undefined
   }

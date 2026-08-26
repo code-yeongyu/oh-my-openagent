@@ -1,9 +1,10 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, relative, resolve } from "node:path"
 import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
@@ -28,6 +29,12 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
   tempDirs.push(pluginPath)
   await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
   await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
   const requiredSkillNames = [
     "ast-grep",
     "coding-agent-sessions",
@@ -40,9 +47,9 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
     "refactor",
     "remove-ai-slops",
     "review-work",
-    "start-work",
     "ultimate-browsing",
     "ultrawork",
+    "ulw-execute",
     "ulw-loop",
     "ulw-plan",
     "ulw-research",
@@ -53,6 +60,22 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
   }
   await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
   if (options.runtime !== false) {
+    const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
+    await chmod(astGrepRuntime, 0o755)
+    const astGrepRuntimeBytes = await readFile(astGrepRuntime)
+    await writeFixtureFile(
+      join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
+      `${JSON.stringify({
+        sha256: createHash("sha256").update(astGrepRuntimeBytes).digest("hex"),
+        mode: 0o755,
+        stagedAtUtc: "2026-08-03T00:00:00.000Z",
+      }, null, 2)}\n`,
+    )
+    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "cli.js"), "export {}\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "ulw-loop", "cli.js"), "console.log('ulw-loop')\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit"), "#!/bin/sh\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"), "@echo off\r\n")
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
@@ -116,6 +139,150 @@ describe("runSenpiInstaller", () => {
     expect(await backupFiles(agentDir)).toHaveLength(1)
   })
 
+  test("#given legacy goal and webfetch packages #when installing #then builtin-shadowing entries are removed", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const legacyGoal = join(repoRoot, "packages", "pi-goal")
+    const legacyWebfetch = join(repoRoot, "packages", "pi-webfetch")
+    await writeFile(
+      join(agentDir, "settings.json"),
+      JSON.stringify({
+        packages: [
+          "keep-me",
+          relative(agentDir, legacyGoal),
+          legacyWebfetch,
+          pluginPath,
+        ],
+      }),
+    )
+
+    // when
+    await runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    const settings = await readSettings(agentDir)
+    expect(settings.packages).toEqual(["keep-me", pluginPath])
+  })
+
+  test("#given a Windows packed runtime with a POSIX manifest mode #when installing #then matching content passes integrity", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    await chmod(runtimeEntry, 0o700)
+
+    // when
+    const result = await runSenpiInstaller({
+      env: { SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+      platform: "win32",
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(await readSettings(agentDir)).toEqual({ packages: [pluginPath] })
+  })
+
+  test("#given a POSIX packed runtime with a mismatched manifest mode #when installing #then integrity fails", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    await chmod(runtimeEntry, 0o700)
+
+    // when
+    const install = runSenpiInstaller({
+      env: { SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+      platform: "linux",
+    })
+
+    // then
+    await expect(install).rejects.toThrow("mode mismatch: manifest=493 actual=")
+  })
+
+  test("#given packed ast-grep runtime differs from its manifest #when installing #then integrity failure leaves settings unchanged", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const runtimeEntry = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
+    const original = await readFile(runtimeEntry)
+    await writeFixtureFile(
+      join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
+      `${JSON.stringify({
+        sha256: createHash("sha256").update(original).digest("hex"),
+        mode: 0o755,
+        stagedAtUtc: "2026-08-03T00:00:00.000Z",
+      }, null, 2)}\n`,
+    )
+    await writeFile(runtimeEntry, "#!/usr/bin/env node\nthrow new Error('corrupted runtime')\n", "utf8")
+    await chmod(runtimeEntry, 0o755)
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
+  test("#given packed ast-grep runtime missing its manifest #when installing #then integrity failure leaves settings unchanged", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"))
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
+  test("#given a packed plugin missing the run supervisor #when installing #then artifact validation fails before settings change", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "extensions", "memory-run-supervisor.mjs"))
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
+  test("#given a packed plugin missing the dream persona #when installing #then artifact validation fails before settings change", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "extensions", "dream-persona.md"))
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
   test("#given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written", async () => {
     // given
     const agentDir = await makeAgentDir()
@@ -130,6 +297,17 @@ describe("runSenpiInstaller", () => {
     await expect(install).rejects.toThrow("missing required runtime artifacts")
     expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
     expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
+  test("#given packed plugin missing the lazy task runtime #when installing #then settings stay unchanged", async () => {
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "extensions", "omo-task.js"))
+
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
   })
 })
 

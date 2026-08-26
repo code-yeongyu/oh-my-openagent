@@ -1,0 +1,1 @@
+npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'; echo "EXIT=$?"

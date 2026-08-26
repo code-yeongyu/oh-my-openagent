@@ -1,0 +1,46 @@
+### GREEN capture - issue #6141 - 2026-07-27T05:56:21Z
+### product diff:
+ packages/omo-opencode/src/agents/hephaestus/agent.ts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+### the product change:
+diff --git a/packages/omo-opencode/src/agents/hephaestus/agent.ts b/packages/omo-opencode/src/agents/hephaestus/agent.ts
+index 92baf00a4..6d5218b17 100644
+--- a/packages/omo-opencode/src/agents/hephaestus/agent.ts
++++ b/packages/omo-opencode/src/agents/hephaestus/agent.ts
+@@ -20,6 +20,7 @@ const GPT_5_3_CODEX_RE = /^gpt-5[.-]3-codex(?:$|[.-])/i;
+ const GPT_5_4_RE = /^gpt-5[.-]4(?:$|[.-])/i;
+ const GPT_5_5_RE = /^gpt-5[.-]5(?:$|[.-])/i;
+ const GPT_5_6_RE = /^gpt-5[.-]6(?:$|[.-])/i;
++const HOSTED_VENDOR_PREFIX_RE = /^(?:[^./]+\.)+(gpt-5[.-].*)$/i;
+ 
+ export type HephaestusPromptSource = "gpt-5-6" | "gpt-5-5" | "gpt-5-4" | "gpt";
+ 
+@@ -36,7 +37,8 @@ export class UnsupportedHephaestusModelError extends Error {
+ }
+ 
+ function extractModelName(model: string): string {
+-  return model.includes("/") ? (model.split("/").pop() ?? model) : model;
++  const afterProvider = model.includes("/") ? (model.split("/").pop() ?? model) : model;
++  return HOSTED_VENDOR_PREFIX_RE.exec(afterProvider)?.[1] ?? afterProvider;
+ }
+ 
+ export function isHephaestusSupportedModel(model: string | undefined): boolean {
+
+=== bun test packages/omo-opencode/src/agents/hephaestus/agent.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 36 pass
+ 0 fail
+ 95 expect() calls
+Ran 36 tests across 1 file. [1224.00ms]
+EXIT=0
+
+=== whole agents/ tree ===
+bun test v1.3.14 (0d9b296a)
+
+ 374 pass
+ 0 fail
+ 1045 expect() calls
+Ran 374 tests across 30 files. [4.67s]
+EXIT_agents=0

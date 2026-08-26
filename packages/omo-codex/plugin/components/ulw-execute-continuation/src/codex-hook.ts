@@ -1,0 +1,108 @@
+import type { ContinuationState } from "./boulder-reader.js";
+import { readContinuationState } from "./boulder-reader.js";
+import { ULW_EXECUTE_CONTINUATION_DIRECTIVE } from "./directive.js";
+import type { ReadonlyFileSystem, StopHookEventName, StopHookOutput, StopInput } from "./types.js";
+
+export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
+	if (!isStopInput(input)) return "";
+	if (input.stop_hook_active) return "";
+	if (hasAllowedExternalBlockerMarker(input.last_assistant_message)) return "";
+	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
+	const state = readContinuationState(input.cwd, input.session_id);
+	if (state === null) return "";
+	return JSON.stringify({
+		decision: "block",
+		reason: renderDirective(state, input.session_id),
+	} satisfies StopHookOutput);
+}
+
+function renderDirective(state: ContinuationState, sessionId: string): string {
+	const lineBreak = String.fromCharCode(10);
+	const worktreeBlock =
+		state.worktreePath === null
+			? ""
+			: `${lineBreak}- Worktree: \`${state.worktreePath}\` (all edits, tests, and commands run inside this directory)`;
+	const replacements = {
+		PLAN_NAME: state.planName,
+		PLAN_PATH: state.planPath,
+		BOULDER_PATH: state.boulderPath,
+		REMAINING_COUNT: String(state.checklist.remaining),
+		TOTAL_COUNT: String(state.checklist.total),
+		NEXT_TASK_LABEL: state.checklist.nextTaskLabel ?? "none (final gate pending)",
+		WORKTREE_BLOCK: worktreeBlock,
+		LEDGER_PATH: state.ledgerPath,
+		SESSION_ID: sessionId,
+	} as const;
+	let rendered = ULW_EXECUTE_CONTINUATION_DIRECTIVE;
+	for (const [placeholder, value] of Object.entries(replacements)) {
+		rendered = rendered.replaceAll(`{{${placeholder}}}`, value);
+	}
+	return rendered;
+}
+
+const EXTERNAL_BLOCKER_MARKER = "<ulw-execute-blocked-external>";
+const ULTRAWORK_OPENER = "ULTRAWORK MODE ENABLED!";
+
+// The marker alone is not enough to end the turn. `directive.md` requires the exact blocker and
+// the condition that resumes the work on the following lines, so at least one is required here
+// too. That keeps a bare echo of the marker, whether quoted back from a prompt or produced by
+// untrusted text the agent read, from skipping the continuation guard.
+function hasAllowedExternalBlockerMarker(lastAssistantMessage: string | undefined): boolean {
+	if (lastAssistantMessage === undefined) return false;
+	const lines = lastAssistantMessage.split(String.fromCharCode(10));
+	const [firstLine = "", secondLine = ""] = lines;
+
+	let markerLineIndex = -1;
+	if (firstLine.trim() === EXTERNAL_BLOCKER_MARKER) markerLineIndex = 0;
+	else if (firstLine.trim() === ULTRAWORK_OPENER && secondLine.trim() === EXTERNAL_BLOCKER_MARKER) markerLineIndex = 1;
+	if (markerLineIndex === -1) return false;
+
+	return lines.slice(markerLineIndex + 1).some((line) => line.trim() !== "");
+}
+
+const CONTEXT_PRESSURE_MARKERS = [
+	"context compacted",
+	"context_length_exceeded",
+	"skill descriptions were shortened",
+	"context_too_large",
+	"codex ran out of room in the model's context window",
+	"your input exceeds the context window",
+	"long threads and multiple compactions",
+] as const;
+
+function transcriptHasContextPressureMarker(transcriptPath: string, fs: ReadonlyFileSystem): boolean {
+	try {
+		const transcript = fs.readFileSync(transcriptPath, "utf8").toLowerCase();
+		return CONTEXT_PRESSURE_MARKERS.some((marker) => transcript.includes(marker));
+	} catch (error) {
+		if (error instanceof Error) return false;
+		throw error;
+	}
+}
+
+function isStopInput(value: unknown): value is StopInput {
+	return (
+		isRecord(value) &&
+		isStopHookEventName(value["hook_event_name"]) &&
+		typeof value["session_id"] === "string" &&
+		typeof value["turn_id"] === "string" &&
+		typeof value["transcript_path"] === "string" &&
+		typeof value["cwd"] === "string" &&
+		typeof value["model"] === "string" &&
+		typeof value["permission_mode"] === "string" &&
+		typeof value["stop_hook_active"] === "boolean" &&
+		optionalString(value["last_assistant_message"])
+	);
+}
+
+function isStopHookEventName(value: unknown): value is StopHookEventName {
+	return value === "Stop" || value === "SubagentStop";
+}
+
+function optionalString(value: unknown): boolean {
+	return value === undefined || typeof value === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}

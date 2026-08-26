@@ -36,7 +36,7 @@ describe("normalizeModelToCanonicalString", () => {
       const result = normalizeModelToCanonicalString(model)
 
       // then
-      expect(result).toBe("openai/gpt-5.5-codex")
+      expect(result).toBe("openai/gpt-5.5-codex(medium)")
     })
 
     test("#when it exposes modelID instead of id #then it still resolves", () => {

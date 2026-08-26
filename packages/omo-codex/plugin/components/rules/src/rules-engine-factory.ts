@@ -1,11 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-
+import { createEngine, findProjectRoot, findRuleCandidates } from "@oh-my-opencode/rules-engine/engine";
 import { configFromEnvironment } from "./config.js";
-import { createEngine } from "@oh-my-opencode/rules-engine/engine";
-import { findRuleCandidates } from "@oh-my-opencode/rules-engine/engine";
-import { findProjectRoot } from "@oh-my-opencode/rules-engine/engine";
 
 interface RulesEngineFactoryOptions {
 	env?: NodeJS.ProcessEnv;

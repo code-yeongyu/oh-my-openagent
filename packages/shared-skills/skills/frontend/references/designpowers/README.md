@@ -9,7 +9,7 @@ The purpose of this ruleset is to enrich the existing frontend workflow while pr
 - `references/design/README.md` still owns the `DESIGN.md` contract, taste routing, brand references, React dev tooling, and browser-based design QA expectations.
 - `references/perfection/README.md` still owns Lighthouse, performance, SEO, accessibility audit mechanics, and real-browser verification.
 - `/visual-qa` still owns objective rendered evidence for visual claims.
-- `/ulw-plan`, `/start-work`, and `/review-work` still own planning, execution, and final implementation review when those phases apply.
+- `/ulw-plan`, `/ulw-execute`, and `/review-work` still own planning, execution, and final implementation review when those phases apply.
 
 ## Load Order
 

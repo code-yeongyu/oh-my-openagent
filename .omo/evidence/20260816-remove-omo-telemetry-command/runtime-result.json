@@ -1,0 +1,17 @@
+{
+  "enabled": {
+    "label": "enabled",
+    "requestCount": 2,
+    "payloadHistoryExists": false,
+    "stdoutIncludesCompletion": true,
+    "stderrTail": "e: 1 }\nomo-senpi process sweep skipped: running inside a senpi-task RPC child undefined\nomo-senpi start-work-continuation skipped { reason: 'not-continuable' }\nomo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }\nomo-senpi ulw-loop continuation skipped { reason: 'inactive' }\nomo-senpi start-work-continuation skipped { reason: 'not-continuable' }\nomo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }\nomo-senpi ulw-loop continuation skipped { reason: 'inactive' }\n"
+  },
+  "optedOut": {
+    "label": "opted-out",
+    "requestCount": 0,
+    "payloadHistoryExists": false,
+    "stdoutIncludesCompletion": true,
+    "stderrTail": "e: 1 }\nomo-senpi process sweep skipped: running inside a senpi-task RPC child undefined\nomo-senpi start-work-continuation skipped { reason: 'not-continuable' }\nomo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }\nomo-senpi ulw-loop continuation skipped { reason: 'inactive' }\nomo-senpi start-work-continuation skipped { reason: 'not-continuable' }\nomo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }\nomo-senpi ulw-loop continuation skipped { reason: 'inactive' }\n"
+  },
+  "pass": true
+}

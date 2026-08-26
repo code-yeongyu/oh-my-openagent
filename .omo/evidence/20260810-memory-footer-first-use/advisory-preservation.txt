@@ -1,0 +1,22 @@
+RED:
+`bun test packages/omo-senpi/src/components/memory/status.test.ts`
+
+- `showFooter: false` was ignored, so the bind-time advisory path still rendered a footer.
+- `checkAdvisory: false` was ignored, so the first-use footer path emitted a duplicate warning.
+- Result: 9 pass, 2 fail, 26 assertions.
+
+GREEN:
+`bun test packages/memory-core/src/git/repo.test.ts packages/omo-senpi/src/components/memory/status.test.ts packages/omo-senpi/src/components/memory/wiring.test.ts`
+
+- bind-time path can check the compile-token advisory without rendering a footer
+- first-use path can render the footer without rechecking the advisory
+- exact age buckets, missing metadata, once-per-session gating, and namespaced tools remain green
+- Result: 22 pass, 0 fail, 56 assertions, 5.19s
+
+Adjacent verification:
+- `bun run --cwd packages/omo-senpi typecheck` exit 0
+- `bun test packages/omo-senpi/src/components/memory` -> 246 pass, 0 fail, 823 assertions across 39 files
+- `OMO_SKIP_MATERIALIZE=1 bun run build:senpi-plugin` exit 0
+- final xterm before/after assertions -> PASS
+
+The bind-time advisory retains the old fire-and-forget error-swallowing behavior; the first memory-tool result only performs footer rendering.

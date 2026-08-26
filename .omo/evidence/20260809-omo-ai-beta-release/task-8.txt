@@ -1,0 +1,188 @@
+Task 8 evidence - package-shape pin tests for the published contract
+Date: 2026-08-09
+
+== BASELINE: test GREEN before mutations ==
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/package-shape.test.ts:
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [1.49ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then @code-yeongyu/senpi is the sole runtime dependency [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.06ms]
+
+ 10 pass
+ 0 fail
+ 12 expect() calls
+Ran 10 tests across 1 file. [103.00ms]
+
+GREEN exit status: 0
+
+
+== PROBE (i): flip senpi pin to ^2026.8.9 -> RED ==
+
+Mutation: jq '.dependencies["@code-yeongyu/senpi"] = "^2026.8.9"'
+Resulting pin: { "@code-yeongyu/senpi": "^2026.8.9" }
+
+--- RED RUN ---
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/package-shape.test.ts:
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [0.33ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then @code-yeongyu/senpi is the sole runtime dependency [0.04ms]
+49 |         expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@code-yeongyu/senpi"])
+50 |       })
+51 |
+52 |       test("#then the senpi pin is exact with no range operator", () => {
+53 |         const pin = manifest.dependencies?.["@code-yeongyu/senpi"]
+54 |         expect(pin).toBe("2026.8.9")
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: "2026.8.9"
+Received: "^2026.8.9"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/package-shape.test.ts:54:21)
+(fail) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.17ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.04ms]
+
+ 9 pass
+ 1 fail
+ 10 expect() calls
+Ran 10 tests across 1 file. [77.00ms]
+
+RED exit status: 1
+
+--- REVERT: git checkout -- packages/omo-native/package.json ---
+
+--- GREEN RUN (post-revert) ---
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/package-shape.test.ts:
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [1.56ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.12ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then @code-yeongyu/senpi is the sole runtime dependency [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.10ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.04ms]
+
+ 10 pass
+ 0 fail
+ 12 expect() calls
+Ran 10 tests across 1 file. [70.00ms]
+
+GREEN exit status: 0
+
+
+== PROBE (ii): add omo-agent-toolkit to bin map -> RED (naming the forbidden entry) ==
+
+Mutation: jq '.bin["omo-agent-toolkit"] = "bin/omo-agent-toolkit.js"'
+Resulting bin: { "omo": "bin/omo.js", "omo-agent-toolkit": "bin/omo-agent-toolkit.js" }
+
+--- RED RUN ---
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/package-shape.test.ts:
+22 |
+23 | describe("omo-ai published package shape", () => {
+24 |   describe("#given the omo-native package manifest", () => {
+25 |     describe("#when the bin map is audited", () => {
+26 |       test("#then it exposes exactly the omo command pointing at bin/omo.js", () => {
+27 |         expect(manifest.bin).toEqual({ omo: "bin/omo.js" })
+                                  ^
+error: expect(received).toEqual(expected)
+
+  {
+    "omo": "bin/omo.js",
++   "omo-agent-toolkit": "bin/omo-agent-toolkit.js",
+  }
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/package-shape.test.ts:27:30)
+(fail) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [1.54ms]
+26 |       test("#then it exposes exactly the omo command pointing at bin/omo.js", () => {
+27 |         expect(manifest.bin).toEqual({ omo: "bin/omo.js" })
+28 |       })
+29 |
+30 |       test("#then omo-agent-toolkit is absent from the bin map", () => {
+31 |         expect(manifest.bin).not.toHaveProperty("omo-agent-toolkit")
+                                      ^
+error: expect(received).not.toHaveProperty(path)
+
+Expected path: not "omo-agent-toolkit"
+
+Received value: "bin/omo-agent-toolkit.js"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/package-shape.test.ts:31:34)
+(fail) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.12ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then @code-yeongyu/senpi is the sole runtime dependency [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.10ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.04ms]
+
+ 8 pass
+ 2 fail
+ 12 expect() calls
+Ran 10 tests across 1 file. [72.00ms]
+
+RED exit status: 1
+
+The forbidden entry "omo-agent-toolkit" is explicitly named in the failure output:
+  - toEqual diff shows: + "omo-agent-toolkit": "bin/omo-agent-toolkit.js"
+  - not.toHaveProperty error: Expected path: not "omo-agent-toolkit"
+
+--- REVERT: git checkout -- packages/omo-native/package.json ---
+
+--- GREEN RUN (post-revert) ---
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/package-shape.test.ts:
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [1.50ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.06ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then @code-yeongyu/senpi is the sole runtime dependency [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.09ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.05ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.04ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.04ms]
+
+ 10 pass
+ 0 fail
+ 12 expect() calls
+Ran 10 tests across 1 file. [71.00ms]
+
+GREEN exit status: 0
+
+
+== POST-MUTATION VERIFY: package.json unmodified ==
+
+git diff --name-only packages/omo-native/package.json
+(empty output confirms unmodified)

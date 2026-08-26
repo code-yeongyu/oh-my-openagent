@@ -1,0 +1,62 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/scheduler.test.ts:
+(pass) DAG scheduler terminal result persistence > #given only the senpi-task scheduler #when a node completes #then output and run stats are persisted without an adapter [30.66ms]
+(pass) DAG scheduler subscriber backpressure > #given a non-default subscriber ring #when a scheduler listener falls behind #then overflow occurs at the configured bound [27.79ms]
+(pass) DAG scheduler execution mode dispatch > #given task.default_execution_mode #when a DAG node is dispatched #then the scheduler resolves through the existing chain [17.38ms]
+(pass) DAG scheduler failure semantics > #given every terminal task status #when folded #then each maps to its exact node outcome and error code [93.83ms]
+(pass) DAG scheduler failure semantics > #given every start denial #when admission fails #then each maps to its exact node error code [24.32ms]
+(pass) DAG scheduler failure semantics > #given a failed root with a descendant chain #when failure cascades #then every descendant skip is persisted separately [31.66ms]
+(pass) DAG scheduler failure semantics > #given graph-ordered failures finish out of order #when independent work settles #then the run uses the first wave and declaration failure [33.22ms]
+(pass) DAG scheduler cancellation > #given durable waiters armed before and during cancellation #when the scheduler cancels through a separate journal path #then every wait and re-attach settles cancelled [12.99ms]
+(pass) DAG scheduler cancellation > #given a running wave and pending descendants #when cancelled #then tasks cancel, admission stops, and waiters resolve cancelled [25.09ms]
+(pass) DAG scheduler cancellation > #given one startOwned rejects after a sibling starts #when cancellation follows #then admission clears and the sibling is attached and cancelled [15.37ms]
+(pass) DAG scheduler cancellation > #given an AbortError returned by task cancellation #when the run is cancelled #then durable cancellation settles and the rejection still surfaces [13.17ms]
+(pass) DAG scheduler cancellation > #given a genuine task cancellation failure #when a wave is cancelled #then the run settles cancelled and the failure still surfaces [19.06ms]
+(pass) DAG scheduler cancellation > #given a paused unclaimed run #when cancelled #then it ends cancelled without task cancellation [11.64ms]
+(pass) DAG scheduler strict wave barrier > #given a linear three-wave DAG #when run #then nodes and wave events are admitted in order [39.73ms]
+(pass) DAG scheduler strict wave barrier > #given a diamond DAG #when run #then the fan-out shares one wave and the join waits for it [38.73ms]
+(pass) DAG scheduler strict wave barrier > #given a wave-one task is still running #when the scheduler is active #then wave two is not admitted before terminal [22.99ms]
+(pass) DAG scheduler strict wave barrier > #given one waitFor rejects while a sibling is running #when the wave settles #then the rejection becomes one node failure and the sibling completes [19.34ms]
+(pass) DAG scheduler strict wave barrier > #given one root start fails #when its wave is admitted #then siblings and the independent branch still run [24.67ms]
+(pass) DAG scheduler strict wave barrier > #given startOwned queues a scheduled node #when attached #then its queue position is journaled [12.61ms]
+(pass) DAG scheduler strict wave barrier > #given a same-wave node is residency denied #when an attached sibling frees a slot #then admission retries without failing it [20.34ms]
+(pass) DAG scheduler strict wave barrier > #given a wave wider than residency capacity #when tasks settle #then all nodes are admitted in batches without a second concurrency limit [29.71ms]
+896 | 
+897 |     // when
+898 |     const result = await scheduler.run()
+899 | 
+900 |     // then
+901 |     expect(result.nodes[0]?.state).toBe("failed")
+                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "failed"
+Received: "completed"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/scheduler.test.ts:901:36)
+(fail) DAG scheduler node spawn policy > #given a policy that denies an agent-routed node #when the wave admits #then the node fails with the denial message and startOwned is never called [11.48ms]
+917 | 
+918 |     // when
+919 |     await scheduler.run()
+920 | 
+921 |     // then
+922 |     expect(manager.startedSpecs[0]?.prompt).toBe(canonical)
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "Review the work plan at .omo/plans/x.md for contradictions and blocking issues."
+Received: "caller wording"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/scheduler.test.ts:922:45)
+(fail) DAG scheduler node spawn policy > #given a policy that forces the prompt #when the node starts #then the child receives the forced prompt [11.74ms]
+(pass) DAG scheduler node spawn policy > #given category-routed nodes #when the wave admits #then the policy is never consulted [10.54ms]
+
+2 tests failed:
+(fail) DAG scheduler node spawn policy > #given a policy that denies an agent-routed node #when the wave admits #then the node fails with the denial message and startOwned is never called [11.48ms]
+(fail) DAG scheduler node spawn policy > #given a policy that forces the prompt #when the node starts #then the child receives the forced prompt [11.74ms]
+
+ 22 pass
+ 2 fail
+ 82 expect() calls
+Ran 24 tests across 1 file. [747.00ms]

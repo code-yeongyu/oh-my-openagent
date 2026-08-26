@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
+import { CATEGORY_PROMPT_APPENDS } from "../../category"
 import { listTaskAgents, listTaskCategories } from "./categories"
 
 describe("listTaskCategories", () => {
@@ -47,13 +48,25 @@ describe("listTaskCategories", () => {
     // then
     expect(names).not.toContain("quick")
   })
+
+  test("#given caller-directed builtin guidance #when worker appends are inspected #then only worker context remains", () => {
+    // given
+    const callerDirectedCategories = ["quick", "unspecified-low", "unspecified-high"]
+
+    // when / then
+    for (const category of callerDirectedCategories) {
+      expect(CATEGORY_PROMPT_APPENDS[category]).toContain("<Category_Context>")
+      expect(CATEGORY_PROMPT_APPENDS[category]).not.toContain("<Selection_Gate>")
+      expect(CATEGORY_PROMPT_APPENDS[category]).not.toContain("<Caller_Warning>")
+    }
+  })
 })
 
 describe("listTaskAgents", () => {
   test("#given loaded agent definitions #when listed #then names and descriptions surface, disabled excluded", () => {
     // given
     const agents: Readonly<Record<string, AgentDefinition>> = {
-      oracle: { name: "oracle", description: "Deep reasoning" },
+      momus: { name: "momus", description: "Deep reasoning" },
       hidden: { name: "hidden", description: "n/a", disable: true },
     }
 
@@ -61,7 +74,7 @@ describe("listTaskAgents", () => {
     const listed = listTaskAgents(agents)
 
     // then
-    expect(listed).toContainEqual({ name: "oracle", description: "Deep reasoning" })
+    expect(listed).toContainEqual({ name: "momus", description: "Deep reasoning" })
     expect(listed.map((entry) => entry.name)).not.toContain("hidden")
   })
 })

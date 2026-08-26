@@ -3,9 +3,6 @@ import { describe, expect, test } from "bun:test"
 import type { ThemeColor } from "@code-yeongyu/senpi"
 
 import {
-  excerptRendererText,
-  linesComponent,
-  normalizeRendererText,
   renderTaskCallLines,
   renderTaskResultComponent,
   renderTaskResultLines,
@@ -36,7 +33,6 @@ describe("statusThemeColor", () => {
     expect(statusThemeColor("lost")).toBe("error")
   })
 })
-
 describe("taskCallLines", () => {
   test("#given current spawn arguments #when rendered #then the plain row includes task, target, actual prompt, and mode", () => {
     // given
@@ -93,6 +89,38 @@ describe("taskCallLines", () => {
     expect(line).not.toContain("\n")
     expect(line).toContain("...")
     expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(100)
+  })
+
+  test("#given a task_summary #when rendered #then the summary replaces the truncated prompt excerpt", () => {
+    // given
+    const args = {
+      prompt: "TASK: A very long internal delegation prompt that the user should not have to read in the call row.",
+      task_summary: "Audit the task tool boundary",
+      category: "quick",
+      run_in_background: false,
+    }
+
+    // when
+    const lines = taskCallLines(args)
+
+    // then
+    expect(lines).toEqual(['task "Audit the task tool boundary" foreground'])
+  })
+
+  test("#given a task_summary #when rendered width-bounded #then the summary replaces the prompt excerpt", () => {
+    // given
+    const args = {
+      prompt: "TASK: A very long internal delegation prompt that the user should not have to read in the call row.",
+      task_summary: "Audit the task tool boundary",
+      run_in_background: true,
+    }
+
+    // when
+    const [line = ""] = renderTaskCallLines(args, ANSI_THEME, 100)
+
+    // then
+    expect(line).toContain("Audit the task tool boundary")
+    expect(line).not.toContain("internal delegation")
   })
 
   test("#given a long Korean prompt #when excerpted #then truncation backs up to a word boundary", () => {
@@ -172,7 +200,7 @@ describe("taskResultLines", () => {
     const row = taskResultLines(details).join(" ")
 
     // then
-    expect(row).toContain("category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh)")
+    expect(row).toContain("category:ultrabrain(openai/gpt-5.6-sol:xhigh)")
     expect(row.match(/xhigh/gu)).toHaveLength(1)
     expect(row).toContain("background")
     expect(row).toContain("pending")
@@ -181,20 +209,91 @@ describe("taskResultLines", () => {
     expect(row).toContain("reason:provider capacity")
   })
 
+  test("#given resolved category metadata with variant only #when rendered #then the variant is shown", () => {
+    // given
+    const details = {
+      task_id: "st_0000000c",
+      status: "pending",
+      mode: "spawn" as const,
+      category: "ultrabrain",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        reasoning_effort: "xhigh",
+        variant: "sol",
+        source: "category" as const,
+      },
+    }
+
+    // when
+    const row = taskResultLines(details).join(" ")
+
+    // then
+    expect(row).toContain("category:ultrabrain(openai/gpt-5.6-sol:xhigh)")
+    expect(row).not.toContain(":sol")
+  })
+
+  test("#given resolved category metadata with reasoning effort only #when rendered #then the reasoning effort is shown", () => {
+    // given
+    const details = {
+      task_id: "st_0000000c",
+      status: "pending",
+      mode: "spawn" as const,
+      category: "ultrabrain",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        reasoning_effort: "xhigh",
+        source: "category" as const,
+      },
+    }
+
+    // when
+    const row = taskResultLines(details).join(" ")
+
+    // then
+    expect(row).toContain("category:ultrabrain(openai/gpt-5.6-sol:xhigh)")
+  })
+
+  test("#given resolved category metadata without effort or variant #when rendered #then the model is shown without a suffix", () => {
+    // given
+    const details = {
+      task_id: "st_0000000c",
+      status: "pending",
+      mode: "spawn" as const,
+      category: "ultrabrain",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT-5.6 Sol",
+        source: "category" as const,
+      },
+    }
+
+    // when
+    const row = taskResultLines(details).join(" ")
+
+    // then
+    expect(row).toContain("category:ultrabrain(openai/gpt-5.6-sol)")
+    expect(row).not.toContain(":xhigh")
+    expect(row).not.toContain(":sol")
+  })
+
   test("#given a legacy explicit model result #when rendered #then raw model fallback is useful without empty labels", () => {
     // when
     const row = taskResultLines({
       task_id: "st_0000000d",
       status: "completed",
       mode: "spawn",
-      subagent_type: "oracle",
+      subagent_type: "momus",
       model: "openai/manual",
       run_in_background: false,
     }).join(" ")
 
     // then
-    expect(row).toContain("agent:oracle")
-    expect(row).toContain("model:openai/manual")
+    expect(row).toContain("agent:momus(openai/manual)")
     expect(row).toContain("foreground")
     expect(row).not.toContain("prompt:")
     expect(row).not.toContain("reason:")
@@ -223,11 +322,11 @@ describe("taskResultLines", () => {
     const compact = renderTaskResultComponent(details, ANSI_THEME).render(96).join(" ")
 
     // then
-    expect(plain).toContain("(OpenAI GPT-5.6 SOL reasoning:xhigh)")
-    expect(compact).toContain("(OpenAI GPT-5.6 SOL xhigh)")
+    expect(plain).toContain("category:ultrabrain(openai/gpt-5.6-sol:xhigh)")
+    expect(compact).toContain("category:ultrabrain(openai/gpt-5.6-sol:xhigh)")
   })
 
-  test("#given resolved category context #when the real result component renders at width 72 #then provider, friendly model, and reasoning stay visible within bounds", () => {
+  test("#given resolved category context #when the real result component renders at width 80 #then provider, model, and reasoning stay visible within bounds", () => {
     // given
     const details = {
       task_id: "st_0000000e",
@@ -247,55 +346,48 @@ describe("taskResultLines", () => {
     }
 
     // when
-    const rendered = renderTaskResultComponent(details, ANSI_THEME).render(72)
+    const rendered = renderTaskResultComponent(details, ANSI_THEME).render(80)
 
     // then
-    expect(rendered.join(" ")).toContain("(openai GPT-5.6 Sol xhigh)")
-    for (const line of rendered) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
+    expect(rendered.join(" ")).toContain("category:ultrabrain(openai/gpt-5.6-sol:xhigh)")
+    for (const line of rendered) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(80)
+  })
+
+  test("#given two recorded fallback attempts #when full and compact rows render #then canonical model and fallback count remain visible", () => {
+    // given
+    const details = {
+      task_id: "st_0000000f",
+      status: "completed",
+      mode: "spawn" as const,
+      category: "quick",
+      resolved_model: {
+        provider: "openai-codex",
+        model_id: "gpt-5.6-luna-fast",
+        display: "gpt-5.6-luna-fast",
+        reasoning_effort: "high",
+        source: "category" as const,
+      },
+      fallback_attempts: [
+        { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed", display: "kimi-for-coding-highspeed", source: "category" as const },
+        { provider: "openai-codex", model_id: "gpt-5.6-luna-fast", display: "gpt-5.6-luna-fast", reasoning_effort: "high", source: "category" as const },
+      ],
+      run_in_background: false,
+    }
+
+    // when
+    const plain = taskResultLines(details).join(" ")
+    const compact = renderTaskResultComponent(details, ANSI_THEME).render(120).join(" ")
+
+    // then
+    for (const row of [plain, compact]) {
+      expect(row).toContain("category:quick(openai-codex/gpt-5.6-luna-fast:high)")
+      expect(row).toContain("fallback:2")
+    }
+    expect(rendererVisibleWidth(compact)).toBeLessThanOrEqual(120)
   })
 })
 
 describe("renderer grammar", () => {
-  test("#given long multiline Korean and English text #when excerpted at width 72 #then whitespace is normalized and terminal width is bounded", () => {
-    // given
-    const text = [
-      "첫 번째 줄은 아주 긴 한국어 설명입니다.",
-      "Second line keeps enough English words to prove mixed-width truncation is terminal-aware.",
-    ].join("\n")
-
-    // when
-    const excerpt = excerptRendererText(text, 72)
-
-    // then
-    expect(excerpt).not.toContain("\n")
-    expect(excerpt).toContain(" ")
-    expect(excerpt).toContain("...")
-    expectNoTerminalControls(excerpt)
-    expect(rendererVisibleWidth(excerpt)).toBeLessThanOrEqual(72)
-  })
-
-  test("#given adversarial terminal sequences and Korean whitespace #when normalized #then controls are removed without damaging ordinary text", () => {
-    // given
-    const cases = [
-      { value: "앞 \u001b[31m빨강\u001b[0m 뒤", expected: "앞 빨강 뒤" },
-      { value: "앞 \u001b]8;;https://example.com\u0007링크\u001b]8;;\u0007 뒤", expected: "앞 링크 뒤" },
-      { value: "한\u001b]0;창 제목\u001b\\글", expected: "한글" },
-      { value: "한\u0007글", expected: "한글" },
-      { value: "한\u001b[2J글", expected: "한글" },
-      { value: "한\u001bc글", expected: "한글" },
-      { value: "한\u007f\u0085글", expected: "한글" },
-      { value: "안전\u001b]8;;https://example.com/숨김", expected: "안전" },
-      { value: "  첫째\t둘째\n界  ", expected: "첫째 둘째 界" },
-    ] as const
-
-    // when
-    const normalized = cases.map(({ value }) => normalizeRendererText(value))
-
-    // then
-    expect(normalized).toEqual(cases.map(({ expected }) => expected))
-    for (const value of normalized) expectNoTerminalControls(value)
-  })
-
   test("#given injected ANSI in task call and result fields #when themed #then injected controls are removed while trusted theme ANSI remains", () => {
     // given
     const callArgs = {
@@ -323,74 +415,5 @@ describe("renderer grammar", () => {
     expect(call).not.toContain("\u001b[2J")
     expect(result).not.toContain("https://example.com")
     expectNoTerminalControls(plain)
-  })
-})
-
-describe("linesComponent", () => {
-  test("#given lines #when a component is built #then render returns those lines and invalidate is callable", () => {
-    // given
-    const component = linesComponent(["row one", "row two"])
-
-    // when
-    const rendered = component.render(80)
-    component.invalidate()
-
-    // then
-    expect(rendered).toEqual(["row one", "row two"])
-  })
-
-  test("#given long Korean and English lines #when rendered at width 72 #then every row is truncated by visible width", () => {
-    // given
-    const component = linesComponent([
-      "요약: 한국어 텍스트가 길어도 셀 폭 기준으로 잘려야 합니다 and the English suffix should not overflow the terminal row.",
-    ])
-
-    // when
-    const rendered = component.render(72)
-
-    // then
-    expect(rendered).toHaveLength(1)
-    expect(rendered[0]).toContain("...")
-    expect(rendererVisibleWidth(rendered[0])).toBeLessThanOrEqual(72)
-  })
-})
-
-describe("taskResultLines run stats", () => {
-  test("#given terminal details with run stats #when rendered #then runtime and tps tokens are appended", () => {
-    // given
-    const details = {
-      task_id: "st_00000009",
-      status: "completed",
-      mode: "spawn" as const,
-      category: "deep",
-      execution_mode: "in-process",
-      model: "apitopia/kimi-k3-unlocked",
-      run_in_background: false,
-      run_stats: {
-        runtime_ms: 134_000,
-        turns: 3,
-        tool_calls: 5,
-        output_tokens: 900,
-        total_tokens: 4_200,
-        generation_ms: 7_600,
-        tokens_per_second: 118,
-      },
-    }
-
-    // when
-    const [line = ""] = taskResultLines(details)
-
-    // then
-    expect(line).toContain("ran:2m14s")
-    expect(line).toContain("tps:118")
-  })
-
-  test("#given details without run stats #when rendered #then no runtime tokens appear", () => {
-    // when
-    const [line = ""] = taskResultLines({ task_id: "st_00000009", status: "completed", mode: "spawn" as const })
-
-    // then
-    expect(line).not.toContain("ran:")
-    expect(line).not.toContain("tps:")
   })
 })

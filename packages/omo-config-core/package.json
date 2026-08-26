@@ -16,7 +16,6 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
-    "@oh-my-opencode/utils": "workspace:*",
     "jsonc-parser": "^3.3.1",
     "zod": "^4.4.3"
   },

@@ -34,21 +34,21 @@ akamai_bot_manager:
     # at least a challenge page (i.e. IP still alive) rather than an outright
     # TLS reject. Grouped by family; planner tries top groups first.
     # Refresh quarterly — vendor WAFs shift which TLS fingerprints they trust.
-    - [safari, safari15_3, safari15_5, safari17_0, safari260]
+    - [safari, safari15_3, safari15_5, safari17_0, safari260, safari2601]
     - [safari_ios, safari17_2_ios, safari260_ios]
-    - [chrome99, chrome100, chrome101, chrome104, chrome110, chrome116, chrome119, chrome124, chrome131, chrome133a, chrome136, chrome145, chrome146]
+    - [chrome99, chrome100, chrome101, chrome104, chrome110, chrome116, chrome119, chrome124, chrome131, chrome133a, chrome136, chrome142, chrome145, chrome146]
     - [chrome_android, chrome131_android]
     - [edge99, edge101]
   tls_impersonate_avoid:
     # Empirically observed to 403 immediately (TLS fingerprint blacklisted).
     # DO NOT hard-block — planner deprioritizes only. Refresh quarterly.
+    # NOTE: requires curl_cffi >= 0.15.0 for chrome142/145/146 + safari260/2601 +
+    # firefox144/147 targets (added 0.14.0-0.15.0; default aliases resolve to
+    # chrome146/safari2601/firefox147 in 0.16.0+). Older installs raise ImpersonateError.
     - safari18_0
     - chrome107
     - chrome120
     - chrome123
-    - chrome145     # curl_cffi 0.11+ needed — mark avoid for older installs
-    - chrome146
-    - firefox
     - firefox133
     - firefox135
   referer_strategies:
@@ -57,6 +57,7 @@ akamai_bot_manager:
     - original
     - mobile_subdomain   # www.* → m.* — strong observational win in SSR sites
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - curl_grid_exhaust   # try more impersonate × referer × url combos
     - playwright_real_chrome
   notes: |
@@ -77,6 +78,7 @@ cloudflare_turnstile:
     - google_search
     - self_root
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_mcp       # MCP sufficient; Chromium TLS passes CF baseline
     - playwright_real_chrome
 
@@ -112,6 +114,7 @@ datadome_probable:
   tls_impersonate_candidates:
     - [safari, chrome]
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_real_chrome
   notes: |
     "_probable" suffix reminds us this is a growing attack surface — mark
@@ -127,6 +130,7 @@ perimeterx_human:
   tls_impersonate_candidates:
     - [safari, chrome]
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_real_chrome
   notes: |
     PerimeterX (now HUMAN Bot Defender). Distinct cookie family from
@@ -154,6 +158,7 @@ unknown_challenge:
     - original
     - mobile_subdomain
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_mcp
     - playwright_real_chrome
   notes: |

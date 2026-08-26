@@ -1,0 +1,21 @@
+Command:
+bun test packages/omo-senpi/src/components/memory
+
+Observed:
+251 pass
+0 fail
+835 expect() calls
+Ran 251 tests across 40 files. [54.09s]
+
+Coverage highlights:
+- memory component registration and session shutdown
+- direct and MCP-search tool surfaces
+- prompt compilation and cache refresh
+- cross-identity guards and filesystem policy
+- memory tool commits, errors, lock contention, and concurrent serialization
+- reflection trigger, worker, compaction, journal, and sandbox behavior
+- footer relative-time formatting and first-use lifecycle
+
+No test was skipped, disabled, or weakened.
+
+This final run occurred after merging repaired `dev`, fixing the final lifecycle review findings, preserving the bind-time advisory, and rebuilding the final plugin tree.

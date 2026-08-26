@@ -1,0 +1,32 @@
+### GREEN capture - issue #6376 - 2026-07-28T01:52:01Z
+### product diff vs upstream/dev:
+ packages/shared-skills/index.mjs | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/packages/shared-skills/index.mjs b/packages/shared-skills/index.mjs
+index f8d5d67f4..c81c9ce50 100644
+--- a/packages/shared-skills/index.mjs
++++ b/packages/shared-skills/index.mjs
+@@ -1,5 +1,12 @@
++import { existsSync } from "node:fs";
+ import { fileURLToPath } from "node:url";
+ 
++// Bundlers inline this module, so import.meta.url points at the consuming bundle.
++// dist/index.js sits beside dist/skills, but dist/cli/index.js and dist/cli-node/index.js
++// sit one level below it, so the sibling lookup has to fall back to the parent.
+ export function sharedSkillsRootPath() {
+-	return fileURLToPath(new URL("./skills/", import.meta.url));
++	const sibling = fileURLToPath(new URL("./skills/", import.meta.url));
++	if (existsSync(sibling)) return sibling;
++	const parent = fileURLToPath(new URL("../skills/", import.meta.url));
++	return existsSync(parent) ? parent : sibling;
+ }
+
+=== bun test packages/shared-skills/shared-skills-root-path.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+ 3 pass
+ 0 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [1197.00ms]
+EXIT=0

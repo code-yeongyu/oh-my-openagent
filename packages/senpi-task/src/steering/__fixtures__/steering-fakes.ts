@@ -111,9 +111,11 @@ export function makeHarness(): SteeringHarness {
   const port: SteeringPort = {
     store,
     liveHandle: (taskId) => live.get(taskId),
-    reacquireForRevive: (taskId) => {
-      reviveCalls.push(taskId)
-    },
+    reserveForRevive: (taskId) => ({
+      ok: true,
+      release: () => undefined,
+      commit: () => { reviveCalls.push(taskId) },
+    }),
     dequeuePending: (taskId) => {
       dequeueCalls.push(taskId)
       return false
@@ -141,6 +143,7 @@ export function makeHarness(): SteeringHarness {
         depth: 1,
         execution_mode: "in-process",
         model: "anthropic/claude",
+        notify_on_terminal: false,
         ...overrides,
       })
       store.save(record)

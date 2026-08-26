@@ -7,7 +7,7 @@ import { createMomusAgent } from "./momus"
 type AgentSources = Parameters<typeof collectPendingBuiltinAgents>[0]["agentSources"]
 
 describe("Momus GPT-5.6 warm-cache registration", () => {
-  test("registers transformed Vercel terra ahead of Copilot terra", () => {
+  test("registers Copilot terra ahead of transformed Vercel terra", () => {
     // given
     const availableModels = new Set([
       "github-copilot/gpt-5.6-terra",
@@ -27,7 +27,7 @@ describe("Momus GPT-5.6 warm-cache registration", () => {
     const config = pendingAgentConfigs.get("momus")
 
     // then
-    expect(config?.model).toBe("vercel/openai/gpt-5.6-terra")
+    expect(config?.model).toBe("github-copilot/gpt-5.6-terra")
     expect(config?.variant).toBe("high")
   })
 })

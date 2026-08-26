@@ -1,0 +1,112 @@
+Task 20: Status surfaces show suspended children
+=================================================
+
+Plan: .omo/plans/subagent-session-resume-revival.md, todo 20
+Worktree: /Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival
+Branch: feat/subagent-session-resume-revival
+
+SUMMARY
+-------
+Extended the residency->label mapping in three surface areas so that
+persisted_only/rpc_detached children render as "suspended":
+
+1. status-row-format.ts (omo-senpi): formatTaskRow, buildWidgetRows,
+   backgroundWidgetRows, and compactTaskContext all use a shared
+   statusLabel() helper that maps persisted_only/rpc_detached to
+   "suspended" instead of the raw status (e.g. "running").
+
+2. renderers.ts (senpi-task tools/output): the task_output status row
+   uses "suspended" as the status label when the snapshot carries
+   suspended details.
+
+3. snapshot.ts (senpi-task tools/output): buildTaskSnapshot now
+   carries residency_state from the record and attaches a
+   SuspendedDetails explanation when the residency is persisted_only
+   or rpc_detached. statusText() in output.ts surfaces this
+   explanation in the model-facing status text.
+
+RED phase (failing-first)
+-------------------------
+Initial test run captured 9 failures from the new tests (6 in
+status-row-format.test.ts, 2 in renderers.test.ts, 2 in
+output.test.ts — one overlapped with a pre-existing failure).
+3 pre-existing event-bridge failures were identified as unrelated
+(concurrent todos 18/19).
+
+Command: bun test packages/senpi-task/src/tools packages/omo-senpi/src/components/task
+Result: 9 new failures (suspended labeling), 3 pre-existing (event-bridge)
+
+GREEN phase
+-----------
+After implementing the residency->label mapping:
+
+Command: bun test packages/senpi-task/src/tools packages/omo-senpi/src/components/task
+Result: 547 pass, 0 fail
+
+Command: bun test packages/senpi-task packages/omo-senpi
+Result: 1834 pass, 0 fail (all pre-existing failures resolved by
+concurrent todo work landing in the same worktree)
+
+Command: bun run typecheck
+Result: clean (tsgo --noEmit across all packages)
+
+QA scenarios
+------------
+happy: formatted row for a persisted_only record contains "suspended"
+  - Verified by test: "suspended residency labeling > #given a
+    persisted_only record #when formatting a full row #then the
+    status shows suspended"
+  - Verified by test: "suspended residency labeling > #given a
+    persisted_only record #when building a widget row #then it
+    contains suspended"
+  - Verified by test: "suspended residency labeling > #given a
+    persisted_only record #when building a background widget row
+    #then it contains suspended"
+  - Verified by test: "task_output suspended residency rendering >
+    #given a persisted_only snapshot #when the status row renders
+    #then it shows suspended"
+  - Verified by test: "runTaskOutput > #given a persisted_only record
+    #when read in status mode #then the status text states it is
+    suspended"
+
+  Also verified for rpc_detached residency (parallel tests).
+
+failure (regression pin): resident record label unchanged
+  - Verified by test: "suspended residency labeling > #given a
+    resident record #when formatting a full row #then the status
+    label is unchanged (regression pin)"
+  - Verified by test: "task_output suspended residency rendering >
+    #given a resident snapshot #when the status row renders #then
+    the status label is unchanged (regression pin)"
+  - Verified by test: "runTaskOutput > #given a resident record #when
+    read in status mode #then no suspended text appears (regression
+    pin)"
+
+ADVERSARIAL: misleading_success_output
+---------------------------------------
+Probe: applicable — regression pin tests assert that resident records
+do NOT show "suspended". If the mapping were inverted or overly broad,
+these tests would fail.
+Rest: N/A
+
+CHANGED FILES (mine only)
+-------------------------
+packages/omo-senpi/src/components/task/status-row-format.ts
+packages/omo-senpi/src/components/task/status-row-format.test.ts
+packages/senpi-task/src/tools/output/types.ts
+packages/senpi-task/src/tools/output/snapshot.ts
+packages/senpi-task/src/tools/output/output.ts
+packages/senpi-task/src/tools/output/renderers.ts
+packages/senpi-task/src/tools/output/renderers.test.ts
+packages/senpi-task/src/tools/output/renderers-run-stats.test.ts
+packages/senpi-task/src/tools/output/output.test.ts
+packages/senpi-task/src/tools/output/__fixtures__/records.ts
+packages/senpi-task/src/tools/output/index.ts
+packages/senpi-task/src/index.ts
+
+COORDINATION NOTE
+-----------------
+todos 18 and 19 concurrently edit event-bridge/member-liveness files.
+status-row-format.ts is shared — I touched only the residency->label
+mapping (statusLabel helper + SUSPENDED_RESIDENCIES set + isSuspended
+guard), leaving row ordering and notification copy unchanged.

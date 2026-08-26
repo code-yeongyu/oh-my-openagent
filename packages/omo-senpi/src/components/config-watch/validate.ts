@@ -2,13 +2,11 @@ import { createHash } from "node:crypto"
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path"
 
 import {
-  loadOmoConfig,
   resolveUserOmoConfigDirectory,
-  type LoadOmoConfigOptions,
-  type LoadOmoConfigResult,
-  type OmoConfigDiagnostic,
   type OmoConfigEnv,
 } from "@oh-my-opencode/omo-config-core"
+
+import { loadSenpiOmoConfig, type SenpiConfigDiagnostic } from "../config-resolution"
 
 const MERGED_OMO_CONFIG_DIAGNOSTIC_PATH = "(merged omo config)"
 /** Matches the frozen config-watch validation wire shape without importing senpi internals. */
@@ -22,15 +20,15 @@ export interface CreateOmoConfigValidatorOptions {
   readonly cwd: string
   readonly env?: OmoConfigEnv
   readonly platform?: NodeJS.Platform
-  readonly loadConfig?: (options: LoadOmoConfigOptions) => LoadOmoConfigResult
+  readonly loadConfig?: typeof loadSenpiOmoConfig
 }
 
 type FingerprintedDiagnostic = {
-  readonly diagnostic: OmoConfigDiagnostic
+  readonly diagnostic: SenpiConfigDiagnostic
   readonly fingerprint: string
 }
 
-function fingerprintDiagnostic(diagnostic: OmoConfigDiagnostic): string {
+function fingerprintDiagnostic(diagnostic: SenpiConfigDiagnostic): string {
   return createHash("sha256")
     .update(`${diagnostic.kind}\u0000${diagnostic.path}\u0000${diagnostic.message}`)
     .digest("hex")
@@ -56,11 +54,11 @@ function containingConfigDirectory(path: string, userConfigDirectory: string): s
 }
 
 function isAttributableDiagnostic(
-  diagnostic: OmoConfigDiagnostic,
+  diagnostic: SenpiConfigDiagnostic,
   changedPaths: readonly string[],
   userConfigDirectory: string,
 ): boolean {
-  if (diagnostic.path === MERGED_OMO_CONFIG_DIAGNOSTIC_PATH) return true
+  if (diagnostic.path === MERGED_OMO_CONFIG_DIAGNOSTIC_PATH || diagnostic.kind === "model_catalog_cycle") return true
 
   const diagnosticConfigDirectory = containingConfigDirectory(diagnostic.path, userConfigDirectory)
   return changedPaths.some((changedPath) => {
@@ -70,7 +68,7 @@ function isAttributableDiagnostic(
   })
 }
 
-function formatDiagnostic(diagnostic: OmoConfigDiagnostic): string {
+function formatDiagnostic(diagnostic: SenpiConfigDiagnostic): string {
   return diagnostic.message
 }
 
@@ -83,8 +81,8 @@ function formatDiagnostic(diagnostic: OmoConfigDiagnostic): string {
 export function createOmoConfigValidator(options: CreateOmoConfigValidatorOptions): OmoConfigValidator {
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
-  const loadConfig = options.loadConfig ?? loadOmoConfig
-  const userConfigDirectory = resolveUserOmoConfigDirectory(env, platform)
+  const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
+  const userConfigDirectory = resolveUserOmoConfigDirectory(env)
   let baseline = new Set(loadConfig({ cwd: options.cwd, env, platform }).diagnostics.map(fingerprintDiagnostic))
   const unresolvedRejected = new Set<string>()
 
@@ -111,7 +109,7 @@ export function createOmoConfigValidator(options: CreateOmoConfigValidatorOption
       if (unresolvedRejected.size > 0) {
         const errors = [...unresolvedRejected]
           .map((fingerprint) => diagnosticsByFingerprint.get(fingerprint))
-          .filter((diagnostic): diagnostic is OmoConfigDiagnostic => diagnostic !== undefined)
+          .filter((diagnostic): diagnostic is SenpiConfigDiagnostic => diagnostic !== undefined)
           .map(formatDiagnostic)
         return { ok: false, errors }
       }

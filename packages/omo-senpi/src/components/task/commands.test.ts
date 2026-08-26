@@ -16,6 +16,7 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
     created_at: "2026-07-07T00:00:00.000Z",
     updated_at: "2026-07-07T00:00:01.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }
@@ -147,6 +148,39 @@ describe("registerTaskCommands", () => {
 
     // then the selector was shown and the chosen task cancelled
     expect(ui.selectCalls).toHaveLength(1)
+    expect(manager.cancelled).toEqual(["st_kill"])
+  })
+
+  it("#given a task with a description #when /task-kill lists options #then the human label leads and the id trails", async () => {
+    // given
+    const running = record({ task_id: "st_kill", name: "task-1", description: "Audit the waiting line", status: "running" })
+    const manager = fakeManager([running])
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, manager)
+    const { ctx, ui } = commandCtx("session-a", "tui", { select: () => Promise.resolve(undefined) })
+
+    // when
+    await invoke(pi, "task-kill", "", ctx)
+
+    // then
+    expect(ui.selectCalls[0]?.options[0]).toBe("Audit the waiting line (st_kill) running")
+  })
+
+  it("#given a multi-word description #when /task-kill selects and confirms #then cancelTask runs for the task id, not a word of the label", async () => {
+    // given
+    const running = record({ task_id: "st_kill", name: "task-1", description: "Audit the waiting line", status: "running" })
+    const manager = fakeManager([running])
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, manager)
+    const { ctx } = commandCtx("session-a", "tui", {
+      select: (_title, options) => Promise.resolve(options[0]),
+      confirm: () => Promise.resolve(true),
+    })
+
+    // when
+    await invoke(pi, "task-kill", "", ctx)
+
+    // then
     expect(manager.cancelled).toEqual(["st_kill"])
   })
 

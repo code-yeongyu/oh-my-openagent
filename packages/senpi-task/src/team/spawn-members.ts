@@ -4,6 +4,7 @@ import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
 import type { ResolvedModelRecord } from "../state"
+import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
 import {
   SenpiTeamRuntimeError,
@@ -121,7 +122,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
   const launch = input.memberExtension
   const extensions = launch === undefined
     ? undefined
-    : [...new Set([...(launch.inheritedExtensions ?? []), launch.entryPath])]
+    : assembleMemberExtensions(launch.entryPath, launch.inheritedExtensions)
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
@@ -131,6 +132,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     execution_mode: "process",
     run_in_background: true,
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
+    ...(member.task_summary !== undefined ? { task_summary: member.task_summary } : {}),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
     ...(launch !== undefined ? {
@@ -142,16 +144,15 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
   }
 }
 
-// Every member bootstrap frames the pull protocol FIRST so members wait for work instead of
-// completing after the role prompt: role-only bootstraps historically completed in under two
-// minutes and left the lead's first task messages rotting in durable inboxes.
+// Every member bootstrap frames the injection protocol FIRST so members end their initial turn while
+// remaining resident; later lead mail steers into that same session's running turn.
 function buildMemberPrompt(spec: TeamSpec, member: TeamMember): string {
   const role = member.prompt ?? `You are team member '${member.name}' in team '${spec.name}'.`
   return [
     `You are '${member.name}', a member of team '${spec.name}' running under the senpi-task team runtime.`,
-    "Work arrives as team messages from the lead and the other members; coordinate with the task_send and team_wait tools.",
-    "After completing any immediate instructions below, call team_wait to receive work instead of ending your turn, and keep going until the lead releases you.",
-    "When you finish assigned work, task_send the lead a summary before returning to team_wait.",
+    "Work arrives as injected messages from the lead and other members; coordinate with task_send.",
+    "After completing any immediate instructions below, report with task_send, then end your turn. Injected messages revive this resident session with more work.",
+    "When you finish assigned work, task_send the lead a summary, then end your turn and wait for an injected message.",
     role,
   ].join("\n\n")
 }

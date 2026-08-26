@@ -27,10 +27,10 @@ export function configureCleanupCommand(program: Command): void {
     .addHelpText("after", `
 Examples:
   $ npx lazycodex-ai uninstall
-  $ omo uninstall --platform=codex
+  $ omo-agent-toolkit uninstall --platform=codex
   $ npx lazycodex-ai cleanup
-  $ omo cleanup --platform=codex
-  $ omo uninstall --platform=codex --project /path/to/project
+  $ omo-agent-toolkit cleanup --platform=codex
+  $ omo-agent-toolkit uninstall --platform=codex --project /path/to/project
 `)
     .action(async (options: CleanupCommandOptions) => {
       const rootOptions = program.opts<CleanupRootCommandOptions>()

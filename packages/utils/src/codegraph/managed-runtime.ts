@@ -15,6 +15,19 @@ export interface ResolvePinnedCodegraphBinOptions {
   readonly readText?: (filePath: string) => string
 }
 
+function managedBinPath(installDir: string, platform: NodeJS.Platform): string {
+  return join(installDir, "bin", platform === "win32" ? "codegraph.cmd" : "codegraph")
+}
+
+export function hasCodegraphManagedInstall(
+  installDir: string,
+  options: Pick<ResolvePinnedCodegraphBinOptions, "fileExists" | "platform"> = {},
+): boolean {
+  const fileExists = options.fileExists ?? existsSync
+  return fileExists(managedBinPath(installDir, options.platform ?? process.platform))
+    || fileExists(join(installDir, ".provisioned"))
+}
+
 export function resolvePinnedCodegraphBin(
   installDir: string | undefined,
   options: ResolvePinnedCodegraphBinOptions = {},
@@ -22,11 +35,7 @@ export function resolvePinnedCodegraphBin(
   if (installDir === undefined) return null
   const fileExists = options.fileExists ?? existsSync
   const readText = options.readText ?? ((filePath: string) => readFileSync(filePath, "utf8"))
-  const expectedBin = join(
-    installDir,
-    "bin",
-    (options.platform ?? process.platform) === "win32" ? "codegraph.cmd" : "codegraph",
-  )
+  const expectedBin = managedBinPath(installDir, options.platform ?? process.platform)
   const markerPath = join(
     installDir,
     ".provisioned",

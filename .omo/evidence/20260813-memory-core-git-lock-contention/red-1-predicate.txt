@@ -1,0 +1,32 @@
+87 | 
+88 |     // when / then
+89 |     expect(isGitLockError(new Error(message))).toBe(true)
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/config-lock.test.ts:89:48)
+(fail) git lock error classification > #given a real index.lock contention message #when classified #then it is a retryable lock error [0.28ms]
+92 |   it("#given a ref lock failure #when classified #then it is a retryable lock error", () => {
+93 |     // given
+94 |     const message = "fatal: cannot lock ref 'HEAD': Unable to create '/tmp/probe/.git/HEAD.lock': File exists."
+95 | 
+96 |     // when / then
+97 |     expect(isGitLockError(new Error(message))).toBe(true)
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/memory-core-git-lock-contention/packages/memory-core/src/git/config-lock.test.ts:97:48)
+(fail) git lock error classification > #given a ref lock failure #when classified #then it is a retryable lock error [0.10ms]
+(pass) git lock error classification > #given the config.lock message #when classified #then it stays a retryable lock error [0.06ms]
+(pass) git lock error classification > #given an unrelated git failure #when classified #then it is NOT retryable [0.06ms]
+
+ 4 pass
+ 2 fail
+ 8 expect() calls
+Ran 6 tests across 1 file. [390.00ms]

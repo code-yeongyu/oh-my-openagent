@@ -1,0 +1,35 @@
+bun test v1.3.12 (700fc117)
+
+script/publish-workflow.test.ts:
+(pass) test workflows > use pure bun test for workflows [1.23ms]
+(pass) test workflows > prepares vendored lsp-tools-mcp before publish workflow tests and typecheck [0.11ms]
+(pass) test workflows > builds publish-main from the prepared release SHA [0.22ms]
+131 |     const rebuildPrecedesCommit =
+132 |       prepareJob.indexOf("node packages/omo-senpi/plugin/scripts/build-extension.mjs") <
+133 |       prepareJob.indexOf('git commit -m "release: v${VERSION}"')
+134 | 
+135 |     // #then
+136 |     expect(rebuildsBundles, "the version bump restamps OMO_SENPI_PACKAGE_VERSION, so the release commit must rebuild the Senpi bundles").toBe(true)
+                                                                                                                                               ^
+error: the version bump restamps OMO_SENPI_PACKAGE_VERSION, so the release commit must rebuild the Senpi bundles
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/diag-publish-parity/script/publish-workflow.test.ts:136:138)
+(fail) test workflows > rebuilds version-stamped Senpi bundles into the release commit [0.25ms]
+(pass) test workflows > dispatches a source-pinned publish run before provenance-bearing release operations [0.19ms]
+(pass) test workflows > runs Codex compatibility checks before publish jobs [0.07ms]
+(pass) test workflows > exercise root checks across linux macos and windows [0.12ms]
+(pass) test workflows > runs codex compatibility checks on every supported os without serializing build [0.10ms]
+(pass) test workflows > runs Codex compatibility tests with Node available for the self-built MCP runtimes [0.23ms]
+(pass) test workflows > sets up Bun before vendored lsp-tools-mcp builds in publish workflow jobs [0.01ms]
+(pass) test workflows > builds bundled MCP runtimes before Codex compatibility tests [0.23ms]
+(pass) test workflows > runs Git Bash installer regressions in Codex compatibility checks [0.14ms]
+(pass) test workflows > tracks the nested Codex plugin lockfile used by npm ci [13.75ms]
+(pass) test workflows > pins every workflow Bun setup to the tested runtime [1.41ms]
+
+ 13 pass
+ 1 fail
+ 67 expect() calls
+Ran 14 tests across 1 file. [106.00ms]

@@ -33,7 +33,7 @@ export async function runDelegatedOmoCommand(
     return
   }
   const env = invocation.delegatesToOmo
-    ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env }
+    ? { ...process.env, OMO_INVOCATION_NAME: "omo-agent-toolkit", ...invocation.env }
     : { ...process.env, ...invocation.env }
   await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env })
 }
@@ -51,7 +51,7 @@ export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): 
     return { command: "npx", args, delegatesToOmo: true }
   }
 
-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command]
+  const args = ["--yes", "--package", "oh-my-openagent", "omo-agent-toolkit", parsed.command]
   if (parsed.command === "cleanup") {
     args.push("--platform=codex", ...parsed.args)
   } else {

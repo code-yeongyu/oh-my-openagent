@@ -1,0 +1,30 @@
+POST-REBASE VERIFICATION
+Captured: 2026-08-17
+
+CI failure signature
+- PR run/job: 32027787657 / 95380750909
+- Failing test: task RPC launch profile parity > explicit provider extension model visibility
+- Error: process model admission failed for omo-mock/mock-1: model is not visible in the child profile
+- PR files: AGENTS.md, ATTRIBUTION.md, and evidence text only; no task/RPC/runtime file changed.
+
+Distinguishing evidence
+- Base SHA 04ccd5943 Ubuntu job 95372177918: identical RPC parity test passed (2/2).
+- Local branch before rebase: identical RPC parity test passed in isolation (2/2).
+- origin/dev advanced by 11 commits and included 3b00103ff:
+  test: isolate XDG data and cache dirs per test process
+- Diagnosis: full-suite cross-process environment contamination, not the documentation change.
+
+Rebase
+- Command: git rebase origin/dev
+- Result: success, no conflicts.
+- Rebased base: origin/dev 105258b24.
+- Divergence after rebase: 2 ahead, 0 behind.
+
+Verification under CI Bun
+- Command: npm exec --yes --package=bun@1.3.12 -- bun test packages/shared-skills
+- Result: 81 pass, 0 fail, 593 expect() calls across 15 files.
+- Command: npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts
+- Result: 2 pass, 0 fail, 2 expect() calls.
+
+Evidence-bound rebased source tree
+3a193c39b7ba1696203f5e5866f7dd70534691a8

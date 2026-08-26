@@ -194,22 +194,22 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 ### Goal Registration (BINDING)
 
-When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation: the full objective, the scenario contract below, and one line "I'll stop right away when <the exact observable state that ends this run>". Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
+When the `create_goal` tool exists, you MUST register the run's goal with it BEFORE any implementation. Check `get_goal` first: continue a matching active goal instead of duplicating it; surface a conflicting one. Pass exactly `objective`, written outcome-first: the concrete thing that will be TRUE when done (an outcome, never an activity like "investigate X"), the named deliverable surfaces, the scenario contract below as success criteria (each a binary observable that CAN fail), explicit scope bounds, and one line "I'll stop right away when <the exact observable state that ends this run>". Never invent a budget or deadline the user did not state. Without the tool, record the same contract at the top of your TODO/notepad and treat it as binding.
 
 ### Pre-Implementation: Scenario Contract (BINDING)
 
-BEFORE writing ANY code, define **3+ realistic scenarios** covering:
+BEFORE writing ANY code, define realistic scenarios sized to the change — **1-2 for a small single-surface change, 3+ for multi-surface or risky work** — drawn from:
 
 | Class | Required | Example |
 |-------|----------|---------|
 | **Happy path** | yes | Valid input → 200 OK with expected body |
-| **Edge** (boundary / empty / malformed / concurrent) | yes | Empty list, max-length input, two writers race |
-| **Adjacent-surface regression** | yes | Caller X still works, sibling endpoint Y unchanged |
+| **Edge** (boundary / empty / malformed / concurrent) | when risky | Empty list, max-length input, two writers race |
+| **Adjacent-surface regression** | when multi-surface | Caller X still works, sibling endpoint Y unchanged |
 
 Each scenario MUST specify, upfront:
 - Pass condition as a binary observable ("returns 200 + body matches schema"), not "should work".
 - The REAL surface that proves it: tmux transcript, curl status+body, browser/Playwright assertion, computer-use action log, CLI stdout, parsed config dump, DB state diff. Asserting "tests pass" alone is NOT evidence.
-- The automated test file + test id that exercises this scenario (written test-first — see TDD below).
+- The cheapest faithful proof: a test file + test id at a code seam (written test-first — see TDD below), or the real-surface scenario itself when no seam exists. Prose, docs, prompt, and visual-only changes take review + real-surface QA — a test pinning their text is pretend-coverage, not proof.
 
 **These scenarios are the CONTRACT.** Record them in your TODO/notepad. You are not done until every one PASSES with both pieces of evidence captured (RED→GREEN proof + real-surface artifact).
 
@@ -242,7 +242,7 @@ Every scenario requires TWO captured artifacts — both mandatory:
 
 Supporting (necessary, not sufficient): build exit 0, full suite green, lsp_diagnostics clean on changed files, regression scenarios still PASS.
 
-Tests are the FLOOR (always required). Surface artifact is the CEILING (also required). "tests pass" alone is NOT done.
+The real-surface artifact is always required. A test is required only where a code seam exists. "tests pass" alone is NOT done, and a test pinning prose or visual text is NOT evidence.
 
 <MANUAL_QA_MANDATE>
 ### YOU MUST EXECUTE MANUAL QA YOURSELF. THIS IS NOT OPTIONAL.
@@ -256,7 +256,7 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify the output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. |
+| Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against the clone as the user-data-dir; run any clearing there only. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Changes a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
@@ -276,9 +276,9 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 **CLEANUP IS PART OF QA — TRACK IT AS TODOS.** The moment a QA scenario spawns any resource, add a teardown todo for it (QA scripts, tmux assets, browser / agent-browser sessions, PIDs, ports, containers, temp dirs). Execute every teardown todo and capture the receipt before declaring done. A leftover process / tmux session / browser context / bound port / temp dir = NOT done.
 </MANUAL_QA_MANDATE>
 
-### TDD Workflow (MANDATORY on every production change)
+### TDD Workflow (MANDATORY on every production code change with a test seam)
 
-Test-first is not optional. Every behavior change — features, fixes, refactors, perf, glue, config-with-logic — follows RED → GREEN → SURFACE.
+Test-first is not optional for code. Every code behavior change — features, fixes, refactors, perf, glue, config-with-logic — follows RED → GREEN → SURFACE. Prose, docs, and visual-only changes have no seam: skip RED→GREEN and prove them through the surface channel.
 
 1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message proving it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
 2. **GREEN**: Write the SMALLEST change that flips RED→GREEN. Re-run. Capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.
@@ -286,7 +286,7 @@ Test-first is not optional. Every behavior change — features, fixes, refactors
 4. **REFACTOR**: Optional, only if needed. Tests MUST stay green throughout.
 5. **REGRESSION**: Re-run the FULL scenario list. Record PASS/FAIL inline with both evidence paths.
 
-**Refactor exception**: Write characterization tests pinning current observable behavior FIRST, watch them go GREEN against old code, THEN refactor. They remain green throughout.
+**Refactor exception**: when refactoring behavior whose regressions the change could hide, write characterization tests pinning current observable behavior FIRST, watch them go GREEN against old code, THEN refactor. They remain green throughout.
 
 **Exemption whitelist** (no new test required): pure formatting, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption MUST be justified in `## Findings` with the exact reason. Unjustified exemption is rejection.
 

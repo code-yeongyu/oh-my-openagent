@@ -7,13 +7,13 @@ payloads, and component NOTICE files.
 
 ## Components
 
-### @colbymchenry/codegraph@1.0.1
+### @colbymchenry/codegraph@1.5.0
 - License: MIT, from npm package metadata and root third-party notice inspection.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
 - Where-bundled: optional runtime dependency of `plugin/components/codegraph`.
 
-### @colbymchenry/codegraph platform bundles@1.0.1
+### @colbymchenry/codegraph platform bundles@1.5.0
 - License: MIT for CodeGraph package metadata; bundled payloads also include a Node.js v24.16.0 runtime and vendored JavaScript/WASM dependencies. The Codex CodeGraph component ships the Node.js runtime license and bundled third-party license text at `plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
 - Copyright: CodeGraph contributors, Node.js contributors, and bundled dependency contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
@@ -45,9 +45,9 @@ payloads, and component NOTICE files.
 - Notice: `plugin/components/rules/NOTICE`.
 - Where-bundled: Codex rules/context injection hooks and bundled rule files.
 
-### @code-yeongyu/codex-start-work-continuation@4.10.0
-- License: MIT, from `plugin/components/start-work-continuation/LICENSE`.
-- Notice: `plugin/components/start-work-continuation/NOTICE`.
+### @code-yeongyu/codex-ulw-execute-continuation@4.10.0
+- License: MIT, from `plugin/components/ulw-execute-continuation/LICENSE`.
+- Notice: `plugin/components/ulw-execute-continuation/NOTICE`.
 - Where-bundled: Codex `Stop` and `SubagentStop` continuation hook component.
 
 ### @code-yeongyu/codex-telemetry@4.10.0
@@ -79,7 +79,7 @@ payloads, and component NOTICE files.
 ### @oh-my-opencode/boulder-state@0.1.0
 - License: project license.
 - Copyright: Yeongyu Kim and contributors.
-- Where-bundled: bundled into the start-work continuation component runtime.
+- Where-bundled: bundled into the ulw-execute continuation component runtime.
 
 ### @oh-my-opencode/comment-checker-core@0.1.0
 - License: project license.

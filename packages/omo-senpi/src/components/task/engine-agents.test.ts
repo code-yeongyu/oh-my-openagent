@@ -36,7 +36,7 @@ function writeOmoJson(cwd: string, config: unknown): void {
 }
 
 // The rendered "Available agents: a, b, c" fragment of the task tool description. The example line
-// quoting subagent_type="oracle" must never leak into this extraction, so the marker anchors it.
+// quoting subagent_type="momus" must never leak into this extraction, so the marker anchors it.
 function advertisedAgentNames(engine: TaskEngine): string {
   const description = buildTaskToolDescription({ omoConfig: engine.omoConfig, agents: engine.agents })
   const marker = "Available agents: "
@@ -47,14 +47,24 @@ function advertisedAgentNames(engine: TaskEngine): string {
   return (end < 0 ? rest : rest.slice(0, end)).trim()
 }
 
+function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
+  const description = buildTaskToolDescription({ omoConfig: engine.omoConfig, agents: engine.agents })
+  const marker =
+    "Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and ulw-execute was never invoked): "
+  const start = description.indexOf(marker)
+  if (start < 0) throw new Error("task tool description is missing the Plan-gated agents list")
+  const rest = description.slice(start + marker.length)
+  const end = rest.indexOf("\n")
+  return (end < 0 ? rest : rest.slice(0, end)).trim()
+}
+
 describe("task engine builtin agent overlay", () => {
-  test("#given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas", () => {
+  test("#given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present", () => {
     // given / when
     const engine = composeIn(tempProject())
 
     // then
-    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
-    expect(engine.agents["explore"]?.prompt).toContain("codebase search specialist")
+    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus"])
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
   })
 
@@ -82,7 +92,7 @@ describe("task engine builtin agent overlay", () => {
     const engine = composeIn(cwd)
 
     // then
-    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus", "oracle", "scout"])
+    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus", "scout"])
     expect(engine.agents["scout"]?.prompt).toBe("Scout the repo.")
   })
 
@@ -112,24 +122,26 @@ describe("task engine builtin agent overlay", () => {
     expect(engine.agents["scout"]?.executionMode).toBe("process")
   })
 
-  test("#given the default engine agents #when the task tool description renders #then all 5 builtin names are advertised sorted", () => {
+  test("#given the default engine agents #when the task tool description renders #then plain builtins are advertised and the plan-gated tier is classified separately", () => {
     // given
     const engine = composeIn(tempProject())
 
     // when / then
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian, metis, momus, oracle")
+    expect(advertisedAgentNames(engine)).toBe("explore, librarian")
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis, momus")
   })
 
-  test("#given agents.oracle.disable in omo.json #when the description renders #then oracle is hidden and the other four stay listed", () => {
+  test("#given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed", () => {
     // given
     const cwd = tempProject()
-    writeOmoJson(cwd, { agents: { oracle: { disable: true } } })
+    writeOmoJson(cwd, { agents: { momus: { disable: true } } })
 
     // when
     const engine = composeIn(cwd)
 
     // then
-    expect(engine.agents["oracle"]?.disable).toBe(true)
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian, metis, momus")
+    expect(engine.agents["momus"]?.disable).toBe(true)
+    expect(advertisedAgentNames(engine)).toBe("explore, librarian")
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis")
   })
 })

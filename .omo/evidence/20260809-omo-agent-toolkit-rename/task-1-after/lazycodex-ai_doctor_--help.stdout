@@ -1,0 +1,19 @@
+Usage: oh-my-opencode doctor [options]
+
+Check oh-my-opencode installation health and diagnose issues
+
+Options:
+  --status               Show compact system dashboard
+  --verbose              Show detailed diagnostic information
+  --json                 Output results in JSON format
+  --platform <platform>  Doctor target platform: opencode, codex (choices:
+                         "opencode", "codex")
+  -h, --help             Display help for command
+
+Examples:
+  $ bunx oh-my-opencode doctor            # Show problems only
+  $ bunx oh-my-opencode doctor --status   # Compact dashboard
+  $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
+  $ bunx oh-my-opencode doctor --json     # JSON output
+  $ omo doctor --platform=codex           # Codex/LazyCodex diagnostics only
+

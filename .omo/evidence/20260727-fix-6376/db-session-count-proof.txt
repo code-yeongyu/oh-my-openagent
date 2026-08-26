@@ -1,0 +1,12 @@
+### DB-UNTOUCHED PROOF - issue #6376 - 2026-07-28T01:33:13Z
+### AGENTS.md: SELECT count(*) FROM session on the REAL database, before/after QA.
+
+real database: C:\Users\pss\.local\share\opencode\opencode.db
+  count BEFORE both captures = 2729
+  count AFTER  both captures = 2729    (driver delta = 0)
+  count AFTER  20s ambient control = 2729    (ambient delta = 0)
+
+The driver runs the built omo CLI with HOME/USERPROFILE/APPDATA/LOCALAPPDATA and
+every XDG_* redirected into a mktemp sandbox removed on exit. This QA runs from
+inside a live opencode session writing to the same database, so an ambient control
+gap is included to separate driver writes from ambient writes.

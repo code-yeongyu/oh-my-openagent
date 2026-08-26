@@ -152,11 +152,11 @@ describe("applyUserPromptUlwLoopSteering - OMO directive patterns", () => {
 		expect(out).toContain("accepted");
 	});
 
-	it("processes omo ulw-loop steer: pattern", async () => {
+	it.each(["omo ulw-loop steer", "omo-agent-toolkit ulw-loop steer"])("processes %s: pattern", async (marker) => {
 		const repoRoot = await bootstrapPlanRepo();
 		const out = await applyUserPromptUlwLoopSteering(
 			payload(
-				'omo ulw-loop steer: {"kind":"annotate_ledger","source":"user_prompt_submit","evidence":"x","rationale":"y"}',
+				`${marker}: {"kind":"annotate_ledger","source":"user_prompt_submit","evidence":"x","rationale":"y"}`,
 				repoRoot,
 			),
 		);
@@ -242,7 +242,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 				permissionDecision: "deny",
 			},
 		});
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("token_budget");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("unlimited");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
@@ -258,7 +257,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 		// then
 		const parsed = JSON.parse(output);
 		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
 	});
 
@@ -272,7 +270,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 		// then
 		const parsed = JSON.parse(output);
 		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 	});
 
 	it("#given create_goal omits token_budget #when PreToolUse runs #then it stays silent", () => {

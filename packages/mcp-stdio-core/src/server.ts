@@ -15,6 +15,13 @@ export interface ParentWatchdogConfig {
   readonly pollIntervalMs?: number
   // Injectable so tests do not depend on OS process semantics.
   readonly probeAlive?: (pid: number) => boolean
+  // Fires after every completed poll with what the probe saw. Defaults to absent,
+  // so a production server does no work and emits nothing per poll; a caller that
+  // needs to observe "the watchdog is still polling and the parent is still alive"
+  // opts in. Deliberately a callback rather than a lifecycle log line: at the
+  // 30s default poll this would otherwise be thousands of log lines per day per
+  // server, forever, to serve an observability need almost no consumer has.
+  readonly onPoll?: (alive: boolean) => void
 }
 
 export interface JsonRpcStdioServerConfig<HandlerOptions> {
@@ -183,7 +190,14 @@ export function createParentWatchdog(
   const probeAlive = config.probeAlive ?? isProcessAlive
   let fired = false
   const timer = setInterval(() => {
-    if (fired || probeAlive(parentPid)) return
+    if (fired) return
+    const alive = probeAlive(parentPid)
+    // Report the poll before acting on it, so an observer can distinguish "still
+    // polling, parent healthy" from "timer never armed or silently stopped" -- a
+    // watchdog observable only when it kills the process is untestable. No-op
+    // unless the caller opted in, so this costs a production server nothing.
+    config.onPoll?.(alive)
+    if (alive) return
     fired = true
     onDeadParent(parentPid, pollIntervalMs)
   }, pollIntervalMs)

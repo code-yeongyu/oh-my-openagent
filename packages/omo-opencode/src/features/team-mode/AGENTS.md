@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Spawns coordinated agent teams with shared mailbox, task list, optional tmux layout, and graceful lifecycle. Modeled after Claude Code Agent Teams. **OFF by default.** Enable via `team_mode.enabled` in `oh-my-opencode.jsonc`; restart OpenCode after enabling. Harness-neutral registry/mailbox/tasklist/state/worktree/tmux-layout primitives are extracted to [`packages/team-core/`](../../../../../packages/team-core); this directory remains the OpenCode adapter for session spawning, hooks, tools, and config integration.
+Spawns coordinated agent teams with shared mailbox, task list, optional tmux layout, and graceful lifecycle. Modeled after Claude Code Agent Teams. **OFF by default.** Enable via `team_mode.enabled` in `.omo/omo.jsonc`; restart OpenCode after enabling. Harness-neutral registry/mailbox/tasklist/state/worktree/tmux-layout primitives are extracted to [`packages/team-core/`](../../../../../packages/team-core); this directory remains the OpenCode adapter for session spawning, hooks, tools, and config integration.
 
 User docs: [`docs/guide/team-mode.md`](../../../../../docs/guide/team-mode.md).
 

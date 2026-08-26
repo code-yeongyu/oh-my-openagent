@@ -1,6 +1,6 @@
 # @oh-my-opencode/omo-codex
 
-Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, start-work continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
+Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, ulw-execute continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
 
 ## Layout
 
@@ -20,7 +20,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `git-bash` (TypeScript + Git Bash MCP) - exposes the Windows-only `git_bash` MCP and reminds Codex on the first shell-like call, including the first one after compaction.
 - `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
 - `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit; `PreToolUse` spawn guards (fan-out cap + gate-artifact preflight) and a `Stop` auto-resume hook.
-- `start-work-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` start-work plans.
+- `ulw-execute-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` ulw-execute plans.
 - `telemetry` (TypeScript) - anonymous daily active telemetry hook.
 
 ## Install
@@ -71,23 +71,40 @@ Add extra exclude-only roots with `codegraph.excluded_roots`:
 
 Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
 
-CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment, plus `CODEGRAPH_NO_DAEMON=1` unless the shared daemon is opted in (see below). OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
+CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. The shared daemon is enabled by default; setting `codegraph.daemon` to `false` adds `CODEGRAPH_NO_DAEMON=1`. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
 
-### CodeGraph daemon (opt-in)
+### CodeGraph SessionStart bootstrap
 
-By default every CodeGraph MCP process runs the index in-process and exits with its client. Set `codegraph.daemon` to `true` in the OMO config (`~/.omo/config.jsonc`, or `.omo/config.jsonc` in a project) to opt into the upstream shared daemon:
+The Codex `SessionStart` hook never runs `codegraph status`. It judges a project initialized only when `<projectRoot>/.codegraph/codegraph.db` exists. If an ancestor directory has that database, the nested project is treated as covered and no duplicate child index is initialized.
+
+Only a definitively uninitialized project may spawn the background initializer. OMO serializes attempts with an atomic per-project lock under `~/.omo/codegraph/session-start/locks/`, recovers stale locks, and records worker failures in an exponential cooldown stamp. The default cooldown starts at 15 minutes, doubles after consecutive failures, and caps at 24 hours. Configure the base interval for Codex with `codegraph.session_start_cooldown_ms` (minimum 60000):
 
 ```jsonc
 {
-  "codegraph": {
-    // Default false. When true, one detached daemon per project serves every
-    // CodeGraph client instead of each client loading the index in-process.
-    "daemon": true
+  "[codex]": {
+    "codegraph": {
+      "session_start_cooldown_ms": 900000
+    }
   }
 }
 ```
 
-With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. Opting in trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. It ships off by default so no process outlives the client that started it.
+Suppressed attempts are auditable in `~/.omo/codegraph/session-start.jsonl` through actions such as `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`. The worker invokes only bounded `codegraph init` and records success only when the exact project database appears afterward; probe errors and timeouts never mean "uninitialized".
+
+### CodeGraph daemon
+
+By default CodeGraph uses the upstream shared daemon. Set `codegraph.daemon` to `false` in the unified OMO config (`~/.omo/omo.jsonc`, or `.omo/omo.jsonc` in a project) to keep each MCP process in-process:
+
+```jsonc
+{
+  "codegraph": {
+    // Default true. Set false to keep the index inside each MCP client.
+    "daemon": false
+  }
+}
+```
+
+With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. The default trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. Set `daemon: false` when strict client-scoped process lifetime is preferred.
 
 Inspect or stop running daemons with the upstream manager:
 
@@ -97,9 +114,9 @@ codegraph daemon   # interactive list of running daemons; pick one and press ent
 
 An ambient `CODEGRAPH_NO_DAEMON=1` in the environment still forces daemon-off when `codegraph.daemon` is `true`.
 
-### Process hygiene and the CodeGraph 1.4.1 upgrade
+### Process hygiene and the CodeGraph 1.5.0 upgrade
 
-CodeGraph is pinned to 1.4.1. Project stores built by older versions migrate automatically on first use; no manual re-index is needed.
+CodeGraph is pinned to 1.5.0. Managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index.
 
 Process lifecycle is self-cleaning and always on (no config keys):
 
@@ -177,4 +194,4 @@ The bundled component implementations come from the Sisyphus Labs Codex plugin f
 - [code-yeongyu/codex-lsp](https://github.com/code-yeongyu/codex-lsp)
 - [code-yeongyu/codex-ultrawork](https://github.com/code-yeongyu/codex-ultrawork)
 - [code-yeongyu/codex-ulw-loop](https://github.com/code-yeongyu/codex-ulw-loop)
-- [code-yeongyu/codex-start-work-continuation](https://github.com/code-yeongyu/codex-start-work-continuation)
+- [code-yeongyu/codex-ulw-execute-continuation](https://github.com/code-yeongyu/codex-ulw-execute-continuation)

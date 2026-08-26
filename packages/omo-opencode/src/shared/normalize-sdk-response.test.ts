@@ -47,6 +47,51 @@ describe("normalizeSDKResponse", () => {
     expect(result).toEqual({ value: "legacy" })
   })
 
+  it("returns an array fallback for a non-array error envelope when raw response is preferred", () => {
+    //#given
+    const response = {
+      data: undefined,
+      error: { message: "session messages unavailable" },
+      request: new Request("https://example.com/session/ses_123/messages"),
+      response: new Response(null, { status: 502 }),
+    }
+    const fallback = [{ id: "fallback" }]
+
+    //#when
+    const result = normalizeSDKResponse(response, fallback, { preferResponseOnMissingData: true })
+
+    //#then
+    expect(result).toBe(fallback)
+  })
+
+  it("returns an array fallback when an error envelope omits data", () => {
+    //#given
+    const response = {
+      error: { message: "session messages unavailable" },
+      request: new Request("https://example.com/session/ses_123/messages"),
+      response: new Response(null, { status: 502 }),
+    }
+    const fallback = [{ id: "fallback" }]
+
+    //#when
+    const result = normalizeSDKResponse(response, fallback, { preferResponseOnMissingData: true })
+
+    //#then
+    expect(result).toBe(fallback)
+  })
+
+  it("returns an array fallback when response data is not an array", () => {
+    //#given
+    const response = { data: { id: "malformed" } }
+    const fallback = [{ id: "fallback" }]
+
+    //#when
+    const result = normalizeSDKResponse(response, fallback, { preferResponseOnMissingData: true })
+
+    //#then
+    expect(result).toBe(fallback)
+  })
+
   it("returns fallback for null response", () => {
     //#given
     const response = null

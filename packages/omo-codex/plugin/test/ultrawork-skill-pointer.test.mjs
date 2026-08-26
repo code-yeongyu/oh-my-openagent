@@ -33,7 +33,6 @@ test("#given synced skills #when the ultrawork skill is inspected #then it carri
 	const directive = readFileSync(join(root, "components", "ultrawork", "directive.md"), "utf8");
 	assert.match(skill, /^---\nname: ultrawork\n/);
 	assert.equal(skill.endsWith(directive), true);
-	assert.match(skill, /## 1\. Create the goal with binding success criteria/);
 });
 
 test("#given the built ultrawork CLI #when a ulw prompt is submitted #then a compact skill pointer is emitted", () => {
@@ -42,10 +41,8 @@ test("#given the built ultrawork CLI #when a ulw prompt is submitted #then a com
 	const output = JSON.parse(result.stdout);
 	const context = output.hookSpecificOutput.additionalContext;
 	assert.match(context, /^<ultrawork-mode>/);
-	assert.match(context, /First user-visible line this turn MUST be exactly:/);
 	assert.match(context, /create_goal/);
 	assert.equal(context.includes(skillPath), true);
-	assert.equal(context.includes("Tier triage"), false);
 	assert.equal(Buffer.byteLength(context, "utf8") < POINTER_MAX_BYTES, true);
 });
 

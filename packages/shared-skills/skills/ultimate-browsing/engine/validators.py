@@ -43,6 +43,41 @@ CHALLENGE_MARKERS: list[str] = [
 # that know their response type should pass success_selectors instead.
 SMALL_BODY_THRESHOLD = 3000
 
+# Surrogate-route interstitial: a search-engine front page returned in place
+# of the cached page (dead cache services fall back to their home page).
+INTERSTITIAL_TITLE_MARKERS: list[str] = [
+    "<title>google search</title>",
+]
+
+
+def is_interstitial_title(body_lower: str) -> bool:
+    return any(m in body_lower for m in INTERSTITIAL_TITLE_MARKERS)
+
+
+def is_redirect_stub(text: str, *, target_url: Optional[str] = None) -> bool:
+    """True when the body only exists to send the reader back to `target_url`.
+
+    AMP-cache style stubs answer HTTP 200 with a few hundred bytes whose sole
+    content is a meta-refresh / JS redirect pointing at the origin we failed
+    to fetch — accepting one loops the caller straight back into the block.
+    """
+    if not text or len(text) >= SMALL_BODY_THRESHOLD:
+        return False
+    lowered = text.lower()
+    has_redirect = (
+        "http-equiv=\"refresh\"" in lowered
+        or "location.replace" in lowered
+        or "window.location" in lowered
+    )
+    if not has_redirect:
+        return False
+    if target_url is None:
+        return True
+    host_match = "".join(c for c in target_url.split("//")[-1].split("/")[0])
+    if not host_match:
+        return True
+    return host_match.lower() in lowered
+
 
 class Verdict(Enum):
     """Three-level classification (Codex suggestion — avoid binary)."""
@@ -115,6 +150,7 @@ def validate(
     success_selectors: Optional[list[str]] = None,
     known_bad_sizes: Optional[list[int]] = None,
     size_tolerance: int = 20,
+    target_url: Optional[str] = None,
 ) -> ValidationResult:
     """Validate a `curl_cffi` / `requests` response.
 
@@ -151,6 +187,16 @@ def validate(
     if markers:
         r.verdict = Verdict.CHALLENGE
         r.reasons.extend(f"marker:{m}" for m in markers[:3])
+        return r
+
+    # --- Layer 1.5: surrogate-route dead ends (interstitial / redirect stub) --
+    if is_interstitial_title(lowered):
+        r.verdict = Verdict.CHALLENGE
+        r.reasons.append("interstitial_title")
+        return r
+    if is_redirect_stub(text, target_url=target_url):
+        r.verdict = Verdict.CHALLENGE
+        r.reasons.append("redirect_stub")
         return r
 
     # --- Layer 2: size fingerprints (caller hint, tolerant match) ---

@@ -1,6 +1,6 @@
 import type { AgentToolResult, Theme, ThemeColor, ToolRenderResultOptions } from "@code-yeongyu/senpi"
-import { truncateToWidth } from "@earendil-works/pi-tui"
 
+import { piTui } from "../../lazy/pi-tui"
 import {
   excerptRendererPromptText,
   excerptRendererText,
@@ -11,7 +11,7 @@ import {
   statusThemeColor,
 } from "../task/renderers"
 import type { TaskCancelInput } from "./cancel"
-import type { TaskSendInput, StructuredMessageInput } from "./send-schema"
+import type { MemberScopedTaskSendInput, TaskSendInput, StructuredMessageInput } from "./send-schema"
 import type { CancelResultDetails, SendResultDetails } from "./types"
 
 export type ControlRenderTheme = Pick<Theme, "fg" | "italic">
@@ -33,6 +33,10 @@ const MIN_MEANINGFUL_TRUNCATED_EXCERPT_WIDTH = 8
 
 export function renderTaskSendCall(args: TaskSendInput, theme: ControlRenderTheme): RenderComponent {
   return widthComponent((width) => theme.fg("toolTitle", taskSendCallLine(args, theme, width)))
+}
+
+export function renderMemberScopedTaskSendCall(args: MemberScopedTaskSendInput, theme: ControlRenderTheme): RenderComponent {
+  return renderTaskSendCall(args, theme)
 }
 
 export function renderTaskSendResult(
@@ -58,6 +62,7 @@ export function renderTaskCancelResult(
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => [truncateToWidth(renderLine(width), width, ELLIPSIS)],
     invalidate: (): void => {},
@@ -69,7 +74,6 @@ function taskSendCallLine(args: TaskSendInput, theme: ControlRenderTheme, width:
   const base = joinRendererTokens([
     "task_send",
     `to:${normalizeRendererText(args.to)}`,
-    `deliver:${args.deliver_as ?? "followUp"}`,
   ])
   if (typeof args.message === "string") return withExcerpt(base, "message", args.message, theme, width)
   return base
@@ -146,18 +150,18 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+    case "capacity_deferred":
+      return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
     case "not_continuable":
       return { color: "warning", text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}` }
+    case "one_shot_agent":
+      return { color: "error", text: `task_send denied ${details.task_id} one-shot:${details.agent}` }
     case "scope_denied":
       return { color: "error", text: `task_send denied ${details.task_id} owner:${details.owning_session_id}` }
     case "not_found":
       return { color: "error", text: notFoundText(details) }
     case "invalid_arguments":
       return { color: "error", text: `task_send invalid: ${details.reason}` }
-    case "interrupted":
-      return { color: "warning", text: `task_send interrupted ${details.task_id} (was ${details.previous_status})` }
-    case "noop":
-      return { color: statusThemeColor(details.previous_status), text: `task_send no change ${details.task_id} (${details.previous_status}): ${details.reason}` }
     case "team_message":
       return teamMessageRow(details.team)
     case "shutdown_requested":

@@ -1,0 +1,19 @@
+{
+  "workflow": 31938387966,
+  "job": 95143900936,
+  "job_url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31938387966/job/95143900936",
+  "head": "a2bdb5257827df51aa3a4780e97a6cd18e227113",
+  "test": "MemoryBlockCache > #given the same template identity and HEAD #when compiled twice #then the stable projection is reused",
+  "duration_ms": 5015,
+  "result": "FAIL",
+  "root_cause": "The first and fourth Git-backed cache tests omitted the existing Windows integration-test timeout applied to the other cache tests.",
+  "fix": "Apply WINDOWS_INTEGRATION_TEST_TIMEOUT to every Git-backed MemoryBlockCache test.",
+  "green": {
+    "focused_command": "bun test packages/memory-core/src/compile/cache.test.ts",
+    "result": "5 pass, 0 fail",
+    "duration_seconds": 1.59,
+    "workflow": 31939507552,
+    "windows_shard_job": 95146554571,
+    "windows_shard_conclusion": "SUCCESS"
+  }
+}

@@ -27,7 +27,7 @@ describe("prompt-builder", () => {
           { name: "my-project-skill", description: "Project-specific deployment", location: "project" },
         ]
         const availableCategories: AvailableCategory[] = [
-          { name: "quick", description: "Trivial tasks", model: "openai/gpt-5.4-mini" },
+          { name: "quick", description: "Trivial tasks", model: "openai/gpt-5.6-luna-fast" },
         ]
 
         // when
@@ -81,7 +81,7 @@ describe("prompt-builder", () => {
           { name: "git-master", description: "Git workflow automation", location: "plugin" },
         ]
         const availableCategories: AvailableCategory[] = [
-          { name: "quick", description: "Trivial tasks", model: "openai/gpt-5.4-mini" },
+          { name: "quick", description: "Trivial tasks", model: "openai/gpt-5.6-luna-fast" },
         ]
 
         // when
@@ -94,7 +94,6 @@ describe("prompt-builder", () => {
         // then
         expect(result).toBeDefined()
         expect(result).toContain("git-master")
-        expect(result).toContain("AVAILABLE SKILLS")
       })
     })
 
@@ -140,7 +139,6 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
 
     // then
     expect(result).toBeDefined()
-    expect(result).toContain("AVAILABLE SKILLS")
     expect(result).toContain("omo-skill")
     expect(result).toContain("test-driven-development")
     expect(result).toContain("TDD discipline")

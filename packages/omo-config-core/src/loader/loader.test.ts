@@ -14,16 +14,14 @@ function makeFixture(): {
   readonly workDir: string
   readonly projectDir: string
   readonly cwd: string
-  readonly xdgConfigHome: string
 } {
   const root = mkdtempSync(join(tmpdir(), "omo-config-loader-"))
   const homeDir = join(root, "home")
-  const xdgConfigHome = join(root, "xdg")
   const workDir = join(homeDir, "work")
   const projectDir = join(workDir, "project")
   const cwd = join(projectDir, "child")
   mkdirSync(cwd, { recursive: true })
-  return { homeDir, workDir, projectDir, cwd, xdgConfigHome }
+  return { homeDir, workDir, projectDir, cwd }
 }
 
 describe("loadOmoConfig", () => {
@@ -31,7 +29,7 @@ describe("loadOmoConfig", () => {
     // given
     const fixture = makeFixture()
     writeJsonc(
-      join(fixture.xdgConfigHome, "omo", "omo.jsonc"),
+      join(fixture.homeDir, ".omo", "omo.jsonc"),
       `{
         "categories": {
           "quick": { "model": "user-model", "tools": { "read": true } }
@@ -72,7 +70,7 @@ describe("loadOmoConfig", () => {
     // when
     const result = loadOmoConfig({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: { HOME: fixture.homeDir },
       platform: "linux",
     })
 
@@ -94,7 +92,7 @@ describe("loadOmoConfig", () => {
     // given
     const fixture = makeFixture()
     writeJsonc(
-      join(fixture.xdgConfigHome, "omo", "omo.jsonc"),
+      join(fixture.homeDir, ".omo", "omo.jsonc"),
       `{
         "teams": {
           "alpha": {
@@ -117,7 +115,7 @@ describe("loadOmoConfig", () => {
     // when
     const result = loadOmoConfig({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: { HOME: fixture.homeDir },
       platform: "linux",
     })
 
@@ -138,7 +136,7 @@ describe("loadOmoConfig", () => {
     // when
     const result = loadOmoConfig({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: { HOME: fixture.homeDir },
       platform: "linux",
     })
 
@@ -162,7 +160,7 @@ describe("loadOmoConfig", () => {
       // when
       const result = loadOmoConfig({
         cwd: fixture.cwd,
-        env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+        env: { HOME: fixture.homeDir },
         platform: "linux",
       })
 
@@ -177,13 +175,13 @@ describe("loadOmoConfig", () => {
     // given
     const fixture = makeFixture()
     const unreadablePath = join(fixture.projectDir, ".omo", "omo.jsonc")
-    writeJsonc(join(fixture.xdgConfigHome, "omo", "omo.jsonc"), `{"task":{"default_concurrency":"five"}}`)
+    writeJsonc(join(fixture.homeDir, ".omo", "omo.jsonc"), `{"task":{"default_concurrency":"five"}}`)
     writeJsonc(unreadablePath, `{"task":{"default_concurrency":3}}`)
 
     // when
     const result = loadOmoConfig({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: { HOME: fixture.homeDir },
       fileSystem: {
         existsSync: () => true,
         readFileSync: (path: string) => {
@@ -204,13 +202,13 @@ describe("loadOmoConfig", () => {
   test("#given only user omo json #when loading #then user json is read and jsonc takes precedence when both exist", () => {
     // given
     const jsonOnlyFixture = makeFixture()
-    const jsonOnlyPath = join(jsonOnlyFixture.xdgConfigHome, "omo", "omo.json")
+    const jsonOnlyPath = join(jsonOnlyFixture.homeDir, ".omo", "omo.json")
     writeJsonc(jsonOnlyPath, `{"task":{"default_concurrency":9}}`)
 
     // when
     const jsonOnly = loadOmoConfig({
       cwd: jsonOnlyFixture.cwd,
-      env: { HOME: jsonOnlyFixture.homeDir, XDG_CONFIG_HOME: jsonOnlyFixture.xdgConfigHome },
+      env: { HOME: jsonOnlyFixture.homeDir },
       platform: "linux",
     })
 
@@ -221,15 +219,15 @@ describe("loadOmoConfig", () => {
 
     // given
     const bothFixture = makeFixture()
-    const jsoncPath = join(bothFixture.xdgConfigHome, "omo", "omo.jsonc")
-    const jsonPath = join(bothFixture.xdgConfigHome, "omo", "omo.json")
+    const jsoncPath = join(bothFixture.homeDir, ".omo", "omo.jsonc")
+    const jsonPath = join(bothFixture.homeDir, ".omo", "omo.json")
     writeJsonc(jsonPath, `{"task":{"default_concurrency":8}}`)
     writeJsonc(jsoncPath, `{"task":{"default_concurrency":4}}`)
 
     // when
     const both = loadOmoConfig({
       cwd: bothFixture.cwd,
-      env: { HOME: bothFixture.homeDir, XDG_CONFIG_HOME: bothFixture.xdgConfigHome },
+      env: { HOME: bothFixture.homeDir },
       platform: "linux",
     })
 
@@ -243,7 +241,7 @@ describe("loadOmoConfig", () => {
     // given
     const schemaUrl = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
     const fixture = makeFixture()
-    const userPath = join(fixture.xdgConfigHome, "omo", "omo.jsonc")
+    const userPath = join(fixture.homeDir, ".omo", "omo.jsonc")
     writeJsonc(
       userPath,
       `{
@@ -255,7 +253,7 @@ describe("loadOmoConfig", () => {
     // when
     const result = loadOmoConfig({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: { HOME: fixture.homeDir },
       platform: "linux",
     })
 
@@ -265,4 +263,27 @@ describe("loadOmoConfig", () => {
     expect(result.config.task?.default_concurrency).toBe(3)
     expect(result.config.$schema).toBe(schemaUrl)
   })
+})
+
+test("#given cwd outside home #when loading #then ancestor project configs are read", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "omo-config-outside-home-"))
+  const homeDir = join(root, "home")
+  const outsideProject = join(root, "elsewhere", "project")
+  mkdirSync(outsideProject, { recursive: true })
+  mkdirSync(homeDir, { recursive: true })
+  writeJsonc(join(homeDir, ".omo", "omo.jsonc"), `{"task":{"default_concurrency":2}}`)
+  writeJsonc(join(outsideProject, ".omo", "omo.jsonc"), `{"task":{"default_concurrency":7}}`)
+  writeJsonc(join(root, "elsewhere", ".omo", "omo.jsonc"), `{"task":{"default_concurrency":9}}`)
+
+  // when
+  const result = loadOmoConfig({
+    cwd: outsideProject,
+    env: { HOME: homeDir },
+    platform: "linux",
+  })
+
+  // then
+  expect(result.config.task?.default_concurrency).toBe(7)
+  expect(result.sources.some((source) => source.path.endsWith(join("elsewhere", ".omo", "omo.jsonc")))).toBe(true)
 })
