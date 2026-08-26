@@ -31,7 +31,7 @@ ultrawork
 
 That's it. The agent figures everything out — explores your codebase, researches patterns, implements the feature, verifies with diagnostics. Keeps working until done.
 
-Want more control? Open the agent selector (Tab) and choose [Prometheus](./orchestration.md) for interview-based planning, then run `/start-work` so Atlas executes the plan.
+Want more control? Open the agent selector (Tab) and choose [Prometheus](./orchestration.md) for interview-based planning, then run `/ulw-execute` so Atlas executes the plan.
 
 ---
 
@@ -64,7 +64,7 @@ User Request
     └─→ [Category-based agents] — Specialized by task type
 
 Planning path (sibling primary agents, not Sisyphus subagents):
-User → Tab or /agent → [Prometheus] (plan) → /start-work → [Atlas] (execute)
+User → Tab or /agent → [Prometheus] (plan) → /ulw-execute → [Atlas] (execute)
 ```
 
 When Sisyphus delegates to a subagent, it doesn't pick a model name. It picks a **category** — `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`. The category automatically maps to the right model. You touch nothing.
@@ -115,7 +115,7 @@ Open the agent selector (Tab) or run `/agent` and choose Prometheus.
 
 Atlas executes Prometheus plans. Distributes tasks to specialized subagents. Accumulates learnings across tasks. Verifies completion independently.
 
-Run `/start-work [plan-name] [--worktree <path>] [--make-pr] [--ship]` to hand the session to Atlas. Atlas loads the Prometheus plan, sets a Goal when the Goal tools are enabled, registers every plan task as todos, then executes.
+Run `/ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship]` to hand the session to Atlas. Atlas loads the Prometheus plan, sets a Goal when the Goal tools are enabled, registers every plan task as todos, then executes.
 
 ### Oracle: The Consultant
 
@@ -147,7 +147,7 @@ Open the agent selector (Tab) and choose Prometheus, or run `/agent`.
 
 Prometheus interviews you like a real engineer. Asks clarifying questions. Identifies scope and ambiguities. Builds a detailed plan before a single line of code is touched.
 
-Then run `/start-work` to hand the session to Atlas, which sets a Goal, registers plan todos, and executes (optional `--worktree` / `--make-pr` / `--ship`). Tasks are distributed to specialized subagents. Each completion is verified independently. Learnings accumulate across tasks. Progress tracks across sessions.
+Then run `/ulw-execute` to hand the session to Atlas, which sets a Goal, registers plan todos, and executes (optional `--worktree` / `--make-pr` / `--ship`). Tasks are distributed to specialized subagents. Each completion is verified independently. Learnings accumulate across tasks. Progress tracks across sessions.
 
 Use Prometheus for multi-day projects, critical production changes, complex refactoring, or when you want a documented decision trail.
 

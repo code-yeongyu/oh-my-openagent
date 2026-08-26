@@ -90,7 +90,7 @@ Before launching agents, collect these inputs. Extract from conversation history
 </required_inputs>
 
 
-Review PRs and branches from a dedicated review worktree only: create or attach one with `git worktree add <path> <branch>` before collecting changed files, diff, file contents, or running checks. The main worktree is read-only context; never checkout, test, or edit the review branch there.
+Review PRs and branches from a dedicated review worktree only: create or attach one with `git worktree add <path> <branch>` before collecting changed files, diff, file contents, or running checks, then immediately lock it with `git worktree lock <path> --reason "review:<pr-or-branch>"`. The main worktree is read-only context; never checkout, test, or edit the review branch there.
 
 **Auto-collection sequence:**
 
@@ -530,8 +530,6 @@ OUTPUT FORMAT:
 """)
 ```
 
----
-
 ## Phase 2: Wait & Collect
 
 After launching all 5 agents in one turn, wait for completions in bounded
@@ -560,6 +558,8 @@ agent if safe, keep the lane INCONCLUSIVE, and emit the final aggregate
 review result with the incomplete lane named. Do not spin in repeated
 wait/followup cycles. Do not use `multi_agent_v1.send_input` as an interrupt; queued
 followups are not cancellation.
+
+After ALL 5 lanes reach a terminal state and before delivering the verdict, tear down the review worktree: run `git worktree unlock <path>` followed by `git worktree remove <path>`. The lanes above run inside that worktree, so removing it earlier destroys their working directory; a crashed review leaves the locked tree as a recoverable marker for manual cleanup.
 
 ---
 

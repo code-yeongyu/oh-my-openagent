@@ -9,7 +9,7 @@ import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, getSessionAgent, registerAgentName, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { validateObjective } from "../hooks/goal/validation"
-import { createStartWorkHook } from "../hooks/start-work"
+import { createUlwExecuteHook } from "../hooks/ulw-execute"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
@@ -22,7 +22,7 @@ type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatM
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
 type MockHandlerArgs = ChatMessageHandlerArgs & { readonly _appliedSessions: string[] }
 
-function createStartWorkTemplateOutput(): ChatMessageHandlerOutput {
+function createUlwExecuteTemplateOutput(): ChatMessageHandlerOutput {
   return {
     message: {},
     parts: [
@@ -109,7 +109,7 @@ function createMockHandlerArgs(overrides?: {
       keywordDetector: null,
       claudeCodeHooks: null,
       autoSlashCommand: null,
-      startWork: null,
+      ulwExecute: null,
       goal: null,
     }),
     _appliedSessions: appliedSessions,
@@ -380,12 +380,12 @@ describe("createChatMessageHandler - cache warning behavior", () => {
   })
 })
 
-describe("createChatMessageHandler - /start-work integration", () => {
+describe("createChatMessageHandler - /ulw-execute integration", () => {
   let testDir = ""
   let originalWorkingDirectory = ""
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `chat-message-start-work-${randomUUID()}`)
+    testDir = join(tmpdir(), `chat-message-ulw-execute-${randomUUID()}`)
     originalWorkingDirectory = process.cwd()
     mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
     writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
@@ -405,7 +405,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     updateSessionAgent("test-session", "prometheus")
     const args = createMockHandlerArgs()
     args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
-    args.hooks.startWork = createStartWorkHook({
+    args.hooks.ulwExecute = createUlwExecuteHook({
       directory: testDir,
       client: { tui: { showToast: async () => {} } },
     } as never)
@@ -413,7 +413,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     const input = createMockInput("prometheus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "/start-work" }],
+      parts: [{ type: "text", text: "/ulw-execute" }],
     }
 
     // when
@@ -428,13 +428,13 @@ describe("createChatMessageHandler - /start-work integration", () => {
     expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
   })
 
-  test("smoke: resolves quoted human-readable plan names through the full /start-work chat.message path", async () => {
+  test("smoke: resolves quoted human-readable plan names through the full /ulw-execute chat.message path", async () => {
     // given
     writeFileSync(join(testDir, ".omo", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
     updateSessionAgent("test-session", "prometheus")
     const args = createMockHandlerArgs()
     args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
-    args.hooks.startWork = createStartWorkHook({
+    args.hooks.ulwExecute = createUlwExecuteHook({
       directory: testDir,
       client: { tui: { showToast: async () => {} } },
     } as never)
@@ -442,7 +442,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     const input = createMockInput("prometheus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "/start-work \"my feature plan\"" }],
+      parts: [{ type: "text", text: "/ulw-execute \"my feature plan\"" }],
     }
 
     // when
@@ -458,25 +458,25 @@ describe("createChatMessageHandler - /start-work integration", () => {
 })
 
 describe("createChatMessageHandler - goal command handling and stop continuation clearing", () => {
-  test("clears stop state before raw /start-work resumes work through chat.message", async () => {
+  test("clears stop state before raw /ulw-execute resumes work through chat.message", async () => {
     // given
     const stopContinuationGuard = createStopContinuationGuardMock(true)
-    const startWorkCalls: string[] = []
+    const ulwExecuteCalls: string[] = []
     const args = createMockHandlerArgs()
     args.hooks.stopContinuationGuard = stopContinuationGuard.guard
-    args.hooks.startWork = {
+    args.hooks.ulwExecute = {
       "chat.message": async (input: { sessionID: string }) => {
-        startWorkCalls.push(input.sessionID)
+        ulwExecuteCalls.push(input.sessionID)
       },
     }
     const handler = createChatMessageHandler(args)
-    const output = createStartWorkTemplateOutput()
+    const output = createUlwExecuteTemplateOutput()
 
     // when
     await handler(createMockInput("sisyphus"), output)
 
     // then
-    expect(startWorkCalls).toEqual(["test-session"])
+    expect(ulwExecuteCalls).toEqual(["test-session"])
     expect(stopContinuationGuard.isStoppedCalls).toEqual(["test-session"])
     expect(stopContinuationGuard.clearCalls).toEqual(["test-session"])
   })
@@ -572,12 +572,12 @@ describe("createChatMessageHandler - goal command handling and stop continuation
   test("does not clear stop state for ordinary stopped chat messages", async () => {
     // given
     const stopContinuationGuard = createStopContinuationGuardMock(true)
-    const startWorkCalls: string[] = []
+    const ulwExecuteCalls: string[] = []
     const args = createMockHandlerArgs()
     args.hooks.stopContinuationGuard = stopContinuationGuard.guard
-    args.hooks.startWork = {
+    args.hooks.ulwExecute = {
       "chat.message": async (input: { sessionID: string }) => {
-        startWorkCalls.push(input.sessionID)
+        ulwExecuteCalls.push(input.sessionID)
       },
     }
     const handler = createChatMessageHandler(args)
@@ -589,7 +589,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     })
 
     // then
-    expect(startWorkCalls).toEqual(["test-session"])
+    expect(ulwExecuteCalls).toEqual(["test-session"])
     expect(stopContinuationGuard.isStoppedCalls).toHaveLength(0)
     expect(stopContinuationGuard.clearCalls).toHaveLength(0)
   })
@@ -597,13 +597,13 @@ describe("createChatMessageHandler - goal command handling and stop continuation
   test("does not clear stop state when the session was not stopped", async () => {
     // given
     const stopContinuationGuard = createStopContinuationGuardMock(false)
-    const startWorkCalls: string[] = []
+    const ulwExecuteCalls: string[] = []
     const goalMock = createGoalHookMock()
     const args = createMockHandlerArgs()
     args.hooks.stopContinuationGuard = stopContinuationGuard.guard
-    args.hooks.startWork = {
+    args.hooks.ulwExecute = {
       "chat.message": async (input: { sessionID: string }) => {
-        startWorkCalls.push(input.sessionID)
+        ulwExecuteCalls.push(input.sessionID)
       },
     }
     args.hooks.goal = goalMock.hook
@@ -612,7 +612,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     // when
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: createStartWorkTemplateOutput().parts,
+      parts: createUlwExecuteTemplateOutput().parts,
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
@@ -632,7 +632,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     })
 
     // then
-    expect(startWorkCalls).toEqual([
+    expect(ulwExecuteCalls).toEqual([
       "test-session",
       "test-session",
       "test-session",

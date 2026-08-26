@@ -45,9 +45,9 @@ payloads, and component NOTICE files.
 - Notice: `plugin/components/rules/NOTICE`.
 - Where-bundled: Codex rules/context injection hooks and bundled rule files.
 
-### @code-yeongyu/codex-start-work-continuation@4.10.0
-- License: MIT, from `plugin/components/start-work-continuation/LICENSE`.
-- Notice: `plugin/components/start-work-continuation/NOTICE`.
+### @code-yeongyu/codex-ulw-execute-continuation@4.10.0
+- License: MIT, from `plugin/components/ulw-execute-continuation/LICENSE`.
+- Notice: `plugin/components/ulw-execute-continuation/NOTICE`.
 - Where-bundled: Codex `Stop` and `SubagentStop` continuation hook component.
 
 ### @code-yeongyu/codex-telemetry@4.10.0
@@ -79,7 +79,7 @@ payloads, and component NOTICE files.
 ### @oh-my-opencode/boulder-state@0.1.0
 - License: project license.
 - Copyright: Yeongyu Kim and contributors.
-- Where-bundled: bundled into the start-work continuation component runtime.
+- Where-bundled: bundled into the ulw-execute continuation component runtime.
 
 ### @oh-my-opencode/comment-checker-core@0.1.0
 - License: project license.

@@ -1,6 +1,6 @@
 {
 	"name": "@sisyphuslabs/omo-codex-plugin",
-	"version": "5.0.0-beta.17",
+	"version": "5.0.0-beta.21",
 	"description": "Aggregate Codex plugin root for OMO components.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -14,7 +14,7 @@
 		"components/lsp",
 		"components/telemetry",
 		"components/teammode",
-		"components/start-work-continuation",
+		"components/ulw-execute-continuation",
 		"components/ulw-loop",
 		"components/ultrawork"
 	],

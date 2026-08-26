@@ -10,6 +10,9 @@ Cross-package invariants and integration fixtures that do not belong to one pack
 tests/
 ├── omo-config-category-drift.test.ts  # Config/category contract stays synchronized
 ├── omo-schema-freshness.test.ts       # Generated omo.schema.json matches source
+├── reasoning-vocabulary-parity.test.ts  # model-core vs omo-config-core reasoning levels + normalization agree
+├── ulw-loop-define-goal-reference.test.ts  # ulw-loop skills (omo-senpi + omo-codex editions) ship define-goal.md beside full-workflow.md
+├── ulw-plan-review-convergence-contract.test.ts  # bounded review-convergence contract JSON present in every edition's full-workflow.md (issue #6128)
 └── hashline/                          # Standalone headless Hashline exercise package
     ├── package.json
     ├── bun.lock
@@ -22,7 +25,7 @@ tests/
 
 | Surface | Command | Purpose |
 |---------|---------|---------|
-| Root invariants | `bun test tests/omo-config-category-drift.test.ts tests/omo-schema-freshness.test.ts` | Fast cross-package contract checks |
+| Root invariants | `bun test tests/*.test.ts` | Fast cross-package contract checks (direct children only; the glob deliberately misses `hashline/`) |
 | Full root suite | `bun test` | Includes these tests through root `bunfig.toml` |
 | Hashline fixture | Run from a disposable full-repository copy inside a filesystem-isolated VM/container | Exercises edit operations and multi-model behavior through adapter-internal imports; makes live network/model calls, and may write model-selected paths relative to cwd |
 
@@ -30,7 +33,7 @@ tests/
 
 - Keep package-specific tests beside package source; use this directory only for real cross-package or standalone-fixture boundaries.
 - **Prompt/prose contract tests are forbidden.** Do not pin authored prompt, skill, rule, `AGENTS.md`, or markdown-instruction wording or structure. Allowed seams are machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, and observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation.
-- Treat `tests/hashline/` as its own Bun package. Preserve its lockfile and headless entry rather than importing it into the root test preload.
+- Treat `tests/hashline/` as its own Bun package. Preserve its lockfile and headless entry rather than importing it into the root test preload. Its heavy drivers (`test-edit-ops.ts`, `test-edge-cases.ts`, `test-multi-model.ts`) do not match Bun's `*.test.ts` discovery, so the root suite only ever picks up the self-contained `test-environment.test.ts` parser test.
 - The Hashline fixture imports adapter-internal `../../packages/...` paths, performs live network/model calls, and may write model-selected paths relative to cwd. Run it only from a disposable full-repository copy inside a filesystem-isolated VM or container with no sensitive parent files and never from the primary checkout or an active worktree.
 - In that sandbox, set explicit short-lived, least-privilege test-only values for `HASHLINE_TEST_BASE_URL` and `HASHLINE_TEST_API_KEY`. `test-environment.ts` requires and validates them (HTTP/HTTPS URL, non-blank key); `headless.ts` throws without them and no longer falls back to hardcoded defaults. Use a non-production endpoint and never use production or personal credentials.
 - Keep generated files and raw stdout/stderr inside the disposable sandbox or local redacted evidence directory. Redact before sharing and never publish raw logs.

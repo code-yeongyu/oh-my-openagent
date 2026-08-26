@@ -1,12 +1,16 @@
 [submodule "packages/shared-skills/upstreams/open-design"]
 	path = packages/shared-skills/upstreams/open-design
 	url = https://github.com/nexu-io/open-design
+	shallow = true
 [submodule "packages/shared-skills/upstreams/taste-skill"]
 	path = packages/shared-skills/upstreams/taste-skill
 	url = https://github.com/Leonxlnx/taste-skill
+	shallow = true
 [submodule "packages/shared-skills/upstreams/ui-ux-pro-max"]
 	path = packages/shared-skills/upstreams/ui-ux-pro-max
 	url = https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+	shallow = true
 [submodule "packages/shared-skills/upstreams/designpowers"]
 	path = packages/shared-skills/upstreams/designpowers
 	url = https://github.com/Owl-Listener/designpowers
+	shallow = true

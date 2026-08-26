@@ -255,7 +255,7 @@ describe("category activation gating", () => {
   describe("#given an ungated builtin category", () => {
     test("#when the registry offers only a chain rung #then the pre-gating fallback behavior is unchanged", () => {
       // given
-      const models = registry([model("quotio-openai", "gpt-5.6-luna-fast")])
+      const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)
@@ -269,7 +269,7 @@ describe("category activation gating", () => {
 
     test("#when a gated category is unmet #then other categories stay listed as available", () => {
       // given
-      const models = registry([model("quotio-openai", "gpt-5.6-luna-fast")])
+      const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)

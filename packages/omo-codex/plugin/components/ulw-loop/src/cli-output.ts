@@ -2,6 +2,9 @@ import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan } from "./types.js"
 import { UlwLoopError } from "./types.js";
 
 export const ULW_LOOP_HELP = `Usage:
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+  omo-agent-toolkit ulw-loop help
   omo-agent-toolkit ulw-loop create-goals --brief "..." [--brief-file <path>] [--from-stdin] [--codex-goal-mode aggregate|per_story] [--validation-batch-json <json-or-path>] [--force] [--json]
   omo-agent-toolkit ulw-loop status [--json]
   omo-agent-toolkit ulw-loop complete-goals [--retry-failed] [--json]
@@ -12,7 +15,16 @@ export const ULW_LOOP_HELP = `Usage:
   omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]
   omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "..." --objective "..." --evidence "..." --codex-goal-json <...> [--json]
 
-All subcommands accept [--session-id <id>] to isolate state under .omo/ulw-loop/<id>/; without it, Codex session env is used when present.`;
+All subcommands accept [--session-id <id>] to isolate state under .omo/ulw-loop/<id>/; without it, Codex session env is used when present.
+Every subcommand accepts --help | -h to print its own usage line.`;
+
+export function subcommandHelp(subcommand: string): string {
+	const lines = ULW_LOOP_HELP.split("\n").filter((line) =>
+		line.trimStart().startsWith(`omo-agent-toolkit ulw-loop ${subcommand}`),
+	);
+	if (lines.length === 0) return ULW_LOOP_HELP;
+	return ["Usage:", ...lines].join("\n");
+}
 
 type CriteriaCounts = { readonly pass: number; readonly total: number };
 

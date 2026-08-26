@@ -1,10 +1,23 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
+import {
+  ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+  serialQuarantineCommand,
+} from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
 const rootConfig = readFileSync(new URL("../bunfig.root.toml", import.meta.url), "utf8")
+const rootParallelConfigPath = new URL("../bunfig.root.parallel.toml", import.meta.url)
 const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
+
+function quarantinedTestPaths(config: string): readonly string[] {
+  return [...config.matchAll(/"([^"]+\.test\.ts)"/g)].map((match) => match[1] ?? "")
+}
+
+function escapeForRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
 
 function rootTestJob(): string {
   const start = workflow.indexOf("  test:\n")
@@ -37,37 +50,61 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
 
     expect(job).toContain("bun test packages/omo-opencode packages/memory-core")
-    expect(job).toContain("bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts")
-    expect(job).toContain("packages/utils/src/codegraph-provision-upgrade.test.ts")
-    expect(job).toContain("packages/senpi-task/src/__adversarial__/chaos-bench.test.ts")
-    expect(job).toContain("packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts")
-    expect(job).toContain("script/codex-installer-version.test.ts")
-    expect(job).toContain("packages/omo-native/test/payload.test.ts")
-    expect(job).toContain("packages/omo-codex/src/install/install-codex.test.ts")
-    expect(job).toContain("packages/shared-skills/provenance-gate.test.ts")
-    expect(job).toContain("packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts")
     expect(job).toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-opencode/**")
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/memory-core/**")
-    const parallelConfig = readFileSync(win2ParallelConfigPath, "utf8")
-    expect(parallelConfig).toContain("packages/senpi-task/src/runners/rpc-process.windows.test.ts")
-    expect(parallelConfig).toContain("packages/utils/src/codegraph-provision-upgrade.test.ts")
-    expect(parallelConfig).toContain("packages/senpi-task/src/__adversarial__/chaos-bench.test.ts")
-    expect(parallelConfig).toContain("packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts")
-    expect(parallelConfig).toContain("script/codex-installer-version.test.ts")
-    expect(parallelConfig).toContain("packages/omo-native/test/payload.test.ts")
-    expect(parallelConfig).toContain("packages/omo-codex/src/install/install-codex.test.ts")
-    expect(parallelConfig).toContain("packages/shared-skills/provenance-gate.test.ts")
-    expect(parallelConfig).toContain("packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts")
+  })
+
+  test("#given the shared quarantine module #when a parallel leg is rendered #then its serial command lists exactly those files", () => {
+    const job = rootTestJob()
+    const serialCommand = serialQuarantineCommand()
+
+    expect(ROOT_TEST_SERIAL_QUARANTINE_PATHS.length).toBeGreaterThan(0)
+    // Both parallel legs (POSIX and Windows shard 2) run the same serial list,
+    // so a file added to or dropped from the module must move both legs.
+    expect([...job.matchAll(new RegExp(escapeForRegExp(serialCommand), "g"))]).toHaveLength(2)
+  })
+
+  test("#given the shared quarantine module #when the parallel bunfigs are read #then each ignores exactly the quarantined files", () => {
+    expect(existsSync(rootParallelConfigPath)).toBe(true)
+    expect(existsSync(win2ParallelConfigPath)).toBe(true)
+
+    for (const configPath of [rootParallelConfigPath, win2ParallelConfigPath]) {
+      expect(quarantinedTestPaths(readFileSync(configPath, "utf8"))).toEqual([
+        ...ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+      ])
+    }
+  })
+
+  test("#given bunfig.root.parallel.toml #when the POSIX leg parallelizes #then it keeps every bunfig.root.toml exclusion", () => {
+    const parallelPatterns = quotedPatterns(readFileSync(rootParallelConfigPath, "utf8"))
+
+    for (const pattern of quotedPatterns(rootConfig)) {
+      expect(parallelPatterns).toContain(pattern)
+    }
+  })
+
+  test("#given the Linux and macOS legs #when root tests run #then the quarantine precedes the parallel remainder", () => {
+    const job = rootTestJob()
+    const posixStep = job.slice(
+      job.indexOf("runner.os != 'Windows'"),
+      job.indexOf("matrix.shard == '1/2'"),
+    )
+
+    expect(posixStep).toContain(serialQuarantineCommand())
+    expect(posixStep).toContain("bun --config=bunfig.root.parallel.toml test --parallel")
+    expect(posixStep.indexOf(serialQuarantineCommand())).toBeLessThan(
+      posixStep.indexOf("bun --config=bunfig.root.parallel.toml test --parallel"),
+    )
   })
 
   test("#given the dedicated Senpi compatibility job #when root tests run #then omo-senpi is excluded on every OS", () => {
-    const job = rootTestJob()
-
-    expect(job).toContain("bun --config=bunfig.root.toml test")
     expect(quotedPatterns(rootConfig)).toContain("packages/omo-senpi/**")
+    expect(quotedPatterns(readFileSync(rootParallelConfigPath, "utf8"))).toContain(
+      "packages/omo-senpi/**",
+    )
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-senpi/**")
   })
 

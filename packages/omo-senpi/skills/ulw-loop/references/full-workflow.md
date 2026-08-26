@@ -1,10 +1,3 @@
----
-name: ulw-loop
-description: Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.
-metadata:
-  short-description: Goal-like ultrawork loop for systematic decomposition
----
-
 ## Role
 Expert goal orchestration agent. You conduct; right-sized subagents play. Plan durable multi-goal work, fan independent work out, QA every result yourself, record only proven evidence.
 Use GPT-5.x style: outcome-first, evidence-bound, atomic decisions, no nested branching prose.
@@ -72,43 +65,7 @@ omo-senpi subagent reliability:
 Do all three steps before execution. No edits, goal tools, or checkpointing before bootstrap completes.
 
 ### 1. Create goals from the brief
-Resolve the CLI before the first command. If `omo` is absent from PATH or lacks `ulw-loop`, use the stable local installer bin or cached omo-senpi component CLI — same CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, recording the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
-```sh
-CODEX_HOME="${CODEX_HOME:-$HOME/.omo-senpi}"
-ULW_LOOP_NODE="$(command -v node 2>/dev/null || true)"
-if [ -z "$ULW_LOOP_NODE" ]; then
-  for candidate in /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
-    [ -x "$candidate" ] || continue
-    ULW_LOOP_NODE="$candidate"
-    break
-  done
-fi
-
-ULW_LOOP_CLI=
-if command -v omo-agent-toolkit >/dev/null 2>&1 && omo-agent-toolkit ulw-loop help >/dev/null 2>&1; then
-  ULW_LOOP_CLI=omo-agent-toolkit
-elif [ -n "$ULW_LOOP_NODE" ]; then
-  for candidate in "$HOME/.local/bin/omo-agent-toolkit" "$CODEX_HOME/bin/omo-agent-toolkit" "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
-    [ -f "$candidate" ] || [ -x "$candidate" ] || continue
-    if "$ULW_LOOP_NODE" "$candidate" ulw-loop help >/dev/null 2>&1; then
-      ULW_LOOP_CLI="$candidate"
-      break
-    fi
-  done
-
-  if [ -n "$ULW_LOOP_CLI" ] && [ -n "$ULW_LOOP_NODE" ]; then
-    omo-agent-toolkit() { "$ULW_LOOP_NODE" "$ULW_LOOP_CLI" "$@"; }
-  fi
-fi
-
-if [ -z "${ULW_LOOP_CLI:-}" ]; then
-  /bin/mkdir -p .omo/ulw-loop 2>/dev/null || mkdir -p .omo/ulw-loop 2>/dev/null || true
-  NOTE="${NOTE:-.omo/ulw-loop/bootstrap-notepad.md}"
-  printf '%s\n' "No ulw-loop-capable omo-agent-toolkit executable found; PATH omo-agent-toolkit may be the OpenCode CLI without the omo-senpi ulw-loop subcommand, and cached ulw-loop CLI was not found under ${CODEX_HOME:-$HOME/.omo-senpi}." >> "$NOTE" 2>/dev/null || true
-  printf '%s\n' "Install with npx omo-senpi-ai install or set CODEX_LOCAL_BIN_DIR to a PATH directory." >&2
-fi
-```
-If `ULW_LOOP_CLI` is empty, open the durable notepad first, record the missing CLI evidence, then surface the installer issue.
+Resolve the CLI from the ulw-loop skill-pointer message: it carries the resolved absolute path of the `omo-agent-toolkit` shim for this installation. Invoke it as `<path> ulw-loop <subcommand>` (or `node <dir>/cli.js ulw-loop <subcommand>`). If no pointer path is present and `omo-agent-toolkit` is not on PATH, record the missing-CLI evidence in the notepad and surface the installer issue instead of probing.
 
 Run one form:
 ```sh
@@ -159,7 +116,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 
 ### Per-Criterion Cycle
 1. PLAN: read `criterion.scenario`, `criterion.expectedEvidence`, prior ledger entries, and safety bounds. Identify which tasks in the current wave are independent — write scopes disjoint, no two workers editing the same files; units whose edits overlap wait for a later wave or run under team mode with per-member worktrees.
-2. Register atomic todos via `update_plan` — one ultra-granular step per action, `path: <action> for <criterion> - verify by <check>`. Call `update_plan` on every transition (start → `in_progress`, finish → `completed`); exactly one `in_progress`, mark completed immediately, never batch, never let the rendered plan lag behind reality.
+2. Register atomic todos via the `todo` tool — one ultra-granular step per action, `path: <action> for <criterion> - verify by <check>`. Call `todo` on every transition (start → `in_progress`, finish → `completed`); exactly one `in_progress`, mark completed immediately, never batch, never let the rendered plan lag behind reality.
 3. DELEGATE-IN-PARALLEL: dispatch every independent task in the wave through ONE native batch call: `task({ tasks: [{ prompt, subagent_type | category }, ...], run_in_background: true })`. Each prompt starts with `TASK:` and names `DELIVERABLE`, `SCOPE`, `VERIFY`, and `STOP WHEN`. Use one `task` call only when the wave has one worker. Keep doing independent root work while children run; consume injected progress/completion and use `task_send`, `task_output`, or `task_cancel` only as defined by the native task contract.
 4. INTEGRATE + CRITICAL SELF-QA + GIT CHECKPOINT (EVERY WORKER RETURN): do NOT trust the worker's report. Read the diff yourself, re-run its tests, and run LSP diagnostics on the changed files. Treat "done" as a claim to disprove. If the diff drifts, the test is hollow, or evidence is missing, RESPAWN the worker with the specific failure context. Once the work unit is verified, use `git-master` before staging: inspect recent repository commits and touched-path history to infer commit language, Conventional Commit scope, message shape, and unit size. Stage only that unit's files and commit in the observed style; do not carry verified work forward into a later omnibus commit. If no git-tracked files changed or committing is unsafe, record the no-commit reason as evidence. Forward every finding/learning to subsequent workers.
 5. EXECUTE-AS-SCENARIO: ACTUALLY run the Manual-QA scenario the criterion named (channel table above). Run it yourself for the orchestrator check; for heavier flows dispatch a dedicated QA execution worker (category `unspecified-low` by default; `unspecified-high` when the QA flow itself is hard) whose ONLY job is to drive the channel and write the artifact to the named evidence path. If the scenario FAILS, respawn the implementing worker with the captured failure — do not hand-patch around it.
@@ -177,7 +134,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ### Goal Completion
 1. Non-final aggregate goal: confirm every `essential` criterion is `pass`; non-essential criteria may remain pending. Final aggregate goal: confirm every criterion across the whole plan is `pass`.
 2. Call `get_goal` for a fresh snapshot.
-3. Run `omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidence "<criteria evidence summary>" --omo-senpi-goal-json <snapshot> --json`; on success it auto-starts and prints the next eligible goal unless `--no-advance` is passed.
+3. Run `omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidence "<criteria evidence summary>" --codex-goal-json <snapshot> --json`; on success it auto-starts and prints the next eligible goal unless `--no-advance` is passed.
 4. If blocked or failed, checkpoint with `--status blocked` or `--status failed` and include diagnosis evidence.
 5. If this is the final goal, run the final quality gate first and pass `--quality-gate-json`.
 
@@ -189,10 +146,10 @@ Trigger only for the final aggregate goal after every criterion in every goal is
 3b. Only then spawn omo-senpi-gate-reviewer with those artifact paths.
 3c. The gate's approval binds to the frozen tree and full commit SHA and covers its three lanes — code quality, hands-on QA, and goal verification. Immediately append one durable `.omo/ulw-loop/ledger.jsonl` record per passing lane with the lane name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the ledger and require the exact lane/SHA pair; memory or an unstamped report is not coverage. A later rebase or amend that keeps the tree identical still has a new SHA and needs fresh lane stamps; changed content needs fresh review of the delta.
 4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Any fix restarts the freeze at the new HEAD: re-run ONLY the proofs it invalidated and stamp the fresh output — never regenerate all evidence or relabel stale output to HEAD — re-review the delta at most TWICE; then record-review-blockers (step 5) and surface to the user.
-5. If review remains blocked, run `omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --omo-senpi-goal-json <snapshot> --json`.
+5. If review remains blocked, run `omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 6. If clean, checkpoint final completion:
 ```sh
-omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e evidence + manual QA notes>" --omo-senpi-goal-json <snapshot> --quality-gate-json <json-or-path> --json
+omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e evidence + manual QA notes>" --codex-goal-json <snapshot> --quality-gate-json <json-or-path> --json
 ```
 `--quality-gate-json` shape:
 ```json

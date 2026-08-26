@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@oh-my-opencode/utils": "workspace:*",
-    "posthog-node": "^5.49.2"
+    "posthog-node": "^5.51.1"
   },
   "sideEffects": false
 }

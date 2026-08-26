@@ -9,10 +9,10 @@ import {
 } from "@oh-my-opencode/telemetry-core";
 
 import {
-	MACHINE_ID_PREFIX,
 	createComponentTelemetryProductConfig,
 	getComponentTelemetryStateDir,
 	getComponentVersion,
+	MACHINE_ID_PREFIX,
 	writeComponentTelemetryDiagnostic,
 } from "./product-identity.js";
 
@@ -53,24 +53,14 @@ function resolveActivityStateProvider(options: CreatePluginPostHogOptions): Acti
 
 	if (options.stateDir === undefined) {
 		return () =>
-			getDailyActiveCaptureState(createDailyActiveCaptureStateInput(
-				getComponentTelemetryStateDir(),
-				options.now,
-			));
+			getDailyActiveCaptureState(createDailyActiveCaptureStateInput(getComponentTelemetryStateDir(), options.now));
 	}
 
 	const stateDir = options.stateDir;
-	return () =>
-		getDailyActiveCaptureState(createDailyActiveCaptureStateInput(
-			stateDir,
-			options.now,
-		));
+	return () => getDailyActiveCaptureState(createDailyActiveCaptureStateInput(stateDir, options.now));
 }
 
-function createDailyActiveCaptureStateInput(
-	stateDir: string,
-	now: Date | undefined,
-) {
+function createDailyActiveCaptureStateInput(stateDir: string, now: Date | undefined) {
 	if (now === undefined) {
 		return {
 			diagnostics: writeComponentTelemetryDiagnostic,

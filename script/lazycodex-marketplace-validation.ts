@@ -85,7 +85,7 @@ async function validatePluginHookCommands(pluginRoot: string, issues: string[]):
 
 // Codex links every component package.json "bin" as a managed bin; a missing target leaves the
 // installer repairing a dangling bin on every session even when no hook references the CLI
-// (lazycodex#108: omo-start-work-continuation, omo-ulw-loop, ulw, ulw-loop).
+// (lazycodex#108: omo-ulw-execute-continuation, omo-ulw-loop, ulw, ulw-loop).
 async function validatePluginManagedBins(pluginRoot: string, issues: string[]): Promise<void> {
   const componentsRoot = join(pluginRoot, "components")
   let entries

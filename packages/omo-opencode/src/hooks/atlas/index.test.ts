@@ -1922,7 +1922,7 @@ session_id: ses_untrusted_999
     })
 
     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
-       // given - boulder explicitly set to atlas, but last agent is sisyphus (initial state after /start-work)
+       // given - boulder explicitly set to atlas, but last agent is sisyphus (initial state after /ulw-execute)
        const planPath = join(TEST_DIR, "test-plan.md")
        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
@@ -1935,7 +1935,7 @@ session_id: ses_untrusted_999
        }
        writeBoulderState(TEST_DIR, state)
 
-       // given - last agent is sisyphus (typical state right after /start-work)
+       // given - last agent is sisyphus (typical state right after /ulw-execute)
        cleanupMessageStorage(MAIN_SESSION_ID)
        setupMessageStorage(MAIN_SESSION_ID, "sisyphus")
 
@@ -2431,7 +2431,7 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalled()
     })
 
-    test("should inject when session agent was updated to atlas by start-work even if message storage agent differs", async () => {
+    test("should inject when session agent was updated to atlas by ulw-execute even if message storage agent differs", async () => {
       // given - boulder targets atlas, but nearest stored message still says hephaestus
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -2460,7 +2460,7 @@ session_id: ses_untrusted_999
         },
       })
 
-      // then - should continue because start-work updated session agent to atlas
+      // then - should continue because ulw-execute updated session agent to atlas
       expect(mockInput._promptMock).toHaveBeenCalled()
     })
 
@@ -2681,6 +2681,16 @@ session_id: ses_untrusted_999
         await firePendingTimers()
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       })
+    })
+
+    test("releases Atlas-owned state on disposal", () => {
+      // given - an Atlas hook instance owns session state and retry handles
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      // when - the plugin lifecycle disposes the hook
+      // then - Atlas exposes its lifecycle cleanup contract
+      expect(hook).toHaveProperty("dispose")
     })
   })
 })

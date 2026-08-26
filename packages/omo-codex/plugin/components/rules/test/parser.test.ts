@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-
 import { parseRule } from "@oh-my-opencode/rules-engine/engine";
+import { describe, expect, it } from "vitest";
 
 describe("parseRule", () => {
 	it("#given content without frontmatter #when parsing #then body is preserved", () => {

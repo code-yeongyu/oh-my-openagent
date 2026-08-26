@@ -116,9 +116,12 @@ describe("build:omo-native staged payload", () => {
             "scripts/install.mjs",
           ])
 
-          expect(readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8")).toBe(
-            "/plugin/\n",
-          )
+          expect(
+            readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8").replaceAll(
+              "\r\n",
+              "\n",
+            ),
+          ).toBe("/plugin/\n")
 
           rmSync(join(outputDir, "extensions", "dream-persona.md"))
           const missingPersona = runBuild(["--output", outputDir, "--check-only"])

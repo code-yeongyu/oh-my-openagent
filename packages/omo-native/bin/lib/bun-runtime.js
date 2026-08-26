@@ -1,8 +1,7 @@
-import { spawnSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { homedir as osHomedir } from "node:os"
 import { posix, win32 } from "node:path"
-import { propagateResult } from "./child-process.js"
+import { propagateResult, runChild } from "./child-process.js"
 
 // A bun global install lives under <BUN_ROOT>/install/global/, and `bun add -g` links the launcher
 // into <BUN_ROOT>/bin. The link TARGET is what identifies the install, so every comparison below
@@ -20,7 +19,7 @@ function pathApi(platform) {
   return platform === "win32" ? win32 : posix
 }
 
-function bunRoot(env, homedir, platform) {
+export function bunRoot(env, homedir, platform) {
   return env.BUN_INSTALL ? env.BUN_INSTALL : pathApi(platform).join(homedir(), ".bun")
 }
 
@@ -120,19 +119,23 @@ export function resolveBunReexec(input) {
 }
 
 /**
- * Runs the decision. Returns true when bun took over the process, in which case the caller must
+ * Runs the decision. Resolves true when bun took over the process, in which case the caller must
  * return immediately: the child has already run to completion and its exit status is propagated.
+ *
+ * The wait is asynchronous for the same reason the engine spawn is: this is the outer half of the
+ * launcher chain, and a node process blocked in `spawnSync` here dies to a SIGTERM without ever
+ * telling the bun child - which owns the engine - that anything happened.
  *
  * Node's execArgv is deliberately dropped - node flags are not bun flags, and forwarding them
  * would fail the very launch this re-exec is meant to make work.
  */
-export function maybeReexecUnderBun(input) {
+export async function maybeReexecUnderBun(input) {
   const decision = resolveBunReexec(input)
   if (!decision.reexec) return false
-  const spawn = input.spawn ?? spawnSync
+  const run = input.spawn ?? runChild
   const propagate = input.propagate ?? propagateResult
   const argv = input.argv ?? process.argv
-  const result = spawn(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
+  const result = await run(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
     stdio: "inherit",
     windowsHide: true,
   })

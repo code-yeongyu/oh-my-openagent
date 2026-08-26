@@ -134,8 +134,9 @@ function foldSendOutcome(
   }
 }
 
-// A revived child settles OUTSIDE any wave: no wave loop is awaiting this task, so the send arms the
-// one watcher that folds its new terminal outcome and persists its result exactly once.
+// A revived child can settle OUTSIDE the live settle loop (the run may already be quiescent):
+// no admission pass is necessarily awaiting this task, so the send arms the one watcher that folds
+// its new terminal outcome and persists its result exactly once.
 async function watchRevivedTask(
   options: DagSchedulerOptions,
   nodeId: DagNodeId,

@@ -106,7 +106,7 @@ function registryCtx(sessionId: string): unknown {
 }
 
 const SHARED_KEYS = [
-  "$process_person_profile", "package_version", "platform", "product_name", "schema_version",
+  "$process_person_profile", "install_id", "package_version", "platform", "product_name", "schema_version", "surface",
 ]
 
 describe("OmO Native session telemetry", () => {

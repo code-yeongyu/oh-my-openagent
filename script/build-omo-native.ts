@@ -5,11 +5,13 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -36,7 +38,7 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "refactor", "SKILL.md"),
   join("skills", "remove-ai-slops", "SKILL.md"),
   join("skills", "review-work", "SKILL.md"),
-  join("skills", "start-work", "SKILL.md"),
+  join("skills", "ulw-execute", "SKILL.md"),
   join("skills", "ultimate-browsing", "SKILL.md"),
   join("skills", "ultrawork", "SKILL.md"),
   join("skills", "ulw-loop", "SKILL.md"),
@@ -88,13 +90,19 @@ function parseArgs(argv: readonly string[]): BuildOptions {
 }
 
 function runSenpiPluginBuild(): void {
-  const result = spawnSync("bun", ["run", "build:senpi-plugin"], {
-    cwd: repoRoot,
-    stdio: "inherit",
-  })
-  if (result.error !== undefined) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`build:senpi-plugin failed with exit code ${result.status ?? 1}`)
+  const buildRoot = mkdtempSync(join(tmpdir(), "omo-native-lsp-build-"))
+  try {
+    const result = spawnSync("bun", ["run", "build:senpi-plugin"], {
+      cwd: repoRoot,
+      env: { ...process.env, OMO_LSP_DAEMON_DIST: join(buildRoot, "dist") },
+      stdio: "inherit",
+    })
+    if (result.error !== undefined) throw result.error
+    if (result.status !== 0) {
+      throw new Error(`build:senpi-plugin failed with exit code ${result.status ?? 1}`)
+    }
+  } finally {
+    rmSync(buildRoot, { recursive: true, force: true })
   }
 }
 
@@ -154,7 +162,9 @@ function main(argv: readonly string[]): number {
     )
     return 1
   }
-  if (!options.checkOnly) {
+  // Only the default package plugin dir is git-ignored; staging builds (--output)
+  // must leave packages/omo-native untouched.
+  if (!options.checkOnly && options.outputDir === defaultOutputDir) {
     writeFileSync(join(packageDir, ".gitignore"), "/plugin/\n", "utf8")
   }
   console.log(

@@ -29,6 +29,16 @@ Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-tools-mcp`). Serve
 
 ## NOTES
 
-- **Node + npm + vitest + biome, NOT Bun.** Built with `npm ci` + `npm run build` (triggered from root via `bun run build:lsp-tools-mcp`). `engines.node >= 20`.
-- **All logic lives in `lsp-core`.** This package is a thin vendored shim that re-exports the core and adds a standalone CLI entry.
+- **Node + npm + vitest + biome, NOT Bun.** Built with `npm ci` + `npm run build` (triggered from root via `bun run build:lsp-tools-mcp`). `engines.node >= 20`. The build itself bundles with `bun build`; tests/tooling stay npm/Vitest/Biome.
+- **All logic lives in `lsp-core`.** This package is a thin vendored shim that re-exports the core and adds a standalone CLI entry. Most `src/lsp/*.ts` are one-line re-export shims.
+- **`ensure-core-links.mjs`** prepares local `lsp-core` links before build — run via the npm scripts, not manually.
 - **Config:** `.codex/lsp-client.json` (project) and `~/.codex/lsp-client.json` (user), overridable via `LSP_TOOLS_MCP_PROJECT_CONFIG` and `LSP_TOOLS_MCP_USER_CONFIG`.
+
+## COMMANDS
+
+```bash
+# from packages/lsp-tools-mcp/
+npm ci
+npm run check        # typecheck + biome + build (what CI runs)
+npm test             # vitest
+```

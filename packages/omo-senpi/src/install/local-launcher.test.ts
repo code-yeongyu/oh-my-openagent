@@ -20,6 +20,7 @@ describe("local omo launcher", () => {
 
         expect(brand).toEqual({
           name: "OmO",
+          command: "omo",
           displayVersion: "9.9.9",
           configDir: ".omo",
           flatLayout: false,

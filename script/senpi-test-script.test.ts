@@ -103,7 +103,7 @@ describe("Senpi compatibility test script", () => {
         "refactor",
         "remove-ai-slops",
         "review-work",
-        "start-work",
+        "ulw-execute",
         "ultimate-browsing",
         "ultrawork",
         "ulw-loop",

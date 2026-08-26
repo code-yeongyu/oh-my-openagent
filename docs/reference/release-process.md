@@ -49,6 +49,8 @@ A failure before release state exists may still be rerun when it is purely trans
 
 The workflow uses two dispatches. The first run has an empty `prepared_release_sha`; it runs the gates, prepares or reuses release state, creates or validates the tag, and dispatches a second run from that tag. The second run carries the exact prepared SHA in `prepared_release_sha`; only this run can execute `publish-platform`, `publish-main`, and `release`.
 
+The release-binary asset lane (compiled `omo` binaries attached to the GitHub release) is idempotent across reruns. Its build steps run unconditionally with respect to the npm already-published skips - they are gated only by a release-asset existence probe - so a rerun rebuilds the binaries even when npm publication is skipped. The release job uploads with `gh release upload --clobber`, then re-downloads every asset and re-verifies its SHA256 before declaring success, and it fails the release job unless exactly 13 assets (12 binaries plus `SHA256SUMS`) verify. Because that verification is unconditional, `skip_platform=true` is valid only for a rerun whose earlier attempt already uploaded the assets; a `skip_platform=true` run with no prior assets fails closed instead of shipping an assetless release.
+
 Rerun the run that owns the failed work:
 
 - If preparation, tagging, or the provenance-safe follow-up dispatch failed, rerun the first run's ID.

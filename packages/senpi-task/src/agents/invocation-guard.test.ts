@@ -25,7 +25,7 @@ function stateOf(opts: {
 }
 
 describe("AGENT_INVOCATION_CONDITIONS", () => {
-  test("#given the classification #when inspected #then metis and momus form the plan-gated tier with the ulw-plan/artifact/start-work condition", () => {
+  test("#given the classification #when inspected #then metis and momus form the plan-gated tier with the ulw-plan/artifact/ulw-execute condition", () => {
     // given / when
     const condition = AGENT_INVOCATION_CONDITIONS
 
@@ -37,7 +37,7 @@ describe("AGENT_INVOCATION_CONDITIONS", () => {
     for (const name of ["metis", "momus"] as const) {
       expect(condition[name]?.requiresSkills).toEqual(["ulw-plan"])
       expect(condition[name]?.requiresPlanArtifact).toBe(true)
-      expect(condition[name]?.forbidsSkills).toEqual(["start-work"])
+      expect(condition[name]?.forbidsSkills).toEqual(["ulw-execute"])
     }
   })
 
@@ -105,27 +105,27 @@ describe("evaluateInvocationGuard", () => {
     expect(verdict.kind).toBe("allow")
   })
 
-  test("#given a user request with artifact but start-work invoked #when momus is evaluated #then it denies and names start-work", () => {
+  test("#given a user request with artifact but ulw-execute invoked #when momus is evaluated #then it denies and names ulw-execute", () => {
     // given / when
     const verdict = evaluateInvocationGuard(
       "momus",
-      stateOf({ requested: ["ulw-plan"], artifact: true, invoked: ["start-work"] }),
+      stateOf({ requested: ["ulw-plan"], artifact: true, invoked: ["ulw-execute"] }),
     )
 
     // then
     expect(verdict.kind).toBe("deny")
     if (verdict.kind !== "deny") throw new Error("expected deny")
-    expect(verdict.message).toContain("start-work")
+    expect(verdict.message).toContain("ulw-execute")
   })
 
-  test("#given momus with only start-work invoked #when evaluated #then the forbidden denial takes precedence over the missing requirement", () => {
+  test("#given momus with only ulw-execute invoked #when evaluated #then the forbidden denial takes precedence over the missing requirement", () => {
     // given / when
-    const verdict = evaluateInvocationGuard("momus", stateOf({ invoked: ["start-work"] }))
+    const verdict = evaluateInvocationGuard("momus", stateOf({ invoked: ["ulw-execute"] }))
 
     // then
     expect(verdict.kind).toBe("deny")
     if (verdict.kind !== "deny") throw new Error("expected deny")
-    expect(verdict.message).toContain("start-work")
+    expect(verdict.message).toContain("ulw-execute")
   })
 })
 
@@ -176,14 +176,14 @@ describe("evaluateInvocationGuard - denial names the real unlock path", () => {
     expect(verdict.message).toContain(".omo/plans")
   })
 
-  test("#given start-work already invoked #when momus is evaluated #then the terminal denial does not advertise an unlock", () => {
+  test("#given ulw-execute already invoked #when momus is evaluated #then the terminal denial does not advertise an unlock", () => {
     // given / when
-    const verdict = evaluateInvocationGuard("momus", stateOf({ invoked: ["start-work"], requested: ["ulw-plan"], artifact: true }))
+    const verdict = evaluateInvocationGuard("momus", stateOf({ invoked: ["ulw-execute"], requested: ["ulw-plan"], artifact: true }))
 
     // then
     expect(verdict.kind).toBe("deny")
     if (verdict.kind !== "deny") return
-    expect(verdict.message).toContain("start-work")
+    expect(verdict.message).toContain("ulw-execute")
     expect(verdict.message).not.toContain("/skill:ulw-plan")
   })
 })

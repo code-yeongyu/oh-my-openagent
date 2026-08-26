@@ -903,7 +903,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "dist/cli-node", "script/qa/strip-ansi.mjs", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-visual-qa.mjs", "script/qa/xterm-live-terminal.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
+            .files = ["dist/cli", "dist/cli-node", "script/qa/strip-ansi.mjs", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-visual-qa.mjs", "script/qa/xterm-live-terminal.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |
@@ -970,6 +970,7 @@ jobs:
     with:
       version: ${{ needs.release-metadata.outputs.version }}
       dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
+      omo_ai_version: ${{ needs.release-metadata.outputs.omo_ai_version }}
     secrets: inherit
 
   release:
@@ -1109,6 +1110,56 @@ jobs:
           fi
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
             gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}" --title "v${VERSION}" --notes-file /tmp/changelog.md
+
+      - name: Download release-binary artifacts
+        if: inputs.skip_platform != true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: release-binary-*
+          path: .omo/release-binaries
+          merge-multiple: true
+
+      - name: Upload release assets
+        # Runs for both stable and dist-tagged releases: the compiled binaries
+        # and SHA256SUMS are part of the release contract on every channel.
+        # skip_platform reruns rely on the assets a prior run already uploaded.
+        if: inputs.skip_platform != true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la .omo/release-binaries/
+          # Generate the combined checksum file from the 12 downloaded binaries:
+          # each matrix leg uploads only its own omo-* binary (per-leg SHA256SUMS
+          # would collide under merge-multiple), so the release job owns the
+          # release-level SHA256SUMS covering every binary.
+          (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
+          cat .omo/release-binaries/SHA256SUMS
+          gh release upload "v${VERSION}" .omo/release-binaries/omo-* .omo/release-binaries/SHA256SUMS --clobber
+
+      - name: Verify uploaded assets
+        # Intentionally ungated: release assets are part of the release
+        # contract, so reruns that skip the platform jobs must still prove the
+        # assets are downloadable and hash-verified. Reruns are safe because
+        # upload is --clobber-idempotent and the per-target build is
+        # unconditional, so this can only stay green when the release actually
+        # carries its 13 assets (12 per-target omo binaries + SHA256SUMS).
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERIFY_DIR="$(mktemp -d)"
+          gh release download "v${VERSION}" --dir "$VERIFY_DIR"
+          ASSET_COUNT="$(find "$VERIFY_DIR" -maxdepth 1 -type f | wc -l)"
+          if [ "$ASSET_COUNT" -ne 13 ]; then
+            echo "::error::Release v${VERSION} must expose 13 assets (12 per-target omo binaries + SHA256SUMS); found ${ASSET_COUNT}."
+            exit 1
+          fi
+          (
+            cd "$VERIFY_DIR"
+            shasum -a 256 -c SHA256SUMS
+          )
+          echo "Verified ${ASSET_COUNT}/13 release assets for v${VERSION}"
 
       - name: Delete draft release
         run: gh release delete next --yes 2>/dev/null || true

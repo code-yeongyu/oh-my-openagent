@@ -53,7 +53,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     expect(delivered[0]).toBe("task st_done completed\n\nContinue the active omo-agent-toolkit ulw-loop run.\nRun `omo-agent-toolkit ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.")
   })
 
-  it("#given active boulder start-work continuation #when ulw-loop agent_end fires #then it enqueues nothing", async () => {
+  it("#given active boulder ulw-execute continuation #when ulw-loop agent_end fires #then it enqueues nothing", async () => {
     // given a workspace with active senpi boulder work
     const root = mkdtempSync(join(tmpdir(), "senpi-ulw-precedence-"))
     try {

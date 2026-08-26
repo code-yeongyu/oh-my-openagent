@@ -18,6 +18,7 @@ import {
 	resolveModelFromChain,
 } from "./fallback-chain-resolution"
 import { transformModelForProvider } from "./provider-model-id-transform"
+import { isExcludedFallbackLaneModel } from "./fallback-lane-policy"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
@@ -120,6 +121,7 @@ function attachFallbackModels<T extends AgentConfig | CategoryConfig>(
   }
 
   const fallbackModels = uniqueFallbacks.slice(primaryIndex + 1)
+    .filter((entry) => !isExcludedFallbackLaneModel(entry.model))
   if (fallbackModels.length === 0) {
     return config
   }
@@ -136,7 +138,9 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
   availability: ReturnType<typeof toProviderAvailability>,
 ): T {
   const uniqueFallbacks = collectAvailableFallbacks(fallbackChain, availability)
-  const fallbackModels = uniqueFallbacks.filter((entry) => entry.model !== config.model)
+  const fallbackModels = uniqueFallbacks
+    .filter((entry) => entry.model !== config.model)
+    .filter((entry) => !isExcludedFallbackLaneModel(entry.model))
   if (fallbackModels.length === 0) {
     return config
   }

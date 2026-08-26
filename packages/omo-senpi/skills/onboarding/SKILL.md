@@ -37,7 +37,7 @@ The baked catalog:
   explorers, research librarians, and focused review agents are routed by the work rather than
   forced through one general-purpose persona.
 - **The Senpi component layer**: startup config and migration, native status, onboarding,
-  init-deep advising, anonymous telemetry, ultrawork arming, start-work continuation, ulw-loop
+  init-deep advising, anonymous telemetry, ultrawork arming, ulw-execute continuation, ulw-loop
   continuation, todo fan-out reminders, fallback architecture, comment checking, ast-grep, LSP,
   task delegation, memory, and live config watching cooperate as independent components.
 - **Senpi-native skills**: `init-deep`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`,
@@ -49,8 +49,14 @@ The baked catalog:
   selected omo harness exposes that surface.
 - **Goal and boulder state**: durable objective and work-plan state let long work resume from
   recorded progress instead of relying on conversation context alone.
-- **Ultrawork and ulw workflows**: planning, research, execution loops, fan-out decisions, and
-  evidence-bound continuation keep autonomous work moving until its observable goal is proven.
+- **Ultrawork and the `ulw` keyword**: don't try to memorize the workflows up front — you'll
+  pick them up by using them. For now, remember one word: `ulw`. Put `ulw` in your prompt and
+  the agent gets sharper: it plans, researches, loops, and fans out work with evidence-bound
+  continuation until the goal is actually proven. Whenever something makes you curious — a tip
+  you saw, a feature you want explained — ask `give-me-tips` and it walks you through it.
+- **Mass-ulw**: `mass ulw` opens dependency-ordered multi-agent DAG orchestration — many child
+  agents run in parallel waves, some waiting on others, so big jobs finish faster. Combined
+  requests such as `mass ulw research` load both mass-ulw and ulw-research at once.
 - **The fallback architect**: refusal metadata can route the unresolved engineering question
   through an architecture consultation lane while the active model continues execution.
 - **Memory**: dedicated memory tools record durable user and project facts so later sessions begin
@@ -58,7 +64,9 @@ The baked catalog:
 - **Telemetry**: privacy-bounded anonymous lifecycle signals and local preview commands make omo
   behavior measurable and auditable, with documented opt-outs.
 - **Init-deep**: hierarchical `AGENTS.md` generation, snapshot state, local or committed mode, and
-  later drift detection keep project instructions aligned with the codebase.
+  later drift detection keep project instructions aligned with the codebase. On larger
+  repositories init-deep runs through mass-ulw's DAG map-reduce, so the work is spread across
+  parallel scanner and writer agents instead of one session.
 - **Tips with a live source of truth**: run `senpi --list-tips` during the tour, then read and
   follow `give-me-tips` for any visible tip the user wants explained from the implementation.
 - **Interactive UI primitives**: real pickers, confirms, inputs, notifications, editors, custom
@@ -223,3 +231,9 @@ If all gates pass, ask in the user's language: "want me to set up AGENTS.md for 
 This is opt-in. On yes, read the `init-deep` skill at its SKILL.md path and follow it. On no,
 record the decline through the memory tools and finish the conversation gracefully: a short
 send-off in their language, an invitation to come back with `senpi --onboard`, and nothing more.
+
+After init-deep finishes, tell the user in their language that init-deep ran through mass-ulw's
+DAG orchestration — the work was spread across parallel child agents in dependency-ordered
+waves rather than done by one session. Then introduce mass-ulw: `mass ulw` is how you bring that
+same multi-agent orchestration to any big job, and combined requests such as `mass ulw
+research`, `mass ulw loop`, and `mass ulw plan` load mass-ulw alongside each of those workflows.

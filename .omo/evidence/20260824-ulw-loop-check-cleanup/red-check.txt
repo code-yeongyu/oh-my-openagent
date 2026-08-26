@@ -1,0 +1,20 @@
+WHAT WAS TESTED
+npm --prefix packages/omo-codex/plugin/components/ulw-loop run check
+
+OBSERVED RED
+Exit code: 1.
+Biome checked 82 files and reported:
+- error: src/codex-hook.ts formatter output differs.
+- error: test/package-smoke.test.ts uses unsafe optional chaining at the nested hooks command lookup.
+- error: test/steering.test.ts formatter output differs.
+- warning: test/package-smoke.test.ts unnecessarily escapes double quotes inside a template literal.
+
+The command also prints two non-failing configuration infos:
+- biome.json schema URL is 2.4.16 while the installed CLI is 2.5.9.
+- the current linter configuration shape includes a deprecated key.
+
+WHY THIS IS THE RIGHT RED
+These are exactly the three previously disclosed failing files. The full component check reaches TypeScript successfully, then fails only in Biome before build.
+
+WHAT WAS OMITTED
+No credentials, auth headers, or secret-bearing output was captured.

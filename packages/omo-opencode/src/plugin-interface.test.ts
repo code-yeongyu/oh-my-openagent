@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { createPluginInterface } from "./plugin-interface"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
-import { createStartWorkHook } from "./hooks/start-work"
+import { createUlwExecuteHook } from "./hooks/ulw-execute"
 import { readBoulderState } from "./features/boulder-state"
 import {
   _resetForTesting,
@@ -19,7 +19,7 @@ describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `plugin-interface-start-work-${randomUUID()}`)
+    testDir = join(tmpdir(), `plugin-interface-ulw-execute-${randomUUID()}`)
     mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
     writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
     _resetForTesting()
@@ -32,7 +32,7 @@ describe("createPluginInterface - command.execute.before", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  test("executes start-work side effects for native command execution", async () => {
+  test("executes ulw-execute side effects for native command execution", async () => {
     // given
     updateSessionAgent("ses-command-before", "prometheus")
     const pluginInterface = createPluginInterface({
@@ -50,7 +50,7 @@ describe("createPluginInterface - command.execute.before", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        startWork: createStartWorkHook({
+        ulwExecute: createUlwExecuteHook({
           directory: testDir,
           client: { tui: { showToast: async () => {} } },
         } as never),
@@ -64,7 +64,7 @@ describe("createPluginInterface - command.execute.before", () => {
     // when
     await pluginInterface["command.execute.before"]?.(
       {
-        command: "start-work",
+        command: "ulw-execute",
         sessionID: "ses-command-before",
         arguments: "",
       },
@@ -73,13 +73,13 @@ describe("createPluginInterface - command.execute.before", () => {
 
     // then
     expect(pluginInterface["command.execute.before"]).toBeDefined()
-    expect(output.parts[0]?.text).toContain("<!-- omo-start-work-context -->")
+    expect(output.parts[0]?.text).toContain("<!-- omo-ulw-execute-context -->")
     expect(getSessionAgent("ses-command-before")).toBe("sisyphus")
     expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
     expect(readBoulderState(testDir)?.plan_name).toBe("worker-plan")
   })
 
-  test("does not run start-work side effects for other native commands with session context", async () => {
+  test("does not run ulw-execute side effects for other native commands with session context", async () => {
     // given
     updateSessionAgent("ses-handoff", "prometheus")
     const pluginInterface = createPluginInterface({
@@ -97,7 +97,7 @@ describe("createPluginInterface - command.execute.before", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        startWork: createStartWorkHook({
+        ulwExecute: createUlwExecuteHook({
           directory: testDir,
           client: { tui: { showToast: async () => {} } },
         } as never),
@@ -123,7 +123,7 @@ describe("createPluginInterface - command.execute.before", () => {
     expect(getSessionAgent("ses-handoff")).toBe("prometheus")
   })
 
-  test("switches native start-work to Atlas when Atlas is registered in config", async () => {
+  test("switches native ulw-execute to Atlas when Atlas is registered in config", async () => {
     // given
     registerAgentName("atlas")
     updateSessionAgent("ses-command-atlas", "prometheus")
@@ -142,7 +142,7 @@ describe("createPluginInterface - command.execute.before", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        startWork: createStartWorkHook({
+        ulwExecute: createUlwExecuteHook({
           directory: testDir,
           client: { tui: { showToast: async () => {} } },
         } as never),
@@ -151,7 +151,7 @@ describe("createPluginInterface - command.execute.before", () => {
     })
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "/start-work" }],
+      parts: [{ type: "text", text: "/ulw-execute" }],
     }
 
     // when

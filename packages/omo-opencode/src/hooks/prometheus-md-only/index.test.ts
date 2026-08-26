@@ -553,13 +553,13 @@ describe("prometheus-md-only", () => {
       rmSync(BOULDER_DIR, { recursive: true, force: true })
     })
 
-    //#given session was started with prometheus (first message), but /start-work set boulder agent to atlas
+    //#given session was started with prometheus (first message), but /ulw-execute set boulder agent to atlas
     //#when user types "continue" after interruption (memory cleared, falls back to message files)
     //#then should use boulder state agent (atlas), not message file agent (prometheus)
     test("should prioritize boulder agent over message file agent", async () => {
       setupMessageStorage(TEST_SESSION_ID, undefined)
       
-      // given - atlas in boulder state (from /start-work)
+      // given - atlas in boulder state (from /ulw-execute)
       writeFileSync(BOULDER_FILE, JSON.stringify({
         active_plan: "/test/plan.md",
         started_at: new Date().toISOString(),

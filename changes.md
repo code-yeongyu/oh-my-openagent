@@ -1,3 +1,112 @@
+## 2026-08-26 — Stop the omo launcher from orphaning its engine
+
+The native launcher chain blocked in `spawnSync` at both of its layers: `bin/omo.js` waiting on the
+engine, and the bun re-exec waiting on the bun launcher. No JavaScript runs while `spawnSync`
+blocks, so a launcher that received `SIGTERM` died on the spot and the engine below it was
+reparented to pid 1, still holding the terminal and still running. Those orphans are what later
+surface as stdin `EIO` crashes and as engine processes lingering for days.
+
+Both layers now go through one asynchronous spawn helper. It forwards `SIGTERM` and `SIGHUP` to the
+child, waits for the child to finish its own shutdown within a bounded grace window (10 seconds,
+overridable with `OMO_SIGNAL_GRACE_MS`), and re-raises the signal on itself if the child ignores it,
+so a supervisor still observes the death it asked for. `SIGINT` is not forwarded, because the tty
+delivers it to the entire foreground process group already and a second delivery would interrupt the
+engine twice; the launcher merely stops dying underneath it. Exit-status fidelity is unchanged - the
+child's exit code passes through, and a child killed by a signal still makes the launcher die by
+that same signal. Windows installs no signal handlers, where POSIX signal delivery does not exist.
+
+`omo doctor` now also names the orphans that earlier launcher versions left behind: interactive
+engine processes reparented to pid 1, reported with pid, age and tty. Cleaning them up is an
+explicit per-pid action, `omo doctor --reap <pid> [pid...]`, which re-reads the live process table
+and refuses any pid that is not an orphaned interactive engine at that moment - a live session, an
+`--mode` rpc or app-server engine, or anything that is not an engine at all. There is deliberately
+no pattern-matching kill.
+
+Real-surface QA drives the whole chain on a pty whose session leader outlives the launcher (so the
+kernel's own `SIGHUP` on session teardown cannot be mistaken for a fix), on both the node chain and
+the three-deep bun chain a `bun add -g omo-ai` install has. Evidence:
+`.omo/evidence/20260826-launcher-signal-forward/`.
+
+## 2026-08-26 — Release OmO beta.21 with Senpi 2026.8.26
+
+Hotfix release: OmO release metadata and platform package pins advance from
+beta.20 to beta.21 with the Senpi contract aligned to `@code-yeongyu/senpi`
+2026.8.26 (compaction liveness + anthropic sdk peer alignment), carrying the
+pi-tui/senpi cross-bundle lazy warm-up fix and status-widget render containment
+from #7354. The Bun lockfile is regenerated for the exact release dependency
+graph.
+
+## 2026-08-25 — Release OmO beta.20 with Senpi 2026.8.25
+
+OmO release metadata and platform package pins advance from beta.19 to beta.20,
+with the native, adapter, task-engine, and package-shape Senpi contract aligned to
+`@code-yeongyu/senpi` 2026.8.25. The Bun lockfile is regenerated for the exact
+release dependency graph.
+
+The committed Senpi extension and Codex installer bundles were regenerated after
+the provenance-safe CI gate reported stale generated output for the beta.20
+release-state SHA. The generated payloads now match the release metadata and
+must remain synchronized with the exact Senpi dependency and skill inventory.
+
+The staged native-payload test now normalizes Windows CRLF before checking the
+shipped `.gitignore` contract. The file content remains `/plugin/`; checkout
+line-ending policy no longer creates a false release-gate failure on Windows.
+
+The embedded-runtime provisioning test now treats POSIX file mode assertions as
+POSIX-only. Windows does not expose the same `0o644` mode bits, while byte
+content, SHA-256 validation, and marker-based skip behavior remain covered.
+
+## 2026-08-24 — Pin OmO beta.19 to Senpi 2026.8.24
+
+The OmO Native launcher, adapter peers/dev dependencies, task engine, root
+development dependency, and package-shape tests now move in lockstep to
+`@code-yeongyu/senpi` 2026.8.24. This release carries the Bun 1.4 redirect-body
+cleanup fix for environments whose Undici body lacks `dump()`, plus the audited
+Senpi dependency refresh.
+
+The exact pin is part of the shipped runtime contract and is synchronized before
+the beta.19 publishing workflow stamps package versions.
+
+## 2026-08-24 — Refresh compatible dependencies
+
+The beta.19 release refreshes the compatible direct dependency lines used by the
+OpenCode, TUI, matching, telemetry, and Senpi adapter surfaces: OpenCode
+SDK/plugin 1.18.22, OpenTUI 0.5.8, Picomatch 4.0.7, PostHog Node 5.51.1, and
+TypeBox 1.3.18. The Bun lockfile is regenerated from those manifest pins.
+The dependency security and Codex component package-shape tests now assert the
+new Picomatch 4.0.7 floor instead of pinning the previous safe floor.
+
+The clean-install warnings reported against beta.18 were also reproduced and
+audited. Bun intentionally does not let a dependency grant trust to its own
+transitive lifecycle scripts, so adding package-local `trustedDependencies`
+would be ineffective and was rejected. `@google/genai` runs a declared no-op
+preinstall and `protobufjs` runs a compatibility-warning-only postinstall; both
+are safe to leave blocked. The Anthropic peer warning remains an intentional
+tradeoff: the required `@anthropic-ai/sdk >=0.93.0` line pulls Node credential
+modules into the browser bundle, while the retained 0.91.1 pin passes the
+browser-safety gate.
+
+
+## 2026-08-23 — Surface attribution + shared install id on every omo-native event (schema v3)
+
+**What:** `OMO_NATIVE_SCHEMA_VERSION` bumps to 3. `telemetry-core` event clients spread
+`product.additionalProperties` into the shared property block (fixed identity keys still win).
+`product-identity.ts` gains `getOmoNativeAttribution`/`withOmoNativeAttribution`: `surface`
+(`cli` | `desktop`, from `OMO_NATIVE_SURFACE`) and `install_id` (random 64-hex file beside the
+session-id salt; `OMO_NATIVE_INSTALL_ID` env wins when valid). Both the session client and the
+component's privacy facade attach them, so every event carries attribution. Test fixtures
+(`withTempAgentDir`, `useTemporaryAgentDir`) now pin all three agent-dir env names — an ambient
+`OMO_CODING_AGENT_DIR` used to leak real-home writes out of tests. Docs updated in
+`docs/reference/senpi-telemetry.md`.
+
+**Why:** The OmO Desktop app drives the bundled runtime over RPC; without attribution those
+turns counted as CLI adoption and the 264 RPC users could not be split. The install id is the
+agent-home file shared with the desktop host, so CLI and Desktop join without deriving anything
+from the machine.
+
+**A future refactor or sync must not break:** attribution must never derive from hostname,
+hardware, or accounts; keep both capture paths (session client + facade) attributed or events
+disagree about their own schema.
 ## 2026-08-20 — Demand parent-side verification of DAG completions
 
 A DAG node's completion summary was delivered to the orchestrating parent as if

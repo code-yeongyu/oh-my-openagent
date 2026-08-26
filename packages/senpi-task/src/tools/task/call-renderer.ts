@@ -1,6 +1,6 @@
 import type { Theme } from "@code-yeongyu/senpi"
-import { truncateToWidth } from "@earendil-works/pi-tui"
 
+import { piTui } from "../../lazy/pi-tui"
 import { formatTargetIdentity } from "../../status-line"
 import {
   ELLIPSIS,
@@ -63,7 +63,7 @@ function taskCallLineForWidth(args: TaskCallArgs, mode: string, plainMode: strin
   const prompt = normalized === undefined || available <= 0
     ? undefined
     : `"${excerptRendererPromptText(normalized, available)}"`
-  return truncateToWidth(joinRendererTokens(["task", prompt, mode]), width, ELLIPSIS)
+  return piTui().truncateToWidth(joinRendererTokens(["task", prompt, mode]), width, ELLIPSIS)
 }
 
 function promptToken(text: string | undefined): string | undefined {

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-37 files. Powers the `oh-my-opencode run <message>` command. Connects to OpenCode server, creates/resumes sessions, streams events, and polls for completion.
+~61 files (33 impl + 28 colocated tests). Powers the `oh-my-opencode run <message>` command. Connects to OpenCode server, creates/resumes sessions, streams events, and polls for completion.
 
 ## EXECUTION FLOW
 

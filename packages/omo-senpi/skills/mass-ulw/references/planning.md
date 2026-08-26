@@ -119,7 +119,7 @@ A node prompt is the ONLY thing the worker sees. It has no conversation history,
 
 1. **TASK** - one imperative sentence naming the deliverable.
 2. **DELIVERABLE** - the concrete artifact returned: files changed, the exact report shape, the evidence produced.
-3. **SCOPE** - what the node may read and what it may write, with exact paths. Name what is OUT of scope when a neighboring node owns it.
+3. **SCOPE** - what the node may read and what it may write, with exact paths, stated as a HARD boundary the prompt forbids crossing. Name what is OUT of scope when a neighboring node owns it or the node could plausibly wander there - an explicit bound is what makes drift detectable.
 4. **VERIFY** - the check the node runs on its own work before reporting: the literal command and its expected result.
 5. **STOP WHEN** - the single observable condition that ends the node's run.
 

@@ -137,7 +137,7 @@ BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first p
 
 - **Affects**: Current OpenCode/Ultimate planning flow.
 - **Symptom**: `@plan` is OpenCode's native plan-agent mention, not an OMO Prometheus switch, so typing it from Sisyphus does not hand the request to Prometheus.
-- **Workaround**: Select Prometheus first with the Tab agent selector or `/agent`, ask for the plan there; after the plan is written under `.omo/plans/`, run `/start-work` so Atlas executes it.
+- **Workaround**: Select Prometheus first with the Tab agent selector or `/agent`, ask for the plan there; after the plan is written under `.omo/plans/`, run `/ulw-execute` so Atlas executes it.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4710.
 
 ## #5050: OpenCode can hang during startup before the plugin runs

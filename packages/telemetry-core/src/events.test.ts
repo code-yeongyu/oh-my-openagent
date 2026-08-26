@@ -116,6 +116,36 @@ describe("event telemetry client", () => {
     expect(diagnostics.map((input) => input.event)).toEqual(["telemetry_event_property_dropped"])
   })
 
+  test("#given a product with additionalProperties #when any event is captured #then they ride on the shared block without overriding fixed keys", () => {
+    // given
+    const recorder = createRecorder()
+    const client = createEventTelemetryClient({
+      diagnostics: () => undefined,
+      distinctId: "machine-hash",
+      env: { POSTHOG_API_KEY: "test-key" },
+      product: {
+        ...PRODUCT,
+        additionalProperties: { install_id: "a".repeat(64), platform: "spoofed", surface: "desktop" },
+      },
+      propertyAllowlist: ALLOWLIST,
+      schemaVersion: 3,
+      source: "test",
+      transportFactory: recorder.factory,
+    })
+
+    // when
+    client.captureEvent("session_started", { $session_id: "session-hash", reason: "startup" })
+
+    // then: attribution rides along; fixed identity keys cannot be overridden by the product
+    expect(recorder.messages[0]?.properties).toMatchObject({
+      install_id: "a".repeat(64),
+      platform: "omo-senpi",
+      product_name: "omo-native",
+      schema_version: 3,
+      surface: "desktop",
+    })
+  })
+
   test("#given the native events client #when the effective transport options are inspected #then disableGeoip is false while $ip, unknown $-keys, *_text/_path/_prompt suffixes and non-finite numbers are still rejected", () => {
     // given: a product that asks for geoip suppression AND its own transport tuning
     const recorder = createRecorder()

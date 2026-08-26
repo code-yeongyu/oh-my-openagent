@@ -1,0 +1,36 @@
+FOCUSED TESTS
+- test/codex-hook.test.ts
+- test/package-smoke.test.ts
+- test/steering.test.ts
+- Result: 3 files passed, 75 tests passed.
+
+CHANGED-FILE DIAGNOSTICS
+- src/codex-hook.ts: no LSP diagnostics.
+- test/package-smoke.test.ts: no LSP diagnostics.
+- test/steering.test.ts: no LSP diagnostics.
+- git diff --check: passed.
+
+FULL COMPONENT CHECK
+- TypeScript: passed.
+- Biome: 82 files clean, no findings.
+- Build: passed.
+
+MANDATORY CODEX GATE
+- `bun run test:codex`: passed.
+- Final Node test stage: 493 passed, 0 failed, 0 skipped.
+
+ISOLATED REAL-CODEX QA
+- common self-check: passed; sandbox home removed; real config unchanged.
+- install verification: passed; plugin cache, config, bins, and agent TOMLs present in sandbox.
+- app-server plugin drive: passed; turn completed and sessionStart/stop/userPromptSubmit hooks fired.
+- Real `~/.codex/config.toml` hash remained c5f0992836d5be1988c09454d66521dcb6ff6321.
+
+DIFF REVIEW
+- `codex-hook.ts` and `steering.test.ts` are formatter-only.
+- `package-smoke.test.ts` replaces unsafe optional indexing with a fully optional chain plus an explicit string assertion, and removes unnecessary template-literal escapes.
+- `biome.json` applies the exact CLI migration preview: schema 2.5.9 and the equivalent recommended preset.
+- No shipped behavior or lint-policy change.
+
+CLEANUP
+- Setup-generated unrelated codegraph/install bundles were restored to origin/dev bytes and executable modes.
+- Codex QA sandboxes and mock-model processes were removed by their drivers.

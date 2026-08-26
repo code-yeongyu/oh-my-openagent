@@ -29,7 +29,7 @@ export interface ReflectionReservationStoreOptions {
   readonly identity: MemoryIdentity
   readonly config: TriggerConfig
   readonly getJournal: (conversationId: string) => Promise<TranscriptJournal>
-  readonly createRunId?: () => string
+  readonly createRunId?: () => string | Promise<string>
   readonly now?: () => Date
   readonly launcherIdentity?: () => Promise<ReflectionLauncherIdentity>
 }
@@ -48,7 +48,7 @@ export class ReflectionReservationStore {
   private readonly activePath: string
   private readonly pendingPath: string
   private readonly schedulerLockPath: string
-  private readonly createRunId: () => string
+  private readonly createRunId: () => string | Promise<string>
   private readonly now: () => Date
   private readonly launcherIdentity: () => Promise<ReflectionLauncherIdentity>
 
@@ -87,8 +87,11 @@ export class ReflectionReservationStore {
   }
 
   async tryReserve(request: ReflectionRequest, signal?: AbortSignal): Promise<ReservationResult> {
-    const runId = this.createRunId()
-    return this.locked(runId, async () => {
+    // Minting happens INSIDE the scheduler lock: a disk-scoped factory derives the next id from
+    // persisted state, so two processes reserving concurrently must not observe the same state.
+    return this.locked(undefined, async () => {
+      signal?.throwIfAborted()
+      const runId = await this.createRunId()
       signal?.throwIfAborted()
       const current = await this.readStateUnlocked()
       signal?.throwIfAborted()

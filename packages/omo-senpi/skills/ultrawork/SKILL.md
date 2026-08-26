@@ -76,7 +76,13 @@ exercises the surface; capture the artifact.
      if Chrome is not available, download and use agent-browser
      (https://github.com/vercel-labs/agent-browser). Capture action
      log + screenshot path. Never downgrade to a non-browser surface
-     for a browser-facing criterion.
+     for a browser-facing criterion. NEVER clear cookies, cache, or
+     site data (`Network.clearBrowserCookies`, `Storage.clearCookies`,
+     `chrome.browsingData.remove`, "clear browsing data") on the user's
+     real/main browser profile — it wipes their logged-in state. If you
+     need that profile's login state, clone it first (`rsync -a
+     <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against
+     the clone as the user-data-dir; run any clearing there only.
   4. Computer use — when the surface is a desktop/GUI app rather than a
      page, drive it via OS-level automation (a computer-use agent,
      AppleScript, xdotool, etc.) against the running app; capture
@@ -106,6 +112,8 @@ stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
+
+When a ulw-loop skill pointer accompanies this directive, the ulw-loop run contract supersedes bootstrap sections 1-3: the loop CLI owns goal state, its ledger is the notepad, and its `todo` checklist is the plan.
 
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each

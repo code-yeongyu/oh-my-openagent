@@ -19,7 +19,11 @@ import {
   writeFileAt,
 } from "./fixtures.test-support"
 
-export const originalAgentDir = process.env.SENPI_CODING_AGENT_DIR
+const originalAgentDirs = {
+  OMO_CODING_AGENT_DIR: process.env.OMO_CODING_AGENT_DIR,
+  SENPI_CODING_AGENT_DIR: process.env.SENPI_CODING_AGENT_DIR,
+  PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR,
+} as const
 
 export const componentContext: ComponentContext = {
   logger: { info() {}, warn() {}, error() {} },
@@ -38,7 +42,9 @@ export type SelectImplementation = (
 
 export function setTestHome(marker: "old" | "current" | "missing" = "old"): string {
   const home = makeTempDir("omo-init-deep-home-")
+  process.env.OMO_CODING_AGENT_DIR = home
   process.env.SENPI_CODING_AGENT_DIR = home
+  process.env.PI_CODING_AGENT_DIR = home
   if (marker === "missing") return home
   const stateDir = getOmoNativeStateDir(process.env)
   mkdirSync(stateDir, { recursive: true })
@@ -50,8 +56,10 @@ export function setTestHome(marker: "old" | "current" | "missing" = "old"): stri
 }
 
 export function resetTestHome(): void {
-  if (originalAgentDir === undefined) delete process.env.SENPI_CODING_AGENT_DIR
-  else process.env.SENPI_CODING_AGENT_DIR = originalAgentDir
+  for (const [name, value] of Object.entries(originalAgentDirs)) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
   cleanupTempDirs()
 }
 

@@ -10,7 +10,7 @@ Oh My OpenAgent's orchestration system transforms a simple AI agent into a coord
 | --------------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
 | **Simple**            | Just prompt               | Simple tasks, quick fixes, single-file changes                                           |
 | **Complex + Lazy**    | Type `ulw` or `ultrawork` | Complex tasks where explaining context is tedious. Agent figures it out.                 |
-| **Complex + Precise** | Prometheus → `/start-work` | Precise, multi-step work requiring true orchestration. Switch to Prometheus (agent selector) to plan; Atlas executes. |
+| **Complex + Precise** | Prometheus → `/ulw-execute` | Precise, multi-step work requiring true orchestration. Switch to Prometheus (agent selector) to plan; Atlas executes. |
 
 **Decision Flow:**
 
@@ -21,7 +21,7 @@ Is it a quick fix or simple task?
   └─ NO  → Is explaining the full context tedious?
               └─ YES → Type "ulw" and let the agent figure it out
               └─ NO  → Do you need precise, verifiable execution?
-                         └─ YES → Switch to Prometheus (agent selector) for planning, then /start-work
+                         └─ YES → Switch to Prometheus (agent selector) for planning, then /ulw-execute
                          └─ NO  → Just use "ulw"
 ```
 
@@ -61,7 +61,7 @@ flowchart TB
     Momus -->|"OKAY / REJECT"| Prometheus
     Oracle -->|"OKAY / REJECT"| Prometheus
 
-    User -->|"/start-work"| Orchestrator
+    User -->|"/ulw-execute"| Orchestrator
     Plan -->|"Read"| Orchestrator
 
     Orchestrator -->|"task(category=deep/quick/unspecified-*)"| Junior
@@ -156,7 +156,7 @@ stateDiagram-v2
     DualReview --> WritePlan: EITHER REJECTS - fix issues
     DualReview --> Done: BOTH APPROVE - plan approved
 
-    Done --> [*]: Guide to /start-work
+    Done --> [*]: Guide to /ulw-execute
 ```
 
 **Intent-Specific Strategies:**
@@ -415,7 +415,7 @@ Why `oracle`/`prometheus` are rejected in team members:
 
 **Alternative: `/hyperplan`**
 
-When you want adversarial multi-agent planning instead of a single planner, run `/hyperplan` from Sisyphus — it cross-critiques the plan before it is handed to `/start-work`.
+When you want adversarial multi-agent planning instead of a single planner, run `/hyperplan` from Sisyphus — it cross-critiques the plan before it is handed to `/ulw-execute`.
 
 **Which Should You Use?**
 
@@ -425,16 +425,16 @@ When you want adversarial multi-agent planning instead of a single planner, run 
 | **Want explicit control**         | Switch to Prometheus agent | Clear separation of planning vs execution contexts   |
 | **Adversarial, high-rigor plan**  | `/hyperplan`               | Cross-critique debate before the plan is written     |
 
-### /start-work Behavior and Session Continuity
+### /ulw-execute Behavior and Session Continuity
 
-**What Happens When You Run /start-work:**
+**What Happens When You Run /ulw-execute:**
 
 ```
-User: /start-work
+User: /ulw-execute
     ↓
-[start-work hook activates]
+[ulw-execute hook activates]
     ↓
-Parse: /start-work [plan-name] [--worktree <path>] [--make-pr] [--ship]
+Parse: /ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship]
     ↓
 Check: active/paused works in .omo/boulder.json?
     ↓
@@ -470,20 +470,20 @@ The `boulder.json` file is a multi-work registry (`works` + `active_work_id`). E
 Monday 9:00 AM
   └─ Switch to Prometheus: "Build user authentication"
   └─ Prometheus interviews and creates plan
-  └─ User: /start-work
+  └─ User: /ulw-execute
   └─ Atlas begins execution, creates boulder.json
   └─ Task 1 complete, Task 2 in progress...
   └─ [Session ends - computer crash, user logout, etc.]
 
 Monday 2:00 PM (NEW SESSION)
   └─ User opens new session (agent = Sisyphus by default)
-  └─ User: /start-work
-  └─ [start-work hook reads boulder.json]
+  └─ User: /ulw-execute
+  └─ [ulw-execute hook reads boulder.json]
   └─ "Resuming 'Build user authentication' - 3 of 8 tasks complete"
   └─ Atlas continues from Task 3 (no context lost)
 ```
 
-Atlas is automatically activated when you run `/start-work`. You don't need to manually switch to Atlas.
+Atlas is automatically activated when you run `/ulw-execute`. You don't need to manually switch to Atlas.
 
 ### Hephaestus vs Sisyphus + ultrawork
 
@@ -494,7 +494,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 | **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
-| **Planning**    | Self-plans during execution                | Executes Prometheus plans via `/start-work` (Atlas), not by typing `ulw` |
+| **Planning**    | Self-plans during execution                | Executes Prometheus plans via `/ulw-execute` (Atlas), not by typing `ulw` |
 | **Delegation**  | Heavy use of explore/librarian agents      | Uses category-based delegation                       |
 
 **When to Use Hephaestus:**
@@ -533,7 +533,7 @@ Use the `ulw` keyword in Sisyphus when:
    - Trust the agent to explore and decide
 
 4. **You want plan-driven execution**
-   - Run `/start-work` instead: it hands an existing Prometheus plan to Atlas
+   - Run `/ulw-execute` instead: it hands an existing Prometheus plan to Atlas
    - `ulw` explores autonomously and does not resume plans
 
 **Recommendation:**
@@ -556,7 +556,7 @@ Do not refactor, rename, reorganize, or clean up unrelated code.
 List exact files in scope and exact verification commands.
 ```
 
-Then run `/start-work` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
+Then run `/ulw-execute` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
 
 Use `ulw` directly only when the target is already narrow:
 
@@ -582,7 +582,7 @@ The `sisyphus_agent` object of `~/.omo/omo.jsonc` exposes optional legacy Sisyph
 
   // Hook settings (add to disable)
   "disabled_hooks": [
-    // "start-work",             // Disable execution trigger
+    // "ulw-execute",             // Disable execution trigger
     // "prometheus-md-only"      // Remove Prometheus write restrictions (not recommended)
   ],
 }
@@ -596,15 +596,15 @@ The `sisyphus_agent` object of `~/.omo/omo.jsonc` exposes optional legacy Sisyph
 
 Prometheus explores first. On CLEAR intent it asks only the remaining owner-decisions; on UNCLEAR intent it adopts defaults. Approve the brief to have the plan written to `.omo/plans/`. There is no "make it a plan" trigger.
 
-### "/start-work says 'no active plan found'"
+### "/ulw-execute says 'no active plan found'"
 
 - If you see **No Plans Found**, no plans exist in `.omo/plans/` → Create one with Prometheus first
-- If several active works exist, pick one explicitly with `/start-work {plan-name}`
+- If several active works exist, pick one explicitly with `/ulw-execute {plan-name}`
 - Deleting `.omo/boulder.json` is not the first fix — unrelated boulder state is ignored when it does not match
 
 ### "I'm in Atlas but I want to switch back to normal mode"
 
-Start a new session, or use the agent selector to switch back to Sisyphus. There is no OMO `exit` command. Atlas is primarily entered via `/start-work` - you don't typically "switch to Atlas" manually.
+Start a new session, or use the agent selector to switch back to Sisyphus. There is no OMO `exit` command. Atlas is primarily entered via `/ulw-execute` - you don't typically "switch to Atlas" manually.
 
 ### "Should I use Hephaestus or type ulw?"
 

@@ -35,12 +35,12 @@
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "@opencode-ai/plugin": "1.18.19",
-    "@opencode-ai/sdk": "1.18.19",
+    "@opencode-ai/plugin": "1.18.22",
+    "@opencode-ai/sdk": "1.18.22",
     "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "picomatch": "^4.0.5",
+    "picomatch": "^4.0.7",
     "zod": "^4.4.3"
   }
 }

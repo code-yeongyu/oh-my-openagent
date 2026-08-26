@@ -20,7 +20,7 @@
         "tailwindcss-animate": "^1.0.7",
       },
       "devDependencies": {
-        "@biomejs/biome": "^2.4.15",
+        "@biomejs/biome": "2.4.15",
         "@opennextjs/cloudflare": "^1.19.11",
         "@playwright/test": "1.60.0",
         "@tailwindcss/postcss": "4.3.0",

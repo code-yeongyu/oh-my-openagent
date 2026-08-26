@@ -1,6 +1,6 @@
 # delegate-core — Delegate Model Selection + Retry Guidance (Core)
 
-**Generated:** 2026-07-17 / 7d664b96b
+**Generated:** 2026-08-24 / f3642fcda
 
 ## OVERVIEW
 
@@ -25,7 +25,7 @@ Two harness-neutral primitives for the `task`/delegate tool: (1) resolve which m
 ## DEPENDENCIES & CONSUMERS
 
 - **Depends on:** `@oh-my-opencode/model-core` (`fuzzyMatchModel`, `normalizeModel`, `parseModelString`, `parseVariantFromModelID`, `transformModelForProvider`).
-- **Consumed by** (OpenCode edition only; no Codex consumer): `omo-opencode/src/tools/delegate-task/model-selection.ts` (wires cache + logger deps) and `hooks/delegate-task-retry/{patterns,guidance}.ts` (re-export).
+- **Consumed by** (no Codex consumer): `packages/omo-opencode` (`src/tools/delegate-task/model-selection.ts` wires cache + logger deps; `hooks/delegate-task-retry/{patterns,guidance}.ts` re-export retry behavior) and `packages/senpi-task` (category resolver, category/agent fallback chains, `manager/types.ts`, `model-chain.ts` import `resolveModelForDelegateTask` + `DelegateFallbackEntry`). `packages/omo-senpi` declares the dep and uses the fallback-entry type in tests only.
 
 ## NOTES
 

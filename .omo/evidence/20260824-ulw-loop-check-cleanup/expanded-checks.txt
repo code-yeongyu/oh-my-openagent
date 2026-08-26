@@ -1,0 +1,30 @@
+EXPANDED SCOPE — ALL CODEX PLUGIN COMPONENTS
+Trigger: user directive to fix all same-class check debt; context review proved identical Biome 2.5 debt beyond ulw-loop.
+
+RED (before expanded edits), npm run check per component:
+- comment-checker: exit 1 — 4 errors (3x assist/source/organizeImports, 1x format) + 2 config infos
+- lazycodex-executor-verify: exit 1 — 2 format errors + 2 config infos
+- lsp: exit 1 — TypeScript TS2339 startup_timeout_sec gone from typed McpServer fixture
+- rules: exit 1 — 21 errors (useOptionalChain, organizeImports, format) + 1 warning + 2 config infos
+- start-work-continuation: exit 0 but 2 config infos
+- telemetry: exit 1 — 7 errors (useImportType, organizeImports, format) + 2 config infos
+- ultrawork: exit 1 — 1 format error + 2 config infos
+- ulw-loop: exit 0 (fixed in first increment 46aacea73)
+
+GREEN (after expanded edits), same commands:
+- All 8 components: exit 0, zero errors, zero warnings, zero config infos.
+- Per-component tests: comment-checker 29, lazycodex-executor-verify 25, lsp 24+8, rules 165, start-work-continuation 42, telemetry 15, ultrawork 24 — all passed.
+
+ROOT GATES ON EXPANDED TREE
+- bun run test:codex: PASS — final Node stage 493/493, 0 failed, 0 skipped.
+- Isolated real-Codex QA: common.sh self-check PASS; install-verify PASS (cache/config/bins/agents in sandbox, real ~/.codex/config.toml unchanged); app-server-drive --plugin PASS (turn completed, sessionStart/userPromptSubmit hooks fired).
+
+BEHAVIOR-AUDIT OF NON-FORMATTING EDITS
+- lsp test/package-smoke.test.ts: startup_timeout_sec now asserted via literal comparison of shipped .mcp.json document (timeout 10 still locked; cwd assertion added); typed command/args checks kept; no lying casts.
+- rules src/static-injection.ts: transcriptText !== null && .includes() -> transcriptText?.includes() — equivalent for string|null.
+- rules test pin picomatch ^4.0.5 matches shipped package.json exactly.
+- All other edits: import organization, formatter wrapping, biome.json schema 2.5.9 + preset:"recommended" (CLI-previewed, no policy change).
+
+CLEANUP
+- Gate/setup regenerated codegraph dist + install-local.mjs drift restored to committed bytes (git restore).
+- Codex QA sandboxes removed by their drivers.

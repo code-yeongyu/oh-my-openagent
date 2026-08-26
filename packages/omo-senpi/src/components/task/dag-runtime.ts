@@ -293,6 +293,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const statusUi = createDagStatusUi({
     manager: queryManager,
     runtime: deps.engine.runtime,
+    logger: deps.logger,
     ...(deps.statusUiTimers === undefined ? {} : { timers: deps.statusUiTimers }),
   })
 
@@ -438,8 +439,6 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       activeSessionId = deps.engine.runtime.sessionId()
       durableEventListener = onEvent
       wake?.onSessionStart(activeSessionId)
-      bridge.attach()
-      syncActivitySubscriptions()
       const sessionId = activeSessionId
       if (sessionId !== undefined) {
         try {
@@ -449,6 +448,12 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
         }
         for (const run of manager.list(sessionId)) ensureScheduled(run.runId, sessionId)
       }
+      // #7316 defect 1: the bridge attaches AFTER recovery so its first emitted snapshot reflects
+      // the recovered runs. Attaching first pushed a pre-recovery paused projection, and wholesale
+      // consumers (omo-desktop) read a run missing-or-paused as "the dag finished". While recovery
+      // runs the bridge is silent, which consumers treat as "no change" - dark beats lying.
+      bridge.attach()
+      syncActivitySubscriptions()
       statusUi.syncNow()
     },
     sync() {

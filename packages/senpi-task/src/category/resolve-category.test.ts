@@ -47,7 +47,7 @@ const gpt56CategoryCases = [
     mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
     copilotVariant: "medium",
     copilotFallbackEntry: {
-      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"] as string[],
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"] as string[],
       model: "gpt-5.6-sol",
       variant: "medium",
     },
@@ -59,7 +59,7 @@ const gpt56CategoryCases = [
     mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-terra", variant: "high" },
     copilotVariant: "high",
     copilotFallbackEntry: {
-      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"] as string[],
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"] as string[],
       model: "gpt-5.6-terra",
       variant: "high",
     },
@@ -320,7 +320,7 @@ describe("resolveCategory", () => {
     expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["zai-coding-plan", "opencode-go", "vercel"],
+      providers: ["zai-coding-plan", "opencode-go"],
       model: "glm-5.2",
       variant: "max",
     })
@@ -479,7 +479,7 @@ describe("builtin category defaults", () => {
       ["quick", "kimi-coding/kimi-for-coding-highspeed", undefined],
       ["unspecified-low", "xai/grok-4.6", "xhigh"],
       ["architect", "anthropic/claude-fable-5", "xhigh"],
-      ["unspecified-high", "kimi-coding/k3", "max"],
+      ["unspecified-high", "anthropic/claude-opus-5", "xhigh"],
       ["writing", "kimi-coding/k3", "low"],
     ])
 

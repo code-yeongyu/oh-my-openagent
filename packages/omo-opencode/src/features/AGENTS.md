@@ -1,4 +1,4 @@
-# src/features/ — 24 Feature Modules
+# src/features/ — 25 Feature Modules
 
 **Generated:** 2026-08-07
 
@@ -34,6 +34,7 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 | **claude-code-session-state** | LOW | no | Subagent session state tracking |
 | **monitor** | MEDIUM | no | `monitor_*` tools backend: managed watcher processes, line filtering, ring buffer, batched output injection (gated on `monitor.enabled`) |
 | **tui-sidebar** | MEDIUM | no | TUI sidebar snapshot builder + mirror manager (roster/state derivers rendered into the OpenCode TUI; gated on `tui.sidebar.enabled`) |
+| **opengateway-provider** | LOW | no | Injects the `opengateway` provider into opencode's live config when a credential exists (`OPENGATEWAY_API_KEY` env or `opengateway` auth.json entry); fills only missing keys, ships bundled `opengateway-models.json` catalog |
 
 ## KEY MODULES
 

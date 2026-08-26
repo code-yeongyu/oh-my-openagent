@@ -1,6 +1,6 @@
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
-import { truncateToWidth } from "@earendil-works/pi-tui"
 
+import { piTui } from "../../lazy/pi-tui"
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
 import {
   formatTaskMode,
@@ -59,6 +59,7 @@ export function renderTaskResultLines(details: TaskToolDetails, theme: RendererT
 }
 
 export function renderTaskResultComponent(details: TaskToolDetails, theme: RendererTheme): LinesComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => {
       if (width <= 0) return [""]
@@ -75,6 +76,7 @@ export function renderTaskResultComponent(details: TaskToolDetails, theme: Rende
 }
 
 export function linesComponent(lines: readonly string[] | WidthAwareLines): LinesComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => {
       const widthAware = typeof lines === "function"

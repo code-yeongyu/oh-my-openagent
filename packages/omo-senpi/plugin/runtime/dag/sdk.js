@@ -106,7 +106,8 @@ export function snapshot(runId) {
 }
 
 export function wait(runId) {
-  return callDag({ action: "wait", run_id: runId })
+  // A cell cannot receive the session's wake injections, so the SDK keeps the blocking contract.
+  return callDag({ action: "wait", run_id: runId, detach: false })
 }
 
 export function cancel(runId, reason) {

@@ -2,7 +2,7 @@
 // Manual QA driver for the plan-gated agent tier (metis/momus): proves on a REAL senpi process
 // that task(subagent_type: "momus"|"metis") is denied without an explicit USER ulw-plan request
 // plus a .omo/plans artifact (a SKILL.md read alone stays denied), opens once the user prompt
-// requests ulw-plan and a plan file is written, and closes again after a start-work SKILL.md read.
+// requests ulw-plan and a plan file is written, and closes again after a ulw-execute SKILL.md read.
 //   node plan-gated-agents-e2e.mjs --bundle <pluginDir> --scenario <denial|read-unlock|sequence> --expect <gated|ungated>
 // Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
 // ~/.senpi/agent is digest-compared before/after and MUST stay identical.
@@ -102,7 +102,7 @@ function sequenceScript(skillsDir) {
     parentSteps: [
       { type: "tool_call", name: "write", arguments: { path: ".omo/plans/qa-plan.md", content: "# QA Plan\n\n- review me\n" } },
       { type: "tool_call", name: "task", arguments: { subagent_type: "momus", prompt: "review the plan", run_in_background: false } },
-      { type: "tool_call", name: "read", arguments: { path: join(skillsDir, "start-work", "SKILL.md") } },
+      { type: "tool_call", name: "read", arguments: { path: join(skillsDir, "ulw-execute", "SKILL.md") } },
       { type: "tool_call", name: "task", arguments: { subagent_type: "metis", prompt: "gap analysis", run_in_background: true } },
       { type: "text", text: "sequence scenario complete" },
     ],
@@ -193,8 +193,8 @@ function main() {
     const records = storeTaskRecords(stateDir)
     const missingRequestDenial = transcript.includes("available only after the user explicitly requests")
     const missingArtifactDenial = transcript.includes("no plan artifact")
-    const startWorkDenial = transcript.includes("is plan-gated and cannot be spawned:")
-    const anyDenial = missingRequestDenial || missingArtifactDenial || startWorkDenial
+    const ulwExecuteDenial = transcript.includes("is plan-gated and cannot be spawned:")
+    const anyDenial = missingRequestDenial || missingArtifactDenial || ulwExecuteDenial
     const childCompleted = transcript.includes("momus review complete")
 
     const checks = {}
@@ -212,7 +212,7 @@ function main() {
       checks.child_spawned = records.length > 0
     } else if (args.scenario === "sequence" && args.expect === "gated") {
       checks.first_spawn_allowed = childCompleted
-      checks.second_denied_start_work = startWorkDenial
+      checks.second_denied_ulw_execute = ulwExecuteDenial
       checks.exactly_one_child = records.length === 1
     } else if (args.scenario === "sequence" && args.expect === "ungated") {
       checks.no_gate_text = !anyDenial

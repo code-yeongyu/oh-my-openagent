@@ -26,7 +26,7 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/loader/resolution.ts` | `resolveOmoConfigView` (base -> `[harness]` -> `profiles.<P>` -> `profiles.<P>.[harness]` fold, control keys stripped) + `resolveOmoProfileName` (`OMO_PROFILE` > `OCX_PROFILE` > `OPENCODE_CONFIG_DIR` tail `profiles/<name>` > none). |
 | `src/loader/merge.ts` | `mergeOmoConfigRecords` - recursive deep merge with prototype-pollution key sanitization. |
 | `src/loader/types.ts` | `LoadOmoConfigOptions/Result`, `OmoConfigDiagnostic`, `OmoConfigSource`, the injectable `OmoConfigReadFileSystem` port, and `DEFAULT_READ_FILE_SYSTEM`. |
-| `src/models/model-reference-resolution.ts` | `resolveModelReferences` - expands `models` catalog keys referenced by agent/category `model` strings, fills unset tuning (site tuning wins), and reports `model_catalog_cycle` diagnostics. |
+| `src/models/model-reference-resolution.ts` (+ `model-catalog-cycles.ts`) | `resolveModelReferences` - expands `models` catalog keys referenced by agent/category `model` strings, fills unset tuning (site tuning wins), and reports `model_catalog_cycle` diagnostics (`findModelCatalogCycles`). |
 | `src/migration/` | Lock+journal transaction engine (`batch.ts`, `engine.ts`): owner-aware lease lock (`lock.ts`), journal recovery before predicates (`recovery.ts`, `predicate.ts`), per-(target, migration-id) `_migrations` markers, no-clobber merge with `skipped:` diagnostics (`merge.ts`), comment-preserving atomic target writes (`commit.ts`), and journaled resumable backups. |
 | `src/writer/writer.ts` | `updateOmoConfig(options)` - jsonc-parser `modify`/`applyEdits`, timestamped backup, atomic temp-then-rename write. |
 | `src/writer/types.ts` | `OmoConfigEdit`, `UpdateOmoConfigOptions/Result`, the injectable `OmoConfigWriteFileSystem` port, and the typed `OmoConfigWriteError`. |
@@ -75,8 +75,4 @@ Co-located `*.test.ts` cover the schema (`src/schema/config-schema.test.ts`), th
 
 ## GENERATED SCHEMA
 
-The checked-in generated JSON artifact at `assets/omo.schema.json` is produced by `bun run build:omo-schema` via [`script/build-omo-schema.ts`](../../script/build-omo-schema.ts). Its `$id` and editor URL are `https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json`. This package owns the schema source; the generated JSON artifact remains an ownership-boundary surface outside this package.
-
-## FOLLOW-UPS
-
-- The category schema must stay in field parity with `packages/omo-opencode/src/config/schema/categories.ts`; a drift guard test is still pending.
+The checked-in generated JSON artifact at `assets/omo.schema.json` is produced by `bun run build:omo-schema` via [`script/build-omo-schema.ts`](../../script/build-omo-schema.ts). Its `$id` and editor URL are `https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json`. This package owns the schema source; the generated JSON artifact remains an ownership-boundary surface outside this package. Category-schema field parity with `packages/omo-opencode/src/config/schema/categories.ts` is pinned by the repo-root guard `tests/omo-config-category-drift.test.ts` (compares the inner `OmoCategoryConfigObjectSchema` shape, since the canonical export wraps a legacy-key preprocessor); schema changes must update both sides or that test fails.

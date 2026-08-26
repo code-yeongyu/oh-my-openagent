@@ -209,6 +209,9 @@ export type DagRunSnapshot = {
   // One entry per accepted amendment. Observe surfaces read this projection, so it must carry the
   // history rather than making them reach for the raw record. Absent on never-amended runs.
   readonly amendHistory?: readonly AmendRecord[]
+  // Host pid holding the resume lease on a paused run. Display surfaces need it to tell a run that
+  // is being resumed right now from one that is genuinely parked. Absent unless a claim is held.
+  readonly leaseHolderPid?: number
 }
 
 // One entry per accepted amendment. Defined here rather than in manager.ts so the snapshot, the wire

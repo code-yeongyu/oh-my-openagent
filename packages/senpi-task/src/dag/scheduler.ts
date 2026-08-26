@@ -1,4 +1,4 @@
-// allow: SIZE_OK - the admission loop, event reducer, and task outcome folding stay together so the strict barrier cannot be bypassed by callers.
+// allow: SIZE_OK - the admission loop, event reducer, and task outcome folding stay together so dependency-frontier admission cannot be bypassed by callers.
 import { createHash } from "node:crypto"
 import * as fs from "node:fs"
 import { relative } from "node:path"
@@ -59,6 +59,13 @@ export type DagSchedulerOptions = {
   readonly ancestry?: { readonly depth: number }
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
+  /**
+   * Children that are ALREADY running under a durable owner when this scheduler is built - a
+   * session restart reattaches them instead of waiting for them. Each entry is folded into the
+   * live settle loop exactly like an admitted node, so recovery never has to block on a
+   * long-running child before the run leaves `paused`.
+   */
+  readonly preAttachedTasks?: ReadonlyMap<DagNodeId, string>
   // Skill materialization for a retry that carries a prompt override (it re-runs the amend path).
   readonly materializeSkills?: DagMaterializeSkills
   // Lease identity for the control verbs: a run leased by a DIFFERENT live process is not ours to
@@ -158,6 +165,13 @@ type SchedulerContext = {
   cancellationOperation?: Promise<void>
   admissionInProgress: boolean
   readonly admissionIdleWaiters: Set<() => void>
+  // Residency-denied nodes waiting for a free slot, in first-denied order: a slot freed by a
+  // settlement is offered to the OLDEST denied admission before any newly ready node.
+  pendingAdmission: DagNodeId[]
+  // Wave events are informational groupings over frontier admission, never barriers: admission
+  // remembers which wave indexes this instance reported so each index completes at most once.
+  readonly emittedWaveAdmissions: Set<number>
+  readonly emittedWaveCompletions: Set<number>
 }
 
 export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
@@ -201,10 +215,17 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     cancellationStarted: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
+    pendingAdmission: [],
+    emittedWaveAdmissions: new Set<number>(),
+    emittedWaveCompletions: new Set<number>(),
+  }
+  for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
+    context.attachedTaskIds.set(nodeId, taskId)
+    attachTaskSettlement(context, nodeId, taskId)
   }
 
   const scheduler: DagScheduler = {
-    run: () => runWaves(context),
+    run: () => runFrontier(context),
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     snapshot: journal.snapshot,
     subscribe: journal.subscribe,
@@ -428,33 +449,34 @@ function resolveAdmissionIdle(context: SchedulerContext): void {
   context.admissionIdleWaiters.clear()
 }
 
-async function runWaves(context: SchedulerContext): Promise<DagRunRecordV1> {
+// Dependency-frontier execution: a node is admitted the moment EVERY node it dependsOn holds a
+// terminal `completed` state and a resident slot is free - never because a wave boundary was
+// reached. Compiled waves survive only as informational event groupings (dag.wave.started is
+// emitted per admission pass, dag.wave.completed when a wave's full membership is terminal), so
+// an unrelated slow sibling can no longer starve ready dependents behind a barrier the tool
+// contract never promised (dag_530ad299).
+async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
   if (context.journal.snapshot().status === "pending") {
     context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
   }
 
   for (;;) {
-    for (const wave of context.journal.snapshot().waves) {
-      if (context.cancellationStarted) return cancelledSnapshot(context)
-      applyDependentSkipCascade(context)
-      const runnable = wave.nodeIds.filter((nodeId) => isRunnable(context.journal.snapshot(), nodeId))
-      if (runnable.length === 0) continue
-
-      for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
-      context.journal.append(dagWaveStartedEvent({ waveIndex: wave.index, nodeIds: runnable }))
-      if (!await admitAndSettleWave(context, runnable)) return cancelledSnapshot(context)
-      context.journal.append(dagWaveCompletedEvent({ waveIndex: wave.index, nodeIds: runnable }))
-    }
-
-    applyDependentSkipCascade(context)
+    if (context.cancellationStarted) return cancelledSnapshot(context)
+    // The skip cascade runs only at frontier quiescence (nothing attached), generalizing the
+    // barrier-era rule that dependents were skipped between waves: a failed node stays revivable
+    // (send -> revive) while any sibling is still mid-flight, and a revived outcome can complete
+    // it, so an eager cascade would strand the dependent as skipped (dag_2d12c2f7 regression).
+    if (context.attachedTasks.size === 0) applyDependentSkipCascade(context)
+    // Completions are reported before the next admission pass so a finishing wave reads as
+    // settled before later-wave nodes it unblocked start interleaving their own events.
+    emitCompletedWaves(context)
+    if (!await admitFrontier(context)) return cancelledSnapshot(context)
     const current = context.journal.snapshot()
     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
     if (context.attachedTasks.size === 0) {
       throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
     }
-    while (context.attachedTasks.size > 0) {
-      if (!await settleOne(context)) return cancelledSnapshot(context)
-    }
+    if (!await settleOne(context)) return cancelledSnapshot(context)
   }
 
   const snapshot = context.journal.snapshot()
@@ -468,12 +490,28 @@ async function runWaves(context: SchedulerContext): Promise<DagRunRecordV1> {
   return context.journal.snapshot()
 }
 
-async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly DagNodeId[]): Promise<boolean> {
-  let awaitingAdmission = [...nodeIds]
-  const attached = context.attachedTasks
-
-  while (awaitingAdmission.length > 0) {
+// One admission pass over the frontier: the ordered residency-denied queue first (oldest denial
+// gets the first freed slot), then every newly ready node. startOwned runs as one batch; denials
+// park in the queue and retry after a settlement frees a slot, failing with residency_denied only
+// when no attached task can ever free one. Cancellation aborts the pass without admitting more.
+async function admitFrontier(context: SchedulerContext): Promise<boolean> {
+  for (;;) {
     if (context.cancellationStarted) return false
+    const denied = context.pendingAdmission.splice(0)
+    const deniedIds = new Set(denied)
+    const snapshot = context.journal.snapshot()
+    const runnable = snapshot.nodes
+      .filter((node) =>
+        (node.state === "pending" || node.state === "blocked") &&
+        !deniedIds.has(node.id) &&
+        isRunnable(snapshot, node.id))
+      .map((node) => node.id)
+    if (denied.length === 0 && runnable.length === 0) return true
+
+    for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
+    emitWaveAdmissions(context, runnable)
+
+    const awaitingAdmission = [...denied, ...runnable]
     context.admissionInProgress = true
     let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
     try {
@@ -485,7 +523,7 @@ async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly D
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
     }
-    const denied: DagNodeId[] = []
+    const nextDenied: DagNodeId[] = []
     for (let index = 0; index < results.length; index += 1) {
       const settled = results[index]
       const nodeId = awaitingAdmission[index]
@@ -498,28 +536,73 @@ async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly D
       if (context.cancellationStarted) {
         if (result.kind === "started") attachStarted(context, nodeId, result)
       } else if (result.kind === "residency_denied") {
-        denied.push(nodeId)
+        nextDenied.push(nodeId)
       } else {
         attachOrFail(context, nodeId, result)
       }
     }
     if (context.cancellationStarted) return false
-    awaitingAdmission = denied
-    if (awaitingAdmission.length === 0) break
-    if (attached.size === 0) {
-      for (const nodeId of awaitingAdmission) {
+    context.pendingAdmission.push(...nextDenied)
+    if (nextDenied.length === 0) return true
+    if (context.attachedTasks.size === 0) {
+      for (const nodeId of nextDenied) {
         failNode(context, nodeId, "residency_denied", "resident child cap reached and no task can free a slot")
       }
-      awaitingAdmission = []
-      break
+      context.pendingAdmission.length = 0
+      return true
     }
-    await settleOne(context)
-  }
-
-  while (attached.size > 0) {
     if (!await settleOne(context)) return false
   }
-  return true
+}
+
+// dag.wave.started is informational: one event per wave index touched by this admission pass,
+// listing exactly the nodes the pass scheduled. A wave index can appear in multiple started
+// events across a run when frontier admission staggers its nodes (a slow sibling no longer
+// holds ready dependents back), which is why the grouping never gates execution.
+function emitWaveAdmissions(context: SchedulerContext, scheduled: readonly DagNodeId[]): void {
+  if (scheduled.length === 0) return
+  const waveIndexOf = waveIndexByNodeId(context.journal.snapshot())
+  const groups = new Map<number, DagNodeId[]>()
+  for (const nodeId of scheduled) {
+    const waveIndex = waveIndexOf.get(nodeId)
+    if (waveIndex === undefined) continue
+    const group = groups.get(waveIndex) ?? []
+    group.push(nodeId)
+    groups.set(waveIndex, group)
+  }
+  for (const waveIndex of [...groups.keys()].sort((a, b) => a - b)) {
+    context.journal.append(dagWaveStartedEvent({ waveIndex, nodeIds: groups.get(waveIndex) ?? [] }))
+    context.emittedWaveAdmissions.add(waveIndex)
+  }
+}
+
+// dag.wave.completed is informational and once per instance per wave index: it fires when EVERY
+// member of the compiled wave holds a terminal state, carrying the full membership (skipped and
+// failed nodes included - the grouping describes the graph, not a success claim). Waves this
+// instance never admitted (fully skipped or fully reused) stay silent, matching the barrier-era
+// vocabulary where a wave event implied this run executed part of it.
+function emitCompletedWaves(context: SchedulerContext): void {
+  if (context.emittedWaveAdmissions.size === 0) return
+  const snapshot = context.journal.snapshot()
+  const states = new Map(snapshot.nodes.map((node) => [node.id as DagNodeId, node.state]))
+  for (const wave of snapshot.waves) {
+    if (!context.emittedWaveAdmissions.has(wave.index) || context.emittedWaveCompletions.has(wave.index)) continue
+    const settled = wave.nodeIds.every((nodeId) => {
+      const state = states.get(nodeId)
+      return state !== undefined && TERMINAL_NODE_STATES.has(state)
+    })
+    if (!settled) continue
+    context.journal.append(dagWaveCompletedEvent({ waveIndex: wave.index, nodeIds: wave.nodeIds }))
+    context.emittedWaveCompletions.add(wave.index)
+  }
+}
+
+function waveIndexByNodeId(record: DagRunRecordV1): ReadonlyMap<DagNodeId, number> {
+  const indexes = new Map<DagNodeId, number>()
+  for (const wave of record.waves) {
+    for (const nodeId of wave.nodeIds) indexes.set(nodeId, wave.index)
+  }
+  return indexes
 }
 
 function attachOrFail(

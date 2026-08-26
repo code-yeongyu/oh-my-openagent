@@ -2,7 +2,7 @@
 // Live RPC probe for the dead-chain category warning (plan todo 6). Drives a sandboxed senpi in
 // --mode rpc against the lane-private omo-mock provider (registry = omo-mock only, so every builtin
 // category chain is dead), spawns the quick category TWICE via scripted task tool calls, and proves:
-//   happy:    exactly ONE {method:"notify",notifyType:"warning"} frame on the RPC stdout stream AND
+//   happy:    exactly ONE {method:"notify",notifyType:"info"} frame on the RPC stdout stream AND
 //             exactly ONE senpi-task.category-unavailable custom message in the session JSONL;
 //   negative: task.warnings.unavailable_categories=false -> neither frame nor message.
 // Isolation: real ~/.senpi/agent credential files must stay byte-identical; the sandbox is removed.
@@ -167,13 +167,16 @@ function driveRpc(senpiBin, scenario) {
         env: {
           ...process.env,
           // HOME must be sandboxed: senpi resolves its settings/tips paths from HOME even when the
-          // agent-dir env is set, and the omo user config layer lives at $HOME/.omo. Both agent-dir
-          // env spellings are set (the installed binary reads PI_CODING_AGENT_DIR; the workspace
-          // source reads SENPI_CODING_AGENT_DIR).
+          // agent-dir env is set, and the omo user config layer lives at $HOME/.omo. Every agent-dir
+          // env spelling is set: the omo brand prefix wins first (OMO_CODING_AGENT_DIR leaks the
+          // developer's real agent dir when the probe runs inside an omo session), then the legacy
+          // SENPI_/PI_ spellings the unbranded binary reads.
           HOME: scenario.sandbox.home,
           USERPROFILE: scenario.sandbox.home,
+          OMO_CODING_AGENT_DIR: scenario.sandbox.agentDir,
           SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
           PI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+          OMO_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
           SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
           XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
           OMO_SENPI_QA: "1",
@@ -223,7 +226,7 @@ function assertScenario(run, sessionTranscript, expectWarning) {
   const notifyFrames = frames.filter(
     (frame) =>
       frame.method === "notify" &&
-      frame.notifyType === "warning" &&
+      frame.notifyType === "info" &&
       typeof frame.message === "string" &&
       frame.message.includes(WARNING_TEXT),
   )
@@ -324,7 +327,9 @@ async function main() {
       const sessionTranscript = readSessionTranscript(seeded.sessionDir)
       result = assertScenario(run, sessionTranscript, scenario.expectWarning)
     } finally {
-      rmSync(seeded.sandbox.root, { recursive: true, force: true })
+      // The SIGKILLed RPC child can leave a grandchild flushing late writes into the sandbox;
+      // without retries rmSync races them and dies ENOTEMPTY on macOS.
+      rmSync(seeded.sandbox.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
     }
     if (existsSync(seeded.sandbox.root)) result.result = "FAIL"
     reports.push({ label: scenario.label, result })

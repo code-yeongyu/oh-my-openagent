@@ -194,21 +194,28 @@ jobs:
         run: npm test
         working-directory: packages/lsp-daemon
 
-      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
-      # tests observe sh instead of the native PowerShell/cmd execution path.
+      # Same shape as Windows shard 2: the shared serial quarantine
+      # (script/root-test-serial-quarantine.ts) runs in one process first, then
+      # the remainder runs with --parallel. test-env.ts gives every worker its
+      # own XDG dirs and test-setup.ts its own HOME, which is what makes the
+      # parallel pass safe.
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: bun --config=bunfig.root.toml test
+        run: |
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          bun --config=bunfig.root.parallel.toml test --parallel
 
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun test packages/omo-opencode packages/memory-core
 
+      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
+      # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/omo-native/test/payload.test.ts packages/omo-codex/src/install/install-codex.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun --config=bunfig.win2.parallel.toml test --parallel
 
@@ -221,7 +228,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs all non-Senpi root tests on Linux and macOS via bunfig.root.toml.
+            - Runs all non-Senpi root tests on Linux and macOS: the shared serial quarantine first, then the remainder in parallel via bunfig.root.parallel.toml.
             - Splits Windows by measured package groups so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -308,6 +315,21 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run test:codex
 
+
+      - name: Run omo-codex component checks
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=0
+          for component in packages/omo-codex/plugin/components/*/; do
+            if jq -e '.scripts.check' "${component}package.json" > /dev/null 2>&1; then
+              echo "::group::Component check: ${component}"
+              npm --prefix "$component" run check || status=1
+              echo "::endgroup::"
+            fi
+          done
+          exit $status
       - name: Build Codex platform smoke prerequisites
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: |
@@ -341,7 +363,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the MCP runtimes needed by the Codex adapter.
-            - Runs the full hermetic Codex gate on Linux and platform-specific installer/path/shell smoke tests on macOS and Windows.
+            - Runs the full hermetic Codex gate plus every omo-codex component check script on Linux, and platform-specific installer/path/shell smoke tests on macOS and Windows.
             - Preserves Linux, macOS, and Windows platform compatibility coverage without duplicating platform-neutral tests.
           JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

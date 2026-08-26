@@ -106,6 +106,8 @@ describe("resolveSenpiLaunch", () => {
 
     // then
     expect(child.exitCode).toBe(0)
-    expect(child.stdout.toString().trim()).toMatch(/^\d{4}\.\d+\.\d+/)
+    expect(child.stdout.toString().trim()).toMatch(
+      /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/,
+    )
   }, 30_000)
 })

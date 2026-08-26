@@ -46,6 +46,7 @@ bunx oh-my-opencode
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
 | `config migrate` | Migrate legacy OMO configuration into the unified config at `~/.omo/omo.jsonc` (`--dry-run` prints the transform/backup plan without writing, `--json` emits a machine-readable report) |
+| `worktree-sweep` | Report (and optionally remove) stale linked git worktrees: SWEEP when merged into the default branch and clean, KEEP when locked/external/unmerged/dirty, PRUNE when the path is gone. Dry-run by default; `--apply` removes with `git worktree remove` (never forced) and prunes; `--older-than <days>` adds an age fallback, `--repo <path>` is repeatable, `--json` emits machine-readable output |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
 | `update` | `lazycodex` / `lazycodex-ai` bins only: refresh the installed Codex Light edition in place (`--dry-run`, `--repo-root <path>`) |
 | `boulder` | Inspect Sisyphus boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |

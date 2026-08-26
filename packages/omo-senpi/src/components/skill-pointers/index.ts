@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 
@@ -15,6 +17,7 @@ interface SkillPointerTarget {
   readonly pattern: RegExp
   readonly expandedBlockPattern: RegExp
   readonly instruction: string
+  readonly extra?: string
 }
 
 // One uniform keyword table, no cross-keyword exceptions: every pattern matches
@@ -43,6 +46,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
     pattern: /\bulw[\s-]*loop\b/i,
     expandedBlockPattern: /<skill\s+name="ulw-loop"/i,
     instruction: "run the goal-driven ultrawork loop with evidence-bound execution",
+    extra: ulwLoopCliShimSentence(),
   },
   {
     skillName: "ulw-research",
@@ -119,9 +123,19 @@ function handleInput(pi: SenpiExtensionAPI, payload: unknown, ctx: ComponentCont
   return { action: "continue" }
 }
 
+function ulwLoopCliShimPath(): string {
+  return fileURLToPath(new URL("../runtime/agent-toolkit/omo-agent-toolkit", import.meta.url))
+}
+
+function ulwLoopCliShimSentence(): string {
+  const abs = ulwLoopCliShimPath()
+  return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand>\`.`
+}
+
 function skillPointer(target: SkillPointerTarget): string {
   const skillsRoot = getBuiltinSkillsRoot()
-  return `<omo-${target.skillName}-pointer>The user asked for ${target.skillName}. Read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}.</omo-${target.skillName}-pointer>`
+  const extra = target.extra ?? ""
+  return `<omo-${target.skillName}-pointer>The user asked for ${target.skillName}. Read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}.${extra}</omo-${target.skillName}-pointer>`
 }
 
 function skillCommandName(text: string): string | undefined {

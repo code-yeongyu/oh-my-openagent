@@ -91,12 +91,36 @@ describe("dist/cli.js entrypoint dispatch", () => {
 		expect(result.code).toBe(1);
 	});
 
-	it("#given the top-level entrypoint #when invoked with 'help' #then prints usage and exits 0", async () => {
+	it("#given the top-level entrypoint #when invoked with 'help' #then prints the merged hook and subcommand usage and exits 0", async () => {
 		const result = await runCli(["help"]);
 
 		expect(result.code).toBe(0);
 		expect(result.stdout).toContain("Usage:");
-		expect(result.stdout).toContain("omo-agent-toolkit ulw-loop <subcommand>");
+		expect(result.stdout).toContain("hook user-prompt-submit");
+		expect(result.stdout).toContain("create-goals");
+		expect(result.stdout).toContain("complete-goals");
+		expect(result.stdout).toContain("record-review-blockers");
+		expect(result.stdout).not.toContain("for ulw-loop subcommands");
+	});
+
+	it("#given the staged router strips nothing #when invoked with 'ulw-loop help' #then prints the same merged help text", async () => {
+		const bare = await runCli(["help"]);
+		const nested = await runCli(["ulw-loop", "help"]);
+
+		expect(nested.code).toBe(0);
+		expect(nested.stdout.trim()).toBe(bare.stdout.trim());
+		expect(nested.stdout).toContain("hook user-prompt-submit");
+		expect(nested.stdout).toContain("record-review-blockers");
+		expect(nested.stdout).not.toContain("for ulw-loop subcommands");
+	});
+
+	it("#given a subcommand with required args #when invoked with 'create-goals --help' #then prints its usage and exits 0", async () => {
+		const result = await runCli(["create-goals", "--help"]);
+
+		expect(result.code).toBe(0);
+		expect(result.stdout).toContain("Usage:");
+		expect(result.stdout).toContain("create-goals");
+		expect(`${result.stdout}${result.stderr}`).not.toContain("Missing brief text");
 	});
 
 	it("#given a command outside the ulw-loop vocabulary #when invoked with 'frobnicate' #then fails as unknown command", async () => {

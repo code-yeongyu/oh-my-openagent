@@ -60,10 +60,10 @@ test("#given component directories #when scanned #then only intentional resource
 		"lazycodex-executor-verify",
 		"lsp",
 		"rules",
-		"start-work-continuation",
 		"teammode",
 		"telemetry",
 		"ultrawork",
+		"ulw-execute-continuation",
 		"ulw-loop",
 	]);
 	for (const name of componentNames) {

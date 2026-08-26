@@ -212,7 +212,7 @@ These are the only deprecated keys the strict agent schema accepts. `textVerbosi
 
 #### Builtin agents
 
-The Senpi task engine ships four builtin curated agents: `explore` and `librarian` are always spawnable through the task tool with zero configuration, for example `task(subagent_type: "explore", ...)`, while `metis` and `momus` are plan-gated: spawnable only after the user requests the `ulw-plan` workflow, a `.omo/plans/*.md` artifact was touched, and `start-work` was never invoked. They are read-only research and review specialists; implementation and orchestration agents stay category-routed. (`oracle` is an OpenCode plugin agent, not a Senpi builtin.)
+The Senpi task engine ships four builtin curated agents: `explore` and `librarian` are always spawnable through the task tool with zero configuration, for example `task(subagent_type: "explore", ...)`, while `metis` and `momus` are plan-gated: spawnable only after the user requests the `ulw-plan` workflow, a `.omo/plans/*.md` artifact was touched, and `ulw-execute` was never invoked. They are read-only research and review specialists; implementation and orchestration agents stay category-routed. (`oracle` is an OpenCode plugin agent, not a Senpi builtin.)
 
 | Name | Purpose |
 |------|---------|

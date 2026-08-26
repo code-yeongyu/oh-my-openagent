@@ -230,7 +230,7 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
       providers
         ? `Category "${resolution.category}" has no usable model: none of its fallback-chain providers are connected (${providers}).`
         : `Category "${resolution.category}" has no usable model for memory reflection.`,
-      "warning",
+      "info",
     )
   }
 

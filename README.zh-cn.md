@@ -133,7 +133,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
-**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`npx lazycodex-ai install` 或 `bunx oh-my-openagent install --platform=codex`）提供能够干净地移植到 OpenAI Codex CLI 插件系统的 核心组件（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`start-work-continuation`、`telemetry`），外加 `teammode` 和配套组件（`bootstrap`、`codegraph`、`lcx` 等），并会把 Codex 智能体 TOML 安装到 `~/.codex/agents/`。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`npx lazycodex-ai install` 或 `bunx oh-my-openagent install --platform=codex`）提供能够干净地移植到 OpenAI Codex CLI 插件系统的 核心组件（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`ulw-execute-continuation`、`telemetry`），外加 `teammode` 和配套组件（`bootstrap`、`codegraph`、`lcx` 等），并会把 Codex 智能体 TOML 安装到 `~/.codex/agents/`。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
 
 ---
 
@@ -171,7 +171,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 特性                                                            | Editions | 功能说明                                                                                                                                                                        |
 | :---: | :-------------------------------------------------------------- | :------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 |   🤖   | **自律军团 (Discipline Agents)**                                | Ultimate | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的可移植组件 (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry, teammode 等)。安装: `npx lazycodex-ai install`。                    |
+|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的可移植组件 (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, ulw-execute continuation, telemetry, teammode 等)。安装: `npx lazycodex-ai install`。                    |
 |   👥   | **Team Mode** (v4.0, 选择性启用)                                 | Ultimate | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                         | Both     | 一键触发，所有智能体(Ultimate)或 Codex `ultrawork` 组件(Light)出动。任务完成前绝不罢休。                                                                                          |
 |   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | Ultimate | 真正行动前，先分析用户的真实意图。不再有字面意义上的误解。(Light 仅识别 `ulw` / `ultrawork` 关键词。)                                                       |
@@ -308,7 +308,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 
 碰到了硬骨头？千万不要扔个 Prompt 就双手合十祈祷。
 
-Prometheus **会像一个真实的主管那样去采访你**，主动深挖需求、指出模糊地带，并在改动哪怕一行代码之前把经过严密论证的计划写入 `.omo/plans/`。随后 `/start-work` 基于该计划启动 **Atlas** 工作会话。你的 Agent 终于知道了自己在干嘛。
+Prometheus **会像一个真实的主管那样去采访你**，主动深挖需求、指出模糊地带，并在改动哪怕一行代码之前把经过严密论证的计划写入 `.omo/plans/`。随后 `/ulw-execute` 基于该计划启动 **Atlas** 工作会话。你的 Agent 终于知道了自己在干嘛。
 
 ### 技能系统 (Skills)
 

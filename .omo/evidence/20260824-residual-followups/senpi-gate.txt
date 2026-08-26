@@ -1,0 +1,14 @@
+SENPI GATE
+- tsgo --noEmit -p packages/omo-senpi/tsconfig.json: PASS
+- bun run build:senpi-plugin: PASS (extensions + skills synced + installer built)
+- bun test packages/omo-senpi: 2217 pass / 1 skip / 14 fail
+
+PRE-EXISTING FAILURE SEPARATION (proof)
+- Clean baseline at origin/dev (ea8ee43b7), same suite: 14 fail — name-set IDENTICAL to fix tree (diff empty).
+- Fix tree originally had 15 fail; the one extra (skills-sync leak) was introduced by our doc fix exposing a real defect and is now fixed in-tree; final fix tree = 14, identical to baseline.
+- The 14 remaining failures are environment/pre-existing: init-deep-advisor dialog (12), OmO Native product identity path, resolveSenpiLaunch PATH fallback, session-start ordering, cli-local — none touch the ulw-loop skill doc or skills-sync surface.
+
+ROOT CAUSE OF THE DOC TYPO
+- packages/omo-senpi skills sync is verbatim for component-owned ulw-loop; the leak test bans the token 'codex'.
+- The old --omo-senpi-goal-json was a FAKE flag invented to dodge that ban; the real CLI flag is --codex-goal-json (live-proven: user session parsed the flag and failed on missing objective, not unknown flag).
+- Correct fix: source doc uses the real flag (3 sites) + skills-sync.test.ts masks the literal CLI interface name before token scanning. Isolated skills-sync run: 11/11 pass.

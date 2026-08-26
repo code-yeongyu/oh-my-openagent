@@ -1,0 +1,36 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/dag-stall-repro.test.ts:
+207 |     await sleep(400)
+208 | 
+209 |     // then - the run must show life while the child still runs: the resumed boundary event
+210 |     // and the reuse of already-completed durable results must NOT wait for the running child.
+211 |     const seen = events(store).map((event) => event.type)
+212 |     expect(seen).toContain("dag.node.reused")   // lane-a durable result reused
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "dag.node.reused"
+Received: []
+
+      at <anonymous> (/private/tmp/omo-dag-stall-repro/packages/senpi-task/src/dag/dag-stall-repro.test.ts:212:18)
+(fail) dag_530ad299 stall repro > R1: resume emits dag.run.resumed and reuses completed nodes even while a reattached child is still running [407.77ms]
+235 |     manager.complete("task-lane-a")
+236 |     await sleep(400)
+237 | 
+238 |     // then - documented semantics: "a node starts only after every node it dependsOn has
+239 |     // finished" - lane-a IS finished, so lane-b should be admitted despite lane-c running.
+240 |     expect(manager.starts).toContain("lane-b")
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "lane-b"
+Received: [ "lane-a", "lane-c" ]
+
+      at <anonymous> (/private/tmp/omo-dag-stall-repro/packages/senpi-task/src/dag/dag-stall-repro.test.ts:240:28)
+(fail) dag_530ad299 stall repro > R2: a dependent whose dependsOn are all completed is admitted while an unrelated wave-0 sibling still runs [462.44ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [1029.00ms]

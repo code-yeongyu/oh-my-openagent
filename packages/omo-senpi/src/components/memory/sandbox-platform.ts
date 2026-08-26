@@ -1,8 +1,12 @@
-import { accessSync, constants, existsSync, mkdirSync, realpathSync } from "node:fs"
-import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
+import { existsSync, mkdirSync } from "node:fs"
+import { dirname, join } from "node:path"
 
 import type { FactsSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
+import { canonicalAbsentPath, canonicalPath, defaultWhich, resolveInnerCommand } from "./sandbox-paths"
+import { probeBwrapUsability, type SandboxUsability } from "./sandbox-bwrap-probe"
 import { SandboxUnavailableError, type SandboxPolicy } from "./sandbox-contracts"
+
+export { classifyBwrapSmoke, probeBwrapUsability, type SandboxUsability } from "./sandbox-bwrap-probe"
 
 export interface PathSandboxInput {
   readonly surface: "reflection" | "facts"
@@ -22,6 +26,12 @@ export interface PathSandboxInput {
   readonly errorRethrow?: (error: SandboxUnavailableError) => never
   readonly platform?: NodeJS.Platform
   readonly which?: (command: string) => string | undefined
+  /**
+   * Verifies the resolved Linux executable can actually start a sandbox. Defaults to the real
+   * bwrap smoke probe, which only spawns when the resolved path exists on this machine, so tests
+   * that inject a fake `which` keep their existence-only semantics and never spawn bwrap.
+   */
+  readonly probe?: (executable: string) => SandboxUsability
 }
 
 export interface GenericSandboxTransform<T> {
@@ -47,6 +57,19 @@ export function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsS
       throw error
     }
     return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
+  }
+
+  if (platform === "linux") {
+    const usability = (input.probe ?? defaultProbe)(executable)
+    if (!usability.usable) {
+      const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+      if (input.policy === "required") {
+        const error = new SandboxUnavailableError(platform, reason)
+        if (input.errorRethrow !== undefined) input.errorRethrow(error)
+        throw error
+      }
+      return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
+    }
   }
 
   const lockPaths = input.lockPaths ?? []
@@ -134,47 +157,13 @@ function resolveExecutable(
   return undefined
 }
 
-function defaultWhich(command: string): string | undefined {
-  for (const entry of (process.env.PATH ?? "").split(delimiter)) {
-    if (entry === "") continue
-    const candidate = join(entry, command)
-    try {
-      accessSync(candidate, constants.X_OK)
-      return candidate
-    } catch {
-      // Not executable on this PATH entry; keep scanning.
-    }
-  }
-  if (command === "sandbox-exec" && existsSync("/usr/bin/sandbox-exec")) return "/usr/bin/sandbox-exec"
-  return undefined
-}
-
 /**
- * Canonicalizes as much of the path as exists and re-joins the remaining segments.
- *
- * The sandbox is built BEFORE the reflection child runs, and several granted entries
- * (runtime/reflection, runtime/reflection-sessions, the resolved agent dir, XDG_CONFIG_HOME)
- * legitimately do not exist yet on a fresh machine or a first reflection. A bare realpathSync
- * throws `ENOENT ... lstat '<first missing ancestor>'` there, which surfaced as a pre-spawn
- * `spawn_failed` and stalled the reflection cursor.
- *
- * Only the existing prefix is resolved through the filesystem; the absent tail is appended
- * verbatim, so the grant always names the full intended path and can never widen to an ancestor.
+ * Probes only executables that exist on this machine: a resolved path that is absent here comes
+ * from an injected `which` seam, and spawning it would prove nothing while breaking hermeticity.
  */
-function canonicalPath(path: string): string {
-  const segments: string[] = []
-  let current = path
-  for (;;) {
-    if (existsSync(current)) return join(realpathSync(current), ...segments.reverse())
-    const parent = dirname(current)
-    if (parent === current) return path
-    segments.push(basename(current))
-    current = parent
-  }
-}
-
-function canonicalAbsentPath(path: string): string {
-  return join(canonicalPath(dirname(path)), basename(path))
+function defaultProbe(executable: string): SandboxUsability {
+  if (!existsSync(executable)) return { usable: true }
+  return probeBwrapUsability(executable)
 }
 
 type LockPathsResolution =
@@ -234,19 +223,4 @@ function guardedSandboxedTransform<T extends ReflectionSpawnArgs | FactsSpawnArg
     return identityTransform(`${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`)
   }
   return Object.assign((spawnArgs: T) => transform(spawnArgs, innerCommand), { wasSandboxed: true })
-}
-
-function resolveInnerCommand(command: string, env: NodeJS.ProcessEnv): string | undefined {
-  if (isAbsolute(command)) return command
-  for (const entry of (env.PATH ?? "").split(delimiter)) {
-    if (entry === "") continue
-    const candidate = join(entry, command)
-    try {
-      accessSync(candidate, constants.X_OK)
-      return candidate
-    } catch {
-      // Not executable on this child PATH entry; keep scanning.
-    }
-  }
-  return undefined
 }

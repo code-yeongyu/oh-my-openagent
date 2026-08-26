@@ -1,3 +1,10 @@
+## 2026-08-25 — Name the executable in the local-launcher brand profile
+
+The sibling-store local launcher now injects `command: "omo"` on the `SENPI_BRAND`
+profile it hands the engine, matching the published omo-ai launcher. Senpi can
+render resume hints with the real executable name instead of guessing; unknown
+fields stay ignored on older engines.
+
 ## 2026-08-22 — One exception-free keyword table for every ULW skill pointer
 
 The mass-ulw and ulw-skill-pointers components were the same mechanism written twice, and the

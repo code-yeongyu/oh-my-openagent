@@ -2,15 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  createAgentSession,
-  createExtensionRuntime,
-  ModelRegistry,
-  ModelRuntime,
-  SessionManager,
-  type AgentSessionEvent,
-} from "@code-yeongyu/senpi"
+import type { AgentSessionEvent, createAgentSession } from "@code-yeongyu/senpi"
 
+import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
 import { createRuntimeFallbackSettings } from "../in-process/runtime-fallback-settings"
 
@@ -49,6 +43,13 @@ export type FallbackSessionHarness = {
 }
 
 export async function createFallbackSessionHarness(errorMessage: string): Promise<FallbackSessionHarness> {
+  const {
+    createAgentSession,
+    ModelRegistry,
+    ModelRuntime,
+    SessionManager,
+    createExtensionRuntime,
+  } = await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-access-terminated-"))
   const modelRuntime = ModelRuntime.createSync()
   const modelRegistry = new ModelRegistry(modelRuntime)

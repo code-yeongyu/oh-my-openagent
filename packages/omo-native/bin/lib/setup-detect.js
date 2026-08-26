@@ -127,18 +127,35 @@ function inspectSqlite(id, path, DatabaseSync, modelHint) {
   return result
 }
 
+/**
+ * Every filesystem input detection reads, in a stable order, so a cache can fingerprint exactly
+ * what the answer depends on. `detectHarnesses` resolves its own paths through this list, which
+ * keeps the cache key and the live detection from ever drifting apart.
+ */
+export function detectedFilePaths(home = homedir(), env = process.env) {
+  const agentDir = canonicalAgentDir(env, home)
+  const dataHome = env.XDG_DATA_HOME || join(home, ".local", "share")
+  return [
+    join(agentDir, "auth.json"),
+    join(agentDir, "models.json"),
+    join(dataHome, "opencode", "auth.json"),
+    join(home, ".omp", "agent", "agent.db"),
+    join(home, ".omp", "agent", "models.db"),
+    join(home, ".gjc", "agent", "agent.db"),
+    join(home, ".gjc", "agent", "config.yml"),
+  ]
+}
+
 export async function detectHarnesses(options = {}) {
   const home = options.home ?? homedir()
   const env = options.env ?? process.env
-  const agentDir = canonicalAgentDir(env, home)
-  const dataHome = env.XDG_DATA_HOME || join(home, ".local", "share")
-  const senpi = readAuthJson("senpi", join(agentDir, "auth.json"))
-  readSenpiModels(join(agentDir, "models.json"), senpi)
-  const opencode = readAuthJson("opencode", join(dataHome, "opencode", "auth.json"))
-  const ompPath = join(home, ".omp", "agent", "agent.db")
-  const gjcPath = join(home, ".gjc", "agent", "agent.db")
-  const ompModels = existsSync(join(home, ".omp", "agent", "models.db")) ? "models.db: yes" : "models.db: no"
-  const gjcModels = readGajaeModels(join(home, ".gjc", "agent", "config.yml"))
+  const [senpiAuthPath, senpiModelsPath, opencodeAuthPath, ompPath, ompModelsPath, gjcPath, gjcConfigPath] =
+    detectedFilePaths(home, env)
+  const senpi = readAuthJson("senpi", senpiAuthPath)
+  readSenpiModels(senpiModelsPath, senpi)
+  const opencode = readAuthJson("opencode", opencodeAuthPath)
+  const ompModels = existsSync(ompModelsPath) ? "models.db: yes" : "models.db: no"
+  const gjcModels = readGajaeModels(gjcConfigPath)
   let DatabaseSync
   try {
     const sqlite = await (options.loadSqlite ?? (() => import("node:sqlite")))()

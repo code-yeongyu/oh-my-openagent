@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-
+import type { Engine } from "@oh-my-opencode/rules-engine/engine";
 import {
 	type PostCompactPendingKind,
 	type PostCompactPendingState,
@@ -9,7 +9,6 @@ import {
 	postCompactPendingKinds,
 	postCompactRecoveringKinds,
 } from "./post-compact-state.js";
-import type { Engine } from "@oh-my-opencode/rules-engine/engine";
 import { SESSION_STATE_LOCK_CONTENDED, withSessionStateLock } from "./session-state-lock.js";
 
 export type PostCompactClaimResult = "claimed" | "not-pending" | "contended";

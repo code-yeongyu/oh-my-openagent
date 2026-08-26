@@ -317,6 +317,59 @@ function expectedSuccessSequence(waves: readonly (readonly string[])[]): readonl
   ]
 }
 
+// Frontier admission interleaves events the barrier used to serialize: a dependent is admitted as
+// soon as ITS dependencies settle, so a staggered run emits several wave.started groupings for one
+// wave index and a later wave's completed can precede an earlier wave's. Waves here are
+// informational groupings over the compiled graph, never execution barriers.
+function expectedFrontierSequence(): readonly string[] {
+  return [
+    "dag.run.created",
+    "dag.run.started",
+    "dag.node.transitioned:intake:pending>scheduled",
+    "dag.node.transitioned:research:pending>scheduled",
+    "dag.wave.started:0:[intake,research]",
+    "dag.node.task-attached:intake",
+    "dag.node.transitioned:intake:scheduled>running",
+    "dag.node.task-attached:research",
+    "dag.node.transitioned:research:scheduled>running",
+    "dag.node.transitioned:intake:running>completed",
+    "dag.node.transitioned:design:pending>scheduled",
+    "dag.node.transitioned:budget:pending>scheduled",
+    "dag.wave.started:1:[design,budget]",
+    "dag.node.task-attached:design",
+    "dag.node.transitioned:design:scheduled>running",
+    "dag.node.task-attached:budget",
+    "dag.node.transitioned:budget:scheduled>running",
+    "dag.node.transitioned:research:running>completed",
+    "dag.wave.completed:0:[intake,research]",
+    "dag.node.transitioned:evidence:pending>scheduled",
+    "dag.wave.started:1:[evidence]",
+    "dag.node.task-attached:evidence",
+    "dag.node.transitioned:evidence:scheduled>running",
+    "dag.node.transitioned:design:running>completed",
+    "dag.node.transitioned:budget:running>completed",
+    "dag.node.transitioned:evidence:running>completed",
+    "dag.wave.completed:1:[design,evidence,budget]",
+    "dag.node.transitioned:build:pending>scheduled",
+    "dag.node.transitioned:docs:pending>scheduled",
+    "dag.wave.started:2:[build,docs]",
+    "dag.node.task-attached:build",
+    "dag.node.transitioned:build:scheduled>running",
+    "dag.node.task-attached:docs",
+    "dag.node.transitioned:docs:scheduled>running",
+    "dag.node.transitioned:build:running>completed",
+    "dag.node.transitioned:docs:running>completed",
+    "dag.wave.completed:2:[build,docs]",
+    "dag.node.transitioned:review:pending>scheduled",
+    "dag.wave.started:3:[review]",
+    "dag.node.task-attached:review",
+    "dag.node.transitioned:review:scheduled>running",
+    "dag.node.transitioned:review:running>completed",
+    "dag.wave.completed:3:[review]",
+    "dag.run.completed",
+  ]
+}
+
 function assertArtifacts(fixture: E2eFixture, runId: DagRunId, key: string, nodeIds: readonly string[]): void {
   expect(fs.existsSync(fixture.store.paths.run(runId))).toBe(true)
   expect(fs.existsSync(fixture.store.paths.key(parentSessionId, key))).toBe(true)
@@ -379,7 +432,7 @@ describe("DAG happy-path end to end", () => {
     assertArtifacts(fixture, result.runId, input.key, ["plan", "build", "review"])
   })
 
-  test("#given a diamond fan-out and join #when the real engine runs #then the middle nodes share one strict wave", async () => {
+  test("#given a diamond fan-out and join #when the real engine runs #then the middle nodes share one admission pass", async () => {
     // given
     const fixture = e2eFixture()
     const input = definition("diamond", [
@@ -433,7 +486,7 @@ describe("DAG happy-path end to end", () => {
 
     // then
     expect(result.snapshot.waves.map((wave) => wave.nodeIds.map(String))).toEqual(waves)
-    expect(eventSequence(fixture.events(result.runId))).toEqual(expectedSuccessSequence(waves))
+    expect(eventSequence(fixture.events(result.runId))).toEqual(expectedFrontierSequence())
     expect(result.snapshot.nodes.map((node) => ({ id: String(node.id), route: node.route }))).toEqual([
       { id: "intake", route: { kind: "category", category: "quick" } },
       { id: "research", route: { kind: "agent", agent: "explore" } },
@@ -444,12 +497,14 @@ describe("DAG happy-path end to end", () => {
       { id: "docs", route: { kind: "category", category: "writing" } },
       { id: "review", route: { kind: "agent", agent: "momus" } },
     ])
+    // Launch order follows the frontier, not declaration: budget starts as soon as intake
+    // settles, ahead of evidence whose dependency research folded one settlement later.
     expect(fixture.runner.startedSpecs.map((spec) => [spec.prompt.replace(/^do /, ""), spec.model, spec.agentType])).toEqual([
       ["intake", "scripted/quick", undefined],
       ["research", "scripted/explore", "explore"],
       ["design", "scripted/visual-engineering", undefined],
-      ["evidence", "scripted/librarian", "librarian"],
       ["budget", "scripted/deep", undefined],
+      ["evidence", "scripted/librarian", "librarian"],
       ["build", "scripted/hephaestus", "hephaestus"],
       ["docs", "scripted/writing", undefined],
       ["review", "scripted/momus", "momus"],

@@ -88,7 +88,8 @@ describe("hooks/hooks.json", () => {
 		const hooks = await readJson("hooks/hooks.json") as Record<string, unknown>;
 		const events = (hooks["hooks"] as Record<string, unknown>)["UserPromptSubmit"] as readonly Record<string, unknown>[];
 		expect(events.length).toBeGreaterThan(0);
-		const command = ((events[0]?.["hooks"] as readonly Record<string, unknown>[])[0]?.["command"]) as string;
+		const command = (events[0]?.["hooks"] as readonly Record<string, unknown>[] | undefined)?.[0]?.["command"];
+		expect(command).toEqual(expect.any(String));
 		expect(command).toContain(`$${"{PLUGIN_ROOT}"}`);
 		expect(command).toContain("dist/cli.js");
 		expect(command).toContain("hook user-prompt-submit");
@@ -168,7 +169,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 				].join("\n"),
 			);
 
-			const result = await runShell(`${bootstrap}\n\"$ULW_LOOP_NODE\" \"$ULW_LOOP_CLI\" ulw-loop status --json`, {
+			const result = await runShell(`${bootstrap}\n"$ULW_LOOP_NODE" "$ULW_LOOP_CLI" ulw-loop status --json`, {
 				...process.env,
 				CODEX_HOME: codexHome,
 				HOME: home,

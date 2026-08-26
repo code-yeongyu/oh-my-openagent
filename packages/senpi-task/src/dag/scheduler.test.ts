@@ -667,8 +667,9 @@ describe("DAG scheduler cancellation", () => {
     expect(waitSurface.waiterCount(runId)).toBe(0)
   })
 
-  test("#given a running wave and pending descendants #when cancelled #then tasks cancel, admission stops, and waiters resolve cancelled", async () => {
-    // given
+  test("#given a running wave and pending descendants #when cancelled #then admitted tasks cancel, frontier admission stops, and waiters resolve cancelled", async () => {
+    // given - frontier admission: `next` becomes runnable the moment `finished` settles, so it is
+    // attached (and cancellable) while wave-0 sibling `running` is still mid-flight.
     const manager = new FakeTaskManager({ autoComplete: false, queuedNodeIds: ["queued"] })
     const { scheduler, events, store } = schedulerFixture(
       definition([node("finished"), node("running"), node("queued"), node("next", ["finished"]), node("last", ["next"])]),
@@ -693,14 +694,15 @@ describe("DAG scheduler cancellation", () => {
     await attached.promise
     manager.complete("finished")
     await finishedSettled.promise
+    await manager.whenStarted("next")
 
     // when
     await waitSurface.attach(runId, parentSessionId).cancel("stop now")
     const [runResult, waitResult] = await Promise.all([running, waiter])
 
     // then
-    expect(manager.cancellations).toEqual(["running", "queued"])
-    expect(manager.starts).toEqual(["finished", "running", "queued"])
+    expect(manager.cancellations).toEqual(["running", "queued", "next"])
+    expect(manager.starts).toEqual(["finished", "running", "queued", "next"])
     expect(runResult.status).toBe("cancelled")
     expect(runResult.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
       "finished:completed",
@@ -805,8 +807,8 @@ describe("DAG scheduler cancellation", () => {
   })
 })
 
-describe("DAG scheduler strict wave barrier", () => {
-  test("#given a linear three-wave DAG #when run #then nodes and wave events are admitted in order", async () => {
+describe("DAG scheduler dependency-frontier admission", () => {
+  test("#given a linear three-wave DAG #when run #then nodes and wave events still settle in order", async () => {
     // given
     const manager = new FakeTaskManager()
     const { scheduler, events } = schedulerFixture(definition([node("a"), node("b", ["a"]), node("c", ["b"])]), manager)
@@ -821,7 +823,7 @@ describe("DAG scheduler strict wave barrier", () => {
     expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["a:completed", "b:completed", "c:completed"])
   })
 
-  test("#given a diamond DAG #when run #then the fan-out shares one wave and the join waits for it", async () => {
+  test("#given a diamond DAG #when run #then the fan-out shares one admission pass and the join waits for both", async () => {
     // given
     const manager = new FakeTaskManager()
     const { scheduler, events } = schedulerFixture(
@@ -837,8 +839,31 @@ describe("DAG scheduler strict wave barrier", () => {
     expect(manager.starts).toEqual(["a", "b", "c", "d"])
   })
 
-  test("#given a wave-one task is still running #when the scheduler is active #then wave two is not admitted before terminal", async () => {
-    // given
+  test("#given an unrelated sibling still running #when a dependent's dependencies are all terminal #then the dependent is admitted without waiting for the sibling", async () => {
+    // given - the documented dependency contract (and dag_530ad299): b waits on a ONLY. The
+    // strict wave barrier used to hold b behind c until c settled, starving ready work.
+    const manager = new FakeTaskManager({ autoComplete: false })
+    const { scheduler } = schedulerFixture(definition([node("a"), node("c"), node("b", ["a"])]), manager)
+    const aStarted = manager.whenStarted("a")
+    const cStarted = manager.whenStarted("c")
+    const bStarted = manager.whenStarted("b")
+
+    // when
+    const running = scheduler.run()
+    await Promise.all([aStarted, cStarted])
+    manager.complete("a")
+    await bStarted
+
+    // then - b runs while c is still mid-flight: frontier admission, no barrier.
+    expect(manager.starts).toEqual(["a", "c", "b"])
+    manager.complete("b")
+    manager.complete("c")
+    const result = await running
+    expect(result.status).toBe("completed")
+  })
+
+  test("#given a dependency still running #when the scheduler is active #then its dependent is not admitted before terminal", async () => {
+    // given - the inverse half of the contract: frontier admission never bypasses dependsOn.
     const manager = new FakeTaskManager({ autoComplete: false })
     const { scheduler } = schedulerFixture(definition([node("a"), node("b", ["a"])]), manager)
     const aStarted = manager.whenStarted("a")

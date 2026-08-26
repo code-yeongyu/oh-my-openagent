@@ -136,6 +136,7 @@ function createLauncherFixture(fixture: Fixture): string {
   }))
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   write(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
+  write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
@@ -144,8 +145,14 @@ function createLauncherFixture(fixture: Fixture): string {
 }
 
 function runLauncher(launcher: string, fixture: Fixture, args: string[], tty = false) {
+  // A developer machine exports the agent directory for its own install; an inherited OMO_* value
+  // would outrank the fixture's SENPI_* override and answer with real machine state.
+  // launcher.test.ts defends the same way.
+  const inherited = { ...process.env }
+  delete inherited.OMO_CODING_AGENT_DIR
+  delete inherited.PI_CODING_AGENT_DIR
   const env = {
-    ...process.env, HOME: fixture.home, SENPI_CODING_AGENT_DIR: fixture.agentDir,
+    ...inherited, HOME: fixture.home, SENPI_CODING_AGENT_DIR: fixture.agentDir,
     XDG_DATA_HOME: fixture.xdg,
   }
   // spawnSync only returns after the child has exited and been reaped, so no live child owns the
@@ -156,6 +163,20 @@ function runLauncher(launcher: string, fixture: Fixture, args: string[], tty = f
     : spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, launcher, ...args], { encoding: "utf8", env })
   if (result.error) throw result.error
   return result
+}
+
+/**
+ * Awaits the detached refresh child's cache rewrite by polling the exact observable it produces,
+ * with a bounded deadline. The child is detached and unref'd by contract, so there is no exit
+ * event to subscribe to; the rewritten cache file IS the signal.
+ */
+async function waitFor(probe: () => boolean, description: string): Promise<void> {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    if (probe()) return
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  throw new Error(`waited 15s for ${description}`)
 }
 
 afterEach(() => {
@@ -264,17 +285,34 @@ describe("omo setup sibling detection", () => {
       expect(result.stdout).not.toContain("INFO no credentials found")
     })
 
-    test.skipIf(process.platform === "win32")("#when default launch is on a TTY #then one hint appears and non-TTY emits none", () => {
+    test.skipIf(process.platform === "win32")("#when default launch is on a TTY #then the hint is answered from the cache, cold first then warm", async () => {
       const fixture = createFixture()
       const launcher = createLauncherFixture(fixture)
       write(join(fixture.xdg, "opencode", "auth.json"), "{}")
       const nonTty = runLauncher(launcher, fixture, [])
       expect(`${nonTty.stdout}${nonTty.stderr}`).not.toContain("run `omo setup`")
+      // Cold cache: the first interactive launch must not block on live detection; it answers from
+      // the empty default and kicks off the detached refresh that writes the cache.
+      const cold = runLauncher(launcher, fixture, [], true)
+      expect(`${cold.stdout}${cold.stderr}`).not.toContain("sibling credentials detected")
+      const cachePath = join(fixture.agentDir, "harness-detect-cache.json")
+      await waitFor(
+        () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === true,
+        "the detached refresh child to warm the cache",
+      )
       const tty = runLauncher(launcher, fixture, [], true)
       const output = `${tty.stdout}${tty.stderr}`
       expect(tty.status).toBe(0)
       expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
       write(join(fixture.agentDir, "auth.json"), JSON.stringify({ senpi: { type: "api_key", key: "SENPI-SECRET" } }))
+      // Stale fingerprint: this launch still answers from the cache (the one-launch staleness the
+      // design accepts), then the refresh child catches the cache up.
+      const stale = runLauncher(launcher, fixture, [], true)
+      expect(`${stale.stdout}${stale.stderr}`).toContain("sibling credentials detected")
+      await waitFor(
+        () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === false,
+        "the detached refresh child to catch the cache up",
+      )
       const configured = runLauncher(launcher, fixture, [], true)
       expect(`${configured.stdout}${configured.stderr}`).not.toContain("sibling credentials detected")
     })

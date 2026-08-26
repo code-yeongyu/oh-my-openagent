@@ -16,7 +16,7 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection, goal command dispatch + default goal auto-start |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
 | `chat-headers.ts` | `chat.headers` | Copilot `x-initiator` header injection |
-| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (stop-continuation, /goal dispatch, start-work, auto-slash-command) |
+| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (stop-continuation, /goal dispatch, ulw-execute, auto-slash-command) |
 | `event.ts` | `event` | Session lifecycle (created/deleted/idle/error/status), openclaw dispatch, runtime fallback, 4 team-session-event handlers (when team_mode.enabled) |
 | `tool-execute-before.ts` | `tool.execute.before` | Pre-tool guards (mcp_ strip, bash sleep block, task subagent resolution, skill /goal + /stop-continuation dispatch) |
 | `tool-execute-after.ts` | `tool.execute.after` | Post-tool hooks (truncation, comment-checker, hashline read tagging, json-error-recovery) |

@@ -114,7 +114,8 @@ export async function start(name, options) {
   return {
     ...response,
     run_id: runId,
-    done: () => dag({ action: "wait", run_id: runId }),
+    // done() blocks for the final result, opting out of the tool's detached default.
+    done: () => dag({ action: "wait", run_id: runId, detach: false }),
     cancel: (reason) =>
       reason === undefined
         ? dag({ action: "cancel", run_id: runId })

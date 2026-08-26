@@ -34,7 +34,7 @@ const CODEX_BIN_NAMES = [
   "omo-lsp",
   "omo-comment-checker",
   "omo-ultrawork",
-  "omo-start-work-continuation",
+  "omo-ulw-execute-continuation",
   "omo-telemetry",
   "omo-git-bash-hook",
 ] as const

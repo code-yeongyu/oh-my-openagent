@@ -1,6 +1,6 @@
 # script/ -- Build/Publish Automation
 
-**Generated:** 2026-07-03
+**Generated:** 2026-08-24
 
 ## OVERVIEW
 
@@ -15,6 +15,14 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `build.ts` | Main build entry (`bun run build`) |
 | `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/`. Also embeds a source-freshness marker (`// omo-codex-install:<sourceDigest>:<bodyDigest>`) as line 2 of the generated bundle and exports `buildCodexInstaller()` / `digestCodexInstallerSources()` / `parseCodexInstallerArtifact()` for non-destructive freshness checks; guarded by `import.meta.main` |
 | `build-omo-schema.ts` + `build-omo-schema-document.ts` | Generate the unified OMO config schema + companion document |
+| `build-omo-native.ts` | Build the native omo runtime artifacts |
+| `ensure-vendored-lsp-daemon.ts` | Build/watch the vendored LSP daemon (daemon bin + lock-dir watch) |
+| `verify-omo-ai-payload.mjs` | omo-ai npm payload gate: required artifact list, 18-skill minimum, 30 MB unpacked cap, no nested `node_modules`/source paths |
+| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml` |
+| `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): platform-sensitive paths and the `ci:full-matrix` label force the full OS matrix |
+| `telemetry-schema-block.mjs` | Generate the telemetry schema doc block (`generateTelemetrySchemaBlock`) |
+| `remove-stale-self-package-tests.ts` | Prune self-package tests that reference deleted sources |
+| `agent-command-string-scan.ts` | Scan tracked sources for unsafe agent command strings; allowlisted exceptions live in `agent-command-string-audit.allowlist.json` |
 | `verify-npm-payload.mjs` | npm payload verification |
 | `build-help-schemas.ts` | Generate CLI help schemas |
 | `build-schema.ts` + `build-schema-document.ts` | Zod schema to JSON Schema for `assets/oh-my-opencode.schema.json` |
@@ -31,10 +39,11 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 
 ## SUBDIRS
 
+- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`, `omo-native-telemetry-qa.mjs` (end-to-end telemetry privacy QA: sandbox, capture server, redaction; `--evidence-dir <dir> --senpi-bin <path>`).
+- `fixtures/` -- shared script test fixtures (vendored LSP build owner).
 - `agent/` -- dev-env contract: `setup.sh`, `cleanup.sh`, `cleanup-hook.sh`, `docker-dev.sh`, `qa-sandbox.sh`, `qa-docker.sh` (see root AGENTS.md DEVELOPMENT ENVIRONMENT).
-- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`.
 
-## TESTS (~40 `*.test.ts`)
+## TESTS (61 `*.test.ts`)
 
 Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `publish-lazycodex-workflow.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
 
@@ -44,6 +53,10 @@ Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycode
 | `shared-core-extraction-guard.test.ts` | `packages/*-core` stay harness-neutral (no harness-adapter imports/deps) |
 | `agent-env.test.ts` / `agent-harness-wiring.test.ts` / `agents-md-dev-env.test.ts` | Dev-env scripts, harness wiring files, and the root AGENTS.md DEVELOPMENT ENVIRONMENT section stay in sync |
 | `codex-install-bundle-freshness.test.ts` | The COMMITTED Codex installer bundle matches its sources: reads the bundle from the git index (`git show :packages/omo-codex/scripts/install-dist/install-local.mjs`), checks the build marker is present and self-consistent, and asserts the current source digest matches it |
+| `agent-command-string-audit.test.ts` (+ `agent-command-string-scan.test.ts`) | Bare/unsafe agent command strings in tracked sources must be allowlisted (`agent-command-string-audit.allowlist.json`, categorized) |
+| `ci-root-test-partition.test.ts` / `root-test-config.test.ts` | `ci.yml` root test job and the `bunfig.*.toml` partition stay in sync |
+| `root-test-serial-quarantine.ts` | Single source of truth for the test files every parallel CI leg runs serially first, with the documented reason per entry; pinned into both parallel bunfigs and both leg commands by `ci-root-test-partition.test.ts` |
+| `test-environment-isolation.test.ts` | The test preload strips `OPENCODE_SERVER_PASSWORD` so credentials never reach tests |
 
 ## TSCONFIG
 

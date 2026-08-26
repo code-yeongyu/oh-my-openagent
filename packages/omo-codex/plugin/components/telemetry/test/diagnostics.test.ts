@@ -1,17 +1,14 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { cleanupTelemetryDiagnostics } from "@oh-my-opencode/telemetry-core";
 import { afterEach, describe, expect, it } from "vitest";
-
 import {
-	cleanupTelemetryDiagnostics,
-} from "@oh-my-opencode/telemetry-core";
-import {
+	CACHE_DIR_NAME,
 	getComponentTelemetryDiagnosticsFilePath,
 	getComponentTelemetryStateDir,
 	writeComponentTelemetryDiagnostic,
 } from "../src/product-identity.js";
-import { CACHE_DIR_NAME } from "../src/product-identity.js";
 
 const originalXdgDataHome = process.env["XDG_DATA_HOME"];
 const tempDirectories: string[] = [];

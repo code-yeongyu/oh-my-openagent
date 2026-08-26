@@ -21,19 +21,19 @@ describe("createSkillInvocationTracker", () => {
 
     // then
     expect(tracker.stateFor("sess-a").hasInvoked("ulw-plan")).toBe(true)
-    expect(tracker.stateFor("sess-a").hasInvoked("start-work")).toBe(false)
+    expect(tracker.stateFor("sess-a").hasInvoked("ulw-execute")).toBe(false)
   })
 
-  test("#given a read of a start-work SKILL.md #when the tool result arrives #then the session has invoked start-work", async () => {
+  test("#given a read of a ulw-execute SKILL.md #when the tool result arrives #then the session has invoked ulw-execute", async () => {
     // given
     const pi = new FakeExtensionAPI()
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    await pi.dispatch("tool_result", readResult("/home/u/.senpi/agent/skills/start-work/SKILL.md"), CTX_A)
+    await pi.dispatch("tool_result", readResult("/home/u/.senpi/agent/skills/ulw-execute/SKILL.md"), CTX_A)
 
     // then
-    expect(tracker.stateFor("sess-a").hasInvoked("start-work")).toBe(true)
+    expect(tracker.stateFor("sess-a").hasInvoked("ulw-execute")).toBe(true)
   })
 
   test("#given a read of a non-skill file #when the tool result arrives #then nothing is recorded", async () => {
@@ -341,7 +341,7 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
       "input",
       {
         type: "input",
-        text: "\uc2b9\uc778\uc740 \uacc4\ud68d \uc791\uc131\uae4c\uc9c0\ub9cc \ud5c8\uac00\ud558\ub294 \uac83\uc774\uace0, \uc2e4\ud589\uc740 \ubcc4\ub3c4\ub85c /start-work\ub85c \uc2dc\uc791\ud569\ub2c8\ub2e4",
+        text: "\uc2b9\uc778\uc740 \uacc4\ud68d \uc791\uc131\uae4c\uc9c0\ub9cc \ud5c8\uac00\ud558\ub294 \uac83\uc774\uace0, \uc2e4\ud589\uc740 \ubcc4\ub3c4\ub85c /ulw-execute\ub85c \uc2dc\uc791\ud569\ub2c8\ub2e4",
         source: "interactive",
       },
       CTX_A,
@@ -471,7 +471,7 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
     expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(false)
   })
 
-  test("#given an expanded start-work skill block #when it arrives #then start-work counts as invoked for the forbids check", async () => {
+  test("#given an expanded ulw-execute skill block #when it arrives #then ulw-execute counts as invoked for the forbids check", async () => {
     // given
     const pi = new FakeExtensionAPI()
     const tracker = createSkillInvocationTracker(pi)
@@ -479,12 +479,12 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
     // when
     await pi.dispatch(
       "input",
-      { type: "input", text: '<skill name="start-work" location="/skills/start-work/SKILL.md"> Execute the plan.', source: "interactive" },
+      { type: "input", text: '<skill name="ulw-execute" location="/skills/ulw-execute/SKILL.md"> Execute the plan.', source: "interactive" },
       CTX_A,
     )
 
     // then
-    expect(tracker.stateFor("sess-a").hasInvoked("start-work")).toBe(true)
+    expect(tracker.stateFor("sess-a").hasInvoked("ulw-execute")).toBe(true)
   })
 })
 

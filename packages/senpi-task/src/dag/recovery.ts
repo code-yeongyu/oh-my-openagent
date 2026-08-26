@@ -1,4 +1,4 @@
-// allow: SIZE_OK - recovery keeps lease claiming, node reconciliation, and resumed wave admission in one crash-safety boundary.
+// allow: SIZE_OK - recovery keeps lease claiming, node reconciliation, and resumed frontier admission in one crash-safety boundary.
 import * as fs from "node:fs"
 import { join } from "node:path"
 
@@ -19,7 +19,14 @@ import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
 import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
 import type { DagFileStore } from "./store"
-import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import type {
+  DagNodeError,
+  DagNodeErrorCode,
+  DagNodeId,
+  DagNodeTransitionReason,
+  DagRunEvent,
+  DagRunId,
+} from "./types"
 
 const LIVE_RUN_STATUSES = new Set(["pending", "running"])
 
@@ -30,7 +37,8 @@ type RecoverableRecord = DagRunRecordV1 & {
 
 export type DagRecoveryOutcome = {
   readonly runId: DagRunId
-  readonly kind: "resumed" | "skipped"
+  // "adopted" is a resume that also re-homed a foreign orphaned run to the resuming session (#7316).
+  readonly kind: "resumed" | "adopted" | "skipped"
   readonly record?: DagRunRecordV1
   readonly reusedOutputs?: ReadonlyMap<DagNodeId, string>
   readonly reason?: "foreign_session" | "live_lease" | "not_paused"
@@ -117,15 +125,49 @@ async function resumePausedRuns(
 ): Promise<readonly DagRecoveryOutcome[]> {
   const outcomes: DagRecoveryOutcome[] = []
   for (const observed of listRunRecords(context.store)) {
-    if (observed.parentSessionId !== parentSessionId) continue
-    const claim = claimPausedRun(context, observed.runId, parentSessionId)
+    const foreign = observed.parentSessionId !== parentSessionId
+    const claim = foreign
+      ? claimOrphanedRun(context, observed.runId, parentSessionId)
+      : claimPausedRun(context, observed.runId, parentSessionId)
     if (claim.kind === "skipped") {
-      if (claim.reason === "live_lease") outcomes.push({ runId: observed.runId, kind: "skipped", reason: claim.reason })
+      if (!foreign && claim.reason === "live_lease") {
+        outcomes.push({ runId: observed.runId, kind: "skipped", reason: claim.reason })
+      }
       continue
     }
-    outcomes.push(await resumeClaimedRun(context, claim.record))
+    const outcome = await resumeClaimedRun(context, claim.record)
+    outcomes.push(foreign && outcome.kind === "resumed" ? { ...outcome, kind: "adopted" } : outcome)
   }
   return outcomes
+}
+
+// #7316: a paused run whose parent session id never comes back (fork, compaction, or a restart
+// under a new id) was skipped as foreign_session forever - invisible AND unrecoverable. Adoption
+// is gated on PROOF of abandonment: the recorded lease holder is this very process, or a pid that
+// is no longer alive. An ABSENT holder proves nothing (a pause recorded inside a live foreign
+// session carries no pid), so those records stay untouched rather than stolen from a session that
+// may still be running.
+function claimOrphanedRun(context: RecoveryContext, runId: DagRunId, parentSessionId: string): ClaimedRun {
+  return context.store.withRunLock(runId, () => {
+    const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
+    if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
+    if (fresh.parentSessionId === parentSessionId) return { kind: "skipped", reason: "not_paused" }
+    const holder = fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid
+    if (holder === undefined) return { kind: "skipped", reason: "foreign_session" }
+    if (holder !== context.hostPid && context.isProcessAlive(holder)) {
+      return { kind: "skipped", reason: "live_lease" }
+    }
+    // Re-home fully: parent AND root move to the adopter so children spawned after the resume
+    // carry live ancestry, matching what a fresh start records (the dag tool wires root = session).
+    const claimed: RecoverableRecord = {
+      ...fresh,
+      parentSessionId,
+      rootSessionId: parentSessionId,
+      leaseHolderPid: context.hostPid,
+    }
+    context.store.writeCheckpoint(runId, claimed)
+    return { kind: "claimed", record: claimed }
+  })
 }
 
 function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSessionId: string): ClaimedRun {
@@ -148,8 +190,9 @@ async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRe
   const pendingTerminalResults = new Map<DagNodeId, RecoveryPendingTerminalResult>()
   const journal = recoveryJournal(context, claimed, pendingErrors, pendingTerminalResults)
   const reusedOutputs = new Map<DagNodeId, string>()
+  const reattachedTasks = new Map<DagNodeId, string>()
   try {
-    await reconcileNodes(context, journal, reusedOutputs, pendingErrors, pendingTerminalResults)
+    await reconcileNodes(context, journal, reusedOutputs, pendingErrors, pendingTerminalResults, reattachedTasks)
     const generation = journal.snapshot().generation + 1
     journal.append(dagRunResumedEvent({ generation }))
     const scheduler = createDagScheduler({
@@ -158,6 +201,7 @@ async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRe
       initialRecord: journal.snapshot(),
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
       ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
+      ...(reattachedTasks.size === 0 ? {} : { preAttachedTasks: reattachedTasks }),
       now: context.now,
     })
     const record = await scheduler.run()
@@ -173,6 +217,7 @@ async function reconcileNodes(
   reusedOutputs: Map<DagNodeId, string>,
   pendingErrors: Map<DagNodeId, DagNodeError>,
   pendingTerminalResults: Map<DagNodeId, RecoveryPendingTerminalResult>,
+  reattachedTasks: Map<DagNodeId, string>,
 ): Promise<void> {
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
@@ -236,9 +281,17 @@ async function reconcileNodes(
       continue
     }
 
+    // A child that survived the restart is handed to the scheduler as a pre-attached settlement
+    // instead of being awaited here: blocking inside reconcile froze the whole run in `paused` for
+    // as long as the slowest child ran, withholding `dag.run.resumed`, the reuse events of every
+    // node ordered after it, and every operator lever that refuses on an active run.
     if (task.status === "pending" || task.status === "running") {
       context.reattach?.(journal.snapshot().runId, task.task_id)
-      task = await context.taskManager.waitFor(task.task_id)
+      if (observed.state !== "running") {
+        transition(journal, observed.id, "running", pendingErrors)
+      }
+      reattachedTasks.set(observed.id, task.task_id)
+      continue
     }
     foldTaskOutcome(context, journal, observed.id, task, pendingErrors, pendingTerminalResults)
   }
@@ -325,7 +378,7 @@ function attachTask(journal: DagJournal<DagRunRecordV1>, nodeId: DagNodeId, task
 function transition(
   journal: DagJournal<DagRunRecordV1>,
   nodeId: DagNodeId,
-  to: "completed" | "failed",
+  to: "completed" | "failed" | "running",
   pendingErrors: ReadonlyMap<DagNodeId, DagNodeError>,
 ): void {
   const node = nodeById(journal.snapshot(), nodeId)
@@ -333,9 +386,15 @@ function transition(
     nodeId,
     from: node.state,
     to,
-    reason: to === "completed" ? { kind: "succeeded" } : { kind: "failed" },
+    reason: transitionReason(to),
   }))
   void pendingErrors
+}
+
+function transitionReason(to: "completed" | "failed" | "running"): DagNodeTransitionReason {
+  if (to === "completed") return { kind: "succeeded" }
+  if (to === "failed") return { kind: "failed" }
+  return { kind: "resumed" }
 }
 
 function failNode(

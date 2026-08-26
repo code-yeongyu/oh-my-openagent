@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-~2850 LOC across 23 files. Claude Code `settings.json` compatibility layer. Parses CC hooks config and maps CC hook events (PreToolUse, PostToolUse, Stop, Notification, PreCompact, Session*) to OpenCode event handlers.
+~5.9k LOC across 39 `.ts` files (incl. `handlers/` subdir). Claude Code `settings.json` compatibility layer. Parses CC hooks config and maps CC hook events (PreToolUse, PostToolUse, Stop, Notification, PreCompact, Session*) to OpenCode event handlers.
 
 ## WHAT IT DOES
 

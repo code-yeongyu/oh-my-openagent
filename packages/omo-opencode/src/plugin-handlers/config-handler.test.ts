@@ -1502,7 +1502,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 })
 
 describe("command agent routing coherence", () => {
-  test("keeps start-work aligned with the exported Atlas list key opencode matches exactly", async () => {
+  test("keeps ulw-execute aligned with the exported Atlas list key opencode matches exactly", async () => {
     //#given
     const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -1514,8 +1514,8 @@ describe("command agent routing coherence", () => {
     ;(unsafeTestValue<{
       mockReturnValue: (value: Record<string, unknown>) => void
     }>(builtinCommands.loadBuiltinCommands)).mockReturnValue({
-      "start-work": {
-        name: "start-work",
+      "ulw-execute": {
+        name: "ulw-execute",
         description: "(builtin) Start work",
         template: "template",
         agent: "atlas",
@@ -1542,7 +1542,7 @@ describe("command agent routing coherence", () => {
     const agentConfig = config.agent as Record<string, unknown>
     const commandConfig = config.command as Record<string, { agent?: string }>
     expect(Object.keys(agentConfig)).toContain(getAgentListDisplayName("atlas"))
-    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"))
+    expect(commandConfig["ulw-execute"]?.agent).toBe(getAgentListDisplayName("atlas"))
   })
 })
 

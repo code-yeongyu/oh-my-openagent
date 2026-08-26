@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 
-import { defineTool, type AgentToolResult, type ToolDefinition } from "@code-yeongyu/senpi"
+import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { TeamModeConfig } from "@oh-my-opencode/team-core/config"
 import { sendMessage } from "@oh-my-opencode/team-core/team-mailbox"
 import { Type, type Static } from "typebox"
@@ -82,11 +82,14 @@ export async function runMemberTaskSend(
 export function createMemberTaskSendTool(
   deps: MemberTaskSendDeps,
 ): ToolDefinition<typeof MemberTaskSendParams, MemberTaskSendDetails> {
-  return defineTool({
+  // Returned as a plain literal: senpi's defineTool is an identity helper for type inference
+  // (pinned by the senpi API tripwire), so wrapping here would only statically bind this module
+  // to the engine barrel.
+  return {
     name: "task_send",
     label: "Task Send",
     description: "Send a durable message to another team member or the team lead.",
     parameters: MemberTaskSendParams,
     execute: (_toolCallId, params) => runMemberTaskSend(deps, params),
-  })
+  }
 }

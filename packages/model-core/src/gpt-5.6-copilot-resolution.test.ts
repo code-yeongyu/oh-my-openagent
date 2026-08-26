@@ -58,7 +58,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   }
 
-  test("warm cache resolves transformed Vercel GPT-5.6 with high", () => {
+  test("warm cache does not pick up transformed Vercel GPT-5.6 now that vercel left the default lanes", () => {
     // given
     const availableModels = new Set(["vercel/openai/gpt-5.6-terra"])
 
@@ -71,13 +71,13 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "vercel/openai/gpt-5.6-terra",
-      source: "provider-fallback",
-      variant: "high",
+      model: "system/default",
+      source: "system-default",
+      variant: undefined,
     })
   })
 
-  test("warm cache keeps transformed Vercel terra ahead of Copilot terra", () => {
+  test("warm cache prefers the Copilot rung over a transformed Vercel terra", () => {
     // given
     const availableModels = new Set([
       "github-copilot/gpt-5.6-terra",
@@ -93,7 +93,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "vercel/openai/gpt-5.6-terra",
+      model: "github-copilot/gpt-5.6-terra",
       source: "provider-fallback",
       variant: "high",
     })

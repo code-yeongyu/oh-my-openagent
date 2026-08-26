@@ -19,6 +19,10 @@ A run is a declarative definition: a stable `key` (idempotency: re-starting the 
 
 Route every node by `category` using the routing table in `references/planning.md`; the run executes nodes in parallel waves as their dependencies clear.
 
+## Goal before start
+
+Every run is goal-bound. Before `start`, register the run's goal (`create_goal`, or a `# Goal` block where no goal tool exists): the objective names the deliverable the graph produces, and the success criteria carry RESULT VERIFICATION - node and run completion claims are false until proven against captured evidence, the same contract the dag completion directive injects (TREAT AS FALSE UNTIL YOU PROVE IT). The verification wave (references/planning.md) produces the evidence those criteria name; the run ends when the criteria pass, never when the last node reports completion.
+
 ## Running a dag - eval is the default
 
 Build and run every dag INSIDE an eval cell. The eval kernel installs the `tool.dag` proxy and the extension publishes a small JS SDK at `OMO_DAG_SDK_ROOT`; driving runs from a cell is what unlocks the orchestration patterns in `references/planning.md` (data-driven graph construction, multi-run composition, concurrent runs, adaptive retries).
@@ -39,7 +43,7 @@ const result = await sdk.wait(run.run_id)
 
 `define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` are the whole surface.
 
-Python cells cannot import the ESM SDK; call `tool.dag({...})` directly with the same payload shape the SDK produces. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
+Python cells cannot import the ESM SDK; call `tool.dag({...})` directly with the same payload shape the SDK produces - note the SDK passes `detach: false` on `wait`, so a blocking Python wait is `tool.dag({"action": "wait", "run_id": run_id, "detach": False})`; without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
 
 ## Run lifecycle
 
@@ -55,7 +59,7 @@ await sdk.cancel(runId, "superseded by a new plan")
 
 - `attach` re-binds to a live run you already own, for example after your own context was rebuilt.
 - `snapshot` is a cheap read of status and node counts; poll it instead of `wait` when you have other work to do.
-- `wait` blocks until the run settles and returns the final result.
+- `wait` blocks until the run settles and returns the final result (the SDK passes `detach: false`; the bare tool action detaches by default against a live run, and the session is woken on node completions and on settle).
 - `cancel` stops the run; pass a reason so the record says why.
 
 ## Recovering one node - retry, send, amend
@@ -80,7 +84,11 @@ Runs are journaled. When the session dies mid-run, the run pauses instead of bei
 
 `start` is for STARTING a run, not for recovering one: re-issuing the same key and definition against an already-settled run returns it untouched and schedules nothing. To move a settled run forward, use `retry` or `amend` above.
 
-## Observing a run
+## Supervising a run
+
+Observation is supervision, not spectating. Running children err, over-engineer, obsess over one sub-problem, and drift out of scope MID-RUN, not only at the end. On every mid-run wake (a node completion notification, a monitor event) and on periodic `snapshot` peeks, check each active node against ITS OWN prompt's SCOPE: the assigned work, only the assigned work, at the assigned depth. On any sign of drift - writes outside its scope, gold-plating past the deliverable, circling one sub-problem - steer it back with `send` naming the exact boundary it crossed; a node that stays off course gets a tightened prompt through `retry` or `amend` (above) once the run settles. Drift corrected in wave 1 costs one message; drift discovered at synthesis costs the run.
+
+Surfaces:
 
 - The TUI status widget shows live runs with per-node progress.
 - `/dag` opens the detail view: node states, waves, and failures for each run in the session.

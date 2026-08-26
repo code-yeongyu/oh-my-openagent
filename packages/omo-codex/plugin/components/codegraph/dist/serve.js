@@ -5815,6 +5815,17 @@ var OmoCodegraphSettingsSchema = OmoCodegraphSettingsLayerSchema.extend({
   telemetry: boolean2().default(false)
 }).strict();
 
+// ../../../../omo-config-core/src/schema/git-master.ts
+var OmoGitMasterSettingsShape = {
+  commit_footer: union([boolean2(), string2()]),
+  include_co_authored_by: boolean2()
+};
+var OmoGitMasterSettingsLayerSchema = object(OmoGitMasterSettingsShape).partial().strict();
+var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
+  commit_footer: union([boolean2(), string2()]).default(true),
+  include_co_authored_by: boolean2().default(true)
+}).strict();
+
 // ../../../../omo-config-core/src/schema/memory.ts
 var OmoMemoryReflectionTriggerSchema = object({
   step_count: number2().int().nonnegative().default(25),
@@ -5987,7 +5998,7 @@ var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSche
 
 // ../../../../omo-config-core/src/schema/task.ts
 import { availableParallelism } from "node:os";
-var ResidencyMaxChildrenInputSchema = union([number2().int().positive(), literal("unlimited")]);
+var ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
 var OmoTaskWaitSchema = object({
   min_ms: number2().int().positive().default(5000),
   default_ms: number2().int().positive().default(60000),
@@ -6013,9 +6024,10 @@ var OmoTaskDagSettingsSchema = object({
 }).strict();
 var OmoTaskSettingsSchema = object({
   default_execution_mode: _enum(["in-process", "process"]).default("in-process"),
-  default_concurrency: number2().int().positive().default(5),
-  provider_concurrency: record(string2(), number2().int().positive()).optional(),
-  model_concurrency: record(string2(), number2().int().positive()).optional(),
+  default_concurrency: number2().int().nonnegative().default(5),
+  global_concurrency: number2().int().nonnegative().default(8),
+  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
   max_depth: number2().int().nonnegative().default(1),
   residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
   ttl_ms: number2().int().positive().default(86400000),
@@ -6056,9 +6068,10 @@ var OmoTaskWarningsLayerSchema = object({
 }).strict();
 var OmoTaskSettingsLayerSchema = object({
   default_execution_mode: _enum(["in-process", "process"]).optional(),
-  default_concurrency: number2().int().positive().optional(),
-  provider_concurrency: record(string2(), number2().int().positive()).optional(),
-  model_concurrency: record(string2(), number2().int().positive()).optional(),
+  default_concurrency: number2().int().nonnegative().optional(),
+  global_concurrency: number2().int().nonnegative().optional(),
+  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
   max_depth: number2().int().nonnegative().optional(),
   residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
   ttl_ms: number2().int().positive().optional(),
@@ -6074,7 +6087,8 @@ function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism
   const record2 = record(string2(), unknown()).parse(input);
   return OmoTaskSettingsSchema.parse({
     ...record2,
-    residency_max_children: record2["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3)
+    residency_max_children: record2["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3),
+    global_concurrency: record2["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2)
   });
 }
 
@@ -6140,6 +6154,7 @@ var OmoTypedHarnessConfigSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -6150,6 +6165,7 @@ var OmoConfigProfileSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -6164,6 +6180,7 @@ var OmoConfigSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsSchema.optional(),
+  git_master: OmoGitMasterSettingsSchema.optional(),
   task: OmoTaskSettingsSchema.optional(),
   teams: OmoTeamsConfigSchema.optional(),
   models: OmoModelCatalogSchema.optional(),
@@ -6181,6 +6198,7 @@ var OmoConfigLayerSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -9333,7 +9351,11 @@ function createParentWatchdog(config2, onDeadParent) {
   const probeAlive = config2.probeAlive ?? isProcessAlive;
   let fired = false;
   const timer = setInterval(() => {
-    if (fired || probeAlive(parentPid))
+    if (fired)
+      return;
+    const alive = probeAlive(parentPid);
+    config2.onPoll?.(alive);
+    if (alive)
       return;
     fired = true;
     onDeadParent(parentPid, pollIntervalMs);
@@ -9403,7 +9425,8 @@ async function runBridgedCodegraphProcess(command, args, options) {
   const child = spawn(invocation.command, invocation.args, {
     cwd: options.cwd,
     env: options.env,
-    stdio: ["pipe", "pipe", "inherit"]
+    stdio: ["pipe", "pipe", "inherit"],
+    windowsHide: true
   });
   const childInput = child.stdin;
   const childOutput = child.stdout;

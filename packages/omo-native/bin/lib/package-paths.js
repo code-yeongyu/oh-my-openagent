@@ -31,17 +31,34 @@ export function updateTarget(root = packageRoot, platform = process.platform) {
   return { manager: "npm", command: "npm i -g omo-ai@beta" }
 }
 
-export function resolveSenpi() {
+export function resolveSenpi(options = {}) {
+  const {
+    resolveIndex = () => fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")),
+    platform = process.platform,
+  } = options
   let indexPath
   try {
-    indexPath = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))
+    indexPath = resolveIndex()
   } catch (error) {
     throw new Error(`could not resolve @code-yeongyu/senpi; reinstall with: ${updateTarget().command} (${error.message})`)
   }
 
-  const cliPath = join(dirname(indexPath), "cli.js")
+  const distDir = dirname(indexPath)
+  const cliPath = join(distDir, "cli.js")
   if (!existsSync(cliPath)) {
     throw new Error(`senpi CLI is missing at ${cliPath}; reinstall with: ${updateTarget().command}`)
+  }
+  // The engine imports this module on every boot, and it is the file interrupted upgrades lose in
+  // the wild (npm reify dies on a Windows-locked native module and leaves a partial tree), so
+  // checking it here turns the engine's raw ERR_MODULE_NOT_FOUND stack into one actionable line.
+  const brandPath = join(distDir, "core", "brand.js")
+  if (!existsSync(brandPath)) {
+    const windowsHint = platform === "win32"
+      ? " (close every running omo/senpi process first: Windows locks loaded native modules, so npm fails with EBUSY mid-upgrade and leaves exactly this partial state)"
+      : ""
+    throw new Error(
+      `senpi engine files are incomplete: ${brandPath} is missing, which usually means an interrupted or failed omo-ai upgrade; reinstall with: ${updateTarget().command}${windowsHint}`,
+    )
   }
   return { cliPath, packageRoot: dirname(dirname(indexPath)) }
 }

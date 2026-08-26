@@ -1,14 +1,9 @@
 import { execFile } from "node:child_process"
 
-import {
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-  defineTool,
-  formatSize,
-  truncateHead,
-  type ToolDefinition,
-} from "@code-yeongyu/senpi"
+import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { Type, type Static } from "typebox"
+
+import { loadSenpiBarrel, senpiBarrel } from "../../lazy/senpi-barrel"
 
 const CurlProgram = Type.Literal("curl")
 const GitHubProgram = Type.Literal("gh")
@@ -79,13 +74,18 @@ export function createCuratedReadonlyBashTool(
   cwd: string,
   executor: CuratedReadonlyExecutor = executeCommand,
 ): ToolDefinition {
-  return defineTool({
+  // Returned as a plain literal: senpi's defineTool is an identity helper for type inference
+  // (pinned by the senpi API tripwire), so wrapping here would only statically bind this module
+  // to the engine barrel. The barrel values below (truncateHead/formatSize/limits) are read
+  // lazily inside execute, which warms the boundary first.
+  return {
     name: "bash",
     label: "Read-only research",
     description: "Run a structured read-only gh or curl request directly, without a shell or filesystem-writing flags.",
     promptSnippet: "Structured read-only remote research through gh or curl; arbitrary shell commands are unavailable.",
     parameters: CuratedReadonlyBashParams,
-    execute: async (_toolCallId, input, signal) => {
+    execute: async (_toolCallId, input: CuratedReadonlyBashInput, signal) => {
+      await loadSenpiBarrel()
       const command = planCuratedReadonlyCommand(input)
       try {
         const text = await executor(command, cwd, input.timeout_seconds ?? 30, signal)
@@ -95,10 +95,11 @@ export function createCuratedReadonlyBashTool(
         throw new CuratedReadonlyCommandError(capResultText(error.message), { cause: error })
       }
     },
-  })
+  }
 }
 
 function capResultText(text: string): string {
+  const { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateHead } = senpiBarrel()
   const boundary = truncateHead(text, { maxBytes: DEFAULT_MAX_BYTES, maxLines: DEFAULT_MAX_LINES })
   if (!boundary.truncated) return text
 
@@ -127,7 +128,7 @@ function buildTruncationNotice(
 ): string {
   const shown = truncatedBy === "lines"
     ? `${countLines(content)} of ${totalLines} lines`
-    : `${formatSize(Buffer.byteLength(content))} of ${formatSize(totalBytes)}`
+    : `${senpiBarrel().formatSize(Buffer.byteLength(content))} of ${senpiBarrel().formatSize(totalBytes)}`
   return `[truncated: ${shown}. Narrow the request before retrying.]`
 }
 

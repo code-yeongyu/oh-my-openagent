@@ -24,7 +24,10 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const components = { "ulw-loop": join(dirname(fileURLToPath(import.meta.url)), "ulw-loop", "cli.js") }
-const [component, ...args] = process.argv.slice(2)
+const [requestedComponent, ...requestedArgs] = process.argv.slice(2)
+const forwardsHelp = requestedComponent === undefined || requestedComponent === "help" || requestedComponent === "--help" || requestedComponent === "-h"
+const component = forwardsHelp ? "ulw-loop" : requestedComponent
+const args = forwardsHelp ? ["help"] : requestedArgs
 const entry = components[component]
 if (entry === undefined) {
   console.error(\`Unknown component: \${component ?? "(missing)"}. Available components: ulw-loop\`)

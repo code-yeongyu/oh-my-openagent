@@ -38,10 +38,11 @@ export type {
 } from "./dag-tool-contract"
 
 const DESCRIPTION = [
-  "Run a dependency graph of child tasks in one call: nodes execute in parallel waves, and a node starts only after every node it dependsOn has finished.",
+  "Run a dependency graph of child tasks in one call: a node starts only after every node it dependsOn has finished, and unrelated nodes run in parallel up to the resident-child cap.",
   "dependsOn is ordering ONLY - no upstream output is substituted into a downstream prompt, so each prompt must stand alone.",
   "Each node targets EITHER category OR subagent_type, never both; model is an explicit override valid only alongside subagent_type.",
   "start is idempotent per definition key: re-starting the same key with the same graph reuses the run instead of duplicating it.",
+  "wait detaches by default against a live run: the session is woken as each node completes and when the run settles, and detach=false restores the blocking wait that returns the final result.",
   "When a run settles badly, do NOT start a new one: retry re-runs the failed nodes in place, amend edits the graph and re-runs only what changed, and send steers or revives one node's child.",
 ].join(" ")
 
@@ -94,7 +95,12 @@ async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<Dag
   })
 }
 
-async function waitAction(deps: DagToolDeps, runId: string): Promise<DagToolResult> {
+// Structural mirror of the engine's terminal vocabulary (senpi-task keeps its own private set in
+// handle.ts; dag-wake-source.ts mirrors it the same way) so an already-settled run never takes the
+// detached path.
+const TERMINAL_RUN_STATUSES: ReadonlySet<string> = new Set(["completed", "failed", "cancelled"])
+
+async function waitAction(deps: DagToolDeps, params: DagToolInput, runId: string): Promise<DagToolResult> {
   const parentSessionId = deps.parentSessionId()
   // Ownership is enforced before dispatch so an unknown or foreign run never reaches the scheduler.
   const snapshot = deps.manager.snapshot(runId as DagRunId, parentSessionId)
@@ -104,6 +110,21 @@ async function waitAction(deps: DagToolDeps, runId: string): Promise<DagToolResu
       run_id: runId,
       result: { runId: runId as DagRunId, status: snapshot.status, snapshot, nodes: {} },
     })
+  }
+  // The model-facing default detaches monitor-style against a live run: node completion
+  // notifications and the terminal dag-run wake already reach the session through the idle
+  // coordinator, so holding the tool call open only freezes the turn. A terminal run resolves
+  // immediately through the wait surface either way, and detach=false keeps the blocking contract
+  // the eval SDK and dag library rely on.
+  if (params.detach !== false && !TERMINAL_RUN_STATUSES.has(snapshot.status)) {
+    return toolResult(
+      `Detached from dag run ${runId} (${snapshot.status}, ${snapshot.counts.completed}/${snapshot.counts.total} nodes complete). The session is woken as each node completes and again when the run settles; use action=snapshot for a midpoint peek or action=wait with detach=false to block until settle.`,
+      {
+        kind: "detached",
+        run_id: runId,
+        snapshot,
+      },
+    )
   }
   const result = await deps.wait(runId as DagRunId, parentSessionId)
   return toolResult(`Dag run ${runId} finished with status ${result.status}.`, {
@@ -152,7 +173,7 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
         })
       }
       case "wait":
-        return await waitAction(deps, runId)
+        return await waitAction(deps, params, runId)
       case "cancel":
         return await cancelAction(deps, runId, params.reason)
       case "retry":
