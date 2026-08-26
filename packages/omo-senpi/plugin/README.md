@@ -63,6 +63,11 @@ Herdr's custom-agent API automatically:
 After a preceding `working` state, Herdr exposes the settled `idle` report as the
 user-facing `done` status.
 
+Shutdown uses a synchronous final `idle` report followed by `release-agent`. The same
+cleanup runs from a process-exit fallback because Ctrl-D can terminate Senpi without a
+`session_shutdown` event, and Herdr requires a current report before release to invalidate
+an already materialized custom-agent status.
+
 The integration activates only when Herdr provides `HERDR_ENV=1`, `HERDR_BIN_PATH`, and
 `HERDR_PANE_ID`. Outside Herdr it performs no command. A failed Herdr report is logged as a
 warning and does not interrupt the OMO session.

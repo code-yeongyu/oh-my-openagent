@@ -44,18 +44,19 @@ the real `$HERDR_BIN_PATH` against the current `$HERDR_PANE_ID`. After each disp
 
 ### Automated checks
 
-- Focused component and registry tests: **6 passed, 0 failed**.
+- Focused component and registry tests: **7 passed, 0 failed**.
 - TypeScript typecheck: **passed**.
 - LSP diagnostics on both new TypeScript files and both changed registry files: **0 diagnostics**.
 - TypeScript no-excuse audit: **0 violations in 4 files**.
 - Generated extension freshness check: **passed**.
-- Full Senpi gate: **2285 passed, 1 Windows-only skip, 0 failed** across 314 files.
+- Full Senpi gate: **2286 passed, 1 Windows-only skip, 0 failed** across 314 files.
 - `senpi-qa` driver self-test: **passed**.
 - Real isolated Senpi driver: **PASS**, including `realSenpiUntouched=true`,
   `ultraworkInjected=true`, and `commentChecker=PASS`.
 
 Sanitized machine-readable results are stored in `post-rebase-drive.json` and
-`post-rebase-herdr.json`.
+`post-rebase-herdr.json`. The Ctrl-D shutdown reproduction and fix are captured in
+`post-rebase-shutdown.json`.
 
 ### Real Herdr lifecycle
 
@@ -72,6 +73,15 @@ The component sends `idle` for `agent_settled`; after a preceding `working` stat
 normalizes that settled edge to the user-facing `done` status.
 `agent_not_found` after shutdown proves `release-agent` removed the component's ownership.
 
+### Ctrl-D shutdown fallback
+
+The first real Ctrl-D reproduction returned the pane to zsh while Herdr retained the prior
+OMO status for more than 30 seconds. A synchronous marker proved Senpi had emitted no
+`session_shutdown` event. Calling `release-agent` alone did not invalidate that materialized
+status; synchronously reporting a final `idle` before release changed the readback to
+`agent_not_found`. Repeating the exact Ctrl-D flow with the rebuilt native branch returned to
+zsh and immediately produced `agent_not_found`.
+
 ### Original checkout preservation
 
 The original checkout's four pre-existing generated-file changes remained untouched. The
@@ -86,7 +96,8 @@ wiring. Typecheck and diagnostics cover the adapter integration. The generated-b
 proves the shipped extension matches the source. The isolated real Senpi driver proves the
 rebased plugin loads without touching the real agent directory. The real Herdr run verifies the
 exact user surface that was broken: readiness, work, completion, and release are now observable
-semantic states rather than process-title inference.
+semantic states rather than process-title inference. The process-exit test and Ctrl-D run cover
+the host path that omits `session_shutdown`.
 
 ## What was omitted
 

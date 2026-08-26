@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 
@@ -19,7 +19,9 @@ type HerdrEnvironment = {
 
 export interface HerdrAgentStateComponentOptions {
   readonly environment?: Readonly<Record<string, string | undefined>>
+  readonly registerProcessExit?: (handler: () => void) => () => void
   readonly runCommand?: (command: string, args: readonly string[]) => Promise<CommandResult>
+  readonly runCommandSync?: (command: string, args: readonly string[]) => CommandResult
 }
 
 function resolveHerdrEnvironment(
@@ -47,6 +49,22 @@ function runCommand(command: string, args: readonly string[]): Promise<CommandRe
   })
 }
 
+function runCommandSync(command: string, args: readonly string[]): CommandResult {
+  const result = spawnSync(command, [...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "ignore", "pipe"],
+  })
+  return {
+    code: result.status ?? 1,
+    stderr: result.stderr.trim(),
+  }
+}
+
+function registerProcessExit(handler: () => void): () => void {
+  process.once("exit", handler)
+  return () => process.off("exit", handler)
+}
+
 export function createHerdrAgentStateComponent(
   options: HerdrAgentStateComponentOptions = {},
 ): OmoSenpiComponent {
@@ -56,6 +74,7 @@ export function createHerdrAgentStateComponent(
       const environment = resolveHerdrEnvironment(options.environment ?? process.env)
       if (environment === undefined) return
       const execute = options.runCommand ?? runCommand
+      const executeSync = options.runCommandSync ?? runCommandSync
 
       const invoke = async (action: "release-agent" | "report-agent", args: readonly string[]): Promise<void> => {
         try {
@@ -79,11 +98,35 @@ export function createHerdrAgentStateComponent(
         "--agent", AGENT,
         "--state", state,
       ])
+      const invokeSync = (action: "release-agent" | "report-agent", args: readonly string[]): void => {
+        try {
+          const result = executeSync(environment.binPath, ["pane", action, environment.paneId, ...args])
+          if (result.code === 0) return
+          ctx.logger.warn("omo-senpi Herdr lifecycle report failed", {
+            action,
+            code: result.code,
+            stderr: result.stderr,
+          })
+        } catch (error) {
+          ctx.logger.warn("omo-senpi Herdr lifecycle report failed", {
+            action,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      const releaseSync = (): void => {
+        invokeSync("report-agent", ["--source", SOURCE, "--agent", AGENT, "--state", "idle"])
+        invokeSync("release-agent", ["--source", SOURCE, "--agent", AGENT])
+      }
+      const unregisterProcessExit = (options.registerProcessExit ?? registerProcessExit)(releaseSync)
 
       pi.on("session_start", () => report("idle"))
       pi.on("agent_start", () => report("working"))
       pi.on("agent_settled", () => report("idle"))
-      pi.on("session_shutdown", () => invoke("release-agent", ["--source", SOURCE, "--agent", AGENT]))
+      pi.on("session_shutdown", () => {
+        unregisterProcessExit()
+        releaseSync()
+      })
     },
   }
 }

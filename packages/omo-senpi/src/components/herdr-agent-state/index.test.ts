@@ -31,7 +31,12 @@ describe("createHerdrAgentStateComponent", () => {
         HERDR_ENV: "1",
         HERDR_PANE_ID: "w1:p2",
       },
+      registerProcessExit: () => () => {},
       runCommand: async (command, args) => {
+        calls.push({ command, args })
+        return { code: 0, stderr: "" }
+      },
+      runCommandSync: (command, args) => {
         calls.push({ command, args })
         return { code: 0, stderr: "" }
       },
@@ -52,6 +57,10 @@ describe("createHerdrAgentStateComponent", () => {
       {
         command: "/opt/herdr",
         args: ["pane", "report-agent", "w1:p2", "--source", "omo-senpi", "--agent", "omo", "--state", "working"],
+      },
+      {
+        command: "/opt/herdr",
+        args: ["pane", "report-agent", "w1:p2", "--source", "omo-senpi", "--agent", "omo", "--state", "idle"],
       },
       {
         command: "/opt/herdr",
@@ -86,6 +95,45 @@ describe("createHerdrAgentStateComponent", () => {
     expect(calls).toEqual([])
   })
 
+  test("#given Senpi exits without session_shutdown #when process exit fires #then it releases ownership synchronously", () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const calls: CommandCall[] = []
+    let exitHandler: (() => void) | undefined
+    createHerdrAgentStateComponent({
+      environment: {
+        HERDR_BIN_PATH: "/opt/herdr",
+        HERDR_ENV: "1",
+        HERDR_PANE_ID: "w1:p2",
+      },
+      registerProcessExit: (handler) => {
+        exitHandler = handler
+        return () => {
+          exitHandler = undefined
+        }
+      },
+      runCommandSync: (command, args) => {
+        calls.push({ command, args })
+        return { code: 0, stderr: "" }
+      },
+    }).register(pi, context([]))
+
+    // when
+    exitHandler?.()
+
+    // then
+    expect(calls).toEqual([
+      {
+        command: "/opt/herdr",
+        args: ["pane", "report-agent", "w1:p2", "--source", "omo-senpi", "--agent", "omo", "--state", "idle"],
+      },
+      {
+        command: "/opt/herdr",
+        args: ["pane", "release-agent", "w1:p2", "--source", "omo-senpi", "--agent", "omo"],
+      },
+    ])
+  })
+
   test("#given Herdr rejects a report #when the lifecycle event fires #then the session continues and records a warning", async () => {
     // given
     const pi = new FakeExtensionAPI()
@@ -96,6 +144,7 @@ describe("createHerdrAgentStateComponent", () => {
         HERDR_ENV: "1",
         HERDR_PANE_ID: "w1:p2",
       },
+      registerProcessExit: () => () => {},
       runCommand: async () => ({ code: 2, stderr: "socket unavailable" }),
     }).register(pi, context(warnings))
 

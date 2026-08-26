@@ -91,9 +91,12 @@ uses Herdr's custom-agent reporting contract whenever the host provides `HERDR_E
 Keep the source and agent identifiers stable as `omo-senpi` and `omo`. `session_start` and
 `agent_settled` report `idle`, `agent_start` reports `working`, and `session_shutdown`
 releases the claim. After `working`, Herdr exposes the settled `idle` report as `done`.
-Reporting is intentionally best-effort: failures warn through the component logger but must
-not interrupt the OMO session. Revisit this adapter only if Herdr adds OMO as a built-in
-agent kind with an equivalent authoritative lifecycle contract.
+Ctrl-D can terminate Senpi without `session_shutdown`, so process exit performs the same
+synchronous cleanup. Cleanup reports one final `idle` before `release-agent`; Herdr needs
+that current report to invalidate a previously materialized custom-agent status. Reporting
+is intentionally best-effort: failures warn through the component logger but must not
+interrupt the OMO session. Revisit this adapter only if Herdr adds OMO as a built-in agent
+kind with an equivalent authoritative lifecycle contract.
 
 ## 2026-08-25 — Name the executable in the local-launcher brand profile
 
