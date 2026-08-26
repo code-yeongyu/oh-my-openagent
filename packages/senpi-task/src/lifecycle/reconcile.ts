@@ -163,6 +163,10 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 }
 
 async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
+  if (record.killed === true) {
+    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
+    return { task_id: record.task_id, kind: "resumed", reason: "killed resident disposed" }
+  }
   if (record.status === "lost" || record.status === "cancelled") {
     if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
     return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }

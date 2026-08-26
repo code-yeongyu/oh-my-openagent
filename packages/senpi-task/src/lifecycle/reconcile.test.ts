@@ -391,6 +391,25 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(store.load("st_00000016")?.status).toBe("completed")
   })
 
+  test("#given a killed terminal resident with a session file #when the legacy sweep runs #then it is disposed and never respawned", async () => {
+    const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000026", status: "error" })
+    store.replace({
+      ...store.load("st_00000026")!,
+      execution_mode: "in-process",
+      pid: undefined,
+      residency_state: "resident",
+      killed: true,
+    })
+    persistSessions(store, "st_00000026")
+
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    expect(result.outcomes[0]).toEqual({ task_id: "st_00000026", kind: "resumed", reason: "killed resident disposed" })
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
+    expect(store.load("st_00000026")?.residency_state).toBe("disposed")
+    expect(store.load("st_00000026")?.killed).toBe(true)
+  })
+
   test("#given an evicted completed record with a session file #when the legacy sweep runs #then it is not respawned", async () => {
     const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000017", status: "completed" })
     store.replace({
