@@ -10,15 +10,30 @@
 // skip this load entirely.
 export type PiTuiModule = typeof import("@earendil-works/pi-tui")
 
-let piTuiModule: PiTuiModule | undefined
-let piTuiPromise: Promise<PiTuiModule> | undefined
+// The plugin ships senpi-task inside several bundles (omo.js, omo-task.js, omo-member.js), each
+// with its own copy of this module. The warm-up state lives on globalThis under a process-wide
+// symbol so that awaiting loadPiTui() through one copy (compose.ts, in omo.js) also satisfies the
+// synchronous readers bundled into another copy (the DAG status widget timer in omo-task.js).
+interface PiTuiSharedState {
+  module: PiTuiModule | undefined
+  promise: Promise<PiTuiModule> | undefined
+}
+
+const SHARED_STATE_KEY = Symbol.for("omo.senpi-task.piTui")
+
+function sharedState(): PiTuiSharedState {
+  const holder = globalThis as typeof globalThis & { [SHARED_STATE_KEY]?: PiTuiSharedState }
+  holder[SHARED_STATE_KEY] ??= { module: undefined, promise: undefined }
+  return holder[SHARED_STATE_KEY]
+}
 
 export function loadPiTui(): Promise<PiTuiModule> {
-  piTuiPromise ??= import("@earendil-works/pi-tui").then((loaded) => {
-    piTuiModule = loaded
+  const state = sharedState()
+  state.promise ??= import("@earendil-works/pi-tui").then((loaded) => {
+    state.module = loaded
     return loaded
   })
-  return piTuiPromise
+  return state.promise
 }
 
 /**
@@ -28,10 +43,11 @@ export function loadPiTui(): Promise<PiTuiModule> {
  * runtime condition.
  */
 export function piTui(): PiTuiModule {
-  if (piTuiModule === undefined) {
+  const loaded = sharedState().module
+  if (loaded === undefined) {
     throw new Error(
       "The @earendil-works/pi-tui barrel was accessed before it was loaded. Await loadPiTui() at the registration entry point before reading pi-tui values synchronously.",
     )
   }
-  return piTuiModule
+  return loaded
 }
