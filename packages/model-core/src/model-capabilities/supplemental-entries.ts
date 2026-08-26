@@ -90,8 +90,8 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: ["text"],
 		},
 		limit: {
-			context: 400000,
-			input: 272000,
+			context: 1050000,
+			input: 922000,
 			output: 128000,
 		},
 	},
