@@ -1,0 +1,21 @@
+Focused regression command:
+bun test packages/omo-opencode/src/hooks/todo-continuation-enforcer/continuation-injection.test.ts
+
+Observed:
+(pass) injectContinuation > inherits tools but disables question for an internal continuation
+
+8 pass
+0 fail
+24 expect() calls
+
+Related suite command:
+bun test packages/omo-opencode/src/hooks/todo-continuation-enforcer
+
+Observed:
+145 pass
+0 fail
+251 expect() calls
+Ran 145 tests across 17 files.
+
+The previously failing payload assertion is green, and the full
+todo-continuation-enforcer suite has no regression.

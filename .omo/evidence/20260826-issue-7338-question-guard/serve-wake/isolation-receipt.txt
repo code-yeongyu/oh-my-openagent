@@ -1,0 +1,4 @@
+real_db=~/.local/share/opencode/opencode.db before=7810
+fake_llm_port=59468
+session_id=<sandbox-session>
+after=7810 unchanged=yes

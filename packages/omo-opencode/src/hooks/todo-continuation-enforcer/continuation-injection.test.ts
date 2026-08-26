@@ -90,7 +90,7 @@ describe("injectContinuation", () => {
     expect(capturedAgent).not.toContain("\u200B")
   })
 
-  test("inherits tools from resolved message info when reinjecting", async () => {
+  test("inherits tools but disables question for an internal continuation", async () => {
     // given
     let capturedTools: Record<string, boolean> | undefined
     let capturedPart:
@@ -137,7 +137,7 @@ describe("injectContinuation", () => {
       resolvedInfo: {
         agent: "Hephaestus",
         model: { providerID: "openai", modelID: "gpt-5.5" },
-        tools: { question: "deny", bash: "allow" },
+        tools: { question: "allow", bash: "allow" },
       },
       sessionStateStore: sessionStateStore as never,
     })

@@ -1,0 +1,13 @@
+Typecheck:
+bun run typecheck
+Result: exit 0
+
+Full build:
+bun run build
+Result: exit 0
+Final line: build: all steps completed
+
+LSP diagnostics:
+The session LSP rejected sibling-worktree paths as outside its request cwd.
+The repository-wide typecheck above completed cleanly and covers both changed
+TypeScript files.

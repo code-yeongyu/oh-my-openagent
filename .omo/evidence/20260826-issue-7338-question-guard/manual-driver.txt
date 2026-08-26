@@ -1,0 +1,9 @@
+Surface: direct library/module driver importing injectContinuation()
+
+Input inherited tool permissions:
+{"question":"allow","bash":"allow"}
+
+Observed promptAsync tool payload:
+{"question":false,"bash":true}
+
+Result: exit 0

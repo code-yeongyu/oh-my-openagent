@@ -1,0 +1,2 @@
+[2026-08-26T04:54:42.100Z] [live-server-route] registered {"directory":"<sandbox>/proj","hasServerUrl":true,"registrationCount":1}
+[2026-08-26T04:54:55.868Z] [live-server-route] dispatch via live listener {"sessionID":"<sandbox-session>","source":"background-agent-parent-wake"}

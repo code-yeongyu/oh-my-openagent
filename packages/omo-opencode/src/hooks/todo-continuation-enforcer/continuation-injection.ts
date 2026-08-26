@@ -210,7 +210,10 @@ ${todoList}`
       incompleteCount: freshIncompleteCount,
     })
 
-    const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
+    const inheritedTools = {
+      ...resolveInheritedPromptTools(sessionID, tools),
+      question: false,
+    }
 
     const launchModel = model
       ? { providerID: model.providerID, modelID: model.modelID }

@@ -1,0 +1,22 @@
+Surface: OpenCode TUI under tmux with the local dist plugin
+
+Attempt 1:
+Official opencode-qa tui-smoke self-test.
+Result: no known render marker within 25 seconds; teardown passed; real DB
+count stayed at 7810.
+
+Attempt 2:
+Standard OpenCode TUI with isolated HOME and XDG directories.
+Result: process remained alive but the pane was blank within the bounded
+window; teardown passed; real DB count stayed at 7810.
+
+Attempt 3:
+OpenCode --mini with TERM=xterm-256color, isolated HOME and XDG directories,
+and the local dist plugin.
+Observed process: opencode, alive.
+Observed render markers: OpenCode composer and "ctrl+p cmd".
+Typed sentinel observed in composer: oqaXYZ
+Teardown: tmux session stopped.
+Isolation: real DB count stayed at 7810.
+
+Result: PASS

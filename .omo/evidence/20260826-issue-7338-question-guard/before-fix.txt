@@ -1,0 +1,24 @@
+Command:
+bun test packages/omo-opencode/src/hooks/todo-continuation-enforcer/continuation-injection.test.ts
+
+Observed:
+packages/omo-opencode/src/hooks/todo-continuation-enforcer/continuation-injection.test.ts:
+
+expect(received).toEqual(expected)
+
+  {
+    "bash": true,
+-   "question": false,
++   "question": true,
+  }
+
+(fail) injectContinuation > inherits tools but disables question for an internal continuation
+
+7 pass
+1 fail
+20 expect() calls
+Command exited with code 1
+
+This is the required failing-first reproduction for issue #7338. The internal
+todo-continuation prompt inherited an allowed interactive `question` tool,
+which OpenCode's TUI does not surface for plugin-originated promptAsync turns.
