@@ -10,6 +10,7 @@ import {
   defaultResolveCallerSessionId,
   evaluateSpawnPolicy,
   isTeamMemberProcess,
+  loadPiTui,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
@@ -76,6 +77,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         return
       }
 
+      // The task runtime is a separate bundle with its own lazy-module state. Warming here also
+      // keeps its dynamic import reachable through minification.
+      await loadPiTui()
+
       const cwd = options.resolveCwd?.() ?? sessionCwd(pi)
       const loaded = loadConfig({ cwd })
       const loadSkills = options.loadSkills ?? createTaskSkillLoader()
@@ -126,6 +131,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         manager: engine.manager,
         runtime: engine.runtime,
         terminalWidth: () => process.stdout.columns,
+        logger: ctx.logger,
       })
       const resumptionChannels = createResumptionChannelEmitter({
         pi,
