@@ -27,3 +27,20 @@ result: no diagnostics
 BUILD
 command: bun run build
 result: build: all steps completed
+
+P1 CANCELLATION RED
+command: bun test script/publish-workflow.test.ts
+result: 12 pass, 1 fail
+failure: a cancelled release run must not start wrapper publication
+expected: true
+received: false
+
+P1 CANCELLATION GREEN
+command: bun test script/publish-workflow.test.ts
+result: 13 pass, 0 fail, 61 expect() calls
+command: bun test <14 publish/workflow test files>
+result: 70 pass, 0 fail, 460 expect() calls
+command: bun run typecheck:script
+result: clean
+command: actionlint v1.7.10
+result: no diagnostics

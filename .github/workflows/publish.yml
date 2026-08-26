@@ -677,7 +677,8 @@ jobs:
       needs.gate-reuse.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
-      needs.prepare-release-state.result == 'success'
+      needs.prepare-release-state.result == 'success' &&
+      needs.publish-platform.result != 'cancelled'
     steps:
       - uses: actions/checkout@v5
         with:

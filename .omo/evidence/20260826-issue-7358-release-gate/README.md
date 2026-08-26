@@ -26,10 +26,14 @@ platform npm packages are missing from the registry.
 - `bun run build` ended with `build: all steps completed`.
 - The parsed workflow reported:
   - it still waits for `publish-platform`;
-  - `needs.publish-platform.result` no longer blocks it;
+  - a successful or failed platform result no longer blocks it;
+  - a cancelled release remains blocked;
   - the `Verify platform packages are published` proof remains;
   - a failed binary smoke with published platform packages is eligible to continue;
   - missing platform packages still fail closed.
+- A P1 review identified the cancellation edge after the first push. A second
+  failing-first assertion reproduced it (`Expected: true`, `Received: false`), and
+  the corrected guard passed the focused and related workflow suites.
 
 Exact concise outputs are recorded in `verification.txt` and `manual-qa.txt`.
 

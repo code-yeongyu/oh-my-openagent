@@ -3,12 +3,15 @@ parser: Ruby YAML
 
 {
   "parsed": true,
-  "waitsFor": "publish-platform",
-  "platformResultBlocks": false,
-  "registryProofRetained": true,
-  "platformFailureWithPublishedPackages": "publish-main eligible",
-  "platformFailureWithMissingPackages": "registry proof fails closed"
+  "success": "eligible",
+  "failure": "eligible after registry proof",
+  "skipped": "eligible for skip_platform",
+  "cancelled": "blocked",
+  "registryProofRetained": true
 }
 
 The first Bun-based parser attempt was intentionally discarded after it reported that
 the repository does not depend on the `yaml` package. No dependency was added for QA.
+The first cancellation parser command used an incorrectly shell-escaped quote and failed
+closed. Printing the parsed condition exposed the quoting mistake; the corrected driver
+above passed against the same shipped workflow.
