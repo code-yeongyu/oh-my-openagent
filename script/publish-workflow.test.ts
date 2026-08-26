@@ -95,6 +95,24 @@ describe("test workflows", () => {
     expect(regeneratesInstallerBeforeMainBuild, "publish-main must regenerate the embedded Codex installer from that release commit").toBe(true)
   })
 
+  test("lets registry proof decide wrapper publication after a platform smoke failure", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+
+    // #when
+    const waitsForPlatformPublication = publishMainJob.includes(
+      "needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+    )
+    const gatesOnPlatformJobResult = publishMainJob.includes("needs.publish-platform.result")
+    const provesPlatformPackagesExist = publishMainJob.includes("name: Verify platform packages are published")
+
+    // #then
+    expect(waitsForPlatformPublication, "publish-main must wait until publish-platform finishes").toBe(true)
+    expect(gatesOnPlatformJobResult, "binary smoke failures must not suppress the registry-backed npm publish gate").toBe(false)
+    expect(provesPlatformPackagesExist, "missing platform npm packages must still fail before wrapper publication").toBe(true)
+  })
+
   test("dispatches a source-pinned publish run before provenance-bearing release operations", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")

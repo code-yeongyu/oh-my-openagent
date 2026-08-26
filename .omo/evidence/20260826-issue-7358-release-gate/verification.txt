@@ -1,0 +1,29 @@
+RED
+command: bun test script/publish-workflow.test.ts
+result: 12 pass, 1 fail
+failure: binary smoke failures must not suppress the registry-backed npm publish gate
+expected: false
+received: true
+
+GREEN
+command: bun test script/publish-workflow.test.ts
+result: 13 pass, 0 fail, 60 expect() calls
+
+RELATED
+command: bun test <14 publish/workflow test files>
+result: 70 pass, 0 fail, 459 expect() calls
+
+TYPECHECK
+command: bun run typecheck:script
+result: clean
+command: bun run typecheck
+result: clean
+
+WORKFLOW SYNTAX
+command: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.10 -color -shellcheck=""
+image digest: sha256:ef8299f97635c4c30e2298f48f30763ab782a4ad2c95b744649439a039421e36
+result: no diagnostics
+
+BUILD
+command: bun run build
+result: build: all steps completed
