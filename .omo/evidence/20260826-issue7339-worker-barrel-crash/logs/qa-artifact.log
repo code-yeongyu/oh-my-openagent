@@ -1,0 +1,5 @@
+== FINAL artifact QA (rebuilt omo-task.js, isolated /tmp sandbox)
+{"registeredTools":["task","task_send","task_cancel","task_output","dag","team_create","team_delete","task_create","task_get","task_list","task_update"],"completionRendererPresent":true,"renderedLines":["                                                                                "," \u001b[1m· Task completion\u001b[22m                                                              "," Task completion details are unavailable.                                       ","                                                                                "]}
+
+1787700397 /home/viprix/.omo
+1786319605 /home/viprix/.senpi

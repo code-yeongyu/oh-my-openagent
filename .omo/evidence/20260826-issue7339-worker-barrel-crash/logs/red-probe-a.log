@@ -1,0 +1,10 @@
+== RED probe A (task register pi-tui warm-up), fresh bun run process
+{"coldBeforeRegister":true,"widgetRendered":false,"error":"The @earendil-works/pi-tui barrel was accessed before it was loaded. Await loadPiTui() at the registration entry point before reading pi-tui values synchronously."}
+
+== RED probe A wrapper (bun test)
+(fail) createTaskComponent pi-tui warm-up > #given a cold process with only the task component registered #when the debounced status-widget timer renders #then no barrel error escapes the timer [594.29ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [1.78s]
