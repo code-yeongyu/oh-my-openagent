@@ -146,7 +146,7 @@ swsp_start_fake_llm() {
   local hdeadline=0
   hdeadline=$(( $(date +%s) + 5 ))
   while [ "$(date +%s)" -lt "$hdeadline" ]; do
-    if curl -sf "http://127.0.0.1:${FAKE_SERVER_PORT}/health" >/dev/null 2>&1; then
+    if curl --noproxy '*' -sf --connect-timeout 2 --max-time 3 "http://127.0.0.1:${FAKE_SERVER_PORT}/health" >/dev/null 2>&1; then
       swsp_info "fake-openai listening on port $FAKE_SERVER_PORT"
       return 0
     fi
@@ -309,7 +309,7 @@ swsp_wait_session_idle() {
   deadline=$(( $(date +%s) + timeout_s ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     local status_json
-    status_json="$(curl -sf -u "opencode:${pass}" "${url}/session/status" 2>/dev/null)" || true
+    status_json="$(curl --noproxy '*' -sf --connect-timeout 2 --max-time 5 -u "opencode:${pass}" "${url}/session/status" 2>/dev/null)" || true
     if [ -z "$status_json" ] || ! printf '%s' "$status_json" | grep -q "$ses_id" 2>/dev/null; then
       return 0
     fi
@@ -515,7 +515,7 @@ swsp_self_test() {
     swsp_info "fake-LLM started on port $FAKE_SERVER_PORT"
 
     # Health check
-    if curl -sf "http://127.0.0.1:${FAKE_SERVER_PORT}/health" >/dev/null 2>&1; then
+    if curl --noproxy '*' -sf --connect-timeout 2 --max-time 3 "http://127.0.0.1:${FAKE_SERVER_PORT}/health" >/dev/null 2>&1; then
       swsp_info "PASS: fake-LLM /health 200"
     else
       swsp_log "FAIL: fake-LLM /health did not return 200"
@@ -560,7 +560,7 @@ swsp_self_test() {
 
     # /global/health check
     local health_code
-    health_code="$(curl -so /dev/null -w "%{http_code}" -u "opencode:${OQA_SERVER_PASS}" \
+    health_code="$(curl --noproxy '*' -so /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 5 -u "opencode:${OQA_SERVER_PASS}" \
       "${OQA_SERVER_URL}/global/health" 2>/dev/null)" || true
     if [ "$health_code" = "200" ]; then
       swsp_info "PASS: /global/health 200"
@@ -773,7 +773,14 @@ swsp_run_probe() {
   port="$(oqa_free_port)"
   pass="oqa-${RANDOM}${RANDOM}"
 
-  OPENCODE_SERVER_PASSWORD="$pass" opencode serve --port "$port" --hostname 127.0.0.1 \
+  # Serve-mode first-request plugin loading reifies the $HOME/.opencode plugin
+  # store; its in-process registry fetch can stall indefinitely in QA sandboxes
+  # (observed with and without proxy env), wedging every /session route. The
+  # sandbox is offline by design: force npm offline so reify no-ops, and strip
+  # proxy env so nothing in the serve tree dials out through a local relay.
+  env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+    npm_config_offline=true npm_config_prefer_offline=true \
+    OPENCODE_SERVER_PASSWORD="$pass" opencode serve --port "$port" --hostname 127.0.0.1 \
     >"$serve_stdout" 2>"$serve_stderr" &
   OQA_SERVER_PID=$!
   disown "$OQA_SERVER_PID" 2>/dev/null || true
@@ -798,7 +805,7 @@ swsp_run_probe() {
   # Step 5: Create a session
   swsp_info "creating session..."
   local ses_response ses_id
-  ses_response="$(curl -sS -u "opencode:${pass}" \
+  ses_response="$(curl --noproxy '*' -sS --connect-timeout 5 --max-time 30 -u "opencode:${pass}" \
     -X POST "${OQA_SERVER_URL}/session?directory=${enc_dir}" \
     -H 'content-type: application/json' \
     -d '{"title":"wake split probe"}' 2>/dev/null)" || ses_response=""
@@ -817,7 +824,7 @@ swsp_run_probe() {
   # Step 6: Send the split probe prompt
   swsp_info "sending split probe prompt..."
   local prompt_response
-  prompt_response="$(curl -sS -u "opencode:${pass}" \
+  prompt_response="$(curl --noproxy '*' -sS --connect-timeout 5 --max-time 30 -u "opencode:${pass}" \
     -X POST "${OQA_SERVER_URL}/session/${ses_id}/prompt_async?directory=${enc_dir}" \
     -H 'content-type: application/json' \
     -d '{"parts":[{"type":"text","text":"Run the split probe: call call_omo_agent exactly once as instructed, then run the bash hold command."}]}' \
