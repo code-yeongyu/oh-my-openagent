@@ -48,6 +48,10 @@ export interface StatusUiTimers {
   clear(handle: TimerHandle): void
 }
 
+export interface StatusUiLogger {
+  warn(message: string, meta?: unknown): void
+}
+
 export interface TaskStatusUiDeps {
   readonly manager: StatusUiManager
   readonly runtime: StatusUiRuntime
@@ -56,6 +60,7 @@ export interface TaskStatusUiDeps {
   readonly terminalWidth?: () => number | undefined
   // Local rendering time used by the live-refresh timer and deterministic tests.
   readonly now?: () => number
+  readonly logger?: StatusUiLogger
 }
 
 export interface TaskStatusUi {
@@ -83,11 +88,24 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   let liveRefresh: TimerHandle | undefined
 
   function syncNow(): void {
-    if (!refreshCachedRecords()) {
+    guardRender(() => {
+      if (!refreshCachedRecords()) {
+        clearLiveRefresh()
+        return
+      }
+      renderCachedRecords()
+    })
+  }
+
+  function guardRender(render: () => void): void {
+    try {
+      render()
+    } catch (error) {
       clearLiveRefresh()
-      return
+      deps.logger?.warn("omo-senpi task status render failed; skipping this frame", {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
-    renderCachedRecords()
   }
 
   function refreshCachedRecords(): boolean {
@@ -143,7 +161,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     if (pending !== undefined) timers.clear(pending)
     pending = timers.set(() => {
       pending = undefined
-      if (recordsRefreshed) renderCachedRecords()
+      if (recordsRefreshed) guardRender(renderCachedRecords)
       else syncNow()
     }, debounceMs)
   }
@@ -178,7 +196,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       timers.clear(handle)
       if (liveRefresh !== handle) return
       liveRefresh = undefined
-      renderCachedRecords()
+      guardRender(renderCachedRecords)
     }, LIVE_STATUS_REFRESH_MS)
     liveRefresh = handle
   }
