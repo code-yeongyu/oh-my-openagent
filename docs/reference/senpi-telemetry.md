@@ -19,7 +19,7 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `session_started` | `$os_version` | `string` | - |
 | `session_started` | `arch` | `string` | - |
 | `session_started` | `cpu_count` | `number` | - |
-| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `glm-5.3-flash`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
 | `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
@@ -47,7 +47,7 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `turn_completed` | `cache_write_tokens` | `number` | - |
 | `turn_completed` | `cost_usd` | `number` | - |
 | `turn_completed` | `input_tokens` | `number` | - |
-| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `glm-5.3-flash`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
 | `turn_completed` | `output_tokens` | `number` | - |
 | `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `turn_completed` | `reasoning_tokens` | `number` | - |
@@ -106,7 +106,7 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `delegation_completed` | `execution_mode` | `string` | `in-process`, `process` |
 | `delegation_completed` | `fallback_attempts` | `number` | - |
 | `delegation_completed` | `input_tokens` | `number` | - |
-| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `glm-5.3-flash`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
 | `delegation_completed` | `model_source` | `string` | `category`, `explicit`, `agent`, `none` |
 | `delegation_completed` | `output_tokens` | `number` | - |
 | `delegation_completed` | `owner_kind` | `string` | `plain_child`, `dag_node`, `team_member`, `unknown` |

@@ -32,4 +32,39 @@ describe("bundled model capabilities snapshot", () => {
       })
     }
   })
+
+  test("registers GLM-5.3-Flash with native vision and GLM reasoning semantics", () => {
+    // given
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "zai-coding-plan",
+      modelID: "glm-5.3-flash",
+      bundledSnapshot,
+    })
+
+    // then
+    expect(bundledSnapshot.models["glm-5.3-flash"]).toMatchObject({
+      limit: { context: 1_000_000, output: 131_072 },
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "glm-5.3-flash",
+      family: "glm",
+      reasoning: true,
+      supportsThinking: true,
+      reasoningEfforts: ["high", "max"],
+      maxOutputTokens: 131_072,
+      toolCall: true,
+      modalities: {
+        input: ["text", "image"],
+        output: ["text"],
+      },
+      diagnostics: {
+        resolutionMode: "snapshot-backed",
+        snapshot: { source: "bundled-snapshot" },
+      },
+    })
+  })
 })

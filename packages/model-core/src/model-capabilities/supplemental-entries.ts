@@ -1,6 +1,21 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
+	"glm-5.3-flash": {
+		id: "glm-5.3-flash",
+		family: "glm",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1_000_000,
+			output: 131_072,
+		},
+	},
 	"kimi-k3": {
 		id: "kimi-k3",
 		family: "kimi",
