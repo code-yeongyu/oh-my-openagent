@@ -1,0 +1,1 @@
+bun: 1.4.0 (linux-x64, ~/omo clone at 172cb67ea); bun install --frozen-lockfile; build-extension.mjs; --check: build is current; changed: omo.js omo-task.js only
