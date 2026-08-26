@@ -1,0 +1,3 @@
+real_db=~/.local/share/opencode/opencode.db before=7810
+after=7810 unchanged=yes
+sandbox_session=<redacted>

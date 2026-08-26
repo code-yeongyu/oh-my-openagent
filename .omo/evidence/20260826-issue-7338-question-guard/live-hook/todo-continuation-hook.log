@@ -1,0 +1,10 @@
+[2026-08-26T05:31:53.872Z] [todo-continuation-enforcer] session.idle {"sessionID":"<sandbox-session>"}
+[2026-08-26T05:31:53.876Z] [todo-continuation-enforcer] Agent check {"sessionID":"<sandbox-session>","agentName":"Hephaestus - Deep Agent","skipAgents":["prometheus","compaction","plan"],"compactionGuardActive":false,"acknowledgedCompaction":false}
+[2026-08-26T05:31:53.877Z] [todo-continuation-enforcer] Countdown started {"sessionID":"<sandbox-session>","seconds":2,"incompleteCount":1}
+[2026-08-26T05:31:55.886Z] [todo-continuation-enforcer] Injecting continuation {"sessionID":"<sandbox-session>","agent":"Hephaestus - Deep Agent","model":{"providerID":"openai","modelID":"gpt-5.6-sol"},"incompleteCount":1}
+[2026-08-26T05:31:55.898Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"<sandbox-session>","source":"todo-continuation-enforcer"}
+[2026-08-26T05:31:55.899Z] [live-server-route] dispatch via live listener {"sessionID":"<sandbox-session>","source":"todo-continuation-enforcer"}
+[2026-08-26T05:31:55.906Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"<sandbox-session>","source":"todo-continuation-enforcer","holdMs":5000}
+[2026-08-26T05:31:55.906Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"<sandbox-session>","source":"todo-continuation-enforcer"}
+[2026-08-26T05:31:55.906Z] [todo-continuation-enforcer] Injection successful {"sessionID":"<sandbox-session>","status":"dispatched"}
+[2026-08-26T05:31:55.912Z] [todo-continuation-enforcer] Deferred user interruption classification until message part {"sessionID":"<sandbox-session>","messageID":"msg_03c8db87c001j9bokmoN8PcSC3"}

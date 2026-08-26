@@ -1,0 +1,3 @@
+watching <server>/event?directory=<sandbox>/proj for 'session.idle' (<=90s)
+first matching event: {"type":"session.idle"}
+PASS: observed 'session.idle' on <server>

@@ -7,6 +7,7 @@
 - Repository typechecking and the full build, including shared-skill materialization, were run.
 - A direct module driver invoked `injectContinuation()` and inspected the payload accepted by `promptAsync`.
 - The real OpenCode server was driven in an isolated XDG sandbox with the local plugin and a local fake model. The probe exercised a plugin-originated internal prompt route and captured the resulting session state.
+- A dedicated live-hook probe created a pending todo through the real `todowrite` tool, observed `session.idle` over SSE, and waited for `todo-continuation-enforcer` to dispatch its internal continuation.
 - The official tmux TUI smoke and two manual tmux variants were attempted to cover the user-facing TUI surface.
 
 ## What Was Observed
@@ -16,11 +17,12 @@
 - The direct driver observed `{"question":false,"bash":true}`. Other inherited tools remain enabled while the unsupported interactive question tool is disabled.
 - Typechecking passed and the full build ended with `build: all steps completed`.
 - The isolated OpenCode server probe reported `RESULT=FIXED`, one plugin initialization, one child session, one terminal stop, and a live internal-prompt route. The real OpenCode database remained at 7,810 sessions before and after.
+- The dedicated hook probe recorded an initial user message with `tools.question=1`, one pending todo, an SSE `session.idle` event, and one internal continuation message with `tools.question=0`. The hook log shows the countdown, `source:"todo-continuation-enforcer"`, live-listener dispatch, and successful injection. Its sandbox also left the real database count unchanged.
 - The official smoke and standard manual TUI launch did not render within their bounded windows. A third attempt using `opencode --mini` and a longer window rendered the OpenCode composer, displayed the typed `oqaXYZ` sentinel, and then tore down cleanly. The real database count remained unchanged.
 
 ## Why It Is Enough
 
-The failing-first test pins the exact issue payload, while the passing hook suite covers surrounding continuation behavior. The module driver proves the shipped runtime function emits the intended tool map. Typechecking and the full build cover compilation and packaging. The isolated real-server probe demonstrates that the local plugin loads and that plugin-originated internal prompts still complete through OpenCode after the payload change.
+The failing-first test pins the exact issue payload, while the passing hook suite covers surrounding continuation behavior. The dedicated real-server probe covers the exact changed route: an allowed question permission reaches a live session, an incomplete todo makes the session idle, the changed hook fires, and the persisted internal message disables the question tool. Typechecking and the full build cover compilation and packaging. The additional server and TUI probes cover adjacent internal-prompt and user-facing regressions.
 
 ## What Was Omitted
 

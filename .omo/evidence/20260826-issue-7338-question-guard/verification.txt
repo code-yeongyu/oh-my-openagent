@@ -7,6 +7,13 @@ bun run build
 Result: exit 0
 Final line: build: all steps completed
 
+Exact live-hook QA:
+bash .omo/evidence/20260826-issue-7338-question-guard/live-hook/run-probe.sh
+Result: exit 0
+Final line:
+RESULT=PASS continuation_seen=yes internal_question=0 pending_todos=1
+sse_session_idle=observed hook_injection=successful isolation=unchanged
+
 LSP diagnostics:
 The session LSP rejected sibling-worktree paths as outside its request cwd.
 The repository-wide typecheck above completed cleanly and covers both changed
