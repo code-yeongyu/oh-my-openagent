@@ -1,0 +1,108 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:
+116 | 
+117 | describe("engine claude-sdk-oauth slot recovery (issue #7084)", () => {
+118 |   describe("#given the pinned senpi accounts module", () => {
+119 |     test("#then it exposes an upsert that replaces a same-name slot in place", async () => {
+120 |       const accounts = await describeAccounts()
+121 |       expect(typeof accounts.upsertAccount).toBe("function")
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "function"
+Received: "undefined"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:121:45)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given the pinned senpi accounts module > #then it exposes an upsert that replaces a same-name slot in place [6.58ms]
+137 |       accounts.assertSentinelInvariant(next)
+138 |     })
+139 | 
+140 |     test("#then an unknown name still appends so explicit multi-account keeps working", async () => {
+141 |       const accounts = await describeAccounts()
+142 |       const current = accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))
+                                     ^
+TypeError: accounts.upsertAccount is not a function. (In 'accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))', 'accounts.upsertAccount' is undefined)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:142:32)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given the pinned senpi accounts module > #then an unknown name still appends so explicit multi-account keeps working [0.37ms]
+151 | 
+152 |   describe("#given a single logged-in Claude account #when /login succeeds again without an explicit new name", () => {
+153 |     test("#then the existing slot is refreshed in place instead of appending account-N+1", async () => {
+154 |       const accounts = await describeAccounts()
+155 |       const oauthLogin = await describeOAuthLogin()
+156 |       const current = accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))
+                                     ^
+TypeError: accounts.upsertAccount is not a function. (In 'accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))', 'accounts.upsertAccount' is undefined)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:156:32)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given a single logged-in Claude account #when /login succeeds again without an explicit new name > #then the existing slot is refreshed in place instead of appending account-N+1 [5.23ms]
+173 |     })
+174 | 
+175 |     test("#then a dead auth_error slot comes back live after re-login", async () => {
+176 |       const accounts = await describeAccounts()
+177 |       const oauthLogin = await describeOAuthLogin()
+178 |       const current = accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a", { blockReason: "auth_error" }))
+                                     ^
+TypeError: accounts.upsertAccount is not a function. (In 'accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a", { blockReason: "auth_error" }))', 'accounts.upsertAccount' is undefined)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:178:32)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given a single logged-in Claude account #when /login succeeds again without an explicit new name > #then a dead auth_error slot comes back live after re-login [0.40ms]
+193 | 
+194 |     test("#then accepting the prompt placeholder recovers the newest login slot instead of minting account-N+1", async () => {
+195 |       const accounts = await describeAccounts()
+196 |       const oauthLogin = await describeOAuthLogin()
+197 |       const imported = { ...loginSlot("imported-anthropic", "i"), source: "import" as const }
+198 |       const withImport = accounts.upsertAccount(accounts.emptyCredential(), imported)
+                                        ^
+TypeError: accounts.upsertAccount is not a function. (In 'accounts.upsertAccount(accounts.emptyCredential(), imported)', 'accounts.upsertAccount' is undefined)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:198:35)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given a single logged-in Claude account #when /login succeeds again without an explicit new name > #then accepting the prompt placeholder recovers the newest login slot instead of minting account-N+1 [0.84ms]
+220 |     })
+221 | 
+222 |     test("#then a typed brand-new name still adds a second account", async () => {
+223 |       const accounts = await describeAccounts()
+224 |       const oauthLogin = await describeOAuthLogin()
+225 |       const current = accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))
+                                     ^
+TypeError: accounts.upsertAccount is not a function. (In 'accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))', 'accounts.upsertAccount' is undefined)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:225:32)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given a single logged-in Claude account #when /login succeeds again without an explicit new name > #then a typed brand-new name still adds a second account [0.42ms]
+241 |   describe("#given failover classifies an authentication failure", () => {
+242 |     test("#then the auth_error stamp carries an expiry instead of blocking forever", async () => {
+243 |       const accounts = await describeAccounts()
+244 |       const failover = await describeFailover()
+245 |       const now = 1_000_000
+246 |       const store = createInMemoryStore(accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a")))
+                                                       ^
+TypeError: accounts.upsertAccount is not a function. (In 'accounts.upsertAccount(accounts.emptyCredential(), loginSlot("default", "a"))', 'accounts.upsertAccount' is undefined)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:246:50)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given failover classifies an authentication failure > #then the auth_error stamp carries an expiry instead of blocking forever [1.67ms]
+62 |     // against the cleared view before reporting the earliest available account.
+63 |     const cleared = clearExpiredBlocks(accounts, now);
+64 |     const afterClear = selectUnblocked(cleared, options, now);
+65 |     if (afterClear)
+66 |         return afterClear;
+67 |     throw new AllAccountsBlockedError(soonestUnblockAt(accounts, now));
+               ^
+AllAccountsBlockedError: All Claude SDK OAuth accounts are blocked until re-login.
+ soonestUnblockAt: undefined,
+
+      at selectAccount (/home/viprix/projects/oom-wt-7084/node_modules/.bun/@code-yeongyu+senpi@2026.8.23+3aa9f84f7136ce5f/node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/claude-sdk-oauth/affinity.js:67:11)
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:284:33)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given affinity selection over blocked slots > #then an elapsed auth_error stamp no longer blocks selection [0.95ms]
+294 | 
+295 |       // when expired blocks are cleared at any time
+296 |       const cleared = affinity.clearExpiredBlocks([legacyStamp], 5_000_000)
+297 | 
+298 |       // then the permanent legacy stamp is gone
+299 |       expect(cleared[0]?.blockReason).toBeUndefined()
+                                            ^
+error: expect(received).toBeUndefined()
+
+Received: "auth_error"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7084/packages/omo-senpi/src/engine-claude-sdk-oauth-slot-recovery.test.ts:299:39)
+(fail) engine claude-sdk-oauth slot recovery (issue #7084) > #given affinity selection over blocked slots > #then clearing blocks also cleans legacy auth_error stamps that never had an expiry [0.35ms]
+
+ 1 pass
+ 9 fail
+ 4 expect() calls
+Ran 10 tests across 1 file. [278.00ms]

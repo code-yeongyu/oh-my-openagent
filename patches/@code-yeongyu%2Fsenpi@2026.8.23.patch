@@ -1,0 +1,151 @@
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/accounts.d.ts b/dist/core/extensions/builtin/claude-sdk-oauth/accounts.d.ts
+index f1e1cbe2ec6bf3c9b60fbaff16f9d4e117f268e6..17ad3a850e7ff0d66401c91f60ab48c14480d32b 100644
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/accounts.d.ts
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/accounts.d.ts
+@@ -26,6 +26,7 @@ export declare function emptyCredential(): ClaudeSdkOauthCredential;
+ export declare function listAccounts(credential: ClaudeSdkOauthCredential, env?: (name: string) => string | undefined): AccountSlot[];
+ export declare function assertValidAccountName(name: string): void;
+ export declare function addAccount(credential: ClaudeSdkOauthCredential, slot: AccountSlot): ClaudeSdkOauthCredential;
++export declare function upsertAccount(credential: ClaudeSdkOauthCredential, slot: AccountSlot): ClaudeSdkOauthCredential;
+ export declare function removeAccount(credential: ClaudeSdkOauthCredential, name: string): ClaudeSdkOauthCredential;
+ export declare function pinAccount(credential: ClaudeSdkOauthCredential, name: string): ClaudeSdkOauthCredential;
+ export declare function assertSentinelInvariant(credential: ClaudeSdkOauthCredential): void;
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/accounts.js b/dist/core/extensions/builtin/claude-sdk-oauth/accounts.js
+index 351f94fd1abdf6cd8eb70964a4a3fc51f729f650..0fe0baa805ccecdb0b461e9ff7746577b6f8e0c1 100644
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/accounts.js
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/accounts.js
+@@ -33,6 +33,29 @@ export function addAccount(credential, slot) {
+     }
+     return { ...credential, accounts: [...storedSlots(credential), slot] };
+ }
++export function upsertAccount(credential, slot) {
++    assertValidAccountName(slot.name);
++    const existing = storedSlots(credential);
++    if (!existing.some((candidate) => candidate.name === slot.name)) {
++        return addAccount(credential, slot);
++    }
++    return {
++        ...credential,
++        accounts: existing.map((candidate) => {
++            if (candidate.name !== slot.name)
++                return candidate;
++            const { blockedUntil: _blockedUntil, blockReason: _blockReason, ...available } = candidate;
++            return {
++                ...available,
++                name: slot.name,
++                access: slot.access,
++                refresh: slot.refresh,
++                expires: slot.expires,
++                source: slot.source,
++            };
++        }),
++    };
++}
+ export function removeAccount(credential, name) {
+     const accounts = storedSlots(credential).filter((slot) => slot.name !== name);
+     const next = { ...credential, accounts };
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/affinity.js b/dist/core/extensions/builtin/claude-sdk-oauth/affinity.js
+index 80888e3052094d39add8d7dcec5fadf92f8a1fd6..78a36600da39dd34b7fadd7857c49b42cab67535 100644
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/affinity.js
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/affinity.js
+@@ -26,16 +26,17 @@ export function rendezvousOrder(key, accounts) {
+         .map(({ account }) => account);
+ }
+ function isBlocked(account, now) {
+-    return account.blockReason === "auth_error" || (account.blockedUntil !== undefined && account.blockedUntil > now);
++    return account.blockedUntil !== undefined && account.blockedUntil > now;
+ }
+-/** Removes elapsed rate/capacity blocks but deliberately retains auth blocks until login refreshes the slot. */
++/** Removes elapsed blocks; every stamp including auth_error expires, and stamps without an expiry are cleared. */
+ export function clearExpiredBlocks(accounts, now = Date.now()) {
+     return accounts.map((account) => {
+-        if (account.blockReason !== "auth_error" && account.blockedUntil !== undefined && account.blockedUntil <= now) {
+-            const { blockedUntil: _blockedUntil, blockReason: _blockReason, ...available } = account;
+-            return available;
+-        }
+-        return account;
++        if (account.blockReason === undefined && account.blockedUntil === undefined)
++            return account;
++        if (account.blockedUntil !== undefined && account.blockedUntil > now)
++            return account;
++        const { blockedUntil: _blockedUntil, blockReason: _blockReason, ...available } = account;
++        return available;
+     });
+ }
+ function selectUnblocked(accounts, options, now) {
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/failover.d.ts b/dist/core/extensions/builtin/claude-sdk-oauth/failover.d.ts
+index f3e7e767b94481d3478429c5bf9efe5c69600a60..e47423238e0a7592495fddb33d42d19f264bd783 100644
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/failover.d.ts
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/failover.d.ts
+@@ -3,6 +3,7 @@ import type { AccountSlot } from "./accounts.ts";
+ import type { SdkErrorClassification } from "./errors.ts";
+ export declare const MAX_RATE_LIMIT_BLOCK_MS: number;
+ export declare const DEFAULT_RATE_LIMIT_BLOCK_MS = 60000;
++export declare const AUTH_ERROR_BLOCK_MS: number;
+ export declare const TURN_RETRY_SUPPRESSION_PREFIX = "senpi:no-turn-retry:";
+ export type FailoverEvent = {
+     account: AccountSlot;
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/failover.js b/dist/core/extensions/builtin/claude-sdk-oauth/failover.js
+index c1155bb9674753c7de14e864fb0361a28389db95..1d285c885aed179c5844d65b7daa246cbb700566 100644
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/failover.js
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/failover.js
+@@ -45,10 +45,10 @@ function retryAfterMs(error) {
+     const seconds = text.match(/\bretry[-_ ]?after\s*[:=]\s*(\d+(?:\.\d+)?)/i);
+     return seconds ? Math.ceil(Number(seconds[1]) * 1_000) : undefined;
+ }
++export const AUTH_ERROR_BLOCK_MS = 30 * 60 * 1_000;
+ function blockedAccount(account, classification, now, attempt, baseBlockMs, error) {
+     if (classification.kind === "auth_error") {
+-        const { blockedUntil: _blockedUntil, ...withoutExpiry } = account;
+-        return { ...withoutExpiry, blockReason: "auth_error" };
++        return { ...account, blockedUntil: now + AUTH_ERROR_BLOCK_MS, blockReason: "auth_error" };
+     }
+     const fallback = Math.min(MAX_RATE_LIMIT_BLOCK_MS, baseBlockMs * 2 ** attempt);
+     const duration = Math.min(MAX_RATE_LIMIT_BLOCK_MS, retryAfterMs(error) ?? fallback);
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/oauth-login.js b/dist/core/extensions/builtin/claude-sdk-oauth/oauth-login.js
+index 3e20b3a15f490dcee64fd9d093ea5e5e9d2d5e3e..b46be6bc9b13105f56c319cb6541173dabcf9ec0 100644
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/oauth-login.js
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/oauth-login.js
+@@ -1,5 +1,5 @@
+ import { loadAnthropicOAuth } from "@earendil-works/pi-ai/oauth";
+-import { addAccount, emptyCredential, listAccounts, SENTINEL_OAUTH_FIELDS, } from "./accounts.js";
++import { addAccount, emptyCredential, listAccounts, SENTINEL_OAUTH_FIELDS, upsertAccount, } from "./accounts.js";
+ import { readAmbientClaudeAuthStatus } from "./availability.js";
+ export const CLAUDE_SDK_OAUTH_NAME = "Claude SDK OAuth (Claude Pro/Max)";
+ const ENV_TOKEN_NAMES = [
+@@ -21,16 +21,23 @@ function requestClaudeEnvironment(value) {
+ function toSlot(credential, name, source) {
+     return { name, access: credential.access, refresh: credential.refresh, expires: credential.expires, source };
+ }
++function defaultRecoveryName(existing) {
++    const loginSlots = existing.filter((slot) => slot.source === "login" || slot.source === "import");
++    if (loginSlots.length > 0)
++        return loginSlots[loginSlots.length - 1].name;
++    return `account-${existing.length + 1}`;
++}
+ async function promptAccountName(callbacks, existing) {
+     if (existing.length === 0)
+         return "default";
++    const recovery = defaultRecoveryName(existing);
+     if (!callbacks.onPrompt)
+-        return `account-${existing.length + 1}`;
++        return recovery;
+     const answer = (await callbacks.onPrompt({
+         message: `Name for this account (existing: ${existing.map((slot) => slot.name).join(", ")})`,
+-        placeholder: `account-${existing.length + 1}`,
++        placeholder: recovery,
+     })).trim();
+-    return answer || `account-${existing.length + 1}`;
++    return answer || recovery;
+ }
+ export function createOAuthConfig(deps) {
+     const claudeEnvironment = async (ctx) => {
+@@ -110,7 +117,7 @@ export function createOAuthConfig(deps) {
+             const credential = await flow.login(interaction);
+             const existingAfter = listAccounts(current);
+             const name = await promptAccountName(callbacks, existingAfter);
+-            return addAccount(current, toSlot(credential, name, "login"));
++            return upsertAccount(current, toSlot(credential, name, "login"));
+         },
+         async refreshToken(credentials) {
+             return credentials;
