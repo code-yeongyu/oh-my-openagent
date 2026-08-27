@@ -22,3 +22,36 @@ diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump
          }
          return false;
      }
+diff --git a/dist/modes/interactive/components/favorite-models-selector.js b/dist/modes/interactive/components/favorite-models-selector.js
+--- a/dist/modes/interactive/components/favorite-models-selector.js
++++ b/dist/modes/interactive/components/favorite-models-selector.js
+@@ -1,5 +1,5 @@
+ import { modelsAreEqual } from "@earendil-works/pi-ai";
+-import { Container, getKeybindings, Input, Key, matchesKey, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Input, Key, matchesKey, Spacer, Text, TruncatedText, } from "@earendil-works/pi-tui";
+ import { rankModelSearchItems } from "../model-search-rank.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+@@ -146,7 +146,7 @@
+             const modelText = isSelected ? theme.fg("accent", item.model.id) : item.model.id;
+             const providerBadge = theme.fg("muted", ` [${item.model.provider}]`);
+             const currentMarker = this.currentModel && modelsAreEqual(this.currentModel, item.model) ? theme.fg("success", " ✓") : "";
+-            this.listContainer.addChild(new Text(`${prefix}${favoriteMarker} ${modelText}${providerBadge}${currentMarker}`, 0, 0));
++            this.listContainer.addChild(new TruncatedText(`${prefix}${favoriteMarker} ${modelText}${providerBadge}${currentMarker}`, 0, 0));
+         }
+         if (this.filteredItems.length > this.maxVisible) {
+             const scrollInfo = `  (${startIndex + 1}-${endIndex} of ${this.filteredItems.length})`;
+diff --git a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/interactive-mode.js
+--- a/dist/modes/interactive/interactive-mode.js
++++ b/dist/modes/interactive/interactive-mode.js
+@@ -4738,8 +4738,8 @@
+         }
+         this.ui.requestRender();
+     }
+-    cycleThinkingLevel() {
+-        const newLevel = this.session.cycleThinkingLevel();
++    async cycleThinkingLevel() {
++        const newLevel = await this.session.cycleThinkingLevel();
+         if (newLevel === undefined) {
+             this.showStatus("Current model does not support thinking");
+         }
