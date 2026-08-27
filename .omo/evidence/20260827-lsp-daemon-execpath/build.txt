@@ -1,0 +1,46 @@
+BUILD: lsp-daemon package build on the repository-required Node runtime
+
+Toolchain:
+- node --version: v24.14.1
+- pinned bun --version: 1.3.12
+- npm script: @code-yeongyu/lsp-daemon@0.1.0 build
+
+Preparation:
+- A clean sibling worktree initially lacked the root workspace links needed by `lsp-core`.
+- `bun install --frozen-lockfile --ignore-scripts` with pinned Bun 1.3.12 completed successfully (1186 packages).
+- The rejected pre-preparation build stopped in TypeScript sibling resolution before the changed stamp call; it was not counted as patch validation.
+
+Command:
+$env:PATH = '<PINNED_BUN_DIR>;' + $env:PATH
+npm --prefix packages/lsp-daemon run build
+
+Result: exit 0
+
+Observed output:
+- TypeScript compilation completed.
+- Bun bundled 80 modules.
+- cli.js, index.js, and client.js were emitted.
+- DIST_CLI_EXISTS=True
+- DIST_CLIENT_EXISTS=True
+- DIST_VERSION=0.1.0
+
+The Node runtime emitted DEP0190 for the two pre-existing Windows shell-based shim calls. The warning is expected in this scoped fix: `tsc` and `bun` still need Windows `.cmd` resolution, while the direct `process.execPath` stamp call now sets `shell: false` and completed successfully.
+
+Supporting gates:
+- Focused Windows regression: 1/1 passed.
+- `npm --prefix packages/lsp-daemon run typecheck`: exit 0.
+- Targeted Biome check of `test/build-exec-path.test.ts`: exit 0, no fixes.
+- Full package Vitest: 152 passed; 4 pre-existing Windows `EPERM` failures where unrelated tests call `symlinkSync` without Developer Mode/elevated symlink privilege (`request-routing.test.ts` x3, `version-reap.test.ts` x1). The new regression passed in the same run.
+- Full package Biome reported 15 existing formatting/import diagnostics, all in unchanged files; the changed test passes its targeted Biome check. `scripts/build.mjs` is outside this package's Biome include list and passes `node --check`.
+
+Why this is enough:
+- The required package build exercises real `tsc`, real Bun bundling, the real stamp script, and atomic dist publication on Node 24.
+- The focused process-level test separately forces the exact spaced `process.execPath` condition and proves the stamp argument through the emitted package manifest.
+
+Sanitization and omissions:
+- The worktree and tool directory are represented as `<WORKTREE>` and `<PINNED_BUN_DIR>`.
+- Raw environment dumps, credentials, authentication headers, and package cache paths were not captured.
+
+Cleanup receipt:
+- Build helper removed its unique temporary build parent in `finally`.
+- No server, daemon, port, socket, container, browser context, or persistent QA child was started.
