@@ -1,0 +1,42 @@
+RED: focused Windows spaced-Node regression against unmodified production code
+
+Toolchain:
+- node --version: v24.14.1
+- pinned bun --version: 1.3.12
+- vitest: 4.1.8
+
+Command:
+$env:PATH = '<PINNED_BUN_DIR>;' + $env:PATH
+npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.test.ts --reporter=verbose
+
+Result: exit 1 (expected RED)
+
+RUN  v4.1.8 <WORKTREE>
+
+× packages/lsp-daemon/test/build-exec-path.test.ts > #given Node at an absolute path containing spaces #when the atomic build runs #then the stamped version argument remains intact
+  → Command failed: <NODE_WITH_SPACES> <WORKTREE>\packages\lsp-daemon\scripts\build.mjs
+'<TEMP>\node' is not recognized as an internal or external command,
+operable program or batch file.
+
+FAIL  packages/lsp-daemon/test/build-exec-path.test.ts > #given Node at an absolute path containing spaces #when the atomic build runs #then the stamped version argument remains intact
+Error: Command failed: <NODE_WITH_SPACES> <WORKTREE>\packages\lsp-daemon\scripts\build.mjs
+'<TEMP>\node' is not recognized as an internal or external command,
+operable program or batch file.
+
+Test Files  1 failed (1)
+Tests       1 failed (1)
+
+Failure classification:
+- The real `scripts/build.mjs` was invoked by `execFileSync` through the copied Node executable at `<NODE_WITH_SPACES>`.
+- Windows `.cmd` shims let the atomic runner complete its `tsc` and `bun` calls without importing package source, isolating the stamp subprocess.
+- The inner Windows shell truncated `<NODE_WITH_SPACES>` at the first space to `<TEMP>\node`, proving the failure is the `shell: true` split at `run(process.execPath, ...)`, not syntax, import resolution, or a missing dependency.
+
+Sanitization:
+- Worktree absolute path replaced with `<WORKTREE>`.
+- Per-run temporary root replaced with `<TEMP>`.
+- Copied Node executable path replaced with `<NODE_WITH_SPACES>`.
+
+Cleanup receipt:
+- Test `finally` removed the per-run temporary root and asserted it no longer existed.
+- Independent post-run check: `RED_TEMP_PATH_EXISTS=False`.
+- Independent post-run prefix scan: `MATCHING_TEMP_DIRS=0`.

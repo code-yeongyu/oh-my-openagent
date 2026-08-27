@@ -1,0 +1,47 @@
+GREEN: focused Windows spaced-Node regression after the per-call shell override
+
+Toolchain:
+- node --version: v24.14.1
+- pinned bun --version: 1.3.12
+- vitest: 4.1.8
+
+Command:
+$env:PATH = '<PINNED_BUN_DIR>;' + $env:PATH
+npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.test.ts --reporter=verbose
+
+Result: exit 0
+
+RUN  v4.1.8 <WORKTREE>
+
+✓ packages/lsp-daemon/test/build-exec-path.test.ts > #given Node at an absolute path containing spaces #when the atomic build runs #then the stamped version argument remains intact
+
+Test Files  1 passed (1)
+Tests       1 passed (1)
+
+Behavior proven by the passing test:
+- `process.execPath` was copied to `<NODE_WITH_SPACES>`.
+- The test asserted `<NODE_WITH_SPACES>` is absolute and matches `/\s/` before invoking it.
+- That copied Node executable invoked the real `<WORKTREE>/packages/lsp-daemon/scripts/build.mjs`.
+- Windows `.cmd` shims for `tsc` and `bun` remained discoverable, exercising the unchanged `shell: true` default for those calls.
+- The real `stamp-dist-version.mjs` received the atomic temp-dist argument and wrote `<TEMP>/dist/package.json`.
+- The test read that output and asserted `version === "0.1.0"`.
+
+Additional check:
+- `npm exec -- biome check scripts/build.mjs test/build-exec-path.test.ts` from `packages/lsp-daemon`: exit 0; the configured test file was checked with no fixes. The package Biome include list does not include `.mjs` scripts, so `build.mjs` was not processed.
+- `git diff --check`: exit 0.
+
+Sanitization:
+- Worktree absolute path replaced with `<WORKTREE>`.
+- Per-run temporary root replaced with `<TEMP>`.
+- Copied Node executable path replaced with `<NODE_WITH_SPACES>`.
+
+Cleanup receipt:
+- Test `finally` removed the per-run temporary root and asserted it no longer existed.
+- Independent post-run prefix scan: `MATCHING_TEMP_DIRS=0`.
+
+Frozen-tree revalidation after the strict TypeScript index-access correction:
+- Identical focused command: exit 0; 1 test file passed, 1 test passed.
+- Test duration: 481 ms; total Vitest duration: 594 ms.
+- `npm --prefix packages/lsp-daemon run typecheck`: exit 0.
+- `npm exec -- biome check test/build-exec-path.test.ts` from `packages/lsp-daemon`: exit 0; 1 file checked, no fixes.
+- Cleanup: the test `finally` assertion passed; no persistent process, port, socket, or temp root remained.
