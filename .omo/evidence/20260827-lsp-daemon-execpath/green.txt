@@ -7,13 +7,13 @@ Toolchain:
 
 Command:
 $env:PATH = '<PINNED_BUN_DIR>;' + $env:PATH
-npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.test.ts --reporter=verbose
+npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.windows.test.ts --reporter=verbose
 
 Result: exit 0
 
 RUN  v4.1.8 <WORKTREE>
 
-✓ packages/lsp-daemon/test/build-exec-path.test.ts > #given Node at an absolute path containing spaces #when the atomic build runs #then the stamped version argument remains intact
+✓ packages/lsp-daemon/test/build-exec-path.windows.test.ts > #given Node at an absolute path containing spaces #when the atomic build runs #then the stamped version argument remains intact
 
 Test Files  1 passed (1)
 Tests       1 passed (1)
@@ -27,7 +27,7 @@ Behavior proven by the passing test:
 - The test read that output and asserted `version === "0.1.0"`.
 
 Additional check:
-- `npm exec -- biome check scripts/build.mjs test/build-exec-path.test.ts` from `packages/lsp-daemon`: exit 0; the configured test file was checked with no fixes. The package Biome include list does not include `.mjs` scripts, so `build.mjs` was not processed.
+- `npm exec -- biome check scripts/build.mjs test/build-exec-path.windows.test.ts` from `packages/lsp-daemon`: exit 0; the configured test file was checked with no fixes. The package Biome include list does not include `.mjs` scripts, so `build.mjs` was not processed.
 - `git diff --check`: exit 0.
 
 Sanitization:
@@ -39,9 +39,10 @@ Cleanup receipt:
 - Test `finally` removed the per-run temporary root and asserted it no longer existed.
 - Independent post-run prefix scan: `MATCHING_TEMP_DIRS=0`.
 
-Frozen-tree revalidation after the strict TypeScript index-access correction:
+Revalidation after the Windows CI-discovery rename:
 - Identical focused command: exit 0; 1 test file passed, 1 test passed.
-- Test duration: 481 ms; total Vitest duration: 594 ms.
+- Test duration: 504 ms; total Vitest duration: 638 ms.
 - `npm --prefix packages/lsp-daemon run typecheck`: exit 0.
-- `npm exec -- biome check test/build-exec-path.test.ts` from `packages/lsp-daemon`: exit 0; 1 file checked, no fixes.
+- `npm exec -- biome check test/build-exec-path.windows.test.ts` from `packages/lsp-daemon`: exit 0; 1 file checked, no fixes.
+- Exact six-path PR diff classification: `generatedReleasePush: false`, `webOnly: false`, `runHeavy: true`, and `fullMatrix: true`; the renamed basename is platform-sensitive under `script/ci-fast-path.mjs`.
 - Cleanup: the test `finally` assertion passed; no persistent process, port, socket, or temp root remained.

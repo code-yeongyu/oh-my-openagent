@@ -19,14 +19,14 @@
 
 ### What was tested
 
-The focused Windows Vitest `test/build-exec-path.test.ts` copies the running Node 24.14.1 executable into a new absolute temp directory named `node with spaces`, asserts that copied executable is absolute and matches `/\s/`, and uses it to invoke the real `packages/lsp-daemon/scripts/build.mjs`.
+The focused Windows Vitest `test/build-exec-path.windows.test.ts` copies the running Node 24.14.1 executable into a new absolute temp directory named `node with spaces`, asserts that copied executable is absolute and matches `/\s/`, and uses it to invoke the real `packages/lsp-daemon/scripts/build.mjs`.
 
 The test places `tsc.cmd` and `bun.cmd` shims first on `PATH`. Those shims isolate the atomic orchestration from unrelated TypeScript workspace dependency resolution while proving the existing Windows `shell: true` default still resolves `.cmd` build tools. The `bun.cmd` shim writes only the required `cli.js` sentinel. The build then runs the real `stamp-dist-version.mjs`, publishes the atomic temp dist, and the test asserts the resulting `dist/package.json` version is exactly `0.1.0`.
 
-RED and GREEN used the identical command, with the pinned Bun 1.3.12 directory (`<PINNED_BUN_DIR>`) prepended to `PATH`:
+RED and GREEN used the same test contents and focused Vitest invocation, with the pinned Bun 1.3.12 directory (`<PINNED_BUN_DIR>`) prepended to `PATH`. The accepted RED predates the reviewer-requested `.windows` basename and is preserved under its original `test/build-exec-path.test.ts` filename in `red.txt`; GREEN uses the CI-discoverable name:
 
 ```text
-npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.test.ts --reporter=verbose
+npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.windows.test.ts --reporter=verbose
 ```
 
 ### What was observed
@@ -34,7 +34,8 @@ npm --prefix packages/lsp-daemon exec -- vitest --run test/build-exec-path.test.
 - RED on the unmodified `scripts/build.mjs`: exit 1. The inner shell reported `'<TEMP>\node' is not recognized`, showing it split `<NODE_WITH_SPACES>` at the first whitespace during `run(process.execPath, ...)`. See `red.txt`.
 - GREEN after allowing `run(command, args, options = {})` and supplying `{ shell: false }` only to the stamp invocation: exit 0, one test passed. The stamped version assertion reached and accepted `0.1.0`. See `green.txt`.
 - `tsc` and `bun` call sites received no options override, so on Windows they retain `shell: true` and continue resolving `.cmd` shims.
-- `npm exec -- biome check scripts/build.mjs test/build-exec-path.test.ts` from the package exited 0 and checked the configured test path with no fixes. Package Biome excludes `.mjs`, so the production script was not processed by that formatter.
+- `npm exec -- biome check scripts/build.mjs test/build-exec-path.windows.test.ts` from the package exited 0 and checked the configured test path with no fixes. Package Biome excludes `.mjs`, so the production script was not processed by that formatter.
+- The exact six-path PR diff now includes `build-exec-path.windows.test.ts`, so `script/ci-fast-path.mjs` reports `generatedReleasePush: false`, `webOnly: false`, `runHeavy: true`, and `fullMatrix: true`. This schedules the existing Windows package-test job instead of silently exercising only the Ubuntu skip.
 - `git diff --check` exited 0.
 - After installing the root workspace links with pinned Bun 1.3.12, `npm --prefix packages/lsp-daemon run build` completed on Node 24.14.1, emitted all three entry points, and stamped `dist/package.json` as `0.1.0`. See `build.txt`.
 - `npm --prefix packages/lsp-daemon run typecheck` exited 0 after the regression used strict index access for `process.env["PATH"]`.
@@ -56,7 +57,7 @@ The test removes its unique temp root in `finally` and asserts `existsSync(tempR
 
 ### History and commit style
 
-Touched-path history shows `d2dcb49f3a fix(build): isolate parallel lsp daemon artifacts` introduced the atomic runner, with nearby package-test history using `test(lsp-daemon): ...` and production history using `fix(lsp-daemon): ...`. No commit was created per assignment. If the orchestrator later commits this patch, a consistent subject is `fix(lsp-daemon): preserve spaced Node build path`.
+Touched-path history shows `d2dcb49f3a fix(build): isolate parallel lsp daemon artifacts` introduced the atomic runner, with nearby package-test history using `test(lsp-daemon): ...` and production history using `fix(lsp-daemon): ...`. The production fix and regression evidence use those repository conventions; the CI-discovery follow-up is a test-only rename.
 
 ### Residual risk
 

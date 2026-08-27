@@ -29,7 +29,7 @@ The Node runtime emitted DEP0190 for the two pre-existing Windows shell-based sh
 Supporting gates:
 - Focused Windows regression: 1/1 passed.
 - `npm --prefix packages/lsp-daemon run typecheck`: exit 0.
-- Targeted Biome check of `test/build-exec-path.test.ts`: exit 0, no fixes.
+- Targeted Biome check of `test/build-exec-path.windows.test.ts`: exit 0, no fixes.
 - Full package Vitest: 152 passed; 4 pre-existing Windows `EPERM` failures where unrelated tests call `symlinkSync` without Developer Mode/elevated symlink privilege (`request-routing.test.ts` x3, `version-reap.test.ts` x1). The new regression passed in the same run.
 - Full package Biome reported 15 existing formatting/import diagnostics, all in unchanged files; the changed test passes its targeted Biome check. `scripts/build.mjs` is outside this package's Biome include list and passes `node --check`.
 
