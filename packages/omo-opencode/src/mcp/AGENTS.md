@@ -10,7 +10,7 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 
 | Name | Type | Endpoint / Command | Env Vars | Tools |
 |------|------|--------------------|----------|-------|
-| **websearch** | remote | `mcp.exa.ai` (default) or `mcp.tavily.com` | `EXA_API_KEY` (optional), `TAVILY_API_KEY` (if tavily) | Web search |
+| **websearch** | remote | `mcp.exa.ai` (default), `mcp.tavily.com`, or `search.parallel.ai/mcp` | `EXA_API_KEY` (optional), `TAVILY_API_KEY` (if tavily); none for parallel | Web search; Parallel also exposes `web_fetch` |
 | **context7** | remote | `mcp.context7.com/mcp` | `CONTEXT7_API_KEY` (optional) | Library documentation |
 | **grep_app** | remote | `mcp.grep.app` | None | GitHub code search |
 | **lsp** | local (stdio, node/bun) | `node packages/lsp-tools-mcp/dist/cli.js mcp` or `bun packages/lsp-tools-mcp/src/cli.ts mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG`, `LSP_TOOLS_MCP_USER_CONFIG`, `LSP_TOOLS_MCP_INSTALL_DECISIONS` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
@@ -41,7 +41,7 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 |------|---------|
 | `index.ts` | `createBuiltinMcps()` registry for built-in MCPs |
 | `types.ts` | `McpNameSchema`: `"websearch" \| "context7" \| "grep_app" \| "lsp" \| "codegraph"` |
-| `websearch.ts` | Exa/Tavily provider with config |
+| `websearch.ts` | Exa/Tavily/Parallel provider with config |
 | `context7.ts` | Context7 with optional auth header |
 | `grep-app.ts` | Grep.app (no auth) |
 | `lsp.ts` | Local stdio MCP config for packaged `lsp-tools-mcp` |

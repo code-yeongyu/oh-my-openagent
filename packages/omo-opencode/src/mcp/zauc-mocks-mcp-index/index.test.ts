@@ -14,6 +14,27 @@ function mockLocalMcps(): void {
 }
 
 describe("createBuiltinMcps", () => {
+  test("registers Parallel under the existing websearch name only when enabled", () => {
+    // given
+    mockLocalMcps()
+    const { createBuiltinMcps } = require("../index") as typeof import("../index")
+    const config = { websearch: { provider: "parallel" as const } }
+
+    // when
+    const enabled = createBuiltinMcps([], config)
+    const disabled = createBuiltinMcps(["websearch"], config)
+
+    // then
+    expect(enabled.websearch).toEqual({
+      type: "remote",
+      url: "https://search.parallel.ai/mcp",
+      enabled: true,
+      oauth: false,
+    })
+    expect(disabled.websearch).toBeUndefined()
+    expect(enabled).not.toHaveProperty("parallel")
+  })
+
   test("should return all MCPs when disabled_mcps is empty", () => {
     // given
     mockLocalMcps()
