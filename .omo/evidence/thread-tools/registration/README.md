@@ -10,4 +10,4 @@ Authoritative PASS artifacts:
 
 The official `qa-thread-tools-final.txt` records a later invocation after the throwaway Senpi QA worktree had been removed; it is retained as a non-authoritative diagnostic because `plugin-surface-pass.txt` is the authoritative plugin registration proof and `qa-thread-tools-main.txt` is the authoritative full live-host QA run.
 
-Earlier `qa-*.txt`/`*-rerun.txt` files were superseded: the first runs used stale Senpi dist or a removed checkout; `real-surface-raw.txt` and `raw2` failed during harness setup/scope selection, while `raw3` passed create/send but used the wrong transcript-length assertion. They are removed to avoid contradictory evidence.
+The current authoritative plugin acceptance pair is `plugin-surface-raw-r6.txt` and `plugin-surface-pass.txt`, generated from one completed run. Earlier `qa-*.txt`/`*-rerun.txt` files were superseded: the first runs used stale Senpi dist or a removed checkout; `real-surface-raw.txt` and `raw2` failed during harness setup/scope selection, while `raw3` passed create/send but used the wrong transcript-length assertion. They are removed to avoid contradictory evidence.
