@@ -1,10 +1,13 @@
 import { createConnection } from "node:net"
 import { randomUUID } from "node:crypto"
-import { getAgentDir } from "@code-yeongyu/senpi"
+import { createRequire } from "node:module"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
+
+const require = createRequire(import.meta.url)
+function senpiAgentDir(): string { return (require("@code-yeongyu/senpi") as { getAgentDir: () => string }).getAgentDir() }
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
@@ -30,7 +33,7 @@ async function request(socketPath: string, command: Record<string, unknown>): Pr
 }
 
 /** Client for Senpi's existing supervisor-owned unix socket. It never starts or replaces a host. */
-export function resolveThreadSocket(getDir: () => string = getAgentDir): string {
+export function resolveThreadSocket(getDir: () => string = senpiAgentDir): string {
   return process.env.SENPI_RPC_SOCKET ?? join(getDir(), "rpc", "rpc.sock")
 }
 
