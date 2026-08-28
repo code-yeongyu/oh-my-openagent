@@ -15,7 +15,11 @@ describe("live thread socket discovery", () => {
     expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === "/h/.omo/settings.json" })).toBe("/h/.omo")
     expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe("/h/.senpi/agent")
   })
-  test("missing socket returns undefined", () => {
-    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })).toBeUndefined()
+  test("always constructs a surface when the socket is absent at registration", () => {
+    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })).toBeDefined()
+  })
+  test("returns typed host_unavailable when the socket is absent at call time", async () => {
+    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })
+    await expect(surface.listSessions()).rejects.toThrow("host_unavailable:/missing.sock")
   })
 })

@@ -17,28 +17,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       const host = options.host ?? createLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
-      if (host === undefined) {
-        ctx.logger.warn("omo-senpi thread component skipped: live RPC surface unavailable")
-        let attempts = 0
-        const retry = (): void => {
-          const retryHost = options.host ?? createLiveThreadSurface(pi)
-          if (retryHost !== undefined) {
-            registerThreadTools(pi, {
-              host: retryHost,
-              stateDirectory,
-              diskSessions: options.diskSessions,
-              ensureHost: options.ensureHost,
-              callerSessionId: options.callerSessionId ?? (() => "unknown-caller"),
-              callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
-            })
-            return
-          }
-          attempts += 1
-          if (attempts < 100) setTimeout(retry, 100)
-        }
-        setTimeout(retry, 100)
-        return
-      }
+      ctx.logger.info("omo-senpi thread tools use lazy shared-host availability")
       registerThreadTools(pi, {
         host,
         stateDirectory,

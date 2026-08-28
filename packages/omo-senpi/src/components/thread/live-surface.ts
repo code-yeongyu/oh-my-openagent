@@ -34,10 +34,13 @@ export function resolveThreadSocket(env: Readonly<Record<string, string | undefi
   return env.SENPI_RPC_SOCKET ?? join(resolveAgentHome({ env }), "rpc", "rpc.sock")
 }
 
-export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: { readonly env?: Readonly<Record<string, string | undefined>>; readonly exists?: (path: string) => boolean } = {}): ThreadHost | undefined {
+export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: { readonly env?: Readonly<Record<string, string | undefined>>; readonly exists?: (path: string) => boolean } = {}): ThreadHost {
+  const call = async <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => {
+    const socket = resolveThreadSocket(options.env)
+    if (!(options.exists ?? existsSync)(socket)) throw new Error(`host_unavailable:${socket}`)
+    return await request(socket, { type, ...data }) as T
+  }
   const socket = resolveThreadSocket(options.env)
-  if (!(options.exists ?? existsSync)(socket)) return undefined
-  const call = async <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => await request(socket, { type, ...data }) as T
   return {
     socket,
     listSessions: async () => (await call<{ sessions: ThreadHostSession[] }>("list_sessions")).sessions,

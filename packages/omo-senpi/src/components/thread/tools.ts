@@ -153,7 +153,11 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       return output(result)
     } catch (error) {
       receipts.abandon(admission, error instanceof Error ? error.message : String(error))
-      return output(failure("internal_error", `Thread operation failed: ${error instanceof Error ? error.message : String(error)}`, "Call thread_list and retry after checking the target."))
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.startsWith("host_unavailable:")) {
+        return output(failure("host_unavailable", `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`, "Retry when the shared Senpi host is running."))
+      }
+      return output(failure("internal_error", `Thread operation failed: ${message}`, "Call thread_list and retry after checking the target."))
     }
   }
 
