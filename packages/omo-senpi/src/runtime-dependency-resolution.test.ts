@@ -49,7 +49,7 @@ describe("omo-senpi local-path runtime dependencies", () => {
       `${runtimeImports.map((specifier) => `await import(${JSON.stringify(specifier)})`).join("\n")}\nconsole.log("runtime-dependencies-loaded")\n`,
     )
 
-    for (const specifier of runtimeImports) {
+    for (const specifier of new Set(runtimeImports.map(packageNameOf))) {
       const dependencyRoot = findPackageRoot(specifier)
       const linkPath = join(isolatedPackageRoot, "node_modules", ...packageNameOf(specifier).split("/"))
       mkdirSync(dirname(linkPath), { recursive: true })
