@@ -1,21 +1,24 @@
 import { describe, expect, test } from "bun:test"
 import { createThreadComponent } from "./component"
+import type { ThreadHost } from "./tools"
 
-function ctx(logs: string[]) { return { logger: { info() {}, error() {}, warn(message: string) { logs.push(message) } }, config: { getFlag: () => undefined } } }
-function pi(request?: (name: string, data?: unknown) => Promise<unknown>) { const tools: Record<string, unknown>[] = []; return { tools, pi: { cwd: process.cwd(), rpc: request === undefined ? undefined : { request }, registerTool(tool: Record<string, unknown>) { tools.push(tool) }, on() {}, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {} } } }
+function host(): ThreadHost {
+  return { socket: "/tmp/thread-test.sock", listSessions: async () => [], openSession: async () => ({ sessionId: "s", cwd: process.cwd() }), getMessages: async () => [], getState: async () => ({}), prompt: async () => ({}), interrupt: async () => ({}) }
+}
+function context(warnings: string[]) { return { logger: { info() {}, error() {}, warn(message: string) { warnings.push(message) } }, config: { getFlag: () => undefined } } }
+function api() { const tools: Record<string, unknown>[] = []; return { tools, pi: { cwd: process.cwd(), rpc: { emit() {}, handle() {} }, registerTool(tool: Record<string, unknown>) { tools.push(tool) }, on() {}, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {} } } }
 
 describe("thread component production registration", () => {
-  test("constructs the live surface from pi.rpc and registers all six tools", () => {
-    const seen: string[] = []
-    const f = pi(async (name) => { seen.push(name); if (name === "list_sessions") return { sessions: [] }; throw new Error(`unexpected ${name}`) })
-    createThreadComponent().register(f.pi as never, ctx([]) as never)
+  test("registers all six tools when a test host is supplied", () => {
+    const f = api()
+    createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
     expect(f.tools.map((tool) => tool.name)).toEqual(["thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff"])
-    expect(seen).toEqual([])
   })
 
-  test("warns when the runtime RPC surface is unavailable", () => {
-    const logs: string[] = []; const f = pi()
-    createThreadComponent().register(f.pi as never, ctx(logs) as never)
-    expect(f.tools).toHaveLength(0); expect(logs).toEqual(["omo-senpi thread component skipped: live RPC surface unavailable"])
+  test("warns when the socket surface cannot be constructed", () => {
+    const warnings: string[] = []; const f = api(); const previous = process.env.SENPI_RPC_SOCKET
+    delete process.env.SENPI_RPC_SOCKET; delete process.env.SENPI_CODING_AGENT_DIR; delete process.env.OMO_CODING_AGENT_DIR
+    try { createThreadComponent().register(f.pi as never, context(warnings) as never) } finally { if (previous === undefined) delete process.env.SENPI_RPC_SOCKET; else process.env.SENPI_RPC_SOCKET = previous }
+    expect(f.tools).toHaveLength(0); expect(warnings).toEqual(["omo-senpi thread component skipped: live RPC surface unavailable"])
   })
 })

@@ -18,6 +18,7 @@ import { threadToolFailure, type ThreadErrorCode } from "./errors"
 import { createOrderedDeliveryMailbox, type MailboxTargetPort } from "./mailbox"
 import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_SEARCH_METADATA } from "./metadata"
 import { readTranscript, type ThreadTranscriptEntry } from "./reader"
+export type { ThreadTranscriptEntry } from "./reader"
 import { createReceiptStore, type ReceiptStore } from "./receipts"
 
 export type ThreadHostSession = {
