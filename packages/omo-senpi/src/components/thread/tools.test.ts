@@ -30,7 +30,7 @@ describe("thread tool registration", () => {
   test("unknown targets return the typed not_found result", async () => {
     const f = fixture()
     const list = createThreadTools({ ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
-    const result = await list[2].execute("call-1", { thread: "missing" }, undefined, undefined, undefined)
+    const result = await list[2].execute("call-1", { thread: "missing" }, undefined, undefined, {} as never)
     expect((result.details as { result: { kind: string; error?: { code: string } } }).result).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
 })
