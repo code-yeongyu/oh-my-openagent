@@ -14,6 +14,26 @@ afterEach(cleanupProjects)
 const iso = (): string => new Date().toISOString()
 
 describe("TaskManager outcome guards", () => {
+  test("#given a nonterminal record #when an outcome tries to settle waiters and the record then becomes terminal #then the waiter remains armed until terminal settlement", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const waiter = manager.waitFor(started.task_id)
+    const current = store.load(started.task_id)
+    if (current === null || current === undefined) throw new Error("expected record")
+    store.replace({ ...current, status: "pending" })
+
+    // when - the outcome reaches #settleWaiters while the record is still nonterminal
+    inProcess.handles.get(started.task_id)?.settle({ status: "completed", finalResponse: "late" })
+    await Promise.resolve()
+    expect(manager.waiterKeyCount()).toBe(1)
+    await manager.cancelTask(started.task_id)
+
+    // then
+    expect(await waiter).toMatchObject({ status: "cancelled" })
+  })
+
   test("#given a running resident child #when suspension forgets its handle and the abort settles cancelled #then the record stays running+persisted_only and no waiter settles with a terminal", async () => {
     // given
     const { manager, store, inProcess } = makeManager({})
@@ -117,6 +137,26 @@ describe("TaskManager outcome guards", () => {
     const record = store.load(taskId)
     expect(record?.status).toBe("cancelled")
     expect(record?.residency_state).toBe("disposed")
+  })
+
+  test("#given a child with no assistant turn #when a false empty completion settles #then the record errors instead of completing", async () => {
+    // given - the runner incorrectly reports a clean completion even though the child session only
+    // contains its initiating user prompt and produced no assistant turn.
+    const { manager, store, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const taskId = started.task_id
+    const waiter = manager.waitFor(taskId)
+
+    // when
+    inProcess.handles.get(taskId)?.settle({ status: "completed", finalResponse: "" })
+    await flush()
+
+    // then
+    const record = await waiter
+    expect(record.status).toBe("error")
+    expect(record.error_message).toContain("no assistant output")
+    expect(store.load(taskId)?.status).toBe("error")
   })
 
   test("#given a running resident child #when it completes normally #then the record completes and the waiter settles with the terminal record", async () => {

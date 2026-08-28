@@ -1,0 +1,34 @@
+Deterministic module surface
+----------------------------
+  reserve idle recipient gate; send; confirm unread; release blocker
+  queued wake dispatched: yes
+  unread message injected after wake: yes
+Real OpenCode surface
+---------------------
+  disposable Docker, OpenCode 1.18.4, CI-Bun 1.4.0 local dist/index.js
+  health: healthy
+  team_create/team_send_message registered: yes
+  SSE server.connected: yes
+  host sessions: 7933 -> 7933
+  host config mounted: no
+  team-live-delivery early reservation releases: 0
+  fallback dispatched after blocker expiry: yes
+  final message-specific dedupe bundle run: pass
+  final transient-retry bundle run: pass
+  final deleted-team bundle run: pass
+  final exact-message bundle run: pass
+  final bounded-validation bundle run: pass
+  final pending-ack bundle run: pass
+  final transport-retry bundle run: pass
+  final bounded-queue blocker bundle run: pass
+  final reservation-race blocker bundle run: pass
+  final retry-invariant blocker bundle run: pass
+  final durable-retry bundle run: pass
+  final connection-classifier bundle run: pass
+  live Senpi adapter driver: pass
+The bundle reached the real tool surface; the module seam proved hold
+preservation and obsolete-wake cancellation.
+Captured command output:
+  artifacts/real-opencode.txt
+  artifacts/real-fallback-run.txt
+  artifacts/review-correction-run.txt

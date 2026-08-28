@@ -62,7 +62,7 @@ stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 defn["key"] = f"{defn['key']}-{stamp}"
 text = json.dumps(defn).replace("{{key}}", defn["key"]).replace("{{date}}", stamp[:8]).replace("{{datetime}}", stamp)
 run = tool.dag({"action": "start", "definition": json.loads(text)})
-result = tool.dag({"action": "wait", "run_id": run["run_id"]})
+result = tool.dag({"action": "wait", "run_id": run["run_id"], "detach": False})  # detach=False keeps the cell-blocking wait; the bare tool action detaches against a live run
 ```
 
 ## Saving a new definition

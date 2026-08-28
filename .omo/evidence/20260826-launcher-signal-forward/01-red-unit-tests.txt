@@ -1,0 +1,71 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/doctor-stale-engines.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'classifyEngineProcesses' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/bin/lib/doctor.js'.
+-------------------------------
+
+
+packages/omo-native/test/child-process-signal.test.ts:
+115 |       const content = readFileSync(path, "utf8")
+116 |       if (content.includes(expected)) return content
+117 |     }
+118 |     await new Promise((resolveWait) => setTimeout(resolveWait, 10))
+119 |   }
+120 |   throw new Error(`timed out waiting for ${expected} in ${path}: ${existsSync(path) ? readFileSync(path, "utf8") : "<absent>"}`)
+                  ^
+error: timed out waiting for SIGTERM in /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-signal-L5QGtk/signals.log: <absent>
+      at waitForContent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:120:13)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:165:32)
+(fail) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGTERM > #then the child receives SIGTERM and drains before the launcher exits [15258.91ms]
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGTERM > #then a child that ignores SIGTERM still ends the launcher by SIGTERM after the grace window [247.05ms]
+115 |       const content = readFileSync(path, "utf8")
+116 |       if (content.includes(expected)) return content
+117 |     }
+118 |     await new Promise((resolveWait) => setTimeout(resolveWait, 10))
+119 |   }
+120 |   throw new Error(`timed out waiting for ${expected} in ${path}: ${existsSync(path) ? readFileSync(path, "utf8") : "<absent>"}`)
+                  ^
+error: timed out waiting for SIGHUP in /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-signal-RucFqq/signals.log: <absent>
+      at waitForContent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:120:13)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:165:32)
+(fail) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGHUP > #then the child receives SIGHUP and drains before the launcher exits [15278.53ms]
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGHUP > #then a child that ignores SIGHUP still ends the launcher by SIGHUP after the grace window [247.17ms]
+198 |       await new Promise((resolveWait) => setTimeout(resolveWait, 500))
+199 | 
+200 |       const recorded = existsSync(harness.signalLog) ? readFileSync(harness.signalLog, "utf8") : ""
+201 |       expect(recorded).not.toContain("SIGINT")
+202 |       // The child is untouched and still running, so the launcher is still waiting on it.
+203 |       expect(await Promise.race([parent.exit, Promise.resolve("running")])).toBe("running")
+                                                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: {
+  code: null,
+  signal: "SIGINT",
+}
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:203:77)
+(fail) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGINT > #then the launcher never forwards it a second time [739.57ms]
+(pass) launcher child signal forwarding > #given an engine child that exits on its own #when it returns a non-zero code > #then the launcher exits with the same code [234.27ms]
+(pass) launcher child signal forwarding > #given an engine child killed by a signal #when the launcher propagates the result > #then the launcher dies by that same signal [274.52ms]
+115 |       const content = readFileSync(path, "utf8")
+116 |       if (content.includes(expected)) return content
+117 |     }
+118 |     await new Promise((resolveWait) => setTimeout(resolveWait, 10))
+119 |   }
+120 |   throw new Error(`timed out waiting for ${expected} in ${path}: ${existsSync(path) ? readFileSync(path, "utf8") : "<absent>"}`)
+                  ^
+error: timed out waiting for SIGTERM in /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-signal-mu2Phd/signals.log: <absent>
+      at waitForContent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:120:13)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/packages/omo-native/test/child-process-signal.test.ts:283:20)
+(fail) launcher child signal forwarding > #given a launcher that re-execed itself under bun #when the launcher receives SIGTERM > #then the re-exec layer forwards it to the runtime child too [15261.27ms]
+
+ 4 pass
+ 5 fail
+ 1 error
+ 7 expect() calls
+Ran 9 tests across 2 files. [48.04s]

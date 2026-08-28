@@ -4,11 +4,25 @@ import { LspClientTransport } from "./transport.js";
 
 interface InitializeCapabilities {
 	readonly diagnosticProvider?: unknown;
+	readonly documentFormattingProvider?: unknown;
 }
 
 function supportsDiagnosticPull(capabilities: InitializeCapabilities | undefined): boolean {
 	if (capabilities === undefined) return false;
 	return Object.hasOwn(capabilities, "diagnosticProvider");
+}
+
+/**
+ * Reads the whole-document formatting capability the server advertised at initialize time.
+ *
+ * The provider is either a boolean or an options object, and an explicit `false` means the
+ * server refuses the request, so both shapes are checked instead of mere key presence.
+ */
+function supportsDocumentFormatting(capabilities: InitializeCapabilities | undefined): boolean {
+	if (capabilities === undefined) return false;
+	const provider = capabilities.documentFormattingProvider;
+	if (provider === undefined || provider === null || provider === false) return false;
+	return provider === true || typeof provider === "object";
 }
 
 export class LspClientConnection extends LspClientTransport {
@@ -28,6 +42,7 @@ export class LspClientConnection extends LspClientTransport {
 						references: {},
 						documentSymbol: { hierarchicalDocumentSymbolSupport: true },
 						publishDiagnostics: {},
+						formatting: { dynamicRegistration: false },
 						rename: {
 							prepareSupport: true,
 							prepareSupportDefaultBehavior: 1,
@@ -71,6 +86,7 @@ export class LspClientConnection extends LspClientTransport {
 			{ timeoutMs: this.initializeTimeoutMs },
 		);
 		this.setDiagnosticPullSupported(supportsDiagnosticPull(result?.capabilities));
+		this.setDocumentFormattingSupported(supportsDocumentFormatting(result?.capabilities));
 		await this.sendNotification("initialized", {});
 		await this.sendNotification("workspace/didChangeConfiguration", {
 			settings: { json: { validate: { enable: true } } },

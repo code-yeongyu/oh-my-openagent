@@ -1,0 +1,30 @@
+Failing first
+-------------
+  messaging.test.ts: timed out waiting for queued fallback mailbox wake
+  corrected gate-blocker path: 1 failed
+
+After fix
+---------
+  focused messaging: 39 pass, 0 fail
+  related messaging/idle-wake/prompt-route: 67 pass, 0 fail
+  prompt gate core: 67 pass, 0 fail
+  CI regressions: auto-retry 13 pass; tmux ordering 2 pass
+  exact message read: 2 pass, 0 fail
+  CI-Bun Senpi artifact check: pass
+  live Senpi driver: pass; real agent directory untouched
+  Senpi package gate: 2417 pass, 1 platform skip, 0 fail
+  bun run typecheck: pass
+  bun run build: pass
+  git diff --check: pass
+
+Captured command output:
+  artifacts/failing-first.txt
+  artifacts/focused-tests.txt
+  artifacts/related-tests.txt
+  artifacts/typecheck-build.txt
+  artifacts/real-fallback-run.txt
+  artifacts/prompt-gate-tests.txt
+  artifacts/ci-regressions.txt
+  artifacts/exact-message-tests.txt
+  artifacts/senpi-artifact-check.txt
+  artifacts/review-correction-run.txt

@@ -1,0 +1,35 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts:
+(pass) runRows node selection > #given fifteen nodes with the three running ones beyond the row budget #when rendering #then every running node is shown [3.85ms]
+(pass) runRows node selection > #given more running nodes than the whole row budget #when rendering #then running rows are exempt from the cap [1.64ms]
+(pass) runRows node selection > #given two running nodes declared latest-first #when rendering #then the earlier start leads [0.51ms]
+(pass) runRows node selection > #given nodes across every settled bucket #when rendering #then running leads waiting, failed, completed, skipped [149.65ms]
+(pass) runRows node elapsed > #given a running node with startedAt #when rendering at a fixed now #then the row carries elapsed since start [0.17ms]
+(pass) runRows node elapsed > #given a completed node #when rendering now and later #then the settled duration is frozen [0.17ms]
+(pass) runRows node elapsed > #given a pending node without startedAt #when rendering #then no elapsed token appears [0.10ms]
+(pass) runRows width awareness > #given a 50-column terminal #when rendering #then activity is dropped while label route and elapsed stay [0.12ms]
+(pass) runRows width awareness > #given a 120-column terminal #when rendering #then a long latest-activity line survives well past 40 characters [0.15ms]
+(pass) runRows width awareness > #given a 120-column terminal and a short node #when rendering #then the row is not padded [0.11ms]
+(pass) runRows paused run header honesty > #given a paused run whose lease holder is alive #when rendering #then the header reads resuming under the neutral icon [0.14ms]
+(pass) runRows paused run header honesty > #given a paused run with no live lease and running nodes #when rendering #then the header reads suspended with the active count [0.17ms]
+(pass) runRows paused run header honesty > #given a paused run with no live lease and no running nodes #when rendering #then the header still reads paused under the neutral icon [0.12ms]
+(pass) runRows activity semantics > #given a running node with live activity #when rendering #then the row shows it after the route [0.12ms]
+(pass) runRows activity semantics > #given a completed node with stale activity still known #when rendering #then no activity text shows [0.11ms]
+
+packages/omo-senpi/src/components/task/dag-snapshot-payload.test.ts:
+(pass) dagUpdatedPayload > #given a node that failed and was retried > #when the payload is built #then the node carries its attempt and last_error [0.36ms]
+(pass) dagUpdatedPayload > #given a node that failed and was retried > #when the node never failed #then last_error is absent rather than null [0.11ms]
+(pass) dagUpdatedPayload > #given a node that failed and was retried > #when the engine error carries extra fields #then only code and message reach the wire [0.09ms]
+(pass) dagUpdatedPayload > #given a run whose definition was amended > #when the payload is built #then amend_count reports the amend history length [0.10ms]
+(pass) dagUpdatedPayload > #given a run whose definition was amended > #when the run was never amended #then amend_count is absent [0.07ms]
+(pass) dagUpdatedPayload > #given a settled run that resumed after a retry > #when the payload is built #then completed_at is absent for the running run [0.07ms]
+(pass) dagUpdatedPayload > #given a settled run that resumed after a retry > #when the run is terminal #then completed_at still reaches the wire [0.07ms]
+(pass) dagUpdatedPayload > #given a paused run holding a resume lease > #when the payload is built #then lease_holder_pid reaches the wire [0.06ms]
+(pass) dagUpdatedPayload > #given a paused run holding a resume lease > #when the run holds no lease #then lease_holder_pid is absent rather than null [0.06ms]
+(pass) dagUpdatedPayload > #given the omo-desktop-app reducer contract > #when a plain run is serialized #then the existing field order and names are untouched [0.08ms]
+
+ 25 pass
+ 0 fail
+ 56 expect() calls
+Ran 25 tests across 2 files. [448.00ms]

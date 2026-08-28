@@ -1,6 +1,6 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
 import { LspClient } from "./client.js";
-import { IDLE_TIMEOUT_MS, INIT_TIMEOUT_MS, REAPER_INTERVAL_MS } from "./constants.js";
+import { IDLE_TIMEOUT_MS, INIT_TIMEOUT_MS, MAX_RESIDENT_CLIENTS, REAPER_INTERVAL_MS } from "./constants.js";
 import { installProcessSignalCleanup } from "./process-signal-cleanup.js";
 import type { ResolvedServer } from "./types.js";
 
@@ -28,6 +28,7 @@ export interface ClientSnapshot {
 export interface LspManagerOptions {
 	idleTimeoutMs?: number;
 	initTimeoutMs?: number;
+	maxResidentClients?: number;
 	reaperIntervalMs?: number;
 	clientFactory?: (root: string, server: ResolvedServer) => LspClient;
 	now?: () => number;
@@ -80,6 +81,7 @@ export class LspManager {
 
 	private readonly idleTimeoutMs: number;
 	private readonly initTimeoutMs: number;
+	private readonly maxResidentClients: number;
 	private readonly reaperIntervalMs: number;
 	private readonly clientFactory: (root: string, server: ResolvedServer) => LspClient;
 	private readonly now: () => number;
@@ -87,6 +89,7 @@ export class LspManager {
 	constructor(options: LspManagerOptions = {}) {
 		this.idleTimeoutMs = options.idleTimeoutMs ?? IDLE_TIMEOUT_MS;
 		this.initTimeoutMs = options.initTimeoutMs ?? INIT_TIMEOUT_MS;
+		this.maxResidentClients = options.maxResidentClients ?? MAX_RESIDENT_CLIENTS;
 		this.reaperIntervalMs = options.reaperIntervalMs ?? REAPER_INTERVAL_MS;
 		this.clientFactory = options.clientFactory ?? ((root, server) => new LspClient(root, server));
 		this.now = options.now ?? (() => Date.now());
@@ -132,6 +135,32 @@ export class LspManager {
 				this.clients.delete(key);
 			}
 		}
+	}
+
+	/**
+	 * Frees capacity for one new client by stopping the least recently used idle client.
+	 *
+	 * Only clients with no in-flight work are eligible, so a resident server is never torn down
+	 * underneath a live request; when every resident client is busy the cap is exceeded instead.
+	 */
+	private evictForAdmission(): void {
+		while (this.clients.size >= this.maxResidentClients) {
+			const victim = this.leastRecentlyUsedIdleClient();
+			if (!victim) return;
+			this.clients.delete(victim.key);
+			void stopClientBestEffort(victim.managed.client);
+		}
+	}
+
+	private leastRecentlyUsedIdleClient(): { readonly key: string; readonly managed: ManagedClient } | null {
+		let candidate: { readonly key: string; readonly managed: ManagedClient } | null = null;
+		for (const [key, managed] of this.clients) {
+			if (managed.refCount > 0 || managed.pendingWaiters > 0 || managed.isInitializing) continue;
+			if (candidate === null || managed.lastUsedAt < candidate.managed.lastUsedAt) {
+				candidate = { key, managed };
+			}
+		}
+		return candidate;
 	}
 
 	private async tryDeleteIfOrphaned(key: string, managed: ManagedClient): Promise<void> {
@@ -196,6 +225,8 @@ export class LspManager {
 			managed.lastUsedAt = this.now();
 			return managed.client;
 		}
+
+		this.evictForAdmission();
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
@@ -263,6 +294,8 @@ export class LspManager {
 		if (this.disposed) return;
 		const key = this.getKey(root, server.id);
 		if (this.clients.has(key)) return;
+
+		this.evictForAdmission();
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();

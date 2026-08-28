@@ -121,7 +121,7 @@ function defaultRetryTargets(record: DagRunRecordV1): DagNodeId[] {
 }
 
 // Transitive skipped dependents of the retry set: the cascade skipped them, so retrying their
-// blocking ancestor must hand them back to the wave loop as blocked work.
+// blocking ancestor must hand them back to the scheduler loop as blocked work.
 function skippedDependentsOf(record: DagRunRecordV1, seeds: readonly DagNodeId[]): readonly DagNode[] {
   const selected = new Set(seeds)
   const restored: DagNode[] = []
@@ -163,8 +163,8 @@ function assertRetryable(record: DagRunRecordV1, runId: DagRunId, targets: reado
       })
     }
     if (node.state !== "skipped") continue
-    // A skipped node whose blocking ancestor stays failed is re-skipped by the dependent cascade the
-    // moment the wave loop runs, so every such ancestor must be part of the same retry set.
+    // A skipped node whose blocking ancestor stays failed is re-skipped by the dependent cascade
+    // the moment the scheduler loop runs, so every such ancestor must be part of the same retry set.
     const blocking = blockingAncestors(record, node).filter((ancestorId) => !selected.has(ancestorId))
     if (blocking.length > 0) {
       throw new DagNodeControlError({

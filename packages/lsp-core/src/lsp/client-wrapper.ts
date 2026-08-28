@@ -17,6 +17,7 @@ import {
 } from "./errors.js";
 import { getLspManager, type LspManager } from "./manager.js";
 import { findWorkspaceRootOutsideContext } from "./outside-context-workspace.js";
+import { LSP_LOCAL_INSTALL_HINTS } from "./server-definitions.js";
 import { loadInstallDecision } from "./server-install-state.js";
 import { findServerForExtension } from "./server-resolution.js";
 import type { ServerLookupResult } from "./types.js";
@@ -138,6 +139,26 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
 	].join("\n");
 }
 
+/**
+ * Builds the install guidance, offering the repo-local install first.
+ *
+ * A repo-local install is resolvable without touching the global environment, so it is the
+ * recommended route whenever the server ships as a project dependency.
+ */
+function formatInstallOptions(serverId: string, installHint: string): string[] {
+	const localHint = LSP_LOCAL_INSTALL_HINTS[serverId];
+	if (localHint === undefined) {
+		return ["To install, run:", `  ${installHint}`];
+	}
+	return [
+		"To install in THIS repository (preferred — no global install needed):",
+		`  ${localHint}`,
+		"",
+		"Or install it globally:",
+		`  ${installHint}`,
+	];
+}
+
 function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_installed" }>): string {
 	const { server, installHint } = result;
 	const extensions = server.extensions.join(", ");
@@ -154,20 +175,20 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 		`Command not found: ${server.command[0]}`,
 		"",
 	];
+	const installOptions = formatInstallOptions(server.id, installHint);
 
 	if (decision === "allowed") {
 		return [
 			...header,
 			"The user has pre-authorized LSP installation. Run the install command, then retry this tool:",
-			`  ${installHint}`,
+			...installOptions.slice(1),
 		].join("\n");
 	}
 
 	if (!context.capabilities.installDecisionTool) {
 		return [
 			...header,
-			"To install, run:",
-			`  ${installHint}`,
+			...installOptions,
 			"",
 			"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
 			"Install-decision recording is unavailable in this harness; proceed without LSP if the user declines.",
@@ -176,8 +197,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 
 	return [
 		...header,
-		"To install, run:",
-		`  ${installHint}`,
+		...installOptions,
 		"",
 		"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
 		"- If the user agrees: run the install command above, then retry this tool.",

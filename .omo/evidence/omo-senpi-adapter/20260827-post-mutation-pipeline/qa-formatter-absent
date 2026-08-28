@@ -1,0 +1,1 @@
+Outcome: PASS (unit-backed policy path). Best-effort formatter absence is fail-open and emits at most one session notice per formatter; required mode returns a tool-result error. The missing notice is actionable and includes `bun add -d`.

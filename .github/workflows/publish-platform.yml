@@ -11,6 +11,13 @@ on:
         required: false
         type: string
         default: ""
+      omo_ai_version:
+        # omo-ai version stamped into the release binaries. Optional here so the
+        # caller wiring stays actionlint-clean; the binary lane fails loud when
+        # it is missing or malformed (see "Check release assets").
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       version:
@@ -22,6 +29,10 @@ on:
         required: false
         type: string
         default: ""
+      omo_ai_version:
+        description: "omo-ai version to stamp into release binaries (e.g., 3.0.0-0.beta.12)"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -181,6 +192,201 @@ jobs:
           path: |
             binary-${{ matrix.platform }}.tar.gz
             binary-${{ matrix.platform }}.zip
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Check release assets
+        id: release-assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.validate.outputs.version }}
+          OMO_AI_VERSION: ${{ inputs.omo_ai_version }}
+        run: |
+          if ! [[ "$OMO_AI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid omo_ai_version: $OMO_AI_VERSION"
+            exit 1
+          fi
+
+          PLATFORM="${{ matrix.platform }}"
+          BINARY="omo-${PLATFORM}"
+          if [[ "$PLATFORM" == windows-* ]]; then
+            BINARY="omo-${PLATFORM}.exe"
+          fi
+
+          # The binary lane has its own idempotency key: the release asset on
+          # the GitHub release. It deliberately ignores the npm publish skip.
+          if ASSET_NAMES="$(gh release view "v${VERSION}" --json assets --jq '.assets[].name' 2>/dev/null)"; then
+            if grep -Fxq "$BINARY" <<<"$ASSET_NAMES"; then
+              echo "binary_exists=true" >> "$GITHUB_OUTPUT"
+              echo "✓ release asset ${BINARY} already exists on v${VERSION}"
+            else
+              echo "binary_exists=false" >> "$GITHUB_OUTPUT"
+              echo "→ release asset ${BINARY} missing on v${VERSION}; building release binary"
+            fi
+          else
+            echo "binary_exists=false" >> "$GITHUB_OUTPUT"
+            echo "→ release v${VERSION} not found or lists no assets; building release binary"
+          fi
+
+      - name: Build release binary
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        env:
+          OMO_VERSION: ${{ steps.validate.outputs.version }}
+          OMO_AI_VERSION: ${{ inputs.omo_ai_version }}
+        run: |
+          bun run script/build-omo-binary.ts \
+            --target "${{ matrix.platform }}" \
+            --omo-version "$OMO_VERSION" \
+            --omo-ai-version "$OMO_AI_VERSION"
+          echo "Built release binary:"
+          ls -lh .omo/release-binaries/
+        timeout-minutes: 45
+
+      - name: Smoke test release binary
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        env:
+          OMO_AI_VERSION: ${{ inputs.omo_ai_version }}
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.platform }}"
+          EXE_SUFFIX=""
+          if [[ "$TARGET" == windows-* ]]; then
+            EXE_SUFFIX=".exe"
+          fi
+          BIN=".omo/release-binaries/omo-${TARGET}${EXE_SUFFIX}"
+          ENGINE_PIN="$(jq -r '.dependencies["@code-yeongyu/senpi"]' packages/omo-native/package.json)"
+          # Exact stamped version line: a missing sibling package.json silently
+          # stamps 0.0.0, so the full string including the engine pin is compared.
+          EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN})"
+          test -f "$BIN"
+
+          isolate() {
+            SMOKE_ROOT="$(mktemp -d)"
+            mkdir -p "${SMOKE_ROOT}/home" "${SMOKE_ROOT}/agent" \
+              "${SMOKE_ROOT}/xdg/config" "${SMOKE_ROOT}/xdg/data" \
+              "${SMOKE_ROOT}/xdg/state" "${SMOKE_ROOT}/xdg/cache"
+            export HOME="${SMOKE_ROOT}/home"
+            export XDG_CONFIG_HOME="${SMOKE_ROOT}/xdg/config"
+            export XDG_DATA_HOME="${SMOKE_ROOT}/xdg/data"
+            export XDG_STATE_HOME="${SMOKE_ROOT}/xdg/state"
+            export XDG_CACHE_HOME="${SMOKE_ROOT}/xdg/cache"
+            export OMO_CODING_AGENT_DIR="${SMOKE_ROOT}/agent"
+            # Node's Windows os.homedir() follows USERPROFILE; HOME alone is
+            # only the Git Bash shell view and does not control provisioning.
+            if [[ "$TARGET" == windows-* ]]; then
+              export USERPROFILE="${HOME}"
+            fi
+          }
+
+          assert_version_line() {
+            local actual
+            actual="$($BIN --version)"
+            if [ "$actual" != "$EXPECTED_VERSION_LINE" ]; then
+              echo "version mismatch for ${TARGET}: expected '${EXPECTED_VERSION_LINE}', got '${actual}'"
+              return 1
+            fi
+          }
+
+          assert_first_run_provisioned() {
+            local provisioned="${HOME}/.omo/binary-runtime/${OMO_AI_VERSION}/omo${EXE_SUFFIX}"
+            if [ ! -f "$provisioned" ]; then
+              echo "first-run provisioning did not materialize ${provisioned}"
+              return 1
+            fi
+          }
+
+          pty_smoke() {
+            # Round-trip the binary through a real pty on the pty-smoked legs.
+            if [[ "${OSTYPE:-}" == darwin* ]]; then
+              script -q /dev/null "$BIN" --version | tr -d '\r' | grep -F "$EXPECTED_VERSION_LINE"
+            else
+              script -qec "$BIN --version" /dev/null | tr -d '\r' | grep -F "$EXPECTED_VERSION_LINE"
+            fi
+          }
+
+          oldstable_glibc_smoke() {
+            # The binary must also run against a glibc older than the builder's.
+            docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
+              debian:oldstable sh -c "${BIN} --version" | grep -F "$EXPECTED_VERSION_LINE"
+          }
+
+          musl_smoke() {
+            # musl binaries cannot run on the glibc runner: alpine container.
+            docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
+              alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && ${BIN} --version" | grep -F "$EXPECTED_VERSION_LINE"
+          }
+
+          verify_checksum_and_size_only() {
+            # No arm64 Windows runner exists: verify digest and size budget
+            # without executing the binary.
+            ( cd .omo/release-binaries && sha256sum -c SHA256SUMS )
+            local size
+            size="$(wc -c < "$BIN")"
+            if [ "$size" -gt 157286400 ]; then
+              echo "release binary ${TARGET} exceeds the 150MB size budget (${size} bytes)"
+              return 1
+            fi
+          }
+
+          case "$TARGET" in
+            darwin-arm64)
+              # arm64 macOS runner: native exec.
+              isolate
+              assert_version_line
+              assert_first_run_provisioned
+              pty_smoke
+              ;;
+            darwin-x64|darwin-x64-baseline)
+              # No x64 macOS runner: Rosetta attempt, tolerated failure.
+              isolate
+              if assert_version_line; then
+                assert_first_run_provisioned
+              else
+                echo "::warning::Rosetta smoke failed for ${TARGET} (tolerated; checksum and size are still enforced by the build)"
+              fi
+              ;;
+            linux-x64|linux-x64-baseline)
+              # x64 Linux runner: native exec; pty + oldstable-glibc legs on the main target.
+              isolate
+              assert_version_line
+              assert_first_run_provisioned
+              if [ "$TARGET" = "linux-x64" ]; then
+                pty_smoke
+                oldstable_glibc_smoke
+              fi
+              ;;
+            linux-x64-musl|linux-x64-musl-baseline)
+              isolate
+              musl_smoke
+              ;;
+            linux-arm64|linux-arm64-musl)
+              # The x64 runner cannot execute arm64 binaries; the
+              # smoke-linux-arm64 job execs them on an arm64 runner.
+              echo "${TARGET} smoke deferred to the smoke-linux-arm64 job"
+              ;;
+            windows-x64|windows-x64-baseline)
+              # x64 Windows runner: native exec.
+              isolate
+              assert_version_line
+              assert_first_run_provisioned
+              ;;
+            windows-arm64)
+              # No arm64 Windows runner: digest and size budget only.
+              verify_checksum_and_size_only
+              ;;
+            *)
+              echo "::error::no smoke leg defined for ${TARGET}"
+              exit 1
+              ;;
+          esac
+        timeout-minutes: 20
+
+      - name: Upload release binary artifact
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-binary-${{ matrix.platform }}
+          path: .omo/release-binaries/omo-*
           retention-days: 1
           if-no-files-found: error
 
@@ -370,3 +576,110 @@ jobs:
             echo
             echo "Check artifact download status, npm trusted publishing, and the package-specific publish log."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # =============================================================================
+  # Job 3: Smoke linux-arm64 release binaries on a native arm64 runner
+  # - The build matrix compiles these legs on x64 (cross-compile), so they need
+  #   a real arm64 host to execute: the glibc binary runs natively on
+  #   ubuntu-24.04-arm and the musl binary runs in an alpine container.
+  # - If the arm64 runner label is unavailable the job fails: intended hard
+  #   signal, no silent fallback.
+  # =============================================================================
+  smoke-linux-arm64:
+    needs: build
+    if: github.repository == 'code-yeongyu/oh-my-openagent' && needs.build.result == 'success'
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check release assets
+        id: release-assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          for LEG in linux-arm64 linux-arm64-musl; do
+            if ASSET_NAMES="$(gh release view "v${VERSION}" --json assets --jq '.assets[].name' 2>/dev/null)"; then
+              if grep -Fxq "omo-${LEG}" <<<"$ASSET_NAMES"; then
+                echo "${LEG//-/_}_exists=true" >> "$GITHUB_OUTPUT"
+                echo "✓ release asset omo-${LEG} already exists on v${VERSION}"
+                continue
+              fi
+            fi
+            echo "${LEG//-/_}_exists=false" >> "$GITHUB_OUTPUT"
+            echo "→ release asset omo-${LEG} missing on v${VERSION}; smoking it"
+          done
+
+      - name: Download linux-arm64 release binary artifact
+        if: steps.release-assets.outputs.linux_arm64_exists != 'true'
+        uses: actions/download-artifact@v7
+        with:
+          name: release-binary-linux-arm64
+          path: .omo/release-binaries
+
+      - name: Download linux-arm64-musl release binary artifact
+        if: steps.release-assets.outputs.linux_arm64_musl_exists != 'true'
+        uses: actions/download-artifact@v7
+        with:
+          name: release-binary-linux-arm64-musl
+          path: .omo/release-binaries
+
+      - name: Smoke linux-arm64 binaries
+        if: steps.release-assets.outputs.linux_arm64_exists != 'true' || steps.release-assets.outputs.linux_arm64_musl_exists != 'true'
+        env:
+          OMO_AI_VERSION: ${{ inputs.omo_ai_version }}
+          GLIBC_EXISTS: ${{ steps.release-assets.outputs.linux_arm64_exists }}
+          MUSL_EXISTS: ${{ steps.release-assets.outputs.linux_arm64_musl_exists }}
+        run: |
+          set -euo pipefail
+          ENGINE_PIN="$(jq -r '.dependencies["@code-yeongyu/senpi"]' packages/omo-native/package.json)"
+          EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN})"
+
+          isolate() {
+            SMOKE_ROOT="$(mktemp -d)"
+            mkdir -p "${SMOKE_ROOT}/home" "${SMOKE_ROOT}/agent" \
+              "${SMOKE_ROOT}/xdg/config" "${SMOKE_ROOT}/xdg/data" \
+              "${SMOKE_ROOT}/xdg/state" "${SMOKE_ROOT}/xdg/cache"
+            export HOME="${SMOKE_ROOT}/home"
+            export XDG_CONFIG_HOME="${SMOKE_ROOT}/xdg/config"
+            export XDG_DATA_HOME="${SMOKE_ROOT}/xdg/data"
+            export XDG_STATE_HOME="${SMOKE_ROOT}/xdg/state"
+            export XDG_CACHE_HOME="${SMOKE_ROOT}/xdg/cache"
+            export OMO_CODING_AGENT_DIR="${SMOKE_ROOT}/agent"
+          }
+
+          if [ "$GLIBC_EXISTS" != "true" ]; then
+            # Native arm64 exec (glibc).
+            chmod +x .omo/release-binaries/omo-linux-arm64
+            isolate
+            actual="$(.omo/release-binaries/omo-linux-arm64 --version)"
+            if [ "$actual" != "$EXPECTED_VERSION_LINE" ]; then
+              echo "version mismatch for omo-linux-arm64: expected '${EXPECTED_VERSION_LINE}', got '${actual}'"
+              exit 1
+            fi
+            test -f "${HOME}/.omo/binary-runtime/${OMO_AI_VERSION}/omo"
+          fi
+
+          if [ "$MUSL_EXISTS" != "true" ]; then
+            # alpine container for the musl binary.
+            docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
+              alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && chmod +x .omo/release-binaries/omo-linux-arm64-musl && .omo/release-binaries/omo-linux-arm64-musl --version" \
+              | grep -F "$EXPECTED_VERSION_LINE"
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release-binary smoke (linux-arm64)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Downloads the linux-arm64 and linux-arm64-musl release binaries.
+            - Execs the glibc binary natively and the musl binary in an alpine container.
+            - Asserts the exact stamped version line and the provisioned runtime.
+          JOB_SUMMARY_NEXT: Check the smoke step output for the failing target or version line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+        timeout-minutes: 15

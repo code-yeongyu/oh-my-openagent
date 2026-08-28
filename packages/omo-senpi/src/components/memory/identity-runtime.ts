@@ -13,6 +13,7 @@ import type { ComponentLogger } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
+import { createReflectionRunIdFactory } from "./reflection-run-id"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import {
   resolveAgentReflectionSettings,
@@ -52,8 +53,6 @@ export interface MemoryIdentityRuntime {
   reconcile(): Promise<void>
 }
 
-let runCounter = 0
-
 function asMemoryIdentity(context: MemoryIdentityContext): MemoryIdentity {
   return {
     id: context.identity,
@@ -73,7 +72,7 @@ export function createIdentityRuntime(
     config: resolveReflectionTriggerConfig(settings, identity.identity),
     getJournal: async (conversationId: string) =>
       new TranscriptJournal({ journalDir: `${identity.identityPaths.transcripts}/${conversationId}` }),
-    createRunId: () => `reflection-run-${++runCounter}`,
+    createRunId: createReflectionRunIdFactory({ identityPaths: identity.identityPaths }),
   })
 
   let builtSandbox: SandboxTransform | undefined

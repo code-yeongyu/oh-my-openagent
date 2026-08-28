@@ -15,7 +15,7 @@ describe("OpenCode task category routing policy", () => {
     expect(routing).toEqual({
       visualEngineering: { model: "anthropic/claude-opus-5", variant: "max" },
       quick: { model: "kimi-for-coding/kimi-for-coding-highspeed" },
-      unspecifiedHigh: { model: "kimi-for-coding/k3", variant: "max" },
+      unspecifiedHigh: { model: "anthropic/claude-opus-5", variant: "xhigh" },
     })
   })
 })

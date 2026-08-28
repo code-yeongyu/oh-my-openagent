@@ -120,7 +120,10 @@ async function loadConversations(transcriptsDir: string): Promise<LoadedConversa
   const names = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort(compareConversationIds)
   const conversations = await Promise.all(names.map(async (conversationId): Promise<LoadedConversation | null> => {
     const journalDir = join(transcriptsDir, conversationId)
-    const journalEntries = await new TranscriptJournal({ journalDir }).readEntries()
+    // Snapshot read (lock-free, torn-tail tolerant): this scan walks EVERY journal of the
+    // identity, so taking each state.lock here starved active sessions' reconciles and the
+    // shutdown drain that share those locks.
+    const journalEntries = await new TranscriptJournal({ journalDir }).readEntriesSnapshot()
     const state = await readReflectionState(join(journalDir, "state.json"), journalEntries)
     const snapshot = captureCursorSnapshot(journalEntries, state)
     const newest = journalEntries.findLast(isCanonicalEntry)

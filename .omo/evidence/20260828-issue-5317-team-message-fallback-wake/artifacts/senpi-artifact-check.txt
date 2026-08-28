@@ -1,0 +1,6 @@
+$ bunx bun@1.4.0 packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+omo-senpi extension build is current
+Senpi LSP runtime is current
+Senpi ast-grep-mcp runtime is current
+Senpi agent-toolkit runtime is current
+EXIT=0

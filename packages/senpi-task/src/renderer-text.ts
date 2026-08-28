@@ -1,10 +1,10 @@
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui"
+import { piTui } from "./lazy/pi-tui"
 
 const DEFAULT_EXCERPT_WIDTH = 120
 export const ELLIPSIS = "..."
 
 export function rendererVisibleWidth(value: string): number {
-  return visibleWidth(value)
+  return piTui().visibleWidth(value)
 }
 
 export function normalizeRendererText(value: string): string {
@@ -14,7 +14,7 @@ export function normalizeRendererText(value: string): string {
 export function excerptRendererText(value: string, width = DEFAULT_EXCERPT_WIDTH): string {
   const normalized = normalizeRendererText(value)
   if (width <= 0) return ""
-  return stripTerminalControls(truncateToWidth(normalized, width, ELLIPSIS))
+  return stripTerminalControls(piTui().truncateToWidth(normalized, width, ELLIPSIS))
 }
 
 export function excerptRendererPromptText(value: string, width = DEFAULT_EXCERPT_WIDTH): string {
@@ -22,10 +22,10 @@ export function excerptRendererPromptText(value: string, width = DEFAULT_EXCERPT
   if (width <= 0) return ""
   if (rendererVisibleWidth(normalized) <= width) return normalized
   const contentWidth = Math.max(0, width - rendererVisibleWidth(ELLIPSIS))
-  const clipped = truncateToWidth(normalized, contentWidth, "")
+  const clipped = piTui().truncateToWidth(normalized, contentWidth, "")
   const boundary = clipped.search(/\s+\S*$/u)
   if (boundary > 0) return `${clipped.slice(0, boundary).trimEnd()}${ELLIPSIS}`
-  return stripTerminalControls(truncateToWidth(normalized, width, ELLIPSIS))
+  return stripTerminalControls(piTui().truncateToWidth(normalized, width, ELLIPSIS))
 }
 
 export function joinRendererTokens(tokens: readonly (string | undefined | false)[]): string {

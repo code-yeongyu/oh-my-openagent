@@ -108,7 +108,7 @@ describe("dag eval sdk", () => {
               ],
             },
           },
-          { action: "wait", run_id: "run-7" },
+          { action: "wait", run_id: "run-7", detach: false },
         ])
         expect(started).toEqual(expect.objectContaining({
           run_id: "run-7",
@@ -134,7 +134,7 @@ describe("dag eval sdk", () => {
         expect(handle.run_id).toBe("run-9")
         expect(calls).toEqual([
           { action: "attach", run_id: "run-9" },
-          { action: "wait", run_id: "run-9" },
+          { action: "wait", run_id: "run-9", detach: false },
           { action: "cancel", run_id: "run-9", reason: "superseded" },
           { action: "snapshot", run_id: "run-9" },
           { action: "cancel", run_id: "run-9" },

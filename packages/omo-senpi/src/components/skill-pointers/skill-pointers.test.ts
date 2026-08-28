@@ -184,6 +184,25 @@ describe("omo-senpi skill-pointers component", () => {
       expect(content).toContain("dag tool")
     })
 
+    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop includes the resolved CLI shim", async () => {
+      // given
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      // when
+      await dispatchInput(pi, "mass ulw-loop ship the refactor")
+
+      // then
+      const massContent = pi.messages[0]?.message["content"]
+      const loopContent = pi.messages[1]?.message["content"]
+      if (typeof massContent !== "string" || typeof loopContent !== "string") {
+        throw new Error("expected string skill-pointer messages")
+      }
+      expect(loopContent).toContain("runtime/agent-toolkit/omo-agent-toolkit")
+      expect(loopContent).toContain("ulw-loop <subcommand>")
+      expect(massContent).not.toContain("runtime/agent-toolkit")
+    })
+
     it("#when overlapping keywords are mentioned #then one pointer per skill is injected in table order", async () => {
       // given
       const pi = new FakeExtensionAPI()

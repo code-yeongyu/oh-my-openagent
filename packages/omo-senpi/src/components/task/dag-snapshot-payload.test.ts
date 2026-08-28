@@ -7,6 +7,7 @@ type WireRun = {
   readonly status: string
   readonly completed_at?: string
   readonly amend_count?: number
+  readonly lease_holder_pid?: number
   readonly nodes: readonly {
     readonly id: string
     readonly attempt: number
@@ -151,6 +152,24 @@ describe("dagUpdatedPayload", () => {
 
       // then
       expect(wireRun?.completed_at).toBe("2026-08-14T00:00:09.000Z")
+    })
+  })
+
+  describe("#given a paused run holding a resume lease", () => {
+    it("#when the payload is built #then lease_holder_pid reaches the wire", () => {
+      // given a paused run claimed by a resuming host
+      const runs = payloadRuns([runSnapshot({ status: "paused", leaseHolderPid: 4242 })])
+
+      // then a viewer can tell resuming apart from parked instead of guessing from status alone
+      expect(runs[0]?.lease_holder_pid).toBe(4242)
+    })
+
+    it("#when the run holds no lease #then lease_holder_pid is absent rather than null", () => {
+      // given / when
+      const runs = payloadRuns([runSnapshot({ status: "paused" })])
+
+      // then
+      expect(runs[0]).not.toHaveProperty("lease_holder_pid")
     })
   })
 

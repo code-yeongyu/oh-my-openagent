@@ -20,6 +20,15 @@ await ensureVendoredLspDaemonBuilt({
   packageDir: join(import.meta.dir, "packages", "lsp-daemon"),
 })
 
+// senpi-task reads the @earendil-works/pi-tui and @code-yeongyu/senpi namespaces lazily
+// (render helpers and child-session values) so the built task/member blobs do not statically bind
+// those barrels; tests call those helpers synchronously, so warm both boundaries once per test
+// process here. Production warms them at the explicit async entry points (task component
+// registration, runner start/resume, tool execute).
+const { loadPiTui } = await import("./packages/senpi-task/src/lazy/pi-tui")
+const { loadSenpiBarrel } = await import("./packages/senpi-task/src/lazy/senpi-barrel")
+await Promise.all([loadPiTui(), loadSenpiBarrel()])
+
 // setDefaultTimeout is per-file when a TEST file calls it, but the preload runs before every file and
 // its value becomes the default each file starts from. CI runners need multiples of the local time for
 // the same git/npm/installer subprocesses, so raise the floor here once rather than rediscovering the

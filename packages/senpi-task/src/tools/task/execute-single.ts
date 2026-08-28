@@ -1,6 +1,7 @@
 import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
 import { createChildProgress } from "../../progress"
+import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import type { TaskRecord } from "../../state"
 import { buildStartSpec } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
@@ -65,6 +66,9 @@ export async function runSpawn(
   }
   const effectiveParams = policy?.kind === "force" ? { ...params, prompt: policy.prompt, load_skills: [] } : params
   const target = selection.kind === "category" ? { category: selection.category } : { subagentType: selection.subagentType }
+  // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
+  // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
+  await loadSenpiBarrel()
   const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {

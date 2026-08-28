@@ -1,3 +1,5 @@
+import { loadPiTui } from "@oh-my-opencode/senpi-task"
+
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
@@ -98,6 +100,15 @@ export function composeOmoSenpiExtension(
         pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
       { scheduleFlush: (flush) => void setTimeout(flush, 200) },
     )
+
+    // Warm the pi-tui lazy boundary once for the whole extension, before any component registers.
+    // Renderers across several components (fallback-architect notices, memory worker entries, task
+    // renderers) read the pi-tui namespace synchronously from render callbacks, and any of those
+    // components can be live while another is disabled by flag or fails to register. Warming here —
+    // not inside one component's register — is what keeps `--omo-senpi-task-disabled` from turning
+    // every other component's notice into a throw. The load is memoized, so this costs one small
+    // module load per process.
+    await loadPiTui()
 
     const ctx: ComponentContext = {
       logger,

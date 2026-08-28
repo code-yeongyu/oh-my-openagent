@@ -1,0 +1,6 @@
+$ bun test packages/team-core/src/team-mailbox/inbox.test.ts
+bun test v1.3.14
+ 3 pass
+ 0 fail
+ 4 expect() calls
+Ran 3 tests across 1 file. [870.00ms]

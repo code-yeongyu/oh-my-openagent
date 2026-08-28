@@ -261,6 +261,7 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     bottlenecks: record.bottlenecks,
     diagnostics: record.diagnostics,
     counts: countNodes(record.nodes),
+    ...(record.leaseHolderPid === undefined ? {} : { leaseHolderPid: record.leaseHolderPid }),
   }
 }
 

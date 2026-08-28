@@ -99,6 +99,20 @@ describe("cancellable journal flush", () => {
     expect((await readFile(join(dir, "transcript.jsonl"), "utf8")).trim().split("\n")).toHaveLength(1)
   })
 
+  it("#given the state.lock held by a live foreign holder #when flush runs #then it completes without waiting for the lock", async () => {
+    // given
+    const { dir, journal } = await createJournal()
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] }])
+    const lockPath = join(dir, "state.lock")
+    await writeFile(lockPath, `${process.pid}\n`, "utf8")
+
+    // when
+    await journal.flush()
+
+    // then
+    expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
+  }, 15_000)
+
   it("#given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file", async () => {
     // given
     const { dir, journal } = await createJournal()
@@ -231,21 +245,19 @@ describe("stale journal lock recovery", () => {
   }, 15_000)
 })
 
-  it("#given a signal aborted mid-flush #when the remaining fsyncs are reached #then flush returns early without throwing", async () => {
+  it("#given an injected journal lock #when flush runs #then the lock is never invoked", async () => {
     // given
     const { dir, journal } = await createJournal()
     await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] }])
-    const controller = new AbortController()
-    const aborting = new TranscriptJournal({
+    const lockFree = new TranscriptJournal({
       journalDir: dir,
-      lock: async (lockPath, task, signal) => withLocalJournalLock(lockPath, async () => {
-        controller.abort()
-        return task()
-      }, signal),
+      lock: async () => {
+        throw new Error("flush must not take the journal lock")
+      },
     })
 
     // when
-    await aborting.flush(controller.signal)
+    await lockFree.flush()
 
     // then
     expect(existsSync(join(dir, "state.lock"))).toBe(false)

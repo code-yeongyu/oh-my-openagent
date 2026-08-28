@@ -4,6 +4,7 @@ import { resolveMessageEventSessionID, resolveSessionEventID } from "../../share
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
 import { handleAtlasSessionIdle } from "./idle-event"
+import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 export function createAtlasEventHandler(input: {
@@ -11,8 +12,9 @@ export function createAtlasEventHandler(input: {
   options?: AtlasHookOptions
   sessions: Map<string, SessionState>
   getState: (sessionID: string) => SessionState
+  cleanupSession: (sessionID: string) => void
 }): (arg: { event: { type: string; properties?: unknown } }) => Promise<void> {
-  const { ctx, options, sessions, getState } = input
+  const { ctx, options, sessions, getState, cleanupSession } = input
 
   return async ({ event }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -21,15 +23,23 @@ export function createAtlasEventHandler(input: {
       const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
-      const state = getState(sessionID)
       const isAbort = isAbortError(props?.error)
-      state.lastEventWasAbortError = isAbort
 
       log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort })
-      if (!isAbort) {
-        const previousInjectedAt = state.lastContinuationInjectedAt
+      if (isAbort) {
+        const activeBoulderSession = await resolveActiveBoulderSession({
+          client: ctx.client,
+          directory: ctx.directory,
+          sessionID,
+        })
+        if (activeBoulderSession) getState(sessionID).lastEventWasAbortError = true
+      } else {
+        const previousInjectedAt = sessions.get(sessionID)?.lastContinuationInjectedAt
         await handleAtlasSessionIdle({ ctx, options, getState, sessionID })
+        const state = sessions.get(sessionID)
         if (
+          state
+          &&
           state.lastContinuationInjectedAt !== undefined
           && state.lastContinuationInjectedAt !== previousInjectedAt
         ) {
@@ -93,12 +103,7 @@ export function createAtlasEventHandler(input: {
     if (event.type === "session.deleted") {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
-        const deletedState = sessions.get(sessionID)
-        if (deletedState?.pendingRetryTimer) {
-          clearTimeout(deletedState.pendingRetryTimer)
-          deletedState.pendingRetryTimer = undefined
-        }
-        sessions.delete(sessionID)
+        cleanupSession(sessionID)
         log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID })
       }
       return
@@ -107,12 +112,7 @@ export function createAtlasEventHandler(input: {
     if (event.type === "session.compacted") {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
-        const compactedState = sessions.get(sessionID)
-        if (compactedState?.pendingRetryTimer) {
-          clearTimeout(compactedState.pendingRetryTimer)
-          compactedState.pendingRetryTimer = undefined
-        }
-        sessions.delete(sessionID)
+        cleanupSession(sessionID)
         log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
       }
     }

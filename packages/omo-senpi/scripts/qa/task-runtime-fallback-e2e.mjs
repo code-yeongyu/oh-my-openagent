@@ -17,7 +17,7 @@ const realAgentDir = join(homedir(), ".senpi", "agent")
 // OMO_FALLBACK_SCENARIO to decide which category the parent spawns and which child models die.
 // - user-fallback: custom category with user fallback_models (dead primary -> healthy fallback).
 // - builtin-chain-fallback: builtin "quick" with rung-1 (kimi-coding) dead and rung-2
-//   (quotio-openai) healthy; NO user fallback_models, so the runtime chain must come from the
+//   (openai-codex) healthy; NO user fallback_models, so the runtime chain must come from the
 //   builtin category chain itself.
 // - chain-exhausted: every available "quick" rung dies; the session must record
 //   retry_fallback_exhausted without crashing or hanging.
@@ -50,7 +50,7 @@ const scenarios = [
     checks: (artifacts, stdoutText) => ({
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: artifacts.log.includes("retry_fallback_applied") ? "PASS" : "FAIL",
-      final_model: artifacts.task?.model === "quotio-openai/gpt-5.6-luna-fast" ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "openai-codex/gpt-5.6-luna-fast" ? "PASS" : "FAIL",
       requested_model: artifacts.task?.requested_model?.display === "kimi-coding/kimi-for-coding-highspeed"
         ? "PASS"
         : "FAIL",
@@ -58,7 +58,7 @@ const scenarios = [
         artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
       ) === JSON.stringify([
         "kimi-coding/kimi-for-coding-highspeed",
-        "quotio-openai/gpt-5.6-luna-fast",
+        "openai-codex/gpt-5.6-luna-fast",
       ]) ? "PASS" : "FAIL",
     }),
   },

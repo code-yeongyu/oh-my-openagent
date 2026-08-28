@@ -207,7 +207,7 @@ You can define custom categories in the `[opencode]` block of the unified config
 | `max_prompt_tokens` | number  | Maximum prompt tokens for delegated tasks                                   |
 | `is_unstable_agent` | boolean | Mark agent as unstable - forces background mode for monitoring              |
 | `disable`           | boolean | Disable this category and exclude it from task delegation                   |
-| `warn_unavailable`  | boolean | Suppress or emit unavailable-chain warnings for this category               |
+| `warn_unavailable`  | boolean | Suppress or emit unavailable-chain notices for this category               |
 
 #### Example Configuration
 

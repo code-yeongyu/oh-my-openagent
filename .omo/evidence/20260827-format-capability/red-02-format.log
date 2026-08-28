@@ -1,0 +1,22 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/lsp-core/src/tools/format.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './format.js' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/lsp-format-capability/packages/lsp-core/src/tools/format.test.ts'
+-------------------------------
+
+
+packages/lsp-core/src/lsp/format-document.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './format-document.js' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/lsp-format-capability/packages/lsp-core/src/lsp/format-document.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 2 fail
+ 2 errors
+Ran 2 tests across 2 files. [966.00ms]

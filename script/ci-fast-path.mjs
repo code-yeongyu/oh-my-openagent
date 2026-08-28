@@ -13,6 +13,7 @@ const platformSensitiveExactPaths = new Set([
   ".github/workflows/ci.yml",
   "script/ci-fast-path.mjs",
   "bunfig.win2.parallel.toml",
+  "script/root-test-serial-quarantine.ts",
 ])
 
 function parseArguments(argv) {

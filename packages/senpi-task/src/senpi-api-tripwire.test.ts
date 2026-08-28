@@ -8,6 +8,7 @@ import {
   createAgentSession,
   createExtensionRuntime,
   DefaultResourceLoader,
+  defineTool,
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
   type ResourceLoader,
@@ -64,6 +65,20 @@ describe("pinned Senpi API surface", () => {
     expect(options.resourceLoader).toBe(resourceLoader)
     expect(options.customTools).toEqual([])
     expect(options.tools).toEqual(["read", "bash"])
+  })
+
+  test("#given the pinned senpi barrel #when defineTool is applied #then it is the identity helper", () => {
+    // given / when / then - the task tool factories return their definitions unwrapped on the
+    // strength of defineTool being identity; pin that so a senpi bump that changes this trips the
+    // tripwire instead of silently changing tool construction.
+    const sample: ToolDefinition = {
+      name: "sample",
+      label: "Sample",
+      description: "sample",
+      parameters: undefined as never,
+      execute: () => Promise.resolve(undefined as never),
+    }
+    expect(defineTool(sample)).toBe(sample)
   })
 
   test("#given agent dir marker extension #when session boots with minimal loader #then marker factory is not invoked", async () => {

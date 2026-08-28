@@ -1,3 +1,60 @@
+## 2026-08-28 — Align the Senpi adapter with 2026.8.28
+
+`packages/omo-senpi/package.json` now requires the exact published
+`@code-yeongyu/senpi` `2026.8.28` release for both its optional peer and
+development dependency, matching the native runtime pin. The engine release
+repairs the beta.23 shared interactive host regressions (thinking-level
+cycling, duplicate user-message rendering, and resume of host-held sessions)
+and restores the compiled eval kernels.
+
+## 2026-08-27 — Align the Senpi adapter with 2026.8.27
+
+`packages/omo-senpi/package.json` now requires the exact published
+`@code-yeongyu/senpi` `2026.8.27` release for both its optional peer and
+development dependency. Keep the peer, dev dependency, root patched-dependency
+key, and generated lockfile aligned with the native runtime pin.
+
+## 2026-08-27 — Allow the mailbox durability stress test to finish on Windows
+
+The mailbox cap-and-restart test now has a 15-second per-test budget. It performs
+128 durable atomic queue writes plus a second byte-cap queue on Windows, where
+filesystem write and rename latency can exceed Bun's default five-second test
+budget even though the queue contract completes correctly. This changes only the
+test deadline; mailbox bounds, ordering, persistence, and production retry
+behavior remain unchanged.
+
+## 2026-08-27 — Preserve the full Windows model-admission test budget
+
+The task RPC model-admission parity tests now pass their calculated timeout
+through Bun's supported timeout option object. This preserves the intended
+`PROBE_TIMEOUT_MS * 3 + 20_000` budget on Windows instead of allowing the
+legacy numeric argument form to be capped by the runner's default test
+deadline. Production probe behavior is unchanged.
+
+## 2026-08-27 — Keep thread persistence and DAP portable on Windows
+
+The thread mailbox and durable receipt stores now use the shared atomic-write
+implementation, which opens a writable temporary file, tolerates the Windows
+filesystem's allowed `fsync` limitations, and avoids directory `fsync` where
+Windows rejects directory handles. The DAP client now distinguishes a real
+`host:port` adapter endpoint from a Windows drive-letter script path, so the
+fixture adapter launches instead of attempting a socket connection to drive
+`C:`. The existing POSIX durability behavior remains unchanged.
+
+## 2026-08-27 — Regenerate both Senpi extension entry points after merge
+
+The generated `omo.js` and `omo-task.js` entry points are refreshed from the
+current source after the post-beta.23 merges. This removes conflict-marker
+content that had remained in `omo-task.js` and keeps both tracked entry points
+aligned with the source component set consumed by the release build.
+
+## 2026-08-26 — Normalize ULW CLI pointer paths across platforms
+
+The ulw-loop skill pointer now normalizes the resolved executable path to
+POSIX separators before embedding it in the machine-consumed command sentence.
+Windows Senpi compatibility therefore receives the same canonical path shape as
+POSIX while the actual executable path remains unchanged.
+
 ## 2026-08-25 — Name the executable in the local-launcher brand profile
 
 The sibling-store local launcher now injects `command: "omo"` on the `SENPI_BRAND`

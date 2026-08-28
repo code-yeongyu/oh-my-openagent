@@ -43,7 +43,7 @@ const result = await sdk.wait(run.run_id)
 
 `define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` are the whole surface.
 
-Python cells cannot import the ESM SDK; call `tool.dag({...})` directly with the same payload shape the SDK produces. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
+Python cells cannot import the ESM SDK; call `tool.dag({...})` directly with the same payload shape the SDK produces - note the SDK passes `detach: false` on `wait`, so a blocking Python wait is `tool.dag({"action": "wait", "run_id": run_id, "detach": False})`; without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
 
 ## Run lifecycle
 
@@ -59,7 +59,7 @@ await sdk.cancel(runId, "superseded by a new plan")
 
 - `attach` re-binds to a live run you already own, for example after your own context was rebuilt.
 - `snapshot` is a cheap read of status and node counts; poll it instead of `wait` when you have other work to do.
-- `wait` blocks until the run settles and returns the final result.
+- `wait` blocks until the run settles and returns the final result (the SDK passes `detach: false`; the bare tool action detaches by default against a live run, and the session is woken on node completions and on settle).
 - `cancel` stops the run; pass a reason so the record says why.
 
 ## Recovering one node - retry, send, amend

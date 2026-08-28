@@ -32,7 +32,7 @@ describe("Senpi Luna and DeepSeek chain policy", () => {
       const chain = AGENT_FALLBACK_CHAINS[agentName]
 
       expect(chain?.slice(0, 2)).toEqual([
-        { providers: ["openai"], model: "gpt-5.6-luna-fast", variant: "low" },
+        { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
         DEEPSEEK_MAX,
       ])
     },

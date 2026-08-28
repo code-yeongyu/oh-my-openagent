@@ -12,6 +12,7 @@
 |------|----------|
 | New users — what is this? | [docs/guide/overview.md](guide/overview.md) |
 | Installing the plugin | [docs/guide/installation.md](guide/installation.md) |
+| Installing the compiled binary | [docs/guide/binary-install.md](guide/binary-install.md) |
 | How agents collaborate | [docs/guide/orchestration.md](guide/orchestration.md) |
 | Picking the right model per agent | [docs/guide/agent-model-matching.md](guide/agent-model-matching.md) |
 | Team Mode (opt-in multi-agent) | [docs/guide/team-mode.md](guide/team-mode.md) |

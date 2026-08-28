@@ -1,0 +1,1 @@
+No credentials, environment dumps, auth headers, private paths outside the isolated worktree/sandbox, or raw user session data were copied. The generic live driver does not expose raw model transcripts. Process evidence records only command classes/counts, not environment variables.

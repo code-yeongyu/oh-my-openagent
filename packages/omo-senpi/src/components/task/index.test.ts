@@ -169,7 +169,7 @@ function toolNames(pi: FakeExtensionAPI): string[] {
 }
 
 describe("omo-senpi task component wiring", () => {
-  it("#given an explicit team member process #when the task component registers #then no lead task surface is wired", () => {
+  it("#given an explicit team member process #when the task component registers #then no lead task surface is wired", async () => {
     // given
     const previousMember = process.env.SENPI_TASK_MEMBER
     process.env.SENPI_TASK_MEMBER = "11111111-1111-4111-8111-111111111111::alice"
@@ -178,7 +178,7 @@ describe("omo-senpi task component wiring", () => {
 
     try {
       // when
-      createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+      await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
     } finally {
       if (previousMember === undefined) delete process.env.SENPI_TASK_MEMBER
       else process.env.SENPI_TASK_MEMBER = previousMember
@@ -191,13 +191,13 @@ describe("omo-senpi task component wiring", () => {
     expect(pi.handlers).toEqual([])
   })
 
-  it("#given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired", () => {
+  it("#given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired", async () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
 
     // when
-    createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // the /tasks and /task-kill commands registered
@@ -248,20 +248,20 @@ describe("omo-senpi task component wiring", () => {
     ])
   })
 
-  it("#given a fake ExtensionAPI boot #when the task component registers #then only injection-driven lead team tools are wired", () => {
+  it("#given a fake ExtensionAPI boot #when the task component registers #then only injection-driven lead team tools are wired", async () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
 
     // when
-    createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     const registered = toolNames(pi)
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
     expect(registered).not.toContain("team_wait")
   })
 
-  it("#given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance", () => {
+  it("#given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance", async () => {
     // given
     const pi = new FakeExtensionAPI() as FakeExtensionAPI & {
       registerRemovedToolHint: (name: string, hint: string) => void
@@ -271,7 +271,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then
     expect(hints).toEqual([{
@@ -280,14 +280,14 @@ describe("omo-senpi task component wiring", () => {
     }])
   })
 
-  it("#given the omo-task flag is false #when the component registers #then only the unconditional hygiene sweep handler is wired", () => {
+  it("#given the omo-task flag is false #when the component registers #then only the unconditional hygiene sweep handler is wired", async () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     pi.setFlag("omo-task", false)
 
     // when
-    createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then
     expect(pi.tools).toEqual([])
@@ -296,7 +296,7 @@ describe("omo-senpi task component wiring", () => {
     expect(logger.entries).toContainEqual({ level: "info", message: "omo-senpi task component disabled by flag" })
   })
 
-  it("#given a malformed omo.json #when the component registers #then it boots with defaults and still wires the tools", () => {
+  it("#given a malformed omo.json #when the component registers #then it boots with defaults and still wires the tools", async () => {
     // given a project whose .omo/omo.json is invalid JSON
     const project = tempProject()
     mkdirSync(join(project, ".omo"), { recursive: true })
@@ -305,7 +305,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
 
     // then it never crashed: all tools still registered
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
@@ -514,14 +514,14 @@ describe("omo-senpi task component wiring", () => {
     expect(leadCalls.shutdowns).toBe(1)
   })
 
-  it("#given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes", () => {
+  it("#given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes", async () => {
     // given a pi whose registerMessageRenderer capability is absent
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     ;(pi as { registerMessageRenderer?: unknown }).registerMessageRenderer = undefined
 
     // when
-    createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then no tools wired; only the unconditional hygiene sweep handler remains
     expect(pi.tools).toEqual([])

@@ -41,12 +41,13 @@ describe("generateModelConfig provider routes", () => {
       expect(result.categories?.quick?.model).toBe("atlascloud/deepseek-ai/deepseek-v4-flash")
     })
 
-    test("selects Atlas Cloud before the catch-all Vercel gateway", () => {
+    test("keeps Atlas Cloud eligible without restoring retired Vercel fallback lanes", () => {
       const result = generateModelConfig(createConfig({ hasAtlasCloud: true, hasVercelAiGateway: true }))
 
       expect(result.agents?.hephaestus?.model).toBe("atlascloud/openai/gpt-5.6-sol")
       const providers = CLI_AGENT_MODEL_REQUIREMENTS.hephaestus.fallbackChain[0]?.providers ?? []
-      expect(providers.indexOf("atlascloud")).toBeLessThan(providers.indexOf("vercel"))
+      expect(providers).toContain("atlascloud")
+      expect(providers).not.toContain("vercel")
     })
   })
 
@@ -255,37 +256,38 @@ describe("generateModelConfig provider routes", () => {
       expect(serializedFallbacks).not.toContain('"model":"vercel/')
     })
 
-    test("explore uses gateway minimax when only gateway is available", () => {
+    test("explore never routes through the gateway when only gateway is available", () => {
       // given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })
 
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then Explore uses the gateway Minimax route
-      expect(result.agents?.explore?.model).toBe("vercel/minimax/minimax-m2.7-highspeed")
+      // then Explore keeps the built-in nano default instead of a gateway lane
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
+      expect(result.agents?.explore?.model).not.toContain("vercel/")
     })
 
-    test("librarian uses gateway minimax when only gateway is available", () => {
+    test("librarian is omitted when only gateway is available", () => {
       // given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })
 
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then Librarian uses the gateway Minimax route
-      expect(result.agents?.librarian?.model).toBe("vercel/minimax/minimax-m2.7-highspeed")
+      // then Librarian has no eligible lane now that vercel left the default lanes
+      expect(result.agents?.librarian).toBeUndefined()
     })
 
-    test("Hephaestus uses gateway GPT-5.6 Sol when only gateway is available", () => {
+    test("Hephaestus is omitted when only gateway is available", () => {
       // given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })
 
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then Hephaestus uses gateway GPT-5.6 Sol
-      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.6-sol")
+      // then Hephaestus has no eligible lane now that vercel left the default lanes
+      expect(result.agents?.hephaestus).toBeUndefined()
     })
 
     test("native providers take priority over gateway", () => {

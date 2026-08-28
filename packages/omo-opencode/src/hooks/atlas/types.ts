@@ -38,6 +38,7 @@ export type PendingTaskRef =
   | { kind: "skip"; reason: "ambiguous_task_key"; task: TrackedTopLevelTaskRef }
 
 export interface SessionState {
+  lifecycleActive?: boolean
   lastEventWasAbortError?: boolean
   skipNextIdleAfterRuntimeErrorRetry?: boolean
   lastContinuationInjectedAt?: number

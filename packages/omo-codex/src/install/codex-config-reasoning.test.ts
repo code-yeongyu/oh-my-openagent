@@ -89,7 +89,7 @@ describe("codex-config-reasoning", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain('model = "gpt-5.6-sol"')
-    expect(content).toContain("model_context_window = 372000")
+    expect(content).toContain("model_context_window = 650000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
   })
@@ -128,7 +128,7 @@ describe("codex-config-reasoning", () => {
     expect(content.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
     expect(content.match(/^plan_mode_reasoning_effort\s*=/gm)).toHaveLength(1)
     expect(content).toContain('model = "gpt-5.6-sol"')
-    expect(content).toContain("model_context_window = 372000")
+    expect(content).toContain("model_context_window = 650000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
     expect(content).not.toContain("model_context_window = 272000")

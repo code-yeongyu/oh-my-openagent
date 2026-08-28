@@ -105,6 +105,18 @@ const expectedToolSurface = [
 		},
 	},
 	{
+		name: "format",
+		title: "LSP Format",
+		description: "Format a source file with its language server and write the returned edits to disk.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				filePath: { type: "string", description: "Source file path to format." },
+			},
+			required: ["filePath"],
+		},
+	},
+	{
 		name: "install_decision",
 		title: "LSP Install Decision",
 		description:
@@ -128,7 +140,7 @@ const expectedToolSurface = [
 ];
 
 describe("LSP core tool surface", () => {
-	test("#given tool descriptors #when listed #then the public eight-tool schemas are pinned", () => {
+	test("#given tool descriptors #when listed #then the public nine-tool schemas are pinned", () => {
 		// given / when
 		const surface = LSP_MCP_TOOLS.map((tool) => ({
 			name: tool.name,

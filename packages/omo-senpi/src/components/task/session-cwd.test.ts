@@ -33,7 +33,7 @@ function ctxFor(pi: FakeExtensionAPI, logger: ComponentLogger): ComponentContext
 // directory - anchoring task state there makes every session share one store and puts child
 // artifacts where the host's per-project readers never look.
 describe("task component session cwd anchoring", () => {
-  it("#given a host exposing the session cwd #when the component registers #then task state anchors at the session cwd, not the launch dir", () => {
+  it("#given a host exposing the session cwd #when the component registers #then task state anchors at the session cwd, not the launch dir", async () => {
     // given a session whose cwd differs from the process launch dir
     const sessionCwd = tempProject()
     const pi = new FakeExtensionAPI()
@@ -41,7 +41,7 @@ describe("task component session cwd anchoring", () => {
     const anchored: (string | undefined)[] = []
 
     // when
-    createTaskComponent({
+    await createTaskComponent({
       loadConfig: (options = {}) => {
         anchored.push(options.cwd)
         return loadSenpiOmoConfig(options)
@@ -53,13 +53,13 @@ describe("task component session cwd anchoring", () => {
     expect(anchored[0]).not.toBe(process.cwd())
   })
 
-  it("#given a host that does not expose a session cwd #when the component registers #then it falls back to the process cwd", () => {
+  it("#given a host that does not expose a session cwd #when the component registers #then it falls back to the process cwd", async () => {
     // given an older senpi host whose ExtensionAPI has no cwd
     const pi = new FakeExtensionAPI()
     const anchored: (string | undefined)[] = []
 
     // when
-    createTaskComponent({
+    await createTaskComponent({
       loadConfig: (options = {}) => {
         anchored.push(options.cwd)
         return loadSenpiOmoConfig(options)

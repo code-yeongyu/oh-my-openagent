@@ -61,7 +61,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `artistry` | anthropic/claude-fable-5 (variant: xhigh) | google-categories.ts | Creative / unconventional approaches |
 | `quick` | kimi-for-coding/kimi-for-coding-highspeed | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | xai/grok-4.6 (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
-| `unspecified-high` | kimi-for-coding/kimi-k3 (variant: max) | anthropic-categories.ts | High effort fallback |
+| `unspecified-high` | anthropic/claude-opus-5 (variant: xhigh) | anthropic-categories.ts | High effort fallback |
 | `writing` | kimi-for-coding/kimi-k3 (variant: low) | kimi-categories.ts | Documentation, prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.

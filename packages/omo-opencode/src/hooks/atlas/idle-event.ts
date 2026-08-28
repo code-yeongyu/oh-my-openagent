@@ -31,7 +31,6 @@ export async function handleAtlasSessionIdle(input: {
 }): Promise<void> {
   const { ctx, options, getState, sessionID } = input
   const normalizedSessionID = normalizeSessionId(sessionID)
-  const sessionState = getState(sessionID)
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
@@ -44,6 +43,8 @@ export async function handleAtlasSessionIdle(input: {
     log(`[${HOOK_NAME}] Skipped: session not registered in active boulder`, { sessionID })
     return
   }
+
+  const sessionState = getState(sessionID)
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (sessionState.waitingForFinalWaveApproval) {

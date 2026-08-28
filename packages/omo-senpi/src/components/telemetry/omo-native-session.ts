@@ -24,6 +24,7 @@ import {
   createOmoNativeProductConfig,
   getOmoNativeStateDir,
   hashSessionId,
+  withOmoNativeAttribution,
 } from "./product-identity"
 import { readOmoNativeInventory, type OmoNativeInventoryDiagnostic } from "./session-inventory"
 import { resolveSessionModelRegistry } from "./session-model-registry"
@@ -63,7 +64,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           diagnostics: options.diagnostics,
           distinctId: getTelemetryDistinctId(product.machineIdPrefix, osProvider),
           env,
-          product,
+          product: withOmoNativeAttribution(product, { env }),
           propertyAllowlist: OMO_NATIVE_PROPERTY_ALLOWLISTS,
           schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,

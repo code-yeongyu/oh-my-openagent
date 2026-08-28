@@ -239,3 +239,224 @@ describe("release and platform publish workflows", () => {
     ).toEqual(buildBinariesPlatforms)
   })
 })
+
+describe("release binary asset lane in the platform publish workflow", () => {
+  test("plumbs omo_ai_version into the release-binary build", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+
+    const callInputs = sliceWorkflowSection(workflow, "  workflow_call:", "  workflow_dispatch:")
+    const dispatchInputs = workflow.slice(
+      workflow.indexOf("  workflow_dispatch:"),
+      workflow.indexOf("permissions:"),
+    )
+    const buildBinaryStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Build release binary",
+      "      - name: Smoke test release binary",
+    )
+
+    // #when
+    const declaresInput =
+      callInputs.includes("omo_ai_version:") && dispatchInputs.includes("omo_ai_version:")
+    const buildStepUsesInput = buildBinaryStep.includes("OMO_AI_VERSION: ${{ inputs.omo_ai_version }}")
+    const buildCommand =
+      buildBinaryStep.includes("bun run script/build-omo-binary.ts") &&
+      buildBinaryStep.includes('--target "${{ matrix.platform }}"') &&
+      buildBinaryStep.includes('--omo-version "$OMO_VERSION"') &&
+      buildBinaryStep.includes('--omo-ai-version "$OMO_AI_VERSION"')
+    const bunPins = [...workflow.matchAll(/bun-version:\s*"([^"]+)"/g)].map((match) => match[1])
+    const bunPinnedEverywhere = bunPins.length > 0 && bunPins.every((pin) => pin === "1.4.0")
+
+    // #then
+    expect(declaresInput, "omo_ai_version must be a workflow_call and workflow_dispatch input").toBe(true)
+    expect(buildStepUsesInput, "the release-binary build must consume inputs.omo_ai_version").toBe(true)
+    expect(
+      buildCommand,
+      "the build step must invoke build-omo-binary.ts for the matrix leg with both version inputs",
+    ).toBe(true)
+    expect(bunPinnedEverywhere, "every setup-bun step (existing and new) must pin bun 1.4.0").toBe(true)
+  })
+
+  test("gates release-binary steps on a release-asset probe, not the npm publish skip", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+    const binaryLane = sliceWorkflowSection(
+      workflow,
+      "      - name: Check release assets",
+      "      - name: Write job summary",
+    )
+
+    const probeStep = sliceWorkflowSection(
+      binaryLane,
+      "      - name: Check release assets",
+      "      - name: Build release binary",
+    )
+    const binarySteps = [
+      sliceWorkflowSection(
+        binaryLane,
+        "      - name: Build release binary",
+        "      - name: Smoke test release binary",
+      ),
+      sliceWorkflowSection(
+        binaryLane,
+        "      - name: Smoke test release binary",
+        "      - name: Upload release binary artifact",
+      ),
+      binaryLane.slice(binaryLane.indexOf("      - name: Upload release binary artifact")),
+    ]
+
+    // #when
+    const probesReleaseAssets =
+      probeStep.includes("gh release view") &&
+      probeStep.includes("--json assets") &&
+      probeStep.includes("binary_exists=") &&
+      probeStep.includes("Invalid omo_ai_version")
+    const gatedOnProbe = binarySteps.every((step) =>
+      step.includes("if: steps.release-assets.outputs.binary_exists != 'true'"),
+    )
+    const neverNpmSkipped = binarySteps.every((step) => !step.includes("steps.check.outputs.skip"))
+
+    // #then
+    expect(
+      probesReleaseAssets,
+      "the binary-lane skip must key on a gh release asset-existence probe and validate omo_ai_version",
+    ).toBe(true)
+    expect(gatedOnProbe, "every release-binary step must gate on the asset probe output").toBe(true)
+    expect(
+      neverNpmSkipped,
+      "release-binary steps must run regardless of the npm already-published skip",
+    ).toBe(true)
+
+    // upload shape: bare binaries + SHA256SUMS under .omo/release-binaries, npm-artifact parity on retention
+    const uploadStep = binarySteps[2]!
+    expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
+    expect(uploadStep).toContain("name: release-binary-${{ matrix.platform }}")
+    expect(uploadStep).toContain("path: .omo/release-binaries/")
+    expect(uploadStep).toContain("retention-days: 1")
+    expect(uploadStep).toContain("if-no-files-found: error")
+  })
+
+  test("smokes every release binary leg on its matching runner class", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+    const smokeStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Smoke test release binary",
+      "      - name: Upload release binary artifact",
+    )
+
+    const branch = (pattern: string): string => {
+      const start = smokeStep.indexOf(pattern)
+      if (start < 0) throw new Error(`missing smoke case branch: ${pattern}`)
+      const end = smokeStep.indexOf(";;", start)
+      if (end < 0) throw new Error(`unterminated smoke case branch: ${pattern}`)
+      return smokeStep.slice(start, end)
+    }
+
+    // #when / #then
+    // Exact stamped version assert: a missing sibling package.json silently
+    // stamps 0.0.0, so the full line including the engine pin is compared.
+    expect(smokeStep).toContain(
+      'EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN})"',
+    )
+    expect(smokeStep).toContain("ENGINE_PIN=")
+    // isolation: every exec runs against fresh HOME/XDG/OMO_CODING_AGENT_DIR
+    expect(smokeStep).toContain("mktemp -d")
+    expect(smokeStep).toContain("XDG_CONFIG_HOME")
+    expect(smokeStep).toContain("OMO_CODING_AGENT_DIR")
+    // Node's Windows os.homedir() uses USERPROFILE, not Git Bash's HOME.
+    expect(smokeStep).toContain('export USERPROFILE="${HOME}"')
+    // first-run self-provisioning must materialize before any PASS
+    expect(smokeStep).toContain("binary-runtime/${OMO_AI_VERSION}")
+    // pty round-trip on the pty-capable legs
+    expect(branch("darwin-arm64)")).toContain("pty_smoke")
+    expect(branch("linux-x64|linux-x64-baseline)")).toContain("pty_smoke")
+    expect(smokeStep).toContain("script -q")
+    // oldstable-glibc container smoke on linux-x64
+    expect(branch("linux-x64|linux-x64-baseline)")).toContain("oldstable_glibc_smoke")
+    expect(smokeStep).toContain("debian:oldstable")
+    // Rosetta attempt on darwin-x64 legs: tolerated failure, logged
+    const darwinX64 = branch("darwin-x64|darwin-x64-baseline)")
+    expect(darwinX64).toContain("Rosetta")
+    expect(darwinX64).toContain("::warning::")
+    // musl x64 legs run inside an alpine container
+    const musl = branch("linux-x64-musl|linux-x64-musl-baseline)")
+    expect(musl).toContain("musl_smoke")
+    const muslSmokeFn = smokeStep.slice(
+      smokeStep.indexOf("musl_smoke()"),
+      smokeStep.indexOf("verify_checksum_and_size_only()"),
+    )
+    expect(muslSmokeFn).toContain("docker run")
+    expect(muslSmokeFn).toContain("alpine:")
+    expect(muslSmokeFn).toContain("apk add --no-cache libstdc++")
+    // windows x64 legs exec natively; windows-arm64 is checksum+size only
+    expect(branch("windows-x64|windows-x64-baseline)")).toContain("assert_version_line")
+    const windowsArm64 = branch("windows-arm64)")
+    expect(windowsArm64).toContain("verify_checksum_and_size_only")
+    const checksumFn = smokeStep.slice(
+      smokeStep.indexOf("verify_checksum_and_size_only()"),
+      smokeStep.indexOf('case "$TARGET" in'),
+    )
+    expect(checksumFn).toContain("SHA256SUMS")
+    expect(checksumFn).toContain("sha256sum -c")
+    expect(
+      windowsArm64,
+      "no arm64 Windows runner exists; the binary must not be executed",
+    ).not.toContain("--version")
+    // arm64 linux legs defer to the dedicated arm64 runner job
+    expect(branch("linux-arm64|linux-arm64-musl)")).toContain("smoke-linux-arm64")
+    // unknown legs fail loud instead of silently passing
+    expect(smokeStep).toContain("no smoke leg defined")
+  })
+
+  test("smokes arm64 linux binaries on a native arm64 runner with no fallback", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+    const jobStart = workflow.indexOf("  smoke-linux-arm64:")
+    if (jobStart < 0) throw new Error("missing smoke-linux-arm64 job")
+    const job = workflow.slice(jobStart)
+    const jobHeader = job.slice(0, job.indexOf("steps:"))
+
+    // #when / #then
+    expect(jobHeader).toContain("needs: build")
+    expect(jobHeader).toContain("runs-on: ubuntu-24.04-arm")
+    expect(
+      jobHeader,
+      "the arm64 label being unavailable must fail the job; no fallback runner",
+    ).not.toContain("ubuntu-latest")
+    expect(job).toContain("name: release-binary-linux-arm64")
+    expect(job).toContain("name: release-binary-linux-arm64-musl")
+    // glibc leg execs natively, musl leg runs in an alpine container
+    expect(job).toContain("omo-linux-arm64")
+    expect(job).toContain("alpine:")
+    expect(job).toContain("apk add --no-cache libstdc++")
+    // same exact version-line contract as the build-job smoke
+    expect(job).toContain("(engine: senpi ${ENGINE_PIN})")
+    expect(job).toContain("binary-runtime/${OMO_AI_VERSION}")
+  })
+
+  test("leaves npm publishing, runner routing, and matrix fail-fast untouched", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+    const buildJob = sliceWorkflowSection(workflow, "  build:", "  publish:")
+    const publishJob = sliceWorkflowSection(workflow, "  publish:", "  smoke-linux-arm64:")
+
+    // #when / #then
+    expect(buildJob).toContain(
+      "runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}",
+    )
+    expect(buildJob).toContain("fail-fast: false")
+    expect(publishJob).toContain(
+      "if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'",
+    )
+    expect(publishJob).toContain("if: steps.check.outputs.skip_all != 'true'")
+    expect(publishJob, "the npm publish job must not grow release-binary steps").not.toContain(
+      "release-binary",
+    )
+    expect(
+      workflow,
+      "the guards assert the release-binary lane exists alongside the untouched npm lane",
+    ).toContain("name: Build release binary")
+  })
+})

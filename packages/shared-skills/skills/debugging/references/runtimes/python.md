@@ -41,6 +41,19 @@ python -c 'import asyncio; print(asyncio.__version__)'
 | **post-mortem `pdb.pm()`** | Exception already happened, you want to inspect state | In an exception-caught REPL: `import pdb; pdb.pm()` after the exception propagates |
 | **debugpy (remote / IDE)** | IDE attach, remote host, containerized process | `python -m debugpy --listen 5678 --wait-for-client script.py` then attach from VS Code / PyCharm |
 
+`debugpy` is a Debug Adapter Protocol (DAP) adapter, not merely an IDE convenience.
+Its listener exposes a machine-readable protocol that an agent or other client can drive
+programmatically; it is a better boundary for automation than the human-oriented pdb REPL.
+
+```bash
+# Listen on the requested interface and wait before executing the script
+python -m debugpy --listen <host:port> --wait-for-client <script>
+```
+
+Use a DAP client to send structured requests and receive structured stopped/continued
+and stack/variable events. By contrast, `pdb` exposes prompt-oriented text: an agent
+using it must screen-scrape output and parse a human-facing REPL.
+
 ### Prefer `ipdb` or `pudb` over plain `pdb` when available
 
 - **ipdb** — drop-in replacement with tab completion, syntax highlighting. `pip install ipdb`, then `PYTHONBREAKPOINT=ipdb.set_trace` or use `import ipdb; ipdb.set_trace()`.

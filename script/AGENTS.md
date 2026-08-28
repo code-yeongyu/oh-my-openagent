@@ -55,6 +55,7 @@ Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycode
 | `codex-install-bundle-freshness.test.ts` | The COMMITTED Codex installer bundle matches its sources: reads the bundle from the git index (`git show :packages/omo-codex/scripts/install-dist/install-local.mjs`), checks the build marker is present and self-consistent, and asserts the current source digest matches it |
 | `agent-command-string-audit.test.ts` (+ `agent-command-string-scan.test.ts`) | Bare/unsafe agent command strings in tracked sources must be allowlisted (`agent-command-string-audit.allowlist.json`, categorized) |
 | `ci-root-test-partition.test.ts` / `root-test-config.test.ts` | `ci.yml` root test job and the `bunfig.*.toml` partition stay in sync |
+| `root-test-serial-quarantine.ts` | Single source of truth for the test files every parallel CI leg runs serially first, with the documented reason per entry; pinned into both parallel bunfigs and both leg commands by `ci-root-test-partition.test.ts` |
 | `test-environment-isolation.test.ts` | The test preload strips `OPENCODE_SERVER_PASSWORD` so credentials never reach tests |
 
 ## TSCONFIG

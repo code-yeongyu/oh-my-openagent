@@ -30,7 +30,7 @@ const sectionHeadingsToStrip = new Set([
   "Subagent-dependent transition barrier",
   "Senpi Harness Tool Compatibility",
 ])
-const forbiddenGuidancePattern = /\b(?:multi_agent|spawn_agent)\b/i
+const forbiddenGuidancePattern = /\b(?:multi_agent|spawn_agent|update_plan)\b/i
 
 const sourceTestFilePattern = /\.test\.ts$/
 const ignoredSkillSourceDirNames = new Set([

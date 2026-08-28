@@ -248,6 +248,10 @@ export type {
 } from "./agents"
 export { buildNoticeBox, noticeTone } from "./notice-box"
 export type { NoticeLine, NoticeSpec, NoticeTheme, NoticeTone } from "./notice-box"
+// Render-runtime lazy boundary: the task component awaits this at registration so the render
+// helpers above can read the pi-tui namespace synchronously without statically binding the
+// omo-task.js/omo-member.js blobs to the pi-tui barrel.
+export { loadPiTui } from "./lazy/pi-tui"
 export {
   buildCompletionDetails,
   buildCompletionMessage,

@@ -181,6 +181,8 @@ describe("dag definition library", () => {
 
       expect(run.run_id).toBe("run-42")
       expect(calls.map((call) => call.action)).toEqual(["start", "wait", "cancel"])
+      // The library's done() blocks for the final result, so it opts out of the tool's detached default.
+      expect(calls[1]).toEqual({ action: "wait", run_id: "run-42", detach: false })
       const started = calls[0]!.definition as { key: string; nodes: Array<{ prompt: string }> }
       expect(started.key).toBe("nightly-audit-t1")
       expect(started.nodes[0]!.prompt).toContain("nightly-audit-t1")

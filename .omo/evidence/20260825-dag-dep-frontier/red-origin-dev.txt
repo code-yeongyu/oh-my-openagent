@@ -1,0 +1,34 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/scheduler-frontier.test.ts:
+(fail) DAG scheduler dependency-frontier admission > #given a dependent whose dependsOn completed #when an unrelated sibling keeps running #then the dependent is admitted at once (dag_530ad299) [20005.31ms]
+  ^ this test timed out after 20000ms.
+(pass) DAG scheduler dependency-frontier admission > #given a dependency still running #when the scheduler is active #then its dependent is not admitted before terminal [47.41ms]
+317 |     expect(manager.attempts).toEqual(["a", "b"])
+318 |     manager.complete("a")
+319 |     await manager.whenStarted("b")
+320 | 
+321 |     // then - the freed slot goes to the oldest denial (b); c probes in the same batch and parks.
+322 |     expect(manager.attempts).toEqual(["a", "b", "b", "c"])
+                                   ^
+error: expect(received).toEqual(expected)
+
+  [
+    "a",
+    "b",
+    "b",
+-   "c",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/pristine-dev-check/packages/senpi-task/src/dag/scheduler-frontier.test.ts:322:30)
+(fail) DAG scheduler dependency-frontier admission > #given frontier admission under the residency cap #when a slot frees #then the oldest denial is retried before newer ready nodes [20.32ms]
+(fail) DAG scheduler dependency-frontier admission > #given frontier admission #when the run settles #then every wave index reports exactly one completed grouping with full membership [20033.08ms]
+  ^ this test timed out after 20000ms.
+
+ 1 pass
+ 3 fail
+ 7 expect() calls
+Ran 4 tests across 1 file. [40.55s]

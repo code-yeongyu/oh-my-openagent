@@ -187,14 +187,14 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("medium")
     })
 
-    test("unspecified-high category uses Kimi K3 max as primary", () => {
+    test("unspecified-high category uses Opus 5 xhigh as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("kimi-for-coding/k3")
-      expect(category.variant).toBe("max")
+      expect(category.model).toBe("anthropic/claude-opus-5")
+      expect(category.variant).toBe("xhigh")
     })
   })
 

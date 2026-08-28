@@ -1,0 +1,1 @@
+Scoped unit and live Senpi QA were run from the isolated task worktree. Commands: tsgo --noEmit -p packages/omo-senpi/tsconfig.json; bun run test:senpi; node packages/omo-senpi/scripts/qa/drive.mjs. Targeted tests cover marker gating, defaults/overrides, shared apply_patch path extraction, single-flight, one-notice state, and multi-file comment-checker hook inputs.

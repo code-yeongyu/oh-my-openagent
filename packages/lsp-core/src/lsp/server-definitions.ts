@@ -49,6 +49,35 @@ export const LSP_INSTALL_HINTS: Record<string, string> = {
 		"Install: dotnet tool install -g roslyn-language-server --prerelease (requires v5.8.0+). See https://github.com/dotnet/razor",
 };
 
+/**
+ * Repo-local install commands, offered ahead of the global hints in `LSP_INSTALL_HINTS`.
+ *
+ * A devDependency (or project venv) is resolvable by `resolveServerBinary()` without any
+ * global install, and it pins the version the project actually expects. Only servers that
+ * are genuinely distributed per-project belong here; toolchain-wide servers (rust-analyzer,
+ * gopls, clangd, ...) keep their global hint alone.
+ */
+export const LSP_LOCAL_INSTALL_HINTS: Record<string, string> = {
+	typescript: "bun add -d typescript-language-server typescript",
+	vue: "bun add -d @vue/language-server",
+	eslint: "bun add -d vscode-langservers-extracted",
+	oxlint: "bun add -d oxlint",
+	biome: "bun add -d @biomejs/biome",
+	svelte: "bun add -d svelte-language-server",
+	astro: "bun add -d @astrojs/language-server",
+	bash: "bun add -d bash-language-server",
+	"bash-ls": "bun add -d bash-language-server",
+	"yaml-ls": "bun add -d yaml-language-server",
+	php: "bun add -d intelephense",
+	prisma: "bun add -d prisma",
+	dockerfile: "bun add -d dockerfile-language-server-nodejs",
+	pyright: "uv add --dev pyright",
+	basedpyright: "uv add --dev basedpyright",
+	ruff: "uv add --dev ruff",
+	ty: "uv add --dev ty",
+	"ruby-lsp": "bundle add ruby-lsp --group development",
+};
+
 export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	typescript: {
 		command: ["typescript-language-server", "--stdio"],

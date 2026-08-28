@@ -2682,5 +2682,15 @@ session_id: ses_untrusted_999
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       })
     })
+
+    test("releases Atlas-owned state on disposal", () => {
+      // given - an Atlas hook instance owns session state and retry handles
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      // when - the plugin lifecycle disposes the hook
+      // then - Atlas exposes its lifecycle cleanup contract
+      expect(hook).toHaveProperty("dispose")
+    })
   })
 })

@@ -59,6 +59,25 @@
         "output": 131072
       }
     },
+    "glm-5.3": {
+      "id": "glm-5.3",
+      "family": "glm",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
+        "output": 131072
+      }
+    },
     "glm-5v-turbo": {
       "id": "glm-5v-turbo",
       "family": "glm",

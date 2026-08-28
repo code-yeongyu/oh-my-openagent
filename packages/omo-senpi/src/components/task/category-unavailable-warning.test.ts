@@ -97,7 +97,7 @@ describe("createCategoryUnavailableWarningPlanner", () => {
     plan(planner, "quick")
 
     // then
-    expect(notifies).toEqual([{ message: EXPECTED_TEXT, type: "warning" }])
+    expect(notifies).toEqual([{ message: EXPECTED_TEXT, type: "info" }])
     expect(messages).toHaveLength(1)
     expect(messages[0]?.message).toEqual({
       customType: CATEGORY_UNAVAILABLE_MESSAGE_TYPE,

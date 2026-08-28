@@ -37,6 +37,7 @@ export class LspClientTransport {
 	protected readonly initializeTimeoutMs: number;
 	private workspaceApplyEditHandler: WorkspaceApplyEditHandler | null = null;
 	private diagnosticPullSupported = false;
+	private documentFormattingSupported = false;
 
 	constructor(
 		protected readonly root: string,
@@ -69,6 +70,14 @@ export class LspClientTransport {
 
 	protected isDiagnosticPullSupported(): boolean {
 		return this.diagnosticPullSupported;
+	}
+
+	protected setDocumentFormattingSupported(supported: boolean): void {
+		this.documentFormattingSupported = supported;
+	}
+
+	isDocumentFormattingSupported(): boolean {
+		return this.documentFormattingSupported;
 	}
 
 	protected handlePublishDiagnostics(params: {

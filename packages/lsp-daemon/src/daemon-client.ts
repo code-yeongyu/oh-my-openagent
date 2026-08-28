@@ -74,6 +74,10 @@ export function callDiagnosticsViaDaemon(filePath: string, options: CallToolOpti
 	return callToolViaDaemon("diagnostics", { filePath, severity: "error" }, options);
 }
 
+export function callFormatViaDaemon(filePath: string, options: CallToolOptions): Promise<ToolExecutionResult> {
+	return callToolViaDaemon("format", { filePath }, options);
+}
+
 export function currentRequestContext(env: NodeJS.ProcessEnv = process.env): DaemonToolContext {
 	const cwd = process.cwd();
 	const home = env["HOME"] ?? homedir();
