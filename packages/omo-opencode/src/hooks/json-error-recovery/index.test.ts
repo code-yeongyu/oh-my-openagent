@@ -119,6 +119,19 @@ describe("createJsonErrorRecoveryHook", () => {
       expect(output.output).toBe("JSON parse error: unexpected end of JSON input")
     })
 
+    it("does not append reminder for either Parallel websearch tool", async () => {
+      const parallelTools = ["websearch_web_search", "websearch_web_fetch"]
+      const proseMentioningJson = "The page contains invalid JSON here"
+
+      for (const tool of parallelTools) {
+        const output = createOutput(proseMentioningJson)
+
+        await hook["tool.execute.after"](createInput(tool), output)
+
+        expect(output.output).toBe(proseMentioningJson)
+      }
+    })
+
     it("does not append reminder for subagent and session-content tools", async () => {
       // given
       const subagentTools = [
@@ -208,6 +221,8 @@ describe("createJsonErrorRecoveryHook", () => {
         "read",
         "bash",
         "webfetch",
+        "websearch_web_search",
+        "websearch_web_fetch",
         "task",
         "call_omo_agent",
         "background_output",
