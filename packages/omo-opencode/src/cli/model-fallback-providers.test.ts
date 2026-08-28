@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig, shouldShowChatGPTOnlyWarning } from "./model-fallback"
+import { CLI_AGENT_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
 import type { InstallConfig } from "./types"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
@@ -30,6 +31,26 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
 }
 
 describe("generateModelConfig provider routes", () => {
+  describe("Atlas Cloud provider", () => {
+    test("routes coding agents through Atlas Cloud using fully qualified model IDs", () => {
+      const result = generateModelConfig(createConfig({ hasAtlasCloud: true }))
+
+      expect(result.agents?.sisyphus?.model).toBe("atlascloud/moonshotai/kimi-k3")
+      expect(result.agents?.hephaestus?.model).toBe("atlascloud/openai/gpt-5.6-sol")
+      expect(result.agents?.explore?.model).toBe("atlascloud/deepseek-ai/deepseek-v4-flash")
+      expect(result.categories?.quick?.model).toBe("atlascloud/deepseek-ai/deepseek-v4-flash")
+    })
+
+    test("keeps Atlas Cloud eligible without restoring retired Vercel fallback lanes", () => {
+      const result = generateModelConfig(createConfig({ hasAtlasCloud: true, hasVercelAiGateway: true }))
+
+      expect(result.agents?.hephaestus?.model).toBe("atlascloud/openai/gpt-5.6-sol")
+      const providers = CLI_AGENT_MODEL_REQUIREMENTS.hephaestus.fallbackChain[0]?.providers ?? []
+      expect(providers).toContain("atlascloud")
+      expect(providers).not.toContain("vercel")
+    })
+  })
+
   describe("Hephaestus agent special cases", () => {
     test("Hephaestus is created when OpenAI is available (openai provider connected)", () => {
       // given only OpenAI is available

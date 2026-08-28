@@ -63,6 +63,13 @@ describe("codex cleanup", () => {
         '[plugins."omo@lazycodex"]',
         "enabled = true",
         "",
+        "[model_providers.atlascloud]",
+        'name = "Atlas Cloud"',
+        'base_url = "https://api.atlascloud.ai/v1"',
+        'env_key = "ATLASCLOUD_API_KEY"',
+        'wire_api = "responses"',
+        "requires_openai_auth = false",
+        "",
         "[agents.explorer]",
         'description = "managed"',
         'config_file = "./agents/explorer.toml"',
@@ -111,6 +118,7 @@ describe("codex cleanup", () => {
     expect(config).not.toContain('omo@sisyphuslabs')
     expect(config).not.toContain("[marketplaces.lazycodex]")
     expect(config).not.toContain('omo@lazycodex')
+    expect(config).not.toContain("[model_providers.atlascloud]")
     expect(config).not.toContain("[agents.explorer]")
     expect(config).toContain("[agents.custom]")
     expect(await readFile(result.configBackupPath ?? "", "utf8")).toContain("[marketplaces.sisyphuslabs]")
@@ -121,6 +129,19 @@ describe("codex cleanup", () => {
     expect(projectConfig).not.toMatch(/^max_threads\s*=/m)
     expect(projectConfig).toContain("max_depth = 3")
     expect(await pathExists(join(projectRoot, ".codex", "hooks.json"))).toBe(true)
+  })
+
+  test("preserves a user-modified Atlas Cloud provider during cleanup", () => {
+    const config = [
+      "[model_providers.atlascloud]",
+      'name = "My Atlas Gateway"',
+      'base_url = "https://example.test/v1"',
+      'env_key = "CUSTOM_ATLAS_KEY"',
+      'wire_api = "responses"',
+      "",
+    ].join("\n")
+
+    expect(cleanupCodexLightConfigText(config)).toBe(config)
   })
 
   test("#given malformed project directory #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped", async () => {

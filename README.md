@@ -161,6 +161,32 @@ npx lazycodex-ai install --no-tui --codex-autonomous
 
 For the Light edition, Bun is not required. Use `npx lazycodex-ai install` from a Node/npm environment. Global installation is not officially supported; the installer writes the Codex plugin into `~/.codex/`.
 
+### Use Atlas Cloud
+
+Keep the API key in your environment rather than a checked-in config file:
+
+```bash
+export ATLASCLOUD_API_KEY="your-api-key"
+```
+
+For the Ultimate edition, enable the Atlas Cloud provider during a non-interactive OpenCode install:
+
+```bash
+bunx oh-my-openagent install --no-tui --platform=opencode \
+  --claude=no --gemini=no --copilot=no --atlas-cloud=yes
+```
+
+This registers the OpenAI-compatible `atlascloud` provider and makes supported Atlas Cloud models available to the existing per-agent fallback chains. An existing user-owned `atlascloud` provider block is preserved.
+
+For the Light edition, the normal installer registers Atlas Cloud as a Codex Responses provider without changing your default model or provider:
+
+```bash
+npx lazycodex-ai install
+codex -m moonshotai/kimi-k3 -c 'model_provider="atlascloud"'
+```
+
+See the [full installation guide](docs/guide/installation.md#atlas-cloud-provider) and the [Atlas Cloud coding plan](https://www.atlascloud.ai/console/coding-plan).
+
 ### For LLM Agents
 
 Fetch the full guide and follow it step by step:
@@ -515,6 +541,17 @@ Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/Lazy
 99% of this project was built with OpenCode. I don't really know TypeScript, **but I personally reviewed and largely rewrote this doc.**
 
 ## Loved by professionals at
+
+<a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=oh-my-openagent">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/atlas-cloud-logo-white.svg" />
+    <img src="./.github/assets/atlas-cloud-logo.svg" alt="Atlas Cloud" width="163" />
+  </picture>
+</a>
+
+[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=oh-my-openagent) offers OpenAI-compatible inference for coding-agent workflows. [View the coding plan](https://www.atlascloud.ai/console/coding-plan).
+
+[Configure Atlas Cloud for OpenCode or Codex](#use-atlas-cloud).
 
 - [Indent](https://indentcorp.com)
   - Makers of Spray (influencer marketing solution), vovushop (cross-border commerce platform), and vreview (AI commerce review marketing solution).

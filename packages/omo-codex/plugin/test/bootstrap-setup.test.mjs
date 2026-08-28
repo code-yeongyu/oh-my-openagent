@@ -92,6 +92,11 @@ test("#given a marketplace-flow CODEX_HOME #when the worker setup runs #then con
 		assert.match(config, /\[plugins\."omo@sisyphuslabs"\]\nenabled = true/);
 		assert.match(config, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\]\nenabled = true/);
 		assert.match(config, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\]\nenabled = false/);
+		assert.match(config, /\[model_providers\.atlascloud\]/);
+		assert.match(config, /base_url = "https:\/\/api\.atlascloud\.ai\/v1"/);
+		assert.match(config, /env_key = "ATLASCLOUD_API_KEY"/);
+		assert.match(config, /wire_api = "responses"/);
+		assert.doesNotMatch(config, /^model_provider\s*=/m);
 		assert.match(
 			config,
 			/\[hooks\.state\."omo@sisyphuslabs:hooks\/hooks\.json:session_start:0:0"\]\ntrusted_hash = "sha256:[0-9a-f]{64}"/,

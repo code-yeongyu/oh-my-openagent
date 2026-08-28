@@ -358,11 +358,12 @@ bunx oh-my-openagent install \
   [--minimax-cn-coding-plan=<yes|no>] \
   [--minimax-coding-plan=<yes|no>] \
   [--vercel-ai-gateway=<yes|no>] \
+  [--atlas-cloud=<yes|no>] \
   [--codex-autonomous|--no-codex-autonomous] \
   [--skip-auth]
 ```
 
-`--platform` defaults to `opencode` if omitted. Subscription flags only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` only has an effect when the selected platform includes Codex.
+`--platform` defaults to `opencode` if omitted. Subscription and OpenCode-provider flags only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. The Codex installer registers its Atlas Cloud provider automatically. `--codex-autonomous` only has an effect when the selected platform includes Codex.
 
 **Examples:**
 
@@ -386,6 +387,10 @@ bunx oh-my-openagent install \
   ```bash
   bunx oh-my-openagent install --no-tui --platform=opencode --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes
   ```
+- OpenCode + Atlas Cloud, nothing else:
+  ```bash
+  ATLASCLOUD_API_KEY="your-api-key" bunx oh-my-openagent install --no-tui --platform=opencode --claude=no --gemini=no --copilot=no --atlas-cloud=yes
+  ```
 
 **About the Codex bin names.** Both `lazycodex-ai` and `lazycodex` are shipped bin aliases for the Codex Light Node installer; `lazycodex` is also the GitHub repository identity that hosts the marketplace bundle. Neither invocation requires Bun. The Codex marketplace name is `sisyphuslabs`, and the plugin name is `omo`.
 
@@ -393,10 +398,28 @@ bunx oh-my-openagent install \
 
 | Platform | Writes |
 |----------|--------|
-| `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into the `[opencode]` block of `~/.omo/omo.jsonc` (legacy config files are migrated into the unified file first). |
-| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
+| `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into the `[opencode]` block of `~/.omo/omo.jsonc` (legacy config files are migrated into the unified file first). With `--atlas-cloud=yes`, adds the OpenAI-compatible `atlascloud` provider to `opencode.json[c]` using the `ATLASCLOUD_API_KEY` environment placeholder and makes supported Atlas Cloud models available to the existing fallback chains. |
+| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[model_providers.atlascloud]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
 
 Both halves are independent and idempotent — re-running is safe.
+
+#### Atlas Cloud provider
+
+Keep credentials in the environment:
+
+```bash
+export ATLASCLOUD_API_KEY="your-api-key"
+```
+
+For OpenCode, pass `--atlas-cloud=yes` to the TUI-less installer or answer **Yes** to the Atlas Cloud prompt in the TUI. OMO adds provider `atlascloud` with package `@ai-sdk/openai-compatible`, endpoint `https://api.atlascloud.ai/v1`, and the `{env:ATLASCLOUD_API_KEY}` placeholder. It does not overwrite an existing `provider.atlascloud` object.
+
+For Codex, `npx lazycodex-ai install` automatically registers `[model_providers.atlascloud]` with `wire_api = "responses"` and `env_key = "ATLASCLOUD_API_KEY"`. It deliberately leaves the root `model` and `model_provider` unchanged. Select Atlas Cloud per command, for example:
+
+```bash
+codex -m moonshotai/kimi-k3 -c 'model_provider="atlascloud"'
+```
+
+The Codex uninstall path removes only an unchanged canonical installer-managed block. A pre-existing or user-modified `atlascloud` block remains untouched.
 
 ### Step 3: Verify
 
@@ -787,7 +810,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 - **Codex marketplace snapshot:** `~/.codex/.tmp/marketplaces/sisyphuslabs/` (local marketplace metadata and bundled source snapshot)
 - **User-linked component binaries:** `lazycodex-executor-verify`, `omo-codegraph`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-ulw-execute-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). `teammode` runs through skill, hook, and script surfaces rather than a user-linked executable. The top-level `omo-agent-toolkit` command belongs to the shared oh-my-openagent launcher, not a Codex component.
 - **Codex agent roles:** `~/.codex/agents/{lazycodex-clone-fidelity-reviewer,lazycodex-code-reviewer,lazycodex-gate-reviewer,lazycodex-qa-executor,lazycodex-worker-low,lazycodex-worker-medium,lazycodex-worker-high,explorer,librarian,metis,momus,plan}.toml` (there is no `lazycodex-executor` agent TOML; executor completion is handled by the `lazycodex-executor-verify` hook/bin), copied from the bundled plugin snapshot, so they keep resolving when Codex prunes old plugin-cache versions or temporary marketplace state
-- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled.
+- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, `[model_providers.atlascloud]` (unless a user-owned section already exists), plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled. The Atlas Cloud block references `ATLASCLOUD_API_KEY`, uses the Responses wire API, and does not change the default model/provider.
 
 #### The components
 

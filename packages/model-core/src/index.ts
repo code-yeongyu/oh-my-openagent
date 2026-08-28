@@ -34,6 +34,7 @@ export {
 	transformModelForProvider,
 	transformModelForProviderDisplay,
 } from "./provider-model-id-transform"
+export * from "./atlas-cloud-models"
 export * from "./fallback-chain-from-models"
 export {
   _setModelResolutionLogImplementationForTesting,
