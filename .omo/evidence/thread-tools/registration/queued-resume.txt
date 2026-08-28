@@ -1,0 +1,2 @@
+assert queued-resume host_get_messages=true dead_host_pid=54350 pending_after_restart=1 pending_after_drain=0 delivered_count=1
+PASS queued-resume

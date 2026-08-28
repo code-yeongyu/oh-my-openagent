@@ -1,0 +1,4 @@
+branch=canonical-sentinel
+path=/Users/yeongyu/.omo/agent/rpc/rpc.sock
+inputs=SENPI_RPC_SOCKET OMO_CODING_AGENT_DIR SENPI_CODING_AGENT_DIR PI_CODING_AGENT_DIR CODING_AGENT_DIR unset
+resolver=packages/omo-senpi/src/components/agent-home/resolve-agent-home.ts

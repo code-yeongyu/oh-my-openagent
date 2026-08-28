@@ -35,7 +35,7 @@ describe("omo-senpi local-path runtime dependencies", () => {
     const peerPackages = collectPackageNames(manifest.peerDependencies)
     const runtimeImports = externalImports.filter((specifier) => !peerPackages.has(specifier))
 
-    expect(runtimeImports.filter((specifier) => !runtimePackages.has(specifier))).toEqual([])
+    expect(runtimeImports.filter((specifier) => !runtimePackages.has(packageNameOf(specifier)))).toEqual([])
     expect(runtimeImports.length).toBeGreaterThan(0)
 
     const root = mkdtempSync(join(tmpdir(), "omo-senpi-symlink-"))
@@ -49,9 +49,9 @@ describe("omo-senpi local-path runtime dependencies", () => {
       `${runtimeImports.map((specifier) => `await import(${JSON.stringify(specifier)})`).join("\n")}\nconsole.log("runtime-dependencies-loaded")\n`,
     )
 
-    for (const specifier of runtimeImports) {
+    for (const specifier of new Set(runtimeImports.map(packageNameOf))) {
       const dependencyRoot = findPackageRoot(specifier)
-      const linkPath = join(isolatedPackageRoot, "node_modules", ...specifier.split("/"))
+      const linkPath = join(isolatedPackageRoot, "node_modules", ...packageNameOf(specifier).split("/"))
       mkdirSync(dirname(linkPath), { recursive: true })
       symlinkSync(dependencyRoot, linkPath, "dir")
     }
@@ -103,13 +103,19 @@ function collectPackageNames(value: unknown): Set<string> {
   return new Set(Object.keys(value))
 }
 
+function packageNameOf(specifier: string): string {
+  if (specifier.startsWith("@")) return specifier.split("/").slice(0, 2).join("/")
+  return specifier.split("/")[0] ?? specifier
+}
+
 function findPackageRoot(specifier: string): string {
+  const packageName = packageNameOf(specifier)
   let current = dirname(requireFromPackage.resolve(specifier))
   for (;;) {
     const manifestPath = join(current, "package.json")
     if (existsSync(manifestPath)) {
       const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { name?: unknown }
-      if (manifest.name === specifier) return current
+      if (manifest.name === packageName) return current
     }
 
     const parent = dirname(current)

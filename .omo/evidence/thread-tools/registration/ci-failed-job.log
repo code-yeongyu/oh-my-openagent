@@ -1,0 +1,46 @@
+typecheck	Type check	﻿2026-08-28T06:57:53.4953363Z ##[group]Run bun run typecheck
+typecheck	Type check	2026-08-28T06:57:53.4953837Z ^[[36;1mbun run typecheck^[[0m
+typecheck	Type check	2026-08-28T06:57:53.4980006Z shell: /usr/bin/bash -e {0}
+typecheck	Type check	2026-08-28T06:57:53.4980474Z ##[endgroup]
+typecheck	Type check	2026-08-28T06:57:53.5131455Z $ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+typecheck	Type check	2026-08-28T06:57:55.9111807Z $ tsgo --noEmit -p script/tsconfig.json
+typecheck	Type check	2026-08-28T06:57:56.7109027Z $ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+typecheck	Type check	2026-08-28T06:58:07.2027666Z ##[error]packages/omo-senpi/src/components/thread/tools.test.ts(33,97): error TS2345: Argument of type 'undefined' is not assignable to parameter of type 'ExtensionContext'.
+typecheck	Type check	2026-08-28T06:58:07.2069624Z error: script "typecheck:packages" exited with code 1
+typecheck	Type check	2026-08-28T06:58:07.2073102Z error: script "typecheck" exited with code 1
+typecheck	Type check	2026-08-28T06:58:07.2082125Z ##[error]Process completed with exit code 1.
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	﻿2026-08-28T06:57:52.2584630Z ##[group]Run set -euo pipefail
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.2584986Z ^[[36;1mset -euo pipefail^[[0m
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.2585391Z ^[[36;1mnode packages/omo-senpi/plugin/scripts/build-extension.mjs --check^[[0m
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.2625426Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.2626102Z ##[endgroup]
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.3901462Z runtime dist not built locally; skipping freshness check: /home/runner/work/oh-my-openagent/oh-my-openagent/packages/lsp-daemon/dist
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.4258436Z runtime dist not built locally; skipping freshness check: /home/runner/work/oh-my-openagent/oh-my-openagent/packages/ast-grep-mcp/dist/cli.js
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.4653940Z runtime dist not built locally; skipping freshness check: /home/runner/work/oh-my-openagent/oh-my-openagent/packages/omo-codex/plugin/components/ulw-loop/dist/cli.js
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.5666858Z Bundled 879 modules in 86ms
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.5667676Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.5669775Z   omo.js  1.49 MB  (entry point)
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:52.5670298Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:57.5667355Z Bundled 672 modules in 64ms
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:57.5667939Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:57.5669261Z   omo-task.js  0.93 MB  (entry point)
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:57:57.5669698Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.2676928Z Bundled 285 modules in 37ms
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.2684330Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.2684686Z   omo-member.js  175.36 KB  (entry point)
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.2685118Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.8254751Z Bundled 94 modules in 13ms
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.8255069Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.8255317Z   omo-memory-mcp.js  97.19 KB  (entry point)
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:00.8266230Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.1703650Z Bundled 125 modules in 15ms
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.1704402Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.1716626Z   memory-run-supervisor.mjs  29.25 KB  (entry point)
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.1717245Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.3106064Z Bundled 115 modules in 15ms
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.3106487Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.3106895Z   omo-init-deep-advisor.js  68.82 KB  (entry point)
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.3107316Z 
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.3919476Z omo-senpi extension build is not current: stale-output
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.3921456Z output=/home/runner/work/oh-my-openagent/oh-my-openagent/packages/omo-senpi/plugin/extensions/omo.js
+senpi-compatibility (ubuntu-latest)	Verify committed Senpi plugin bundle is current	2026-08-28T06:58:01.4379058Z ##[error]Process completed with exit code 1.
