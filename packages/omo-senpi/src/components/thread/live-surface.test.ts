@@ -16,6 +16,6 @@ describe("live thread socket discovery", () => {
     expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe("/h/.senpi/agent")
   })
   test("missing socket returns undefined", () => {
-    expect(createLiveThreadSurface({} as never)).toBeUndefined()
+    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })).toBeUndefined()
   })
 })

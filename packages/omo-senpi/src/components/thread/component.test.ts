@@ -17,7 +17,7 @@ describe("thread component production registration", () => {
 
   test("warns when the socket surface cannot be constructed", () => {
     const warnings: string[] = []; const f = api(); const previous = process.env.SENPI_RPC_SOCKET
-    delete process.env.SENPI_RPC_SOCKET; delete process.env.SENPI_CODING_AGENT_DIR; delete process.env.OMO_CODING_AGENT_DIR
+    process.env.SENPI_RPC_SOCKET = "/definitely/missing/thread.sock"; delete process.env.SENPI_CODING_AGENT_DIR; delete process.env.OMO_CODING_AGENT_DIR
     try { createThreadComponent().register(f.pi as never, context(warnings) as never) } finally { if (previous === undefined) delete process.env.SENPI_RPC_SOCKET; else process.env.SENPI_RPC_SOCKET = previous }
     expect(f.tools).toHaveLength(0); expect(warnings).toEqual(["omo-senpi thread component skipped: live RPC surface unavailable"])
   })
