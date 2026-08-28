@@ -1,0 +1,35 @@
+$ docker run --name omo-qa-5317-review -v "$PWD:/workspaces/oh-my-openagent" -e OPENCODE_CONFIG_DIR=/workspaces/oh-my-openagent/.local-ignore/qa-5317/opencode-config omo-qa opencode run "OMO5317_REVIEW_CORRECTION: capture preserved hold and fallback dispatch." --format json --model qa-mock/qa-model
+
+REAL_OPENCODE_RUN_EXIT=0
+STRUCTURED_TOOL_SEQUENCE=team_create:completed,team_status:completed,team_status:completed,team_send_message:completed,team_send_message:completed,team_status:completed,team_status:completed
+FIRST_SEND_BODY=QA_FIRST_MESSAGE
+FALLBACK_SEND_BODY=QA_FALLBACK_MESSAGE
+FINAL_TEXT=OMO5317_REAL_PATH_OK memberResponses=2
+NDJSON_ERROR_COUNT=0
+
+[team-mailbox] live delivery skipped by promptAsync gate, falling back to inbox injection {"status":"reserved"}
+[prompt-async-gate] queued prompt accepted {"source":"team-live-delivery-fallback","position":1}
+[prompt-async-gate] expired reservation released {"source":"model-suggestion-retry"}
+[prompt-async-gate] promptAsync dispatching {"source":"team-live-delivery-fallback"}
+[prompt-async-gate] promptAsync dispatched {"source":"team-live-delivery-fallback"}
+
+TEAM_LIVE_RESERVATION_RELEASE_COUNT=0
+HOST_SESSION_COUNT_BEFORE=7928
+HOST_SESSION_COUNT_AFTER=7928
+FINAL_MESSAGE_SPECIFIC_DEDUPE_RUN_EXIT=0
+FINAL_TRANSIENT_RETRY_RUN_EXIT=0
+REVALIDATION_ERROR_COUNT=0
+FINAL_DELETED_TEAM_RUN_EXIT=0
+FINAL_EXACT_MESSAGE_RUN_EXIT=0
+EXACT_MESSAGE_READ_ERROR_COUNT=0
+FINAL_BOUNDED_VALIDATION_RUN_EXIT=0
+VALIDATION_TIMEOUT_COUNT=0
+FINAL_PENDING_ACK_RUN_EXIT=0
+FINAL_TRANSPORT_RETRY_RUN_EXIT=0
+FINAL_BOUNDED_QUEUE_RUN_EXIT=0
+FINAL_RESERVATION_RACE_RUN_EXIT=0
+FINAL_REVALIDATION_CAP_RUN_EXIT=0
+FINAL_RETRY_INVARIANT_RUN_EXIT=0
+FINAL_NON_RETRYABLE_RUN_EXIT=0
+FINAL_DURABLE_RETRY_RUN_EXIT=0
+FINAL_CONNECTION_CLASSIFIER_RUN_EXIT=0

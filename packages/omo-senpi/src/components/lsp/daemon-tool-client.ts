@@ -22,6 +22,7 @@ type LspRequestContext = {
 };
 
 const DAEMON_TOOL_NAMES = {
+	format: "format",
 	lsp_diagnostics: "diagnostics",
 	lsp_goto_definition: "goto_definition",
 	lsp_find_references: "find_references",

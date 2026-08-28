@@ -1,0 +1,17 @@
+
+ RUN  v4.1.8 /Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/lsp-format-capability/packages/lsp-daemon
+
+error: write EPIPE
+   errno: -32,
+ syscall: "write",
+    code: "EPIPE"
+
+      at failWrite (node:net:53:30)
+      at processTicksAndRejections (native:7:39)
+[lsp-daemon] startup diagnostic failed: synthetic diagnostic failure
+
+ Test Files  21 passed (21)
+      Tests  158 passed (158)
+   Start at  17:48:16
+   Duration  1.52s (transform 8.30s, setup 0ms, import 11.10s, tests 1.30s, environment 3ms)
+

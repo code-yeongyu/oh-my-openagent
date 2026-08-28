@@ -808,6 +808,13 @@ class TaskManagerImpl implements TaskManager {
         context.model,
         context.record.notification.run_epoch,
       )
+      if (current !== null && current !== undefined && !isTerminalRecord(current)) {
+        this.#options.store.transition(context.record.task_id, {
+          type: "fail",
+          timestamp: nowIso(this.#now),
+          error_message: "Runtime fallback launch aborted before the child could start.",
+        })
+      }
       this.#settleWaiters(context.record.task_id)
       return
     }
@@ -904,7 +911,7 @@ class TaskManagerImpl implements TaskManager {
 
   #settleWaiters(taskId: string): void {
     const record = this.#tryLoad(taskId)
-    if (record === null || record === undefined) return
+    if (record === null || record === undefined || !isTerminalRecord(record)) return
     const waiters = this.#waiters.get(taskId)
     if (waiters === undefined) return
     const settling = waiters.splice(0)

@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 
 import { lintDagDefinitionNodes } from "./dag-lint"
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { DagManagerError, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 // The per-node control verbs are not on the package's dag barrel; the runtime already reaches the
 // scheduler module by path for the same reason, and both resolve to the same source file, so the
@@ -76,6 +77,9 @@ async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<Dag
   const nodeErrors = validateNodeTargets(input.nodes)
   if (nodeErrors.length > 0) return invalidNodeTargets(nodeErrors)
   const warnings = lintDagDefinitionNodes(input.nodes)
+  // Dag skill materialization discovers skills synchronously through the senpi barrel. Warm the
+  // lazy boundary at this async tool entry point before the manager reaches that hook.
+  await loadSenpiBarrel()
   const result = await deps.manager.start({
     definition: toDefinition(input),
     parentSessionId: deps.parentSessionId(),

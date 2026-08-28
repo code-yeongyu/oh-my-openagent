@@ -121,6 +121,7 @@ type FakeOptions = {
   readonly rejectStartNodeIds?: readonly string[]
   readonly rejectWaitNodeIds?: readonly string[]
   readonly sendOutcomes?: Readonly<Record<string, SendOutcome>>
+  readonly ownerConflictNodeIds?: readonly string[]
 }
 
 type MutableTask = {
@@ -253,6 +254,14 @@ class FakeTaskManager implements TaskManager {
     this.#tasks.set(taskId, task)
     this.starts.push(nodeId)
     this.#startedSignals.get(nodeId)?.resolve()
+    if (this.#options.ownerConflictNodeIds?.includes(nodeId) === true) {
+      return {
+        kind: "owner_conflict",
+        task_id: taskId,
+        existing_fingerprint: "live-owner-fingerprint",
+        requested_fingerprint: owner.fingerprint,
+      }
+    }
     if (this.#options.autoComplete !== false) queueMicrotask(() => this.complete(nodeId))
     return {
       kind: "started",
@@ -426,6 +435,33 @@ function waveMembership(events: readonly DagRunEvent[], type: "dag.wave.started"
     .filter((event): event is Extract<DagRunEvent, { type: typeof type }> => event.type === type)
     .map((event) => event.nodeIds.map(String))
 }
+
+describe("DAG scheduler owner conflict adoption", () => {
+  test("#given a live task owned by another DAG attempt #when its node is admitted #then the scheduler adopts its completion and admits the dependent", async () => {
+    // given
+    const manager = new FakeTaskManager({ ownerConflictNodeIds: ["A"], autoComplete: false })
+    const { scheduler, events } = schedulerFixture(definition([node("A"), node("B", ["A"])]), manager)
+    const running = scheduler.run().catch((error: unknown) => {
+      throw new Error(`${String(error)} snapshot=${JSON.stringify(scheduler.snapshot())}`)
+    })
+
+    // when
+    await within(manager.whenStarted("A"))
+    manager.complete("A")
+    await within(manager.whenStarted("B"))
+    manager.complete("B")
+    const result = await running
+
+    // then
+    expect(result.status).toBe("completed")
+    expect(result.nodes.find((entry) => entry.id === "A")?.state).toBe("completed")
+    expect(result.nodes.find((entry) => entry.id === "B")?.state).toBe("completed")
+    expect(events().filter((event) => event.type === "dag.node.task-attached")).toEqual([
+      expect.objectContaining({ nodeId: "A", taskId: "task-1" }),
+      expect.objectContaining({ nodeId: "B", taskId: "task-2" }),
+    ])
+  })
+})
 
 describe("DAG scheduler terminal result persistence", () => {
   test("#given only the senpi-task scheduler #when a node completes #then output and run stats are persisted without an adapter", async () => {

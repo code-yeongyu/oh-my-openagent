@@ -1,0 +1,60 @@
+{
+  "result": "PASS",
+  "senpiBin": "E:\\contributor\\omo-configwatch-fix\\node_modules\\.bin\\senpi.exe",
+  "lanes": [
+    {
+      "name": "lane1-single-load",
+      "result": "PASS",
+      "expect": {
+        "status": 0,
+        "standDown": false,
+        "rangeError": false,
+        "registrationFailure": false
+      },
+      "observed": {
+        "status": 0,
+        "signal": null,
+        "standDown": false,
+        "rangeError": false,
+        "registrationFailure": false,
+        "sandboxAgentDir": "C:\\Users\\USER\\AppData\\Local\\Temp\\omo-senpi-qa-0AP1f9\\agent"
+      }
+    },
+    {
+      "name": "lane2-dual-fixed",
+      "result": "PASS",
+      "expect": {
+        "status": 0,
+        "standDown": true,
+        "rangeError": false,
+        "registrationFailure": false
+      },
+      "observed": {
+        "status": 0,
+        "signal": null,
+        "standDown": true,
+        "rangeError": false,
+        "registrationFailure": false,
+        "sandboxAgentDir": "C:\\Users\\USER\\AppData\\Local\\Temp\\omo-senpi-qa-I3VVAp\\agent"
+      }
+    },
+    {
+      "name": "lane3-dual-prefix",
+      "result": "PASS",
+      "expect": {
+        "standDown": false,
+        "rangeError": true
+      },
+      "observed": {
+        "status": 0,
+        "signal": null,
+        "standDown": false,
+        "rangeError": true,
+        "registrationFailure": false,
+        "sandboxAgentDir": "C:\\Users\\USER\\AppData\\Local\\Temp\\omo-senpi-qa-9qiNG2\\agent"
+      }
+    }
+  ],
+  "realSenpiUntouched": true,
+  "realOmoAgentUntouched": true
+}

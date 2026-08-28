@@ -1,0 +1,51 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/lsp-core/src/lsp/manager-max-clients.test.ts:
+71 | 			// when
+72 | 			await manager.getClient("/root-c", SERVER);
+73 | 			manager.releaseClient("/root-c", SERVER.id);
+74 | 
+75 | 			// then
+76 | 			expect(manager.clientCount()).toBe(2);
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/lsp-format-capability/packages/lsp-core/src/lsp/manager-max-clients.test.ts:76:34)
+(fail) LspManager resident client cap > #given a cap of two idle clients #when a third client is admitted #then the least recently used one is stopped and evicted [2.82ms]
+ 97 | 			await manager.getClient("/root-new", SERVER);
+ 98 | 			manager.releaseClient("/root-new", SERVER.id);
+ 99 | 
+100 | 			// then
+101 | 			expect(manager.hasClient("/root-busy", SERVER.id)).toBe(true);
+102 | 			expect(manager.hasClient("/root-idle", SERVER.id)).toBe(false);
+                                                            ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/lsp-format-capability/packages/lsp-core/src/lsp/manager-max-clients.test.ts:102:55)
+(fail) LspManager resident client cap > #given the least recently used client is mid-request #when a new client is admitted #then the busy client survives and an idle one is evicted [0.28ms]
+(pass) LspManager resident client cap > #given every resident client is busy #when a new client is admitted #then nothing is evicted and the cap is exceeded rather than breaking a live request [0.13ms]
+139 | 			manager.warmupClient("/root-warm", SERVER);
+140 | 			await Promise.resolve();
+141 | 			await Promise.resolve();
+142 | 
+143 | 			// then
+144 | 			expect(manager.hasClient("/root-first", SERVER.id)).toBe(false);
+                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/lsp-format-capability/packages/lsp-core/src/lsp/manager-max-clients.test.ts:144:56)
+(fail) LspManager resident client cap > #given warmup requests beyond the cap #when a warm client is admitted #then the idle least recently used client is evicted too [0.26ms]
+
+ 1 pass
+ 3 fail
+ 6 expect() calls
+Ran 4 tests across 1 file. [1076.00ms]

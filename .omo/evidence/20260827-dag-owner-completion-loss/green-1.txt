@@ -1,0 +1,10 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/scheduler.test.ts:
+(pass) DAG scheduler owner conflict adoption > #given a live task owned by another DAG attempt #when its node is admitted #then the scheduler adopts its completion and admits the dependent [26.59ms]
+
+ 1 pass
+ 43 filtered out
+ 0 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [1.86s]

@@ -151,7 +151,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            shard: "1/2"
+          - os: ubuntu-latest
+            shard: "2/2"
           - os: macos-latest
+            shard: "1/2"
+          - os: macos-latest
+            shard: "2/2"
           - os: windows-latest
             shard: "1/2"
           - os: windows-latest
@@ -194,25 +200,26 @@ jobs:
         run: npm test
         working-directory: packages/lsp-daemon
 
-      # Same shape as Windows shard 2: the shared serial quarantine
-      # (script/root-test-serial-quarantine.ts) runs in one process first, then
-      # the remainder runs with --parallel. test-env.ts gives every worker its
-      # own XDG dirs and test-setup.ts its own HOME, which is what makes the
-      # parallel pass safe.
-      - name: Run tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
-          bun --config=bunfig.root.parallel.toml test --parallel
-
+      # Every OS splits the root suite into two parallel jobs (the Windows
+      # shape): shard 1 runs omo-opencode + memory-core in one serial process,
+      # shard 2 runs the shared serial quarantine first and then the remainder.
+      # `bun test --parallel` is not used on POSIX: --isolate re-runs the heavy
+      # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
+      # module state between files. Job-level sharding is the parallelism.
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun test packages/omo-opencode packages/memory-core
 
+      - name: Run tests
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        run: |
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          bun --config=bunfig.win2.parallel.toml test
+
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         run: |
           bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
@@ -228,8 +235,8 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs all non-Senpi root tests on Linux and macOS: the shared serial quarantine first, then the remainder in parallel via bunfig.root.parallel.toml.
-            - Splits Windows by measured package groups so global zauc mock bootstraps stay with their consumers.
+            - Runs all non-Senpi root tests sharded two ways per OS: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine first and then the remainder (serial on POSIX, `--parallel` on Windows).
+            - Splits every OS by the same package groups so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 

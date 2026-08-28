@@ -1,0 +1,9 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-DehvME/agent",
+  "sandboxCwd": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-DehvME/project"
+}

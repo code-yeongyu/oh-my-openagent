@@ -128,7 +128,7 @@ function ulwLoopCliShimPath(): string {
 }
 
 function ulwLoopCliShimSentence(): string {
-  const abs = ulwLoopCliShimPath()
+  const abs = ulwLoopCliShimPath().replaceAll("\\", "/")
   return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand>\`.`
 }
 

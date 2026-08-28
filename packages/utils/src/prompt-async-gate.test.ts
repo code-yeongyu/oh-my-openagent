@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import {
+  _setPromptGateRevalidationTimeoutMsForTesting,
   _setPromptGateMessagesFetchTimeoutMsForTesting,
   dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
@@ -169,6 +170,206 @@ describe("dispatchInternalPrompt", () => {
     // then
     expect(result.status).toBe("queued")
     expect(promptCalls).toBe(1)
+  })
+
+  test("#given queued dispatch revalidation fails transiently #when the queue retries #then the prompt remains queued and dispatches", async () => {
+    // given
+    let validationCalls = 0
+    let promptCalls = 0
+    let resolvePrompt: (() => void) | undefined
+    const promptSeen = new Promise<void>((resolve) => {
+      resolvePrompt = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          resolvePrompt?.()
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_transient_revalidation",
+      input: {
+        path: { id: "ses_queue_transient_revalidation" },
+        body: { parts: [{ type: "text", text: "retry validation" }] },
+      },
+      source: "test:queue-transient-revalidation",
+      settleMs: 0,
+      queueRetryMs: 1,
+      shouldDispatch: async () => {
+        validationCalls += 1
+        if (validationCalls === 1) throw new Error("transient validation failure")
+        return true
+      },
+    })
+    await waitForPromise(promptSeen, "queued prompt after transient revalidation failure")
+
+    // then
+    expect(result.status).toBe("queued")
+    expect(validationCalls).toBe(2)
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given queued revalidation fails permanently #when another prompt waits behind it #then retries stop and the next prompt dispatches", async () => {
+    // given
+    let validationCalls = 0
+    let promptCalls = 0
+    let resolvePrompt: (() => void) | undefined
+    const promptSeen = new Promise<void>((resolve) => {
+      resolvePrompt = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          resolvePrompt?.()
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_permanent_revalidation",
+      input: {
+        path: { id: "ses_queue_permanent_revalidation" },
+        body: { parts: [{ type: "text", text: "permanently invalid" }] },
+      },
+      source: "test:queue-permanent-revalidation",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      queueRetryMs: 1,
+      shouldDispatch: async () => {
+        validationCalls += 1
+        throw new Error("permanent validation failure")
+      },
+    })
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_permanent_revalidation",
+      input: {
+        path: { id: "ses_queue_permanent_revalidation" },
+        body: { parts: [{ type: "text", text: "next prompt" }] },
+      },
+      source: "test:queue-after-permanent-revalidation",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      queueRetryMs: 1,
+    })
+    await waitForPromise(promptSeen, "prompt behind permanent revalidation failure")
+
+    // then
+    expect(first.status).toBe("queued")
+    expect(validationCalls).toBe(3)
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given a durable queued wake fails beyond the global cap #when another prompt waits #then the wake backs off without starving or disappearing", async () => {
+    // given
+    let validationCalls = 0
+    const promptTexts: string[] = []
+    let resolveDurablePrompt: (() => void) | undefined
+    const durablePromptSeen = new Promise<void>((resolve) => {
+      resolveDurablePrompt = resolve
+    })
+    let resolveNextPrompt: (() => void) | undefined
+    const nextPromptSeen = new Promise<void>((resolve) => {
+      resolveNextPrompt = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text: string }> } }) => {
+          const text = input.body.parts[0]?.text
+          if (!text) return
+          promptTexts.push(text)
+          if (text === "durable wake") resolveDurablePrompt?.()
+          if (text === "next prompt") resolveNextPrompt?.()
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_durable_revalidation",
+      input: {
+        path: { id: "ses_queue_durable_revalidation" },
+        body: { parts: [{ type: "text", text: "durable wake" }] },
+      },
+      source: "test:queue-durable-revalidation",
+      durableRetry: true,
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      queueRetryMs: 1,
+      shouldDispatch: async () => {
+        validationCalls += 1
+        if (validationCalls <= 4) throw new Error("transient validation failure")
+        return true
+      },
+    })
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_durable_revalidation",
+      input: {
+        path: { id: "ses_queue_durable_revalidation" },
+        body: { parts: [{ type: "text", text: "next prompt" }] },
+      },
+      source: "test:queue-after-durable-revalidation",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      queueRetryMs: 1,
+    })
+    await Promise.all([
+      waitForPromise(nextPromptSeen, "prompt behind durable revalidation failure"),
+      waitForPromise(durablePromptSeen, "durable wake after transient failures"),
+    ])
+
+    // then
+    expect(first.status).toBe("queued")
+    expect(validationCalls).toBe(5)
+    expect(promptTexts).toEqual(["next prompt", "durable wake"])
+  })
+
+  test("#given queued dispatch revalidation never settles #when the revalidation cap elapses #then the prompt remains queued for retry", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+    _setPromptGateRevalidationTimeoutMsForTesting(5)
+
+    // when
+    const result = await waitForPromise(dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_stalled_revalidation",
+      input: {
+        path: { id: "ses_queue_stalled_revalidation" },
+        body: { parts: [{ type: "text", text: "stalled validation" }] },
+      },
+      source: "test:queue-stalled-revalidation",
+      settleMs: 0,
+      queueRetryMs: 50,
+      dispatchTimeoutMs: 5_000,
+      shouldDispatch: () => new Promise<boolean>(() => {}),
+    }), "bounded queued revalidation")
+
+    // then
+    expect(result.status).toBe("queued")
+    expect(promptCalls).toBe(0)
   })
 
   test("#given duplicate queued prompts for one session #when the session becomes idle #then the dispatcher coalesces them into one prompt", async () => {
@@ -1261,6 +1462,45 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(first.status).toBe("failed")
     expect(first).toMatchObject({ dispatchAttempted: true })
     expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 0 })
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given a retryable dispatch failure #when another caller races #then retry classification preserves the dispatch hold", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          throw new TypeError("fetch failed")
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_retryable_dispatch_reject",
+      input: { path: { id: "ses_retryable_dispatch_reject" }, body: { parts: [] } },
+      source: "test:retryable-reject:first",
+      queueBehavior: "defer",
+      settleMs: 0,
+      retryDispatchFailure: () => true,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_retryable_dispatch_reject",
+      input: { path: { id: "ses_retryable_dispatch_reject" }, body: { parts: [] } },
+      source: "test:retryable-reject:second",
+      queueBehavior: "defer",
+      settleMs: 0,
+    })
+
+    // then
+    expect(first).toMatchObject({ status: "failed", dispatchAttempted: true })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:retryable-reject:first" })
     expect(promptCalls).toBe(1)
   })
 

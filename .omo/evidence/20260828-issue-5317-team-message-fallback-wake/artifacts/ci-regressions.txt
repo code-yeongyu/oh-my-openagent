@@ -1,0 +1,12 @@
+$ bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+13 pass
+0 fail
+39 expect() calls
+Ran 13 tests across 1 file. [827.00ms]
+
+$ bun test packages/omo-opencode/src/features/background-agent/manager.test.ts packages/omo-opencode/src/features/background-agent/spawner.test.ts --test-name-pattern 'tmux callback ordering'
+2 pass
+209 filtered out
+0 fail
+10 expect() calls
+Ran 2 tests across 2 files. [1236.00ms]

@@ -336,7 +336,17 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
     return false
   }
 
-  const CONNECTION_CODES = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"])
+  const CONNECTION_CODES = new Set([
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ENETUNREACH",
+    "EHOSTUNREACH",
+    "ENETDOWN",
+    "EHOSTDOWN",
+    "EADDRNOTAVAIL",
+    "UND_ERR_CONNECT_TIMEOUT",
+  ])
 
   const self = error as NodeJS.ErrnoException
   if (self.code && CONNECTION_CODES.has(self.code)) {
@@ -347,13 +357,6 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
   if (cause && typeof cause === "object" && cause !== null) {
     const causeCode = (cause as NodeJS.ErrnoException).code
     if (causeCode && CONNECTION_CODES.has(causeCode)) {
-      return true
-    }
-  }
-
-  if (error instanceof TypeError) {
-    const msg = error.message
-    if (msg.includes("fetch failed") || msg.includes("Unable to connect")) {
       return true
     }
   }

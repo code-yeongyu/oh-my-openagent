@@ -9,7 +9,7 @@ test("#given bundled model catalog #when inspected #then default verifier and wo
 	const catalog = JSON.parse(await readFile(join(root, "model-catalog.json"), "utf8"));
 
 	assert.equal(catalog.current.model, "gpt-5.6-sol");
-	assert.equal(catalog.current.model_context_window, 372000);
+	assert.equal(catalog.current.model_context_window, 650000);
 	assert.equal(catalog.current.model_reasoning_effort, "high");
 	assert.equal(catalog.current.plan_mode_reasoning_effort, "xhigh");
 	assert.deepEqual(catalog.roles.default, catalog.current);

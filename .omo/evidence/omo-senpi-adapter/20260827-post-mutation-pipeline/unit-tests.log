@@ -1,0 +1,105 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-config-core/src/schema/config-schema.test.ts:
+1 | import { describe, expect, test } from "bun:test"
+2 | import { OmoConfigSchema } from "../index"
+3 | 
+4 | describe("omo config schema", () => {
+5 |   test("#given no formatOnMutation config #when parsed #then formatter defaults are available", () => {
+6 |     expect(OmoConfigSchema.parse({}).formatOnMutation).toEqual({ mode: "best-effort", maxFileBytes: 1048576, timeoutMs: 3000 })
+                                                           ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "maxFileBytes": 1048576,
+-   "mode": "best-effort",
+-   "timeoutMs": 3000,
+- }
++ {}
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feature/post-mutation-pipeline/packages/omo-config-core/src/schema/config-schema.test.ts:6:56)
+(fail) omo config schema > #given no formatOnMutation config #when parsed #then formatter defaults are available [1.07ms]
+(pass) omo config schema > #given formatOnMutation overrides #when parsed #then mode limits and language map survive [0.30ms]
+(pass) omo config schema > #given a full omo config #when parsed #then task defaults and deprecated category keys normalize [1.73ms]
+(pass) omo config schema > #given an empty codegraph config #when parsed #then daemon defaults on [0.10ms]
+(pass) omo config schema > #given an unknown root key #when parsed #then the schema rejects the config [0.27ms]
+(pass) omo config schema > #given a wrong typed codegraph daemon setting #when parsed #then the issue path identifies the bad field [16.73ms]
+(pass) omo config schema > #given a wrong typed task setting #when parsed #then the issue path identifies the bad field [0.19ms]
+
+packages/omo-senpi/src/components/lsp/lsp-architecture.test.ts:
+(pass) omo-senpi lsp architecture boundary > #given the daemon-backed adapter #when source shape is audited #then no vendored LSP engine remains [1.84ms]
+
+packages/omo-senpi/src/components/lsp/lsp-security.test.ts:
+(pass) omo-senpi lsp project config trust > #given untrusted project-local LSP config #when shared server config merges #then arbitrary project commands are not launched [1.14ms]
+(pass) omo-senpi lsp project config trust > #given untrusted project config overrides a builtin #when servers merge #then the builtin command remains selected [0.69ms]
+(pass) omo-senpi lsp project config trust > #given project-local custom commands #when servers merge #then project-local commands remain ignored [0.86ms]
+(pass) omo-senpi lsp project config trust > #given project config customizes safe builtin fields #when servers merge #then command and env still come from the builtin [0.65ms]
+(pass) omo-senpi lsp project config trust > #given user LSP config has a custom command and env #when servers merge #then the user custom server is preserved [0.79ms]
+(pass) omo-senpi lsp project config trust > #given project configs contain multiple unsafe commands #when the component registers #then exactly one migration warning is emitted [5.22ms]
+
+packages/omo-senpi/src/components/lsp/index.test.ts:
+(pass) omo-senpi lsp component > #given the legacy Senpi LSP descriptors #when the daemon-backed component registers #then all non-executor descriptor fields are preserved [1.13ms]
+(pass) omo-senpi lsp component > #given an installed language server #when the component registers #then the exact six LSP tools are exposed [0.35ms]
+(pass) omo-senpi lsp component > #given renamed omo-senpi lsp flags #when diagnostics are disabled #then no LSP tools register [0.28ms]
+(pass) omo-senpi lsp component > #given no language server is resolvable for any file type #when the lsp component registers #then the six tools remain exposed [0.26ms]
+
+packages/omo-senpi/src/components/lsp/daemon-runtime.test.ts:
+(pass) Senpi packaged daemon runtime resolver > #given a shipped extension path #when resolving daemon runtime #then CLI and version are paired from plugin-local runtime [3.40ms]
+(pass) Senpi packaged daemon runtime resolver > #given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .pi context are forwarded [430.61ms]
+(pass) Senpi packaged daemon runtime resolver > #given all six Senpi LSP names #when executing through the packaged client #then canonical Core tool names are used [5.57ms]
+(pass) Senpi packaged daemon runtime resolver > #given daemon runtime overrides #when resolved #then the shared daemon contract is enforced [3.25ms]
+
+packages/omo-senpi/src/components/lsp/lsp-renderers.test.ts:
+(pass) omo-senpi lsp TUI renderers > #given registered LSP tools #when the TUI renders tool activity #then every tool exposes custom call and result renderers [0.97ms]
+
+packages/omo-senpi/src/components/lsp/post-edit-diagnostics.test.ts:
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit diagnostics with errors #when a write tool result arrives #then model-visible diagnostics are injected [1.41ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given many mutated files #when post-edit diagnostics run #then shared orchestration dedupes, bounds concurrency, preserves order, and isolates failures [0.28ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit sessions #when session events fire #then only that session cache resets or deletes [1.02ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given a context with updateToolHookStatus #when post-edit diagnostics run #then the live status label is reported [0.12ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given a non-mutation tool result #when the post-edit handler runs #then no live status is reported [0.10ms]
+(pass) omo-senpi lsp post-edit diagnostics > #given post-edit diagnostics are clean #when a write tool result arrives #then no diagnostics are injected [0.10ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.feedback.test.ts:
+(pass) omo-senpi comment-checker feedback > #given checker violation #when edit completes #then feedback includes the header and offending file [1.82ms]
+(pass) omo-senpi comment-checker feedback > #given checker finds a clean file #when edit completes #then injects nothing [0.33ms]
+(pass) omo-senpi comment-checker feedback > #given unresolvable binary #when eligible results repeat #then component is inert with one notice [0.30ms]
+(pass) omo-senpi comment-checker feedback > #given same file reported twice #when still in one turn #then stale_state debounce emits one report until turn_start [0.31ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.resolver.test.ts:
+(pass) omo-senpi comment-checker binary resolver > #given OMO_COMMENT_CHECKER_BIN and other candidates #when resolving binary #then env var wins first [1.32ms]
+(pass) omo-senpi comment-checker binary resolver > #given package api exports getBinaryPath #when env is unset #then package api resolves before PATH [0.19ms]
+(pass) omo-senpi comment-checker binary resolver > #given env and package resolution fail #when PATH has comment-checker #then PATH fallback resolves last [0.23ms]
+
+packages/omo-senpi/src/components/comment-checker/comment-checker.test.ts:
+(pass) omo-senpi comment-checker component > #given built Senpi runs under Node #when inspecting runtime sources #then comment-checker has no Bun global dependency [8.27ms]
+(pass) omo-senpi comment-checker component > #given every binary resolution path is missing #when eligible results repeat #then inert notice logs once and runner is not called [0.38ms]
+(pass) omo-senpi comment-checker component > #given a context with updateToolHookStatus #when the check runs #then the live status label is reported once [0.20ms]
+(pass) omo-senpi comment-checker component > #given a non-mutation tool result #when tool_result dispatches #then no live status is reported [0.14ms]
+(pass) omo-senpi comment-checker component > #given successful edit result #when tool_result dispatches #then runner receives the right absolute path [0.15ms]
+(pass) omo-senpi comment-checker component > #given bound Senpi session manager #when tool_result dispatches #then runner receives session metadata [0.16ms]
+(pass) omo-senpi comment-checker component > #given successful write result #when tool_result dispatches #then runner receives the written file [0.15ms]
+(pass) omo-senpi comment-checker component > #given read and bash results #when tool_result dispatches #then silent non-edit tools do not trigger [0.14ms]
+(pass) omo-senpi comment-checker component > #given failed edit and write results #when tool_result dispatches #then silent failures do not trigger [1.76ms]
+(pass) omo-senpi comment-checker component > #given missing path and bad payload #when tool_result dispatches #then malformed_input no-ops safely [0.91ms]
+
+packages/omo-senpi/src/components/formatter/formatter.test.ts:
+(pass) format-on-mutation policy > uses marker precedence and never enables prettier beside biome [0.52ms]
+(pass) format-on-mutation policy > has the required defaults and language overrides [0.40ms]
+(pass) format-on-mutation policy > contains machine-readable change notice tokens [0.17ms]
+
+packages/omo-senpi/src/components/post-mutation/post-mutation.test.ts:
+(pass) shared post-mutation primitives > extracts all files from an apply_patch result and centralizes mutation names [0.39ms]
+(pass) shared post-mutation primitives > coalesces duplicate in-flight paths [0.49ms]
+(pass) shared post-mutation primitives > tracks one notice per session and resets on a new session [0.29ms]
+
+1 tests failed:
+(fail) omo config schema > #given no formatOnMutation config #when parsed #then formatter defaults are available [1.07ms]
+
+ 51 pass
+ 1 fail
+ 147 expect() calls
+Ran 52 tests across 12 files. [1364.00ms]

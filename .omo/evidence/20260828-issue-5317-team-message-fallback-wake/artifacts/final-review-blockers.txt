@@ -1,0 +1,79 @@
+Final review blocker evidence
+=============================
+
+Failing first
+-------------
+
+$ bun test packages/utils/src/prompt-async-gate.test.ts --test-name-pattern 'revalidation fails permanently'
+error: timed out waiting for prompt behind permanent revalidation failure
+0 pass, 1 fail
+BOUNDED_RETRY_RED_EXIT=1
+
+$ bun test packages/team-core/src/team-mailbox/inbox.test.ts --test-name-pattern 'reserved for delivery'
+Expected reserved unread message; received undefined
+0 pass, 1 fail
+RESERVATION_RACE_RED_EXIT=1
+
+$ bun test packages/utils/src/prompt-async-gate.test.ts --test-name-pattern 'revalidation cap elapses'
+error: timed out waiting for bounded queued revalidation
+0 pass, 1 fail
+REVALIDATION_CAP_RED_EXIT=1
+
+$ bun test packages/utils/src/prompt-async-gate.test.ts --test-name-pattern 'retry classification preserves'
+Expected dispatchAttempted true; received false
+0 pass, 1 fail
+RETRY_INVARIANT_RED_EXIT=1
+
+$ bun test packages/utils/src/prompt-async-gate.test.ts --test-name-pattern 'durable queued wake fails beyond'
+error: timed out waiting for durable wake after transient failures
+0 pass, 1 fail
+DURABLE_RETRY_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/shared/live-server-route.test.ts --test-name-pattern 'definite connect-phase network errors'
+Expected true; received false for ENETUNREACH
+0 pass, 1 fail
+CONNECTION_CLASSIFIER_RED_EXIT=1
+
+Current green gates
+-------------------
+
+$ bun test packages/utils/src/prompt-async-gate*.test.ts
+70 pass, 0 fail, 176 expect() calls
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-delivering-loss.test.ts packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
+68 pass, 0 fail, 217 expect() calls
+
+$ bun test packages/team-core/src/team-mailbox/inbox.test.ts
+3 pass, 0 fail, 4 expect() calls
+
+$ bun test packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-pending-delivery-verify.test.ts
+2 pass, 0 fail, 6 expect() calls
+
+$ bun test packages/omo-opencode/src/shared/live-server-route.test.ts
+32 pass, 0 fail, 67 expect() calls
+
+$ bun run typecheck
+TYPECHECK_EXIT=0
+
+$ bunx bun@1.4.0 run build
+BUILD_EXIT=0
+
+$ bunx bun@1.4.0 run test:senpi
+2417 pass, 1 Windows-only skip, 0 fail
+
+Observed behavior
+-----------------
+
+- Permanently failing queue revalidation is dropped after three attempts and
+  the next queued prompt dispatches.
+- Exact unread lookup recognizes a message while it is held in the
+  `.delivering-<messageId>.json` reservation slot.
+- Async revalidation uses its own five-second production cap.
+- Retry classification retains the queue entry without clearing semantic
+  dedupe or the post-dispatch reservation hold.
+- Non-retryable fallback failures remain covered separately and do not retry.
+- Mailbox fallback wakes use capped exponential backoff beyond the global
+  three-failure limit, rotate behind unrelated prompts, and remain queued
+  until dispatch succeeds or exact-message revalidation cancels them.
+- Definite connect-phase failures include network/host unreachable, network
+  down, unavailable local address, and Undici connect timeout codes.

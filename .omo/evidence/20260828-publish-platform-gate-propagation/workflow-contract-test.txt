@@ -1,0 +1,22 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+script/publish-release-platform-workflow.test.ts:
+(pass) release and platform publish workflows > publishes platform packages before installable wrappers [0.75ms]
+(pass) release and platform publish workflows > fails when a required platform artifact is missing [0.16ms]
+(pass) release and platform publish workflows > publishes openagent platform packages even when legacy opencode publish is unavailable [0.13ms]
+(pass) release and platform publish workflows > keeps the platform publish workflow step syntax valid around version updates [0.10ms]
+(pass) release and platform publish workflows > publishes platform launchers without Bun compile [0.12ms]
+(pass) release and platform publish workflows > regenerates and commits release lockfiles only in the prepared source state [0.15ms]
+(pass) release and platform publish workflows > validates an existing release tag before redispatching its prepared source [0.14ms]
+(pass) release and platform publish workflows > enumerates windows-arm64 consistently across every platform-list surface [0.53ms]
+(pass) release and platform publish workflows > matches the canonical platform set in optionalDependencies and on-disk platform packages [0.27ms]
+(pass) release binary asset lane in the platform publish workflow > plumbs omo_ai_version into the release-binary build [0.16ms]
+(pass) release binary asset lane in the platform publish workflow > gates release-binary steps on a release-asset probe, not the npm publish skip [0.12ms]
+(pass) release binary asset lane in the platform publish workflow > smokes every release binary leg on its matching runner class [0.17ms]
+(pass) release binary asset lane in the platform publish workflow > smokes arm64 linux binaries on a native arm64 runner with no fallback [0.11ms]
+(pass) release binary asset lane in the platform publish workflow > leaves npm publishing, runner routing, and matrix fail-fast untouched [0.12ms]
+
+ 14 pass
+ 0 fail
+ 96 expect() calls
+Ran 14 tests across 1 file. [744.00ms]

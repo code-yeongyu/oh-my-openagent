@@ -610,6 +610,16 @@ function attachOrFail(
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
 ): void {
+  if (result.kind === "owner_conflict") {
+    attachStarted(context, nodeId, {
+      kind: "started",
+      reused: true,
+      task_id: result.task_id,
+      status: "running",
+      name: result.task_id,
+    })
+    return
+  }
   if (result.kind !== "started") {
     const failure = startFailure(result)
     failNode(context, nodeId, failure.code, failure.message)

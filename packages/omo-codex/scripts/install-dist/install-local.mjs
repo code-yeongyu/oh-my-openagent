@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:475155d5e39ca774e5cf86194fee97439fd9c4f3624a85e946a994d5493e4629:a81031b3fe18e3977f1f0ad2b0683290efaaaa1a0a05202aecf0b69725c05678
+// omo-codex-install:819e258f7485f9ccdcbb64a54ac0097bf81cd8e2980d7f907017f224b1f99b98:256829de546a710f0409c92a5776556e93db9aef58d90ab6c2da12a834f0cc01
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -7962,7 +7962,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.21",
+    version: "5.0.0-beta.22",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -11029,14 +11029,14 @@ import { join as join17 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
     model: "gpt-5.6-sol",
-    modelContextWindow: 372000,
+    modelContextWindow: 650000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh"
   },
   managedProfiles: [
     {
       model: "gpt-5.5",
-      modelContextWindow: 400000,
+      modelContextWindow: 650000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh"
     },

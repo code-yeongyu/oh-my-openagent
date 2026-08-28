@@ -1,4 +1,5 @@
 import { executeLspDiagnostics } from "./diagnostics.js";
+import { executeLspFormat } from "./format.js";
 import { executeLspInstallDecision } from "./install-decision.js";
 import { executeLspFindReferences, executeLspGotoDefinition } from "./navigation.js";
 import { executeLspPrepareRename, executeLspRename } from "./rename.js";
@@ -115,6 +116,19 @@ export const LSP_MCP_TOOLS: LspMcpTool[] = [
 			["filePath", "line", "character", "newName"],
 		),
 		execute: executeLspRename,
+	},
+	{
+		name: "format",
+		aliases: ["lsp_format"],
+		title: "LSP Format",
+		description: "Format a source file with its language server and write the returned edits to disk.",
+		inputSchema: objectSchema(
+			{
+				filePath: { type: "string", description: "Source file path to format." },
+			},
+			["filePath"],
+		),
+		execute: executeLspFormat,
 	},
 	{
 		name: "install_decision",
