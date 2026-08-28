@@ -51,6 +51,18 @@ describe("skill_mcp builtin MCP hint", () => {
     ).rejects.toThrow(/context7_resolve-library-id/)
   })
 
+  it("lists all built-in websearch provider tools", async () => {
+    const tool = createSkillMcpTool({
+      manager: new SkillMcpManager(),
+      getLoadedSkills: () => [],
+      getSessionID: () => "session",
+    })
+
+    await expect(
+      tool.execute({ mcp_name: "websearch", tool_name: "web_search" }, mockContext),
+    ).rejects.toThrow(/websearch_web_search_exa[\s\S]*websearch_web_search[\s\S]*websearch_web_fetch/)
+  })
+
   it("keeps skill-loading hint for unknown MCP names", async () => {
     const tool = createSkillMcpTool({
       manager: new SkillMcpManager(),

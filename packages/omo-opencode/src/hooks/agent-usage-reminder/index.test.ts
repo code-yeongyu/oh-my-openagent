@@ -108,4 +108,23 @@ describe("agent-usage-reminder hook", () => {
 
     clearSessionAgent(sessionID);
   });
+
+  test("recognizes each built-in websearch provider tool", async () => {
+    const hook = createHook();
+
+    for (const [index, tool] of [
+      "websearch_web_search_exa",
+      "websearch_web_search",
+      "websearch_web_fetch",
+    ].entries()) {
+      const sessionID = `agent-usage-websearch-${index}`;
+      updateSessionAgent(sessionID, "Sisyphus");
+      const output = { title: "", output: "result", metadata: {} };
+
+      await hook["tool.execute.after"]({ tool, sessionID, callID: tool }, output);
+
+      expect(output.output).toContain("[Agent Usage Reminder]");
+      clearSessionAgent(sessionID);
+    }
+  });
 });
