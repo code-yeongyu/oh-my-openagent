@@ -1,0 +1,4 @@
+cleanup_worktree=/tmp/senpi-qa-r6
+removed=true
+pruned=true
+scenario_cleanup=tracked host and scratch cleanup completed
