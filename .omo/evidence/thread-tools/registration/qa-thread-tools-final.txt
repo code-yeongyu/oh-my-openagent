@@ -1,0 +1,36 @@
+
+===== cli-surface =====
+error: Cannot find module '/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-qa-main-parent/worktree/packages/coding-agent/scripts/qa-app-server/lib/env.mjs' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs'
+
+Bun v1.4.0-canary.1+b58cd4685 (macOS arm64)
+----- cli-surface exit=1 -----
+
+===== desktop-client =====
+error: Cannot find module '/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-qa-main-parent/worktree/packages/coding-agent/scripts/qa-app-server/lib/env.mjs' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs'
+
+Bun v1.4.0-canary.1+b58cd4685 (macOS arm64)
+----- desktop-client exit=1 -----
+
+===== terminal-to-ui =====
+error: Cannot find module '/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-qa-main-parent/worktree/packages/coding-agent/scripts/qa-app-server/lib/env.mjs' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs'
+
+Bun v1.4.0-canary.1+b58cd4685 (macOS arm64)
+----- terminal-to-ui exit=1 -----
+
+===== desktop-to-cli =====
+error: Cannot find module '/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-qa-main-parent/worktree/packages/coding-agent/scripts/qa-app-server/lib/env.mjs' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs'
+
+Bun v1.4.0-canary.1+b58cd4685 (macOS arm64)
+----- desktop-to-cli exit=1 -----
+
+===== plugin-surface =====
+PASS plugin-surface tools=thread_create,thread_list,thread_read,thread_send,thread_interrupt,thread_handoff guidelines=1
+----- plugin-surface exit=0 -----
+
+===== summary =====
+FAIL cli-surface exit=1
+FAIL desktop-client exit=1
+FAIL terminal-to-ui exit=1
+FAIL desktop-to-cli exit=1
+PASS plugin-surface exit=0
+FAIL run-all failed_scenarios=4
