@@ -4,18 +4,24 @@ import { HostClient, makeScratch, startRealHost, startFakeModelServer, writeMock
 const report = createReport("plugin-surface")
 installCleanupHooks()
 const scratch = makeScratch("plugin-surface")
-const fake = await startFakeModelServer([{ text: "plugin-ready" }])
+const fake = await startFakeModelServer([{ toolCalls: [{ name: "thread_list", args: { all_scope: true } }] }, { text: "plugin-ready" }])
 writeMockModelsJson(scratch.agentDir, fake)
 const extension = join(process.cwd(), "packages/omo-senpi/plugin/extensions/omo.js")
-const host = await startRealHost(scratch, { extraArgs: ["--provider", "mock", "--model", "mock-model", "--extension", extension] })
+const socketPath = join(scratch.agentDir, "rpc", "rpc.sock")
+delete scratch.env.SENPI_CODING_AGENT_DIR
+delete scratch.env.OMO_CODING_AGENT_DIR
+delete scratch.env.CODING_AGENT_DIR
+scratch.env.SENPI_RPC_SOCKET = socketPath
+const host = await startRealHost(scratch, { socketPath, extraArgs: ["--provider", "mock", "--model", "mock-model", "--extension", extension] })
 const client = await HostClient.connect(host.socket, "plugin")
 const caller = await client.openSession({ cwd: scratch.cwd })
 const surfaces = await client.request({ type: "get_loaded_surfaces", sessionId: caller.routingId })
-const source = await Bun.file(extension).text()
-const names = ["thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff"]
+await client.promptAndSettle(caller.routingId, "Call thread_list now.")
+const messages = await client.messages(caller.routingId)
+const toolCallText = JSON.stringify(messages.filter((message) => message.role === "assistant"))
 report.assert("spawn-with-built-extension", JSON.stringify(surfaces).includes("omo.js"), `spawn=senpi --mode rpc --multi-session --listen unix://${host.socket} --extension ${extension}`)
-report.assert("six-tools-and-guideline", names.every((name) => source.includes(name)) && source.includes("Thread tools address peer sessions"), `loaded_surfaces=${JSON.stringify(surfaces.data ?? surfaces).slice(0, 500)}`)
-report.log(`PASS plugin-surface real Senpi host loaded built extension; tools=${names.join(",")} guidelines=1`)
+report.assert("agent-called-thread-list", toolCallText.includes("thread_list"), `assistant_messages=${toolCallText.slice(0, 1000)}`)
+report.log("PASS plugin-surface real Senpi host loaded built extension and target transcript contains a thread_list tool call")
 await cleanupAllAndWait()
 report.write(process.env.OUT)
 if (report.failures) process.exit(1)
