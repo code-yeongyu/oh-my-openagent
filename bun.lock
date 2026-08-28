@@ -65,18 +65,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.0.0-beta.22",
-        "oh-my-opencode-darwin-x64": "5.0.0-beta.22",
-        "oh-my-opencode-darwin-x64-baseline": "5.0.0-beta.22",
-        "oh-my-opencode-linux-arm64": "5.0.0-beta.22",
-        "oh-my-opencode-linux-arm64-musl": "5.0.0-beta.22",
-        "oh-my-opencode-linux-x64": "5.0.0-beta.22",
-        "oh-my-opencode-linux-x64-baseline": "5.0.0-beta.22",
-        "oh-my-opencode-linux-x64-musl": "5.0.0-beta.22",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.0.0-beta.22",
-        "oh-my-opencode-windows-arm64": "5.0.0-beta.22",
-        "oh-my-opencode-windows-x64": "5.0.0-beta.22",
-        "oh-my-opencode-windows-x64-baseline": "5.0.0-beta.22",
+        "oh-my-opencode-darwin-arm64": "5.0.0-beta.25",
+        "oh-my-opencode-darwin-x64": "5.0.0-beta.25",
+        "oh-my-opencode-darwin-x64-baseline": "5.0.0-beta.25",
+        "oh-my-opencode-linux-arm64": "5.0.0-beta.25",
+        "oh-my-opencode-linux-arm64-musl": "5.0.0-beta.25",
+        "oh-my-opencode-linux-x64": "5.0.0-beta.25",
+        "oh-my-opencode-linux-x64-baseline": "5.0.0-beta.25",
+        "oh-my-opencode-linux-x64-musl": "5.0.0-beta.25",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.0.0-beta.25",
+        "oh-my-opencode-windows-arm64": "5.0.0-beta.25",
+        "oh-my-opencode-windows-x64": "5.0.0-beta.25",
+        "oh-my-opencode-windows-x64-baseline": "5.0.0-beta.25",
       },
     },
     "packages/agents-md-core": {
@@ -184,7 +184,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.0.0-beta.22",
+      "version": "5.0.0-beta.25",
       "dependencies": {
         "@oh-my-opencode/utils": "workspace:*",
       },
@@ -202,7 +202,7 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.0.0-0.beta.22",
+      "version": "5.0.0-0.beta.25",
       "bin": {
         "omo": "bin/omo.js",
       },
@@ -247,7 +247,7 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.0.0-beta.22",
+      "version": "5.0.0-beta.25",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "0.84.2",

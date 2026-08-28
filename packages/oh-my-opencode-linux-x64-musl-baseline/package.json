@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-linux-x64-musl-baseline",
-  "version": "5.0.0-beta.22",
+  "version": "5.0.0-beta.25",
   "description": "Platform-specific binary for oh-my-opencode (linux-x64-musl-baseline, no AVX2)",
   "license": "MIT",
   "repository": {

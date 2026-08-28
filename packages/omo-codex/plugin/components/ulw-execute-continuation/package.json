@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-ulw-execute-continuation",
-	"version": "5.0.0-beta.22",
+	"version": "5.0.0-beta.25",
 	"description": "Codex Stop hook continuation injector for omo-codex ulw-execute plans.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
