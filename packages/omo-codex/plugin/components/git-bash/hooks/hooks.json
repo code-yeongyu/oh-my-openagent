@@ -8,7 +8,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "(OmO 5.0.0-beta.24) Recommending Git Bash MCP"
+						"statusMessage": "(OmO 5.0.0-beta.26) Recommending Git Bash MCP"
 					}
 				]
 			}
@@ -20,7 +20,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-compact",
 						"timeout": 5,
-						"statusMessage": "(OmO 5.0.0-beta.24) Resetting Git Bash MCP Reminder"
+						"statusMessage": "(OmO 5.0.0-beta.26) Resetting Git Bash MCP Reminder"
 					}
 				]
 			}
