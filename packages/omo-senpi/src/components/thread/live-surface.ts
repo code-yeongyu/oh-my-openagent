@@ -1,8 +1,8 @@
 import { createConnection } from "node:net"
 import { randomUUID } from "node:crypto"
+import { getAgentDir } from "@code-yeongyu/senpi"
 import { existsSync } from "node:fs"
-import { homedir } from "node:os"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 
@@ -30,10 +30,12 @@ async function request(socketPath: string, command: Record<string, unknown>): Pr
 }
 
 /** Client for Senpi's existing supervisor-owned unix socket. It never starts or replaces a host. */
-export function createLiveThreadSurface(pi: SenpiExtensionAPI): ThreadHost | undefined {
-  const explicitDir = process.env.CODING_AGENT_DIR ?? process.env.SENPI_CODING_AGENT_DIR ?? process.env.OMO_CODING_AGENT_DIR
-  const configDir = resolveOmoConfigDir(pi.cwd ?? process.cwd(), homedir(), explicitDir)
-  const socket = process.env.SENPI_RPC_SOCKET ?? join(configDir, "rpc", "rpc.sock")
+export function resolveThreadSocket(getDir: () => string = getAgentDir): string {
+  return process.env.SENPI_RPC_SOCKET ?? join(getDir(), "rpc", "rpc.sock")
+}
+
+export function createLiveThreadSurface(_pi: SenpiExtensionAPI): ThreadHost | undefined {
+  const socket = resolveThreadSocket()
   if (!existsSync(socket)) return undefined
   const call = async <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => await request(socket, { type, ...data }) as T
   return {
@@ -45,19 +47,6 @@ export function createLiveThreadSurface(pi: SenpiExtensionAPI): ThreadHost | und
     prompt: (sessionId, message, options) => call("prompt", { sessionId, message, ...options }),
     interrupt: (sessionId, turnId) => call("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }),
   }
-}
-
-function resolveOmoConfigDir(cwd: string, home: string, explicit?: string): string {
-  if (explicit !== undefined && explicit.length > 0) return explicit
-  let current = cwd
-  for (;;) {
-    const candidate = join(current, ".omo")
-    if (existsSync(join(candidate, "settings.json")) || existsSync(join(candidate, "agent"))) return candidate
-    const parent = dirname(current)
-    if (parent === current) break
-    current = parent
-  }
-  return join(home, ".omo")
 }
 
 export function defaultThreadStateDirectory(pi: SenpiExtensionAPI): string { return join(pi.cwd ?? process.cwd(), ".omo", "thread-tools") }
