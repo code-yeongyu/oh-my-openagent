@@ -35,10 +35,13 @@ export async function resolveLatestMessageInfo(
       continue
     }
     if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+      const variant = info.model?.variant ?? info.variant
       return {
         resolvedInfo: {
           agent: info.agent,
-          model: info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined),
+          model: info.model ?? (info.providerID && info.modelID
+            ? { providerID: info.providerID, modelID: info.modelID, ...(variant ? { variant } : {}) }
+            : undefined),
           tools: info.tools,
         },
         encounteredCompaction,

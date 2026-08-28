@@ -20,6 +20,7 @@ export interface SDKMessage {
     }
     readonly providerID?: string
     readonly modelID?: string
+    readonly variant?: string
     readonly tools?: Record<string, ToolPermission>
     readonly time?: {
       readonly created?: number
@@ -38,7 +39,7 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
 
   const providerID = info.model?.providerID ?? info.providerID
   const modelID = info.model?.modelID ?? info.modelID
-  const variant = info.model?.variant
+  const variant = info.model?.variant ?? info.variant
 
   if (!info.agent && !providerID && !modelID) {
     return null

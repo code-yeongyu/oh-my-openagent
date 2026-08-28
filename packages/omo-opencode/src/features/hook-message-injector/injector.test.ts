@@ -1,3 +1,4 @@
+/// <reference types="bun-types" />
 // allow: SIZE_OK - hook injector tests share one transcript/session harness for duplicate-injection cases; this release adds narrow regressions and future growth should split by trigger route.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
@@ -53,6 +54,7 @@ function createMockClient(messages: Array<{
     model?: { providerID?: string; modelID?: string; variant?: string }
     providerID?: string
     modelID?: string
+    variant?: string
     tools?: Record<string, boolean>
     time?: { created?: number }
   }
@@ -96,6 +98,23 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
     expect(result).toEqual({
       agent: "sisyphus",
       model: { providerID: "openai", modelID: "gpt-5" },
+      tools: undefined,
+    })
+  })
+
+  it("preserves the variant from an assistant-shaped message", async () => {
+    // given
+    const mockClient = createMockClient([
+      { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.6", variant: "high" } },
+    ])
+
+    // when
+    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+
+    // then
+    expect(result).toEqual({
+      agent: "sisyphus",
+      model: { providerID: "openai", modelID: "gpt-5.6", variant: "high" },
       tools: undefined,
     })
   })

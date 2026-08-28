@@ -66,4 +66,34 @@ describe("resolveLatestMessageInfo", () => {
       tools: undefined,
     })
   })
+
+  test("given an assistant message with a flat model variant, preserves the variant in resolved model info", async () => {
+    // given
+    const messages = unsafeTestValue<MessageWithInfo[]>([
+      {
+        info: {
+          role: "assistant",
+          agent: "sisyphus",
+          providerID: "openai",
+          modelID: "gpt-5.6",
+          variant: "high",
+        },
+        parts: [{ type: "text", text: "continuing the task" }],
+      },
+    ])
+
+    // when
+    const result = await resolveLatestMessageInfo(
+      unsafeTestValue({}),
+      "ses_flat_variant",
+      messages,
+    )
+
+    // then
+    expect(result.resolvedInfo).toEqual({
+      agent: "sisyphus",
+      model: { providerID: "openai", modelID: "gpt-5.6", variant: "high" },
+      tools: undefined,
+    })
+  })
 })
