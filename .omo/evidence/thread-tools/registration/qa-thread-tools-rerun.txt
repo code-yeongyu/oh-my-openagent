@@ -1,0 +1,40 @@
+
+===== cli-surface =====
+FAIL cli-surface harness error: Error: host did not print "senpi rpc listening on unix:///var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-cli-surface-rKWTIe/rpc.sock" within 60000ms:
+
+    at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs:120:25)
+PASS cli-surface/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+FAIL cli-surface assertions_failed=0
+----- cli-surface exit=1 -----
+
+===== desktop-client =====
+FAIL desktop-client harness error: Error
+    at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-desktop-thread-tools/apps/server/src/provider/Layers/OmoSharedProcess.ts:384:29)
+    at runLoop (/Volumes/mengmotaStorage/local-workspaces/omo-desktop-thread-tools/node_modules/effect/dist/internal/effect.js:461:98)
+    at runLoop (/Volumes/mengmotaStorage/local-workspaces/omo-desktop-thread-tools/node_modules/effect/dist/internal/effect.js:480:19)
+    at evaluate (/Volumes/mengmotaStorage/local-workspaces/omo-desktop-thread-tools/node_modules/effect/dist/internal/effect.js:421:23)
+    at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-desktop-thread-tools/node_modules/effect/dist/internal/effect.js:780:15)
+PASS desktop-client/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+FAIL desktop-client assertions_failed=0
+----- desktop-client exit=1 -----
+
+===== terminal-to-ui =====
+FAIL terminal-to-ui harness error: Error: host did not print "senpi rpc listening on unix:///var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-terminal-to-ui-UYRbPq/rpc.sock" within 60000ms:
+
+    at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs:120:25)
+PASS terminal-to-ui/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+FAIL terminal-to-ui assertions_failed=0
+----- terminal-to-ui exit=1 -----
+
+===== desktop-to-cli =====
+FAIL desktop-to-cli harness error: ResolveMessage: Cannot find module '/Users/yeongyu/local-workspaces/omo-desktop-thread-tools/apps/server/src/orchestration/OmoSessionMirror.ts' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs'
+PASS desktop-to-cli/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+FAIL desktop-to-cli assertions_failed=0
+----- desktop-to-cli exit=1 -----
+
+===== summary =====
+FAIL cli-surface exit=1
+FAIL desktop-client exit=1
+FAIL terminal-to-ui exit=1
+FAIL desktop-to-cli exit=1
+FAIL run-all failed_scenarios=4
