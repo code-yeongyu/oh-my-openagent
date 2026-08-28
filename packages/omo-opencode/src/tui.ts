@@ -1,4 +1,5 @@
 import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
+import { createSignal } from "solid-js"
 
 import { registerBtwSideTui } from "./features/btw-side"
 import { computeView, viewKey } from "./features/tui-sidebar/compute-view"
@@ -13,7 +14,10 @@ import { log } from "./shared/logger"
 
 type SolidRuntime<Node> = {
   readonly createElement: (tag: string) => Node
-  readonly insert: (parent: Node, child: Node | string) => unknown
+  readonly insert: (
+    parent: Node,
+    child: Node | string | readonly Node[] | (() => Node | string | readonly Node[]),
+  ) => unknown
   readonly setProp: (node: Node, name: string, value: unknown) => unknown
 }
 
@@ -44,12 +48,13 @@ function registerSidebarContentSlot<Node>({
   requestRender()
 }
 
-function materialize<Node>(nodes: readonly ViewNode[], solid: SolidRuntime<Node>): Node {
+function materialize<Node>(
+  nodes: () => readonly ViewNode[],
+  solid: SolidRuntime<Node>,
+): Node {
   const root = solid.createElement("box")
   solid.setProp(root, "flexDirection", "column")
-  for (const node of nodes) {
-    solid.insert(root, materializeNode(node, solid))
-  }
+  solid.insert(root, () => nodes().map((node) => materializeNode(node, solid)))
   return root
 }
 
@@ -134,8 +139,8 @@ const module: TuiPluginModule = {
       return
     }
 
-    let currentView = await readView(directory)
-    let currentKey = viewKey(currentView)
+    const [currentView, setCurrentView] = createSignal(await readView(directory))
+    let currentKey = viewKey(currentView())
     let disposed = false
     let inFlight = false
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -147,7 +152,10 @@ const module: TuiPluginModule = {
       requestRender: () => {
         api.renderer.requestRender()
       },
-      renderSidebar: () => materialize(buildViewNodes(currentView, api.theme.current), solid),
+      renderSidebar: () => materialize(
+        () => buildViewNodes(currentView(), api.theme.current),
+        solid,
+      ),
     })
 
     const schedule = (): void => {
@@ -164,7 +172,7 @@ const module: TuiPluginModule = {
         const nextView = await readView(directory)
         const nextKey = viewKey(nextView)
         if (nextKey !== currentKey) {
-          currentView = nextView
+          setCurrentView(nextView)
           currentKey = nextKey
           api.renderer.requestRender()
         }

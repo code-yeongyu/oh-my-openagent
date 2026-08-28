@@ -51,7 +51,7 @@ type BuildNode = {
 	deps: string[];
 };
 
-const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid"];
+const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid", "solid-js"];
 
 const nodes: BuildNode[] = [
 	{ id: "git-bash-mcp", command: "bun", args: ["run", "build:git-bash-mcp"], deps: [] },
