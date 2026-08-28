@@ -2,19 +2,20 @@ import { describe, expect, test } from "bun:test"
 import { createLiveThreadSurface, resolveThreadSocket } from "./live-surface"
 
 describe("live thread socket discovery", () => {
-  test("uses the operator socket override first", () => {
-    const old = process.env.SENPI_RPC_SOCKET
-    process.env.SENPI_RPC_SOCKET = "/tmp/override.sock"
-    try { expect(resolveThreadSocket(() => "/tmp/agent")).toBe("/tmp/override.sock") } finally { if (old === undefined) delete process.env.SENPI_RPC_SOCKET; else process.env.SENPI_RPC_SOCKET = old }
+  test("operator override wins", () => {
+    expect(resolveThreadSocket({ SENPI_RPC_SOCKET: "/tmp/override.sock" })).toBe("/tmp/override.sock")
   })
-  test("uses Senpi getAgentDir fallback with agent segment", () => {
-    const old = process.env.SENPI_RPC_SOCKET
-    delete process.env.SENPI_RPC_SOCKET
-    try { expect(resolveThreadSocket(() => "/Users/test/.omo/agent")).toBe("/Users/test/.omo/agent/rpc/rpc.sock") } finally { if (old !== undefined) process.env.SENPI_RPC_SOCKET = old }
+  test("canonical and env branches resolve through resolveAgentHome", async () => {
+    const { resolveAgentHome } = await import("../agent-home/resolve-agent-home")
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === "/h/.omo/agent/settings.json" })).toBe("/h/.omo/agent")
+    expect(resolveAgentHome({ env: { OMO_CODING_AGENT_DIR: "/configured" }, homeDir: "/h", exists: () => false })).toBe("/configured")
   })
-  test("returns undefined when the discovered socket is absent", () => {
-    const old = process.env.SENPI_RPC_SOCKET
-    process.env.SENPI_RPC_SOCKET = "/definitely/missing/thread.sock"
-    try { expect(createLiveThreadSurface({} as never)).toBeUndefined() } finally { if (old === undefined) delete process.env.SENPI_RPC_SOCKET; else process.env.SENPI_RPC_SOCKET = old }
+  test("resolveAgentHome supports flat and standalone fallback", async () => {
+    const { resolveAgentHome } = await import("../agent-home/resolve-agent-home")
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === "/h/.omo/settings.json" })).toBe("/h/.omo")
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe("/h/.senpi/agent")
+  })
+  test("missing socket returns undefined", () => {
+    expect(createLiveThreadSurface({} as never)).toBeUndefined()
   })
 })

@@ -1,13 +1,10 @@
 import { createConnection } from "node:net"
 import { randomUUID } from "node:crypto"
-import { createRequire } from "node:module"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
-
-const require = createRequire(import.meta.url)
-function senpiAgentDir(): string { return (require("@code-yeongyu/senpi") as { getAgentDir: () => string }).getAgentDir() }
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
@@ -33,13 +30,13 @@ async function request(socketPath: string, command: Record<string, unknown>): Pr
 }
 
 /** Client for Senpi's existing supervisor-owned unix socket. It never starts or replaces a host. */
-export function resolveThreadSocket(getDir: () => string = senpiAgentDir): string {
-  return process.env.SENPI_RPC_SOCKET ?? join(getDir(), "rpc", "rpc.sock")
+export function resolveThreadSocket(env: Readonly<Record<string, string | undefined>> = process.env): string {
+  return env.SENPI_RPC_SOCKET ?? join(resolveAgentHome({ env }), "rpc", "rpc.sock")
 }
 
-export function createLiveThreadSurface(_pi: SenpiExtensionAPI): ThreadHost | undefined {
-  const socket = resolveThreadSocket()
-  if (!existsSync(socket)) return undefined
+export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: { readonly env?: Readonly<Record<string, string | undefined>>; readonly exists?: (path: string) => boolean } = {}): ThreadHost | undefined {
+  const socket = resolveThreadSocket(options.env)
+  if (!(options.exists ?? existsSync)(socket)) return undefined
   const call = async <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => await request(socket, { type, ...data }) as T
   return {
     socket,

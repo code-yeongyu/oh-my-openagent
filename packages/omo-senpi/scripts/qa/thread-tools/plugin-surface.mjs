@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { join } from "node:path"
+import { mkdirSync } from "node:fs"
 import { HostClient, makeScratch, startRealHost, startFakeModelServer, writeMockModelsJson, installCleanupHooks, cleanupAllAndWait, createReport } from "./lib/harness.mjs"
 const report = createReport("plugin-surface")
 installCleanupHooks()
@@ -7,11 +8,16 @@ const scratch = makeScratch("plugin-surface")
 const fake = await startFakeModelServer([{ toolCalls: [{ name: "thread_list", args: { all_scope: true } }] }, { text: "plugin-ready" }])
 writeMockModelsJson(scratch.agentDir, fake)
 const extension = join(process.cwd(), "packages/omo-senpi/plugin/extensions/omo.js")
-const socketPath = join(scratch.agentDir, "rpc", "rpc.sock")
+const configAgent = join(scratch.dir, ".omo", "agent")
+mkdirSync(configAgent, { recursive: true })
+await Bun.write(join(configAgent, "settings.json"), "{}")
+await Bun.write(join(configAgent, "models.json"), await Bun.file(join(scratch.agentDir, "models.json")).text())
+const socketPath = join(configAgent, "rpc", "rpc.sock")
+delete scratch.env.SENPI_RPC_SOCKET
 delete scratch.env.SENPI_CODING_AGENT_DIR
 delete scratch.env.OMO_CODING_AGENT_DIR
 delete scratch.env.CODING_AGENT_DIR
-scratch.env.SENPI_RPC_SOCKET = socketPath
+scratch.env.HOME = scratch.dir
 const host = await startRealHost(scratch, { socketPath, extraArgs: ["--provider", "mock", "--model", "mock-model", "--extension", extension] })
 const client = await HostClient.connect(host.socket, "plugin")
 const caller = await client.openSession({ cwd: scratch.cwd })
