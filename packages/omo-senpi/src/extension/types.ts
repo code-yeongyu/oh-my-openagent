@@ -12,7 +12,6 @@ export interface SenpiExtensionAPI {
   on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
   rpc?: {
     emit(name: string, data: unknown): void
-    request?(name: string, data?: unknown): Promise<unknown>
     handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
   }
   events?: {

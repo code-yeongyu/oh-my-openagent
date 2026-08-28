@@ -1,5 +1,9 @@
 import { createConnection } from "node:net"
+import { existsSync } from "node:fs"
+import { homedir } from "node:os"
 import { join } from "node:path"
+import { randomUUID } from "node:crypto"
+import { CONFIG_DIR_NAME, CONFIG_FLAT_LAYOUT, resolveAgentDir } from "@code-yeongyu/senpi"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 
@@ -16,7 +20,7 @@ async function request(socketPath: string, command: Record<string, unknown>): Pr
     const timer = setTimeout(() => { socket.destroy(); reject(new Error("thread RPC request timed out")) }, 60_000)
     const finish = (error?: Error, value?: Record<string, unknown>) => { clearTimeout(timer); socket.destroy(); error === undefined ? resolve(value as Record<string, unknown>) : reject(error) }
     socket.once("error", (error) => finish(error))
-    socket.once("connect", () => socket.write(`${JSON.stringify({ id: `thread-${Date.now()}-${Math.random()}`, ...command })}\n`))
+    socket.once("connect", () => socket.write(`${JSON.stringify({ id: randomUUID(), ...command })}\n`))
     socket.on("data", (chunk) => {
       buffer += chunk.toString("utf8")
       const newline = buffer.indexOf("\n")
@@ -27,10 +31,12 @@ async function request(socketPath: string, command: Record<string, unknown>): Pr
 }
 
 /** Client for Senpi's existing supervisor-owned unix socket. It never starts or replaces a host. */
-export function createLiveThreadSurface(_pi: SenpiExtensionAPI): ThreadHost | undefined {
-  const agentDir = process.env.SENPI_CODING_AGENT_DIR ?? process.env.OMO_CODING_AGENT_DIR
-  const socket = process.env.SENPI_RPC_SOCKET ?? (agentDir === undefined ? undefined : join(agentDir, "rpc", "rpc.sock"))
-  if (socket === undefined) return undefined
+export function createLiveThreadSurface(pi: SenpiExtensionAPI): ThreadHost | undefined {
+  const explicitDir = process.env.CODING_AGENT_DIR ?? process.env.SENPI_CODING_AGENT_DIR ?? process.env.OMO_CODING_AGENT_DIR
+  const agentDir = resolveAgentDir(pi.cwd ?? process.cwd(), homedir(), explicitDir)
+  const configDir = CONFIG_FLAT_LAYOUT ? agentDir : join(agentDir, "..")
+  const socket = process.env.SENPI_RPC_SOCKET ?? join(configDir, CONFIG_FLAT_LAYOUT ? "rpc" : "rpc", "rpc.sock")
+  if (!existsSync(socket)) return undefined
   const call = async <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => await request(socket, { type, ...data }) as T
   return {
     socket,
