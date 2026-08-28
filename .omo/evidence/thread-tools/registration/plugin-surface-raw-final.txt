@@ -1,0 +1,11 @@
+294 | 
+295 |   /** Same as raw(), but a failure response throws (use for steps that must succeed). */
+296 |   async request(command, timeoutMs = 60_000) {
+297 |     const response = await this.raw(command, timeoutMs)
+298 |     if (response.success !== true) {
+299 |       throw new Error(`${command.type} failed: ${JSON.stringify(response.error ?? response)}`)
+                      ^
+error: get_loaded_surfaces failed: "missing_session_id"
+      at request (/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/lib/harness.mjs:299:17)
+
+Bun v1.4.0-canary.1+b58cd4685 (macOS arm64)

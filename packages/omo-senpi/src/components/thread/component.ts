@@ -8,9 +8,8 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
 }
 
 /**
- * Component registration follows task's factory/register pattern. The host adapter is injected by
- * the live multi-session launcher; keeping it as a port prevents this component from creating a
- * competing socket or host lifecycle.
+ * Component registration follows task's factory/register pattern. Production constructs a client
+ * for the existing Senpi multi-session socket; an injected host remains available as a test seam.
  */
 export function createThreadComponent(options: ThreadComponentOptions = {}): OmoSenpiComponent {
   return {
