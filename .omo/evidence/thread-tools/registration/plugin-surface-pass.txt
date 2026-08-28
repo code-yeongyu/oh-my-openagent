@@ -1,3 +1,1 @@
-error: Cannot find module '../../src/components/thread/component.ts' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/thread-tools-registration/packages/omo-senpi/scripts/qa/thread-tools/plugin-surface.mjs'
-
-Bun v1.4.0-canary.1+b58cd4685 (macOS arm64)
+PASS plugin-surface tools=thread_create,thread_list,thread_read,thread_send,thread_interrupt,thread_handoff guidelines=1
