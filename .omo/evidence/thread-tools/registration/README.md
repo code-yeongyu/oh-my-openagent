@@ -4,7 +4,7 @@ Authoritative PASS artifacts:
 
 - `qa-thread-tools-main.txt`: official thread-tools run-all, executed against a throwaway Senpi `origin/main` build at 498281a0d; all four scenarios passed.
 - `qa-task-14-main.txt`: official task-14 run-all against the same throwaway build; all resilience scenarios passed.
-- `plugin-surface-pass.txt`: production plugin-surface registration proof (built extension component registration path), exactly six tools and one family guideline.
+- `plugin-surface-pass.txt`: generated only alongside the current plugin-surface raw log when the real-host scenario passes.
 - `real-surface-raw4.txt`: direct live host proof of six registered tools, one family guideline, create/send target transcript assertion, and typed not_found.
 - `cleanup-receipt.txt`: throwaway host/worktree cleanup and ambient-process handling.
 
