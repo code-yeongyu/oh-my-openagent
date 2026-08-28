@@ -1,0 +1,9 @@
+bun test v1.3.14 (0d9b296a)
+[omo] worktree-sweep failed: Could not determine the default branch for /tmp/wt-sweep-bad-6khPoH/not-a-repo
+
+  ⚙ read_file filePath=/src/index.ts  
+
+ 714 pass
+ 0 fail
+ 1614 expect() calls
+Ran 714 tests across 99 files. [16.24s]

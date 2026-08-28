@@ -8,6 +8,9 @@ import { resetConfigContext } from "./config-context"
 import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
 import * as pluginNameWithVersion from "./plugin-name-with-version"
+import { _resetProviderAuthCacheForTesting } from "../../shared"
+import { detectedToInitialValues } from "../install-validators"
+import type { DetectedConfig } from "../types"
 
 const sourcePlugin = new URL("../../index.ts", import.meta.url).href
 
@@ -100,6 +103,154 @@ describe("detectCurrentConfig - single package detection", () => {
     } finally {
       readFileSyncSpy.mockRestore()
     }
+  })
+})
+
+describe("detectCurrentConfig - provider recognition", () => {
+  let testConfigDir = ""
+  let homeDirectory = ""
+  let originalHome: string | undefined
+  let testConfigPath = ""
+  let testOmoConfigPath = ""
+
+  beforeEach(() => {
+    testConfigDir = join(tmpdir(), `omo-detect-providers-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    homeDirectory = join(testConfigDir, "home")
+    testConfigPath = join(testConfigDir, "opencode.json")
+    testOmoConfigPath = join(homeDirectory, ".omo", "omo.jsonc")
+
+    mkdirSync(join(testOmoConfigPath, ".."), { recursive: true })
+    originalHome = process.env.HOME
+    process.env.HOME = homeDirectory
+    process.env.OPENCODE_CONFIG_DIR = testConfigDir
+    resetConfigContext()
+  })
+
+  afterEach(() => {
+    rmSync(testConfigDir, { recursive: true, force: true })
+    resetConfigContext()
+    delete process.env.OPENCODE_CONFIG_DIR
+    if (originalHome === undefined) delete process.env.HOME
+    else process.env.HOME = originalHome
+    _resetProviderAuthCacheForTesting()
+  })
+
+  it("reports Claude=no Gemini=yes for an install using only Gemini, OpenCode Go, and OpenCode Zen", () => {
+    // given an existing install whose only native provider is Google (issue #6381 scenario)
+    writeFileSync(testConfigPath, JSON.stringify({
+      plugin: ["oh-my-openagent"],
+      provider: { google: { options: { apiKey: "[REDACTED]" } } },
+    }, null, 2) + "\n", "utf-8")
+    writeFileSync(testOmoConfigPath, JSON.stringify({
+      "[opencode]": {
+        agents: {
+          atlas: { model: "opencode-go/kimi-k2.6" },
+          hephaestus: { model: "opencode/gpt-5.6-sol" },
+        },
+      },
+    }, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then the existing configuration is recognized, not assumed to be Claude max20
+    expect(result.isInstalled).toBe(true)
+    expect(result.hasClaude).toBe(false)
+    expect(result.isMax20).toBe(false)
+    expect(result.hasGemini).toBe(true)
+    expect(result.hasOpencodeGo).toBe(true)
+    expect(result.hasOpencodeZen).toBe(true)
+  })
+
+  it("detects an Anthropic provider entry as Claude present without claiming max20", () => {
+    // given an existing install with both anthropic and google provider blocks
+    writeFileSync(testConfigPath, JSON.stringify({
+      plugin: ["oh-my-openagent"],
+      provider: {
+        anthropic: { options: { apiKey: "[REDACTED]" } },
+        google: { options: { apiKey: "[REDACTED]" } },
+      },
+    }, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then Claude is detected from the provider block; the max20 tier is not recorded on disk
+    expect(result.isInstalled).toBe(true)
+    expect(result.hasClaude).toBe(true)
+    expect(result.isMax20).toBe(false)
+    expect(result.hasGemini).toBe(true)
+  })
+
+  it("detects a Claude OAuth login from auth.json even without a provider block", () => {
+    // given an existing install with no provider blocks but an anthropic auth.json entry
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2) + "\n", "utf-8")
+    const originalXdgDataHome = process.env.XDG_DATA_HOME
+    const tempDataDir = join(testConfigDir, "xdg-data")
+    process.env.XDG_DATA_HOME = tempDataDir
+    mkdirSync(join(tempDataDir, "opencode"), { recursive: true })
+    writeFileSync(join(tempDataDir, "opencode", "auth.json"), JSON.stringify({
+      anthropic: { type: "oauth" },
+    }, null, 2) + "\n", "utf-8")
+    _resetProviderAuthCacheForTesting()
+
+    try {
+      // when
+      const result = detectCurrentConfig()
+
+      // then the OAuth credential proves Claude is configured
+      expect(result.isInstalled).toBe(true)
+      expect(result.hasClaude).toBe(true)
+    } finally {
+      _resetProviderAuthCacheForTesting()
+      if (originalXdgDataHome === undefined) delete process.env.XDG_DATA_HOME
+      else process.env.XDG_DATA_HOME = originalXdgDataHome
+      _resetProviderAuthCacheForTesting()
+    }
+  })
+
+  it("reports nothing detected when no OpenCode config exists", () => {
+    // given no opencode config file at all
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then no provider presence may be claimed
+    expect(result.isInstalled).toBe(false)
+    expect(result.hasClaude).toBe(false)
+    expect(result.isMax20).toBe(false)
+    expect(result.hasGemini).toBe(false)
+  })
+
+  it("maps the issue scenario to claude=no gemini=yes initial prompt values", () => {
+    // given a DetectedConfig matching the issue #6381 report
+    const detected: DetectedConfig = {
+      isInstalled: true,
+      installedVersion: "4.19.2",
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: true,
+      hasCopilot: false,
+      hasCodex: false,
+      hasOpencodeZen: true,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+      hasOpencodeGo: true,
+      hasBailianCodingPlan: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
+      hasVercelAiGateway: false,
+    }
+
+    // when
+    const initial = detectedToInitialValues(detected)
+
+    // then the update flow preserves the existing configuration
+    expect(initial.claude).toBe("no")
+    expect(initial.gemini).toBe("yes")
+    expect(initial.opencodeGo).toBe("yes")
+    expect(initial.opencodeZen).toBe("yes")
   })
 })
 

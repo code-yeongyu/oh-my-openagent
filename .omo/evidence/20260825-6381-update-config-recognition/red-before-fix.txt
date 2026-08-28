@@ -1,0 +1,50 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/config-manager/plugin-detection.test.ts:
+148 |     // when
+149 |     const result = detectCurrentConfig()
+150 | 
+151 |     // then the existing configuration is recognized, not assumed to be Claude max20
+152 |     expect(result.isInstalled).toBe(true)
+153 |     expect(result.hasClaude).toBe(false)
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6381/packages/omo-opencode/src/cli/config-manager/plugin-detection.test.ts:153:30)
+(fail) detectCurrentConfig - provider recognition > reports Claude=no Gemini=yes for an install using only Gemini, OpenCode Go, and OpenCode Zen [3.00ms]
+171 |     const result = detectCurrentConfig()
+172 | 
+173 |     // then Claude is detected from the provider block; the max20 tier is not recorded on disk
+174 |     expect(result.isInstalled).toBe(true)
+175 |     expect(result.hasClaude).toBe(true)
+176 |     expect(result.isMax20).toBe(false)
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6381/packages/omo-opencode/src/cli/config-manager/plugin-detection.test.ts:176:28)
+(fail) detectCurrentConfig - provider recognition > detects an Anthropic provider entry as Claude present without claiming max20 [0.73ms]
+210 |     // when
+211 |     const result = detectCurrentConfig()
+212 | 
+213 |     // then no provider presence may be claimed
+214 |     expect(result.isInstalled).toBe(false)
+215 |     expect(result.hasClaude).toBe(false)
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6381/packages/omo-opencode/src/cli/config-manager/plugin-detection.test.ts:215:30)
+(fail) detectCurrentConfig - provider recognition > reports nothing detected when no OpenCode config exists [0.42ms]
+
+ 15 pass
+ 3 fail
+ 43 expect() calls
+Ran 18 tests across 1 file. [1326.00ms]

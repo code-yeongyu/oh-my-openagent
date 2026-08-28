@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared"
+import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME, getProviderAuthType } from "../../shared"
 import type { DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
@@ -112,8 +112,8 @@ export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
     installedVersion: null,
-    hasClaude: true,
-    isMax20: true,
+    hasClaude: false,
+    isMax20: false,
     hasOpenAI: true,
     hasGemini: false,
     hasCopilot: false,
@@ -153,6 +153,8 @@ export function detectCurrentConfig(): DetectedConfig {
 
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
+  result.hasClaude = (providers ? "anthropic" in providers : false) ||
+    getProviderAuthType("anthropic") !== undefined
 
   const {
     hasOpenAI,
