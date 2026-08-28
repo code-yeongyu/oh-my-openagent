@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, dev]
+    branches: [master, dev, release-lane/v5.0.0-beta.25]
   pull_request:
     branches: [master, dev]
     # `labeled` lets the ci:full-matrix label retrigger CI; concurrency cancel-in-progress absorbs bot-label churn.
