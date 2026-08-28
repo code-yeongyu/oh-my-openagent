@@ -1,0 +1,11 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/thread/tools.test.ts:
+(pass) thread tool registration > registers exactly the six contract tools with search metadata [0.92ms]
+(pass) thread tool registration > unknown targets return the typed not_found result [29.54ms]
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [1043.00ms]
+exit=0
